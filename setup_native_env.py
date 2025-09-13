@@ -31,9 +31,17 @@ def setup_spacy_models():
         print("⚠️ spaCy not found. Installing spaCy...")
         subprocess.check_call([sys.executable, "-m", "pip", "install", "spacy"])
     
-    print("📦 Installing spaCy English language model...")
+    print("📦 Installing spaCy English language models...")
     subprocess.check_call([sys.executable, "-m", "spacy", "download", "en_core_web_sm"])
-    print("✅ spaCy model installed successfully!")
+    print("✅ Small spaCy model (en_core_web_sm) installed successfully!")
+    
+    # Also install large model for better accuracy in native deployments
+    try:
+        subprocess.check_call([sys.executable, "-m", "spacy", "download", "en_core_web_lg"])
+        print("✅ Large spaCy model (en_core_web_lg) installed successfully!")
+    except subprocess.CalledProcessError:
+        print("⚠️ Large spaCy model installation failed. Small model will be used.")
+        print("   You can install it later with: python -m spacy download en_core_web_lg")
 
 def main():
     """Main setup function."""

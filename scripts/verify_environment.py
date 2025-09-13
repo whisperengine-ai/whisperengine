@@ -22,27 +22,59 @@ async def verify_spacy() -> Dict[str, Any]:
     try:
         import spacy
         
-        # Check if large model is available
+        # Check which models are available
+        models_available = []
+        models_tested = []
+        
+        # Try large model first
         try:
             nlp = spacy.load('en_core_web_lg')
-            
-            # Test basic functionality
             doc = nlp("This is a test sentence about technology and artificial intelligence.")
             entities = [ent.text for ent in doc.ents]
+            models_available.append('en_core_web_lg')
+            models_tested.append({
+                'model': 'en_core_web_lg',
+                'entities': entities,
+                'status': 'working'
+            })
+        except OSError:
+            models_tested.append({
+                'model': 'en_core_web_lg',
+                'status': 'not_found'
+            })
             
+        # Try small model as fallback
+        try:
+            nlp_sm = spacy.load('en_core_web_sm')
+            doc_sm = nlp_sm("This is a test sentence about technology and artificial intelligence.")
+            entities_sm = [ent.text for ent in doc_sm.ents]
+            models_available.append('en_core_web_sm')
+            models_tested.append({
+                'model': 'en_core_web_sm',
+                'entities': entities_sm,
+                'status': 'working'
+            })
+        except OSError:
+            models_tested.append({
+                'model': 'en_core_web_sm',
+                'status': 'not_found'
+            })
+        
+        if models_available:
             return {
                 'status': 'success',
                 'version': spacy.__version__,
-                'model': 'en_core_web_lg',
-                'test_entities': entities,
+                'models_available': models_available,
+                'models_tested': models_tested,
+                'recommended_model': models_available[0],  # First available (lg preferred)
                 'functional': True
             }
-        except OSError:
+        else:
             return {
                 'status': 'error',
                 'version': spacy.__version__,
-                'model': 'en_core_web_lg',
-                'error': 'Large model not found. Run: python -m spacy download en_core_web_lg',
+                'models_available': [],
+                'error': 'No spaCy models found. Run: python -m spacy download en_core_web_sm',
                 'functional': False
             }
             

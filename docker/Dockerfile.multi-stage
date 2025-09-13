@@ -25,7 +25,8 @@ FROM base as development
 COPY requirements.txt requirements-dev.txt* ./
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip install -r requirements.txt && \
-    if [ -f requirements-dev.txt ]; then pip install -r requirements-dev.txt; fi
+    if [ -f requirements-dev.txt ]; then pip install -r requirements-dev.txt; fi && \
+    python -m spacy download en_core_web_sm
 
 # Copy all source code (for development)
 COPY . .
@@ -49,7 +50,8 @@ COPY requirements.txt ./
 
 # Install Python dependencies with cache mount for faster builds
 RUN --mount=type=cache,target=/root/.cache/pip \
-    pip install --no-cache-dir -r requirements.txt
+    pip install --no-cache-dir -r requirements.txt && \
+    python -m spacy download en_core_web_sm
 
 # Copy only necessary application files
 COPY src/ ./src/
@@ -96,6 +98,7 @@ RUN apk add --no-cache \
 # Copy and install requirements
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt && \
+    python -m spacy download en_core_web_sm && \
     apk del gcc musl-dev libffi-dev openssl-dev
 
 # Copy application

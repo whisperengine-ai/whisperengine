@@ -43,7 +43,7 @@ show_help() {
     echo "  $0 setup                    # Initial setup with data directories"
     echo "  $0 setup-dirs               # Create data directories only"
     echo "  $0 dev                      # Start development environment"
-    echo "  $0 logs discord-bot-dev     # Show bot logs"
+    echo "  $0 logs whisperengine-bot     # Show bot logs"
     echo "  $0 shell                    # Open shell in bot container"
     echo "  $0 prod --monitor           # Start with monitoring"
 }
@@ -136,12 +136,12 @@ start_dev() {
     
     local compose_args=""
     if [[ "$NO_DEPS" == "true" ]]; then
-        compose_args="--no-deps discord-bot-dev"
+        compose_args="--no-deps discord-bot"
     fi
     
     docker-compose -f docker-compose.dev.yml up -d $compose_args
     echo -e "${GREEN}Development environment started${NC}"
-    echo -e "${YELLOW}Bot logs: docker-compose -f docker-compose.dev.yml logs -f discord-bot-dev${NC}"
+    echo -e "${YELLOW}Bot logs: docker-compose -f docker-compose.dev.yml logs -f discord-bot${NC}"
     echo -e "${YELLOW}Shell access: $0 shell${NC}"
 }
 
@@ -180,7 +180,7 @@ restart_services() {
 }
 
 show_logs() {
-    local service=${1:-discord-bot-dev}
+    local service=${1:-discord-bot}
     echo -e "${BLUE}Showing logs for $service...${NC}"
     
     if docker-compose -f docker-compose.dev.yml ps | grep -q "$service"; then
@@ -194,13 +194,13 @@ show_logs() {
 }
 
 open_shell() {
-    local container="custom-discord-bot-dev"
+    local container="whisperengine-bot"
     
     if docker ps | grep -q "$container"; then
         echo -e "${BLUE}Opening shell in development container...${NC}"
         docker exec -it "$container" /bin/bash
     else
-        container="custom-discord-bot"
+        container="whisperengine-bot"
         if docker ps | grep -q "$container"; then
             echo -e "${BLUE}Opening shell in production container...${NC}"
             docker exec -it "$container" /bin/bash
@@ -215,7 +215,7 @@ open_shell() {
 run_tests() {
     echo -e "${BLUE}Running tests in container...${NC}"
     
-    local container="custom-discord-bot-dev"
+    local container="whisperengine-bot"
     if ! docker ps | grep -q "$container"; then
         echo -e "${YELLOW}Starting development container for testing...${NC}"
         start_dev
