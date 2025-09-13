@@ -167,9 +167,9 @@ class APIKeySecurityManager:
         })
         
         if not is_valid:
-            logger.warning(f"API key validation failed: {masked_key} - Threats: {[t.value for t in threats]}")
+            logger.warning(f"API key validation failed: [KeyHash: {key_hash}] - Threats: {[t.value for t in threats]}")
         else:
-            logger.debug(f"API key validated successfully: {masked_key}")
+            logger.debug(f"API key validated successfully: [KeyHash: {key_hash}]")
         
         return key_info
     
