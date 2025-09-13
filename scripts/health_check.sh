@@ -63,10 +63,10 @@ if [[ $tests_passed -eq $tests_total ]]; then
     echo "   Neo4j:      localhost:7474 (web) / localhost:7687 (bolt)"
     echo
     echo "💾 Persistent Data Volumes:"
-    echo "   PostgreSQL: discord-bot-postgres"
-    echo "   Redis:      discord-bot-redis" 
-    echo "   ChromaDB:   discord-bot-chromadb"
-    echo "   Neo4j:      discord-bot-neo4j-data, discord-bot-neo4j-logs"
+    echo "   PostgreSQL: whisperengine-postgres"
+    echo "   Redis:      whisperengine-redis" 
+    echo "   ChromaDB:   whisperengine-chromadb"
+    echo "   Neo4j:      whisperengine-neo4j-data, whisperengine-neo4j-logs"
     exit 0
 else
     echo -e "${RED}❌ Some services are not accessible${NC}"
