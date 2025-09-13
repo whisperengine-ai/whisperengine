@@ -24,6 +24,7 @@ from src.handlers.help import HelpCommandHandlers
 from src.handlers.memory import MemoryCommandHandlers
 from src.handlers.admin import AdminCommandHandlers
 from src.handlers.privacy import PrivacyCommandHandlers
+from src.handlers.voice import VoiceCommandHandlers
 from src.utils.helpers import is_admin
 
 # Logging is already configured by the root launcher
@@ -149,6 +150,19 @@ class ModularBotManager:
             )
             self.command_handlers['privacy'].register_commands()
             logger.info("✅ Privacy command handlers registered")
+            
+            # Voice commands (if voice support is available)
+            if components.get('voice_manager') is not None:
+                self.command_handlers['voice'] = VoiceCommandHandlers(
+                    bot=self.bot,
+                    voice_manager=components['voice_manager'],
+                    voice_support_enabled=getattr(self.bot_core, 'voice_support_enabled', False),
+                    VOICE_AVAILABLE=hasattr(self.bot_core, 'voice_manager') and components.get('voice_manager') is not None
+                )
+                self.command_handlers['voice'].register_commands()
+                logger.info("✅ Voice command handlers registered")
+            else:
+                logger.info("⚠️ Voice command handlers skipped - voice functionality not available")
             
         except Exception as e:
             logger.error(f"Failed to initialize command handlers: {e}")
