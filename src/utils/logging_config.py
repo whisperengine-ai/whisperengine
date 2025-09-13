@@ -47,23 +47,60 @@ class StructuredFormatter(logging.Formatter):
         return json.dumps(log_entry, ensure_ascii=False)
 
 
+class DiscordConnectionFilter(logging.Filter):
+    """
+    Filter to downgrade harmless Discord connection errors that look scary but are normal.
+    """
+    
+    HARMLESS_CONNECTION_ERRORS = [
+        "Cannot write to closing transport",
+        "ClientConnectionResetError",
+        "Connection reset by peer",
+        "Attempting a reconnect",
+        "WebSocket connection is closing",
+        "Transport endpoint is not connected"
+    ]
+    
+    def filter(self, record):
+        """
+        Downgrade scary but harmless connection errors to DEBUG level.
+        Returns True to keep the record, False to drop it.
+        """
+        if record.levelno >= logging.ERROR:
+            message = str(record.getMessage())
+            
+            # Check if this is a harmless connection error
+            for harmless_error in self.HARMLESS_CONNECTION_ERRORS:
+                if harmless_error in message:
+                    # Downgrade to DEBUG level and make message less scary
+                    record.levelno = logging.DEBUG
+                    record.levelname = 'DEBUG'
+                    if "ClientConnectionResetError" in message or "Cannot write to closing transport" in message:
+                        record.msg = f"🔄 Discord connection hiccup (auto-recovering): {record.msg}"
+                    elif "Attempting a reconnect" in message:
+                        record.msg = f"🔄 Discord auto-reconnecting: {record.msg}"
+                    break
+        
+        return True  # Always keep the record, just potentially modified
+
+
 class ColoredConsoleFormatter(logging.Formatter):
     """
     Colored console formatter for development environments.
     """
     
     COLORS = {
-        'DEBUG': '\033[36m',    # Cyan
-        'INFO': '\033[32m',     # Green  
-        'WARNING': '\033[33m',  # Yellow
-        'ERROR': '\033[31m',    # Red
-        'CRITICAL': '\033[35m', # Magenta
+        'DEBUG': '\033[36m',     # Cyan
+        'INFO': '\033[32m',      # Green
+        'WARNING': '\033[33m',   # Yellow
+        'ERROR': '\033[31m',     # Red
+        'CRITICAL': '\033[35m',  # Magenta
     }
     RESET = '\033[0m'
     
-    def format(self, record: logging.LogRecord) -> str:
-        color = self.COLORS.get(record.levelname, '')
-        record.levelname = f"{color}{record.levelname}{self.RESET}"
+    def format(self, record):
+        log_color = self.COLORS.get(record.levelname, self.RESET)
+        record.levelname = f"{log_color}{record.levelname}{self.RESET}"
         return super().format(record)
 
 
@@ -180,7 +217,17 @@ def setup_logging(
     }
     
     for logger_name, log_level in third_party_loggers.items():
-        logging.getLogger(logger_name).setLevel(log_level)
+        logger = logging.getLogger(logger_name)
+        logger.setLevel(log_level)
+        
+        # Add connection filter specifically to Discord client logger
+        if logger_name == 'discord.client':
+            connection_filter = DiscordConnectionFilter()
+            logger.addFilter(connection_filter)
+    
+    # Also add the filter to the main discord.client logger that generates the errors
+    discord_client_logger = logging.getLogger('discord.client')
+    discord_client_logger.addFilter(DiscordConnectionFilter())
     
     # Log the logging configuration
     config_info = {
