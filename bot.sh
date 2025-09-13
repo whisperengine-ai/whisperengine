@@ -107,11 +107,11 @@ show_help() {
     echo "Usage: $0 <command> [mode]"
     echo ""
     echo "Commands:"
-    echo "  start [prod|dev|native]  - Start bot (default: prod)"
+    echo "  start [prod|dev|native]  - Start bot (mode required)"
     echo "  stop [prod|dev|native]   - Stop bot"
     echo "  logs [service]           - View logs (default: whisperengine-bot)"
     echo "  status                   - Show container status"
-    echo "  restart [prod|dev]       - Restart bot"
+    echo "  restart [prod|dev|native] - Restart bot"
     echo "  cleanup                  - Remove orphaned containers and volumes"
     echo "  backup <create|list|restore|help> - Data backup operations"
     echo "  build-push [options]     - Build and push Docker image to Docker Hub"
@@ -135,15 +135,27 @@ show_help() {
 }
 
 start_bot() {
-    local mode="${1:-prod}"
+    local mode="$1"
+    
+    # Require explicit mode selection
+    if [[ -z "$mode" ]]; then
+        print_error "Mode is required. Please specify: prod, dev, or native"
+        echo ""
+        echo "Usage: $0 start <mode>"
+        echo "  prod    - Production mode (docker-compose.yml + docker-compose.prod.yml)"
+        echo "  dev     - Development mode (docker-compose.yml + docker-compose.dev.yml)" 
+        echo "  native  - Native development (docker-compose.yml only for infrastructure)"
+        exit 1
+    fi
+    
     check_docker
     check_env
     
     # Validate compose files exist
     case $mode in
         "prod")
-            if [[ ! -f "docker-compose.yml" ]]; then
-                print_error "docker-compose.yml not found"
+            if [[ ! -f "docker-compose.yml" ]] || [[ ! -f "docker-compose.prod.yml" ]]; then
+                print_error "Required compose files not found (docker-compose.yml and docker-compose.prod.yml)"
                 exit 1
             fi
             ;;
@@ -164,7 +176,7 @@ start_bot() {
     case $mode in
         "prod")
             echo "🚀 Starting Discord Bot in Production Mode..."
-            $COMPOSE_CMD up -d --build
+            $COMPOSE_CMD -f docker-compose.yml -f docker-compose.prod.yml up -d --build
             
             # Wait for all services to be ready (all 4 datastores required)
             echo "⏳ Waiting for all services to start (PostgreSQL, Redis, ChromaDB, Neo4j)..."
@@ -174,10 +186,10 @@ start_bot() {
             
             while [[ $attempt -lt $max_attempts && $services_ready -lt 4 ]]; do
                 services_ready=0
-                if $COMPOSE_CMD ps postgres | grep -q "healthy"; then ((services_ready++)); fi
-                if $COMPOSE_CMD ps redis | grep -q "healthy"; then ((services_ready++)); fi
-                if $COMPOSE_CMD ps chromadb | grep -q "Up"; then ((services_ready++)); fi
-                if $COMPOSE_CMD ps neo4j | grep -q "healthy"; then ((services_ready++)); fi
+                if $COMPOSE_CMD -f docker-compose.yml -f docker-compose.prod.yml ps postgres | grep -q "healthy"; then ((services_ready++)); fi
+                if $COMPOSE_CMD -f docker-compose.yml -f docker-compose.prod.yml ps redis | grep -q "healthy"; then ((services_ready++)); fi
+                if $COMPOSE_CMD -f docker-compose.yml -f docker-compose.prod.yml ps chromadb | grep -q "Up"; then ((services_ready++)); fi
+                if $COMPOSE_CMD -f docker-compose.yml -f docker-compose.prod.yml ps neo4j | grep -q "healthy"; then ((services_ready++)); fi
                 
                 if [[ $services_ready -eq 4 ]]; then
                     break
@@ -211,10 +223,10 @@ start_bot() {
             
             while [[ $attempt -lt $max_attempts && $services_ready -lt 4 ]]; do
                 services_ready=0
-                if $COMPOSE_CMD ps postgres | grep -q "healthy"; then ((services_ready++)); fi
-                if $COMPOSE_CMD ps redis | grep -q "healthy"; then ((services_ready++)); fi
-                if $COMPOSE_CMD ps chromadb | grep -q "Up"; then ((services_ready++)); fi
-                if $COMPOSE_CMD ps neo4j | grep -q "healthy"; then ((services_ready++)); fi
+                if $COMPOSE_CMD -f docker-compose.yml -f docker-compose.dev.yml ps postgres | grep -q "healthy"; then ((services_ready++)); fi
+                if $COMPOSE_CMD -f docker-compose.yml -f docker-compose.dev.yml ps redis | grep -q "healthy"; then ((services_ready++)); fi
+                if $COMPOSE_CMD -f docker-compose.yml -f docker-compose.dev.yml ps chromadb | grep -q "Up"; then ((services_ready++)); fi
+                if $COMPOSE_CMD -f docker-compose.yml -f docker-compose.dev.yml ps neo4j | grep -q "healthy"; then ((services_ready++)); fi
                 
                 if [[ $services_ready -eq 4 ]]; then
                     break
@@ -340,13 +352,17 @@ stop_bot() {
             # Check if dev compose is running
             if $COMPOSE_CMD -f docker-compose.yml -f docker-compose.dev.yml ps -q 2>/dev/null | grep -q .; then
                 mode="dev"
-            else
+            # Check if prod compose is running
+            elif $COMPOSE_CMD -f docker-compose.yml -f docker-compose.prod.yml ps -q 2>/dev/null | grep -q .; then
                 mode="prod"
+            else
+                mode="prod"  # fallback to prod
             fi
         else
             print_warning "No running containers detected. Stopping all compose configurations..."
             $COMPOSE_CMD down 2>/dev/null || true
             $COMPOSE_CMD -f docker-compose.yml -f docker-compose.dev.yml down 2>/dev/null || true
+            $COMPOSE_CMD -f docker-compose.yml -f docker-compose.prod.yml down 2>/dev/null || true
             print_status "Bot stopped!"
             return 0
         fi
@@ -355,7 +371,7 @@ stop_bot() {
     case $mode in
         "prod")
             echo "🛑 Stopping production services..."
-            $COMPOSE_CMD down
+            $COMPOSE_CMD -f docker-compose.yml -f docker-compose.prod.yml down
             ;;
         "dev")
             echo "🛑 Stopping development services..."
@@ -381,26 +397,56 @@ show_logs() {
     fi
     
     # Check if the service exists in the compose configuration
-    if ! $COMPOSE_CMD config --services 2>/dev/null | grep -q "^${service}$"; then
+    # Auto-detect which compose configuration is running
+    local compose_files=""
+    if $COMPOSE_CMD -f docker-compose.yml -f docker-compose.dev.yml ps -q 2>/dev/null | grep -q .; then
+        compose_files="-f docker-compose.yml -f docker-compose.dev.yml"
+    elif $COMPOSE_CMD -f docker-compose.yml -f docker-compose.prod.yml ps -q 2>/dev/null | grep -q .; then
+        compose_files="-f docker-compose.yml -f docker-compose.prod.yml"
+    else
+        compose_files=""  # Default to base compose only
+    fi
+    
+    if ! $COMPOSE_CMD $compose_files config --services 2>/dev/null | grep -q "^${service}$"; then
         print_error "Service '$service' not found in Docker Compose configuration"
         echo ""
         echo "Available services:"
-        $COMPOSE_CMD config --services 2>/dev/null | sed 's/^/  • /' || echo "  Unable to list services"
+        $COMPOSE_CMD $compose_files config --services 2>/dev/null | sed 's/^/  • /' || echo "  Unable to list services"
         return 1
     fi
     
     echo "📋 Viewing $service logs (Ctrl+C to exit)..."
-    $COMPOSE_CMD logs -f "$service"
+    $COMPOSE_CMD $compose_files logs -f "$service"
 }
 
 show_status() {
     check_docker  # Ensure COMPOSE_CMD is set
     echo "📊 Container Status:"
-    $COMPOSE_CMD ps
+    
+    # Auto-detect which compose configuration is running
+    if $COMPOSE_CMD -f docker-compose.yml -f docker-compose.dev.yml ps -q 2>/dev/null | grep -q .; then
+        echo "   (Development configuration)"
+        $COMPOSE_CMD -f docker-compose.yml -f docker-compose.dev.yml ps
+    elif $COMPOSE_CMD -f docker-compose.yml -f docker-compose.prod.yml ps -q 2>/dev/null | grep -q .; then
+        echo "   (Production configuration)"
+        $COMPOSE_CMD -f docker-compose.yml -f docker-compose.prod.yml ps
+    else
+        echo "   (Base configuration)"
+        $COMPOSE_CMD ps
+    fi
 }
 
 restart_bot() {
-    local mode="${1:-prod}"
+    local mode="$1"
+    
+    # Require explicit mode selection
+    if [[ -z "$mode" ]]; then
+        print_error "Mode is required. Please specify: prod, dev, or native"
+        echo ""
+        echo "Usage: $0 restart <mode>"
+        exit 1
+    fi
+    
     stop_bot "$mode"
     sleep 2
     start_bot "$mode"
@@ -415,6 +461,7 @@ cleanup_containers() {
     echo "🛑 Stopping all project containers..."
     $COMPOSE_CMD down --remove-orphans 2>/dev/null || true
     $COMPOSE_CMD -f docker-compose.yml -f docker-compose.dev.yml down --remove-orphans 2>/dev/null || true
+    $COMPOSE_CMD -f docker-compose.yml -f docker-compose.prod.yml down --remove-orphans 2>/dev/null || true
     
     # Remove any orphaned containers with custom-bot or whisperengine-bot prefix
     echo "🗑️ Removing orphaned containers..."
@@ -464,7 +511,7 @@ handle_backup() {
 # Main command handling
 case "${1:-help}" in
     "start")
-        start_bot "${2:-prod}"
+        start_bot "${2:-}"
         ;;
     "stop")
         stop_bot "${2:-auto}"
@@ -481,7 +528,7 @@ case "${1:-help}" in
         show_status
         ;;
     "restart")
-        restart_bot "${2:-prod}"
+        restart_bot "${2:-}"
         ;;
     "cleanup")
         cleanup_containers
