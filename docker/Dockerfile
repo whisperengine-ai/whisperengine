@@ -1,6 +1,14 @@
 # Discord Bot - Universal Dockerfile
 FROM python:3.13-slim
 
+# Image metadata labels
+LABEL org.opencontainers.image.title="WhisperEngine Discord Bot" \
+      org.opencontainers.image.description="Privacy-first Discord bot with AI memory and emotional intelligence" \
+      org.opencontainers.image.vendor="WhisperEngine AI" \
+      org.opencontainers.image.licenses="MIT" \
+      org.opencontainers.image.source="https://github.com/whisperengine-ai/whisperengine" \
+      org.opencontainers.image.documentation="https://github.com/whisperengine-ai/whisperengine/wiki"
+
 # Environment variables
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
@@ -18,25 +26,32 @@ RUN apt-get update && apt-get install -y \
 
 # Copy and install Python dependencies
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-# Add spaCy model download
-RUN python -m spacy download en_core_web_sm
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install --no-cache-dir -r requirements.txt
+# Add spaCy model download with cache
+RUN --mount=type=cache,target=/root/.cache/pip \
+    python -m spacy download en_core_web_sm
 
 # Copy application code (will be overridden by volume mounts in development)
 COPY src/ ./src/
 COPY pyproject.toml validate_config.py env_manager.py run.py ./
-# Copy environment files for configuration
-COPY .env* ./
 
 # Copy system prompt (default, can be overridden by volume mount)
 COPY system_prompt.md ./system_prompt.md
 
+# No .env files copied - configuration injected at runtime via Docker Compose
+
 # Create directories and non-root user in one layer
 RUN mkdir -p backups privacy_data temp_images logs \
-    && useradd --create-home appuser \
-    && chown -R appuser:appuser /app
+    && useradd --create-home --shell /bin/bash --uid 1001 appuser \
+    && chown -R appuser:appuser /app \
+    && chmod -R 755 /app
 
 USER appuser
 
-# Start bot with validation
-CMD ["sh", "-c", "python validate_config.py && python run.py"]
+# Health check for container orchestration
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD python -c "import sys; sys.exit(0)" || exit 1
+
+# Use exec form for proper signal handling, but keep validation
+CMD ["sh", "-c", "python validate_config.py && exec python run.py"]
