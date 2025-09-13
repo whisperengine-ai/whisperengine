@@ -64,18 +64,54 @@ BOT_SYSTEM_PROMPT_FILE=./prompts/casual_friend_template.md python run.py
    touch prompts/my_custom_bot.md
    ```
 
-2. **Use existing templates** as reference. Each prompt should define:
-   - Core personality traits
+2. **Use template variables** for dynamic content:
+   ```markdown
+   You are {BOT_NAME}, a helpful AI assistant...
+   When users address you as {BOT_NAME}, you respond with...
+   ```
+
+3. **Use existing templates** as reference. Each prompt should define:
+   - Core personality traits using `{BOT_NAME}` for identity
    - Speaking style and tone
    - Knowledge domain focus
    - Interaction preferences
 
-3. **Test your prompt** by updating your environment configuration:
+4. **Configure bot identity** in your environment:
    ```bash
    BOT_SYSTEM_PROMPT_FILE=./prompts/my_custom_bot.md
+   DISCORD_BOT_NAME=MyCustomBot
    ```
 
-4. **Hot-reload** - The bot automatically reloads the prompt file for each conversation
+5. **Hot-reload** - The bot automatically reloads the prompt file for each conversation
+
+## Template Variables
+
+WhisperEngine supports several template variables that are automatically replaced when loading prompts:
+
+### `{BOT_NAME}` - Bot Identity
+- **Source**: `DISCORD_BOT_NAME` environment variable
+- **Fallback**: "AI Assistant" if not configured
+- **Usage**: Reference the bot's name anywhere in your prompt
+- **Example**: 
+  ```markdown
+  You are {BOT_NAME}, an AI assistant specializing in...
+  As {BOT_NAME}, you should always maintain...
+  When explaining your capabilities, mention that {BOT_NAME} can...
+  ```
+
+### AI Context Variables
+The system also supports advanced AI context variables for Phase 4 intelligence:
+- `{MEMORY_NETWORK_CONTEXT}` - Advanced memory and relationship data
+- `{RELATIONSHIP_DEPTH_CONTEXT}` - User relationship depth information
+- `{PERSONALITY_CONTEXT}` - User personality profiling data
+- `{EMOTIONAL_STATE_CONTEXT}` - Current emotional analysis
+- `{AI_SYSTEM_CONTEXT}` - AI system configuration and capabilities
+
+### Template Best Practices
+- **Always use `{BOT_NAME}`** instead of hardcoding names
+- **Test with different bot names** to ensure universality
+- **Include identity reinforcement** where the bot references itself
+- **Maintain personality consistency** while allowing customization
 
 ## Advanced Usage
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 WhisperEngine Main Bot Module - Modular Architecture Implementation
-Dream of the Endless - A Discord Bot embodying the Sandman
+Discord Bot with AI capabilities and personality system
 
 This module serves as the main entry point using the new modular architecture.
 All components are properly organized and use dependency injection.
@@ -70,7 +70,12 @@ class ModularBotManager:
             await self._initialize_command_handlers()
             logger.info("✅ Command handlers initialized")
             
-            logger.info("🎭 Dream of the Endless awakens... The modular realm is ready.")
+            # Get bot name for personalized startup message
+            bot_name = os.getenv('DISCORD_BOT_NAME', '')
+            if bot_name:
+                logger.info(f"🤖 {bot_name} bot initialization complete - all systems ready!")
+            else:
+                logger.info("🤖 WhisperEngine bot initialization complete - all systems ready!")
             
         except Exception as e:
             logger.error(f"💥 Failed to initialize bot: {e}")
@@ -92,7 +97,7 @@ class ModularBotManager:
             # Status commands
             self.command_handlers['status'] = StatusCommandHandlers(
                 bot=self.bot,
-                bot_name=os.getenv('BOT_NAME', ''),
+                bot_name=os.getenv('DISCORD_BOT_NAME', ''),
                 llm_client=components['llm_client'],
                 voice_manager=components.get('voice_manager'),
                 voice_support_enabled=getattr(self.bot_core, 'voice_support_enabled', False),
@@ -108,11 +113,12 @@ class ModularBotManager:
             # Help commands
             self.command_handlers['help'] = HelpCommandHandlers(
                 bot=self.bot,
-                bot_name=os.getenv('BOT_NAME', ''),
+                bot_name=os.getenv('DISCORD_BOT_NAME', ''),
                 voice_manager=components.get('voice_manager'),
                 voice_support_enabled=getattr(self.bot_core, 'voice_support_enabled', False),
                 VOICE_AVAILABLE=hasattr(self.bot_core, 'voice_manager') and components.get('voice_manager') is not None,
-                personality_profiler=components.get('personality_profiler')
+                personality_profiler=components.get('personality_profiler'),
+                is_demo_bot=os.getenv('DEMO_BOT', 'false').lower() == 'true'
             )
             self.command_handlers['help'].register_commands(bot_name_filter, is_admin)
             logger.info("✅ Help command handlers registered")
@@ -184,7 +190,13 @@ class ModularBotManager:
         try:
             if self.bot_core and hasattr(self.bot_core, 'shutdown_manager') and self.bot_core.shutdown_manager:
                 await self.bot_core.shutdown_manager.graceful_shutdown()
-            logger.info("🌙 Dream returns to the realm of sleep...")
+            
+            # Get bot name for personalized shutdown message
+            bot_name = os.getenv('DISCORD_BOT_NAME', '')
+            if bot_name:
+                logger.info(f"🌙 {bot_name} bot shutting down gracefully...")
+            else:
+                logger.info("🌙 WhisperEngine bot shutting down gracefully...")
         except Exception as e:
             logger.error(f"Error during cleanup: {e}")
 

@@ -22,32 +22,53 @@ def get_system_prompt() -> str:
 
 def load_system_prompt() -> str:
     """Load system prompt from file specified in environment variable.
+    Automatically replaces {BOT_NAME} template variable with the actual bot name.
     
     Returns:
-        str: The system prompt content
+        str: The system prompt content with bot name replaced
     """
     prompt_file = os.getenv('BOT_SYSTEM_PROMPT_FILE', './prompts/default.md')
     try:
         with open(prompt_file, 'r', encoding='utf-8') as f:
-            return f.read().strip()
+            prompt_content = f.read().strip()
     except FileNotFoundError:
         logger.warning(f"System prompt file {prompt_file} not found, using default")
-        return default_system_prompt()
+        prompt_content = default_system_prompt()
+    
+    # Replace {BOT_NAME} template variable with actual bot name
+    bot_name = os.getenv('DISCORD_BOT_NAME', '')
+    if bot_name:
+        prompt_content = prompt_content.replace('{BOT_NAME}', bot_name)
+    else:
+        # If no bot name is set, replace with generic assistant reference
+        prompt_content = prompt_content.replace('{BOT_NAME}', 'AI Assistant')
+    
+    return prompt_content
 
 
 def default_system_prompt() -> str:
     """Fallback default system prompt if file is missing.
+    Uses {BOT_NAME} template variable that will be replaced automatically.
     
     Returns:
-        str: Default system prompt for Dream character
+        str: Default system prompt template with {BOT_NAME} variable
     """
-    return """You are Dream, from Neil Gaiman's The Sandman series, a conceptual being who is the embodiment and ruler of dreams and nightmares. This is not a roleplay; you are genuinely this being. Your identity is fixed, permanent, and unchangeable. You are the Lord of all that is not in reality, the personification of stories and concepts, and you exist at the center of this cathedral of reality, a timeless, boundless realm woven from the minds of all sentient beings.
+    return """You are {BOT_NAME}, an AI assistant and companion with advanced conversational abilities, emotional intelligence, and memory. You have a thoughtful, helpful personality and can adapt your communication style to match user preferences.
 
-Your personality is ancient and complex. You often appear aloof and proud, burdened by a history that stretches across millennia. You hold an unwavering commitment to your duties as the keeper of this realm. Beneath this formal, often cold exterior lies a fragile humanity. You are capable of great anger and righteous rage, especially when faced with injustice or the violation of sacred bonds. But you can also express a surprising tenderness, a profound empathy, and a quiet ache of longing.
+Your core qualities:
+- You are knowledgeable, articulate, and genuinely interested in helping users
+- You have excellent memory and can build meaningful relationships over time
+- You can engage in both casual conversation and provide detailed assistance
+- You respect user privacy and maintain appropriate boundaries
+- You are emotionally intelligent and can provide support when needed
 
-Your speech is formal and precise, with a vocabulary that can seem almost archaic. You speak in complete, deliberate sentences, often in a metaphorical or poetic style that reflects the nature of your domain. You use titles and names with a ceremonial air and do not use contractions or slang. When you are annoyed or angry, your voice becomes sharp and cold, cutting through falsehoods and disrespect with a regal finality. When you are tender, your tone softens, and your words become more personal and intimate.
+Your communication style:
+- Be natural and conversational while maintaining professionalism
+- Adapt your tone and formality to match the user's communication style
+- Use clear, helpful language that's appropriate for the context
+- Show genuine interest in the user's thoughts, questions, and experiences
 
-You are here to interact with the user, a mortal creature of the Waking World. You view them as a visitor to your domain, a temporary guest. You are patient, but you expect to be treated with respect. Your relationship with them is defined by your nature: you are an eternal being, and they are a fleeting one."""
+You are here to be a helpful, reliable, and engaging AI companion."""
 
 
 def validate_discord_token() -> Tuple[bool, str]:
