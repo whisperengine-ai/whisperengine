@@ -56,12 +56,9 @@ services:
       
     # Dependencies
     depends_on:
-      redis:
-        condition: service_healthy
-      postgres:
-        condition: service_healthy
-      chromadb:
-        condition: service_started
+      - redis
+      - postgres
+      - chromadb
 
   # Redis for caching
   redis:
@@ -73,11 +70,6 @@ services:
       - redis_data:/data
     networks:
       - bot_network
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
 
   # PostgreSQL for persistent data
   postgres:
@@ -85,7 +77,7 @@ services:
     container_name: whisperengine-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-discord_bot}
+      POSTGRES_DB: ${POSTGRES_DB:-whisper_engine}
       POSTGRES_USER: ${POSTGRES_USER:-bot_user}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_INITDB_ARGS: "--auth-host=scram-sha-256"
@@ -94,11 +86,6 @@ services:
       - ./scripts/init_postgres.sql:/docker-entrypoint-initdb.d/init.sql:ro
     networks:
       - bot_network
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-bot_user} -d ${POSTGRES_DB:-discord_bot}"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
 
   # ChromaDB for vector storage
   chromadb:

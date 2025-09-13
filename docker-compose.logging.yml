@@ -12,7 +12,7 @@ services:
     environment:
       # Enhanced logging configuration
       - LOG_DIR=/app/logs
-      - LOG_APP_NAME=discord_bot
+      - LOG_APP_NAME=whisperengine
       - ENVIRONMENT=${ENVIRONMENT:-production}
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
     volumes:

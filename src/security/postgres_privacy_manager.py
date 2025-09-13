@@ -23,7 +23,7 @@ class PostgreSQLPrivacyManager:
     def __init__(self, 
                  host: str = "localhost",
                  port: int = 5432,
-                 database: str = "discord_bot",
+                 database: str = "whisper_engine",
                  user: str = "bot_user",
                  password: str = "bot_password_change_me",
                  min_size: int = 3,
@@ -287,7 +287,7 @@ def create_privacy_manager_from_env() -> PostgreSQLPrivacyManager:
     return PostgreSQLPrivacyManager(
         host=os.getenv('POSTGRES_HOST', 'localhost'),
         port=int(os.getenv('POSTGRES_PORT', '5432')),
-        database=os.getenv('POSTGRES_DB', 'discord_bot'),
+        database=os.getenv('POSTGRES_DB', 'whisper_engine'),
         user=os.getenv('POSTGRES_USER', 'bot_user'),
         password=os.getenv('POSTGRES_PASSWORD', 'bot_password_change_me'),
         min_size=int(os.getenv('POSTGRES_PRIVACY_MIN_CONNECTIONS', '3')),

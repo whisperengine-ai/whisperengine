@@ -28,7 +28,7 @@ class GraphMemoryConfig:
     uri: str = "bolt://localhost:7687"
     username: str = "neo4j"
     password: str = "password"
-    database: str = "discord_bot"
+    database: str = "whisper_engine"
     max_connection_lifetime: int = 3600
     max_connection_pool_size: int = 50
 

@@ -56,14 +56,10 @@ services:
       
     # Dependencies
     depends_on:
-      redis:
-        condition: service_healthy
-      postgres:
-        condition: service_healthy
-      chromadb:
-        condition: service_started
-      neo4j:
-        condition: service_healthy
+      - redis
+      - postgres
+      - chromadb
+      - neo4j
 
   # Redis for caching
   redis:
@@ -77,11 +73,6 @@ services:
       - "6379:6379"
     networks:
       - bot_network
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
 
   # PostgreSQL for persistent data
   postgres:
@@ -89,7 +80,7 @@ services:
     container_name: whisperengine-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-discord_bot}
+      POSTGRES_DB: ${POSTGRES_DB:-whisper_engine}
       POSTGRES_USER: ${POSTGRES_USER:-bot_user}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_INITDB_ARGS: "--auth-host=scram-sha-256"
@@ -100,11 +91,6 @@ services:
       - "5432:5432"
     networks:
       - bot_network
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-bot_user} -d ${POSTGRES_DB:-discord_bot}"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
 
   # ChromaDB for vector storage
   chromadb:
@@ -140,12 +126,6 @@ services:
     ports:
       - "7474:7474"  # HTTP
       - "7687:7687"  # Bolt
-    healthcheck:
-      test: ["CMD", "cypher-shell", "-u", "${NEO4J_USERNAME:-neo4j}", "-p", "${NEO4J_PASSWORD:-neo4j_password_change_me}", "RETURN 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 60s
     networks:
       - bot_network
 
