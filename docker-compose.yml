@@ -61,7 +61,7 @@ services:
       postgres:
         condition: service_healthy
       chromadb:
-        condition: service_healthy
+        condition: service_started
       neo4j:
         condition: service_healthy
 

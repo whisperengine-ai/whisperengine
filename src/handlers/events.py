@@ -123,6 +123,16 @@ class BotEventHandlers:
                 logger.error(f"Failed to initialize PostgreSQL pool: {e}")
                 logger.warning("Bot will continue without PostgreSQL support")
         
+        # Initialize Redis conversation cache if using Redis
+        if self.conversation_cache and hasattr(self.conversation_cache, 'initialize'):
+            try:
+                logger.info("Initializing Redis conversation cache...")
+                await self.conversation_cache.initialize()
+                logger.info("✅ Redis conversation cache initialized successfully")
+            except Exception as e:
+                logger.error(f"Failed to initialize Redis conversation cache: {e}")
+                logger.warning("Bot will continue with limited conversation cache functionality")
+        
         # Start job scheduler if available
         if self.job_scheduler:
             try:
