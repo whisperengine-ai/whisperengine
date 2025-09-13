@@ -1,0 +1,70 @@
+# Prevent copying actual environment files with secrets
+.env
+.env.local
+.env.native
+
+# Keep example files available for copying
+!.env.example
+!.env.minimal
+!.env.production
+!.env.development
+
+# Other sensitive files
+*.key
+*.pem
+secrets/
+private/
+
+# Development files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.log
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.mypy_cache/
+.venv/
+venv/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+.Spotlight-V100
+.Trashes
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# Docker
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# Documentation (except system_prompt.md which is needed)
+*.md
+!system_prompt.md
+docs/
+wiki/
+
+# Backup and temporary files
+backups/
+temp_images/
+logs/
+*.tmp
+*.temp
+
+# Node modules if any
+node_modules/
