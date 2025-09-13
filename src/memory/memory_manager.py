@@ -966,11 +966,27 @@ class UserMemoryManager:
                 "context": context
             }
             
-            self.collection.add(
-                documents=[fact_text],
-                metadatas=[metadata],
-                ids=[doc_id]
-            )
+            # Store in ChromaDB using appropriate method
+            if self.use_external_embeddings and self.add_documents_with_embeddings:
+                # Use external embeddings
+                import asyncio
+                from src.memory.chromadb_external_embeddings import run_async_method
+                success = run_async_method(
+                    self.add_documents_with_embeddings,
+                    self.collection,
+                    [fact_text],
+                    [metadata],
+                    [doc_id]
+                )
+                if not success:
+                    raise MemoryStorageError("Failed to store user fact with external embeddings")
+            else:
+                # Use ChromaDB's built-in embeddings
+                self.collection.add(
+                    documents=[fact_text],
+                    metadatas=[metadata],
+                    ids=[doc_id]
+                )
             
             logger.debug(f"Stored user fact for {user_id}: {fact[:50]}...")
             
