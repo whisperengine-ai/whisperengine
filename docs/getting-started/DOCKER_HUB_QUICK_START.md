@@ -2,18 +2,25 @@
 
 **Get WhisperEngine running in under 2 minutes!** No building, no cloning repos.
 
-## 🚀 One-Command Setup
+## 🌍 Cross-Platform One-Command Setup
 
-```bash
-# Run the quick setup script
-curl -sSL https://raw.githubusercontent.com/WhisperEngine-AI/whisperengine/main/scripts/quick-start.sh | bash
-```
+Choose your platform and run the appropriate command:
+
+| Platform | Command |
+|----------|---------|
+| **🐧 Linux** | `curl -sSL https://raw.githubusercontent.com/WhisperEngine-AI/whisperengine/main/scripts/quick-start.sh \| bash` |
+| **🍎 macOS** | `curl -sSL https://raw.githubusercontent.com/WhisperEngine-AI/whisperengine/main/scripts/quick-start.sh \| bash` |
+| **🪟 Windows (PowerShell)** | `iwr https://raw.githubusercontent.com/WhisperEngine-AI/whisperengine/main/scripts/quick-start.ps1 \| iex` |
+| **🪟 Windows (Command Prompt)** | Download and run: [`quick-start.bat`](https://raw.githubusercontent.com/WhisperEngine-AI/whisperengine/main/scripts/quick-start.bat) |
 
 **That's it!** The script will:
 1. Pull the latest WhisperEngine image from Docker Hub
-2. Create a minimal `.env` file for you to edit
-3. Start all services
-4. Show you next steps
+2. Create a minimal `.env` file for you to edit  
+3. Open your editor to configure Discord token
+4. Start all services
+5. Show you monitoring commands
+
+📖 **[Detailed Cross-Platform Guide](CROSS_PLATFORM_QUICK_START.md)**
 
 ## 🛠️ Manual Setup (3 steps)
 
