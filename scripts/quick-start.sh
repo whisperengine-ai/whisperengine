@@ -97,6 +97,7 @@ services:
       - redis
       - postgres
       - chromadb
+      - neo4j
       
   # Minimal required services
   redis:
@@ -107,20 +108,21 @@ services:
     volumes:
       - redis_data:/data
     ports:
-      - "6379:6379"
+      - "\${REDIS_PORT:-6379}:6379"
       
   postgres:
     image: postgres:16-alpine
     container_name: whisperengine-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB: whisper_engine
-      POSTGRES_USER: bot_user
-      POSTGRES_PASSWORD: bot_password_change_me
+      POSTGRES_DB: \${POSTGRES_DB:-whisper_engine}
+      POSTGRES_USER: \${POSTGRES_USER:-bot_user}
+      POSTGRES_PASSWORD: \${POSTGRES_PASSWORD:-bot_password_change_me}
+      POSTGRES_INITDB_ARGS: "--auth-host=scram-sha-256"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
-      - "5432:5432"
+      - "\${POSTGRES_PORT:-5432}:5432"
       
   chromadb:
     image: chromadb/chroma:latest
@@ -128,16 +130,33 @@ services:
     restart: unless-stopped
     environment:
       - CHROMA_SERVER_HOST=0.0.0.0
-      - CHROMA_SERVER_HTTP_PORT=8000
+      - CHROMA_SERVER_HTTP_PORT=\${CHROMADB_PORT:-8000}
     volumes:
       - chromadb_data:/chroma/chroma
     ports:
-      - "8001:8000"  # Avoid conflict with potential host services
+      - "8001:\${CHROMADB_PORT:-8000}"  # Avoid conflict with potential host services
+      
+  neo4j:
+    image: neo4j:5-enterprise
+    container_name: whisperengine-neo4j
+    restart: unless-stopped
+    environment:
+      NEO4J_AUTH: \${NEO4J_USERNAME:-neo4j}/\${NEO4J_PASSWORD:-neo4j_password_change_me}
+      NEO4J_ACCEPT_LICENSE_AGREEMENT: "yes"
+      NEO4J_dbms_security_procedures_unrestricted: "gds.*,apoc.*"
+    volumes:
+      - neo4j_data:/data
+      - neo4j_logs:/logs
+    ports:
+      - "7474:7474"  # HTTP
+      - "\${NEO4J_PORT:-7687}:7687"  # Bolt
 
 volumes:
   redis_data:
   postgres_data:
   chromadb_data:
+  neo4j_data:
+  neo4j_logs:
 EOF
 
 # Download .env.minimal and use it as template
