@@ -69,6 +69,15 @@ The system provides unified AI capabilities with configurable conversation style
 
 Your bot should generate these context variables:
 
+### System Template Variables
+```python
+# Bot Identity Template Variable (Automatically handled by system)
+{BOT_NAME}
+# Example: "Dream" (from DISCORD_BOT_NAME env var) or "AI Assistant" (fallback)
+# Usage: "You are {BOT_NAME}, a sophisticated AI assistant..."
+# Configuration: Set DISCORD_BOT_NAME in environment variables
+```
+
 ### Phase 4 Specific Variables
 ```python
 # Memory Network Context  
@@ -193,6 +202,10 @@ ai_system_context = f"AI Configuration: Natural conversation adaptation via syst
 
 # Replace all context variables
 system_prompt = system_prompt_template
+
+# Note: {BOT_NAME} is automatically handled by the system's load_system_prompt() function
+# The system replaces {BOT_NAME} with DISCORD_BOT_NAME environment variable before your processing
+
 for variable, value in {
     "MEMORY_NETWORK_CONTEXT": memory_network_context,
     "RELATIONSHIP_DEPTH_CONTEXT": relationship_depth_context,

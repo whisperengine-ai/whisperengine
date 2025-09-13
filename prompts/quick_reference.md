@@ -127,7 +127,10 @@ Add to your conversation context building:
 with open('config/system_prompts/dream_ai_enhanced.md', 'r') as f:
     system_prompt_template = f.read()
 
-# Replace context variables with your Phase 4 AI analysis
+# Note: {BOT_NAME} is automatically replaced by the system's load_system_prompt() function
+# It uses DISCORD_BOT_NAME environment variable (or "AI Assistant" as fallback)
+
+# Replace Phase 4 context variables with your AI analysis
 system_prompt = system_prompt_template.replace("{MEMORY_NETWORK_CONTEXT}", memory_network_context)
 system_prompt = system_prompt.replace("{RELATIONSHIP_DEPTH_CONTEXT}", relationship_depth_context)
 system_prompt = system_prompt.replace("{PERSONALITY_CONTEXT}", personality_context)
@@ -144,6 +147,24 @@ conversation_context.insert(0, {
     "content": system_prompt
 })
 ```
+
+## Template Variables Available
+
+### Core System Variables
+- `{BOT_NAME}` - Automatically replaced with configured bot name (DISCORD_BOT_NAME)
+
+### Phase 4 AI Context Variables
+- `{MEMORY_NETWORK_CONTEXT}` - Advanced memory and relationship data
+- `{RELATIONSHIP_DEPTH_CONTEXT}` - User relationship depth information  
+- `{AI_SYSTEM_CONTEXT}` - AI system configuration and capabilities
+
+### Phase 1-3 Context Variables
+- `{PERSONALITY_CONTEXT}` - User personality profiling data
+- `{EMOTIONAL_STATE_CONTEXT}` - Current emotional analysis
+- `{EXTERNAL_EMOTION_CONTEXT}` - External API emotion analysis
+- `{EMOTIONAL_PREDICTION_CONTEXT}` - Emotional prediction insights
+- `{PROACTIVE_SUPPORT_CONTEXT}` - Proactive support recommendations
+- `{RELATIONSHIP_CONTEXT}` - Basic relationship history
 
 ## AI System Configuration
 
