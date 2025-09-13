@@ -515,9 +515,9 @@ cleanup_containers() {
     $COMPOSE_CMD -f docker-compose.yml -f docker-compose.dev.yml down --remove-orphans 2>/dev/null || true
     $COMPOSE_CMD -f docker-compose.yml -f docker-compose.prod.yml down --remove-orphans 2>/dev/null || true
     
-    # Remove any orphaned containers with custom-bot or whisperengine-bot prefix
+    # Remove any orphaned containers with old custom-bot or whisperengine-bot prefix
     echo "🗑️ Removing orphaned containers..."
-    docker ps -a --format "table {{.Names}}" | grep -E "^(custom-bot|whisperengine-bot)" | xargs -r docker rm -f 2>/dev/null || true
+    docker ps -a --format "table {{.Names}}" | grep -E "^(custom-bot|whisperengine)" | xargs -r docker rm -f 2>/dev/null || true
     
     # Clean up unused volumes (but keep data volumes)
     echo "💾 Cleaning unused Docker resources..."
