@@ -109,7 +109,7 @@ show_help() {
     echo "Commands:"
     echo "  start [prod|dev|native]  - Start bot (default: prod)"
     echo "  stop [prod|dev|native]   - Stop bot"
-    echo "  logs [service]           - View logs (default: discord-bot)"
+    echo "  logs [service]           - View logs (default: whisperengine-bot)"
     echo "  status                   - Show container status"
     echo "  restart [prod|dev]       - Restart bot"
     echo "  cleanup                  - Remove orphaned containers and volumes"
@@ -373,7 +373,7 @@ show_logs() {
     check_docker  # Ensure COMPOSE_CMD is set
     
     # Validate service name to prevent command injection
-    local service="${1:-discord-bot}"
+    local service="${1:-whisperengine-bot}"
     if [[ ! "$service" =~ ^[a-zA-Z0-9_-]+$ ]]; then
         print_error "Invalid service name: $service"
         print_warning "Valid service names contain only letters, numbers, underscores, and hyphens"
@@ -416,9 +416,9 @@ cleanup_containers() {
     $COMPOSE_CMD down --remove-orphans 2>/dev/null || true
     $COMPOSE_CMD -f docker-compose.yml -f docker-compose.dev.yml down --remove-orphans 2>/dev/null || true
     
-    # Remove any orphaned containers with custom-bot or discord-bot prefix
+    # Remove any orphaned containers with custom-bot or whisperengine-bot prefix
     echo "🗑️ Removing orphaned containers..."
-    docker ps -a --format "table {{.Names}}" | grep -E "^(custom-bot|discord-bot)" | xargs -r docker rm -f 2>/dev/null || true
+    docker ps -a --format "table {{.Names}}" | grep -E "^(custom-bot|whisperengine-bot)" | xargs -r docker rm -f 2>/dev/null || true
     
     # Clean up unused volumes (but keep data volumes)
     echo "💾 Cleaning unused Docker resources..."
@@ -475,7 +475,7 @@ case "${1:-help}" in
             print_error "Invalid service name: ${2:-}"
             exit 1
         fi
-        show_logs "${2:-discord-bot}"
+        show_logs "${2:-whisperengine-bot}"
         ;;
     "status")
         show_status

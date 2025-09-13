@@ -3,7 +3,7 @@
 # Includes live code mounting for development
 
 services:
-  discord-bot:
+  whisperengine-bot:
     # Environment configuration for development
     env_file:
       - .env.development  # Base development defaults

@@ -27,7 +27,7 @@ Or via Docker Compose override:
 
 ```yaml
 services:
-  discord-bot:
+  whisperengine-bot:
     environment:
       - BOT_SYSTEM_PROMPT_FILE=/app/prompts/empathetic_companion_template.md
 ```

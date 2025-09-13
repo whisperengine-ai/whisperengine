@@ -100,7 +100,7 @@ docker-compose pull && docker-compose up -d
 **Bot not responding?**
 ```bash
 # Check logs for errors
-docker-compose logs discord-bot
+docker-compose logs whisperengine-bot
 
 # Verify token is correct
 grep DISCORD_BOT_TOKEN .env

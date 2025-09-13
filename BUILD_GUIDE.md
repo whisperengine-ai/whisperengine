@@ -125,17 +125,16 @@ docker compose build --no-cache
 ### Using Docker Build Directly
 
 ```bash
-# Universal build (recommended)
-docker build -f docker/Dockerfile -t discord-bot:latest .
+docker build -f docker/Dockerfile -t whisperengine-bot:latest .
 
-# Production build (multi-stage)
-docker build -f docker/Dockerfile.multi-stage --target production -t discord-bot:prod .
+# Multi-stage production build
+docker build -f docker/Dockerfile.multi-stage --target production -t whisperengine-bot:prod .
 
-# Development build (multi-stage)
-docker build -f docker/Dockerfile.multi-stage --target development -t discord-bot:dev .
+# Development build
+docker build -f docker/Dockerfile.multi-stage --target development -t whisperengine-bot:dev .
 
-# Minimal build (smallest size)
-docker build -f docker/Dockerfile.multi-stage --target minimal -t discord-bot:minimal .
+# Minimal build
+docker build -f docker/Dockerfile.multi-stage --target minimal -t whisperengine-bot:minimal .
 ```
 
 ### Using Management Scripts
@@ -208,10 +207,10 @@ cp .env.example .env
 nano .env  # Edit configuration
 
 # Step 3: Build image
-docker build -f docker/Dockerfile -t discord-bot:latest .
+docker build -f docker/Dockerfile -t whisperengine-bot:latest .
 
 # Step 4: Verify build
-docker images discord-bot
+docker images whisperengine-bot
 ```
 
 ### 2. Multi-stage Production Build
@@ -223,15 +222,15 @@ For production deployments with optimization:
 docker build \
   -f docker/Dockerfile.multi-stage \
   --target production \
-  -t discord-bot:prod-v1.0.0 \
+  -t whisperengine-bot:prod-v1.0.0 \
   --build-arg VERSION=v1.0.0 \
   .
 
 # Tag for registry
-docker tag discord-bot:prod-v1.0.0 your-registry.com/discord-bot:v1.0.0
+docker tag whisperengine-bot:prod-v1.0.0 your-registry.com/whisperengine-bot:v1.0.0
 
 # Push to registry
-docker push your-registry.com/discord-bot:v1.0.0
+docker push your-registry.com/whisperengine-bot:v1.0.0
 ```
 
 ### 3. Development Build with Hot-Reload
@@ -243,7 +242,7 @@ For development with live code editing:
 docker build \
   -f docker/Dockerfile.multi-stage \
   --target development \
-  -t discord-bot:dev \
+  -t whisperengine-bot:dev \
   .
 
 # Start development environment with external datastores
@@ -259,11 +258,11 @@ For resource-constrained environments:
 docker build \
   -f docker/Dockerfile.multi-stage \
   --target minimal \
-  -t discord-bot:minimal \
+  -t whisperengine-bot:minimal \
   .
 
 # Verify size reduction
-docker images discord-bot
+docker images whisperengine-bot
 ```
 
 ---
@@ -284,13 +283,13 @@ Available build arguments for customization:
 
 ```bash
 # Version tagging
-docker build --build-arg VERSION=v1.2.3 -t discord-bot:v1.2.3 .
+docker build --build-arg VERSION=v1.2.3 -t whisperengine-bot:v1.2.3 .
 
 # Python version override
-docker build --build-arg PYTHON_VERSION=3.13-slim -t discord-bot:py313 .
+docker build --build-arg PYTHON_VERSION=3.13-slim -t whisperengine-bot:py313 .
 
 # Custom requirements file
-docker build --build-arg REQUIREMENTS_FILE=requirements-gpu.txt -t discord-bot:gpu .
+docker build --build-arg REQUIREMENTS_FILE=requirements-gpu.txt -t whisperengine-bot:gpu .
 ```
 
 ### Multi-platform Builds
@@ -305,7 +304,7 @@ docker buildx create --name multiarch --use
 docker buildx build \
   --platform linux/amd64,linux/arm64 \
   -f docker/Dockerfile \
-  -t discord-bot:multiarch \
+  -t whisperengine-bot:multiarch \
   --push \
   .
 ```
@@ -317,13 +316,13 @@ docker buildx build \
 export DOCKER_BUILDKIT=1
 
 # Use build cache mount for pip dependencies
-docker build --mount=type=cache,target=/root/.cache/pip -t discord-bot .
+docker build --mount=type=cache,target=/root/.cache/pip -t whisperengine-bot .
 
 # Parallel builds with docker compose
 docker compose build --parallel
 
 # Build only the bot service (skip datastores if they're external)
-docker compose build discord-bot
+docker compose build whisperengine-bot
 ```
 
 ---
@@ -361,7 +360,7 @@ docker compose -f docker-compose.prod.yml build
 #### Minimal Configuration
 ```bash
 # Build smallest possible image
-docker build -f docker/Dockerfile.multi-stage --target minimal -t discord-bot:minimal .
+docker build -f docker/Dockerfile.multi-stage --target minimal -t whisperengine-bot:minimal .
 
 # Features:
 # - Alpine Linux base (~400MB vs ~800MB)
@@ -390,7 +389,7 @@ docker system df
 #### 2. **Build Cache Issues**
 ```bash
 # Force rebuild without cache
-docker build --no-cache -f docker/Dockerfile -t discord-bot .
+docker build --no-cache -f docker/Dockerfile -t whisperengine-bot .
 
 # Clear build cache
 docker builder prune
@@ -405,13 +404,13 @@ cat requirements.txt
 pip install -r requirements.txt
 
 # Build with verbose output
-docker build --progress=plain -f docker/Dockerfile -t discord-bot .
+docker build --progress=plain -f docker/Dockerfile -t whisperengine-bot .
 ```
 
 #### 4. **Platform Compatibility Issues**
 ```bash
 # Force specific platform
-docker build --platform linux/amd64 -f docker/Dockerfile -t discord-bot .
+docker build --platform linux/amd64 -f docker/Dockerfile -t whisperengine-bot .
 
 # Check current platform
 docker version | grep -A 5 "Server:"
@@ -422,36 +421,36 @@ docker version | grep -A 5 "Server:"
 #### Test Built Image
 ```bash
 # Run configuration validation
-docker run --rm discord-bot:latest python validate_config.py
+docker run --rm whisperengine-bot:latest python validate_config.py
 
 # Test container startup
-docker run --rm -e DISCORD_BOT_TOKEN=test discord-bot:latest python -c "print('Build successful')"
+docker run --rm -e DISCORD_BOT_TOKEN=test whisperengine-bot:latest python -c "print('Build successful')"
 
 # Check image layers
-docker history discord-bot:latest
+docker history whisperengine-bot:latest
 ```
 
 #### Security Scan
 ```bash
 # Scan for vulnerabilities (if available)
-docker scan discord-bot:latest
+docker scan whisperengine-bot:latest
 
 #### Security Validation
 ```bash
 # Scan for vulnerabilities (if available)
-docker scan discord-bot:latest
+docker scan whisperengine-bot:latest
 
 # Verify no sensitive data in image
-docker run --rm -it discord-bot:latest find /app -name "*.env*" -o -name "*key*"
+docker run --rm -it whisperengine-bot:latest find /app -name "*.env*" -o -name "*key*"
 
 # Test external datastore connections
 docker run --rm -e DISCORD_BOT_TOKEN=test 
   -e CHROMADB_HOST=your-chromadb-host 
   -e POSTGRES_HOST=your-postgres-host 
-  discord-bot:latest python -c "print('External connections configured')"
+  whisperengine-bot:latest python -c "print('External connections configured')"
 ```
 
-docker run --rm -it discord-bot:latest find /app -name "*.env*" -o -name "*key*"
+docker run --rm -it whisperengine-bot:latest find /app -name "*.env*" -o -name "*key*"
 ```
 
 ---
@@ -506,14 +505,14 @@ jobs:
 set -e
 
 echo "Building all targets..."
-docker build -f docker/Dockerfile -t discord-bot:universal .
-docker build -f docker/Dockerfile.multi-stage --target production -t discord-bot:prod .
-docker build -f docker/Dockerfile.multi-stage --target minimal -t discord-bot:minimal .
+docker build -f docker/Dockerfile -t whisperengine-bot:universal .
+docker build -f docker/Dockerfile.multi-stage --target production -t whisperengine-bot:prod .
+docker build -f docker/Dockerfile.multi-stage --target minimal -t whisperengine-bot:minimal .
 
 echo "Testing builds..."
-docker run --rm discord-bot:universal python --version
-docker run --rm discord-bot:prod python --version  
-docker run --rm discord-bot:minimal python --version
+docker run --rm whisperengine-bot:universal python --version
+docker run --rm whisperengine-bot:prod python --version  
+docker run --rm whisperengine-bot:minimal python --version
 
 echo "All builds successful!"
 ```

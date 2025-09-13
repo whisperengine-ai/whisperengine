@@ -46,7 +46,7 @@ Create a `docker-compose.override.yml` for temporary personality switching:
 
 ```yaml
 services:
-  discord-bot:
+  whisperengine-bot:
     environment:
       - BOT_SYSTEM_PROMPT_FILE=/app/prompts/empathetic_companion_template.md
 ```
@@ -99,7 +99,7 @@ services:
   bot-professional:
     extends:
       file: docker-compose.yml
-      service: discord-bot
+      service: whisperengine-bot
     environment:
       - BOT_SYSTEM_PROMPT_FILE=/app/prompts/professional_ai_template.md
       - DISCORD_BOT_TOKEN=${PROFESSIONAL_BOT_TOKEN}
@@ -108,7 +108,7 @@ services:
   bot-casual:
     extends:
       file: docker-compose.yml
-      service: discord-bot
+      service: whisperengine-bot
     environment:
       - BOT_SYSTEM_PROMPT_FILE=/app/prompts/casual_friend_template.md
       - DISCORD_BOT_TOKEN=${CASUAL_BOT_TOKEN}
