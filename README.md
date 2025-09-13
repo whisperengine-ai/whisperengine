@@ -32,17 +32,47 @@
 - **Production Ready**: Docker orchestration with health monitoring
 - **Multi-Modal**: Text, voice, and image processing capabilities
 
-## 🚀 **Quick Start**
+## 🚀 **Quick Start - Cross Platform**
 
-### ⚡ **Lightning Quick (2 minutes) - Docker Hub**
+### ⚡ **Lightning Quick (2 minutes) - Choose Your Platform**
+
+WhisperEngine supports all major platforms with native quick-start scripts:
+
+| Platform | Command | Description |
+|----------|---------|-------------|
+| **🐧 Linux** | `curl -sSL https://raw.githubusercontent.com/WhisperEngine-AI/whisperengine/main/scripts/quick-start.sh \| bash` | Native Bash script |
+| **🍎 macOS** | `curl -sSL https://raw.githubusercontent.com/WhisperEngine-AI/whisperengine/main/scripts/quick-start.sh \| bash` | Native Bash script |
+| **🪟 Windows PowerShell** | `iwr https://raw.githubusercontent.com/WhisperEngine-AI/whisperengine/main/scripts/quick-start.ps1 \| iex` | Native PowerShell script |
+| **🪟 Windows Command Prompt** | Download and run: [`quick-start.bat`](https://raw.githubusercontent.com/WhisperEngine-AI/whisperengine/main/scripts/quick-start.bat) | Native Batch script |
+
+#### **Quick Installation Examples:**
+
+**Linux/macOS:**
 ```bash
 # One command setup - no cloning required!
 curl -sSL https://raw.githubusercontent.com/WhisperEngine-AI/whisperengine/main/scripts/quick-start.sh | bash
-
-# Then edit .env with your Discord token and start:
-docker-compose up -d
 ```
-**Perfect for:** First-time users, quick demos, production deployments
+
+**Windows PowerShell:**
+```powershell
+# One command setup - no cloning required!
+iwr https://raw.githubusercontent.com/WhisperEngine-AI/whisperengine/main/scripts/quick-start.ps1 | iex
+```
+
+**Windows Command Prompt:**
+```batch
+@REM Download and run the batch script
+curl -L -o quick-start.bat https://raw.githubusercontent.com/WhisperEngine-AI/whisperengine/main/scripts/quick-start.bat
+quick-start.bat
+```
+
+All scripts will:
+1. Download the latest WhisperEngine configuration
+2. Set up your environment file (.env)
+3. Open your editor to configure Discord token
+4. Start all services with Docker Compose
+
+**Perfect for:** First-time users, quick demos, production deployments across any platform
 
 **📖 [Full Docker Hub Guide →](docs/getting-started/DOCKER_HUB_QUICK_START.md)**
 
@@ -69,6 +99,7 @@ nano .env  # Set DISCORD_BOT_TOKEN
 
 | Guide | Audience | Time | Description |
 |-------|----------|------|-------------|
+| **[🌍 Cross-Platform Quick Start](docs/getting-started/CROSS_PLATFORM_QUICK_START.md)** | All Users | 2 min | Native scripts for Linux, macOS, Windows |
 | **[⚡ Docker Hub Quick Start](docs/getting-started/DOCKER_HUB_QUICK_START.md)** | All Users | 2 min | Instant deployment from Docker Hub |
 | **[🚀 Developer Quick Start](docs/getting-started/QUICK_START.md)** | Developers | 5 min | Full setup with customization |
 | **[👥 End User Guide](docs/getting-started/END_USER_GUIDE.md)** | End Users | 15 min | Complete setup and usage |

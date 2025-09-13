@@ -99,6 +99,11 @@ check_env() {
 show_help() {
     echo "Discord Bot Management Script"
     echo ""
+    echo "🚀 New to WhisperEngine? Try our cross-platform quick-start scripts:"
+    echo "   Linux/macOS:   curl -sSL https://raw.githubusercontent.com/WhisperEngine-AI/whisperengine/main/scripts/quick-start.sh | bash"
+    echo "   Windows (PS):  iwr https://raw.githubusercontent.com/WhisperEngine-AI/whisperengine/main/scripts/quick-start.ps1 | iex"
+    echo "   Windows (CMD): Download and run scripts/quick-start.bat"
+    echo ""
     echo "Usage: $0 <command> [mode]"
     echo ""
     echo "Commands:"
@@ -109,6 +114,7 @@ show_help() {
     echo "  restart [prod|dev]       - Restart bot"
     echo "  cleanup                  - Remove orphaned containers and volumes"
     echo "  backup <create|list|restore|help> - Data backup operations"
+    echo "  build-push [options]     - Build and push Docker image to Docker Hub"
     echo ""
     echo "Modes:"
     echo "  prod    - Production mode"
@@ -124,6 +130,8 @@ show_help() {
     echo "  $0 cleanup              # Clean orphaned containers"
     echo "  $0 backup create        # Create data backup"
     echo "  $0 backup list          # List available backups"
+    echo "  $0 build-push --help    # Show Docker build options"
+    echo "  $0 build-push v1.0.0    # Build and push specific version"
 }
 
 start_bot() {
@@ -481,6 +489,11 @@ case "${1:-help}" in
     "backup")
         shift  # Remove 'backup' from arguments
         handle_backup "$@"
+        ;;
+    "build-push")
+        shift  # Remove 'build-push' from arguments
+        # Forward all remaining arguments to the Docker build script
+        exec "$(dirname "$0")/scripts/docker-build-push.sh" "$@"
         ;;
     "help"|*)
         show_help
