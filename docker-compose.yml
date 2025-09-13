@@ -89,7 +89,7 @@ services:
     container_name: whisperengine-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-discord_bot}
+      POSTGRES_DB: ${POSTGRES_DB:-whisper_engine}
       POSTGRES_USER: ${POSTGRES_USER:-bot_user}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_INITDB_ARGS: "--auth-host=scram-sha-256"
@@ -101,7 +101,7 @@ services:
     networks:
       - bot_network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-bot_user} -d ${POSTGRES_DB:-discord_bot}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-bot_user} -d ${POSTGRES_DB:-whisper_engine}"]
       interval: 10s
       timeout: 5s
       retries: 3
