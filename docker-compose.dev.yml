@@ -12,9 +12,11 @@ services:
     volumes:
       # Override the copied source code with live mounting for development
       - ./src:/app/src
-      - ./system_prompt.md:/app/system_prompt.md
+      - ./prompts:/app/prompts
       - ./validate_config.py:/app/validate_config.py
-      # System prompt templates for easy switching
+      - ./run.py:/app/run.py
+      - ./env_manager.py:/app/env_manager.py
+      # System prompt templates and configuration for easy switching
       - ./config:/app/config
       
     environment:

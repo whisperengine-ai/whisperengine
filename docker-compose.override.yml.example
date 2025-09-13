@@ -1,0 +1,27 @@
+# Example Docker Compose Override for Prompt Switching
+# Save as docker-compose.override.yml to automatically apply these settings
+
+services:
+  discord-bot:
+    environment:
+      # Switch to a different personality - uncomment one:
+      
+      # Enhanced Dream character with additional emotional intelligence
+      - BOT_SYSTEM_PROMPT_FILE=/app/prompts/dream_ai_enhanced.md
+      
+      # Professional business assistant
+      # - BOT_SYSTEM_PROMPT_FILE=/app/prompts/professional_ai_template.md
+      
+      # Casual friend for gaming servers
+      # - BOT_SYSTEM_PROMPT_FILE=/app/prompts/casual_friend_template.md
+      
+      # Empathetic companion for support communities
+      # - BOT_SYSTEM_PROMPT_FILE=/app/prompts/empathetic_companion_template.md
+      
+      # Custom personality (create your own file first)
+      # - BOT_SYSTEM_PROMPT_FILE=/app/prompts/my_custom_personality.md
+      
+    # Optional: Add labels for easier management
+    labels:
+      - "personality=dream_enhanced"
+      - "mode=development"

@@ -60,7 +60,7 @@ LLM_CHAT_API_URL=http://host.docker.internal:1234/v1
 LLM_MODEL_NAME=your-model-name
 
 # OPTIONAL: Choose AI personality (defaults to Dream)
-BOT_SYSTEM_PROMPT_FILE=./config/system_prompts/empathetic_companion_template.md
+BOT_SYSTEM_PROMPT_FILE=./prompts/empathetic_companion_template.md
 ```
 
 ## 🎭 Available Personalities
@@ -71,13 +71,13 @@ After setup, you can instantly switch personalities:
 # Edit .env and change BOT_SYSTEM_PROMPT_FILE to:
 
 # 💝 Supportive companion
-BOT_SYSTEM_PROMPT_FILE=./config/system_prompts/empathetic_companion_template.md
+BOT_SYSTEM_PROMPT_FILE=./prompts/empathetic_companion_template.md
 
 # 👔 Business assistant  
-BOT_SYSTEM_PROMPT_FILE=./config/system_prompts/professional_ai_template.md
+BOT_SYSTEM_PROMPT_FILE=./prompts/professional_ai_template.md
 
 # 😊 Casual friend
-BOT_SYSTEM_PROMPT_FILE=./config/system_prompts/casual_friend_template.md
+BOT_SYSTEM_PROMPT_FILE=./prompts/casual_friend_template.md
 
 # Restart: docker-compose restart
 ```

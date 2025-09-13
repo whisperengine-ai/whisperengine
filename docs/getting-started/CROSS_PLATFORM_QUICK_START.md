@@ -217,7 +217,7 @@ After successful installation:
 
 1. **🎭 Customize Your Bot**
    - Read the [Character Creation Guide](../character/character_prompt_guide.md)
-   - Explore personality templates in `config/system_prompts/`
+   - Explore personality templates in `prompts/`
 
 2. **⚙️ Advanced Configuration**
    - Set up local LLM providers (LM Studio, Ollama)

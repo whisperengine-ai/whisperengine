@@ -1,0 +1,28 @@
+# Development Hot Reload - Docker Compose Override
+# Save as docker-compose.hotreload.yml
+
+services:
+  discord-bot:
+    volumes:
+      # Mount source code for live editing
+      - ./src:/app/src
+      - ./prompts:/app/prompts
+      - ./config:/app/config
+      - ./run.py:/app/run.py
+      - ./env_manager.py:/app/env_manager.py
+      
+    environment:
+      - DEBUG_MODE=true
+      - LOG_LEVEL=DEBUG
+      - PYTHONUNBUFFERED=1
+      
+    # Use a file watcher for auto-restart
+    command: >
+      sh -c "
+        echo '🔥 Hot reload mode: watching for Python changes...' &&
+        pip install watchdog &&
+        watchmedo auto-restart --patterns='*.py' --recursive -- python -u run.py
+      "
+      
+    labels:
+      - "dev.hotreload=true"

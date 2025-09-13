@@ -203,40 +203,58 @@ EOF
     print_status "Created basic .env (hidden) and env.example (visible copy)"
 fi
 
-# Download config templates directory
-print_info "Downloading personality templates..."
-mkdir -p config/system_prompts
+# Download prompts directory
+print_info "Downloading personality prompts..."
+mkdir -p prompts
 
-# Download personality templates from GitHub
-GITHUB_BASE="https://raw.githubusercontent.com/WhisperEngine-AI/whisperengine/main/config/system_prompts"
+# Download personality templates from GitHub (new prompts location)
+GITHUB_BASE="https://raw.githubusercontent.com/WhisperEngine-AI/whisperengine/main/prompts"
 TEMPLATES=(
     "empathetic_companion_template.md"
     "professional_ai_template.md" 
     "casual_friend_template.md"
     "character_ai_template.md"
     "adaptive_ai_template.md"
+    "dream_ai_enhanced.md"
+    "README.md"
 )
 
 for template in "${TEMPLATES[@]}"; do
-    if curl -sSL "$GITHUB_BASE/$template" -o "config/system_prompts/$template" 2>/dev/null; then
+    if curl -sSL "$GITHUB_BASE/$template" -o "prompts/$template" 2>/dev/null; then
         print_status "Downloaded: $template"
     else
         print_warning "Could not download: $template (will use defaults)"
     fi
 done
 
-# Download default system prompt
-if curl -sSL "https://raw.githubusercontent.com/WhisperEngine-AI/whisperengine/main/system_prompt.md" -o "system_prompt.md" 2>/dev/null; then
-    print_status "Downloaded default system prompt"
+# Download default system prompt to prompts directory
+if curl -sSL "https://raw.githubusercontent.com/WhisperEngine-AI/whisperengine/main/prompts/default.md" -o "prompts/default.md" 2>/dev/null; then
+    print_status "Downloaded default prompt"
 else
-    # Create a basic fallback
-    cat > system_prompt.md << 'EOF'
-You are a helpful AI assistant. You are friendly, knowledgeable, and always ready to help users with their questions and tasks. You communicate in a warm, approachable manner while being professional and informative.
+    # Create a basic fallback in prompts directory
+    cat > prompts/default.md << 'EOF'
+You are a helpful AI assistant. You are friendly, knowledgeable, and always ready to help users with your questions and tasks. You communicate in a warm, approachable manner while being professional and informative.
 EOF
-    print_warning "Using fallback system prompt"
+    print_warning "Using fallback default prompt"
 fi
 
+# Create legacy config directory for backward compatibility
+print_info "Creating backward compatibility links..."
+mkdir -p config/system_prompts
+for template in prompts/*.md; do
+    if [[ -f "$template" && "$(basename "$template")" != "README.md" ]]; then
+        ln -sf "../../$template" "config/system_prompts/$(basename "$template")"
+    fi
+done
+print_status "Legacy compatibility maintained"
+
 print_status "Configuration files created!"
+
+# Also create a legacy system_prompt.md link for backward compatibility
+if [[ -f "prompts/default.md" ]]; then
+    ln -sf "prompts/default.md" "system_prompt.md"
+    print_status "Created legacy system_prompt.md link"
+fi
 
 # Pull the latest image
 print_info "Pulling WhisperEngine image from Docker Hub..."
