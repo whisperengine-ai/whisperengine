@@ -569,7 +569,7 @@ class DiscordVoiceManager:
                 self.logger.debug(f"Streaming TTS for: {text[:50]}...")
                 
                 try:
-                    from streaming_audio_source import create_streaming_audio_source, cleanup_streaming_audio
+                    from .streaming_audio_source import create_streaming_audio_source, cleanup_streaming_audio
                     
                     # Get streaming audio chunks
                     chunk_generator = self.elevenlabs.text_to_speech_stream(text)
@@ -594,11 +594,11 @@ class DiscordVoiceManager:
                     # Clean up streaming resources
                     cleanup_streaming_audio(temp_filename, self.logger)
                     
-                except ImportError:
-                    self.logger.warning("Streaming audio source not available, falling back to regular TTS")
+                except ImportError as e:
+                    self.logger.warning(f"Streaming audio source not available (ImportError: {e}), falling back to regular TTS")
                     use_streaming = False
                 except Exception as e:
-                    self.logger.warning(f"Streaming TTS failed: {e}, falling back to regular TTS")
+                    self.logger.warning(f"Streaming TTS failed ({type(e).__name__}: {e}), falling back to regular TTS")
                     use_streaming = False
             
             if not use_streaming:
