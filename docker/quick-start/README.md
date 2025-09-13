@@ -10,6 +10,7 @@ Your WhisperEngine instance includes:
 - **🧠 ChromaDB** - Vector database for semantic memory
 - **⚡ Redis** - Fast conversation caching
 - **🐘 PostgreSQL** - Persistent data storage
+- **🏥 Health Monitoring** - Container health checks on port 9090
 - **🕸️ Neo4j** - Optional graph relationships (disabled by default)
 
 ## ⚙️ Configuration Files
@@ -22,6 +23,12 @@ Your WhisperEngine instance includes:
 | **`docker-compose.yml`** | Service definitions | Visible |
 
 ## 🎯 Next Steps
+
+### ⚠️ Important: Docker Hub Images
+**Note**: The quick-start uses pre-built images from Docker Hub. For maximum security:
+- **Production**: Build your own images using the main repository
+- **Development**: Use the development setup from the main repo
+- **Quick Testing**: This setup is perfect for trying WhisperEngine
 
 ### 1. Configure Your Bot Token
 Edit your `.env` file and set:
@@ -80,6 +87,11 @@ docker-compose pull && docker-compose up -d
 ```bash
 # Check all services
 docker-compose ps
+
+# Test health endpoints
+curl http://localhost:9090/health
+curl http://localhost:9090/ready
+curl http://localhost:9090/metrics
 
 # Individual service logs
 docker-compose logs redis

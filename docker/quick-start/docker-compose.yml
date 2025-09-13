@@ -10,6 +10,11 @@ services:
     env_file:
       - .env
       
+    environment:
+      # Health check configuration
+      - HEALTH_CHECK_PORT=9090
+      - HEALTH_CHECK_HOST=0.0.0.0
+      
     volumes:
       # Mount config directory for personality templates
       - ./config:/app/config:ro
@@ -17,7 +22,15 @@ services:
       - ./prompts:/app/prompts:ro
       
     ports:
-      - "8000:8000"  # ChromaDB web interface (optional)
+      - "9090:9090"  # Health check endpoints
+      
+    # Health check using built-in endpoints
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9090/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
       
     depends_on:
       - redis
