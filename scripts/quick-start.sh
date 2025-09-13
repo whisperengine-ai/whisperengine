@@ -140,37 +140,40 @@ volumes:
   chromadb_data:
 EOF
 
-# Create minimal .env file
-cat > .env << 'EOF'
-# =============================================================================
-# WhisperEngine Quick Start Configuration
-# =============================================================================
+# Download .env.minimal and use it as template
+print_info "Downloading environment configuration template..."
+if curl -sSL "https://raw.githubusercontent.com/WhisperEngine-AI/whisperengine/main/docker/quick-start/.env.minimal" -o ".env.minimal" 2>/dev/null; then
+    print_status "Downloaded Docker quick-start .env.minimal template"
+    
+    # Create .env from template
+    cp .env.minimal .env
+    # Also create a visible copy for easy reference
+    cp .env.minimal env.example
+    
+    print_status "Created .env (hidden) and env.example (visible copy)"
+else
+    print_warning "Could not download .env.minimal, creating basic template..."
+    
+    # Create basic fallback .env file
+    cat > .env << 'EOF'
+# =======================================================
+# WhisperEngine - Basic Configuration
+# =======================================================
 
-# ========================================
-# REQUIRED: Discord Bot Configuration
-# ========================================
-# Get your token from: https://discord.com/developers/applications
+# REQUIRED: Discord Bot Token
+# Get from: https://discord.com/developers/applications
 DISCORD_BOT_TOKEN=your_discord_bot_token_here
 
-# ========================================
-# REQUIRED: LLM Configuration
-# ========================================
-# Local LLM (LM Studio, Ollama, etc.)
+# REQUIRED: Local LLM Configuration
+# Default: LM Studio (start LM Studio and load a model first)
 LLM_CHAT_API_URL=http://host.docker.internal:1234/v1
-LLM_MODEL_NAME=your-model-name
+LLM_MODEL_NAME=your-loaded-model-name
 
-# ========================================
-# AI Personality (Optional)
-# ========================================
-# Choose your bot's personality (uncomment one):
-# BOT_SYSTEM_PROMPT_FILE=./config/system_prompts/empathetic_companion_template.md    # 💝 Supportive friend
-# BOT_SYSTEM_PROMPT_FILE=./config/system_prompts/professional_ai_template.md        # 👔 Business assistant
-# BOT_SYSTEM_PROMPT_FILE=./config/system_prompts/casual_friend_template.md          # 😊 Casual buddy
-# BOT_SYSTEM_PROMPT_FILE=./config/system_prompts/character_ai_template.md           # 🎭 Roleplay character
+# Bot Settings
+DISCORD_COMMAND_PREFIX=!
+ADMIN_USER_IDS=your_discord_user_id_here
 
-# ========================================
-# Database Configuration (Auto-configured)
-# ========================================
+# Database Configuration (Auto-configured for Docker)
 REDIS_HOST=redis
 REDIS_PORT=6379
 POSTGRES_HOST=postgres
@@ -181,26 +184,24 @@ POSTGRES_PASSWORD=bot_password_change_me
 CHROMADB_HOST=chromadb
 CHROMADB_PORT=8000
 
-# ========================================
-# Optional: Cloud LLM Providers
-# ========================================
-# Uncomment and configure if using cloud instead of local LLM:
-# LLM_CHAT_API_URL=https://api.openai.com/v1
-# OPENAI_API_KEY=your_openai_api_key_here
-# LLM_MODEL_NAME=gpt-4o-mini
+# Neo4j Graph Database (optional)
+ENABLE_GRAPH_DATABASE=false
+NEO4J_HOST=neo4j
+NEO4J_PORT=7687
+NEO4J_USERNAME=neo4j
+NEO4J_PASSWORD=neo4j_password_change_me
 
-# LLM_CHAT_API_URL=https://openrouter.ai/api/v1  
-# OPENROUTER_API_KEY=your_openrouter_api_key_here
-# LLM_MODEL_NAME=anthropic/claude-3.5-sonnet
-
-# ========================================
-# Advanced Features (Optional)
-# ========================================
+# Advanced Features
 DEBUG_MODE=false
 LOG_LEVEL=INFO
 USE_REDIS_CACHE=true
 USE_CHROMADB_HTTP=true
 EOF
+    
+    # Also create visible copy
+    cp .env env.example
+    print_status "Created basic .env (hidden) and env.example (visible copy)"
+fi
 
 # Download config templates directory
 print_info "Downloading personality templates..."
@@ -252,7 +253,8 @@ echo "🎉 Setup Complete! Next steps:"
 echo "==============================="
 echo ""
 print_info "1. Edit your configuration:"
-echo "   nano .env"
+echo "   nano .env                 # Hidden file (use 'ls -la' to see it)"
+echo "   nano env.example          # Visible copy for reference"
 echo "   (Set your DISCORD_BOT_TOKEN and LLM settings)"
 echo ""
 print_info "2. Start your bot:"
