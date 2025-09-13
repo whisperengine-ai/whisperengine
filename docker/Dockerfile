@@ -51,7 +51,7 @@ USER appuser
 
 # Health check for container orchestration
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD python -c "import sys; sys.exit(0)" || exit 1
+    CMD curl -f http://localhost:9090/health || exit 1
 
 # Use exec form for proper signal handling, but keep validation
 CMD ["sh", "-c", "python validate_config.py && exec python run.py"]

@@ -25,6 +25,7 @@ from src.handlers.memory import MemoryCommandHandlers
 from src.handlers.admin import AdminCommandHandlers
 from src.handlers.privacy import PrivacyCommandHandlers
 from src.handlers.voice import VoiceCommandHandlers
+from src.utils.health_server import create_health_server
 from src.utils.helpers import is_admin
 
 # Logging is already configured by the root launcher
@@ -50,6 +51,7 @@ class ModularBotManager:
         self.bot = None
         self.event_handlers: Optional[BotEventHandlers] = None
         self.command_handlers = {}
+        self.health_server = None
         
     async def initialize(self):
         """Initialize all bot components in the correct order."""
@@ -70,6 +72,10 @@ class ModularBotManager:
             await self._initialize_command_handlers()
             logger.info("✅ Command handlers initialized")
             
+            # Step 4: Initialize health check server for container orchestration
+            await self._initialize_health_server()
+            logger.info("✅ Health check server initialized")
+
             # Get bot name for personalized startup message
             bot_name = os.getenv('DISCORD_BOT_NAME', '')
             if bot_name:
@@ -174,6 +180,28 @@ class ModularBotManager:
             logger.error(f"Failed to initialize command handlers: {e}")
             raise
     
+    async def _initialize_health_server(self):
+        """Initialize the health check server for container orchestration."""
+        try:
+            if not self.bot:
+                logger.warning("Bot not available for health server")
+                return
+                
+            # Get health server configuration from environment
+            health_port = int(os.getenv('HEALTH_CHECK_PORT', '9090'))
+            health_host = os.getenv('HEALTH_CHECK_HOST', '0.0.0.0')
+            
+            # Create and start health server
+            self.health_server = create_health_server(self.bot, port=health_port, host=health_host)
+            await self.health_server.start()
+            
+            logger.info(f"🏥 Health check server started on {health_host}:{health_port}")
+            
+        except Exception as e:
+            logger.error(f"Failed to initialize health server: {e}")
+            # Don't raise - health server is optional for development
+            logger.warning("Continuing without health server...")
+    
     async def run(self):
         """Start the Discord bot."""
         if not self.bot:
@@ -188,6 +216,11 @@ class ModularBotManager:
     async def cleanup(self):
         """Clean up resources when shutting down."""
         try:
+            # Stop health server first
+            if self.health_server:
+                await self.health_server.stop()
+                logger.info("🏥 Health check server stopped")
+            
             if self.bot_core and hasattr(self.bot_core, 'shutdown_manager') and self.bot_core.shutdown_manager:
                 await self.bot_core.shutdown_manager.graceful_shutdown()
             

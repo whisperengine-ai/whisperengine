@@ -16,6 +16,10 @@ services:
       - LOG_LEVEL=DEBUG
       - PYTHONUNBUFFERED=1
       
+    # Expose health check port for development
+    ports:
+      - "9090:9090"  # Health check endpoint
+      
     # Use a file watcher for auto-restart
     command: >
       sh -c "

@@ -20,6 +20,12 @@ services:
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
       - DEBUG_MODE=false
       - PYTHONUNBUFFERED=1
+      - HEALTH_CHECK_PORT=9090
+      - HEALTH_CHECK_HOST=0.0.0.0
+      
+    # Expose health check port for container orchestration
+    ports:
+      - "9090:9090"  # Health check endpoint
       
     # Resource limits
     deploy:
@@ -31,9 +37,9 @@ services:
           memory: 512M
           cpus: '0.25'
     
-    # Health check - verify the main Python process is running
+    # Health check - use the built-in health endpoint
     healthcheck:
-      test: ["CMD-SHELL", "pgrep -f 'python.*main' > /dev/null || exit 1"]
+      test: ["CMD-SHELL", "curl -f http://localhost:9090/health || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
