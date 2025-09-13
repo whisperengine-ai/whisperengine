@@ -111,10 +111,20 @@ show_help() {
     echo "  stop [prod|dev|native]   - Stop bot"
     echo "  logs [service]           - View logs (default: whisperengine-bot)"
     echo "  status                   - Show container status"
-    echo "  restart [prod|dev|native] - Restart bot container only"
-    echo "  restart-all [prod|dev|native] - Restart all services (bot + databases)"
-    echo "  cleanup                  - Remove orphaned containers and volumes"
+    echo ""
+    echo "Restart Commands (Data Preservation):"
+    echo "  restart [prod|dev|native]     - Restart bot container only (fastest)"
+    echo "  restart-all [prod|dev|native] - Restart all services, PRESERVE data"
+    echo "  restart-full [prod|dev|native] - Alias for restart-all (preserve data)"
+    echo "  restart-clean [prod|dev|native] - Restart all services, CLEAR cache only"
+    echo ""
+    echo "Data Management:"
+    echo "  clear-cache [prod|dev|native] - Clear Redis cache, keep persistent data"
+    echo "  reset-data [prod|dev|native]  - ⚠️  DANGER: Clear ALL data volumes"
+    echo "  cleanup                       - Remove orphaned containers and volumes"
     echo "  backup <create|list|restore|help> - Data backup operations"
+    echo ""
+    echo "Development:"
     echo "  build-push [options]     - Build and push Docker image to Docker Hub"
     echo ""
     echo "Modes:"
@@ -122,12 +132,21 @@ show_help() {
     echo "  dev     - Development mode with hot-reload"
     echo "  native  - Native bot + containerized services"
     echo ""
+    echo ""
     echo "Examples:"
     echo "  $0 start prod           # Start in production"
     echo "  $0 start dev            # Start in development"
-    echo "  $0 restart prod         # Restart bot container only"
-    echo "  $0 restart-all prod     # Restart everything (bot + databases)"
+    echo "  $0 restart prod         # Restart bot only (fastest, preserve everything)"
+    echo "  $0 restart-all prod     # Restart all services, preserve data"
+    echo "  $0 restart-clean dev    # Restart all, clear cache only"
+    echo "  $0 clear-cache dev      # Clear cache without restarting"
     echo "  $0 logs                 # View bot logs"
+    echo ""
+    echo "💡 Data Persistence Guide:"
+    echo "   • restart         → Bot only, everything preserved"
+    echo "   • restart-all     → All services, data preserved" 
+    echo "   • restart-clean   → All services, cache cleared, memories kept"
+    echo "   • reset-data      → ⚠️  Nuclear option: ALL data destroyed"
     echo "  $0 logs redis           # View redis logs"
     echo "  $0 stop                 # Stop (auto-detects mode)"
     echo "  $0 cleanup              # Clean orphaned containers"
@@ -609,13 +628,134 @@ restart_all() {
         print_error "Mode is required. Please specify: prod, dev, or native"
         echo ""
         echo "Usage: $0 restart-all <mode>"
+        echo "💡 This preserves all data (memories, embeddings, relationships)"
         exit 1
     fi
     
-    echo "🔄 Restarting ALL services in $mode mode..."
+    echo "🔄 Restarting ALL services in $mode mode (preserving data)..."
     stop_bot "$mode"
     sleep 2
     start_bot "$mode"
+}
+
+restart_full() {
+    # Alias for restart_all with clearer name
+    restart_all "$1"
+}
+
+restart_clean() {
+    local mode="$1"
+    
+    # Require explicit mode selection
+    if [[ -z "$mode" ]]; then
+        print_error "Mode is required. Please specify: prod, dev, or native"
+        echo ""
+        echo "Usage: $0 restart-clean <mode>"
+        echo "💡 This clears cache but preserves memories and embeddings"
+        exit 1
+    fi
+    
+    echo "🔄 Restarting ALL services in $mode mode (clearing cache)..."
+    
+    # Stop services
+    stop_bot "$mode"
+    
+    # Clear Redis cache specifically
+    echo "🧹 Clearing Redis cache..."
+    clear_redis_cache "$mode"
+    
+    sleep 2
+    start_bot "$mode"
+    
+    print_status "Services restarted with cache cleared!"
+    echo "💾 Persistent data (memories, embeddings) preserved"
+}
+
+clear_cache() {
+    local mode="${1:-auto}"
+    
+    echo "🧹 Clearing Redis cache in $mode mode..."
+    clear_redis_cache "$mode"
+    print_status "Cache cleared! Bot will rebuild conversations from persistent memory."
+}
+
+clear_redis_cache() {
+    local mode="$1"
+    
+    # Try to clear Redis if it's running (more reliable check)
+    if docker exec whisperengine-redis redis-cli PING >/dev/null 2>&1; then
+        echo "   🗑️ Flushing Redis cache..."
+        docker exec whisperengine-redis redis-cli FLUSHALL
+        echo "   ✅ Redis cache cleared successfully"
+    else
+        echo "   ⚠️ Redis container not running, cache will be empty on next start"
+    fi
+}
+
+reset_data() {
+    local mode="$1"
+    
+    # Require explicit mode selection
+    if [[ -z "$mode" ]]; then
+        print_error "Mode is required. Please specify: prod, dev, or native"
+        echo ""
+        echo "Usage: $0 reset-data <mode>"
+        exit 1
+    fi
+    
+    # Safety confirmation
+    echo "⚠️  DANGER: This will permanently delete ALL data including:"
+    echo "   • User memories and conversation history"
+    echo "   • Vector embeddings and semantic search index"
+    echo "   • Graph relationships and personality profiles"
+    echo "   • All cached data"
+    echo ""
+    echo "🔴 This action CANNOT be undone!"
+    echo ""
+    read -p "Type 'DELETE ALL DATA' to confirm: " confirmation
+    
+    if [[ "$confirmation" != "DELETE ALL DATA" ]]; then
+        print_status "Data reset cancelled - no changes made"
+        return 0
+    fi
+    
+    echo ""
+    echo "🔥 Stopping services and deleting ALL data volumes..."
+    
+    # Stop everything first
+    stop_bot "$mode"
+    
+    # Get compose files for the mode
+    local compose_files=""
+    case $mode in
+        "prod")
+            compose_files="-f docker-compose.yml -f docker-compose.prod.yml"
+            ;;
+        "dev")
+            compose_files="-f docker-compose.yml -f docker-compose.dev.yml"
+            ;;
+        "native")
+            compose_files=""
+            ;;
+    esac
+    
+    # Remove containers AND volumes
+    echo "💥 Removing containers and volumes..."
+    eval "$COMPOSE_CMD $compose_files down -v --remove-orphans"
+    
+    # Also remove any named volumes that might persist
+    echo "🗑️ Removing named volumes..."
+    docker volume rm whisperengine-redis 2>/dev/null || true
+    docker volume rm whisperengine-postgres 2>/dev/null || true
+    docker volume rm whisperengine-chromadb 2>/dev/null || true
+    docker volume rm whisperengine-neo4j-data 2>/dev/null || true
+    docker volume rm whisperengine-data 2>/dev/null || true
+    docker volume rm whisperengine-backups 2>/dev/null || true
+    
+    print_status "ALL data volumes deleted!"
+    echo ""
+    echo "🚀 Start the bot again with: $0 start $mode"
+    echo "💡 The bot will initialize with fresh databases and no memory of previous conversations"
 }
 
 cleanup_containers() {
@@ -698,6 +838,18 @@ case "${1:-help}" in
         ;;
     "restart-all")
         restart_all "${2:-}"
+        ;;
+    "restart-full")
+        restart_full "${2:-}"
+        ;;
+    "restart-clean")
+        restart_clean "${2:-}"
+        ;;
+    "clear-cache")
+        clear_cache "${2:-}"
+        ;;
+    "reset-data")
+        reset_data "${2:-}"
         ;;
     "cleanup")
         cleanup_containers
