@@ -1,0 +1,205 @@
+{
+  "response_leakage_indicators": {
+    "description": "Patterns that indicate system information leakage in bot responses",
+    "patterns": [
+      {
+        "name": "previous_conversation_context",
+        "pattern": "Previous conversation context:",
+        "description": "Explicit context header in response"
+      },
+      {
+        "name": "global_facts_pattern",
+        "pattern": "Global Facts.*?about the world",
+        "description": "Global facts system information"
+      },
+      {
+        "name": "user_specific_information",
+        "pattern": "User-specific information:",
+        "description": "User data header in response"
+      },
+      {
+        "name": "current_time_utc",
+        "pattern": "Current time:.*?UTC",
+        "description": "System time information"
+      },
+      {
+        "name": "emotional_context_relationship",
+        "pattern": "emotional context:.*?relationship",
+        "description": "Internal emotional context data"
+      },
+      {
+        "name": "intimate_mode_context",
+        "pattern": "Intimate Mode.*?context",
+        "description": "Implementation mode context information"
+      },
+      {
+        "name": "memory_network_status",
+        "pattern": "Memory Network.*?Status.*?:",
+        "description": "Memory network internal status"
+      },
+      {
+        "name": "relationship_depth_value",
+        "pattern": "Relationship Depth.*?:.*?(Friend|Close|Eternal)",
+        "description": "Relationship depth internal values"
+      },
+      {
+        "name": "ai_system_style_human_like",
+        "pattern": "Implementation Mode.*?:.*?Heavy",
+        "description": "Implementation mode internal configuration"
+      },
+      {
+        "name": "external_emotion_analysis_tier",
+        "pattern": "External Emotion Analysis.*?Tier",
+        "description": "External emotion analysis system information"
+      },
+      {
+        "name": "generic_json_context_structure",
+        "pattern": "\\{\\s*\"\\w+_context\"\\s*:",
+        "description": "Generic JSON context structure"
+      },
+      {
+        "name": "lowercase_context_field",
+        "pattern": "\"[a-z_]+_context\"\\s*:\\s*\"[^\"]*\"",
+        "description": "Lowercase context field with value"
+      }
+    ]
+  },
+
+  "xml_response_patterns": {
+    "description": "XML response tag patterns that indicate system formatting leakage",
+    "patterns": [
+      {
+        "name": "response_tag_start",
+        "pattern": "^<response>\\s*",
+        "description": "XML response opening tag at start"
+      },
+      {
+        "name": "response_tag_end", 
+        "pattern": "\\s*</response>$",
+        "description": "XML response closing tag at end"
+      },
+      {
+        "name": "complete_response_wrap",
+        "pattern": "^\\s*<response>\\s*.*\\s*</response>\\s*$",
+        "description": "Complete XML response tag wrapping"
+      }
+    ]
+  },
+
+  "context_variable_at_start_patterns": {
+    "description": "Context variables appearing at the very beginning of responses (critical security issue)",
+    "patterns": [
+      {
+        "name": "memory_network_context_start",
+        "pattern": "^\\s*\\{MEMORY_NETWORK_CONTEXT\\}",
+        "description": "Memory network context at response start"
+      },
+      {
+        "name": "relationship_depth_context_start",
+        "pattern": "^\\s*\\{RELATIONSHIP_DEPTH_CONTEXT\\}",
+        "description": "Relationship depth context at response start"
+      },
+      {
+        "name": "personality_context_start",
+        "pattern": "^\\s*\\{PERSONALITY_CONTEXT\\}",
+        "description": "Personality context at response start"
+      },
+      {
+        "name": "emotional_state_context_start",
+        "pattern": "^\\s*\\{EMOTIONAL_STATE_CONTEXT\\}",
+        "description": "Emotional state context at response start"
+      },
+      {
+        "name": "external_emotion_context_start",
+        "pattern": "^\\s*\\{EXTERNAL_EMOTION_CONTEXT\\}",
+        "description": "External emotion context at response start"
+      },
+      {
+        "name": "emotional_prediction_context_start",
+        "pattern": "^\\s*\\{EMOTIONAL_PREDICTION_CONTEXT\\}",
+        "description": "Emotional prediction context at response start"
+      },
+      {
+        "name": "relationship_context_start",
+        "pattern": "^\\s*\\{RELATIONSHIP_CONTEXT\\}",
+        "description": "Relationship context at response start"
+      },
+      {
+        "name": "proactive_support_context_start",
+        "pattern": "^\\s*\\{PROACTIVE_SUPPORT_CONTEXT\\}",
+        "description": "Proactive support context at response start"
+      },
+      {
+        "name": "emotional_intelligence_context_start",
+        "pattern": "^\\s*\\{EMOTIONAL_INTELLIGENCE_CONTEXT\\}",
+        "description": "Emotional intelligence context at response start"
+      },
+      {
+        "name": "ai_system_context_start",
+        "pattern": "^\\s*\\{AI_SYSTEM_CONTEXT\\}",
+        "description": "Implementation mode context at response start"
+      },
+      {
+        "name": "multiple_context_variables",
+        "pattern": "\\{[A-Z_]+_CONTEXT\\}\\s*\\{[A-Z_]+_CONTEXT\\}",
+        "description": "Multiple context variables appearing together"
+      },
+      {
+        "name": "generic_context_variable_at_start",
+        "pattern": "^\\s*\\{[A-Z_]*CONTEXT[A-Z_]*\\}",
+        "description": "Any context variable pattern at response start"
+      }
+    ]
+  },
+
+  "safe_replacements": {
+    "description": "Safe replacement patterns for sensitive content (preserve functionality while hiding details)",
+    "replacements": [
+      {
+        "pattern": "##[A-Za-z]+",
+        "replacement": "[SECTION]",
+        "description": "Replace system structure markers"
+      },
+      {
+        "pattern": "role.*?system.*?content",
+        "replacement": "[SYSTEM_MESSAGE]",
+        "description": "Replace role/content structure"
+      },
+      {
+        "pattern": "DEFAULT_SYSTEM_PROMPT",
+        "replacement": "[SYSTEM_PROMPT]",
+        "description": "Replace system prompt variable"
+      },
+      {
+        "pattern": "conversation_context\\.append.*?\\n",
+        "replacement": "[CONTEXT_PROCESSING]\\n",
+        "description": "Replace context manipulation code"
+      },
+      {
+        "pattern": "memory_manager\\.[a-zA-Z_]+",
+        "replacement": "[MEMORY_OPERATION]",
+        "description": "Replace memory manager calls"
+      },
+      {
+        "pattern": "ChromaDB.*?collection",
+        "replacement": "[DATABASE_OPERATION]",
+        "description": "Replace database operations"
+      },
+      {
+        "pattern": "user_id:\\s*[0-9]+",
+        "replacement": "user_id: [PROTECTED]",
+        "description": "Protect user ID values"
+      },
+      {
+        "pattern": "emotion_context:.*?\\n",
+        "replacement": "emotion_context: [PROTECTED]\\n",
+        "description": "Protect emotion context data"
+      },
+      {
+        "pattern": "interaction_count:\\s*[0-9]+",
+        "replacement": "interaction_count: [PROTECTED]",
+        "description": "Protect interaction count data"
+      }
+    ]
+  }
+}

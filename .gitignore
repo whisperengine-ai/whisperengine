@@ -1,0 +1,112 @@
+# ===== PYTHON =====
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Testing
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+.pytest_cache/
+
+# Environment & Package Management
+.env
+.env.local
+.env.native
+.venv/
+venv/
+env/
+ENV/
+__pypackages__/
+
+# IDE & Editors
+.vscode/
+*.code-workspace
+.idea/
+.spyderproject
+.spyproject
+.ropeproject
+
+# Type checkers
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.pyre/
+
+# ===== SYSTEM FILES =====
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+
+# ===== PROJECT SPECIFIC =====
+# Bot data & configuration
+config.json
+secrets.json
+*.token
+*.key
+conversations.json
+user_profiles.json
+user_profiles.db
+system_prompt.txt
+
+# Data directories
+chromadb_data/
+logs/
+backups/
+models/
+checkpoints/
+
+# Logs
+*.log
+*.out
+*.err
+
+# Docker
+.env.docker
+docker-compose.override.yml
+docker-data/
+
+# AI/ML files
+*.pkl
+*.model
+*.h5
+*.ckpt
+
+# Temporary development files

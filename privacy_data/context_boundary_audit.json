@@ -1,0 +1,20 @@
+[
+  {
+    "user_id": "test_user_memory",
+    "request_timestamp": "2025-09-09T21:13:55.798108",
+    "source_context": "public_channel",
+    "target_context": "dm",
+    "decision": "blocked",
+    "reason": "Privacy level moderate rule: server_to_dm",
+    "privacy_level": "moderate"
+  },
+  {
+    "user_id": "test_user_memory",
+    "request_timestamp": "2025-09-09T21:14:10.525908",
+    "source_context": "public_channel",
+    "target_context": "dm",
+    "decision": "blocked",
+    "reason": "Privacy level moderate rule: server_to_dm",
+    "privacy_level": "moderate"
+  }
+]
