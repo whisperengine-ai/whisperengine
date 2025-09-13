@@ -104,7 +104,7 @@ class UserMemoryManager:
             collection_name = os.getenv("CHROMADB_COLLECTION_NAME", "user_memories")
             if self.use_external_embeddings:
                 # Create collection with 768-dimensional metadata for external embeddings
-                embedding_model = os.getenv("LLM_EMBEDDING_MODEL_NAME", "text-embedding-nomic-embed-text-v1.5")
+                embedding_model = os.getenv("LLM_EMBEDDING_MODEL", "text-embedding-nomic-embed-text-v1.5")
                 if "nomic" in embedding_model.lower() or "768" in embedding_model:
                     embedding_dim = 768
                 else:

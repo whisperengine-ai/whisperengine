@@ -140,7 +140,7 @@ def validate_llm_and_embedding_endpoints() -> bool:
         # Embedding configuration - use standardized variable names
         embedding_api_url = os.getenv('LLM_EMBEDDING_API_URL')
         embedding_api_key = os.getenv('LLM_EMBEDDING_API_KEY', '')
-        embedding_model = os.getenv('LLM_EMBEDDING_MODEL_NAME')
+        embedding_model = os.getenv('LLM_EMBEDDING_MODEL')
         
         # Validate required embedding configuration
         if not embedding_api_url:
@@ -151,8 +151,8 @@ def validate_llm_and_embedding_endpoints() -> bool:
             return False
             
         if not embedding_model:
-            logger.error("❌ LLM_EMBEDDING_MODEL_NAME environment variable not set")
-            print("❌ Missing required configuration: LLM_EMBEDDING_MODEL_NAME")
+            logger.error("❌ LLM_EMBEDDING_MODEL environment variable not set")
+            print("❌ Missing required configuration: LLM_EMBEDDING_MODEL")
             print("   Please set this variable in your .env file.")
             print("   📖 Check .env.example and docs/ENVIRONMENT_VARIABLES_REFERENCE.md for details")
             return False

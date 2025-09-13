@@ -13,11 +13,28 @@ services:
     
     # Environment configuration
     env_file:
-      - .env.production  # Base production defaults
-      - .env             # Local overrides (includes secrets like DISCORD_BOT_TOKEN)
+      - .env             # Local secrets and overrides
     environment:
       # Production overrides
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - ENV_MODE=production
+      
+      # LLM Configuration - Local LM Studio defaults (override in .env)
+      - LLM_CHAT_API_URL=http://host.docker.internal:1234/v1
+      - LLM_CHAT_API_KEY=
+      - LLM_CHAT_MODEL=mistralai/mistral-nemo-instruct-2407
+      
+      - LLM_FACTS_API_URL=http://host.docker.internal:1234/v1
+      - LLM_FACTS_API_KEY=
+      - LLM_FACTS_MODEL=google/gemma-3n-e4b
+      
+      - LLM_EMOTION_API_URL=http://host.docker.internal:1234/v1
+      - LLM_EMOTION_API_KEY=
+      - LLM_EMOTION_MODEL=mistralai/mistral-nemo-instruct-2407
+      
+      - LLM_EMBEDDING_API_URL=http://host.docker.internal:1234/v1
+      - LLM_EMBEDDING_API_KEY=
+      - LLM_EMBEDDING_MODEL=text-embedding-nomic-embed-text-v1.5
       - DEBUG_MODE=false
       - PYTHONUNBUFFERED=1
       

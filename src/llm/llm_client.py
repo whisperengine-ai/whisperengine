@@ -41,7 +41,7 @@ class LLMClient:
         
         # Load configuration from environment variables
         self.api_url = api_url or os.getenv("LLM_CHAT_API_URL", "http://localhost:1234/v1")
-        raw_api_key = api_key or os.getenv("OPENROUTER_API_KEY")
+        raw_api_key = api_key or os.getenv("LLM_CHAT_API_KEY")
         
         # SECURITY ENHANCEMENT: Validate API key before using
         if raw_api_key and self.api_key_manager:
@@ -56,8 +56,8 @@ class LLMClient:
             self.api_key = raw_api_key  # Fallback to basic handling
         
         # Load separate endpoint for emotion analysis
-        self.emotion_api_url = os.getenv("LLM_EMOTION_API_URL", self.api_url)
-        raw_emotion_key = os.getenv("LLM_EMOTION_API_KEY", self.api_key)
+        self.emotion_api_url = os.getenv("LLM_EMOTION_API_URL")
+        raw_emotion_key = os.getenv("LLM_EMOTION_API_KEY")
         
         # SECURITY ENHANCEMENT: Validate emotion API key
         if raw_emotion_key and self.api_key_manager:
@@ -72,9 +72,8 @@ class LLMClient:
             self.emotion_api_key = raw_emotion_key  # Fallback
 
         # Load separate endpoint for facts analysis
-        # Default to emotion endpoint if facts endpoint not specified (maintains previous behavior)
-        self.facts_api_url = os.getenv("LLM_FACTS_API_URL", self.emotion_api_url)
-        raw_facts_key = os.getenv("LLM_FACTS_API_KEY", raw_emotion_key)
+        self.facts_api_url = os.getenv("LLM_FACTS_API_URL")
+        raw_facts_key = os.getenv("LLM_FACTS_API_KEY")
         
         # SECURITY ENHANCEMENT: Validate facts API key
         if raw_facts_key and self.api_key_manager:
@@ -104,37 +103,49 @@ class LLMClient:
             self.service_name = "Custom LLM API"
         
         # Determine emotion service type
-        self.emotion_is_openrouter = "openrouter.ai" in self.emotion_api_url
-        self.emotion_is_ollama = "11434" in self.emotion_api_url or "ollama" in self.emotion_api_url.lower()
-        self.emotion_is_local_studio = self.emotion_api_url.startswith("http://localhost:1234") or self.emotion_api_url.startswith("http://127.0.0.1:1234")
-        
-        if self.emotion_is_openrouter:
-            self.emotion_service_name = "OpenRouter"
-        elif self.emotion_is_ollama:
-            self.emotion_service_name = "Ollama"
-        elif self.emotion_is_local_studio:
-            self.emotion_service_name = "LM Studio"
+        if self.emotion_api_url:
+            self.emotion_is_openrouter = "openrouter.ai" in self.emotion_api_url
+            self.emotion_is_ollama = "11434" in self.emotion_api_url or "ollama" in self.emotion_api_url.lower()
+            self.emotion_is_local_studio = self.emotion_api_url.startswith("http://localhost:1234") or self.emotion_api_url.startswith("http://127.0.0.1:1234")
+            
+            if self.emotion_is_openrouter:
+                self.emotion_service_name = "OpenRouter"
+            elif self.emotion_is_ollama:
+                self.emotion_service_name = "Ollama"
+            elif self.emotion_is_local_studio:
+                self.emotion_service_name = "LM Studio"
+            else:
+                self.emotion_service_name = "Custom LLM API"
         else:
-            self.emotion_service_name = "Custom LLM API"
+            self.emotion_is_openrouter = False
+            self.emotion_is_ollama = False
+            self.emotion_is_local_studio = False
+            self.emotion_service_name = "Not Configured"
         
         # Determine facts service type
-        self.facts_is_openrouter = "openrouter.ai" in self.facts_api_url
-        self.facts_is_ollama = "11434" in self.facts_api_url or "ollama" in self.facts_api_url.lower()
-        self.facts_is_local_studio = self.facts_api_url.startswith("http://localhost:1234") or self.facts_api_url.startswith("http://127.0.0.1:1234")
-        
-        if self.facts_is_openrouter:
-            self.facts_service_name = "OpenRouter"
-        elif self.facts_is_ollama:
-            self.facts_service_name = "Ollama"
-        elif self.facts_is_local_studio:
-            self.facts_service_name = "LM Studio"
+        if self.facts_api_url:
+            self.facts_is_openrouter = "openrouter.ai" in self.facts_api_url
+            self.facts_is_ollama = "11434" in self.facts_api_url or "ollama" in self.facts_api_url.lower()
+            self.facts_is_local_studio = self.facts_api_url.startswith("http://localhost:1234") or self.facts_api_url.startswith("http://127.0.0.1:1234")
+            
+            if self.facts_is_openrouter:
+                self.facts_service_name = "OpenRouter"
+            elif self.facts_is_ollama:
+                self.facts_service_name = "Ollama"
+            elif self.facts_is_local_studio:
+                self.facts_service_name = "LM Studio"
+            else:
+                self.facts_service_name = "Custom LLM API"
         else:
-            self.facts_service_name = "Custom LLM API"
+            self.facts_is_openrouter = False
+            self.facts_is_ollama = False
+            self.facts_is_local_studio = False
+            self.facts_service_name = "Not Configured"
         
         self.chat_endpoint = f"{self.api_url}/chat/completions"
         self.completions_endpoint = f"{self.api_url}/completions"
-        self.emotion_chat_endpoint = f"{self.emotion_api_url}/chat/completions"
-        self.facts_chat_endpoint = f"{self.facts_api_url}/chat/completions"
+        self.emotion_chat_endpoint = f"{self.emotion_api_url}/chat/completions" if self.emotion_api_url else None
+        self.facts_chat_endpoint = f"{self.facts_api_url}/chat/completions" if self.facts_api_url else None
         
         self.logger = logging.getLogger(__name__)
         
@@ -149,9 +160,13 @@ class LLMClient:
         self.max_tokens_trust_detection = int(os.getenv("LLM_MAX_TOKENS_TRUST_DETECTION", "300"))
         self.max_tokens_user_facts = int(os.getenv("LLM_MAX_TOKENS_USER_FACTS", "400"))
         
-        # Load model name from environment variable
-        self.default_model_name = os.getenv("LLM_MODEL_NAME", "local-model")
-        self.facts_model_name = os.getenv("LLM_FACTS_MODEL_NAME", self.default_model_name)
+        # Load model names from environment variables
+        self.chat_model_name = os.getenv("LLM_CHAT_MODEL", "local-model")
+        self.emotion_model_name = os.getenv("LLM_EMOTION_MODEL", self.chat_model_name)
+        self.facts_model_name = os.getenv("LLM_FACTS_MODEL", self.chat_model_name)
+        
+        # Legacy compatibility
+        self.default_model_name = self.chat_model_name
         
         # Load timeout configuration from environment variables with sensible defaults
         self.request_timeout = int(os.getenv("LLM_REQUEST_TIMEOUT", "90"))  # 90 seconds default for Discord bot (LM Studio can be slow)
@@ -557,6 +572,9 @@ class LLMClient:
         }
         
         try:
+            if not self.emotion_chat_endpoint:
+                raise ValueError("Emotion API endpoint not configured")
+                
             self.logger.debug(f"Sending request to emotion endpoint: {self.emotion_chat_endpoint}")
             
             # SECURITY ENHANCEMENT: Prepare headers for emotion endpoint with secure handling
@@ -641,6 +659,9 @@ class LLMClient:
         }
         
         try:
+            if not self.facts_chat_endpoint:
+                raise ValueError("Facts API endpoint not configured")
+                
             self.logger.debug(f"Sending request to facts endpoint: {self.facts_chat_endpoint}")
             
             # SECURITY ENHANCEMENT: Prepare headers for facts endpoint with secure handling

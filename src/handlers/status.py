@@ -82,6 +82,12 @@ class StatusCommandHandlers:
         async def test_image(ctx):
             """Test image processing with an attached image"""
             await status_handler_instance._test_image_handler(ctx)
+        
+        @self.bot.command(name='health_status', aliases=['system_health'])
+        @bot_name_filter()
+        async def health_status(ctx):
+            """Check comprehensive system health including all services"""
+            await status_handler_instance._health_status_handler(ctx)
     
     async def _llm_status_handler(self, ctx):
         """Handle LLM status command"""
@@ -497,5 +503,168 @@ class StatusCommandHandlers:
             )
         
         embed.set_footer(text=f"Processed {len(processed_images)} of {len(ctx.message.attachments)} attachments")
+        
+        await ctx.send(embed=embed)
+    
+    async def _health_status_handler(self, ctx):
+        """Handle comprehensive system health status command"""
+        logger.debug(f"Health status command called by {ctx.author.name}")
+        
+        # Import here to avoid circular imports
+        import aiohttp
+        import json
+        
+        embed = discord.Embed(
+            title="🏥 System Health Status",
+            color=0x27ae60  # Will change to red if any issues found
+        )
+        
+        # Check bot health endpoint
+        bot_health = {"status": "unknown", "details": None}
+        try:
+            timeout = aiohttp.ClientTimeout(total=5)
+            async with aiohttp.ClientSession(timeout=timeout) as session:
+                async with session.get('http://localhost:9090/health') as response:
+                    if response.status == 200:
+                        bot_health = await response.json()
+                        bot_health["status"] = "healthy"
+                    else:
+                        bot_health["status"] = "unhealthy"
+                        bot_health["details"] = f"HTTP {response.status}"
+        except Exception as e:
+            bot_health["status"] = "error"
+            bot_health["details"] = str(e)
+        
+        # Check bot readiness endpoint for detailed info
+        bot_ready = {"status": "unknown", "details": None}
+        try:
+            timeout = aiohttp.ClientTimeout(total=5)
+            async with aiohttp.ClientSession(timeout=timeout) as session:
+                async with session.get('http://localhost:9090/ready') as response:
+                    if response.status == 200:
+                        bot_ready = await response.json()
+                        bot_ready["status"] = "ready"
+                    else:
+                        bot_ready["status"] = "not_ready"
+                        bot_ready["details"] = f"HTTP {response.status}"
+        except Exception as e:
+            bot_ready["status"] = "error"
+            bot_ready["details"] = str(e)
+        
+        # Bot Health Summary
+        if bot_health["status"] == "healthy" and bot_ready["status"] == "ready":
+            bot_status_text = "✅ **Healthy & Ready**"
+            if bot_ready.get("bot_user"):
+                bot_status_text += f"\n• Bot: {bot_ready['bot_user']}"
+            if bot_ready.get("guilds_count") is not None:
+                bot_status_text += f"\n• Guilds: {bot_ready['guilds_count']}"
+            if bot_ready.get("latency_ms") is not None:
+                bot_status_text += f"\n• Latency: {bot_ready['latency_ms']:.1f}ms"
+        else:
+            bot_status_text = f"❌ **Unhealthy** - {bot_health.get('details', 'Unknown error')}"
+            embed.color = 0xe74c3c  # Red color for issues
+        
+        embed.add_field(
+            name="🤖 Discord Bot",
+            value=bot_status_text,
+            inline=False
+        )
+        
+        # Check LLM connection
+        llm_status = "✅ **Connected**" if self.llm_client.check_connection() else "❌ **Disconnected**"
+        if not self.llm_client.check_connection():
+            embed.color = 0xe74c3c
+        
+        embed.add_field(
+            name="🧠 LLM Service",
+            value=f"{llm_status}\n• Service: {self.llm_client.service_name}\n• Model: {self.llm_client.default_model_name}",
+            inline=True
+        )
+        
+        # Check voice support if available
+        if self.VOICE_AVAILABLE and self.voice_support_enabled:
+            try:
+                # Simple voice support check
+                voice_status = "✅ **Available**"
+                if self.voice_manager:
+                    # Check if voice manager is functioning
+                    voice_status += f"\n• Manager: Active"
+                else:
+                    voice_status = "⚠️ **Partial** - Manager not initialized"
+            except Exception as e:
+                voice_status = f"❌ **Error** - {str(e)}"
+                embed.color = 0xe74c3c
+        else:
+            voice_status = "❌ **Disabled**"
+        
+        embed.add_field(
+            name="🎵 Voice Support",
+            value=voice_status,
+            inline=True
+        )
+        
+        # Check image processing
+        if self.image_processor:
+            vision_config = self.llm_client.get_vision_config()
+            if vision_config and vision_config.get('supports_vision', False):
+                vision_status = "✅ **Available** - Vision model support"
+            else:
+                vision_status = "⚠️ **Text-only** - No vision model"
+        else:
+            vision_status = "❌ **Disabled**"
+        
+        embed.add_field(
+            name="👁️ Vision/Images",
+            value=vision_status,
+            inline=True
+        )
+        
+        # Check conversation cache
+        if self.conversation_cache:
+            try:
+                # Try to get cache stats as a health check
+                stats = await self.conversation_cache.get_stats()
+                cache_status = f"✅ **Active**\n• Type: {stats.get('cache_type', 'Unknown')}"
+                if 'total_conversations' in stats:
+                    cache_status += f"\n• Conversations: {stats['total_conversations']}"
+            except Exception as e:
+                cache_status = f"❌ **Error** - {str(e)}"
+                embed.color = 0xe74c3c
+        else:
+            cache_status = "❌ **Disabled**"
+        
+        embed.add_field(
+            name="💾 Conversation Cache",
+            value=cache_status,
+            inline=True
+        )
+        
+        # Check heartbeat monitor
+        if self.heartbeat_monitor:
+            try:
+                heartbeat_status = "✅ **Active**"
+                # Add more details if available
+            except Exception as e:
+                heartbeat_status = f"❌ **Error** - {str(e)}"
+                embed.color = 0xe74c3c
+        else:
+            heartbeat_status = "❌ **Not Available**"
+        
+        embed.add_field(
+            name="💓 Heartbeat Monitor",
+            value=heartbeat_status,
+            inline=True
+        )
+        
+        # Overall system status
+        overall_status = "🟢 All Systems Operational" if embed.color == 0x27ae60 else "🔴 Issues Detected"
+        embed.add_field(
+            name="📊 Overall Status",
+            value=overall_status,
+            inline=False
+        )
+        
+        # Add helpful footer
+        embed.set_footer(text="💡 Use !bot_status, !llm_status, !voice_status for detailed component info")
         
         await ctx.send(embed=embed)

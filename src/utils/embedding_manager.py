@@ -36,7 +36,7 @@ class ExternalEmbeddingManager:
             os.getenv("OPENAI_API_KEY") or  # Fallback for OpenAI API
             os.getenv("OPENROUTER_API_KEY")  # Fallback for OpenRouter API
         )
-        self.embedding_model = os.getenv("LLM_EMBEDDING_MODEL_NAME", "text-embedding-nomic-embed-text-v1.5")
+        self.embedding_model = os.getenv("LLM_EMBEDDING_MODEL", "text-embedding-nomic-embed-text-v1.5")
         
         # Control whether to use external embeddings - auto-detect based on API URL configuration
         # This matches the pattern used in memory_manager.py for consistency

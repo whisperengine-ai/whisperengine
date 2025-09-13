@@ -57,9 +57,6 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 COPY src/ ./src/
 COPY pyproject.toml validate_config.py env_manager.py run.py ./
 COPY system_prompt.md ./
-COPY .env.production ./
-# Copy local .env if it exists (for local overrides)
-COPY .env* ./
 
 # Create non-root user and directories
 RUN useradd --create-home --no-log-init appuser && \
@@ -104,8 +101,6 @@ RUN pip install --no-cache-dir -r requirements.txt && \
 # Copy application
 COPY src/ ./src/
 COPY validate_config.py env_manager.py run.py system_prompt.md ./
-# Copy environment files for configuration
-COPY .env* ./
 
 # Create user
 RUN adduser -D -s /bin/sh appuser && \
