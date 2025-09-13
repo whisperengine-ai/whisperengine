@@ -46,8 +46,8 @@ services:
       - bot_privacy:/app/privacy_data
       - bot_temp:/app/temp_images
       - bot_logs:/app/logs
-      # System prompt customization (mount host files for easy editing)
-      - ./system_prompt.md:/app/system_prompt.md:ro
+      # System prompt customization (mount prompts directory for flexible prompt management)
+      - ./prompts:/app/prompts:ro
       - ./config:/app/config:ro
       
     # Network

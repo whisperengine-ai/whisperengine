@@ -26,7 +26,7 @@ def load_system_prompt() -> str:
     Returns:
         str: The system prompt content
     """
-    prompt_file = os.getenv('BOT_SYSTEM_PROMPT_FILE', './system_prompt.md')
+    prompt_file = os.getenv('BOT_SYSTEM_PROMPT_FILE', './prompts/default.md')
     try:
         with open(prompt_file, 'r', encoding='utf-8') as f:
             return f.read().strip()

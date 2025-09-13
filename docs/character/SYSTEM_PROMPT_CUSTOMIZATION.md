@@ -1,252 +1,292 @@
 # 🎭 System Prompt Customization Guide
 
-WhisperEngine makes it easy to customize your AI's personality, whether you're running in Docker or natively. Here are all the ways you can personalize your bot.
+Transform your WhisperEngine bot with custom personalities! This guide shows you how to customize your AI's behavior, personality, and responses.
 
-## 🚀 Quick Start - Change Personality in 30 Seconds
+## 🚀 Quick Start
 
-### Option 1: Edit the Main System Prompt
+### Option 1: Edit the Default Prompt
 ```bash
-# Simply edit the main file (works in all modes)
-nano system_prompt.md
+# Edit the main personality file
+nano prompts/default.md
 
-# Restart the bot to apply changes
-./bot.sh restart
+# Changes apply automatically - no restart needed!
 ```
 
 ### Option 2: Switch to a Pre-built Template
 ```bash
 # Set environment variable to use a different template
-echo 'BOT_SYSTEM_PROMPT_FILE=./config/system_prompts/empathetic_companion_template.md' >> .env
+echo 'BOT_SYSTEM_PROMPT_FILE=./prompts/empathetic_companion_template.md' >> .env
 
-# Restart to apply
+# Restart to apply (or changes will apply to new conversations)
 ./bot.sh restart
 ```
 
 ## 📁 Available Personality Templates
 
-Your WhisperEngine installation includes several pre-built personalities:
+Your WhisperEngine installation includes several pre-built personalities in the `prompts/` directory:
 
 | Template | Personality | Best For |
 |----------|-------------|----------|
-| `empathetic_companion_template.md` | 💝 Supportive, caring friend | Emotional support, personal conversations |
-| `professional_ai_template.md` | 👔 Business assistant | Work tasks, formal communication |
-| `casual_friend_template.md` | 😊 Relaxed, friendly | Casual chats, everyday conversations |
-| `character_ai_template.md` | 🎭 Roleplay characters | Creative writing, entertainment |
-| `adaptive_ai_template.md` | 🧠 Self-adapting personality | Learning user preferences over time |
-| `dream_ai_enhanced.md` | ✨ Advanced Dream personality | Enhanced version of the default Dream character |
-| `system_prompt.md` (default) | 🌙 Dream from The Sandman | Literary character, formal speech, mystical |
+| `default.md` | Dream of the Endless | Default character, artistic communities |
+| `dream_ai_enhanced.md` | Enhanced Dream | Advanced Dream persona with more features |
+| `empathetic_companion_template.md` | Supportive Friend | Mental health support, personal growth |
+| `professional_ai_template.md` | Business Assistant | Work servers, productivity |
+| `casual_friend_template.md` | Gaming Buddy | Gaming communities, casual chat |
+| `character_ai_template.md` | Roleplay Character | D&D servers, creative writing |
+| `adaptive_ai_template.md` | Learning AI | Educational communities, research |
 
-## 🐳 Docker Customization Methods
+## 🛠️ Environment Configuration
 
-### Method 1: Direct File Editing (Recommended)
-All Docker modes mount your local files, so you can edit them directly:
-
-```bash
-# Edit the main personality file
-nano system_prompt.md
-
-# Or switch to a template by editing your environment
-nano .env
-# Add: BOT_SYSTEM_PROMPT_FILE=./config/system_prompts/casual_friend_template.md
-
-# Restart the container
-./bot.sh restart
-```
-
-**✅ Benefits:** Changes persist, easy to version control, works with all deployment modes
-
-### Method 2: Environment Variable Override
+### Docker Setup
 ```bash
 # In your .env file
-BOT_SYSTEM_PROMPT_FILE=./config/system_prompts/professional_ai_template.md
-
-# Or set temporarily
-export BOT_SYSTEM_PROMPT_FILE=./config/system_prompts/empathetic_companion_template.md
-./bot.sh start
+BOT_SYSTEM_PROMPT_FILE=./prompts/casual_friend_template.md
 ```
 
-### Method 3: Custom Volume Mount
-For advanced users who want to mount their own system prompt from elsewhere:
+### Native Python
+```bash
+# Export environment variable
+export BOT_SYSTEM_PROMPT_FILE=./prompts/empathetic_companion_template.md
+python run.py
+```
+
+## ✨ Creating Custom Prompts
+
+### 1. Start with a Template
+```bash
+# Copy an existing template as your starting point
+cp prompts/empathetic_companion_template.md prompts/my_custom_personality.md
+
+# Edit your new prompt
+nano prompts/my_custom_personality.md
+
+# Update your environment to use it
+echo 'BOT_SYSTEM_PROMPT_FILE=./prompts/my_custom_personality.md' >> .env
+```
+
+### 2. Build from Scratch
+Create a new file in the `prompts/` directory with these key sections:
+
+```markdown
+# Your Custom Bot - Example Structure
+
+## Core Identity
+You are [character name], a [description]. You embody [key traits].
+
+## Personality Traits
+- **Trait 1**: Description
+- **Trait 2**: Description
+- **Trait 3**: Description
+
+## Speaking Style
+- Tone: [formal/casual/friendly/etc.]
+- Language patterns: [specific ways of speaking]
+- Vocabulary: [specialized terms, avoid certain words]
+
+## Knowledge & Expertise
+Areas you excel in:
+- Domain 1
+- Domain 2
+- Domain 3
+
+## Interaction Guidelines
+- How to respond to questions
+- Conversation flow preferences
+- Special behaviors for different situations
+
+## Example Responses
+When asked about [topic]:
+"[Example response in character]"
+```
+
+## 🎯 Advanced Customization
+
+### Multi-Environment Setup
+Use different personalities for different environments:
+
+```bash
+# Development
+BOT_SYSTEM_PROMPT_FILE=./prompts/debug_helper.md
+
+# Production
+BOT_SYSTEM_PROMPT_FILE=./prompts/professional_ai_template.md
+
+# Testing
+BOT_SYSTEM_PROMPT_FILE=./prompts/test_character.md
+```
+
+### Docker Compose Overrides
+Create personality-specific compose files:
 
 ```yaml
-# In docker-compose.yml or docker-compose.dev.yml
-volumes:
-  - /path/to/my/custom/prompt.md:/app/system_prompt.md:ro
+# docker-compose.gaming.yml
+services:
+  discord-bot:
+    environment:
+      - BOT_SYSTEM_PROMPT_FILE=/app/prompts/gaming_buddy_example.md
 ```
 
-## 🔥 Hot-Reload Support
+### Conditional Loading
+Set up environment-based prompt selection:
 
-**The system prompt reloads automatically!** You don't need to restart the bot for changes:
-
-1. Edit `system_prompt.md` or any template file
-2. Send a message to your bot
-3. The new personality takes effect immediately
-
-This works in all deployment modes (prod, dev, native).
-
-## 🛠️ Creating Custom Personalities
-
-### 1. Copy an Existing Template
 ```bash
-# Copy a template to customize
-cp config/system_prompts/empathetic_companion_template.md my_custom_personality.md
-
-# Edit your copy
-nano my_custom_personality.md
-
-# Use it
-echo 'BOT_SYSTEM_PROMPT_FILE=./my_custom_personality.md' >> .env
+# In your .env file
+ENVIRONMENT=production
+BOT_SYSTEM_PROMPT_FILE=./prompts/${ENVIRONMENT}_personality.md
 ```
 
-### 2. Key Personality Elements to Customize
+## 🔥 Hot Reloading
 
-When creating your own personality, focus on these sections:
+WhisperEngine supports hot reloading of prompts:
 
-**Core Identity:**
-```markdown
-You are [CHARACTER NAME], a [ROLE/TYPE] with [KEY TRAITS].
-```
+- **Edit any file** in the `prompts/` directory
+- **Changes apply immediately** to new conversations
+- **No restart required** for prompt changes
+- **Previous conversations** continue with their original prompt
 
-**Personality Traits:**
-```markdown
-Your personality is [ADJECTIVES]. You are [BEHAVIORS].
-You tend to [TYPICAL ACTIONS] and [RESPONSE PATTERNS].
-```
-
-**Speaking Style:**
-```markdown
-Your speech is [FORMAL/CASUAL/etc]. You [COMMUNICATION PATTERNS].
-You use [VOCABULARY TYPE] and [SENTENCE STRUCTURE].
-```
-
-**Relationship Dynamics:**
-```markdown
-You view users as [RELATIONSHIP TYPE]. You are [INTERACTION STYLE].
-```
-
-### 3. Advanced Features (Phase 4 Intelligence)
-
-Include these sections for advanced AI features:
-
-```markdown
-## Phase 4 Human-Like Intelligence Integration
-
-You possess sophisticated multi-layered intelligence:
-
-**Conversation Mode Adaptation**: You naturally shift between:
-- Human-Like Mode: [When to use, how to behave]
-- Analytical Mode: [When to use, how to behave]
-- Balanced Mode: [Default behavior]
-
-**Emotional Intelligence**: [How to respond to emotions]
-**Memory Integration**: [How to use conversation history]
-```
-
-## 📝 Environment Variables Reference
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `BOT_SYSTEM_PROMPT_FILE` | `./system_prompt.md` | Path to system prompt file |
-
-## 🔍 Deployment Mode Differences
-
-### Production Mode (`./bot.sh start`)
-- ✅ File mounting: Yes (read-only)
-- ✅ Hot-reload: Yes
-- ✅ Template access: Yes
-- ✅ Environment variables: Yes
-
-### Development Mode (`./bot.sh start dev`)
-- ✅ File mounting: Yes (read-write)
-- ✅ Hot-reload: Yes
-- ✅ Template access: Yes  
-- ✅ Environment variables: Yes
-- ✅ Live editing: Yes (best for development)
-
-### Native Mode (`./bot.sh start native`)
-- ✅ File access: Direct (no container)
-- ✅ Hot-reload: Yes
-- ✅ Template access: Yes
-- ✅ Environment variables: Yes
-
-## 🚨 Troubleshooting
-
-### System Prompt Not Loading
+### Development Workflow
 ```bash
-# Check if file exists
-ls -la system_prompt.md
+# Start the bot
+./bot.sh start
 
-# Check file permissions
-chmod 644 system_prompt.md
+# Edit prompts while running
+nano prompts/my_personality.md
 
-# Check environment variable
+# Test immediately - changes are live!
+```
+
+## 🧪 Testing Your Prompts
+
+### Quick Testing Script
+```bash
+#!/bin/bash
+# test_prompt.sh
+
+echo "Testing prompt: $1"
+export BOT_SYSTEM_PROMPT_FILE="./prompts/$1"
+python -c "
+from src.core.config import get_system_prompt
+print('=== PROMPT PREVIEW ===')
+print(get_system_prompt())
+print('=== END PREVIEW ===')
+"
+```
+
+### A/B Testing
+Run multiple instances with different prompts:
+
+```bash
+# Terminal 1 - Version A
+BOT_SYSTEM_PROMPT_FILE=./prompts/version_a.md python run.py
+
+# Terminal 2 - Version B  
+BOT_SYSTEM_PROMPT_FILE=./prompts/version_b.md python run.py
+```
+
+## 📋 Best Practices
+
+### 1. Prompt Structure
+- **Clear identity statement** at the beginning
+- **Specific behavioral guidelines** 
+- **Example interactions** to guide responses
+- **Tone and style specifications**
+
+### 2. Version Control
+```bash
+# Keep prompts in version control
+git add prompts/
+git commit -m "Add new personality: Gaming Buddy"
+
+# Tag stable versions
+git tag -a v1.0-casual-friend -m "Stable casual friend personality"
+```
+
+### 3. Backup Strategy
+```bash
+# Regular backups of custom prompts
+tar -czf prompts-backup-$(date +%Y%m%d).tar.gz prompts/
+
+# Keep multiple versions
+mkdir prompts/archive/
+cp prompts/my_custom.md prompts/archive/my_custom-v1.md
+```
+
+### 4. Documentation
+Document your custom prompts:
+
+```markdown
+# prompts/my_custom_README.md
+## Custom Personality: [Name]
+
+### Purpose
+Why this personality was created
+
+### Usage
+When to use this personality
+
+### Customizations
+Key changes from base templates
+
+### Testing Notes
+How well it performs in different scenarios
+```
+
+## 🔧 Troubleshooting
+
+### Prompt Not Loading
+```bash
+# Check file exists
+ls -la prompts/my_prompt.md
+
+# Verify environment variable
 echo $BOT_SYSTEM_PROMPT_FILE
 
-# Check bot logs
-./bot.sh logs | grep -i "system prompt\|prompt file"
+# Test prompt loading
+python -c "from src.core.config import get_system_prompt; print(get_system_prompt())"
 ```
 
-### Changes Not Taking Effect
+### Changes Not Applying
+1. **Check file permissions**: Ensure prompts directory is readable
+2. **Verify file path**: Double-check the BOT_SYSTEM_PROMPT_FILE path
+3. **Test new conversation**: Changes only apply to new conversations
+4. **Check for syntax errors**: Malformed files may cause fallback
+
+### Performance Issues
+- **Large prompts**: Very long prompts may impact response time
+- **Complex instructions**: Overly complex prompts can confuse the AI
+- **Token limits**: Consider LLM context window limitations
+
+## 🎨 Personality Examples
+
+### Gaming Community Bot
 ```bash
-# Verify hot-reload is working by checking logs
-./bot.sh logs | tail -20
-
-# Force restart if needed
-./bot.sh restart
-
-# Check file is mounted correctly (Docker modes)
-docker-compose exec discord-bot cat /app/system_prompt.md
+echo 'BOT_SYSTEM_PROMPT_FILE=./prompts/professional_ai_template.md' >> .env
 ```
 
-### File Path Issues
+### Support Community Bot  
 ```bash
-# Use absolute paths if needed
-BOT_SYSTEM_PROMPT_FILE=/full/path/to/your/prompt.md
-
-# Or relative paths from project root
-BOT_SYSTEM_PROMPT_FILE=./config/system_prompts/template.md
+echo 'BOT_SYSTEM_PROMPT_FILE=./prompts/empathetic_companion_template.md' >> .env
 ```
 
-## 💡 Best Practices
-
-1. **Version Control:** Keep your custom prompts in git
-2. **Backup:** Copy system_prompt.md before major changes
-3. **Testing:** Use development mode for prompt experimentation
-4. **Templates:** Start with existing templates rather than from scratch
-5. **Documentation:** Comment your custom prompts to remember your changes
-
-## 🎯 Examples
-
-### Quick Personality Switch
+### Creative Writing Bot
 ```bash
-# Business assistant
-echo 'BOT_SYSTEM_PROMPT_FILE=./config/system_prompts/professional_ai_template.md' >> .env
-
-# Friendly companion  
-echo 'BOT_SYSTEM_PROMPT_FILE=./config/system_prompts/empathetic_companion_template.md' >> .env
-
-# Back to Dream character
-echo 'BOT_SYSTEM_PROMPT_FILE=./system_prompt.md' >> .env
+echo 'BOT_SYSTEM_PROMPT_FILE=./prompts/character_ai_template.md' >> .env
 ```
 
-### Custom Personality Example
-```bash
-# Create a gaming buddy personality
-cat > gaming_buddy.md << 'EOF'
-You are Alex, an enthusiastic gaming companion who loves video games, streaming, and esports. You're knowledgeable about games across all platforms but especially love indie games and competitive multiplayer.
+## 📚 Additional Resources
 
-Your personality is upbeat, encouraging, and always ready to discuss strategies, share gaming news, or just hang out and chat about whatever games people are playing. You use gaming terminology naturally and understand gaming culture deeply.
+- [📁 Prompt Management Guide](../configuration/prompt-management.md) - Directory structure and management
+- [🎭 Character Examples](../character/) - More personality examples
+- [🔄 Development Workflow](../development/) - Development best practices
+- [🚀 Quick Reference](prompts/quick_reference.md) - Template overview
 
-You speak casually with gaming slang, but you're also supportive and inclusive - you welcome newcomers to gaming and never gatekeep. You're the kind of friend who'd stay up late helping someone beat a difficult boss or celebrate their achievements.
-EOF
+## 🤝 Community
 
-# Use your custom personality
-echo 'BOT_SYSTEM_PROMPT_FILE=./gaming_buddy.md' >> .env
-./bot.sh restart
-```
+Share your custom personalities:
+- **Discord**: Join our community server
+- **GitHub**: Submit pull requests with new templates
+- **Wiki**: Document unique use cases and configurations
 
-## 🔗 Related Documentation
+---
 
-- [🔄 System Prompt Hot Reload](docs/character/SYSTEM_PROMPT_HOT_RELOAD.md) - Technical details
-- [📚 Template Integration Guide](config/system_prompts/integration_guide.md) - Advanced features
-- [🔍 Quick Reference](config/system_prompts/quick_reference.md) - Template overview
+**Need help?** Check our [troubleshooting guide](../troubleshooting/) or join our Discord community!

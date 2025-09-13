@@ -93,7 +93,7 @@ nano .env  # Set DISCORD_BOT_TOKEN
 ```
 **Perfect for:** Customization, development, advanced features
 
-**Your character bot is now running!** Edit `system_prompt.md` to customize your AI's personality.
+**Your character bot is now running!** Edit files in the `prompts/` directory to customize your AI's personality.
 
 ## 📚 **Documentation**
 
@@ -160,12 +160,12 @@ AI_EMOTIONAL_RESONANCE=true
 
 ```bash
 # Switch to different personalities via environment variable
-BOT_SYSTEM_PROMPT_FILE=./config/system_prompts/professional_ai_template.md    # Business assistant
-BOT_SYSTEM_PROMPT_FILE=./config/system_prompts/empathetic_companion_template.md # Supportive friend
-BOT_SYSTEM_PROMPT_FILE=./config/system_prompts/casual_friend_template.md       # Casual chat buddy
+BOT_SYSTEM_PROMPT_FILE=./prompts/professional_ai_template.md    # Business assistant
+BOT_SYSTEM_PROMPT_FILE=./prompts/empathetic_companion_template.md # Supportive friend
+BOT_SYSTEM_PROMPT_FILE=./prompts/casual_friend_template.md       # Casual chat buddy
 ```
 
-**Hot-reload support** - Edit `system_prompt.md` and changes apply immediately (no restart needed!)
+**Hot-reload support** - Edit any file in the `prompts/` directory and changes apply immediately (no restart needed!)
 
 **Available personalities:**
 - 🌙 **Dream** (default) - Formal, mystical character from The Sandman
