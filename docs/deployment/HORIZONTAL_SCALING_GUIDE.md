@@ -255,7 +255,7 @@ sleep 10
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: discord-bot-shards
+  name: whisperengine-shards
 spec:
   replicas: 4
   selector:

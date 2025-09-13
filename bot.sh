@@ -176,7 +176,7 @@ start_bot() {
                 services_ready=0
                 if $COMPOSE_CMD ps postgres | grep -q "healthy"; then ((services_ready++)); fi
                 if $COMPOSE_CMD ps redis | grep -q "healthy"; then ((services_ready++)); fi
-                if $COMPOSE_CMD ps chromadb | grep -q "healthy"; then ((services_ready++)); fi
+                if $COMPOSE_CMD ps chromadb | grep -q "Up"; then ((services_ready++)); fi
                 if $COMPOSE_CMD ps neo4j | grep -q "healthy"; then ((services_ready++)); fi
                 
                 if [[ $services_ready -eq 4 ]]; then
@@ -213,7 +213,7 @@ start_bot() {
                 services_ready=0
                 if $COMPOSE_CMD ps postgres | grep -q "healthy"; then ((services_ready++)); fi
                 if $COMPOSE_CMD ps redis | grep -q "healthy"; then ((services_ready++)); fi
-                if $COMPOSE_CMD ps chromadb | grep -q "healthy"; then ((services_ready++)); fi
+                if $COMPOSE_CMD ps chromadb | grep -q "Up"; then ((services_ready++)); fi
                 if $COMPOSE_CMD ps neo4j | grep -q "healthy"; then ((services_ready++)); fi
                 
                 if [[ $services_ready -eq 4 ]]; then
@@ -261,7 +261,7 @@ start_bot() {
                 # Check each service individually (only count once per loop)
                 if $COMPOSE_CMD ps postgres | grep -q "healthy"; then ((services_ready++)); fi
                 if $COMPOSE_CMD ps redis | grep -q "healthy"; then ((services_ready++)); fi
-                if $COMPOSE_CMD ps chromadb | grep -q "healthy"; then ((services_ready++)); fi
+                if $COMPOSE_CMD ps chromadb | grep -q "Up"; then ((services_ready++)); fi
                 if $COMPOSE_CMD ps neo4j | grep -q "healthy"; then ((services_ready++)); fi
                 
                 if [[ $services_ready -eq 4 ]]; then
