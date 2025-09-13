@@ -508,26 +508,31 @@ class MemoryCommandHandlers:
                 )
                 
                 try:
-                    # Get recent messages for analysis
+                    # Get recent messages for analysis - ALWAYS use memory manager for consistent results
                     recent_messages = []
-                    if ctx.guild is None:
-                        # DM context - get messages from this channel
-                        async for msg in ctx.channel.history(limit=20):
-                            if msg.author == target_user and not msg.content.startswith('!'):
-                                recent_messages.append(msg.content)
-                    else:
-                        # Server context - get recent stored conversations
-                        try:
-                            message_context = self.memory_manager.classify_discord_context(ctx.message)
-                            recent_context = await self.safe_memory_manager.get_recent_conversations(
-                                user_id, limit=15, context=message_context
-                            )
-                            if recent_context and hasattr(recent_context, 'conversations'):
-                                for conv in recent_context.conversations:
-                                    if hasattr(conv, 'user_message') and conv.user_message:
-                                        recent_messages.append(conv.user_message)
-                        except Exception as e:
-                            logger.debug(f"Could not retrieve recent conversations for personality display: {e}")
+                    
+                    # Try to get stored conversations from memory manager (unified across all contexts)
+                    try:
+                        message_context = self.memory_manager.classify_discord_context(ctx.message)
+                        recent_context = await self.safe_memory_manager.get_recent_conversations(
+                            user_id, limit=20, context=message_context
+                        )
+                        if recent_context and hasattr(recent_context, 'conversations'):
+                            for conv in recent_context.conversations:
+                                if hasattr(conv, 'user_message') and conv.user_message:
+                                    recent_messages.append(conv.user_message)
+                        
+                        logger.debug(f"Retrieved {len(recent_messages)} messages from memory manager for personality analysis")
+                        
+                    except Exception as e:
+                        logger.debug(f"Could not retrieve recent conversations for personality display: {e}")
+                        
+                        # Fallback: Try to get messages from current channel if memory manager fails
+                        if ctx.guild is None:  # Only fallback in DM if memory manager completely fails
+                            logger.debug("Falling back to Discord channel history for DM personality analysis")
+                            async for msg in ctx.channel.history(limit=20):
+                                if msg.author == target_user and not msg.content.startswith('!'):
+                                    recent_messages.append(msg.content)
                     
                     if len(recent_messages) >= 3:
                         # Perform real-time analysis
@@ -591,22 +596,14 @@ class MemoryCommandHandlers:
             await ctx.send(f"❌ **Error:** Could not retrieve personality profile.")
     
     async def _sync_check_handler(self, ctx):
-        """Handle sync check command"""
-        if ctx.guild is not None:
-            await ctx.send("❌ **This command only works in DMs** to check conversation sync.")
-            return
-        
+        """Handle sync check command - now works globally across all contexts"""
         user_id = str(ctx.author.id)
         
         try:
-            # Get recent Discord messages
-            discord_messages = [msg async for msg in ctx.channel.history(limit=20)]
-            discord_messages.reverse()  # Chronological order
-            
             # Get stored conversations from ChromaDB (excluding facts)
             conversation_results = self.memory_manager.collection.get(
                 where={"$and": [{"user_id": user_id}, {"type": {"$ne": "user_fact"}}]},
-                limit=50
+                limit=100
             )
             
             # Get stored facts separately
@@ -615,68 +612,95 @@ class MemoryCommandHandlers:
                 limit=50
             )
             
-            # Process conversations
-            stored_conversations = []
-            if conversation_results['documents']:
-                for i, doc in enumerate(conversation_results['documents']):
-                    metadata = conversation_results['metadatas'][i]
-                    stored_conversations.append({
-                        'user_message': metadata.get('user_message', ''),
-                        'bot_response': metadata.get('bot_response', ''),
-                        'timestamp': metadata.get('timestamp', '')
-                    })
+            # Analyze conversation contexts from stored memory
+            context_breakdown = {}
+            total_conversations = len(conversation_results['ids']) if conversation_results['ids'] else 0
             
-            # Sort stored conversations by timestamp
-            stored_conversations.sort(key=lambda x: x['timestamp'])
+            if conversation_results['metadatas']:
+                for metadata in conversation_results['metadatas']:
+                    context_type = metadata.get('context_type', 'unknown')
+                    server_id = metadata.get('server_id', 'dm')
+                    channel_id = metadata.get('channel_id', 'unknown')
+                    
+                    # Create context key
+                    if server_id == 'dm' or context_type == 'private_message':
+                        context_key = "🔒 Direct Messages"
+                    else:
+                        # Try to get server/channel names if available
+                        context_key = f"🌐 Server: {server_id[:8]}... (Channel: {channel_id[:8]}...)"
+                        
+                    context_breakdown[context_key] = context_breakdown.get(context_key, 0) + 1
             
-            # Analysis - exclude bot commands from user messages
-            discord_user_messages = [msg.content for msg in discord_messages if msg.author != self.bot.user and not msg.content.startswith('!')]
-            discord_bot_messages = [msg.content for msg in discord_messages if msg.author == self.bot.user]
+            # Get recent messages from current context for comparison (if DM)
+            current_context_messages = 0
+            if ctx.guild is None:
+                try:
+                    discord_messages = [msg async for msg in ctx.channel.history(limit=20)]
+                    current_context_messages = len([msg for msg in discord_messages if msg.author == ctx.author])
+                except Exception as e:
+                    logger.debug(f"Could not get current context messages: {e}")
+                    current_context_messages = 0
             
-            stored_user_messages = [conv['user_message'] for conv in stored_conversations]
-            stored_bot_messages = [conv['bot_response'] for conv in stored_conversations]
             
-            # Create sync report
+            # Create enhanced global sync report
             embed = discord.Embed(
-                title="🔄 Conversation Sync Status",
-                color=0x2ecc71
+                title=f"🌐 Global Memory Coverage: {ctx.author.display_name}",
+                description=f"Memory analysis across **all contexts** where you've interacted with the bot",
+                color=0x3498db
             )
             
+            # Global statistics
             embed.add_field(
-                name="📱 Discord Messages",
-                value=f"User messages: {len(discord_user_messages)}\nBot messages: {len(discord_bot_messages)}",
+                name="📊 Total Stored",
+                value=f"**Conversations:** {total_conversations}\n**Facts:** {len(fact_results['documents']) if fact_results['documents'] else 0}",
                 inline=True
             )
             
-            embed.add_field(
-                name="💾 Stored in Memory",
-                value=f"Conversations: {len(stored_conversations)}\nFacts: {len(fact_results['documents']) if fact_results['documents'] else 0}",
-                inline=True
-            )
-            
-            # Check for recent missing conversations
-            recent_discord = discord_user_messages[-5:] if discord_user_messages else []
-            recent_stored = stored_user_messages[-5:] if stored_user_messages else []
-            
-            missing_from_memory = []
-            for msg in recent_discord:
-                if msg not in stored_user_messages:
-                    missing_from_memory.append(msg[:50] + "..." if len(msg) > 50 else msg)
-            
-            if missing_from_memory:
+            # Context breakdown
+            if context_breakdown:
+                context_list = []
+                for context, count in sorted(context_breakdown.items(), key=lambda x: x[1], reverse=True):
+                    context_list.append(f"• {context}: **{count}** messages")
+                
                 embed.add_field(
-                    name="⚠️ Possibly Missing from Memory",
-                    value="\n".join([f"• {msg}" for msg in missing_from_memory[:3]]),
+                    name="�️ Context Distribution",
+                    value="\n".join(context_list[:5]),  # Show top 5 contexts
                     inline=False
                 )
-            else:
+                
+                if len(context_breakdown) > 5:
+                    embed.add_field(
+                        name="� Additional Contexts",
+                        value=f"+ {len(context_breakdown) - 5} more contexts with stored conversations",
+                        inline=False
+                    )
+            
+            # Current context comparison (only for DMs)
+            if ctx.guild is None and current_context_messages > 0:
+                dm_stored = context_breakdown.get("🔒 Direct Messages", 0)
                 embed.add_field(
-                    name="✅ Sync Status",
-                    value="Recent conversations appear to be stored correctly",
-                    inline=False
+                    name="🔍 Current DM Analysis",
+                    value=f"Recent messages here: **{current_context_messages}**\nStored from DMs: **{dm_stored}**",
+                    inline=True
+                )
+                
+                if dm_stored < current_context_messages:
+                    embed.add_field(
+                        name="💡 Sync Suggestion",
+                        value="Some recent DM messages may not be stored. Use `!import_history` to sync.",
+                        inline=True
+                    )
+            
+            # Memory health indicator
+            if total_conversations > 0:
+                health_emoji = "🟢" if total_conversations >= 10 else "🟡" if total_conversations >= 3 else "🔴"
+                embed.add_field(
+                    name=f"{health_emoji} Memory Health",
+                    value=f"{'Excellent' if total_conversations >= 10 else 'Good' if total_conversations >= 3 else 'Building'} conversation history",
+                    inline=True
                 )
             
-            embed.set_footer(text="Use !import_history to sync older conversations")
+            embed.set_footer(text="💡 Use !import_history to sync older conversations • Memory spans all contexts")
             
             await ctx.send(embed=embed)
             
@@ -826,46 +850,139 @@ class MemoryCommandHandlers:
             await ctx.send("⏰ **Timeout** - Data deletion cancelled.")
     
     async def _import_history_handler(self, ctx, limit):
-        """Handle import history command"""
-        if ctx.guild is not None:
-            await ctx.send("❌ **This command only works in DMs** to import your conversation history.")
-            return
-        
+        """Handle import history command - enhanced with global context awareness"""
         user_id = str(ctx.author.id)
         
         try:
-            await ctx.send(f"🔄 **Importing** last {limit} messages from this conversation...")
+            # First, show current memory status across contexts
+            conversation_results = self.memory_manager.collection.get(
+                where={"$and": [{"user_id": user_id}, {"type": {"$ne": "user_fact"}}]},
+                limit=200
+            )
             
-            messages = [msg async for msg in ctx.channel.history(limit=limit)]
-            imported = 0
+            # Analyze existing memory contexts
+            existing_contexts = {}
+            total_stored = len(conversation_results['ids']) if conversation_results['ids'] else 0
             
-            # Process messages in chronological order
-            for i in range(len(messages) - 1, 0, -1):
-                current_msg = messages[i]
-                next_msg = messages[i-1]
-                
-                # Look for user message followed by bot response
-                if current_msg.author != self.bot.user and next_msg.author == self.bot.user:
-                    # Skip bot commands - don't import them to memory
-                    if current_msg.content.startswith('!'):
-                        logger.debug(f"Skipping command from import: {current_msg.content[:50]}...")
-                        continue
-                    # Skip empty messages to avoid validation errors
-                    if not current_msg.content or not current_msg.content.strip():
-                        logger.debug(f"Skipping empty user message from {current_msg.author}")
-                        continue
-                    if not next_msg.content or not next_msg.content.strip():
-                        logger.debug(f"Skipping empty bot response")
-                        continue
+            if conversation_results['metadatas']:
+                for metadata in conversation_results['metadatas']:
+                    context_type = metadata.get('context_type', 'unknown')
+                    server_id = metadata.get('server_id', 'dm')
+                    
+                    if server_id == 'dm' or context_type == 'private_message':
+                        context_key = "Direct Messages"
+                    else:
+                        context_key = f"Server {server_id[:8]}..."
                         
-                    self.memory_manager.store_conversation(
-                        user_id, 
-                        extract_text_for_memory_storage(current_msg.content, current_msg.attachments), 
-                        next_msg.content
-                    )
-                    imported += 1
+                    existing_contexts[context_key] = existing_contexts.get(context_key, 0) + 1
             
-            await ctx.send(f"✅ **Import complete!** Added {imported} conversation pairs to memory.\n\nUse `!sync_check` to verify the import.")
+            # Create status embed
+            embed = discord.Embed(
+                title=f"📥 Import History: {ctx.author.display_name}",
+                description=f"Current memory status and import options",
+                color=0xe67e22
+            )
+            
+            embed.add_field(
+                name="📊 Current Memory",
+                value=f"**Total conversations:** {total_stored}\n**Contexts:** {len(existing_contexts)}",
+                inline=True
+            )
+            
+            if existing_contexts:
+                context_list = []
+                for context, count in existing_contexts.items():
+                    context_list.append(f"• {context}: {count}")
+                embed.add_field(
+                    name="🗂️ Stored Contexts",
+                    value="\n".join(context_list[:4]),
+                    inline=True
+                )
+            
+            # Current context import capability
+            if ctx.guild is None:
+                # DM context - can import
+                embed.add_field(
+                    name="🔄 Available Import",
+                    value=f"Can import up to **{limit}** messages from this DM conversation",
+                    inline=False
+                )
+                
+                # Actually perform the import
+                await ctx.send(embed=embed)
+                await ctx.send(f"🔄 **Starting import** of last {limit} messages from this DM...")
+                
+                messages = [msg async for msg in ctx.channel.history(limit=limit)]
+                imported = 0
+                skipped = 0
+                
+                # Process messages in chronological order
+                for i in range(len(messages) - 1, 0, -1):
+                    current_msg = messages[i]
+                    next_msg = messages[i-1]
+                    
+                    # Look for user message followed by bot response
+                    if current_msg.author != self.bot.user and next_msg.author == self.bot.user:
+                        # Skip bot commands - don't import them to memory
+                        if current_msg.content.startswith('!'):
+                            logger.debug(f"Skipping command from import: {current_msg.content[:50]}...")
+                            skipped += 1
+                            continue
+                        # Skip empty messages to avoid validation errors
+                        if not current_msg.content or not current_msg.content.strip():
+                            logger.debug(f"Skipping empty user message from {current_msg.author}")
+                            skipped += 1
+                            continue
+                        if not next_msg.content or not next_msg.content.strip():
+                            logger.debug(f"Skipping empty bot response")
+                            skipped += 1
+                            continue
+                            
+                        self.memory_manager.store_conversation(
+                            user_id, 
+                            extract_text_for_memory_storage(current_msg.content, current_msg.attachments), 
+                            next_msg.content
+                        )
+                        imported += 1
+            else:
+                # Server context - explain limitations
+                embed.add_field(
+                    name="⚠️ Server Context Limitation",
+                    value=f"Import currently only works in **DM conversations**.\nSwitch to DMs to import message history.",
+                    inline=False
+                )
+                
+                embed.add_field(
+                    name="💡 Alternative",
+                    value="Continue conversations in DMs and use `!sync_check` to monitor global memory coverage.",
+                    inline=False
+                )
+                
+                await ctx.send(embed=embed)
+                return
+            
+            # Send success message for DM imports
+            result_embed = discord.Embed(
+                title="✅ Import Complete",
+                description=f"Successfully processed message history from this DM",
+                color=0x27ae60
+            )
+            
+            result_embed.add_field(
+                name="📊 Import Results",
+                value=f"**Imported:** {imported} conversation pairs\n**Skipped:** {skipped} messages (commands/empty)",
+                inline=True
+            )
+            
+            result_embed.add_field(
+                name="🎯 Next Steps",
+                value="• Use `!sync_check` to verify global memory\n• Use `!personality` to see updated analysis\n• Continue chatting to build more context",
+                inline=False
+            )
+            
+            result_embed.set_footer(text="Memory now includes conversations from this DM context")
+            
+            await ctx.send(result_embed)
             logger.info(f"Imported {imported} conversation pairs for user {ctx.author.name}")
             
         except Exception as e:
