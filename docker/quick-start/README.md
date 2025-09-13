@@ -18,7 +18,7 @@ Your WhisperEngine instance includes:
 |------|---------|------------|
 | **`.env`** | Main configuration (used by Docker) | Hidden (use `ls -la`) |
 | **`env.example`** | Visible copy for reference | Visible |
-| **`system_prompt.md`** | Bot personality definition | Visible |
+| **`prompts/`** | Bot personality prompts directory | Visible |
 | **`docker-compose.yml`** | Service definitions | Visible |
 
 ## 🎯 Next Steps
@@ -51,9 +51,9 @@ WhisperEngine works best with a local LLM like:
 Uncomment one line in your `.env` file:
 ```bash
 # Choose one:
-BOT_SYSTEM_PROMPT_FILE=./config/system_prompts/empathetic_companion_template.md    # 💝 Supportive friend
-BOT_SYSTEM_PROMPT_FILE=./config/system_prompts/professional_ai_template.md        # 👔 Business assistant
-BOT_SYSTEM_PROMPT_FILE=./config/system_prompts/casual_friend_template.md          # 😊 Casual chat buddy
+BOT_SYSTEM_PROMPT_FILE=./prompts/empathetic_companion_template.md    # 💝 Supportive friend
+BOT_SYSTEM_PROMPT_FILE=./prompts/professional_ai_template.md        # 👔 Business assistant
+BOT_SYSTEM_PROMPT_FILE=./prompts/casual_friend_template.md          # 😊 Casual chat buddy
 ```
 
 ## 🎛️ Managing Your Bot
@@ -89,15 +89,16 @@ docker-compose logs chromadb
 
 ## 🎭 Personality Customization
 
-Your bot comes with several pre-built personalities in `config/system_prompts/`:
+Your bot comes with several pre-built personalities in the `prompts/` directory:
 
 - **💝 Empathetic Companion** - Supportive and caring
 - **👔 Professional AI** - Business-focused assistant  
 - **😊 Casual Friend** - Relaxed and friendly
 - **🎭 Character AI** - Template for roleplay characters
 - **🧠 Adaptive AI** - Learns and adapts to users
+- **✨ Dream AI Enhanced** - Enhanced Dream of the Endless persona
 
-**Hot-reload:** Edit `system_prompt.md` and changes apply instantly!
+**Hot-reload:** Edit any file in the `prompts/` directory and changes apply instantly!
 
 ## 🔧 Troubleshooting
 

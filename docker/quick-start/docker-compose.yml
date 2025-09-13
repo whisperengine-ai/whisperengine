@@ -13,8 +13,8 @@ services:
     volumes:
       # Mount config directory for personality templates
       - ./config:/app/config:ro
-      # Mount custom system prompt if you create one
-      - ./system_prompt.md:/app/system_prompt.md:ro
+      # Mount prompts directory for easy prompt management
+      - ./prompts:/app/prompts:ro
       
     ports:
       - "8000:8000"  # ChromaDB web interface (optional)
