@@ -613,24 +613,40 @@ class UserMemoryManager:
                 try:
                     # Ensure graph memory manager is initialized
                     if not getattr(self, '_graph_memory_manager_initialized', False):
-                        self.graph_memory_manager = asyncio.run(get_graph_memory_manager())
-                        self._graph_memory_manager_initialized = True
+                        # Use asyncio to run the async function properly
+                        import asyncio
+                        loop = asyncio.get_event_loop()
+                        if loop.is_running():
+                            # We're in an async context, schedule the coroutine
+                            task = asyncio.create_task(get_graph_memory_manager())
+                            self.graph_memory_manager = None  # Will be set later
+                            logger.warning("Graph memory manager initialization deferred - async context detected")
+                            self._graph_memory_manager_initialized = False
+                        else:
+                            self.graph_memory_manager = asyncio.run(get_graph_memory_manager())
+                            self._graph_memory_manager_initialized = True
                     
                     # Determine knowledge domain from context or content
                     knowledge_domain = self._determine_knowledge_domain(fact, context)
                     
                     # Store in graph database
-                    if self.graph_memory_manager:
-                        fact_id = asyncio.run(self.graph_memory_manager.store_global_fact_hybrid(
-                            chromadb_id=doc_id,
-                            fact_content=fact,
-                            knowledge_domain=knowledge_domain,
-                            confidence_score=0.8,  # Manual facts have high confidence
-                            source="admin",
-                            fact_type="declarative",
-                            tags=self._extract_tags_from_fact(fact)
-                        ))
-                        logger.debug(f"Stored global fact in both ChromaDB and Neo4j: {fact_id}")
+                    if self.graph_memory_manager and self._graph_memory_manager_initialized:
+                        # Similar handling for the hybrid storage
+                        import asyncio
+                        loop = asyncio.get_event_loop()
+                        if loop.is_running():
+                            logger.warning("Skipping Neo4j storage - async context detected, use async wrapper instead")
+                        else:
+                            fact_id = asyncio.run(self.graph_memory_manager.store_global_fact_hybrid(
+                                chromadb_id=doc_id,
+                                fact_content=fact,
+                                knowledge_domain=knowledge_domain,
+                                confidence_score=0.8,  # Manual facts have high confidence
+                                source="admin",
+                                fact_type="declarative",
+                                tags=self._extract_tags_from_fact(fact)
+                            ))
+                            logger.debug(f"Stored global fact in both ChromaDB and Neo4j: {fact_id}")
                     else:
                         logger.warning("Graph memory manager not available for global fact storage")
                 except Exception as e:
