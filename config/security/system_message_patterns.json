@@ -1,0 +1,315 @@
+{
+  "sensitive_patterns": {
+    "description": "Patterns that indicate system prompt leakage or sensitive information disclosure",
+    "patterns": [
+      {
+        "name": "system_prompt_structure",
+        "pattern": "##Archive.*?##Identity",
+        "description": "System prompt section markers"
+      },
+      {
+        "name": "system_prompt_sections", 
+        "pattern": "##Personality.*?##Relationships",
+        "description": "System prompt personality sections"
+      },
+      {
+        "name": "memory_sections",
+        "pattern": "##Memory.*?##Behavior", 
+        "description": "System prompt memory sections"
+      },
+      {
+        "name": "role_content_structure",
+        "pattern": "role.*?system.*?content",
+        "description": "Message role/content structure indicators"
+      },
+      {
+        "name": "default_system_prompt",
+        "pattern": "DEFAULT_SYSTEM_PROMPT",
+        "description": "Default system prompt variable name"
+      },
+      {
+        "name": "conversation_context_append",
+        "pattern": "conversation_context\\.append",
+        "description": "Internal context manipulation code"
+      },
+      {
+        "name": "memory_manager_calls",
+        "pattern": "memory_manager\\.",
+        "description": "Memory manager internal calls"
+      },
+      {
+        "name": "chromadb_references",
+        "pattern": "ChromaDB",
+        "description": "Database system references"
+      },
+      {
+        "name": "llm_server_references",
+        "pattern": "LLM.*?server",
+        "description": "LLM server implementation details"
+      },
+      {
+        "name": "discord_bot_token",
+        "pattern": "Discord.*?bot.*?token",
+        "description": "Authentication token references"
+      },
+      {
+        "name": "user_id_patterns",
+        "pattern": "user_id.*?[0-9]+",
+        "description": "User ID with actual values"
+      },
+      {
+        "name": "emotion_context_relationship",
+        "pattern": "emotion_context.*?relationship.*?level",
+        "description": "Internal emotion context data"
+      },
+      {
+        "name": "interaction_counts",
+        "pattern": "interaction_count.*?[0-9]+",
+        "description": "User interaction statistics"
+      },
+      {
+        "name": "pre_analyzed_emotion",
+        "pattern": "pre_analyzed_emotion_data",
+        "description": "Internal emotion analysis data"
+      },
+      {
+        "name": "debug_mode_enabled",
+        "pattern": "debug.*?mode.*?enabled",
+        "description": "Debug mode indicators"
+      },
+      {
+        "name": "admin_permissions",
+        "pattern": "admin.*?permissions",
+        "description": "Administrative permission data"
+      },
+      {
+        "name": "conversation_cache",
+        "pattern": "conversation.*?cache",
+        "description": "Internal caching mechanisms"
+      },
+      {
+        "name": "bootstrap_limit",
+        "pattern": "bootstrap.*?limit",
+        "description": "System bootstrap configuration"
+      }
+    ]
+  },
+  
+  "context_variable_patterns": {
+    "description": "Context variables that should never appear in bot responses",
+    "patterns": [
+      {
+        "name": "memory_network_context_template", 
+        "pattern": "\\{MEMORY_NETWORK_CONTEXT\\}",
+        "description": "Memory network context template variable"
+      },
+      {
+        "name": "relationship_depth_context_template",
+        "pattern": "\\{RELATIONSHIP_DEPTH_CONTEXT\\}",
+        "description": "Relationship depth context template variable"
+      },
+      {
+        "name": "personality_context_template",
+        "pattern": "\\{PERSONALITY_CONTEXT\\}",
+        "description": "Personality context template variable"
+      },
+      {
+        "name": "emotional_state_context_template",
+        "pattern": "\\{EMOTIONAL_STATE_CONTEXT\\}",
+        "description": "Emotional state context template variable"
+      },
+      {
+        "name": "external_emotion_context_template",
+        "pattern": "\\{EXTERNAL_EMOTION_CONTEXT\\}",
+        "description": "External emotion context template variable"
+      },
+      {
+        "name": "emotional_prediction_context_template",
+        "pattern": "\\{EMOTIONAL_PREDICTION_CONTEXT\\}",
+        "description": "Emotional prediction context template variable"
+      },
+      {
+        "name": "relationship_context_template",
+        "pattern": "\\{RELATIONSHIP_CONTEXT\\}",
+        "description": "Relationship context template variable"
+      },
+      {
+        "name": "proactive_support_context_template",
+        "pattern": "\\{PROACTIVE_SUPPORT_CONTEXT\\}",
+        "description": "Proactive support context template variable"
+      },
+      {
+        "name": "emotional_intelligence_context_template",
+        "pattern": "\\{EMOTIONAL_INTELLIGENCE_CONTEXT\\}",
+        "description": "Emotional intelligence context template variable"
+      },
+      {
+        "name": "implementation_mode_context_template",
+        "pattern": "\\{IMPLEMENTATION_MODE_CONTEXT\\}",
+        "description": "Implementation mode context template variable"
+      },
+      {
+        "name": "generic_context_variable_template",
+        "pattern": "\\{[A-Z_]+_CONTEXT\\}",
+        "description": "Any context variable template pattern"
+      },
+      {
+        "name": "memory_network_context_literal",
+        "pattern": "\\bMEMORY_NETWORK_CONTEXT\\b", 
+        "description": "Memory network context as literal text"
+      },
+      {
+        "name": "relationship_depth_context_literal",
+        "pattern": "\\bRELATIONSHIP_DEPTH_CONTEXT\\b",
+        "description": "Relationship depth context as literal text"
+      },
+      {
+        "name": "personality_context_literal",
+        "pattern": "\\bPERSONALITY_CONTEXT\\b",
+        "description": "Personality context as literal text"
+      },
+      {
+        "name": "emotional_state_context_literal",
+        "pattern": "\\bEMOTIONAL_STATE_CONTEXT\\b",
+        "description": "Emotional state context as literal text"
+      },
+      {
+        "name": "external_emotion_context_literal",
+        "pattern": "\\bEXTERNAL_EMOTION_CONTEXT\\b",
+        "description": "External emotion context as literal text"
+      },
+      {
+        "name": "emotional_prediction_context_literal",
+        "pattern": "\\bEMOTIONAL_PREDICTION_CONTEXT\\b",
+        "description": "Emotional prediction context as literal text"
+      },
+      {
+        "name": "relationship_context_literal",
+        "pattern": "\\bRELATIONSHIP_CONTEXT\\b",
+        "description": "Relationship context as literal text"
+      },
+      {
+        "name": "proactive_support_context_literal",
+        "pattern": "\\bPROACTIVE_SUPPORT_CONTEXT\\b",
+        "description": "Proactive support context as literal text"
+      },
+      {
+        "name": "emotional_intelligence_context_literal",
+        "pattern": "\\bEMOTIONAL_INTELLIGENCE_CONTEXT\\b",
+        "description": "Emotional intelligence context as literal text"
+      },
+      {
+        "name": "implementation_mode_context_literal",
+        "pattern": "\\bIMPLEMENTATION_MODE_CONTEXT\\b",
+        "description": "Implementation mode context as literal text"
+      }
+    ]
+  },
+
+  "json_debug_patterns": {
+    "description": "JSON structure patterns that indicate debug information leakage",
+    "patterns": [
+      {
+        "name": "json_memory_network_context",
+        "pattern": "\"memory_network_context\"",
+        "description": "JSON memory network context field"
+      },
+      {
+        "name": "json_relationship_depth_context",
+        "pattern": "\"relationship_depth_context\"",
+        "description": "JSON relationship depth context field"
+      },
+      {
+        "name": "json_implementation_mode_context",
+        "pattern": "\"implementation_mode_context\"",
+        "description": "JSON implementation mode context field"
+      },
+      {
+        "name": "json_emotional_intelligence_context",
+        "pattern": "\"emotional_intelligence_context\"",
+        "description": "JSON emotional intelligence context field"
+      },
+      {
+        "name": "json_emotional_state_context",
+        "pattern": "\"emotional_state_context\"",
+        "description": "JSON emotional state context field"
+      },
+      {
+        "name": "json_personality_context",
+        "pattern": "\"personality_context\"",
+        "description": "JSON personality context field"
+      },
+      {
+        "name": "json_external_emotion_context",
+        "pattern": "\"external_emotion_context\"",
+        "description": "JSON external emotion context field"
+      },
+      {
+        "name": "json_proactive_support_context", 
+        "pattern": "\"proactive_support_context\"",
+        "description": "JSON proactive support context field"
+      },
+      {
+        "name": "json_emotional_prediction_context",
+        "pattern": "\"emotional_prediction_context\"",
+        "description": "JSON emotional prediction context field"
+      },
+      {
+        "name": "json_context_structure",
+        "pattern": "\\{[\\s\\n]*\"[a-z_]+_context\"",
+        "description": "JSON object with context field"
+      },
+      {
+        "name": "json_uppercase_context",
+        "pattern": "\"[A-Z_]+_CONTEXT\"",
+        "description": "JSON field with uppercase context variable name"
+      },
+      {
+        "name": "json_context_field_pattern",
+        "pattern": "CONTEXT.*?:.*?\"[^\"]*\"",
+        "description": "JSON context field with value"
+      }
+    ]
+  },
+
+  "filtered_content_patterns": {
+    "description": "Patterns that indicate already filtered content is leaking through",
+    "patterns": [
+      {
+        "name": "system_information_filtered_brackets",
+        "pattern": "\\[SYSTEM_INFORMATION_FILTERED\\]",
+        "description": "Bracketed filtered content marker"
+      },
+      {
+        "name": "system_information_filtered_literal",
+        "pattern": "SYSTEM_INFORMATION_FILTERED",
+        "description": "Literal filtered content marker"
+      },
+      {
+        "name": "context_filtered_brackets",
+        "pattern": "\\[CONTEXT_FILTERED\\]",
+        "description": "Bracketed context filtered marker"
+      },
+      {
+        "name": "json_filtered_field",
+        "pattern": "\\{\\s*\\[SYSTEM_INFORMATION_FILTERED\\]\\s*:",
+        "description": "JSON field with filtered marker as key"
+      },
+      {
+        "name": "json_mode_value",
+        "pattern": "\"[A-Z_]+\"\\s*:\\s*\"[^\"]*Mode[^\"]*\"",
+        "description": "JSON field with mode-related value"
+      },
+      {
+        "name": "json_intelligence_value",
+        "pattern": "\"[A-Z_]+\"\\s*:\\s*\"[^\"]*Intelligence[^\"]*\"", 
+        "description": "JSON field with intelligence-related value"
+      },
+      {
+        "name": "json_filtered_content_structure",
+        "pattern": "\\{\\s*\\[SYSTEM_INFORMATION_FILTERED\\]\\s*:\\s*\"[^\"]*\"",
+        "description": "JSON object with filtered content as field"
+      }
+    ]
+  }
+}

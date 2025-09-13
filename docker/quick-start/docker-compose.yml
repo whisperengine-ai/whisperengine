@@ -1,0 +1,66 @@
+# WhisperEngine Quick Start - Docker Hub Version
+# Minimal setup for fastest deployment
+
+services:
+  whisperengine:
+    image: whisperengine/whisperengine:latest
+    container_name: whisperengine-bot
+    restart: unless-stopped
+    
+    env_file:
+      - .env
+      
+    volumes:
+      # Mount config directory for personality templates
+      - ./config:/app/config:ro
+      # Mount custom system prompt if you create one
+      - ./system_prompt.md:/app/system_prompt.md:ro
+      
+    ports:
+      - "8000:8000"  # ChromaDB web interface (optional)
+      
+    depends_on:
+      - redis
+      - postgres
+      - chromadb
+      
+  # Minimal required services
+  redis:
+    image: redis:7-alpine
+    container_name: whisperengine-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+      
+  postgres:
+    image: postgres:16-alpine
+    container_name: whisperengine-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: whisper_engine
+      POSTGRES_USER: bot_user
+      POSTGRES_PASSWORD: bot_password_change_me
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+      
+  chromadb:
+    image: chromadb/chroma:latest
+    container_name: whisperengine-chromadb
+    restart: unless-stopped
+    environment:
+      - CHROMA_SERVER_HOST=0.0.0.0
+      - CHROMA_SERVER_HTTP_PORT=8000
+    volumes:
+      - chromadb_data:/chroma/chroma
+    ports:
+      - "8001:8000"  # Avoid conflict with potential host services
+
+volumes:
+  redis_data:
+  postgres_data:
+  chromadb_data:

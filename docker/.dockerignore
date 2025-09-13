@@ -1,0 +1,157 @@
+# Docker ignore file to reduce build context and improve security
+# Only copy essential code files into the Docker image
+
+# ===============================
+# DATA DIRECTORIES (External mounts)
+# ===============================
+# These will be mounted as volumes, don't copy into image
+backups/
+privacy_data/
+temp_images/
+logs/
+docker-data/
+
+# ===============================
+# ENVIRONMENT & CONFIG FILES
+# ===============================
+# Environment files (will be mounted separately)
+.env
+.env.*
+!.env.minimal
+
+# ===============================
+# DEVELOPMENT & BUILD FILES
+# ===============================
+# Git
+.git/
+.gitignore
+
+# Python build artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+
+# ===============================
+# IDE & EDITOR FILES
+# ===============================
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# ===============================
+# TESTING & QUALITY ASSURANCE
+# ===============================
+# Test files and results
+test_*
+tests/
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+pytest.ini
+
+# ===============================
+# DOCUMENTATION & REPORTS
+# ===============================
+# Documentation (not needed in runtime)
+*.md
+docs/
+system-prompt-examples/
+character_prompt_guide.md
+system_prompt.md
+
+# Reports and analysis files
+*_REPORT.md
+*_GUIDE.md
+*_CHECKLIST*.md
+*_SUCCESS*.md
+*_COMPLETE*.md
+*_SECURITY*.md
+*_IMPLEMENTATION*.md
+
+# ===============================
+# DOCKER & DEPLOYMENT
+# ===============================
+# Docker files themselves
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+DOCKER_SETUP_GUIDE.md
+
+# Shell scripts
+*.sh
+run_*.sh
+
+# ===============================
+# RUNTIME DATA FILES
+# ===============================
+# Database files (will be in external mount)
+*.db
+*.sqlite3
+user_profiles.db
+
+# Log files (will be in external mount)
+*.log
+discord_bot*.log
+
+# JSON data files (some may be needed, some not)
+conversations.json
+
+# Temporary files
+*.tmp
+*.temp
+
+# Backup files
+*.backup
+*.bak
+
+# ===============================
+# CI/CD & MONITORING
+# ===============================
+.github/
+monitoring/
+
+# ===============================
+# SCRIPTS & UTILITIES
+# ===============================
+# Utility scripts (not needed in runtime) - KEEP Docker scripts!
+# scripts/  # Commented out to allow Docker scripts
+# basic_discord_bot.py file has been removed - functionality moved to src/main.py
+
+# Setup and configuration scripts
+setup_*.py
