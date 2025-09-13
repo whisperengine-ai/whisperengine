@@ -186,7 +186,7 @@ BOT_SYSTEM_PROMPT_FILE=$(pwd)/prompts/default.md python run.py
 ls -la prompts/
 
 # Check Docker mount
-docker-compose exec discord-bot ls -la /app/prompts/
+docker-compose exec whisperengine-bot ls -la /app/prompts/
 
 # Test with development mount
 docker-compose -f docker-compose.yml -f docker-compose.dev.yml up

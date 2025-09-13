@@ -2,12 +2,12 @@
 # Optimized for production deployment with external services
 
 services:
-  discord-bot:
+  whisperengine-bot:
     build:
       context: .
       dockerfile: docker/Dockerfile.multi-stage
       target: production
-    image: discord-bot:${VERSION:-latest}
+    image: whisperengine-bot:${VERSION:-latest}
     container_name: whisperengine-bot
     restart: unless-stopped
     

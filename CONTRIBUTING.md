@@ -209,7 +209,7 @@ def _initialize_command_handlers(self):
 docker-compose -f docker-compose.dev.yml logs -f
 
 # Access running container
-docker-compose -f docker-compose.dev.yml exec discord-bot bash
+docker-compose -f docker-compose.dev.yml exec whisperengine-bot bash
 ```
 
 ### Database Access

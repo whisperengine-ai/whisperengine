@@ -113,9 +113,9 @@ The bot's personality is defined in `system_prompt.md` (root level) and loaded d
 ### Service Architecture
 ```yaml
 # docker-compose.yml defines 3 core services:
-discord-bot:    # Main application
-chromadb:      # Vector database
-redis:         # Cache layer
+whisperengine-bot:    # Main application
+chromadb:             # Vector database
+redis:                # Cache layer
 ```
 
 ### Configuration Hierarchy

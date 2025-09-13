@@ -2,7 +2,7 @@
 # Save as docker-compose.hotreload.yml
 
 services:
-  discord-bot:
+  whisperengine-bot:
     volumes:
       # Mount source code for live editing
       - ./src:/app/src

@@ -2,7 +2,7 @@
 # Save as docker-compose.override.yml to automatically apply these settings
 
 services:
-  discord-bot:
+  whisperengine-bot:
     environment:
       # Switch to a different personality - uncomment one:
       

@@ -136,12 +136,12 @@ start_dev() {
     
     local compose_args=""
     if [[ "$NO_DEPS" == "true" ]]; then
-        compose_args="--no-deps discord-bot"
+        compose_args="--no-deps whisperengine-bot"
     fi
     
     docker-compose -f docker-compose.dev.yml up -d $compose_args
     echo -e "${GREEN}Development environment started${NC}"
-    echo -e "${YELLOW}Bot logs: docker-compose -f docker-compose.dev.yml logs -f discord-bot${NC}"
+    echo -e "${YELLOW}Bot logs: docker-compose -f docker-compose.dev.yml logs -f whisperengine-bot${NC}"
     echo -e "${YELLOW}Shell access: $0 shell${NC}"
 }
 
@@ -159,7 +159,7 @@ start_prod() {
     
     docker-compose $compose_files up -d
     echo -e "${GREEN}Production environment started${NC}"
-    echo -e "${YELLOW}Bot logs: docker-compose logs -f discord-bot${NC}"
+    echo -e "${YELLOW}Bot logs: docker-compose logs -f whisperengine-bot${NC}"
 }
 
 stop_services() {
@@ -180,7 +180,7 @@ restart_services() {
 }
 
 show_logs() {
-    local service=${1:-discord-bot}
+    local service=${1:-whisperengine-bot}
     echo -e "${BLUE}Showing logs for $service...${NC}"
     
     if docker-compose -f docker-compose.dev.yml ps | grep -q "$service"; then

@@ -2,7 +2,7 @@
 # This overrides the default logging settings for production deployments
 
 services:
-  discord-bot:
+  whisperengine-bot:
     logging:
       driver: "json-file"
       options:
@@ -21,7 +21,7 @@ services:
       # Optional: Mount to external log aggregation volume
       # - log-volume:/app/logs
     labels:
-      - "logging.service=discord-bot"
+      - "logging.service=whisperengine-bot"
       - "logging.environment=${ENVIRONMENT:-production}"
 
   # Optional: Add log aggregation services
