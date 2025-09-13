@@ -40,9 +40,9 @@ services:
     container_name: whisperengine-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB: whisper_engine
-      POSTGRES_USER: bot_user
-      POSTGRES_PASSWORD: bot_password_change_me
+      POSTGRES_DB: ${POSTGRES_DB:-whisper_engine}
+      POSTGRES_USER: ${POSTGRES_USER:-bot_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-bot_password_change_me}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
