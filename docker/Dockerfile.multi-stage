@@ -21,9 +21,10 @@ RUN apt-get update && apt-get install -y \
 # Development stage
 FROM base as development
 
-# Install development dependencies
+# Install development dependencies with cache mount
 COPY requirements.txt requirements-dev.txt* ./
-RUN pip install -r requirements.txt && \
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install -r requirements.txt && \
     if [ -f requirements-dev.txt ]; then pip install -r requirements-dev.txt; fi
 
 # Copy all source code (for development)
@@ -45,7 +46,10 @@ FROM base as production
 
 # Copy only requirements first (for better caching)
 COPY requirements.txt ./
-RUN pip install --no-cache-dir -r requirements.txt
+
+# Install Python dependencies with cache mount for faster builds
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install --no-cache-dir -r requirements.txt
 
 # Copy only necessary application files
 COPY src/ ./src/

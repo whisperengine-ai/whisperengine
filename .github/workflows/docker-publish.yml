@@ -21,6 +21,9 @@ concurrency:
 env:
   REGISTRY: docker.io
   IMAGE_NAME: whisperengine/whisperengine
+  # Optimize build performance
+  DOCKER_BUILDKIT: 1
+  BUILDX_NO_DEFAULT_ATTESTATIONS: 1
 
 jobs:
   build-and-push:
@@ -38,6 +41,10 @@ jobs:
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
+        with:
+          driver-opts: |
+            image=moby/buildkit:v0.12.0
+            network=host
 
       - name: Log in to Docker Hub
         if: github.event_name != 'pull_request'
@@ -64,13 +71,16 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: ./docker/Dockerfile
-          platforms: linux/amd64,linux/arm64
+          file: ./docker/Dockerfile.multi-stage
+          target: production
+          platforms: ${{ github.event_name == 'pull_request' && 'linux/amd64' || 'linux/amd64,linux/arm64' }}
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          build-args: |
+            BUILDKIT_INLINE_CACHE=1
 
   update-docker-hub-description:
     runs-on: ubuntu-latest
