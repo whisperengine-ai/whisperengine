@@ -965,6 +965,53 @@ class UserMemoryManager:
             logger.error(f"Error storing user fact: {e}")
             raise MemoryStorageError(f"Failed to store user fact: {e}")
 
+    async def get_memories_by_user(self, user_id: str, limit: int = 100) -> List[Dict]:
+        """Retrieve all memories for a specific user"""
+        try:
+            # Validate inputs
+            user_id = self._validate_user_id(user_id)
+            
+            if limit <= 0 or limit > 1000:  # Reasonable limits
+                limit = 100
+            
+            # Get all memories for this user
+            results = self.collection.get(
+                where={"user_id": user_id},
+                limit=limit
+            )
+            
+            memories = []
+            if results and 'ids' in results and results['ids']:
+                for i in range(len(results['ids'])):
+                    memory_id = results['ids'][i]
+                    document = results['documents'][i] if 'documents' in results else ""
+                    metadata = results['metadatas'][i] if 'metadatas' in results else {}
+                    
+                    memory = {
+                        'id': memory_id,
+                        'memory_id': memory_id,  # Alias for compatibility
+                        'content': document,
+                        'text': document,  # Alias for compatibility
+                        'metadata': metadata,
+                        'user_id': metadata.get('user_id', user_id),
+                        'timestamp': metadata.get('timestamp', ''),
+                        'channel_id': metadata.get('channel_id', ''),
+                        'user_message': metadata.get('user_message', ''),
+                        'bot_response': metadata.get('bot_response', ''),
+                        'type': metadata.get('type', 'conversation')
+                    }
+                    memories.append(memory)
+            
+            logger.debug(f"Retrieved {len(memories)} memories for user {user_id}")
+            return memories
+            
+        except ValidationError:
+            # Re-raise validation errors
+            raise
+        except Exception as e:
+            logger.error(f"Error retrieving memories for user {user_id}: {e}")
+            raise MemoryRetrievalError(f"Failed to retrieve memories for user {user_id}: {e}")
+
     def retrieve_relevant_memories(self, user_id: str, query: str, limit: int = 10) -> List[Dict]:
         """Retrieve relevant memories for a user based on the current query, including global facts with priority"""
         try:
