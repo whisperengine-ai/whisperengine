@@ -8,7 +8,7 @@ services:
       dockerfile: docker/Dockerfile.multi-stage
       target: production
     image: discord-bot:${VERSION:-latest}
-    container_name: discord-bot-prod
+    container_name: whisperengine-bot
     restart: unless-stopped
     
     # Environment configuration
@@ -68,7 +68,7 @@ services:
   # Redis for caching
   redis:
     image: redis:7-alpine
-    container_name: discord-bot-redis
+    container_name: whisperengine-redis
     restart: unless-stopped
     command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
     volumes:
@@ -86,7 +86,7 @@ services:
   # PostgreSQL for persistent data
   postgres:
     image: postgres:16-alpine
-    container_name: discord-bot-postgres
+    container_name: whisperengine-postgres
     restart: unless-stopped
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-discord_bot}
@@ -109,7 +109,7 @@ services:
   # ChromaDB for vector storage
   chromadb:
     image: chromadb/chroma:latest
-    container_name: discord-bot-chromadb
+    container_name: whisperengine-chromadb
     restart: unless-stopped
     environment:
       - CHROMA_SERVER_HOST=0.0.0.0
@@ -126,7 +126,7 @@ services:
   # Neo4j graph database
   neo4j:
     image: neo4j:5.15-community
-    container_name: discord-bot-neo4j
+    container_name: whisperengine-neo4j
     restart: unless-stopped
     environment:
       - NEO4J_AUTH=${NEO4J_USERNAME:-neo4j}/${NEO4J_PASSWORD:-neo4j_password_change_me}
@@ -155,28 +155,28 @@ services:
 networks:
   bot_network:
     driver: bridge
-    name: discord-bot-network
+    name: whisperengine-network
 
 # Volumes
 volumes:
   bot_data:
-    name: discord-bot-data
+    name: whisperengine-data
   bot_backups:
-    name: discord-bot-backups
+    name: whisperengine-backups
   bot_privacy:
-    name: discord-bot-privacy
+    name: whisperengine-privacy
   bot_temp:
-    name: discord-bot-temp
+    name: whisperengine-temp
   bot_logs:
-    name: discord-bot-logs
+    name: whisperengine-logs
   redis_data:
-    name: discord-bot-redis
+    name: whisperengine-redis
   postgres_data:
-    name: discord-bot-postgres
+    name: whisperengine-postgres
   chromadb_data:
-    name: discord-bot-chromadb
+    name: whisperengine-chromadb
   neo4j_data:
-    name: discord-bot-neo4j-data
+    name: whisperengine-neo4j-data
   neo4j_logs:
-    name: discord-bot-neo4j-logs
+    name: whisperengine-neo4j-logs
 
