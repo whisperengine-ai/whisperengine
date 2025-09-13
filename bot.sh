@@ -111,7 +111,8 @@ show_help() {
     echo "  stop [prod|dev|native]   - Stop bot"
     echo "  logs [service]           - View logs (default: whisperengine-bot)"
     echo "  status                   - Show container status"
-    echo "  restart [prod|dev|native] - Restart bot"
+    echo "  restart [prod|dev|native] - Restart bot container only"
+    echo "  restart-all [prod|dev|native] - Restart all services (bot + databases)"
     echo "  cleanup                  - Remove orphaned containers and volumes"
     echo "  backup <create|list|restore|help> - Data backup operations"
     echo "  build-push [options]     - Build and push Docker image to Docker Hub"
@@ -124,6 +125,8 @@ show_help() {
     echo "Examples:"
     echo "  $0 start prod           # Start in production"
     echo "  $0 start dev            # Start in development"
+    echo "  $0 restart prod         # Restart bot container only"
+    echo "  $0 restart-all prod     # Restart everything (bot + databases)"
     echo "  $0 logs                 # View bot logs"
     echo "  $0 logs redis           # View redis logs"
     echo "  $0 stop                 # Stop (auto-detects mode)"
@@ -444,9 +447,58 @@ restart_bot() {
         print_error "Mode is required. Please specify: prod, dev, or native"
         echo ""
         echo "Usage: $0 restart <mode>"
+        echo "Note: This only restarts the bot container. Use 'restart-all' to restart everything."
         exit 1
     fi
     
+    check_docker
+    
+    # Auto-detect which compose configuration is running if not native
+    local compose_files=""
+    case $mode in
+        "prod")
+            compose_files="-f docker-compose.yml -f docker-compose.prod.yml"
+            ;;
+        "dev")
+            compose_files="-f docker-compose.yml -f docker-compose.dev.yml"
+            ;;
+        "native")
+            print_error "Native mode doesn't run the bot container. Use 'python run.py' to restart the native bot."
+            exit 1
+            ;;
+        *)
+            print_error "Invalid mode: $mode"
+            exit 1
+            ;;
+    esac
+    
+    echo "🔄 Restarting bot container in $mode mode..."
+    eval "$COMPOSE_CMD $compose_files restart whisperengine-bot"
+    
+    # Wait a moment for the container to be ready
+    echo "⏳ Waiting for bot to restart..."
+    sleep 3
+    
+    # Check if the bot container is running
+    if eval "$COMPOSE_CMD $compose_files ps whisperengine-bot" | grep -q "Up"; then
+        print_status "Bot container restarted successfully!"
+    else
+        print_warning "Bot container may still be starting. Check status with: $0 status"
+    fi
+}
+
+restart_all() {
+    local mode="$1"
+    
+    # Require explicit mode selection
+    if [[ -z "$mode" ]]; then
+        print_error "Mode is required. Please specify: prod, dev, or native"
+        echo ""
+        echo "Usage: $0 restart-all <mode>"
+        exit 1
+    fi
+    
+    echo "🔄 Restarting ALL services in $mode mode..."
     stop_bot "$mode"
     sleep 2
     start_bot "$mode"
@@ -529,6 +581,9 @@ case "${1:-help}" in
         ;;
     "restart")
         restart_bot "${2:-}"
+        ;;
+    "restart-all")
+        restart_all "${2:-}"
         ;;
     "cleanup")
         cleanup_containers
