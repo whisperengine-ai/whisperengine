@@ -104,7 +104,6 @@ class ExternalAPIEmotionAI:
         if self.logger:
             self.logger.info("🌐 External API Emotion AI initialized with full capabilities")
             self.logger.info(f"🔗 LLM provider: {self.llm_api_url}")
-            self.logger.info(f"🔑 OpenAI: {'✅' if self.openai_api_key else '?'}")
             self.logger.info(f"🧠 External Embeddings: {'✅' if self.embedding_manager.use_external else '?'}")
     
     async def initialize(self):
