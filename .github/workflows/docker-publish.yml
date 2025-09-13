@@ -10,7 +10,13 @@ on:
   pull_request:
     branches:
       - main
+    types: [opened, synchronize, reopened]
   workflow_dispatch:
+
+# Prevent multiple runs for the same commit
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 env:
   REGISTRY: docker.io
@@ -22,6 +28,9 @@ jobs:
     permissions:
       contents: read
       packages: write
+
+    # Skip builds for draft PRs and skip duplicate runs
+    if: github.event.pull_request.draft == false
 
     steps:
       - name: Checkout repository
