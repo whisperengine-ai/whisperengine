@@ -30,50 +30,53 @@ class AdminCommandHandlers:
     def register_commands(self, is_admin):
         """Register all admin commands"""
         
+        # Capture self reference for nested functions
+        admin_handler_instance = self
+        
         @self.bot.command(name='debug')
         async def toggle_debug(ctx, action: str = "status"):
             """Toggle debug logging on/off or check status (admin only)"""
-            await self._debug_handler(ctx, action, is_admin)
+            await admin_handler_instance._debug_handler(ctx, action, is_admin)
         
         @self.bot.command(name='schedule_followup')
         async def schedule_followup(ctx, user_mention, hours: int = 24):
             """Schedule a follow-up message for a user (admin only)"""
-            await self._schedule_followup_handler(ctx, user_mention, hours, is_admin)
+            await admin_handler_instance._schedule_followup_handler(ctx, user_mention, hours, is_admin)
         
         @self.bot.command(name='job_status')
         async def job_status(ctx, job_id: Optional[str] = None):
             """Check job scheduler status or specific job status (admin only)"""
-            await self._job_status_handler(ctx, job_id, is_admin)
+            await admin_handler_instance._job_status_handler(ctx, job_id, is_admin)
         
         @self.bot.command(name='followup_settings')
         async def followup_settings(ctx, setting: str = "status"):
             """Manage your follow-up message preferences (opt-in feature)"""
-            await self._followup_settings_handler(ctx, setting)
+            await admin_handler_instance._followup_settings_handler(ctx, setting)
         
         @self.bot.command(name='health')
         async def health_check(ctx):
             """Show system health status (admin only)"""
-            await self._health_check_handler(ctx, is_admin)
+            await admin_handler_instance._health_check_handler(ctx, is_admin)
         
         @self.bot.command(name='memory_stats')
         async def memory_stats(ctx):
             """Show memory system statistics (admin only)"""
-            await self._memory_stats_handler(ctx, is_admin)
+            await admin_handler_instance._memory_stats_handler(ctx, is_admin)
         
         @self.bot.command(name='create_backup')
         async def create_backup(ctx):
             """Create a backup of the memory system (admin only)"""
-            await self._create_backup_handler(ctx, is_admin)
+            await admin_handler_instance._create_backup_handler(ctx, is_admin)
         
         @self.bot.command(name='list_backups')
         async def list_backups(ctx):
             """List available backups (admin only)"""
-            await self._list_backups_handler(ctx, is_admin)
+            await admin_handler_instance._list_backups_handler(ctx, is_admin)
         
         @self.bot.command(name='system_status')
         async def system_status(ctx):
             """Show comprehensive system status (admin only)"""
-            await self._system_status_handler(ctx, is_admin)
+            await admin_handler_instance._system_status_handler(ctx, is_admin)
         
         @self.bot.command(name='emotional_intelligence', aliases=['ei_status', 'emotional_status'])
         async def emotional_intelligence_status(ctx):

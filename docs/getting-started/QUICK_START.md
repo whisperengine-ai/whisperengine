@@ -126,8 +126,8 @@ Get your private AI Discord bot running in ~15 minutes! This guide covers the fa
 
 1. **Clone and Install**
    ```bash
-   git clone https://github.com/theRealMarkCastillo/custom_bot.git
-   cd custom_bot
+   git clone https://github.com/whisperengine-ai/whisperengine.git
+   cd whisperengine
    pip install -r requirements.txt
    ```
 

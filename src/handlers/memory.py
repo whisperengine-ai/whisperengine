@@ -25,25 +25,33 @@ class MemoryCommandHandlers:
         self.graph_personality_manager = graph_personality_manager
         self.personality_profiler = personality_profiler
     
-    def register_commands(self, is_admin):
+    def register_commands(self, is_admin, bot_name_filter=None):
         """Register all memory commands"""
         
+        # Default to no-op filter if none provided
+        if bot_name_filter is None:
+            bot_name_filter = lambda: lambda func: func
+        
         @self.bot.command(name='add_fact')
+        @bot_name_filter()
         async def add_fact(ctx, *, fact):
             """Add a fact about yourself to the bot's memory"""
             await self._add_fact_handler(ctx, fact)
         
         @self.bot.command(name='remove_fact')
+        @bot_name_filter()
         async def remove_fact(ctx, *, search_term):
             """Search and remove facts about yourself"""
             await self._remove_fact_handler(ctx, search_term)
         
         @self.bot.command(name='remove_fact_by_number')
+        @bot_name_filter()
         async def remove_fact_by_number(ctx, fact_number: int, *, search_term):
             """Remove a specific fact by its number from the search results"""
             await self._remove_fact_by_number_handler(ctx, fact_number, search_term)
         
         @self.bot.command(name='list_facts')
+        @bot_name_filter()
         async def list_facts(ctx):
             """List all facts the bot knows about you"""
             await self._list_facts_handler(ctx)
@@ -69,6 +77,7 @@ class MemoryCommandHandlers:
             await self._remove_global_fact_by_number_handler(ctx, fact_number, search_term, is_admin)
         
         @self.bot.command(name='personality', aliases=['profile', 'my_personality'])
+        @bot_name_filter()
         async def show_personality(ctx, user: Optional[discord.Member] = None):
             """Show personality profile for yourself or another user"""
             await self._personality_handler(ctx, user, is_admin)
@@ -79,11 +88,13 @@ class MemoryCommandHandlers:
             await self._sync_check_handler(ctx)
         
         @self.bot.command(name='my_memory')
+        @bot_name_filter()
         async def user_memory_summary(ctx):
             """Show what the bot remembers about you"""
             await self._my_memory_handler(ctx)
         
         @self.bot.command(name='forget_me')
+        @bot_name_filter()
         async def forget_user(ctx):
             """Delete all stored memories about you"""
             await self._forget_me_handler(ctx)

@@ -38,25 +38,47 @@ python basic_discord_bot.py
 
 ### Join Voice Channel
 ```
-!join                 # Joins your current voice channel
-!join "General"       # Joins specific channel
+!join whisperengine      # Joins your current voice channel (REQUIRED in servers)
+!join "General"          # ❌ Will not work - bot name required in servers
+!join whisperengine "General"  # Joins specific channel with bot name
 ```
 
 ### Make Bot Speak
 ```
-!speak Hello everyone!
-!tts Good morning!
-```
-
-### Voice Status
-```
-!voice_status         # Shows current status
-!voice_help          # Shows all commands
+!speak whisperengine Hello everyone!  # Bot name required in servers
+!tts whisperengine Good morning!      # Alternative command
 ```
 
 ### Leave Voice Channel
 ```
-!leave
+!leave whisperengine     # Leaves current voice channel (REQUIRED in servers)
+```
+
+### Get Help
+```
+!voice_help whisperengine # Shows all voice commands (REQUIRED in servers)
+```
+
+## 🏷️ Bot Name Filtering
+
+WhisperEngine requires bot name filtering in servers to prevent conflicts when multiple bots are present:
+
+### Environment Configuration
+```env
+DISCORD_BOT_NAME=dream   # Set your bot's trigger name
+```
+
+### Usage Patterns
+- **Servers/Guilds**: Bot name is REQUIRED - `!join whisperengine` or `!join dream`
+- **Direct Messages**: Bot name is optional - `!join` works fine
+- **Custom Name**: If `DISCORD_BOT_NAME=dream`, use `!join dream`
+- **Fallback**: Always works with `!join whisperengine`
+- **Commands without bot name in servers will be ignored**
+
+### Check Voice Status
+```
+!voice_status              # Shows current voice status
+!voice_status whisperengine # Shows current voice status (using fallback name)
 ```
 
 ## 🎯 How It Works
@@ -109,13 +131,13 @@ ELEVENLABS_REQUEST_TIMEOUT=30 # API timeout
 
 ### Admin Commands
 ```
-!voice_toggle_listening    # Toggle voice listening (Admin only)
-!voice_settings           # Show detailed settings (Admin only)
+!voice_toggle_listening whisperengine  # Toggle voice listening (Admin only)
+!voice_settings whisperengine          # Show detailed settings (Admin only)
 ```
 
 ### Voice Testing
 ```
-!voice_test               # Test voice functionality
+!voice_test whisperengine              # Test voice functionality
 ```
 
 ### Multiple Languages

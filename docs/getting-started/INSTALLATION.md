@@ -21,8 +21,8 @@ This comprehensive guide covers detailed installation, configuration, troublesho
 
 ```bash
 # Clone the repository
-git clone https://github.com/theRealMarkCastillo/custom_bot.git
-cd custom_bot
+git clone https://github.com/whisperengine-ai/whisperengine.git
+cd whisperengine
 
 # Install Python dependencies
 pip install -r requirements.txt
@@ -330,9 +330,9 @@ After=network.target
 [Service]
 Type=simple
 User=whisperengine
-WorkingDirectory=/path/to/custom_bot
-Environment=PATH=/path/to/custom_bot/bot_env/bin
-ExecStart=/path/to/custom_bot/bot_env/bin/python basic_discord_bot.py
+WorkingDirectory=/path/to/whisperengine
+Environment=PATH=/path/to/whisperengine/bot_env/bin
+ExecStart=/path/to/whisperengine/bot_env/bin/python basic_discord_bot.py
 Restart=always
 
 [Install]

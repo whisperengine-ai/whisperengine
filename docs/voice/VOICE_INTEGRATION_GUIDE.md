@@ -1,5 +1,7 @@
 # Discord Voice Integration with ElevenLabs
 
+# Discord Voice Integration with ElevenLabs
+
 This document explains the Discord Voice functionality that has been added to your bot, including setup, usage, and architecture.
 
 ## 🎤 Features
@@ -20,9 +22,16 @@ This document explains the Discord Voice functionality that has been added to yo
 
 ### Voice Commands
 - Join/leave voice channels
-- Manual text-to-speech conversion
+- Manual text-to-speech conversion with bot name filtering
 - Voice status monitoring
 - Administrative controls
+- **Fallback bot name support**: Commands work with both configured and default names
+
+### Bot Name Filtering
+- Environment-configurable bot name (`DISCORD_BOT_NAME`)
+- Fallback to "whisperengine" when no name configured
+- Prevents command conflicts in multi-bot servers
+- Works seamlessly in DMs without name filtering
 
 ## 🛠️ Setup
 
@@ -94,43 +103,62 @@ See `.env.voice.example` for all available configuration options.
 
 #### Join Voice Channel
 ```
-!join                    # Joins your current voice channel
-!join "General Voice"    # Joins specific channel by name
+!join whisperengine         # Joins your current voice channel (REQUIRED in servers)
+!join dream                 # If DISCORD_BOT_NAME=dream (REQUIRED in servers)
+!join whisperengine "General Voice"  # Joins specific channel with bot name
 ```
 
 #### Leave Voice Channel
 ```
-!leave                   # Leaves current voice channel
+!leave whisperengine        # Leaves current voice channel (REQUIRED in servers)
+!leave dream                # If using custom bot name (REQUIRED in servers)
 ```
 
 #### Text-to-Speech
 ```
-!speak Hello everyone!   # Makes bot speak the text
-!tts Good morning!       # Alternative command
+!speak whisperengine Hello! # Makes bot speak (REQUIRED in servers)
+!speak dream Hello everyone! # With custom bot name (REQUIRED in servers)
+!tts whisperengine Good morning!    # Alternative command
 ```
 
 #### Voice Status
 ```
-!voice_status           # Shows current voice status
-!vstatus                # Short version
+!voice_status whisperengine # Shows current voice status (REQUIRED in servers)
+!vstatus whisperengine      # Short version (REQUIRED in servers)
 ```
 
 #### Voice Help
 ```
-!voice_help             # Shows all voice commands
-!vhelp                  # Short version
+!voice_help whisperengine   # Shows all voice commands (REQUIRED in servers)
+!vhelp whisperengine        # Short version (REQUIRED in servers)
 ```
+
+### Bot Name Configuration
+
+The voice system requires bot name filtering in servers to prevent conflicts:
+
+#### Environment Setup
+```env
+DISCORD_BOT_NAME=dream      # Your custom bot name
+```
+
+#### Usage Patterns
+- **Servers/Guilds**: Bot name is MANDATORY - `!join whisperengine` or `!join dream`
+- **Direct Messages**: Bot name is optional - `!join` works without bot name
+- **Custom Name**: If `DISCORD_BOT_NAME=dream`, use `!join dream`
+- **Fallback**: Always works with `!join whisperengine`
+- **⚠️ Important**: Commands without bot name in servers are ignored
 
 ### Admin Commands (Require Manage Server permission)
 
 #### Toggle Listening
 ```
-!voice_toggle_listening  # Enable/disable voice message listening
+!voice_toggle_listening whisperengine  # Enable/disable voice message listening (REQUIRED in servers)
 ```
 
 #### Voice Settings
 ```
-!voice_settings         # Show detailed configuration
+!voice_settings whisperengine  # Show detailed configuration (REQUIRED in servers)
 ```
 
 ### Automatic Features

@@ -1,6 +1,6 @@
 # LLM Testing Framework Documentation
 
-This document explains how to use the mock-based testing system for LLM-dependent functionality in the custom bot project.
+This document explains how to use the mock-based testing system for LLM-dependent functionality in the WhisperEngine project.
 
 ## Overview
 

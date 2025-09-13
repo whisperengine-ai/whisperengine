@@ -68,7 +68,7 @@ echo 'BOT_SYSTEM_PROMPT_FILE=./prompts/my_custom_personality.md' >> .env
 Create a new file in the `prompts/` directory with these key sections:
 
 ```markdown
-# Your Custom Bot - Example Structure
+# Your WhisperEngine Bot - Example Structure
 
 ## Core Identity
 You are [character name], a [description]. You embody [key traits].

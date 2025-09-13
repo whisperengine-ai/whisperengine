@@ -199,8 +199,8 @@ The universal build (`docker/Dockerfile`) is the recommended approach:
 
 ```bash
 # Step 1: Clone and navigate
-git clone https://github.com/theRealMarkCastillo/whisper-engine
-cd whisper-engine
+git clone https://github.com/whisperengine-ai/whisperengine.git
+cd whisperengine
 
 # Step 2: Configure environment
 cp .env.example .env

@@ -31,6 +31,9 @@ class StatusCommandHandlers:
     def register_commands(self, bot_name_filter):
         """Register all status commands"""
         
+        # Capture self reference for nested functions
+        status_handler_instance = self
+        
         @self.bot.command(name='ping')
         @bot_name_filter()
         async def ping(ctx):
@@ -39,39 +42,46 @@ class StatusCommandHandlers:
             await ctx.send('Pong!')
         
         @self.bot.command(name='llm_status')
+        @bot_name_filter()
         async def llm_status(ctx):
             """Check if the LLM server is running and show configuration"""
-            await self._llm_status_handler(ctx)
+            await status_handler_instance._llm_status_handler(ctx)
         
         @self.bot.command(name='bot_status')
+        @bot_name_filter()
         async def bot_status(ctx):
             """Check and refresh the bot's Discord presence"""
-            await self._bot_status_handler(ctx)
+            await status_handler_instance._bot_status_handler(ctx)
         
         @self.bot.command(name='clear_chat')
+        @bot_name_filter()
         async def clear_chat(ctx):
             """Clear the conversation history in this channel"""
-            await self._clear_chat_handler(ctx)
+            await status_handler_instance._clear_chat_handler(ctx)
         
         @self.bot.command(name='cache_stats')
+        @bot_name_filter()
         async def cache_stats(ctx):
             """Show conversation cache statistics"""
-            await self._cache_stats_handler(ctx)
+            await status_handler_instance._cache_stats_handler(ctx)
         
         @self.bot.command(name='vision_status')
+        @bot_name_filter()
         async def vision_status(ctx):
             """Check if the LLM supports vision (image processing)"""
-            await self._vision_status_handler(ctx)
+            await status_handler_instance._vision_status_handler(ctx)
         
         @self.bot.command(name='voice_status')
+        @bot_name_filter()
         async def voice_status(ctx):
             """Check voice support status and configuration"""
-            await self._voice_status_handler(ctx)
+            await status_handler_instance._voice_status_handler(ctx)
         
         @self.bot.command(name='test_image')
+        @bot_name_filter()
         async def test_image(ctx):
             """Test image processing with an attached image"""
-            await self._test_image_handler(ctx)
+            await status_handler_instance._test_image_handler(ctx)
     
     async def _llm_status_handler(self, ctx):
         """Handle LLM status command"""

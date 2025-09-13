@@ -52,7 +52,7 @@ class ChromaDBPerformanceMonitor:
         """Check if ChromaDB container is running"""
         try:
             result = subprocess.run(
-                ["docker", "ps", "--filter", "name=custom-bot-chromadb", "--format", "{{.Status}}"],
+                ["docker", "ps", "--filter", "name=whisperengine-chromadb", "--format", "{{.Status}}"],
                 capture_output=True,
                 text=True,
                 timeout=10
@@ -93,7 +93,7 @@ class ChromaDBPerformanceMonitor:
         try:
             # Check if container was started with GPU access
             result = subprocess.run(
-                ["docker", "inspect", "custom-bot-chromadb", "--format", "{{.HostConfig.DeviceRequests}}"],
+                ["docker", "inspect", "whisperengine-chromadb", "--format", "{{.HostConfig.DeviceRequests}}"],
                 capture_output=True,
                 text=True,
                 timeout=10
@@ -104,7 +104,7 @@ class ChromaDBPerformanceMonitor:
             if has_gpu_request:
                 # Try to detect GPU inside container
                 gpu_test = subprocess.run(
-                    ["docker", "exec", "custom-bot-chromadb", "sh", "-c", "nvidia-smi --query-gpu=name --format=csv,noheader 2>/dev/null || echo 'no-gpu'"],
+                    ["docker", "exec", "whisperengine-chromadb", "sh", "-c", "nvidia-smi --query-gpu=name --format=csv,noheader 2>/dev/null || echo 'no-gpu'"],
                     capture_output=True,
                     text=True,
                     timeout=10

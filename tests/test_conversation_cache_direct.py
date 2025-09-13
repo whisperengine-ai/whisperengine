@@ -114,12 +114,12 @@ async def test_bot_code_fix_validation():
     
     # Import the fixed code and verify it's using the secure method
     try:
-        # NOTE: This test was originally for a different project (custom_bot)
+        # NOTE: This test was originally for a different project (legacy custom_bot)
         # The hardcoded path has been commented out to make the code portable
         # TODO: Update this test to work with the current whisper-engine project
         
         # Check if basic_discord_bot.py is using get_user_conversation_context in DM processing
-        # with open('/Users/demouser/git/custom_bot/basic_discord_bot.py', 'r') as f:
+        # with open('/Users/demouser/git/whisperengine/basic_discord_bot.py', 'r') as f:
         #     bot_code = f.read()
         
         print("  ⚠️ Test skipped - originally for different project")

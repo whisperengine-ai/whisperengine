@@ -1,5 +1,5 @@
 """
-Test configuration and fixtures for the custom bot project
+Test configuration and fixtures for the WhisperEngine project
 """
 
 import pytest
