@@ -68,8 +68,7 @@ LLM_CHAT_API_URL=http://localhost:1234/v1   # Default: http://localhost:1234/v1
 
 # Model names
 LLM_MODEL_NAME=local-model                  # Default: local-model (Main chat model)
-LLM_EMOTION_MODEL_NAME=local-model          # Default: uses LLM_MODEL_NAME (Fast emotion analysis)
-LLM_FACTS_MODEL_NAME=local-model            # Default: uses LLM_EMOTION_MODEL_NAME (Fast fact extraction)
+LLM_FACTS_MODEL_NAME=local-model            # Default: uses LLM_MODEL_NAME (Fast fact extraction)
 
 # Request settings
 LLM_REQUEST_TIMEOUT=90                      # Default: 90 (Request timeout in seconds - LM Studio can be slow)

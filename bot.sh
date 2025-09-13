@@ -137,6 +137,73 @@ show_help() {
     echo "  $0 build-push v1.0.0    # Build and push specific version"
 }
 
+# Helper function to wait for services using health checks
+wait_for_services() {
+    local compose_files="$1"
+    local max_attempts=60
+    local attempt=0
+    
+    echo "⏳ Waiting for all services to be healthy..."
+    echo "📊 Services: PostgreSQL, Redis, ChromaDB, Neo4j, Bot"
+    
+    while [[ $attempt -lt $max_attempts ]]; do
+        local healthy_count=0
+        local status_line=""
+        
+        # Check infrastructure services health
+        if $COMPOSE_CMD $compose_files ps postgres | grep -q "healthy"; then 
+            ((healthy_count++))
+            status_line+="✅DB "
+        else
+            status_line+="⏳DB "
+        fi
+        
+        if $COMPOSE_CMD $compose_files ps redis | grep -q "healthy"; then 
+            ((healthy_count++))
+            status_line+="✅Redis "
+        else
+            status_line+="⏳Redis "
+        fi
+        
+        if $COMPOSE_CMD $compose_files ps chromadb | grep -q "healthy"; then 
+            ((healthy_count++))
+            status_line+="✅Vector "
+        else
+            status_line+="⏳Vector "
+        fi
+        
+        if $COMPOSE_CMD $compose_files ps neo4j | grep -q "healthy"; then 
+            ((healthy_count++))
+            status_line+="✅Graph "
+        else
+            status_line+="⏳Graph "
+        fi
+        
+        # Check bot health using our new health endpoint
+        if curl -sf http://localhost:9090/health >/dev/null 2>&1; then
+            ((healthy_count++))
+            status_line+="✅Bot"
+        else
+            status_line+="⏳Bot"
+        fi
+        
+        # Clear previous line and show current status
+        echo -ne "\r$status_line (${healthy_count}/5)"
+        
+        if [[ $healthy_count -eq 5 ]]; then
+            echo ""
+            return 0
+        fi
+        
+        sleep 2
+        ((attempt++))
+    done
+    
+    echo ""
+    print_warning "Some services may still be starting. Use '$0 status' to check."
+    return 1
+}
+
 start_bot() {
     local mode="$1"
     
@@ -181,34 +248,17 @@ start_bot() {
             echo "🚀 Starting Discord Bot in Production Mode..."
             $COMPOSE_CMD -f docker-compose.yml -f docker-compose.prod.yml up -d --build
             
-            # Wait for all services to be ready (all 4 datastores required)
-            echo "⏳ Waiting for all services to start (PostgreSQL, Redis, ChromaDB, Neo4j)..."
-            local max_attempts=60  # Increased for Neo4j startup time
-            local attempt=0
-            local services_ready=0
-            
-            while [[ $attempt -lt $max_attempts && $services_ready -lt 4 ]]; do
-                services_ready=0
-                if $COMPOSE_CMD -f docker-compose.yml -f docker-compose.prod.yml ps postgres | grep -q "healthy"; then ((services_ready++)); fi
-                if $COMPOSE_CMD -f docker-compose.yml -f docker-compose.prod.yml ps redis | grep -q "healthy"; then ((services_ready++)); fi
-                if $COMPOSE_CMD -f docker-compose.yml -f docker-compose.prod.yml ps chromadb | grep -q "Up"; then ((services_ready++)); fi
-                if $COMPOSE_CMD -f docker-compose.yml -f docker-compose.prod.yml ps neo4j | grep -q "healthy"; then ((services_ready++)); fi
-                
-                if [[ $services_ready -eq 4 ]]; then
-                    break
-                fi
-                echo -n "."
-                sleep 2
-                ((attempt++))
-            done
-            echo ""
-            
-            if [[ $services_ready -eq 4 ]]; then
-                print_status "Bot started in production mode with all datastores!"
+            # Use improved health check waiting
+            if wait_for_services "-f docker-compose.yml -f docker-compose.prod.yml"; then
+                print_status "Bot started in production mode with all services healthy!"
+                echo ""
+                echo "🏥 Health Check: http://localhost:9090/health"
+                echo "📊 Bot Status: http://localhost:9090/status" 
             else
-                print_warning "Services may still be starting. Check status with: $0 status"
+                print_warning "Some services may still be initializing"
             fi
             
+            echo ""
             echo "📋 Quick Commands:"
             echo "   $0 logs        # View logs"
             echo "   $0 stop        # Stop bot"
@@ -218,34 +268,17 @@ start_bot() {
             echo "🚀 Starting Discord Bot in Development Mode..."
             $COMPOSE_CMD -f docker-compose.yml -f docker-compose.dev.yml up -d --build
             
-            # Wait for all services to be ready (all 4 datastores required)
-            echo "⏳ Waiting for all services to start (PostgreSQL, Redis, ChromaDB, Neo4j)..."
-            local max_attempts=60  # Increased for Neo4j startup time
-            local attempt=0
-            local services_ready=0
-            
-            while [[ $attempt -lt $max_attempts && $services_ready -lt 4 ]]; do
-                services_ready=0
-                if $COMPOSE_CMD -f docker-compose.yml -f docker-compose.dev.yml ps postgres | grep -q "healthy"; then ((services_ready++)); fi
-                if $COMPOSE_CMD -f docker-compose.yml -f docker-compose.dev.yml ps redis | grep -q "healthy"; then ((services_ready++)); fi
-                if $COMPOSE_CMD -f docker-compose.yml -f docker-compose.dev.yml ps chromadb | grep -q "Up"; then ((services_ready++)); fi
-                if $COMPOSE_CMD -f docker-compose.yml -f docker-compose.dev.yml ps neo4j | grep -q "healthy"; then ((services_ready++)); fi
-                
-                if [[ $services_ready -eq 4 ]]; then
-                    break
-                fi
-                echo -n "."
-                sleep 2
-                ((attempt++))
-            done
-            echo ""
-            
-            if [[ $services_ready -eq 4 ]]; then
-                print_status "Bot started in development mode with all datastores!"
+            # Use improved health check waiting
+            if wait_for_services "-f docker-compose.yml -f docker-compose.dev.yml"; then
+                print_status "Bot started in development mode with all services healthy!"
+                echo ""
+                echo "🏥 Health Check: http://localhost:9090/health"
+                echo "📊 Bot Status: http://localhost:9090/status"
             else
-                print_warning "Services may still be starting. Check status with: $0 status"
+                print_warning "Some services may still be initializing"
             fi
             
+            echo ""
             echo "🔄 Development Features Enabled:"
             echo "   • Live code editing • Debug logging • Auto-restart"
             echo "   • All 4 datastores: PostgreSQL, Redis, ChromaDB, Neo4j"
@@ -374,10 +407,18 @@ stop_bot() {
     case $mode in
         "prod")
             echo "🛑 Stopping production services..."
+            # Graceful shutdown: Bot first, then datastores
+            echo "   🤖 Stopping bot..."
+            $COMPOSE_CMD -f docker-compose.yml -f docker-compose.prod.yml stop whisperengine-bot 2>/dev/null || true
+            echo "   🗄️ Stopping datastores..."
             $COMPOSE_CMD -f docker-compose.yml -f docker-compose.prod.yml down
             ;;
         "dev")
             echo "🛑 Stopping development services..."
+            # Graceful shutdown: Bot first, then datastores
+            echo "   🤖 Stopping bot..."
+            $COMPOSE_CMD -f docker-compose.yml -f docker-compose.dev.yml stop whisperengine-bot 2>/dev/null || true
+            echo "   🗄️ Stopping datastores..."
             $COMPOSE_CMD -f docker-compose.yml -f docker-compose.dev.yml down
             ;;
         "native")
@@ -427,15 +468,88 @@ show_status() {
     echo "📊 Container Status:"
     
     # Auto-detect which compose configuration is running
+    local compose_files=""
     if $COMPOSE_CMD -f docker-compose.yml -f docker-compose.dev.yml ps -q 2>/dev/null | grep -q .; then
         echo "   (Development configuration)"
+        compose_files="-f docker-compose.yml -f docker-compose.dev.yml"
         $COMPOSE_CMD -f docker-compose.yml -f docker-compose.dev.yml ps
     elif $COMPOSE_CMD -f docker-compose.yml -f docker-compose.prod.yml ps -q 2>/dev/null | grep -q .; then
         echo "   (Production configuration)"
+        compose_files="-f docker-compose.yml -f docker-compose.prod.yml"
         $COMPOSE_CMD -f docker-compose.yml -f docker-compose.prod.yml ps
     else
         echo "   (Base configuration)"
         $COMPOSE_CMD ps
+        return  # Skip health checks for base config
+    fi
+    
+    echo ""
+    echo "🏥 Health Status:"
+    
+    # Check infrastructure health
+    local healthy_count=0
+    
+    if $COMPOSE_CMD -f docker-compose.yml -f docker-compose.dev.yml ps postgres 2>/dev/null | grep -q "healthy" || $COMPOSE_CMD -f docker-compose.yml -f docker-compose.prod.yml ps postgres 2>/dev/null | grep -q "healthy"; then 
+        echo "   ✅ PostgreSQL: Healthy"
+        ((healthy_count++))
+    else
+        echo "   ❌ PostgreSQL: Not healthy"
+    fi
+    
+    if $COMPOSE_CMD -f docker-compose.yml -f docker-compose.dev.yml ps redis 2>/dev/null | grep -q "healthy" || $COMPOSE_CMD -f docker-compose.yml -f docker-compose.prod.yml ps redis 2>/dev/null | grep -q "healthy"; then 
+        echo "   ✅ Redis: Healthy"
+        ((healthy_count++))
+    else
+        echo "   ❌ Redis: Not healthy"
+    fi
+    
+    if $COMPOSE_CMD -f docker-compose.yml -f docker-compose.dev.yml ps chromadb 2>/dev/null | grep -q "healthy" || $COMPOSE_CMD -f docker-compose.yml -f docker-compose.prod.yml ps chromadb 2>/dev/null | grep -q "healthy"; then 
+        echo "   ✅ ChromaDB: Healthy"
+        ((healthy_count++))
+    else
+        echo "   ❌ ChromaDB: Not healthy"
+    fi
+    
+    if $COMPOSE_CMD -f docker-compose.yml -f docker-compose.dev.yml ps neo4j 2>/dev/null | grep -q "healthy" || $COMPOSE_CMD -f docker-compose.yml -f docker-compose.prod.yml ps neo4j 2>/dev/null | grep -q "healthy"; then 
+        echo "   ✅ Neo4j: Healthy"
+        ((healthy_count++))
+    else
+        echo "   ❌ Neo4j: Not healthy"
+    fi
+    
+    # Check bot health using our health endpoint
+    if curl -sf http://localhost:9090/health >/dev/null 2>&1; then
+        echo "   ✅ Bot: Healthy"
+        ((healthy_count++))
+        
+        # Show additional bot info
+        echo ""
+        echo "🤖 Bot Health Details:"
+        if command -v jq >/dev/null 2>&1; then
+            curl -s http://localhost:9090/status 2>/dev/null | jq -r '
+                "   Bot User: " + (.bot.user // "Unknown"),
+                "   Guilds: " + (.bot.guilds_count | tostring),
+                "   Latency: " + (.bot.latency_ms | tostring) + "ms",
+                "   Ready: " + (.bot.is_ready | tostring)
+            ' 2>/dev/null || echo "   (Health endpoint data available at http://localhost:9090/status)"
+        else
+            echo "   Health endpoint: http://localhost:9090/health"
+            echo "   Status endpoint: http://localhost:9090/status"
+            echo "   Install 'jq' for detailed health info display"
+        fi
+    else
+        echo "   ❌ Bot: Not healthy or not responding"
+    fi
+    
+    echo ""
+    echo "📈 Overall Status: $healthy_count/5 services healthy"
+    
+    if [[ $healthy_count -eq 5 ]]; then
+        print_status "All systems operational!"
+    elif [[ $healthy_count -ge 4 ]]; then
+        print_warning "Most services healthy, check any failed services above"
+    else
+        print_error "Multiple services unhealthy. Consider restarting: $0 restart-all"
     fi
 }
 

@@ -21,46 +21,33 @@ class EnvironmentManager:
         """
         Load environment configuration with proper precedence.
         
-        Precedence (highest to lowest):
-        1. Environment variables already set
-        2. .env (local developer config)
-        3. .env.{mode} (mode-specific defaults)
-        
-        Note: .env.example is NOT loaded at runtime - it's just a template
+        Simplified approach:
+        1. Docker Compose provides base configuration via environment variables
+        2. .env file provides local overrides and secrets
         
         Args:
-            mode: 'development', 'production', or None (auto-detect)
+            mode: Environment mode (used for logging only)
             force_reload: Clear existing env vars before loading
         """
         if force_reload:
             self._clear_bot_env_vars()
             
-        # Auto-detect mode if not specified
+        # Auto-detect mode if not specified (for logging purposes)
         if mode is None:
             mode = self._detect_environment_mode()
             
-        # Load in reverse precedence order (lowest to highest priority)
+        # Load local .env file (overrides Docker Compose environment)
         success = False
-        
-        # 1. Load mode-specific config (base defaults for environment)
-        mode_file = self.project_root / f'.env.{mode}'
-        if mode_file.exists():
-            load_dotenv(mode_file, override=False)  # Don't override system env vars
-            self.loaded_files.append(str(mode_file))
-            success = True
-            
-        # 2. Load local .env (highest priority - overrides mode-specific)
         local_env = self.project_root / '.env'
         if local_env.exists():
-            load_dotenv(local_env, override=True)  # Override mode-specific settings
+            load_dotenv(local_env, override=True)  # Override Docker environment
             self.loaded_files.append(str(local_env))
             success = True
-            
-        if success:
-            logging.info(f"✅ Environment loaded for {mode} mode")
+            logging.info(f"✅ Local .env loaded for {mode} mode")
             logging.debug(f"Loaded files: {', '.join(self.loaded_files)}")
         else:
-            logging.error("❌ No environment files found")
+            logging.info(f"✅ Using Docker Compose environment for {mode} mode (no local .env)")
+            success = True  # Docker provides the base config
             
         return success
         

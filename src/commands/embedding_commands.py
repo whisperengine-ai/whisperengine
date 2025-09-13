@@ -165,7 +165,7 @@ async def handle_embedding_performance_command(message) -> str:
             response += f"• API URL: `{embedding_url}`\n"
             if os.getenv("LLM_EMBEDDING_API_URL") is None and os.getenv("LLM_CHAT_API_URL") is not None:
                 response += f"  (using LLM_CHAT_API_URL as fallback)\n"
-            response += f"• Model: `{os.getenv('LLM_EMBEDDING_MODEL_NAME', 'not set')}`\n"
+            response += f"• Model: `{os.getenv('LLM_EMBEDDING_MODEL', 'not set')}`\n"
         else:
             response += f"• Using: ChromaDB default embeddings (CPU-based)\n"
         
@@ -176,7 +176,7 @@ async def handle_embedding_performance_command(message) -> str:
             response += f"Add to your `.env` file:\n"
             response += f"```\n"
             response += f"LLM_EMBEDDING_API_URL=http://localhost:1234/v1\n"
-            response += f"LLM_EMBEDDING_MODEL_NAME=text-embedding-nomic-embed-text-v1.5\n"
+            response += f"LLM_EMBEDDING_MODEL=text-embedding-nomic-embed-text-v1.5\n"
             response += f"```\n"
             response += f"Then restart the bot for better performance.\n"
         
@@ -206,7 +206,7 @@ async def handle_embedding_switch_command(message, args) -> str:
         response += f"1. Add to your `.env` file:\n"
         response += f"```\n"
         response += f"LLM_EMBEDDING_API_URL=http://localhost:1234/v1\n"
-        response += f"LLM_EMBEDDING_MODEL_NAME=text-embedding-nomic-embed-text-v1.5\n"
+        response += f"LLM_EMBEDDING_MODEL=text-embedding-nomic-embed-text-v1.5\n"
         response += f"# Optional: LLM_EMBEDDING_API_KEY=your_key\n"
         response += f"```\n"
         response += f"2. Restart the bot\n\n"
@@ -217,7 +217,7 @@ async def handle_embedding_switch_command(message, args) -> str:
         response += f"1. Remove or comment out these lines in `.env`:\n"
         response += f"```\n"
         response += f"# LLM_EMBEDDING_API_URL=...\n"
-        response += f"# LLM_EMBEDDING_MODEL_NAME=...\n"
+        response += f"# LLM_EMBEDDING_MODEL=...\n"
         response += f"```\n"
         response += f"2. Restart the bot\n\n"
         response += f"Local embeddings will use ChromaDB's built-in models.\n"

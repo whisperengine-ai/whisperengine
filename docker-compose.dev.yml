@@ -6,8 +6,14 @@ services:
   whisperengine-bot:
     # Environment configuration for development
     env_file:
-      - .env.development  # Base development defaults
-      - .env             # Local overrides (includes secrets like DISCORD_BOT_TOKEN)
+      - .env             # Local secrets and overrides
+      
+    environment:
+      # Development-specific settings
+      - ENV_MODE=development
+      - DEBUG_MODE=true
+      - LOG_LEVEL=DEBUG
+      - PYTHONUNBUFFERED=1
       
     volumes:
       # Override the copied source code with live mounting for development
@@ -18,13 +24,6 @@ services:
       - ./env_manager.py:/app/env_manager.py
       # System prompt templates and configuration for easy switching
       - ./config:/app/config
-      
-    environment:
-      # Development-specific settings
-      - ENV_MODE=development
-      - DEBUG_MODE=true
-      - LOG_LEVEL=DEBUG
-      - PYTHONUNBUFFERED=1
       
     # Expose health check port for development
     ports:

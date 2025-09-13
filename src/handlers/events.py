@@ -151,7 +151,7 @@ class BotEventHandlers:
         
         # Set bot presence
         try:
-            activity = discord.Activity(type=discord.ActivityType.listening, name="your thoughts...")
+            activity = discord.Activity(type=discord.ActivityType.listening, name="...")
             await self.bot.change_presence(status=discord.Status.online, activity=activity)
             logger.info("✅ Bot presence set successfully")
         except Exception as e:
@@ -737,19 +737,19 @@ class BotEventHandlers:
                 
             except LLMConnectionError:
                 logger.warning("LLM connection error")
-                await reply_channel.send("⚠️ I can't connect to the LLM server right now. Please try again later.")
+                await reply_channel.send("*The pathways between realms have grown dim...* I cannot reach the source of wisdom at this moment. Pray, try again shortly.")
             except LLMTimeoutError:
                 logger.warning("LLM timeout error")
-                await reply_channel.send("⚠️ The LLM server is taking too long to respond. Please try again.")
+                await reply_channel.send("*Time moves strangely in the realm of dreams...* Thy words have taken too long to reach me. Speak again, if thou wilt.")
             except LLMRateLimitError:
                 logger.warning("LLM rate limit error")
-                await reply_channel.send("⚠️ Too many requests. Please wait a moment before trying again.")
+                await reply_channel.send("*The flow of dreams grows heavy with too many seekers...* Grant me a moment's respite, then we may speak once more.")
             except LLMError as e:
                 logger.error(f"LLM error: {e}")
-                await reply_channel.send("⚠️ There was an issue with the AI service. Please try again.")
+                await reply_channel.send("*The threads of thought grow tangled for a moment...* Please, speak again, and I shall attend to thy words more clearly.")
             except Exception as e:
                 logger.error(f"Unexpected error processing LLM request: {e}")
-                await reply_channel.send("❌ An unexpected error occurred. Please try again later.")
+                await reply_channel.send("*Something stirs in the darkness beyond my understanding...* Perhaps we might try this exchange anew?")
     
     async def _store_conversation_memory(self, message, user_id, response, current_emotion_data, 
                                        external_emotion_data, phase2_context, phase4_context, 
