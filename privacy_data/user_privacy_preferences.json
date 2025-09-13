@@ -1,0 +1,26 @@
+{
+  "test_user_memory": {
+    "user_id": "test_user_memory",
+    "privacy_level": "moderate",
+    "allow_cross_server": false,
+    "allow_dm_to_server": false,
+    "allow_server_to_dm": false,
+    "allow_private_to_public": false,
+    "custom_rules": {},
+    "consent_status": "not_asked",
+    "consent_timestamp": null,
+    "updated_timestamp": "2025-09-09T21:13:55.798034"
+  },
+  "test_user_leak_prevention": {
+    "user_id": "test_user_leak_prevention",
+    "privacy_level": "moderate",
+    "allow_cross_server": false,
+    "allow_dm_to_server": false,
+    "allow_server_to_dm": false,
+    "allow_private_to_public": false,
+    "custom_rules": {},
+    "consent_status": "not_asked",
+    "consent_timestamp": null,
+    "updated_timestamp": "2025-09-09T21:13:55.798883"
+  }
+}

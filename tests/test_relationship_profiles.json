@@ -1,0 +1,294 @@
+{
+  "test_user_progression": {
+    "user_id": "test_user_progression",
+    "name": "New",
+    "relationship_level": "close_friend",
+    "current_emotion": "neutral",
+    "interaction_count": 30,
+    "first_interaction": "2025-09-06T20:11:53.385537",
+    "last_interaction": "2025-09-06T20:12:21.274321",
+    "personal_info": {
+      "name": [
+        "going"
+      ],
+      "location": [
+        "seattle",
+        "seattle and"
+      ],
+      "hobbies": [
+        "reading sci"
+      ],
+      "age": [
+        "28",
+        "28"
+      ]
+    },
+    "preferences": {
+      "likes": [],
+      "dislikes": [],
+      "hobbies": [],
+      "interests": []
+    },
+    "emotion_history": [
+      {
+        "detected_emotion": "neutral",
+        "confidence": 0.8,
+        "triggers": [],
+        "intensity": 0.5,
+        "timestamp": "2025-09-06T20:11:53.385563"
+      },
+      {
+        "detected_emotion": "curious",
+        "confidence": 0.33,
+        "triggers": [
+          "question_mark"
+        ],
+        "intensity": 0.36,
+        "timestamp": "2025-09-06T20:11:53.385629"
+      },
+      {
+        "detected_emotion": "curious",
+        "confidence": 0.33,
+        "triggers": [
+          "interesting"
+        ],
+        "intensity": 0.36,
+        "timestamp": "2025-09-06T20:11:53.385681"
+      },
+      {
+        "detected_emotion": "neutral",
+        "confidence": 0.8,
+        "triggers": [],
+        "intensity": 0.5,
+        "timestamp": "2025-09-06T20:11:53.385753"
+      },
+      {
+        "detected_emotion": "neutral",
+        "confidence": 0.8,
+        "triggers": [],
+        "intensity": 0.5,
+        "timestamp": "2025-09-06T20:11:53.385802"
+      },
+      {
+        "detected_emotion": "neutral",
+        "confidence": 0.8,
+        "triggers": [],
+        "intensity": 0.5,
+        "timestamp": "2025-09-06T20:11:53.386042"
+      },
+      {
+        "detected_emotion": "neutral",
+        "confidence": 0.8,
+        "triggers": [],
+        "intensity": 0.5,
+        "timestamp": "2025-09-06T20:11:53.386097"
+      },
+      {
+        "detected_emotion": "happy",
+        "confidence": 0.33,
+        "triggers": [
+          "love"
+        ],
+        "intensity": 0.36,
+        "timestamp": "2025-09-06T20:11:53.386149"
+      },
+      {
+        "detected_emotion": "happy",
+        "confidence": 0.33,
+        "triggers": [
+          "joy"
+        ],
+        "intensity": 0.36,
+        "timestamp": "2025-09-06T20:11:53.386206"
+      },
+      {
+        "detected_emotion": "grateful",
+        "confidence": 1.0,
+        "triggers": [
+          "appreciate",
+          "pattern:really\\s+appreciate"
+        ],
+        "intensity": 1.0,
+        "timestamp": "2025-09-06T20:11:53.386264"
+      },
+      {
+        "detected_emotion": "neutral",
+        "confidence": 0.8,
+        "triggers": [],
+        "intensity": 0.5,
+        "timestamp": "2025-09-06T20:11:53.386601"
+      },
+      {
+        "detected_emotion": "curious",
+        "confidence": 0.33,
+        "triggers": [
+          "question_mark"
+        ],
+        "intensity": 0.36,
+        "timestamp": "2025-09-06T20:11:53.386645"
+      },
+      {
+        "detected_emotion": "grateful",
+        "confidence": 0.55,
+        "triggers": [
+          "helpful"
+        ],
+        "intensity": 0.6,
+        "timestamp": "2025-09-06T20:11:53.386686"
+      },
+      {
+        "detected_emotion": "frustrated",
+        "confidence": 0.33,
+        "triggers": [
+          "ugh"
+        ],
+        "intensity": 0.36,
+        "timestamp": "2025-09-06T20:11:53.386736"
+      },
+      {
+        "detected_emotion": "neutral",
+        "confidence": 0.8,
+        "triggers": [],
+        "intensity": 0.5,
+        "timestamp": "2025-09-06T20:11:53.386846"
+      },
+      {
+        "detected_emotion": "neutral",
+        "confidence": 0.8,
+        "triggers": [],
+        "intensity": 0.5,
+        "timestamp": "2025-09-06T20:12:21.272773"
+      },
+      {
+        "detected_emotion": "curious",
+        "confidence": 0.33,
+        "triggers": [
+          "question_mark"
+        ],
+        "intensity": 0.36,
+        "timestamp": "2025-09-06T20:12:21.272826"
+      },
+      {
+        "detected_emotion": "curious",
+        "confidence": 0.33,
+        "triggers": [
+          "interesting"
+        ],
+        "intensity": 0.36,
+        "timestamp": "2025-09-06T20:12:21.272877"
+      },
+      {
+        "detected_emotion": "neutral",
+        "confidence": 0.8,
+        "triggers": [],
+        "intensity": 0.5,
+        "timestamp": "2025-09-06T20:12:21.272938"
+      },
+      {
+        "detected_emotion": "neutral",
+        "confidence": 0.8,
+        "triggers": [],
+        "intensity": 0.5,
+        "timestamp": "2025-09-06T20:12:21.272985"
+      },
+      {
+        "detected_emotion": "neutral",
+        "confidence": 0.8,
+        "triggers": [],
+        "intensity": 0.5,
+        "timestamp": "2025-09-06T20:12:21.273383"
+      },
+      {
+        "detected_emotion": "neutral",
+        "confidence": 0.8,
+        "triggers": [],
+        "intensity": 0.5,
+        "timestamp": "2025-09-06T20:12:21.273438"
+      },
+      {
+        "detected_emotion": "happy",
+        "confidence": 0.33,
+        "triggers": [
+          "love"
+        ],
+        "intensity": 0.36,
+        "timestamp": "2025-09-06T20:12:21.273476"
+      },
+      {
+        "detected_emotion": "happy",
+        "confidence": 0.33,
+        "triggers": [
+          "joy"
+        ],
+        "intensity": 0.36,
+        "timestamp": "2025-09-06T20:12:21.273519"
+      },
+      {
+        "detected_emotion": "grateful",
+        "confidence": 1.0,
+        "triggers": [
+          "appreciate",
+          "pattern:really\\s+appreciate"
+        ],
+        "intensity": 1.0,
+        "timestamp": "2025-09-06T20:12:21.273569"
+      },
+      {
+        "detected_emotion": "neutral",
+        "confidence": 0.8,
+        "triggers": [],
+        "intensity": 0.5,
+        "timestamp": "2025-09-06T20:12:21.274130"
+      },
+      {
+        "detected_emotion": "curious",
+        "confidence": 0.33,
+        "triggers": [
+          "question_mark"
+        ],
+        "intensity": 0.36,
+        "timestamp": "2025-09-06T20:12:21.274180"
+      },
+      {
+        "detected_emotion": "grateful",
+        "confidence": 0.55,
+        "triggers": [
+          "helpful"
+        ],
+        "intensity": 0.6,
+        "timestamp": "2025-09-06T20:12:21.274228"
+      },
+      {
+        "detected_emotion": "frustrated",
+        "confidence": 0.33,
+        "triggers": [
+          "ugh"
+        ],
+        "intensity": 0.36,
+        "timestamp": "2025-09-06T20:12:21.274275"
+      },
+      {
+        "detected_emotion": "neutral",
+        "confidence": 0.8,
+        "triggers": [],
+        "intensity": 0.5,
+        "timestamp": "2025-09-06T20:12:21.274320"
+      }
+    ],
+    "escalation_count": 1,
+    "trust_indicators": [
+      "i\\s+trust\\s+you",
+      "(?:personal|private|secret)",
+      "can\\s+i\\s+(?:tell|share)",
+      "(?:personal|private|secret)",
+      "i\\s+(?:feel|felt)\\s+(?:comfortable|safe)",
+      "you\\s+understand",
+      "i\\s+trust\\s+you",
+      "(?:personal|private|secret)",
+      "can\\s+i\\s+(?:tell|share)",
+      "(?:personal|private|secret)",
+      "i\\s+(?:feel|felt)\\s+(?:comfortable|safe)",
+      "you\\s+understand"
+    ]
+  }
+}

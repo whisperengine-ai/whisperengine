@@ -1,0 +1,110 @@
+# Multi-stage Dockerfile for production optimization
+FROM python:3.13-slim as base
+
+# Environment variables
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    TOKENIZERS_PARALLELISM=false \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
+
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    gcc g++ git curl ffmpeg wget netcat-traditional procps \
+    libopus-dev libffi-dev libnacl-dev libssl-dev \
+    && rm -rf /var/lib/apt/lists/* \
+    && pip install --upgrade pip
+
+# ============================================================================
+# Development stage
+FROM base as development
+
+# Install development dependencies
+COPY requirements.txt requirements-dev.txt* ./
+RUN pip install -r requirements.txt && \
+    if [ -f requirements-dev.txt ]; then pip install -r requirements-dev.txt; fi
+
+# Copy all source code (for development)
+COPY . .
+
+# Create user and directories
+RUN useradd --create-home appuser && \
+    mkdir -p chromadb_data backups privacy_data temp_images logs && \
+    chown -R appuser:appuser /app
+
+USER appuser
+
+# Development command with hot-reload
+CMD ["sh", "-c", "python validate_config.py && python run.py"]
+
+# ============================================================================
+# Production stage  
+FROM base as production
+
+# Copy only requirements first (for better caching)
+COPY requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy only necessary application files
+COPY src/ ./src/
+COPY pyproject.toml validate_config.py env_manager.py run.py ./
+COPY system_prompt.md ./
+COPY .env.production ./
+# Copy local .env if it exists (for local overrides)
+COPY .env* ./
+
+# Create non-root user and directories
+RUN useradd --create-home --no-log-init appuser && \
+    mkdir -p backups privacy_data temp_images logs && \
+    chown -R appuser:appuser /app && \
+    # Remove unnecessary packages after installation (keep wget, netcat, and procps for health checks)
+    apt-get autoremove -y gcc g++ git && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+
+USER appuser
+
+# Health check - verify the main Python process is running
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+    CMD pgrep -f "python.*run" > /dev/null || exit 1
+
+# Production command
+CMD ["sh", "-c", "python validate_config.py && python run.py"]
+
+# ============================================================================
+# Minimal/End-user stage (even smaller)
+FROM python:3.13-alpine as minimal
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    TOKENIZERS_PARALLELISM=false
+
+WORKDIR /app
+
+# Install minimal dependencies
+RUN apk add --no-cache \
+    gcc musl-dev libffi-dev openssl-dev \
+    ffmpeg opus-dev wget netcat-openbsd procps && \
+    pip install --upgrade pip
+
+# Copy and install requirements
+COPY requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt && \
+    apk del gcc musl-dev libffi-dev openssl-dev
+
+# Copy application
+COPY src/ ./src/
+COPY validate_config.py env_manager.py run.py system_prompt.md ./
+# Copy environment files for configuration
+COPY .env* ./
+
+# Create user
+RUN adduser -D -s /bin/sh appuser && \
+    mkdir -p chromadb_data backups privacy_data temp_images logs && \
+    chown -R appuser:appuser /app
+
+USER appuser
+
+CMD ["sh", "-c", "python validate_config.py && python run.py"]
