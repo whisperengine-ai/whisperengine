@@ -1,0 +1,30 @@
+{
+  "export_info": {
+    "export_date": "2025-09-06T12:00:00",
+    "total_facts": 3,
+    "export_version": "1.0"
+  },
+  "global_facts": [
+    {
+      "fact": "The user prefers dark mode themes for coding environments",
+      "context": "User interface preferences",
+      "timestamp": "2025-09-06T11:30:00",
+      "added_by": "system",
+      "extraction_method": "conversation_analysis"
+    },
+    {
+      "fact": "Python is the primary programming language used in this project",
+      "context": "Project technical stack",
+      "timestamp": "2025-09-06T11:35:00",
+      "added_by": "system",
+      "extraction_method": "code_analysis"
+    },
+    {
+      "fact": "The bot uses ChromaDB for persistent memory storage",
+      "context": "System architecture",
+      "timestamp": "2025-09-06T11:40:00",
+      "added_by": "admin",
+      "extraction_method": "manual"
+    }
+  ]
+}

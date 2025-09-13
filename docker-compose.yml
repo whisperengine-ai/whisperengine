@@ -1,0 +1,182 @@
+# Production Docker Compose Configuration
+# Optimized for production deployment with external services
+
+services:
+  discord-bot:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.multi-stage
+      target: production
+    image: discord-bot:${VERSION:-latest}
+    container_name: discord-bot-prod
+    restart: unless-stopped
+    
+    # Environment configuration
+    env_file:
+      - .env.production  # Base production defaults
+      - .env             # Local overrides (includes secrets like DISCORD_BOT_TOKEN)
+    environment:
+      # Production overrides
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - DEBUG_MODE=false
+      - PYTHONUNBUFFERED=1
+      
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '0.5'
+        reservations:
+          memory: 512M
+          cpus: '0.25'
+    
+    # Health check - verify the main Python process is running
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f 'python.*main' > /dev/null || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    
+    # Persistent volumes
+    volumes:
+      - bot_data:/app/chromadb_data
+      - bot_backups:/app/backups
+      - bot_privacy:/app/privacy_data
+      - bot_temp:/app/temp_images
+      - bot_logs:/app/logs
+      # System prompt customization (mount host files for easy editing)
+      - ./system_prompt.md:/app/system_prompt.md:ro
+      - ./config:/app/config:ro
+      
+    # Network
+    networks:
+      - bot_network
+      
+    # Dependencies
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      chromadb:
+        condition: service_healthy
+      neo4j:
+        condition: service_healthy
+
+  # Redis for caching
+  redis:
+    image: redis:7-alpine
+    container_name: discord-bot-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    networks:
+      - bot_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # PostgreSQL for persistent data
+  postgres:
+    image: postgres:16-alpine
+    container_name: discord-bot-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-discord_bot}
+      POSTGRES_USER: ${POSTGRES_USER:-bot_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_INITDB_ARGS: "--auth-host=scram-sha-256"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init_postgres.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ports:
+      - "5432:5432"
+    networks:
+      - bot_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-bot_user} -d ${POSTGRES_DB:-discord_bot}"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # ChromaDB for vector storage
+  chromadb:
+    image: chromadb/chroma:latest
+    container_name: discord-bot-chromadb
+    restart: unless-stopped
+    environment:
+      - CHROMA_SERVER_HOST=0.0.0.0
+      - CHROMA_SERVER_HTTP_PORT=8000
+      - CHROMA_SERVER_AUTH_CREDENTIALS_PROVIDER=${CHROMA_AUTH_PROVIDER:-}
+      - CHROMA_SERVER_AUTH_CREDENTIALS=${CHROMA_AUTH_TOKEN:-}
+    volumes:
+      - chromadb_data:/chroma/chroma
+    ports:
+      - "8000:8000"
+    networks:
+      - bot_network
+
+  # Neo4j graph database
+  neo4j:
+    image: neo4j:5.15-community
+    container_name: discord-bot-neo4j
+    restart: unless-stopped
+    environment:
+      - NEO4J_AUTH=${NEO4J_USERNAME:-neo4j}/${NEO4J_PASSWORD:-neo4j_password_change_me}
+      - NEO4J_PLUGINS=["apoc"]
+      - NEO4J_dbms_security_procedures_unrestricted=apoc.*
+      - NEO4J_dbms_memory_heap_initial__size=512m
+      - NEO4J_dbms_memory_heap_max__size=2G
+    volumes:
+      - neo4j_data:/data
+      - neo4j_logs:/logs
+    ports:
+      - "7474:7474"  # HTTP
+      - "7687:7687"  # Bolt
+    healthcheck:
+      test: ["CMD", "cypher-shell", "-u", "${NEO4J_USERNAME:-neo4j}", "-p", "${NEO4J_PASSWORD:-neo4j_password_change_me}", "RETURN 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - bot_network
+
+
+
+# Networks
+networks:
+  bot_network:
+    driver: bridge
+    name: discord-bot-network
+
+# Volumes
+volumes:
+  bot_data:
+    name: discord-bot-data
+  bot_backups:
+    name: discord-bot-backups
+  bot_privacy:
+    name: discord-bot-privacy
+  bot_temp:
+    name: discord-bot-temp
+  bot_logs:
+    name: discord-bot-logs
+  redis_data:
+    name: discord-bot-redis
+  postgres_data:
+    name: discord-bot-postgres
+  chromadb_data:
+    name: discord-bot-chromadb
+  neo4j_data:
+    name: discord-bot-neo4j-data
+  neo4j_logs:
+    name: discord-bot-neo4j-logs
+

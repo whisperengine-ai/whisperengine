@@ -1,0 +1,172 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "whisperengine"
+version = "1.1.0"
+description = "WhisperEngine - Privacy-first Discord bot embodying Dream from Neil Gaiman's Sandman with persistent memory and personality adaptation"
+authors = [{name = "whisperengine-ai", email = "contact@whisperengine.ai"}]
+license = {text = "MIT"}
+readme = "README.md"
+requires-python = ">=3.13"
+keywords = ["discord", "bot", "ai", "memory", "privacy", "sandman", "dream", "personality", "whisperengine"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Communications :: Chat",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+
+dependencies = [
+    # Core Discord Bot Dependencies
+    "discord.py==2.4.0",
+    "python-dotenv==1.0.1",
+    
+    # HTTP Client Dependencies  
+    "aiohttp==3.10.5",
+    "requests==2.32.3",
+    
+    # AI/ML and Memory System Dependencies
+    "chromadb==0.5.15",
+    "sentence-transformers==3.1.1",
+    "numpy==2.1.1",
+    "redis==5.0.8",
+    "spacy==3.7.6",
+    
+    # Image Processing Dependencies
+    "Pillow==10.4.0",
+    
+    # Async File I/O Dependencies
+    "aiofiles==24.1.0",
+    
+    # Voice functionality dependencies (optional)
+    "PyNaCl==1.5.0",
+    "audioop-lts==0.2.2",
+    "elevenlabs==1.8.2",
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest==8.3.3",
+    "pytest-asyncio==0.24.0",
+    "pytest-cov==5.0.0",
+    "pytest-xdist==3.6.0",
+    "pytest-mock==3.14.0",
+]
+dev = [
+    "black==24.8.0",
+    "flake8==7.1.1",
+    "mypy==1.11.2",
+    "pre-commit==3.8.0",
+    "debugpy==1.8.6",
+    "ipython==8.27.0",
+    "jupyter==1.1.1",
+    "ruff==0.6.4",
+]
+
+[project.urls]
+Homepage = "https://github.com/whisperengine-ai/whisperengine"
+Repository = "https://github.com/whisperengine-ai/whisperengine.git"
+Issues = "https://github.com/whisperengine-ai/whisperengine/issues"
+
+[project.scripts]
+whisperengine = "src.main:main"
+discord-bot = "src.main:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["src*"]
+
+[tool.setuptools.package-data]
+"src.config" = ["*.md", "*.example"]
+
+[tool.black]
+line-length = 100
+target-version = ['py313']
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+  # directories
+  \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | build
+  | dist
+  | data
+  | logs
+  | temp_images
+  | __pycache__
+)/
+'''
+
+[tool.ruff]
+target-version = "py313"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "C90", "I", "N", "UP", "B", "A", "C4", "T20"]
+ignore = ["E501", "N806", "N803"]
+
+[tool.coverage.run]
+source = ["src"]
+omit = [
+    "*/tests/*",
+    "*/test_*",
+    "*/__pycache__/*",
+    "*/.*",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+]
+
+[tool.pytest.ini_options]
+minversion = "6.0"
+addopts = "-ra -q --strict-markers --strict-config --cov=src --cov-report=term-missing --cov-report=html"
+testpaths = ["tests"]
+pythonpath = ["."]
+asyncio_mode = "auto"
+markers = [
+    "unit: marks tests as unit tests (fast, no external dependencies)",
+    "integration: marks tests as integration tests (may use real services)",
+    "slow: marks tests as slow running",
+]
+
+[tool.mypy]
+python_version = "3.13"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+disallow_untyped_decorators = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_no_return = true
+warn_unreachable = true
+strict_equality = true
+
+[[tool.mypy.overrides]]
+module = [
+    "discord.*",
+    "chromadb.*",
+    "sentence_transformers.*",
+    "elevenlabs.*",
+    "redis.*",
+    "spacy.*",
+    "audioop_lts.*",
+]
+ignore_missing_imports = true

@@ -1,0 +1,45 @@
+# Core Discord Bot Dependencies (includes all Graph Database dependencies)
+discord.py==2.6.3
+python-dotenv==1.1.1
+
+# HTTP Client Dependencies  
+aiohttp==3.12.15
+requests==2.32.5
+httpx
+
+# AI/ML and Memory System Dependencies
+chromadb
+sentence-transformers==5.1.0
+numpy==2.3.2
+
+# Advanced NLP Dependencies (Phase 1)
+spacy>=3.6.0
+transformers>=4.30.0
+
+# Redis Dependencies
+redis==5.2.1
+
+# PostgreSQL Dependencies
+asyncpg==0.30.0  # For main connection pool and privacy manager
+psycopg[binary]==3.2.3  # Alternative PostgreSQL driver
+psycopg2-binary==2.9.10  # Synchronous PostgreSQL driver for emotion manager
+
+# Neo4j Graph Database Dependencies
+neo4j==5.15.0
+networkx>=2.8  # For graph analysis and visualization
+matplotlib>=3.5.0  # For graph visualization and debugging
+
+# Image Processing Dependencies
+Pillow==11.3.0
+
+# Async File I/O Dependencies
+aiofiles==24.1.0
+
+# Voice functionality dependencies (optional)
+PyNaCl==1.5.0
+audioop-lts==0.2.2
+elevenlabs==2.15.0
+
+# Testing Dependencies (development only)
+pytest==8.4.2
+pytest-asyncio==1.1.0

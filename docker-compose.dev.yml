@@ -1,0 +1,36 @@
+# Discord Bot - Development Configuration
+# Run from root directory: docker-compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
+# Includes live code mounting for development
+
+services:
+  discord-bot:
+    # Environment configuration for development
+    env_file:
+      - .env.development  # Base development defaults
+      - .env             # Local overrides (includes secrets like DISCORD_BOT_TOKEN)
+      
+    volumes:
+      # Override the copied source code with live mounting for development
+      - ./src:/app/src
+      - ./system_prompt.md:/app/system_prompt.md
+      - ./validate_config.py:/app/validate_config.py
+      # System prompt templates for easy switching
+      - ./config:/app/config
+      
+    environment:
+      # Development-specific settings
+      - DEBUG_MODE=true
+      - LOG_LEVEL=DEBUG
+      - PYTHONUNBUFFERED=1
+      
+    # Enable hot-reloading by watching for changes
+    command: >
+      sh -c "
+        echo '🔄 Development mode: watching for file changes...' &&
+        python validate_config.py &&
+        python -u run.py
+      "
+    
+    # Ensure container rebuilds when source changes
+    labels:
+      - "dev.mode=true"
