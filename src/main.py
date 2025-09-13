@@ -126,7 +126,7 @@ class ModularBotManager:
                 graph_personality_manager=components.get('graph_personality_manager'),
                 personality_profiler=components.get('personality_profiler')
             )
-            self.command_handlers['memory'].register_commands(is_admin)
+            self.command_handlers['memory'].register_commands(is_admin, bot_name_filter)
             logger.info("✅ Memory command handlers registered")
             
             # Admin commands

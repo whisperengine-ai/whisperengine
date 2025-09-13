@@ -8,7 +8,7 @@ set -e
 echo "🚀 Starting Neo4j Graph Database Setup..."
 
 # Check if Neo4j container is running
-if ! docker ps | grep -q "custom-bot-neo4j"; then
+if ! docker ps | grep -q "whisperengine-neo4j"; then
     echo "❌ Neo4j container is not running. Please start with: docker-compose up -d neo4j"
     exit 1
 fi
@@ -19,7 +19,7 @@ max_attempts=30
 attempt=0
 
 while [ $attempt -lt $max_attempts ]; do
-    if docker exec custom-bot-neo4j cypher-shell -u neo4j -p "${NEO4J_PASSWORD:-neo4j_password_change_me}" "RETURN 1" > /dev/null 2>&1; then
+    if docker exec whisperengine-neo4j cypher-shell -u neo4j -p "${NEO4J_PASSWORD:-neo4j_password_change_me}" "RETURN 1" > /dev/null 2>&1; then
         echo "✅ Neo4j is ready!"
         break
     fi
@@ -37,7 +37,7 @@ fi
 # Initialize schema and constraints
 echo "📝 Initializing Neo4j schema..."
 
-docker exec custom-bot-neo4j cypher-shell -u neo4j -p "${NEO4J_PASSWORD:-neo4j_password_change_me}" << 'EOF'
+docker exec whisperengine-neo4j cypher-shell -u neo4j -p "${NEO4J_PASSWORD:-neo4j_password_change_me}" << 'EOF'
 // Create constraints for unique IDs
 CREATE CONSTRAINT user_id_unique IF NOT EXISTS FOR (u:User) REQUIRE u.id IS UNIQUE;
 CREATE CONSTRAINT topic_id_unique IF NOT EXISTS FOR (t:Topic) REQUIRE t.id IS UNIQUE;
@@ -66,7 +66,7 @@ echo "✅ Neo4j schema initialized!"
 
 # Verify APOC plugin is available
 echo "🔌 Verifying APOC plugin..."
-if docker exec custom-bot-neo4j cypher-shell -u neo4j -p "${NEO4J_PASSWORD:-neo4j_password_change_me}" "RETURN apoc.version()" > /dev/null 2>&1; then
+if docker exec whisperengine-neo4j cypher-shell -u neo4j -p "${NEO4J_PASSWORD:-neo4j_password_change_me}" "RETURN apoc.version()" > /dev/null 2>&1; then
     echo "✅ APOC plugin is available!"
 else
     echo "⚠️  APOC plugin not available - some advanced features may not work"
@@ -76,7 +76,7 @@ fi
 if [ "${INIT_SAMPLE_DATA:-false}" = "true" ]; then
     echo "📊 Creating sample data..."
     
-    docker exec custom-bot-neo4j cypher-shell -u neo4j -p "${NEO4J_PASSWORD:-neo4j_password_change_me}" << 'EOF'
+    docker exec whisperengine-neo4j cypher-shell -u neo4j -p "${NEO4J_PASSWORD:-neo4j_password_change_me}" << 'EOF'
 // Create sample user
 MERGE (u:User {id: 'sample_user_123'})
 SET u.discord_id = '123456789',

@@ -54,7 +54,7 @@ class ElevenLabsClient:
         self.logger = logging.getLogger(__name__)
         
         # Load voice configuration from environment
-        self.default_voice_id = os.getenv("ELEVENLABS_DEFAULT_VOICE_ID", "21m00Tcm4TlvDq8ikWAM")  # Rachel voice
+        self.default_voice_id = os.getenv("ELEVENLABS_DEFAULT_VOICE_ID", "ked1vRAQW5Sk9vhZC3vI")  # Updated default voice
         self.voice_stability = float(os.getenv("ELEVENLABS_VOICE_STABILITY", "0.5"))
         self.voice_similarity_boost = float(os.getenv("ELEVENLABS_VOICE_SIMILARITY_BOOST", "0.8"))
         self.voice_style = float(os.getenv("ELEVENLABS_VOICE_STYLE", "0.0"))  # 0.0 = most natural

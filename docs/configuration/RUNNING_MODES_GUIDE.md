@@ -1,4 +1,4 @@
-# Custom Bot - Running Modes Guide
+# WhisperEngine - Running Modes Guide
 
 This guide covers all the different ways to run the Discord bot locally, for both developers and end users.
 

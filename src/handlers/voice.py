@@ -19,21 +19,23 @@ def should_bot_respond_voice(ctx: commands.Context) -> bool:
     """
     Check if this bot instance should respond to the voice command.
     Returns True if:
-    1. No bot name filter is configured, OR
-    2. The command message mentions this bot's name, OR
-    3. The command is sent via DM
-    """
-    bot_name = os.getenv('DISCORD_BOT_NAME', '').lower()
+    1. The command is sent via DM (always respond), OR
+    2. The command message contains this bot's name as a separate word, OR
+    3. The command message contains the fallback name "whisperengine" as a separate word
     
-    if not bot_name:  # No name filter configured, respond to all
-        return True
+    For guild channels, bot name must be explicitly mentioned to prevent conflicts.
+    """
+    bot_name = os.getenv('DISCORD_BOT_NAME', 'whisperengine').lower()
+    fallback_name = 'whisperengine'
     
     if not ctx.guild:  # Always respond to DMs
         return True
     
-    # Check if the message contains the bot's name (case insensitive)
-    message_content = ctx.message.content.lower()
-    return bot_name in message_content
+    # Split message into words for exact matching
+    message_words = ctx.message.content.lower().split()
+    
+    # Check if bot name or fallback name appears as a separate word
+    return bot_name in message_words or fallback_name in message_words
 
 
 def voice_bot_name_filter():
@@ -43,9 +45,16 @@ def voice_bot_name_filter():
     """
     def decorator(func):
         @wraps(func)
-        async def wrapper(self, ctx, *args, **kwargs):
-            if should_bot_respond_voice(ctx):
-                return await func(self, ctx, *args, **kwargs)
+        async def wrapper(*args, **kwargs):
+            # Handle both method calls (self, ctx, ...) and function calls (ctx, ...)
+            if len(args) >= 2 and hasattr(args[0], '__dict__'):  # Method call with self
+                ctx = args[1]
+                if should_bot_respond_voice(ctx):
+                    return await func(*args, **kwargs)
+            elif len(args) >= 1:  # Function call with ctx as first argument
+                ctx = args[0]
+                if should_bot_respond_voice(ctx):
+                    return await func(*args, **kwargs)
             # If bot shouldn't respond, do nothing (no error message)
             return
         return wrapper
@@ -74,9 +83,18 @@ class VoiceCommandHandlers:
         async def join_voice(ctx, *, channel_name: Optional[str] = None):
             """
             Join a voice channel
-            Usage: !join [channel_name]
+            Usage: !join [channel_name] or !join whisperengine [channel_name]
             If no channel specified, joins the user's current voice channel
             """
+            logger.info(f"Join voice command triggered by {ctx.author.name}")
+            
+            # Filter out bot name from channel_name if present
+            bot_name = os.getenv('DISCORD_BOT_NAME', 'whisperengine').lower()
+            fallback_name = 'whisperengine'
+            
+            if channel_name and (channel_name.lower() == bot_name or channel_name.lower() == fallback_name):
+                channel_name = None  # Treat as if no channel was specified
+                
             await self._join_voice_handler(ctx, channel_name)
         
         @self.bot.command(name='leave', aliases=['l', 'disconnect'])
@@ -84,7 +102,7 @@ class VoiceCommandHandlers:
         async def leave_voice(ctx):
             """
             Leave the current voice channel
-            Usage: !leave
+            Usage: !leave or !leave whisperengine
             """
             await self._leave_voice_handler(ctx)
         
@@ -93,8 +111,21 @@ class VoiceCommandHandlers:
         async def speak_text(ctx, *, text: str):
             """
             Make the bot speak text in the voice channel
-            Usage: !speak <text>
+            Usage: !speak <text> or !speak whisperengine <text>
             """
+            # Filter out bot name from beginning of text if present
+            bot_name = os.getenv('DISCORD_BOT_NAME', 'whisperengine').lower()
+            fallback_name = 'whisperengine'
+            
+            # Check if text starts with bot name or fallback name and remove it
+            text_words = text.split()
+            if text_words and (text_words[0].lower() == bot_name or text_words[0].lower() == fallback_name):
+                text = ' '.join(text_words[1:])  # Remove the first word (bot name)
+            
+            if not text.strip():
+                await ctx.send("❌ Please provide text to speak. Usage: `!speak <text>`")
+                return
+                
             await self._speak_text_handler(ctx, text)
         
         @self.bot.command(name='voice_toggle_listening', aliases=['vtl', 'toggle_listen'])
@@ -144,67 +175,63 @@ class VoiceCommandHandlers:
         async def voice_help(ctx):
             """
             Show voice command help
-            Usage: !voice_help
+            Usage: !voice_help or !voice_help whisperengine
             """
             await self._voice_help_handler(ctx)
-        
-        # Error handling for voice commands
-        @join_voice.error
-        @leave_voice.error
-        @speak_text.error
-        @toggle_listening.error
-        async def voice_command_error(ctx, error):
-            """Handle voice command errors"""
-            if isinstance(error, commands.MissingPermissions):
-                await ctx.send("❌ You don't have permission to use this command.")
-            elif isinstance(error, commands.MissingRequiredArgument):
-                await ctx.send("❌ Missing required argument. Use `!voice_help` for usage information.")
-            else:
-                self.logger.error(f"Voice command error: {error}")
-                await ctx.send("❌ An error occurred. Please try again.")
     
     async def _join_voice_handler(self, ctx, channel_name: Optional[str] = None):
         """Handle join voice channel command"""
-        if not self.voice_manager:
-            await ctx.send("❌ Voice functionality is not available.")
-            return
-        
-        if not ctx.guild:
-            await ctx.send("❌ This command can only be used in a server.")
-            return
+        try:
+            self.logger.info(f"Join voice command called by {ctx.author.name} in {ctx.guild.name if ctx.guild else 'DM'}")
             
-        # Check if user is in a voice channel or specified one
-        target_channel = None
-        
-        if channel_name:
-            # Find channel by name
-            for channel in ctx.guild.voice_channels:
-                if channel.name.lower() == channel_name.lower():
-                    target_channel = channel
-                    break
-            
-            if not target_channel:
-                await ctx.send(f"❌ Voice channel '{channel_name}' not found.")
+            if not self.voice_manager:
+                await ctx.send("❌ Voice functionality is not available.")
                 return
-        else:
-            # Use user's current voice channel
-            if isinstance(ctx.author, discord.Member) and ctx.author.voice and ctx.author.voice.channel:
-                voice_channel = ctx.author.voice.channel
-                if isinstance(voice_channel, discord.VoiceChannel):
-                    target_channel = voice_channel
             
-            if not target_channel:
-                await ctx.send("❌ You're not in a voice channel. Please join one or specify a channel name.")
+            if not ctx.guild:
+                await ctx.send("❌ This command can only be used in a server.")
                 return
-        
-        # Ensure we have a VoiceChannel
-        if not isinstance(target_channel, discord.VoiceChannel):
-            await ctx.send("❌ Invalid voice channel type.")
-            return
-        
-        # Check permissions
-        if not target_channel.permissions_for(ctx.guild.me).connect:
-            await ctx.send(f"❌ I don't have permission to join '{target_channel.name}'.")
+                
+            # Check if user is in a voice channel or specified one
+            target_channel = None
+            
+            if channel_name:
+                # Find channel by name
+                for channel in ctx.guild.voice_channels:
+                    if channel.name.lower() == channel_name.lower():
+                        target_channel = channel
+                        break
+                
+                if not target_channel:
+                    await ctx.send(f"❌ Voice channel '{channel_name}' not found.")
+                    return
+            else:
+                # Use user's current voice channel
+                self.logger.info(f"User {ctx.author.name} voice state: {ctx.author.voice}")
+                if isinstance(ctx.author, discord.Member) and ctx.author.voice and ctx.author.voice.channel:
+                    voice_channel = ctx.author.voice.channel
+                    if isinstance(voice_channel, discord.VoiceChannel):
+                        target_channel = voice_channel
+                
+                if not target_channel:
+                    await ctx.send("❌ You're not in a voice channel. Please join one or specify a channel name.")
+                    return
+            
+            self.logger.info(f"Target channel: {target_channel.name}")
+            
+            # Ensure we have a VoiceChannel
+            if not isinstance(target_channel, discord.VoiceChannel):
+                await ctx.send("❌ Invalid voice channel type.")
+                return
+            
+            # Check permissions
+            if not target_channel.permissions_for(ctx.guild.me).connect:
+                await ctx.send(f"❌ I don't have permission to join '{target_channel.name}'.")
+                return
+                
+        except Exception as e:
+            self.logger.error(f"Error in join voice handler: {e}", exc_info=True)
+            await ctx.send(f"❌ An error occurred: {e}")
             return
         
         # Join the channel
@@ -405,20 +432,29 @@ class VoiceCommandHandlers:
         )
         
         try:
-            # Test ElevenLabs connection
-            test_result = await self.voice_manager.elevenlabs.test_connection()
+            # Test ElevenLabs TTS functionality (more reliable than voices endpoint)
+            try:
+                # Test TTS with a short message
+                test_audio = await self.voice_manager.elevenlabs.text_to_speech(
+                    "Voice test successful", 
+                    voice_id=self.voice_manager.elevenlabs.default_voice_id
+                )
+                tts_working = len(test_audio) > 0
+            except Exception as e:
+                self.logger.debug(f"TTS test failed: {e}")
+                tts_working = False
             
-            if test_result:
+            if tts_working:
                 embed.add_field(
-                    name="✅ ElevenLabs Connection",
-                    value="Successfully connected to ElevenLabs API",
+                    name="✅ ElevenLabs TTS",
+                    value="Text-to-speech is working correctly",
                     inline=False
                 )
                 embed.color = discord.Color.green()
             else:
                 embed.add_field(
-                    name="❌ ElevenLabs Connection",
-                    value="Failed to connect to ElevenLabs API",
+                    name="❌ ElevenLabs TTS",
+                    value="Text-to-speech is not working",
                     inline=False
                 )
                 embed.color = discord.Color.red()

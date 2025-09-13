@@ -18,25 +18,28 @@ class PrivacyCommandHandlers:
     def register_commands(self):
         """Register all privacy commands"""
         
+        # Capture self reference for nested functions
+        privacy_handler_instance = self
+        
         @self.bot.command(name='privacy')
         async def privacy_settings(ctx):
             """Show current privacy settings"""
-            await self._privacy_handler(ctx)
+            await privacy_handler_instance._privacy_handler(ctx)
         
         @self.bot.command(name='privacy_level')
         async def set_privacy_level(ctx, level: Optional[str] = None):
             """Set privacy level (strict, moderate, permissive)"""
-            await self._privacy_level_handler(ctx, level)
+            await privacy_handler_instance._privacy_level_handler(ctx, level)
         
         @self.bot.command(name='privacy_audit')
         async def privacy_audit(ctx, limit: int = 10):
             """View recent privacy decisions"""
-            await self._privacy_audit_handler(ctx, limit)
+            await privacy_handler_instance._privacy_audit_handler(ctx, limit)
         
         @self.bot.command(name='privacy_help')
         async def privacy_help(ctx):
             """Show detailed privacy help"""
-            await self._privacy_help_handler(ctx)
+            await privacy_handler_instance._privacy_help_handler(ctx)
     
     async def _privacy_handler(self, ctx):
         """Handle privacy command"""

@@ -55,13 +55,14 @@ from src.utils.conversation import ConversationHistoryManager
 try:
     from src.llm.elevenlabs_client import ElevenLabsClient
     from src.voice.voice_manager import DiscordVoiceManager
-    from src.voice.voice_commands import VoiceCommands
+    # from src.voice.voice_commands import VoiceCommands  # Disabled - using VoiceCommandHandlers instead
     VOICE_AVAILABLE = True
 except ImportError:
     VOICE_AVAILABLE = False
     ElevenLabsClient = None
     DiscordVoiceManager = None
-    VoiceCommands = None
+
+VoiceCommands = None  # Explicitly set to None - using VoiceCommandHandlers instead
 
 # External API Emotion AI Integration
 try:
@@ -97,6 +98,7 @@ class DiscordBotCore:
         self.health_monitor = None
         self.backup_manager = None
         self.voice_manager = None
+        self.voice_support_enabled = False  # Will be set during voice initialization
         self.external_emotion_ai = None
         self.shutdown_manager = None
         self.heartbeat_monitor = None
@@ -447,9 +449,9 @@ class DiscordBotCore:
             
     def initialize_voice_system(self):
         """Initialize the voice functionality if available."""
-        voice_support_enabled = os.getenv("VOICE_SUPPORT_ENABLED", "true").lower() == "true"
+        self.voice_support_enabled = os.getenv("VOICE_SUPPORT_ENABLED", "true").lower() == "true"
         
-        if (VOICE_AVAILABLE and voice_support_enabled and ElevenLabsClient is not None 
+        if (VOICE_AVAILABLE and self.voice_support_enabled and ElevenLabsClient is not None 
             and DiscordVoiceManager is not None and self.bot is not None):
             try:
                 self.logger.info("Initializing voice functionality...")
@@ -468,7 +470,7 @@ class DiscordBotCore:
                 self.logger.error(f"Failed to initialize voice functionality: {e}")
                 self.logger.warning("Bot will continue without voice features")
                 self.voice_manager = None
-        elif VOICE_AVAILABLE and not voice_support_enabled:
+        elif VOICE_AVAILABLE and not self.voice_support_enabled:
             self.logger.info("Voice functionality disabled by configuration (VOICE_SUPPORT_ENABLED=false)")
         else:
             self.logger.info("Voice functionality not available - missing dependencies")

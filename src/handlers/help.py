@@ -22,18 +22,21 @@ class HelpCommandHandlers:
     def register_commands(self, bot_name_filter, is_admin):
         """Register help commands"""
         
+        # Capture self reference for nested functions
+        help_handler_instance = self
+        
         @self.bot.command(name='help')
         @bot_name_filter()
         async def help_command(ctx):
             """Show all available bot commands (overrides default help)"""
             logger.debug(f"Help command called by {ctx.author.name} - redirecting to custom commands")
-            await self._custom_help_handler(ctx, is_admin)
+            await help_handler_instance._custom_help_handler(ctx, is_admin)
 
         @self.bot.command(name='commands', aliases=['help_custom'])
         @bot_name_filter()
         async def custom_help(ctx):
             """Show all available bot commands with descriptions"""
-            await self._custom_help_handler(ctx, is_admin)
+            await help_handler_instance._custom_help_handler(ctx, is_admin)
     
     async def _custom_help_handler(self, ctx, is_admin):
         """Handle custom help command with better formatting"""

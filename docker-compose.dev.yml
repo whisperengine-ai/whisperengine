@@ -21,6 +21,7 @@ services:
       
     environment:
       # Development-specific settings
+      - ENV_MODE=development
       - DEBUG_MODE=true
       - LOG_LEVEL=DEBUG
       - PYTHONUNBUFFERED=1

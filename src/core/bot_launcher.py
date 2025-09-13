@@ -31,21 +31,23 @@ def should_bot_respond(ctx: commands.Context) -> bool:
     """
     Check if this bot instance should respond to the command.
     Returns True if:
-    1. No bot name filter is configured, OR
-    2. The command message mentions this bot's name, OR
-    3. The command is sent via DM
-    """
-    bot_name = os.getenv('BOT_NAME', '').lower()
+    1. The command is sent via DM (always respond), OR
+    2. The command message contains this bot's name as a separate word, OR
+    3. The command message contains the fallback name "whisperengine" as a separate word
     
-    if not bot_name:  # No name filter configured, respond to all
-        return True
+    For guild channels, bot name must be explicitly mentioned to prevent conflicts.
+    """
+    bot_name = os.getenv('DISCORD_BOT_NAME', 'whisperengine').lower()
+    fallback_name = 'whisperengine'
     
     if not ctx.guild:  # Always respond to DMs
         return True
     
-    # Check if the message contains the bot's name (case insensitive)
-    message_content = ctx.message.content.lower()
-    return bot_name in message_content
+    # Split message into words for exact matching
+    message_words = ctx.message.content.lower().split()
+    
+    # Check if bot name or fallback name appears as a separate word
+    return bot_name in message_words or fallback_name in message_words
 
 
 def bot_name_filter():

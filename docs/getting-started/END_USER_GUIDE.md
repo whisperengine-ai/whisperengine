@@ -23,8 +23,8 @@ This guide is for users who want to **run the bot** without modifying code. Choo
 ### **Step 1: Download the Bot**
 ```bash
 # Download
-git clone https://github.com/theRealMarkCastillo/whisper-engine
-cd whisper-engine
+git clone https://github.com/whisperengine-ai/whisperengine.git
+cd whisperengine
 ```
 
 ### **Step 2: Get Discord Bot Token**
@@ -182,8 +182,8 @@ Deploy your bot to run 24/7 in the cloud.
 ssh root@your_server_ip
 
 # Download bot
-git clone https://github.com/theRealMarkCastillo/whisper-engine
-cd whisper-engine
+git clone https://github.com/whisperengine-ai/whisperengine.git
+cd whisperengine
 
 # Configure
 cp .env.example .env
@@ -220,8 +220,8 @@ OPENROUTER_API_KEY=your_openrouter_key
    ```
 3. **Deploy bot**:
    ```bash
-   git clone https://github.com/theRealMarkCastillo/whisper-engine
-   cd whisper-engine
+   git clone https://github.com/whisperengine-ai/whisperengine.git
+   cd whisperengine
    cp .env.example .env
    nano .env  # Configure
    ./start.sh
