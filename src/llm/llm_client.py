@@ -336,6 +336,11 @@ class LLMClient:
                     headers.update(secure_headers)
                 else:
                     headers["Authorization"] = f"Bearer {self.api_key}"  # Fallback
+            
+            # Add service-specific headers
+            if self.is_openrouter:
+                headers["HTTP-Referer"] = "https://whisperengine.local"
+                headers["X-Title"] = "WhisperEngine Desktop"
                 
             response = self.session.post(
                 self.chat_endpoint,

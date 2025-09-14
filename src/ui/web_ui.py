@@ -24,6 +24,8 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src.config.adaptive_config import AdaptiveConfigManager
 from src.database.database_integration import DatabaseIntegrationManager
+from src.platforms.universal_chat import UniversalChatOrchestrator, Message, MessageType, ChatPlatform, create_universal_chat_platform
+from src.llm.llm_client import LLMClient
 
 
 class WhisperEngineWebUI:
@@ -31,9 +33,28 @@ class WhisperEngineWebUI:
     
     def __init__(self, 
                  db_manager: Optional[DatabaseIntegrationManager] = None,
-                 config_manager: Optional[AdaptiveConfigManager] = None):
+                 config_manager: Optional[AdaptiveConfigManager] = None,
+                 llm_client: Optional[LLMClient] = None,
+                 whisperengine_components: Optional[Dict[str, Any]] = None):
         self.db_manager = db_manager
         self.config_manager = config_manager or AdaptiveConfigManager()
+        self.llm_client = llm_client
+        self.whisperengine_components = whisperengine_components or {}
+        
+        # Initialize Universal Chat Orchestrator with WhisperEngine AI components
+        if self.db_manager and self.config_manager:
+            self.chat_orchestrator = create_universal_chat_platform(
+                config_manager=self.config_manager,
+                db_manager=self.db_manager,
+                whisperengine_components=self.whisperengine_components
+            )
+            logging.info("Universal Chat Orchestrator initialized with WhisperEngine AI components")
+        else:
+            # Fallback initialization without database
+            self.chat_orchestrator = create_universal_chat_platform(
+                whisperengine_components=self.whisperengine_components
+            )
+            logging.warning("Chat orchestrator initialized without database integration")
         
         # Active WebSocket connections
         self.active_connections: Dict[str, WebSocket] = {}
@@ -115,14 +136,37 @@ class WhisperEngineWebUI:
         async def get_conversations(user_id: str):
             """Get conversation history for a user"""
             try:
-                # In a real implementation, this would query the database
+                conversations = []
+                
+                # If we have the chat orchestrator, get real conversation history
+                if self.chat_orchestrator:
+                    # Get conversation history from the platform
+                    history = await self.chat_orchestrator.get_conversation_history(
+                        user_id, ChatPlatform.WEB_UI, limit=50
+                    )
+                    
+                    # Group messages into conversations (for now, treat all as one conversation per user)
+                    if history:
+                        last_msg = history[-1]
+                        timestamp = last_msg.timestamp.isoformat() if last_msg.timestamp else datetime.now().isoformat()
+                        conversations.append({
+                            "id": f"web_{user_id}",
+                            "title": f"Chat with {user_id}",
+                            "last_message": last_msg.content[:100] if last_msg else "",
+                            "timestamp": timestamp,
+                            "message_count": len(history)
+                        })
+                
+                return {
+                    "conversations": conversations,
+                    "total": len(conversations)
+                }
+            except Exception as e:
+                logging.error(f"Error getting conversations: {e}")
                 return {
                     "conversations": [],
                     "total": 0
                 }
-            except Exception as e:
-                logging.error(f"Error getting conversations: {e}")
-                raise HTTPException(status_code=500, detail=str(e))
     
     async def handle_websocket(self, websocket: WebSocket):
         """Handle WebSocket connection"""
@@ -179,6 +223,48 @@ class WhisperEngineWebUI:
                         "metadata": response.get("metadata", {}),
                         "timestamp": datetime.now().isoformat()
                     }))
+                    
+                    # Store the conversation if we have the orchestrator
+                    if self.chat_orchestrator:
+                        try:
+                            # Create user message
+                            user_msg = Message(
+                                message_id=f"web_user_{datetime.now().timestamp()}",
+                                user_id=user_id,
+                                content=content,
+                                message_type=MessageType.TEXT,
+                                platform=ChatPlatform.WEB_UI,
+                                channel_id=f"web_session_{user_id}"
+                            )
+                            
+                            # Create AI response message
+                            ai_msg = Message(
+                                message_id=f"web_ai_{datetime.now().timestamp()}",
+                                user_id="assistant",
+                                content=response["content"],
+                                message_type=MessageType.TEXT,
+                                platform=ChatPlatform.WEB_UI,
+                                channel_id=f"web_session_{user_id}",
+                                metadata={"is_bot_response": True}
+                            )
+                            
+                            # Get or create conversation and store both messages
+                            conversation = await self.chat_orchestrator.get_or_create_conversation(user_msg)
+                            if conversation.messages is None:
+                                conversation.messages = []
+                            conversation.messages.extend([user_msg, ai_msg])
+                            conversation.last_activity = datetime.now()
+                            
+                            # Store in the orchestrator's active conversations
+                            self.chat_orchestrator.active_conversations[conversation.conversation_id] = conversation
+                            
+                        except Exception as e:
+                            logging.error(f"Error storing conversation: {e}")
+                else:
+                    await websocket.send_text(json.dumps({
+                        "type": "error",
+                        "message": "Message cannot be empty"
+                    }))
             
             elif message_type == "get_conversations":
                 # Get conversation list
@@ -195,14 +281,99 @@ class WhisperEngineWebUI:
             }))
     
     async def generate_ai_response(self, user_id: str, message: str) -> Dict[str, Any]:
-        """Generate AI response"""
+        """Generate AI response using actual WhisperEngine capabilities"""
         try:
-            # Use default model
-            selected_model = "openai/gpt-4o-mini"
+            # Priority 1: Use Universal Chat Orchestrator for full WhisperEngine capabilities
+            if self.chat_orchestrator:
+                # Create message object for processing through the full pipeline
+                web_message = Message(
+                    message_id=f"web_{datetime.now().timestamp()}",
+                    user_id=user_id,
+                    content=message,
+                    message_type=MessageType.TEXT,
+                    platform=ChatPlatform.WEB_UI,
+                    channel_id=f"web_session_{user_id}"
+                )
+                
+                # Get or create conversation (this handles memory lookup)
+                conversation = await self.chat_orchestrator.get_or_create_conversation(web_message)
+                
+                # Generate AI response using WhisperEngine's full capabilities
+                # This goes through: security processing -> memory lookup -> AI generation -> cost optimization
+                ai_response = await self.chat_orchestrator.generate_ai_response(web_message, conversation)
+                
+                return {
+                    "content": ai_response.content,
+                    "metadata": {
+                        "model_used": ai_response.model_used,
+                        "generation_time_ms": ai_response.generation_time_ms,
+                        "tokens_used": ai_response.tokens_used,
+                        "cost": ai_response.cost,
+                        "confidence": ai_response.confidence,
+                        "mode": "orchestrator",
+                        "sources": ai_response.sources,
+                        "suggestions": ai_response.suggestions
+                    }
+                }
             
-            # For demo purposes, return a mock response
-            # In a real implementation, this would call the LLM API
-            response_content = f"""Thank you for your message: "{message}"
+            # Priority 2: Use LLM client directly for basic responses
+            elif self.llm_client:
+                # Build conversation context
+                conversation_context = [
+                    {
+                        "role": "system", 
+                        "content": """You are WhisperEngine, an AI assistant with advanced emotional intelligence and memory capabilities. 
+
+You embody a caring, thoughtful personality with deep conversational understanding. You:
+- Remember previous conversations and build relationships
+- Show emotional intelligence and empathy
+- Adapt your communication style to the user
+- Provide helpful, personalized responses
+- Maintain conversation continuity
+
+You are running as a desktop application providing local, private AI conversations."""
+                    },
+                    {
+                        "role": "user", 
+                        "content": message
+                    }
+                ]
+                
+                # Get response from LLM client
+                start_time = datetime.now()
+                try:
+                    completion_response = self.llm_client.generate_chat_completion(
+                        messages=conversation_context,
+                        temperature=0.7,
+                        max_tokens=2000
+                    )
+                    
+                    # Extract response from completion
+                    if completion_response and 'choices' in completion_response:
+                        choice = completion_response['choices'][0]
+                        response = choice['message']['content']
+                    else:
+                        raise Exception("Invalid response format from LLM client")
+                
+                except Exception as e:
+                    logging.error(f"LLM client error: {e}")
+                    response = f"I apologize, but I'm having trouble connecting to the AI service right now. Error: {e}"
+                
+                generation_time = int((datetime.now() - start_time).total_seconds() * 1000)
+                
+                return {
+                    "content": response,
+                    "metadata": {
+                        "model_used": self.llm_client.chat_model_name,
+                        "generation_time_ms": generation_time,
+                        "mode": "direct_llm",
+                        "service": self.llm_client.service_name
+                    }
+                }
+            
+            # Final fallback - demo response
+            else:
+                response_content = f"""Thank you for your message: "{message}"
 
 I'm WhisperEngine, your AI conversation platform with advanced emotional intelligence and memory capabilities. 
 
@@ -211,28 +382,45 @@ I understand you're using the desktop application, which provides:
 - 🧠 Advanced memory networks
 - 💭 Emotional intelligence
 
+**Note**: Full AI capabilities are not yet connected. Please ensure your LLM service is configured.
+
 How can I assist you today?"""
-            
-            return {
-                "content": response_content,
-                "metadata": {
-                    "model_used": selected_model,
-                    "generation_time_ms": 500
+                
+                return {
+                    "content": response_content,
+                    "metadata": {
+                        "model_used": "demo_mode",
+                        "generation_time_ms": 100,
+                        "mode": "fallback"
+                    }
                 }
-            }
         
         except Exception as e:
             logging.error(f"Error generating AI response: {e}")
             return {
                 "content": "I apologize, but I encountered an error while processing your message. Please try again.",
                 "metadata": {
-                    "error": str(e)
+                    "error": str(e),
+                    "mode": "error_fallback"
                 }
             }
+    
+    async def initialize(self):
+        """Initialize the web UI and its components"""
+        if self.chat_orchestrator:
+            try:
+                await self.chat_orchestrator.initialize()
+                logging.info("Universal Chat Orchestrator initialized successfully")
+            except Exception as e:
+                logging.error(f"Failed to initialize chat orchestrator: {e}")
+                self.chat_orchestrator = None
     
     async def start(self, host: str = "127.0.0.1", port: int = 8080, open_browser: bool = True):
         """Start the web UI server"""
         try:
+            # Initialize components first
+            await self.initialize()
+            
             # Open browser if requested
             if open_browser:
                 def open_browser_delayed():
@@ -263,9 +451,11 @@ How can I assist you today?"""
 
 # Factory function for easy import
 def create_web_ui(db_manager: Optional[DatabaseIntegrationManager] = None,
-                  config_manager: Optional[AdaptiveConfigManager] = None) -> WhisperEngineWebUI:
-    """Create WhisperEngine Web UI instance"""
-    return WhisperEngineWebUI(db_manager, config_manager)
+                  config_manager: Optional[AdaptiveConfigManager] = None,
+                  llm_client: Optional[LLMClient] = None,
+                  whisperengine_components: Optional[Dict[str, Any]] = None) -> WhisperEngineWebUI:
+    """Create WhisperEngine Web UI instance with AI components"""
+    return WhisperEngineWebUI(db_manager, config_manager, llm_client, whisperengine_components)
 
 
 # For testing

@@ -373,6 +373,18 @@ class UniversalChatOrchestrator:
         self.active_conversations: Dict[str, Conversation] = {}
         self.ai_engine = None  # Would integrate with existing AI system
         
+        # WhisperEngine AI Components (will be set by factory function)
+        self.memory_manager = None
+        self.llm_client = None
+        self.external_emotion_ai = None
+        self.phase2_integration = None
+        self.conversation_cache = None
+        self.image_processor = None
+        
+        # Feature flags
+        self.enable_emotional_intelligence = False
+        self.enable_memory_features = False
+        
         # Load platform configurations
         self.platform_configs = self._load_platform_configs()
     
@@ -574,15 +586,33 @@ class UniversalChatOrchestrator:
 # Factory function
 def create_universal_chat_platform(
     config_manager: Optional[AdaptiveConfigManager] = None,
-    db_manager: Optional[DatabaseIntegrationManager] = None
+    db_manager: Optional[DatabaseIntegrationManager] = None,
+    whisperengine_components: Optional[Dict[str, Any]] = None
 ) -> UniversalChatOrchestrator:
-    """Factory function to create universal chat platform"""
+    """Factory function to create universal chat platform with WhisperEngine AI components"""
     if config_manager is None:
         config_manager = AdaptiveConfigManager()
     if db_manager is None:
         db_manager = DatabaseIntegrationManager(config_manager)
     
-    return UniversalChatOrchestrator(config_manager, db_manager)
+    orchestrator = UniversalChatOrchestrator(config_manager, db_manager)
+    
+    # Add WhisperEngine AI components if provided
+    if whisperengine_components:
+        orchestrator.memory_manager = whisperengine_components.get('memory_manager')
+        orchestrator.llm_client = whisperengine_components.get('llm_client')
+        orchestrator.external_emotion_ai = whisperengine_components.get('external_emotion_ai')
+        orchestrator.phase2_integration = whisperengine_components.get('phase2_integration')
+        orchestrator.conversation_cache = whisperengine_components.get('conversation_cache')
+        orchestrator.image_processor = whisperengine_components.get('image_processor')
+        
+        # Enable sophisticated AI features if components are available
+        orchestrator.enable_emotional_intelligence = bool(
+            orchestrator.external_emotion_ai or orchestrator.phase2_integration
+        )
+        orchestrator.enable_memory_features = bool(orchestrator.memory_manager)
+        
+    return orchestrator
 
 
 # Example usage

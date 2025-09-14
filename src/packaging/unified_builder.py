@@ -250,12 +250,14 @@ class NativeDesktopBuilder(BaseBuildStrategy):
         await self._install_dependencies(source_dir)
         
         # Run PyInstaller
-        self._run_command([
+        cmd = [
             sys.executable, "-m", "PyInstaller",
             "--clean",
-            "--onedir" if not self.config.optimize_size else "--onefile",
+            "-y",  # Auto-confirm overwrites
             str(spec_file)
-        ], cwd=source_dir)
+        ]
+        
+        self._run_command(cmd, cwd=source_dir)
         
         # Copy built application to output
         dist_dir = source_dir / "dist"
@@ -408,7 +410,7 @@ a = Analysis(
         'discord.py',
         'neo4j',
         'psycopg2',
-    ] if not {str(self.config.include_discord).lower()} else [],
+    ] if not {self.config.include_discord} else [],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
     cipher=block_cipher,
@@ -430,13 +432,13 @@ exe = EXE(
     a.datas,
     [],
     name='{app_name}',
-    debug={str(self.config.debug_mode).lower()},
+    debug={self.config.debug_mode},
     bootloader_ignore_signals=False,
     strip=False,
     upx=True,
     upx_exclude=[],
     runtime_tmpdir=None,
-    console={str(self.config.debug_mode).lower()},
+    console={self.config.debug_mode},
     disable_windowed_traceback=False,
     target_arch=None,
     codesign_identity=None,
@@ -452,11 +454,11 @@ exe = EXE(
     [],
     exclude_binaries=True,
     name='{app_name}',
-    debug={str(self.config.debug_mode).lower()},
+    debug={self.config.debug_mode},
     bootloader_ignore_signals=False,
     strip=False,
     upx=True,
-    console={str(self.config.debug_mode).lower()},
+    console={self.config.debug_mode},
     disable_windowed_traceback=False,
     target_arch=None,
     codesign_identity=None,
