@@ -249,11 +249,11 @@ class NativeDesktopBuilder(BaseBuildStrategy):
         # Install dependencies in temp environment
         await self._install_dependencies(source_dir)
         
-        # Run PyInstaller
+        # Run PyInstaller with just the spec file (options are in the spec)
         self._run_command([
             sys.executable, "-m", "PyInstaller",
             "--clean",
-            "--onedir" if not self.config.optimize_size else "--onefile",
+            "-y",  # Overwrite output directory without confirmation
             str(spec_file)
         ], cwd=source_dir)
         
@@ -263,8 +263,12 @@ class NativeDesktopBuilder(BaseBuildStrategy):
         
         if self.config.platform == Platform.MACOS:
             app_bundle = dist_dir / f"{app_name}.app"
+            output_app = self.output_path / f"{app_name}.app"
             if app_bundle.exists():
-                shutil.copytree(app_bundle, self.output_path / f"{app_name}.app")
+                # Remove existing output if it exists
+                if output_app.exists():
+                    shutil.rmtree(output_app)
+                shutil.copytree(app_bundle, output_app)
                 return [f"{app_name}.app"]
         
         # For Windows/Linux
@@ -272,14 +276,22 @@ class NativeDesktopBuilder(BaseBuildStrategy):
             # Single file executable
             exe_suffix = ".exe" if self.config.platform == Platform.WINDOWS else ""
             exe_file = dist_dir / f"{app_name}{exe_suffix}"
+            output_exe = self.output_path / f"{app_name}{exe_suffix}"
             if exe_file.exists():
-                shutil.copy2(exe_file, self.output_path / f"{app_name}{exe_suffix}")
+                # Remove existing output if it exists
+                if output_exe.exists():
+                    output_exe.unlink()
+                shutil.copy2(exe_file, output_exe)
                 return [f"{app_name}{exe_suffix}"]
         else:
             # Directory with dependencies
             app_dir = dist_dir / app_name
+            output_dir = self.output_path / app_name
             if app_dir.exists():
-                shutil.copytree(app_dir, self.output_path / app_name)
+                # Remove existing output if it exists
+                if output_dir.exists():
+                    shutil.rmtree(output_dir)
+                shutil.copytree(app_dir, output_dir)
                 return [app_name]
         
         raise Exception("Build output not found")
@@ -314,14 +326,17 @@ async def main():
         # Import after path setup
         from src.platforms.universal_chat import create_universal_chat_platform
         from src.ui.web_ui import WhisperEngineWebUI
-        from src.config.adaptive_config import AdaptiveConfigManager
+        from src.config.adaptive_config import AdaptiveConfigManager, EnvironmentDetector
         from src.database.database_integration import DatabaseIntegrationManager
         
         print("🤖 Starting WhisperEngine Desktop...")
         
+        # Detect environment first
+        environment = EnvironmentDetector.detect_environment()
+        print(f"🔍 Detected environment: {environment}")
+        
         # Initialize configuration
         config_manager = AdaptiveConfigManager()
-        config_manager.detect_environment()
         
         # Initialize database
         db_manager = DatabaseIntegrationManager(config_manager)
@@ -408,7 +423,7 @@ a = Analysis(
         'discord.py',
         'neo4j',
         'psycopg2',
-    ] if not {str(self.config.include_discord).lower()} else [],
+    ] if not {self.config.include_discord} else [],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
     cipher=block_cipher,
@@ -430,13 +445,13 @@ exe = EXE(
     a.datas,
     [],
     name='{app_name}',
-    debug={str(self.config.debug_mode).lower()},
+    debug={self.config.debug_mode},
     bootloader_ignore_signals=False,
     strip=False,
     upx=True,
     upx_exclude=[],
     runtime_tmpdir=None,
-    console={str(self.config.debug_mode).lower()},
+    console={self.config.debug_mode},
     disable_windowed_traceback=False,
     target_arch=None,
     codesign_identity=None,
@@ -452,11 +467,11 @@ exe = EXE(
     [],
     exclude_binaries=True,
     name='{app_name}',
-    debug={str(self.config.debug_mode).lower()},
+    debug={self.config.debug_mode},
     bootloader_ignore_signals=False,
     strip=False,
     upx=True,
-    console={str(self.config.debug_mode).lower()},
+    console={self.config.debug_mode},
     disable_windowed_traceback=False,
     target_arch=None,
     codesign_identity=None,
@@ -477,7 +492,20 @@ coll = COLLECT(
         
         # Add macOS app bundle
         if self.config.platform == Platform.MACOS:
-            spec_content += f'''
+            if self.config.optimize_size:
+                # Single file - use exe directly
+                spec_content += f'''
+app = BUNDLE(
+    exe,
+    name='{app_name}.app',
+    icon=None,
+    bundle_identifier='ai.whisperengine.app',
+    version='{self.config.version}',
+)
+'''
+            else:
+                # Directory - use coll
+                spec_content += f'''
 app = BUNDLE(
     coll,
     name='{app_name}.app',
