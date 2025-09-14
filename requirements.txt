@@ -2,6 +2,22 @@
 discord.py==2.6.3
 python-dotenv==1.1.1
 
+# System monitoring and resource detection
+psutil==6.1.0
+
+# Web UI Dependencies
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+jinja2==3.1.4
+python-multipart==0.0.20
+
+# Desktop UI Dependencies (optional)
+pystray==0.19.5
+Pillow==11.3.0
+
+# Database abstraction
+aiosqlite==0.21.0
+
 # HTTP Client Dependencies  
 aiohttp==3.12.15
 requests==2.32.5
