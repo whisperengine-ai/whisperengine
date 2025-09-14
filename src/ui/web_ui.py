@@ -63,13 +63,27 @@ class WhisperEngineWebUI:
     def setup_universal_chat(self):
         """Initialize the universal chat orchestrator"""
         try:
-            # Create orchestrator 
-            self.chat_orchestrator = UniversalChatOrchestrator(
-                config_manager=self.config_manager,
-                db_manager=self.db_manager or DatabaseIntegrationManager(self.config_manager)
-            )
+            # Check if we're using local database integration
+            using_local_db = (self.db_manager and 
+                            hasattr(self.db_manager, '__class__') and
+                            'Local' in self.db_manager.__class__.__name__)
             
-            logging.info("✅ Universal chat system initialized")
+            if using_local_db:
+                # Create orchestrator with local DB manager, but disable enhanced core
+                self.chat_orchestrator = UniversalChatOrchestrator(
+                    config_manager=self.config_manager,
+                    db_manager=self.db_manager,
+                    bot_core=None,
+                    use_enhanced_core=False  # Disable enhanced core for local DB mode
+                )
+                logging.info("✅ Universal chat system initialized with local database integration")
+            else:
+                # Create orchestrator with enhanced core for full Discord mode
+                self.chat_orchestrator = UniversalChatOrchestrator(
+                    config_manager=self.config_manager,
+                    db_manager=self.db_manager or DatabaseIntegrationManager(self.config_manager)
+                )
+                logging.info("✅ Universal chat system initialized with enhanced core")
             
         except Exception as e:
             logging.error(f"Failed to initialize universal chat system: {e}")

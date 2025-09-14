@@ -19,12 +19,14 @@ try:
     from PIL import Image, ImageDraw
     TRAY_AVAILABLE = True
     RUMPS_AVAILABLE = True  # For compatibility
+    PIL_Image = Image.Image  # Store reference when available
 except ImportError:
     TRAY_AVAILABLE = False
     RUMPS_AVAILABLE = False  # For compatibility
     pystray = None
     Image = None
     ImageDraw = None
+    PIL_Image = None
 
 
 class WhisperEngineMacOSApp:
@@ -400,7 +402,7 @@ class WhisperEngineMacOSApp:
                 icon_image = self._create_status_icon((220, 20, 60))  # Crimson
                 self.tray_icon.icon = icon_image
     
-    def _create_status_icon(self, color=(100, 149, 237)) -> Image.Image:
+    def _create_status_icon(self, color=(100, 149, 237)):
         """Create status icon with specific color"""
         size = (64, 64)
         image = Image.new('RGBA', size, (0, 0, 0, 0))

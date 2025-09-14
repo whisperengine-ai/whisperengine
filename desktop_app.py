@@ -17,7 +17,7 @@ sys.path.insert(0, str(Path(__file__).parent / "src"))
 
 from src.ui.web_ui import create_web_ui
 from src.config.adaptive_config import AdaptiveConfigManager
-from src.database.database_integration import DatabaseIntegrationManager
+from src.database.local_database_integration import LocalDatabaseIntegrationManager
 from src.ui.system_tray import create_system_tray, is_tray_available
 from src.ui.macos_menu_bar import create_macos_menu_bar, is_macos_menu_available
 from src.ui.macos_dock_integration import create_dock_badge_manager, is_dock_integration_available
@@ -212,13 +212,22 @@ class WhisperEngineDesktopApp:
             # Initialize configuration manager
             config_manager = AdaptiveConfigManager()
             
-            # Initialize database manager (optional for desktop)
+            # Initialize database manager with local components
             db_manager = None
             try:
-                db_manager = DatabaseIntegrationManager()
-                logging.info("✅ Database initialized with SQLite for desktop mode")
+                db_manager = LocalDatabaseIntegrationManager(config_manager)
+                init_success = await db_manager.initialize()
+                if init_success:
+                    logging.info("✅ Local database integration initialized successfully")
+                    logging.info("   📊 Vector storage: ChromaDB replacement active")
+                    logging.info("   🕸️ Graph storage: Neo4j replacement active") 
+                    logging.info("   💾 Local cache: Redis replacement active")
+                else:
+                    logging.error("❌ Local database initialization failed")
+                    db_manager = None
             except Exception as e:
-                logging.warning(f"Database initialization failed: {e}")
+                logging.warning(f"Local database initialization failed: {e}")
+                logging.info("🔄 Continuing with fallback mode...")
             
             # Create web UI
             self.web_ui = create_web_ui(db_manager, config_manager)
@@ -282,12 +291,12 @@ class WhisperEngineDesktopApp:
                         if self.dock_badge_manager:
                             print("✅ Dock badge integration enabled")
                     
-                    # Add window management
-                    if is_window_management_available():
-                        print("🪟 Creating window management...")
-                        self.window_manager = create_window_manager(self, self.host, self.port)
-                        if self.window_manager:
-                            print("✅ Native window management enabled")
+                    # Add window management (temporarily disabled to avoid crashes)
+                    # if is_window_management_available():
+                    #     print("🪟 Creating window management...")
+                    #     self.window_manager = create_window_manager(self, self.host, self.port)
+                    #     if self.window_manager:
+                    #         print("✅ Native window management enabled")
                             
                 elif is_tray_available():
                     print("🔄 Creating system tray...")
