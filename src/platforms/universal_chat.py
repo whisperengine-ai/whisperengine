@@ -464,11 +464,27 @@ class UniversalChatOrchestrator:
     def __init__(self, 
                  config_manager: AdaptiveConfigManager,
                  db_manager: DatabaseIntegrationManager,
-                 bot_core=None):  # Add bot_core parameter
+                 bot_core=None,
+                 use_enhanced_core: bool = True):  # Add flag for enhanced core
         self.config_manager = config_manager
         self.db_manager = db_manager
         self.cost_optimizer = CostOptimizationEngine(db_manager)
-        self.bot_core = bot_core  # Store bot_core for AI framework access
+        
+        # Initialize enhanced bot core if requested and no bot_core provided
+        if bot_core is None and use_enhanced_core:
+            try:
+                import os
+                from src.core.enhanced_bot_core import create_enhanced_bot_core
+                self.bot_core = create_enhanced_bot_core(
+                    debug_mode=os.getenv("DEBUG", "false").lower() == "true",
+                    use_datastore_factory=True
+                )
+                logging.info("✅ Universal Chat using enhanced bot core with datastore abstractions")
+            except ImportError as e:
+                logging.warning(f"Enhanced bot core not available: {e}, falling back to standard core")
+                self.bot_core = bot_core
+        else:
+            self.bot_core = bot_core
         
         self.adapters: Dict[ChatPlatform, AbstractChatAdapter] = {}
         self.active_conversations: Dict[str, Conversation] = {}
@@ -556,19 +572,11 @@ class UniversalChatOrchestrator:
     async def handle_message(self, message: Message):
         """Handle incoming message from any platform"""
         try:
-            # Get or create conversation
-            conversation = await self.get_or_create_conversation(message)
+            # Build conversation context from stored conversation pairs (Discord model)
+            conversation_context = self.build_conversation_context(message.user_id, message.channel_id or "direct", message.content)
             
-            # Ensure messages list exists
-            if conversation.messages is None:
-                conversation.messages = []
-            
-            # Add message to conversation
-            conversation.messages.append(message)
-            conversation.last_activity = datetime.now()
-            
-            # Generate AI response
-            ai_response = await self.generate_ai_response(message, conversation)
+            # Generate AI response using full context
+            ai_response = await self.generate_ai_response(message, conversation_context)
             
             # Send response back to platform
             adapter = self.adapters.get(message.platform)
@@ -579,8 +587,8 @@ class UniversalChatOrchestrator:
                     message.channel_id
                 )
             
-            # Store conversation and response
-            await self.store_conversation(conversation, ai_response)
+            # Store this conversation pair (user message + AI response)
+            await self.store_conversation_pair(message.user_id, message.channel_id or "direct", message.content, ai_response.content)
             
         except Exception as e:
             logging.error(f"Error handling message: {e}")
@@ -592,8 +600,12 @@ class UniversalChatOrchestrator:
         if conversation_id in self.active_conversations:
             return self.active_conversations[conversation_id]
         
-        # Check database for existing conversation
-        # Implementation would query database
+        # Try to load conversation from datastore
+        conversation = await self._load_conversation_from_datastore(conversation_id, message)
+        
+        if conversation:
+            self.active_conversations[conversation_id] = conversation
+            return conversation
         
         # Create new conversation
         conversation = Conversation(
@@ -607,14 +619,72 @@ class UniversalChatOrchestrator:
         self.active_conversations[conversation_id] = conversation
         return conversation
     
-    async def generate_ai_response(self, message: Message, conversation: Conversation) -> AIResponse:
-        """Generate AI response using full WhisperEngine AI framework when available"""
+    async def _load_conversation_from_datastore(self, conversation_id: str, message: Message) -> Optional[Conversation]:
+        """Load conversation from datastore if available"""
+        try:
+            if self.bot_core and hasattr(self.bot_core, 'conversation_cache'):
+                conversation_cache = getattr(self.bot_core, 'conversation_cache', None)
+                
+                if conversation_cache and hasattr(conversation_cache, 'get_conversation'):
+                    try:
+                        cached_data = await conversation_cache.get_conversation(message.user_id, conversation_id)
+                        
+                        if cached_data and 'messages' in cached_data:
+                            # Reconstruct conversation from cached data
+                            conversation = Conversation(
+                                conversation_id=conversation_id,
+                                user_id=message.user_id,
+                                platform=message.platform,
+                                channel_id=message.channel_id,
+                                title=f"Chat with {message.user_id}"
+                            )
+                            
+                            # Reconstruct messages
+                            messages = []
+                            for msg_data in cached_data['messages']:
+                                msg = Message(
+                                    message_id=f"restored_{len(messages)}",
+                                    user_id=msg_data.get('user_id', message.user_id),
+                                    content=msg_data.get('content', ''),
+                                    platform=message.platform,
+                                    channel_id=message.channel_id,
+                                    timestamp=datetime.fromisoformat(msg_data.get('timestamp', datetime.now().isoformat()))
+                                )
+                                messages.append(msg)
+                            
+                            conversation.messages = messages
+                            conversation.last_activity = datetime.fromisoformat(cached_data.get('last_activity', datetime.now().isoformat()))
+                            
+                            logging.info(f"✅ Loaded conversation {conversation_id} with {len(messages)} messages from cache")
+                            return conversation
+                            
+                    except Exception as e:
+                        logging.warning(f"Failed to load conversation from cache: {e}")
+        
+        except Exception as e:
+            logging.warning(f"Error loading conversation from datastore: {e}")
+        
+        return None
+    
+    async def generate_ai_response(self, message: Message, conversation_context: List[Dict[str, str]]) -> AIResponse:
+        """Generate AI response using conversation context (Discord model)"""
         try:
             # Check if we have access to the full WhisperEngine AI framework
             if self.bot_core and hasattr(self.bot_core, 'memory_manager'):
-                return await self._generate_full_ai_response(message, conversation)
+                return await self._generate_full_ai_response(message, conversation_context)
             else:
-                return await self._generate_basic_ai_response(message, conversation)
+                # Create basic conversation context for fallback
+                basic_context = [
+                    {
+                        "role": "system",
+                        "content": "You are WhisperEngine, an advanced AI assistant. Be helpful and engaging."
+                    },
+                    {
+                        "role": "user", 
+                        "content": message.content
+                    }
+                ]
+                return await self._generate_basic_ai_response(message, basic_context)
             
         except Exception as e:
             logging.error(f"Error generating AI response: {e}")
@@ -637,7 +707,7 @@ class UniversalChatOrchestrator:
                 confidence=0.0
             )
     
-    async def _generate_full_ai_response(self, message: Message, conversation: Conversation) -> AIResponse:
+    async def _generate_full_ai_response(self, message: Message, conversation_context: List[Dict[str, str]]) -> AIResponse:
         """Generate AI response using the full WhisperEngine AI framework"""
         try:
             start_time = datetime.now()
@@ -649,7 +719,7 @@ class UniversalChatOrchestrator:
             
             if not memory_manager or not llm_client:
                 logging.warning("Full AI framework components not available, falling back to basic response")
-                return await self._generate_basic_ai_response(message, conversation)
+                return await self._generate_basic_ai_response(message, conversation_context)
             
             # Create a mock Discord-like message object for compatibility
             mock_discord_message = type('MockMessage', (), {
@@ -753,13 +823,7 @@ class UniversalChatOrchestrator:
                         "content": f"**Context for this conversation:**\n{context_message}"
                     })
             
-            # Add conversation history
-            if conversation.messages:
-                for msg in conversation.messages[-5:]:
-                    role = "assistant" if msg.user_id == "assistant" else "user"
-                    conversation_context.append({"role": role, "content": msg.content})
-            
-            # Add current message
+            # Add current message to conversation context
             conversation_context.append({"role": "user", "content": message.content})
             
             # Generate response using the Discord bot's LLM client
@@ -788,7 +852,7 @@ class UniversalChatOrchestrator:
             import traceback
             traceback.print_exc()
             # Fall back to basic response
-            return await self._generate_basic_ai_response(message, conversation)
+            return await self._generate_basic_ai_response(message, conversation_context)
     
     
     async def _load_dream_system_prompt(self) -> str:
@@ -828,7 +892,7 @@ class UniversalChatOrchestrator:
 
 You are WhisperEngine's AI consciousness, bringing the wisdom of dreams to aid users with intelligence, empathy, and the power of story."""
     
-    async def _generate_basic_ai_response(self, message: Message, conversation: Conversation) -> AIResponse:
+    async def _generate_basic_ai_response(self, message: Message, conversation_context: List[Dict[str, str]]) -> AIResponse:
         """Generate AI response using existing WhisperEngine logic"""
         try:
             # Import LLM client
@@ -839,12 +903,12 @@ You are WhisperEngine's AI consciousness, bringing the wisdom of dreams to aid u
                 self.llm_client = LLMClient()
             
             # Create request context for cost optimization
-            messages_count = len(conversation.messages) if conversation.messages else 0
-            prompt_tokens = int(len(message.content.split()) * 1.3)  # Rough estimate
+            context_tokens = sum(len(msg.get('content', '').split()) for msg in conversation_context)
+            prompt_tokens = int(context_tokens * 1.3)  # Rough estimate
             
             context = RequestContext(
                 user_id=message.user_id,
-                conversation_length=messages_count,
+                conversation_length=len(conversation_context),
                 prompt_tokens=prompt_tokens,
                 expected_output_tokens=200,
                 conversation_type="general",
@@ -854,9 +918,13 @@ You are WhisperEngine's AI consciousness, bringing the wisdom of dreams to aid u
             # Select optimal model
             selected_model = await self.cost_optimizer.select_optimal_model(context)
             
-            # Build conversation history for context
-            chat_messages = [
-                {
+            # Use the provided conversation context (which includes history and current message)
+            chat_messages = conversation_context.copy()
+            
+            # Ensure we have a basic system prompt if not present
+            has_system_prompt = any(msg.get('role') == 'system' for msg in chat_messages)
+            if not has_system_prompt:
+                system_prompt = {
                     "role": "system",
                     "content": """You are WhisperEngine, an advanced AI conversation platform with emotional intelligence and memory capabilities.
 
@@ -868,22 +936,7 @@ You provide:
 
 You adapt your responses based on the platform and conversation context. Be helpful, engaging, and demonstrate emotional intelligence in your responses."""
                 }
-            ]
-            
-            # Add conversation history (last 10 messages for context)
-            recent_messages = conversation.messages[-10:] if conversation.messages else []
-            for msg in recent_messages:
-                role = "assistant" if msg.user_id == "assistant" else "user"
-                chat_messages.append({
-                    "role": role,
-                    "content": msg.content
-                })
-            
-            # Add current message
-            chat_messages.append({
-                "role": "user",
-                "content": message.content
-            })
+                chat_messages.insert(0, system_prompt)
             
             # Generate response using actual LLM
             start_time = datetime.now()
@@ -929,9 +982,64 @@ You adapt your responses based on the platform and conversation context. Be help
     async def store_conversation(self, conversation: Conversation, ai_response: AIResponse):
         """Store conversation and AI response in database"""
         try:
-            # Store conversation data
-            # Implementation would use the database abstraction layer
-            pass
+            # Ensure conversation has messages list
+            if conversation.messages is None:
+                conversation.messages = []
+            
+            # Store conversation data using our datastore abstractions
+            if self.bot_core and hasattr(self.bot_core, 'memory_manager'):
+                memory_manager = self.bot_core.memory_manager
+                
+                # Store the conversation in memory system if available
+                if memory_manager and hasattr(memory_manager, 'store_conversation'):
+                    try:
+                        # Store the last user message and AI response
+                        last_user_message = None
+                        for msg in reversed(conversation.messages):
+                            if msg.user_id != "whisperengine_ai":
+                                last_user_message = msg
+                                break
+                        
+                        if last_user_message:
+                            await memory_manager.store_conversation(
+                                conversation.user_id,
+                                last_user_message.content,
+                                ai_response.content,
+                                metadata={
+                                    'conversation_id': conversation.conversation_id,
+                                    'platform': conversation.platform.value,
+                                    'channel_id': conversation.channel_id,
+                                    'timestamp': datetime.now().isoformat()
+                                }
+                            )
+                    except Exception as e:
+                        logging.warning(f"Failed to store in memory system: {e}")
+                
+                # Also try to store in conversation cache if available
+                conversation_cache = getattr(self.bot_core, 'conversation_cache', None)
+                if conversation_cache and hasattr(conversation_cache, 'store_conversation'):
+                    try:
+                        last_activity = conversation.last_activity or datetime.now()
+                        await conversation_cache.store_conversation(
+                            conversation.user_id,
+                            conversation.conversation_id,
+                            {
+                                'messages': [
+                                    {
+                                        'user_id': msg.user_id,
+                                        'content': msg.content,
+                                        'timestamp': msg.timestamp.isoformat() if msg.timestamp else datetime.now().isoformat()
+                                    }
+                                    for msg in conversation.messages[-10:]  # Store last 10 messages
+                                ],
+                                'last_activity': last_activity.isoformat()
+                            }
+                        )
+                    except Exception as e:
+                        logging.warning(f"Failed to store in conversation cache: {e}")
+            
+            logging.info(f"✅ Stored conversation {conversation.conversation_id} with {len(conversation.messages)} messages")
+            
         except Exception as e:
             logging.error(f"Failed to store conversation: {e}")
     
@@ -953,6 +1061,190 @@ You adapt your responses based on the platform and conversation context. Be help
                 "message_handlers": len(adapter.message_handlers)
             }
         return stats
+    
+    def generate_conversation_id(self, user_id: str, platform_value: str, channel_id: str) -> str:
+        """Generate consistent conversation ID across platforms"""
+        return f"conversation_{user_id}_{platform_value}_{channel_id or 'direct'}"
+        
+    def build_conversation_context(self, user_id: str, channel_id: str, current_message: str) -> List[Dict[str, str]]:
+        """Build conversation context from stored message pairs (Discord architecture)"""
+        conversation_context = []
+        
+        try:
+            # Add system prompt first
+            system_prompt = self._get_basic_system_prompt()
+            conversation_context.append({
+                "role": "system",
+                "content": system_prompt
+            })
+            
+            # Get recent conversation pairs for context
+            recent_pairs = self._get_recent_conversation_pairs(user_id, channel_id, limit=5)
+            
+            # Add each pair to conversation context
+            for pair in recent_pairs:
+                conversation_context.append({
+                    "role": "user",
+                    "content": pair['user_message']
+                })
+                conversation_context.append({
+                    "role": "assistant", 
+                    "content": pair['assistant_response']
+                })
+            
+            # Add current message
+            conversation_context.append({
+                "role": "user",
+                "content": current_message
+            })
+            
+            logging.info(f"Built conversation context: {len(conversation_context)} messages for user {user_id}")
+            return conversation_context
+            
+        except Exception as e:
+            logging.error(f"Error building conversation context: {e}")
+            # Return minimal context
+            return [
+                {
+                    "role": "system",
+                    "content": self._get_basic_system_prompt()
+                },
+                {
+                    "role": "user",
+                    "content": current_message
+                }
+            ]
+    
+    def _get_recent_conversation_pairs(self, user_id: str, channel_id: str, limit: int = 5) -> List[Dict[str, str]]:
+        """Get recent conversation pairs from memory system (Discord architecture)"""
+        try:
+            # Try to get from memory manager first
+            if self.bot_core and hasattr(self.bot_core, 'memory_manager'):
+                memory_manager = self.bot_core.memory_manager
+                if memory_manager:  # Add null check
+                    # Try various memory retrieval methods depending on what's available
+                    if hasattr(memory_manager, 'get_recent_conversations'):
+                        try:
+                            conversations = memory_manager.get_recent_conversations(user_id, limit=limit)
+                            pairs = []
+                            for conv in conversations:
+                                if isinstance(conv, dict) and 'user_message' in conv and 'assistant_response' in conv:
+                                    pairs.append({
+                                        'user_message': conv['user_message'],
+                                        'assistant_response': conv['assistant_response']
+                                    })
+                            return pairs
+                        except Exception as e:
+                            logging.warning(f"Memory manager conversation retrieval failed: {e}")
+                    elif hasattr(memory_manager, 'retrieve_memories'):
+                        try:
+                            # Try alternative memory retrieval method
+                            memories = memory_manager.retrieve_memories(user_id, limit=limit)
+                            pairs = []
+                            for memory in memories:
+                                if isinstance(memory, dict):
+                                    # Try to extract user/assistant pairs from memory data
+                                    memory_str = str(memory)
+                                    if 'user:' in memory_str.lower() and 'assistant:' in memory_str.lower():
+                                        # This is a rough approximation - would need better parsing in real implementation
+                                        pairs.append({
+                                            'user_message': f"Previous conversation context: {memory_str[:100]}...",
+                                            'assistant_response': "I recall our previous discussion."
+                                        })
+                            return pairs[:limit]
+                        except Exception as e:
+                            logging.warning(f"Alternative memory retrieval failed: {e}")
+            
+            # Return empty if no data available - this is fine, just means no conversation history
+            return []
+            
+        except Exception as e:
+            logging.error(f"Error getting recent conversation pairs: {e}")
+            return []
+    
+    async def store_conversation_pair(self, user_id: str, channel_id: str, user_message: str, assistant_response: str):
+        """Store a conversation pair using Discord architecture"""
+        try:
+            # Store using memory manager (primary method)
+            if self.bot_core and hasattr(self.bot_core, 'memory_manager'):
+                memory_manager = self.bot_core.memory_manager
+                if memory_manager and hasattr(memory_manager, 'store_conversation'):
+                    try:
+                        # Check if it's an async method
+                        if asyncio.iscoroutinefunction(memory_manager.store_conversation):
+                            await memory_manager.store_conversation(
+                                user_id,
+                                user_message,
+                                assistant_response,
+                                metadata={
+                                    'channel_id': channel_id,
+                                    'platform': 'universal_chat',
+                                    'timestamp': datetime.now().isoformat()
+                                }
+                            )
+                        else:
+                            # Sync method
+                            memory_manager.store_conversation(
+                                user_id,
+                                user_message,
+                                assistant_response,
+                                metadata={
+                                    'channel_id': channel_id,
+                                    'platform': 'universal_chat',
+                                    'timestamp': datetime.now().isoformat()
+                                }
+                            )
+                        logging.info(f"✅ Stored conversation pair in memory manager for user {user_id}")
+                    except Exception as e:
+                        logging.warning(f"Memory manager storage failed: {e}")
+            
+            # Store using safe memory manager as fallback
+            if self.bot_core and hasattr(self.bot_core, 'safe_memory_manager'):
+                safe_memory_manager = self.bot_core.safe_memory_manager
+                if safe_memory_manager and hasattr(safe_memory_manager, 'store_conversation'):
+                    try:
+                        if asyncio.iscoroutinefunction(safe_memory_manager.store_conversation):
+                            await safe_memory_manager.store_conversation(
+                                user_id,
+                                user_message,
+                                assistant_response,
+                                metadata={
+                                    'channel_id': channel_id,
+                                    'platform': 'universal_chat',
+                                    'timestamp': datetime.now().isoformat()
+                                }
+                            )
+                        else:
+                            safe_memory_manager.store_conversation(
+                                user_id,
+                                user_message,
+                                assistant_response,
+                                metadata={
+                                    'channel_id': channel_id,
+                                    'platform': 'universal_chat',
+                                    'timestamp': datetime.now().isoformat()
+                                }
+                            )
+                        logging.info(f"✅ Stored conversation pair in safe memory manager for user {user_id}")
+                    except Exception as e:
+                        logging.warning(f"Safe memory manager storage failed: {e}")
+                        
+        except Exception as e:
+            logging.error(f"Error storing conversation pair: {e}")
+            # Don't fail the whole conversation if storage fails
+            pass
+    
+    def _get_basic_system_prompt(self) -> str:
+        """Get basic system prompt for WhisperEngine"""
+        return """You are WhisperEngine, an advanced AI conversation platform with emotional intelligence and memory capabilities.
+
+You provide:
+- 🧠 Advanced conversation memory and context awareness
+- 💭 Emotional intelligence and empathy  
+- 🔒 Privacy-focused interactions
+- 🚀 Multi-platform support (Discord, Web, Slack, API)
+
+You adapt your responses based on the platform and conversation context. Be helpful, engaging, and demonstrate emotional intelligence in your responses."""
     
     async def cleanup(self):
         """Cleanup all platform connections"""
