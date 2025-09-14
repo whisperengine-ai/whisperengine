@@ -254,7 +254,8 @@ class WhisperEngineWebUI:
                         "generation_time_ms": ai_response.generation_time_ms,
                         "confidence": ai_response.confidence,
                         "user_id": user_id,
-                        "platform": "universal_chat"
+                        "platform": "universal_chat",
+                        "status": "real_ai" if ai_response.model_used != "fallback" else "fallback_error"
                     }
                 }
             else:
@@ -304,17 +305,50 @@ Be helpful, engaging, and demonstrate your advanced capabilities. Keep responses
                     "model_used": self.llm_client.chat_model_name,
                     "service": self.llm_client.service_name,
                     "user_id": user_id,
-                    "platform": "fallback_direct"
+                    "platform": "fallback_direct",
+                    "status": "direct_llm"
                 }
             }
         
         except Exception as e:
             logging.error(f"Fallback response failed: {e}")
+            
+            # Check if this is a dependency issue
+            dependency_issue = "requests" in str(e) or "ModuleNotFoundError" in str(e)
+            
+            if dependency_issue:
+                error_content = """⚠️ **Missing Dependencies Detected**
+
+I'm currently running in fallback mode because some required Python packages are missing. To enable full AI capabilities:
+
+1. **Install missing dependencies:**
+   ```bash
+   pip install -r requirements.txt
+   ```
+   
+2. **Or install specific packages:**
+   ```bash
+   pip install requests fastapi uvicorn aiohttp
+   ```
+
+3. **If using macOS with homebrew Python:**
+   ```bash
+   pip install --user -r requirements.txt
+   ```
+
+**Current Status:** Architecture is working correctly, but LLM client can't make API calls due to missing `requests` module.
+
+For technical details, check the console logs."""
+            else:
+                error_content = f"I apologize, but I'm experiencing technical difficulties. The chat system is currently unavailable. Error: {str(e)}"
+            
             return {
-                "content": "I apologize, but I'm experiencing technical difficulties. The chat system is currently unavailable. Please check your configuration and try again.",
+                "content": error_content,
                 "metadata": {
                     "error": str(e),
-                    "user_id": user_id
+                    "user_id": user_id,
+                    "platform": "error_fallback",
+                    "status": "dependency_error" if dependency_issue else "system_error"
                 }
             }
     

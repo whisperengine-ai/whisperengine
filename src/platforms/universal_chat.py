@@ -684,9 +684,18 @@ You adapt your responses based on the platform and conversation context. Be help
             
         except Exception as e:
             logging.error(f"Error generating AI response: {e}")
-            # Fallback response
+            
+            # Check if this is a dependency issue
+            error_str = str(e)
+            if "requests" in error_str or "ModuleNotFoundError" in error_str:
+                error_content = f"⚠️ Missing Dependencies: Cannot make LLM API calls. Install required packages: pip install requests aiohttp. Error: {error_str}"
+                logging.warning("Universal Chat falling back due to missing dependencies")
+            else:
+                error_content = f"I apologize, but I encountered an error while processing your message. Please try again or check the system configuration. Error: {error_str}"
+            
+            # Fallback response with dependency guidance
             return AIResponse(
-                content="I apologize, but I encountered an error while processing your message. Please try again or check the system configuration.",
+                content=error_content,
                 model_used="fallback",
                 tokens_used=20,
                 cost=0.0,
