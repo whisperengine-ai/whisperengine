@@ -215,6 +215,22 @@ class LLMClient:
         self.logger.debug(f"Timeout settings - Request: {self.request_timeout}s, Connection: {self.connection_timeout}s")
         self.logger.debug(f"Vision support: {self.supports_vision}, Max images: {self.vision_max_images}")
     
+    def get_client_config(self) -> Dict[str, Any]:
+        """Get client configuration for debugging/testing"""
+        return {
+            'service_name': self.service_name,
+            'api_url': self.api_url,
+            'is_openrouter': self.is_openrouter,
+            'is_ollama': self.is_ollama,
+            'is_local_studio': self.is_local_studio,
+            'supports_vision': self.supports_vision,
+            'chat_model': self.chat_model_name,
+            'emotion_model': self.emotion_model_name,
+            'facts_model': self.facts_model_name,
+            'max_tokens_chat': self.default_max_tokens_chat,
+            'request_timeout': self.request_timeout
+        }
+    
     def __del__(self):
         """Clean up session on deletion"""
         if hasattr(self, 'session'):

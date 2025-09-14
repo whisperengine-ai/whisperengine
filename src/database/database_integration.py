@@ -212,6 +212,14 @@ class WhisperEngineSchema:
             'FOREIGN KEY (user_id) REFERENCES users (user_id) ON DELETE CASCADE'
         )
         
+        # Transform all other tables with AUTOINCREMENT to SERIAL
+        for table_name in ['memory_entries', 'facts', 'emotions', 'relationships', 'performance_metrics']:
+            if table_name in schema:
+                schema[table_name] = schema[table_name].replace(
+                    'id INTEGER PRIMARY KEY AUTOINCREMENT',
+                    'id SERIAL PRIMARY KEY'
+                )
+        
         # Add indexes for better performance
         schema['indexes'] = '''
             CREATE INDEX IF NOT EXISTS idx_conversations_user_id ON conversations(user_id);

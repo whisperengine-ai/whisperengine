@@ -26,6 +26,7 @@ class WhisperEngineDesktopApp:
     
     def __init__(self):
         self.web_ui = None
+        self.server = None  # Store server reference for graceful shutdown
         self.running = False
         self.host = "127.0.0.1"
         self.port = 8080
@@ -50,11 +51,65 @@ class WhisperEngineDesktopApp:
     def setup_signal_handlers(self):
         """Setup signal handlers for graceful shutdown"""
         def signal_handler(signum, frame):
-            print("\nShutting down WhisperEngine...")
-            self.shutdown()
+            print("\nReceived shutdown signal...")
+            print("Shutting down WhisperEngine gracefully...")
+            self.running = False
+            
+            # Stop system tray immediately
+            if self.system_tray:
+                try:
+                    self.system_tray.stop()
+                    print("✅ System tray stopped")
+                except Exception as e:
+                    print(f"⚠️  System tray cleanup error: {e}")
+            
+            print("✅ WhisperEngine shutdown complete")
+            print("Goodbye!")
+            
+            # Force exit
+            os._exit(0)
         
         signal.signal(signal.SIGINT, signal_handler)
         signal.signal(signal.SIGTERM, signal_handler)
+    
+    async def setup_async_signal_handlers(self):
+        """Setup async signal handlers that work with uvicorn"""
+        import asyncio
+        
+        def shutdown_handler():
+            print("\nReceived shutdown signal...")
+            print("Shutting down WhisperEngine gracefully...")
+            self.running = False
+            
+            # Stop system tray
+            if self.system_tray:
+                try:
+                    self.system_tray.stop()
+                    print("✅ System tray stopped")
+                except Exception as e:
+                    print(f"⚠️  System tray cleanup error: {e}")
+            
+            print("✅ WhisperEngine shutdown complete")
+            print("Goodbye!")
+            
+            # Create a task to exit gracefully
+            asyncio.create_task(self._async_shutdown())
+        
+        # Set up asyncio signal handlers
+        if hasattr(asyncio, 'get_running_loop'):
+            try:
+                loop = asyncio.get_running_loop()
+                for sig in [signal.SIGINT, signal.SIGTERM]:
+                    loop.add_signal_handler(sig, shutdown_handler)
+            except NotImplementedError:
+                # Fallback for Windows or other platforms
+                signal.signal(signal.SIGINT, lambda s, f: shutdown_handler())
+                signal.signal(signal.SIGTERM, lambda s, f: shutdown_handler())
+    
+    async def _async_shutdown(self):
+        """Async shutdown helper"""
+        await asyncio.sleep(0.1)  # Brief delay to let messages print
+        os._exit(0)
     
     def shutdown(self):
         """Gracefully shutdown the application"""
@@ -116,6 +171,9 @@ class WhisperEngineDesktopApp:
     async def start_server(self):
         """Start the web UI server"""
         try:
+            # Setup async signal handlers first
+            await self.setup_async_signal_handlers()
+            
             if not self.check_port_availability():
                 old_port = self.port
                 self.find_available_port()
@@ -145,6 +203,13 @@ class WhisperEngineDesktopApp:
                 raise RuntimeError("Web UI not initialized")
             
             self.running = True
+            print(f"🚀 Starting server on http://{self.host}:{self.port}")
+            if auto_open:
+                print("📱 Browser will open automatically")
+                print("💡 Press Ctrl+C to quit")
+            else:
+                print("💡 Access via system tray or press Ctrl+C to quit")
+            
             await self.web_ui.start(self.host, self.port, open_browser=auto_open)
             
         except KeyboardInterrupt:
