@@ -114,7 +114,7 @@ nano .env  # Set DISCORD_BOT_TOKEN
 WhisperEngine provides unified full AI capabilities:
 
 ### **Complete AI Intelligence** - Always Active
-- **Requirements**: 4GB RAM, modern CPU, GPU recommended
+- **Requirements**: RECOMMENDED - 16GB RAM, modern CPU, GPU required (for AI models) with at least 12GB VRAM
 - **Features**: Complete LLM capabilities, emotional intelligence, advanced memory networks
 - **Best for**: All production environments and use cases
 
