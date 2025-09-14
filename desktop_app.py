@@ -18,6 +18,7 @@ sys.path.insert(0, str(Path(__file__).parent / "src"))
 from src.ui.web_ui import create_web_ui
 from src.config.adaptive_config import AdaptiveConfigManager
 from src.database.database_integration import DatabaseIntegrationManager
+from src.ui.system_tray import create_system_tray, is_tray_available
 
 
 class WhisperEngineDesktopApp:
@@ -28,6 +29,8 @@ class WhisperEngineDesktopApp:
         self.running = False
         self.host = "127.0.0.1"
         self.port = 8080
+        self.system_tray = None
+        self.enable_tray = True  # Can be controlled via env var
         
     def setup_logging(self):
         """Setup logging for desktop app"""
@@ -48,11 +51,20 @@ class WhisperEngineDesktopApp:
         """Setup signal handlers for graceful shutdown"""
         def signal_handler(signum, frame):
             print("\nShutting down WhisperEngine...")
-            self.running = False
-            sys.exit(0)
+            self.shutdown()
         
         signal.signal(signal.SIGINT, signal_handler)
         signal.signal(signal.SIGTERM, signal_handler)
+    
+    def shutdown(self):
+        """Gracefully shutdown the application"""
+        self.running = False
+        
+        # Stop system tray
+        if self.system_tray:
+            self.system_tray.stop()
+        
+        sys.exit(0)
     
     def create_components(self):
         """Create and configure application components"""
@@ -109,14 +121,31 @@ class WhisperEngineDesktopApp:
                 self.find_available_port()
                 logging.warning(f"Port {old_port} unavailable, using port {self.port}")
             
+            # Setup system tray if available and enabled
+            if self.enable_tray and is_tray_available():
+                self.system_tray = create_system_tray(self, self.host, self.port)
+                if self.system_tray and self.system_tray.start_background():
+                    logging.info("System tray enabled - app will run in background")
+                    print("✅ System tray enabled - minimize to tray available")
+                else:
+                    logging.warning("Failed to setup system tray")
+            else:
+                logging.info("System tray disabled or not available")
+            
             logging.info(f"Starting WhisperEngine on http://{self.host}:{self.port}")
-            logging.info("Opening browser... (Close this terminal to quit)")
+            
+            # Only open browser automatically if no system tray (for better UX)
+            auto_open = not (self.system_tray and self.system_tray.running)
+            if auto_open:
+                logging.info("Opening browser... (Close this terminal to quit)")
+            else:
+                logging.info("Access via system tray or visit http://{}:{}".format(self.host, self.port))
             
             if self.web_ui is None:
                 raise RuntimeError("Web UI not initialized")
             
             self.running = True
-            await self.web_ui.start(self.host, self.port, open_browser=True)
+            await self.web_ui.start(self.host, self.port, open_browser=auto_open)
             
         except KeyboardInterrupt:
             logging.info("Received shutdown signal")
@@ -131,9 +160,17 @@ class WhisperEngineDesktopApp:
             self.setup_logging()
             self.setup_signal_handlers()
             
+            # Check for tray preference
+            self.enable_tray = os.getenv("ENABLE_SYSTEM_TRAY", "true").lower() == "true"
+            
             print("🤖 WhisperEngine Desktop App")
             print("=" * 40)
             print("Initializing AI conversation platform...")
+            
+            if self.enable_tray and is_tray_available():
+                print("🔄 System tray integration enabled")
+            elif self.enable_tray:
+                print("⚠️  System tray requested but not available (missing pystray/Pillow)")
             
             # Create components
             self.create_components()
@@ -148,6 +185,10 @@ class WhisperEngineDesktopApp:
             print(f"\nError: {e}")
             print("Please check the logs for more details.")
             sys.exit(1)
+        finally:
+            # Ensure cleanup
+            if self.system_tray:
+                self.system_tray.stop()
 
 
 def main():
