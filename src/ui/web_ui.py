@@ -108,6 +108,10 @@ class WhisperEngineWebUI:
         # Initialize setup guidance manager
         from src.ui.setup_guidance import add_setup_guidance_routes
         self.setup_guidance_manager = add_setup_guidance_routes(self.app, self.templates)
+        
+        # Initialize settings manager
+        from src.ui.settings_api import add_settings_routes
+        self.settings_manager = add_settings_routes(self.app, self.templates)
     
     def setup_routes(self):
         """Setup FastAPI routes"""
