@@ -68,7 +68,29 @@
                     </div>
 
                     <div class="input-area">
+                        <!-- File Upload Area -->
+                        <div id="file-upload-area" class="file-upload-container hidden">
+                            <div class="file-upload-header">
+                                <span>📎 Attachments</span>
+                                <button class="btn-close" onclick="hideFileUpload()">✕</button>
+                            </div>
+                            <div class="file-upload-zone" id="file-drop-zone">
+                                <div class="upload-placeholder">
+                                    <span class="upload-icon">📁</span>
+                                    <p>Drop files here or click to browse</p>
+                                    <small>Supports images, text files, PDFs, and documents</small>
+                                </div>
+                                <input type="file" id="file-input" multiple accept="image/*,.txt,.pdf,.doc,.docx,.json" style="display: none;">
+                            </div>
+                            <div id="file-preview-area" class="file-preview-area"></div>
+                        </div>
+                        
                         <div class="input-container">
+                            <div class="input-toolbar">
+                                <button id="attach-btn" class="btn btn-icon" title="Attach files">
+                                    📎
+                                </button>
+                            </div>
                             <textarea 
                                 id="message-input" 
                                 placeholder="Type your message here..." 
