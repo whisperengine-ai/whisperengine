@@ -24,6 +24,14 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src.config.adaptive_config import AdaptiveConfigManager
 from src.database.database_integration import DatabaseIntegrationManager
+from src.platforms.universal_chat import (
+    UniversalChatOrchestrator, 
+    WebUIChatAdapter, 
+    Message, 
+    ChatPlatform, 
+    MessageType,
+    User
+)
 
 
 class WhisperEngineWebUI:
@@ -39,6 +47,9 @@ class WhisperEngineWebUI:
         self.active_connections: Dict[str, WebSocket] = {}
         self.user_sessions: Dict[str, Dict[str, Any]] = {}
         
+        # Initialize Universal Chat System
+        self.setup_universal_chat()
+        
         # Setup FastAPI app
         self.app = FastAPI(
             title="WhisperEngine",
@@ -48,6 +59,22 @@ class WhisperEngineWebUI:
         
         self.setup_routes()
         self.setup_static_files()
+    
+    def setup_universal_chat(self):
+        """Initialize the universal chat orchestrator"""
+        try:
+            # Create orchestrator 
+            self.chat_orchestrator = UniversalChatOrchestrator(
+                config_manager=self.config_manager,
+                db_manager=self.db_manager or DatabaseIntegrationManager(self.config_manager)
+            )
+            
+            logging.info("✅ Universal chat system initialized")
+            
+        except Exception as e:
+            logging.error(f"Failed to initialize universal chat system: {e}")
+            # Fallback to basic mode
+            self.chat_orchestrator = None
     
     def setup_static_files(self):
         """Setup static file serving"""
@@ -195,38 +222,99 @@ class WhisperEngineWebUI:
             }))
     
     async def generate_ai_response(self, user_id: str, message: str) -> Dict[str, Any]:
-        """Generate AI response"""
+        """Generate AI response using the universal chat system"""
         try:
-            # Use default model
-            selected_model = "openai/gpt-4o-mini"
+            if self.chat_orchestrator:
+                # Initialize the chat orchestrator if not already done
+                if not hasattr(self.chat_orchestrator, 'adapters') or not self.chat_orchestrator.adapters:
+                    await self.chat_orchestrator.initialize()
+                
+                # Create a universal message object
+                message_obj = Message(
+                    message_id=f"web_{user_id}_{int(datetime.now().timestamp())}",
+                    user_id=user_id,
+                    content=message,
+                    platform=ChatPlatform.WEB_UI,
+                    channel_id=f"web_session_{user_id}",
+                    message_type=MessageType.TEXT
+                )
+                
+                # Get or create conversation
+                conversation = await self.chat_orchestrator.get_or_create_conversation(message_obj)
+                
+                # Generate AI response through the orchestrator
+                ai_response = await self.chat_orchestrator.generate_ai_response(message_obj, conversation)
+                
+                return {
+                    "content": ai_response.content,
+                    "metadata": {
+                        "model_used": ai_response.model_used,
+                        "tokens_used": ai_response.tokens_used,
+                        "cost": ai_response.cost,
+                        "generation_time_ms": ai_response.generation_time_ms,
+                        "confidence": ai_response.confidence,
+                        "user_id": user_id,
+                        "platform": "universal_chat"
+                    }
+                }
+            else:
+                # Fallback to basic response
+                return await self._generate_fallback_response(user_id, message)
+        
+        except Exception as e:
+            logging.error(f"Error generating AI response: {e}")
+            return await self._generate_fallback_response(user_id, message)
+    
+    async def _generate_fallback_response(self, user_id: str, message: str) -> Dict[str, Any]:
+        """Fallback response when universal chat system is not available"""
+        try:
+            # Import LLM client directly as fallback
+            from src.llm.llm_client import LLMClient
             
-            # For demo purposes, return a mock response
-            # In a real implementation, this would call the LLM API
-            response_content = f"""Thank you for your message: "{message}"
+            # Initialize LLM client if not already done
+            if not hasattr(self, 'llm_client'):
+                self.llm_client = LLMClient()
+            
+            # Create conversation messages
+            messages = [
+                {
+                    "role": "system", 
+                    "content": """You are WhisperEngine, an advanced AI conversation platform with emotional intelligence and memory capabilities. 
 
-I'm WhisperEngine, your AI conversation platform with advanced emotional intelligence and memory capabilities. 
-
-I understand you're using the desktop application, which provides:
-- 🔒 Local privacy with SQLite storage
+You are running in desktop app mode, providing:
+- 🔒 Local privacy with SQLite storage  
 - 🧠 Advanced memory networks
 - 💭 Emotional intelligence
+- 🖥️ Native macOS integration
 
-How can I assist you today?"""
+Be helpful, engaging, and demonstrate your advanced capabilities. Keep responses conversational but informative."""
+                },
+                {
+                    "role": "user",
+                    "content": message
+                }
+            ]
+            
+            # Generate response using LLM client
+            response_text = self.llm_client.get_chat_response(messages)
             
             return {
-                "content": response_content,
+                "content": response_text,
                 "metadata": {
-                    "model_used": selected_model,
-                    "generation_time_ms": 500
+                    "model_used": self.llm_client.chat_model_name,
+                    "service": self.llm_client.service_name,
+                    "user_id": user_id,
+                    "platform": "fallback_direct"
                 }
             }
         
         except Exception as e:
-            logging.error(f"Error generating AI response: {e}")
+            logging.error(f"Fallback response failed: {e}")
             return {
-                "content": "I apologize, but I encountered an error while processing your message. Please try again.",
+                "content": "I apologize, but I'm experiencing technical difficulties. The chat system is currently unavailable. Please check your configuration and try again.",
                 "metadata": {
-                    "error": str(e)
+                    "error": str(e),
+                    "user_id": user_id
                 }
             }
     

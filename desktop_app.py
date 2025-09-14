@@ -19,6 +19,9 @@ from src.ui.web_ui import create_web_ui
 from src.config.adaptive_config import AdaptiveConfigManager
 from src.database.database_integration import DatabaseIntegrationManager
 from src.ui.system_tray import create_system_tray, is_tray_available
+from src.ui.macos_menu_bar import create_macos_menu_bar, is_macos_menu_available
+from src.ui.macos_dock_integration import create_dock_badge_manager, is_dock_integration_available
+from src.ui.macos_window_manager import create_window_manager, is_window_management_available
 
 
 class WhisperEngineDesktopApp:
@@ -31,7 +34,11 @@ class WhisperEngineDesktopApp:
         self.host = "127.0.0.1"
         self.port = 8080
         self.system_tray = None
+        self.macos_menu_bar = None
+        self.dock_badge_manager = None
+        self.window_manager = None
         self.enable_tray = True  # Can be controlled via env var
+        self.preferences = self._load_preferences()
         
     def setup_logging(self):
         """Setup logging for desktop app"""
@@ -47,6 +54,58 @@ class WhisperEngineDesktopApp:
         
         # Suppress uvicorn access logs for cleaner output
         logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
+    
+    def _load_preferences(self):
+        """Load user preferences from file"""
+        import json
+        prefs_file = Path.home() / ".whisperengine" / "preferences.json"
+        try:
+            if prefs_file.exists():
+                with open(prefs_file, 'r') as f:
+                    return json.load(f)
+        except Exception as e:
+            logging.warning(f"Could not load preferences: {e}")
+        
+        # Default preferences
+        return {
+            "auto_open_browser": True,
+            "show_notifications": True,
+            "start_minimized": False
+        }
+    
+    def _open_browser_delayed(self):
+        """Open browser after a short delay"""
+        import threading
+        import time
+        import webbrowser
+        
+        def delayed_open():
+            time.sleep(2)  # Wait for server to fully start
+            try:
+                webbrowser.open(f"http://{self.host}:{self.port}")
+                logging.info("Auto-opened browser for chat interface")
+            except Exception as e:
+                logging.error(f"Failed to auto-open browser: {e}")
+        
+        thread = threading.Thread(target=delayed_open, daemon=True)
+        thread.start()
+    
+    def cleanup(self):
+        """Cleanup resources"""
+        try:
+            if self.system_tray:
+                self.system_tray.stop()
+            if self.macos_menu_bar:
+                self.macos_menu_bar.stop()
+            if self.dock_badge_manager:
+                self.dock_badge_manager.stop()
+            if self.window_manager:
+                self.window_manager.cleanup()
+            if self.server:
+                self.server.should_exit = True
+        except Exception as e:
+            logging.error(f"Cleanup error: {e}")
+    
     
     def setup_signal_handlers(self):
         """Setup signal handlers for graceful shutdown"""
@@ -88,6 +147,28 @@ class WhisperEngineDesktopApp:
                     print("✅ System tray stopped")
                 except Exception as e:
                     print(f"⚠️  System tray cleanup error: {e}")
+            
+            # Stop macOS integrations
+            if self.macos_menu_bar:
+                try:
+                    self.macos_menu_bar.stop()
+                    print("✅ macOS menu bar stopped")
+                except Exception as e:
+                    print(f"⚠️  macOS menu bar cleanup error: {e}")
+                    
+            if self.dock_badge_manager:
+                try:
+                    self.dock_badge_manager.stop()
+                    print("✅ Dock badge manager stopped")
+                except Exception as e:
+                    print(f"⚠️  Dock badge cleanup error: {e}")
+                    
+            if self.window_manager:
+                try:
+                    self.window_manager.cleanup()
+                    print("✅ Window manager stopped")
+                except Exception as e:
+                    print(f"⚠️  Window manager cleanup error: {e}")
             
             print("✅ WhisperEngine shutdown complete")
             print("Goodbye!")
@@ -174,53 +255,70 @@ class WhisperEngineDesktopApp:
         raise RuntimeError("No available ports found")
     
     async def start_server(self):
-        """Start the web UI server"""
+        """Start the web server and system tray"""
         try:
-            # Setup async signal handlers first
-            await self.setup_async_signal_handlers()
+            import uvicorn
             
-            if not self.check_port_availability():
-                old_port = self.port
-                self.find_available_port()
-                logging.warning(f"Port {old_port} unavailable, using port {self.port}")
+            # Auto-open browser if configured
+            if self.preferences.get("auto_open_browser", True):
+                self._open_browser_delayed()
             
-            # Setup system tray if available and enabled
-            if self.enable_tray and is_tray_available():
-                self.system_tray = create_system_tray(self, self.host, self.port)
-                if self.system_tray and self.system_tray.start_background():
-                    logging.info("System tray enabled - app will run in background")
-                    print("✅ System tray enabled - minimize to tray available")
-                else:
-                    logging.warning("Failed to setup system tray")
-            else:
-                logging.info("System tray disabled or not available")
+            # Create enhanced system tray/menu bar for macOS
+            if self.enable_tray:
+                if is_macos_menu_available():
+                    print("🍎 Creating macOS enhanced menu bar...")
+                    self.macos_menu_bar = create_macos_menu_bar(self, self.host, self.port)
+                    if self.macos_menu_bar:
+                        # Run the macOS menu bar in background thread
+                        import threading
+                        tray_thread = threading.Thread(target=self.macos_menu_bar.run, daemon=True)
+                        tray_thread.start()
+                        print("✅ macOS menu bar created")
+                        
+                    # Add dock badge integration
+                    if is_dock_integration_available():
+                        print("🏷️ Creating dock badge integration...")
+                        self.dock_badge_manager = create_dock_badge_manager(self, self.host, self.port)
+                        if self.dock_badge_manager:
+                            print("✅ Dock badge integration enabled")
+                    
+                    # Add window management
+                    if is_window_management_available():
+                        print("🪟 Creating window management...")
+                        self.window_manager = create_window_manager(self, self.host, self.port)
+                        if self.window_manager:
+                            print("✅ Native window management enabled")
+                            
+                elif is_tray_available():
+                    print("🔄 Creating system tray...")
+                    self.system_tray = create_system_tray(self, self.host, self.port)
+                    if self.system_tray:
+                        print("✅ System tray created")
             
-            logging.info(f"Starting WhisperEngine on http://{self.host}:{self.port}")
+            print(f"🌐 Starting web interface at http://{self.host}:{self.port}")
+            print("📱 Check your system tray for WhisperEngine icon")
+            print("💬 Open your browser to start chatting!")
             
-            # Only open browser automatically if no system tray (for better UX)
-            auto_open = not (self.system_tray and self.system_tray.running)
-            if auto_open:
-                logging.info("Opening browser... (Close this terminal to quit)")
-            else:
-                logging.info("Access via system tray or visit http://{}:{}".format(self.host, self.port))
-            
-            if self.web_ui is None:
+            if not self.web_ui:
                 raise RuntimeError("Web UI not initialized")
             
-            self.running = True
-            print(f"🚀 Starting server on http://{self.host}:{self.port}")
-            if auto_open:
-                print("📱 Browser will open automatically")
-                print("💡 Press Ctrl+C to quit")
-            else:
-                print("💡 Access via system tray or press Ctrl+C to quit")
+            # Create uvicorn config
+            config = uvicorn.Config(
+                self.web_ui.app,  # Use the FastAPI app from WhisperEngineWebUI
+                host=self.host,
+                port=self.port,
+                log_level="info",
+                access_log=False  # Reduce noise
+            )
             
-            await self.web_ui.start(self.host, self.port, open_browser=auto_open)
+            # Create and run server
+            server = uvicorn.Server(config)
+            self.server = server
             
-        except KeyboardInterrupt:
-            logging.info("Received shutdown signal")
+            await server.serve()
+            
         except Exception as e:
-            logging.error(f"Server error: {e}")
+            logging.error(f"Server startup failed: {e}")
             raise
     
     async def run_async(self):
