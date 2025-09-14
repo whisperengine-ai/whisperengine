@@ -4,6 +4,34 @@
 
 WhisperEngine is a privacy-first Discord bot embodying "Dream of the Endless" from Neil Gaiman's Sandman series. It runs completely locally with sophisticated AI memory, emotional intelligence, and personality adaptation systems.
 
+## 🚀 **Feature Branch: Unified Scaling Architecture**
+
+**Current Branch**: `feature/unified-scaling-architecture`  
+**Purpose**: Extend the existing Discord bot to support unified deployment modes
+
+### **What This Branch Adds**
+- **Desktop App Entry Point**: `desktop_app.py` - Standalone desktop application mode
+- **Universal Chat Platform**: `src/platforms/universal_chat.py` - Abstract chat across platforms  
+- **Adaptive Configuration**: `src/config/adaptive_config.py` - Environment-aware settings
+- **Database Abstraction**: `src/database/abstract_database.py` - SQLite ↔ PostgreSQL switching
+- **Build System**: `src/packaging/unified_builder.py` - Native app packaging (has issues)
+
+### **Deployment Modes Being Added**
+1. **Original Discord Bot** (existing, works)
+   - `python run.py` - Discord bot with full AI capabilities
+   - Docker Compose deployment for teams
+
+2. **Desktop App Mode** (new, ~1% complete)  
+   - `python desktop_app.py` - Standalone ChatGPT-like app
+   - Same AI engine, no Discord required
+   - Local SQLite storage for privacy
+
+### **Current Feature Branch Status**
+- ✅ **Core Discord Bot**: Fully functional with AI memory and emotional intelligence
+- ✅ **Architecture Components**: Universal platform abstraction implemented
+- ❌ **Desktop Build System**: PyInstaller integration broken, signal handling issues
+- 🔍 **Docker Deployment**: Needs validation for Discord bot use case
+
 ## 🏗️ Architecture Patterns
 
 ### Modular Component Architecture
@@ -34,10 +62,43 @@ ENABLE_PHASE3_MEMORY = os.getenv('ENABLE_PHASE3_MEMORY', 'true')
 
 ## 🔧 Developer Workflows
 
-### Starting Development
+### Starting Development - Feature Branch
 ```bash
-# Development mode with hot-reloading
-./bot.sh start      # Production Docker mode
+# Discord bot development (existing, works)
+python run.py       # Original Discord bot with full AI capabilities
+
+# Desktop app development (new feature, has issues)  
+python desktop_app.py  # Standalone desktop mode - build system broken
+
+# Docker development (needs validation)
+docker-compose up -d   # Multi-container Discord bot deployment
+```
+
+### **Feature Branch Development Priorities**
+1. **Fix Desktop Build System** - PyInstaller integration has syntax errors
+2. **Repair Signal Handling** - Ctrl+C doesn't work in packaged desktop apps  
+3. **Validate Docker System** - Test Discord bot deployment via Docker Compose
+4. **Test Universal Platform** - Ensure same AI works in Discord and desktop modes
+
+### **Implementation Reality Check**
+- **Discord Bot**: ✅ Fully functional base system with sophisticated AI
+- **Desktop App Source**: ✅ Code exists and runs, uses same AI components
+- **Universal Platform**: ✅ Architecture complete, abstracts Discord vs desktop  
+- **Desktop Build System**: ❌ PyInstaller integration broken, ~1% complete
+- **Docker Validation**: 🔍 Needs end-to-end testing for Discord bot deployment
+
+### **Current Branch Gotchas**
+- **Build Command**: `python build.py native_desktop --sqlite --debug` fails with syntax errors
+- **Signal Handling**: Packaged apps don't respond to Ctrl+C (manual process killing required)
+- **Documentation Claims**: Previous docs overstated completion (desktop app is 1%, not 90%)
+- **Base System Works**: The Discord bot with AI memory/emotion is fully functional
+
+### **Key Files for This Feature Branch**
+- `desktop_app.py` - Desktop app entry point (source works, packaging broken)
+- `src/platforms/universal_chat.py` - Platform abstraction (architecture complete)
+- `src/packaging/unified_builder.py` - Build system (has major PyInstaller issues)
+- `src/config/adaptive_config.py` - Environment detection (working)
+- `src/database/database_integration.py` - Database abstraction (working)
 python run.py       # Native Python development
 ```
 
