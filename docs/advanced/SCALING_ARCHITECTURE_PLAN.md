@@ -21,9 +21,33 @@ WhisperEngine Core
 
 ---
 
-## 📈 **Scaling Tiers**
+## Real-World Usage Analysis
 
-### **Tier 1: Desktop User (Single Bot)**
+Based on actual OpenRouter usage data from WhisperEngine production deployment:
+
+### Production Metrics (3-week sample)
+- **Volume**: 2,956 API requests (~140 requests/day)
+- **Cost**: $16.46 total (~$5.50/week, ~$287/year projected)
+- **Token Patterns**:
+  - Average prompt: 3,387 tokens (large context)
+  - Average completion: 304 tokens (concise responses)
+  - Total throughput: ~10M input tokens, ~900K output tokens
+
+### Model Usage Patterns
+- **Primary Models**: GPT-4o ($0.0056/request avg), GPT-4o-mini ($0.00005/request avg)
+- **Premium Models**: Grok-4 ($0.085/request), expensive but occasional use
+- **Cost Distribution**: 80% of costs from GPT-4o, 15% from premium models, 5% from mini models
+
+### Scaling Cost Projections
+- **Single User**: $300-500/year (current usage)
+- **Small Team (10 users)**: $3,000-5,000/year  
+- **Enterprise (100 users)**: $30,000-50,000/year
+- **Multi-tenant (1000 users)**: $300,000-500,000/year
+
+### Performance Requirements
+- **Response Time**: 324-4087ms generation time observed
+- **Token Throughput**: Need to handle 3,000+ token prompts efficiently
+- **Cost Optimization**: Smart model selection critical (50x cost difference between models)
 - **Target**: Individual users, 1 Discord bot
 - **Resources**: 16-64GB RAM, 4-14 CPU cores
 - **Deployment**: Native Python executable
