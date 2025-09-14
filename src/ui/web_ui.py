@@ -104,6 +104,10 @@ class WhisperEngineWebUI:
         
         # Setup templates
         self.templates = Jinja2Templates(directory=str(templates_path))
+        
+        # Initialize setup guidance manager
+        from src.ui.setup_guidance import add_setup_guidance_routes
+        self.setup_guidance_manager = add_setup_guidance_routes(self.app, self.templates)
     
     def setup_routes(self):
         """Setup FastAPI routes"""
@@ -365,6 +369,20 @@ For technical details, check the console logs."""
                     "status": "dependency_error" if dependency_issue else "system_error"
                 }
             }
+    
+    def set_setup_guidance(self, guidance_data: Dict[str, Any]):
+        """Set setup guidance data for display in UI"""
+        if hasattr(self, 'setup_guidance_manager'):
+            self.setup_guidance_manager.set_setup_guidance(guidance_data)
+            logging.info("Setup guidance set for web UI display")
+        else:
+            logging.warning("Setup guidance manager not available")
+    
+    def clear_setup_guidance(self):
+        """Clear setup guidance when LLM is configured"""
+        if hasattr(self, 'setup_guidance_manager'):
+            self.setup_guidance_manager.clear_setup_guidance()
+            logging.info("Setup guidance cleared from web UI")
     
     async def start(self, host: str = "127.0.0.1", port: int = 8080, open_browser: bool = True):
         """Start the web UI server"""

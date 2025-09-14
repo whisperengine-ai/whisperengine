@@ -39,6 +39,7 @@ class WhisperEngineDesktopApp:
         self.window_manager = None
         self.enable_tray = True  # Can be controlled via env var
         self.preferences = self._load_preferences()
+        self.llm_setup_guidance = None  # Store LLM setup guidance for UI display
         
     def setup_logging(self):
         """Setup logging for desktop app"""
@@ -229,8 +230,48 @@ class WhisperEngineDesktopApp:
                 logging.warning(f"Local database initialization failed: {e}")
                 logging.info("🔄 Continuing with fallback mode...")
             
+            # Initialize LLM auto-detection for desktop app
+            try:
+                from src.llm.desktop_llm_manager import DesktopLLMManager
+                
+                print("🤖 Initializing LLM for desktop app...")
+                llm_manager = DesktopLLMManager()
+                llm_result = await llm_manager.initialize_llm_for_desktop()
+                
+                status = llm_result.get('status', 'unknown')
+                
+                if status == 'local_configured':
+                    server_info = llm_result.get('server_info')
+                    if server_info:
+                        print(f"✅ Local LLM configured: {server_info.name}")
+                        print(f"🔧 Applied configuration: {server_info.url}")
+                        if server_info.models:
+                            print(f"📦 Available models: {', '.join(server_info.models)}")
+                elif status == 'setup_required':
+                    print("💡 No local LLM detected - setup guidance available")
+                    setup_guidance = llm_result.get('setup_guidance')
+                    if setup_guidance:
+                        print(f"📱 Recommended: {setup_guidance.preferred_server}")
+                        # Set up guidance in web UI for display
+                        self.llm_setup_guidance = setup_guidance
+                elif status == 'cloud_fallback':
+                    print("☁️ Using cloud API fallback configuration")
+                elif status == 'manual_config':
+                    print("📝 Using existing manual LLM configuration")
+                else:
+                    print(f"⚙️ LLM status: {status}")
+                
+            except Exception as e:
+                logging.warning(f"LLM auto-detection failed: {e}")
+                print("⚠️ LLM auto-detection failed - continuing with existing config")
+            
             # Create web UI
             self.web_ui = create_web_ui(db_manager, config_manager)
+            
+            # Set up LLM setup guidance if needed
+            if hasattr(self, 'llm_setup_guidance') and self.llm_setup_guidance:
+                self.web_ui.set_setup_guidance(self.llm_setup_guidance)
+                print("📱 Setup guidance configured for web UI")
             
             logging.info("WhisperEngine components initialized successfully")
             
