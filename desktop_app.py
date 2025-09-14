@@ -268,6 +268,38 @@ class WhisperEngineDesktopApp:
             # Create web UI
             self.web_ui = create_web_ui(db_manager, config_manager)
             
+            # Apply settings to web UI
+            if hasattr(self.web_ui, 'settings_manager'):
+                # Apply current system prompt to environment
+                try:
+                    active_prompt = self.web_ui.settings_manager.get_active_system_prompt()
+                    os.environ['CUSTOM_SYSTEM_PROMPT'] = active_prompt
+                    print("📝 Applied custom system prompt to environment")
+                except Exception as e:
+                    logging.warning(f"Failed to apply system prompt: {e}")
+                
+                # Apply LLM configuration
+                try:
+                    llm_config = self.web_ui.settings_manager.get_llm_config()
+                    if llm_config['api_url']:
+                        os.environ['LLM_CHAT_API_URL'] = llm_config['api_url']
+                    if llm_config['api_key']:
+                        os.environ['LLM_API_KEY'] = llm_config['api_key']
+                    if llm_config['model_name']:
+                        os.environ['LLM_MODEL_NAME'] = llm_config['model_name']
+                    print("🤖 Applied LLM configuration from settings")
+                except Exception as e:
+                    logging.warning(f"Failed to apply LLM config: {e}")
+                
+                # Apply Discord configuration
+                try:
+                    discord_config = self.web_ui.settings_manager.get_discord_config()
+                    if discord_config['bot_token']:
+                        os.environ['DISCORD_BOT_TOKEN'] = discord_config['bot_token']
+                    print("🤖 Applied Discord bot configuration from settings")
+                except Exception as e:
+                    logging.warning(f"Failed to apply Discord config: {e}")
+            
             # Set up LLM setup guidance if needed
             if hasattr(self, 'llm_setup_guidance') and self.llm_setup_guidance:
                 self.web_ui.set_setup_guidance(self.llm_setup_guidance)
