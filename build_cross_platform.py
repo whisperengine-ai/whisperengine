@@ -263,6 +263,14 @@ app = BUNDLE(
             return False
         
         config = self.platforms[target_platform]
+        
+        # Check for cross-compilation
+        is_cross_compile = target_platform != self.current_platform
+        if is_cross_compile:
+            print(f"⚠️  Cross-compilation detected: {self.platforms[self.current_platform]['name']} → {config['name']}")
+            print(f"   Note: This creates a {config['name']}-configured build but may not be fully native")
+            print(f"   For best results, build on native {config['name']} system")
+        
         print(f"🔨 Building WhisperEngine for {config['name']}...")
         
         try:
@@ -358,9 +366,10 @@ app = BUNDLE(
                 print(f"\n🎯 Building for current platform: {self.platforms[platform_key]['name']}")
                 results[platform_key] = self.build_platform(platform_key, clean)
             else:
-                print(f"\n⚠️  Cross-compilation to {self.platforms[platform_key]['name']} not supported")
-                print(f"   Build on native {self.platforms[platform_key]['name']} system for best results")
-                results[platform_key] = False
+                print(f"\n🔄 Attempting cross-compilation to: {self.platforms[platform_key]['name']}")
+                print(f"   ⚠️  Note: Cross-compiled builds may have limitations")
+                print(f"   💡 For production use, build on native {self.platforms[platform_key]['name']} system")
+                results[platform_key] = self.build_platform(platform_key, clean)
         
         return results
     
