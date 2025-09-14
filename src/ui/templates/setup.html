@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Setup Local AI - WhisperEngine</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="icon" href="/static/favicon.ico" type="image/x-icon">
+    <style>
+        .setup-container {
+            max-width: 800px;
+            margin: 2rem auto;
+            padding: 2rem;
+            background: var(--bg-secondary);
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+        }
+        
+        .setup-header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+        
+        .setup-title {
+            font-size: 2rem;
+            color: var(--primary-color);
+            margin-bottom: 0.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+        
+        .setup-subtitle {
+            color: var(--text-secondary);
+            font-size: 1.1rem;
+        }
+        
+        .system-info {
+            background: var(--bg-primary);
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 2rem;
+            border-left: 4px solid var(--primary-color);
+        }
+        
+        .system-specs {
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+        
+        .spec-item {
+            background: var(--bg-tertiary);
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            font-size: 0.9rem;
+        }
+        
+        .benefits-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+        
+        .benefit-card {
+            background: var(--bg-primary);
+            padding: 1rem;
+            border-radius: 8px;
+            text-align: center;
+        }
+        
+        .steps-container {
+            background: var(--bg-primary);
+            padding: 1.5rem;
+            border-radius: 8px;
+            margin-bottom: 2rem;
+        }
+        
+        .step-list {
+            list-style: none;
+            padding: 0;
+        }
+        
+        .step-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 1rem;
+            margin-bottom: 1rem;
+            padding: 1rem;
+            background: var(--bg-secondary);
+            border-radius: 6px;
+        }
+        
+        .step-number {
+            background: var(--primary-color);
+            color: white;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.8rem;
+            font-weight: bold;
+            flex-shrink: 0;
+        }
+        
+        .models-section {
+            margin-bottom: 2rem;
+        }
+        
+        .model-card {
+            background: var(--bg-primary);
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            border: 2px solid transparent;
+        }
+        
+        .model-card.recommended {
+            border-color: var(--primary-color);
+            background: linear-gradient(135deg, var(--bg-primary) 0%, rgba(var(--primary-color-rgb), 0.1) 100%);
+        }
+        
+        .model-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.5rem;
+        }
+        
+        .model-name {
+            font-weight: bold;
+            color: var(--primary-color);
+        }
+        
+        .recommended-badge {
+            background: var(--primary-color);
+            color: white;
+            padding: 0.25rem 0.5rem;
+            border-radius: 12px;
+            font-size: 0.7rem;
+            text-transform: uppercase;
+        }
+        
+        .action-buttons {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            margin-top: 2rem;
+        }
+        
+        .btn-download {
+            background: var(--primary-color);
+            color: white;
+            padding: 1rem 2rem;
+            border: none;
+            border-radius: 8px;
+            font-size: 1.1rem;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-download:hover {
+            background: var(--primary-dark);
+            transform: translateY(-2px);
+        }
+        
+        .btn-skip {
+            background: transparent;
+            color: var(--text-secondary);
+            padding: 1rem 2rem;
+            border: 2px solid var(--text-secondary);
+            border-radius: 8px;
+            font-size: 1.1rem;
+            cursor: pointer;
+            text-decoration: none;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-skip:hover {
+            background: var(--text-secondary);
+            color: var(--bg-primary);
+        }
+        
+        .no-guidance {
+            text-align: center;
+            padding: 3rem;
+            color: var(--text-secondary);
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <header class="header">
+            <div class="header-content">
+                <h1 class="logo">
+                    <span class="logo-icon">🤖</span>
+                    WhisperEngine
+                </h1>
+                <div class="header-controls">
+                    <a href="/" class="btn btn-secondary">← Back to Chat</a>
+                </div>
+            </div>
+        </header>
+
+        <main class="main-content">
+            {% if guidance.show_guidance %}
+            <div class="setup-container">
+                <div class="setup-header">
+                    <h1 class="setup-title">
+                        🚀 {{ guidance.title }}
+                    </h1>
+                    <p class="setup-subtitle">{{ guidance.subtitle }}</p>
+                </div>
+
+                <div class="system-info">
+                    <h3>📊 Your System Specifications</h3>
+                    <div class="system-specs">
+                        <div class="spec-item">💾 {{ guidance.system_info.ram }}</div>
+                        <div class="spec-item">⚡ {{ guidance.system_info.cores }}</div>
+                        <div class="spec-item">🎮 {{ guidance.system_info.gpu }}</div>
+                    </div>
+                </div>
+
+                <div class="benefits-section">
+                    <h3>✨ Benefits of Local AI</h3>
+                    <div class="benefits-grid">
+                        {% for benefit in guidance.benefits %}
+                        <div class="benefit-card">
+                            {{ benefit }}
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                {% if guidance.model_recommendations %}
+                <div class="models-section">
+                    <h3>🎯 Recommended Models</h3>
+                    {% for model in guidance.model_recommendations %}
+                    <div class="model-card {% if model.recommended %}recommended{% endif %}">
+                        <div class="model-header">
+                            <span class="model-name">{{ model.name }}</span>
+                            {% if model.recommended %}
+                            <span class="recommended-badge">Recommended</span>
+                            {% endif %}
+                        </div>
+                        <p>{{ model.description }}</p>
+                        <small>Size: {{ model.size }}</small>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+
+                <div class="steps-container">
+                    <h3>📋 Setup Steps</h3>
+                    <ol class="step-list">
+                        {% for step in guidance.setup_steps %}
+                        <li class="step-item">
+                            <span class="step-number">{{ loop.index }}</span>
+                            <span>{{ step }}</span>
+                        </li>
+                        {% endfor %}
+                    </ol>
+                </div>
+
+                <div class="action-buttons">
+                    {% if guidance.download_url %}
+                    <a href="{{ guidance.download_url }}" target="_blank" class="btn-download">
+                        📥 Download {{ guidance.server_name }}
+                    </a>
+                    {% endif %}
+                    <a href="/" class="btn-skip">Skip for Now</a>
+                </div>
+            </div>
+            {% else %}
+            <div class="setup-container">
+                <div class="no-guidance">
+                    <h2>🎉 Local AI Already Configured!</h2>
+                    <p>Your local AI setup is working perfectly.</p>
+                    <a href="/" class="btn-download" style="margin-top: 1rem;">
+                        🚀 Start Chatting
+                    </a>
+                </div>
+            </div>
+            {% endif %}
+        </main>
+    </div>
+
+    <script>
+        // Auto-refresh every 10 seconds to check if LLM becomes available
+        let checkInterval = setInterval(async () => {
+            try {
+                const response = await fetch('/api/setup-guidance');
+                const data = await response.json();
+                
+                // If guidance is no longer needed, redirect to chat
+                if (!data.show_guidance) {
+                    clearInterval(checkInterval);
+                    window.location.href = '/';
+                }
+            } catch (error) {
+                console.log('Setup check failed:', error);
+            }
+        }, 10000);
+        
+        // Clean up interval when page unloads
+        window.addEventListener('beforeunload', () => {
+            clearInterval(checkInterval);
+        });
+    </script>
+</body>
+</html>
