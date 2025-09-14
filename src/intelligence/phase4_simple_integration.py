@@ -13,6 +13,7 @@ while maintaining the sophisticated capabilities of existing phases.
 
 import asyncio
 import logging
+import os
 from datetime import datetime, timezone
 from typing import Dict, List, Optional, Any, Tuple
 from dataclasses import dataclass
@@ -130,6 +131,19 @@ class Phase4HumanLikeIntegration:
         Returns:
             Phase4Context with all analysis results
         """
+        # Check if Phase 4 is enabled
+        enable_phase4 = os.getenv('ENABLE_PHASE4_HUMAN_LIKE', 'true').lower() == 'true'
+        if not enable_phase4:
+            logger.debug("⏭️ Phase 4 disabled via ENABLE_PHASE4_HUMAN_LIKE=false")
+            # Return minimal context with just the message
+            return Phase4Context(
+                user_id=user_id,
+                message=message,
+                conversation_mode=ConversationMode.BALANCED,
+                interaction_type=InteractionType.CASUAL_CHAT,
+                processing_metadata={'phases_executed': [], 'performance_metrics': {}}
+            )
+        
         processing_start = datetime.now(timezone.utc)
         logger.debug(f"Starting Phase 4 comprehensive processing for user {user_id}")
         
@@ -185,29 +199,41 @@ class Phase4HumanLikeIntegration:
                     logger.error(f"Phase 2 processing failed: {e}")
                     phase4_context.phase2_results = None
             
-            # Step 3: Execute Phase 3 (Memory Networks) if available
-            if self.phase3_memory_networks and self.memory_manager:
+            # Step 3: Execute Phase 3 (Memory Networks) if available and enabled
+            enable_phase3 = os.getenv('ENABLE_PHASE3_MEMORY', 'true').lower() == 'true'
+            enable_phase3_background = os.getenv('ENABLE_PHASE3_BACKGROUND', 'true').lower() == 'true'
+            
+            if self.phase3_memory_networks and self.memory_manager and enable_phase3:
                 try:
-                    logger.debug("Executing Phase 3: Memory Networks Analysis")
+                    logger.debug(f"Executing Phase 3: Memory Networks Analysis (background={enable_phase3_background})")
                     phase3_start = datetime.now(timezone.utc)
                     
-                    # Trigger memory network analysis for user
-                    phase3_results = await self.phase3_memory_networks.analyze_complete_memory_network(
-                        user_id=user_id,
-                        memory_manager=self.memory_manager
-                    )
-                    
-                    phase4_context.phase3_results = phase3_results
-                    processing_metadata['phases_executed'].append('phase3')
-                    processing_metadata['performance_metrics']['phase3_duration'] = (
-                        datetime.now(timezone.utc) - phase3_start
-                    ).total_seconds()
-                    
-                    logger.debug("✅ Phase 3 analysis completed")
+                    if enable_phase3_background:
+                        # Start Phase 3 analysis in background, don't wait for completion
+                        asyncio.create_task(self._run_phase3_background(user_id, processing_metadata))
+                        phase4_context.phase3_results = {"status": "running_in_background", "started_at": phase3_start.isoformat()}
+                        processing_metadata['phases_executed'].append('phase3_background')
+                        logger.debug("✅ Phase 3 analysis started in background")
+                    else:
+                        # Traditional synchronous execution
+                        phase3_results = await self.phase3_memory_networks.analyze_complete_memory_network(
+                            user_id=user_id,
+                            memory_manager=self.memory_manager
+                        )
+                        
+                        phase4_context.phase3_results = phase3_results
+                        processing_metadata['phases_executed'].append('phase3')
+                        processing_metadata['performance_metrics']['phase3_duration'] = (
+                            datetime.now(timezone.utc) - phase3_start
+                        ).total_seconds()
+                        
+                        logger.debug("✅ Phase 3 analysis completed synchronously")
                     
                 except Exception as e:
                     logger.error(f"Phase 3 processing failed: {e}")
                     phase4_context.phase3_results = None
+            elif not enable_phase3:
+                logger.debug("⏭️ Phase 3 disabled via ENABLE_PHASE3_MEMORY=false")
             
             # Step 4: Execute Enhanced Memory Query Processing
             if self.enhanced_query_processor:
@@ -470,6 +496,31 @@ class Phase4HumanLikeIntegration:
             },
             'integration_health': self._check_integration_health()
         }
+    
+    async def _run_phase3_background(self, user_id: str, processing_metadata: Dict[str, Any]):
+        """Run Phase 3 analysis in background without blocking the main response"""
+        try:
+            if not self.phase3_memory_networks or not self.memory_manager:
+                logger.warning("Phase 3 components not available for background analysis")
+                return
+            
+            logger.debug(f"Starting background Phase 3 analysis for user {user_id}")
+            phase3_start = datetime.now(timezone.utc)
+            
+            # Run the memory network analysis
+            phase3_results = await self.phase3_memory_networks.analyze_complete_memory_network(
+                user_id=user_id,
+                memory_manager=self.memory_manager
+            )
+            
+            duration = (datetime.now(timezone.utc) - phase3_start).total_seconds()
+            logger.info(f"✅ Background Phase 3 analysis completed for user {user_id} in {duration:.2f}s")
+            
+            # Store results in a background cache if needed
+            # This could be enhanced to update a cache that future requests can use
+            
+        except Exception as e:
+            logger.error(f"Background Phase 3 analysis failed for user {user_id}: {e}")
     
     def _check_integration_health(self) -> str:
         """Check the health of all integrated systems"""

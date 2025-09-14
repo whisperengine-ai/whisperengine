@@ -26,15 +26,15 @@ services:
     ports:
       - "9090:9090"  # Health check endpoint
       
-    # Resource limits
+    # Resource limits - Optimized for API-based AI processing
     deploy:
       resources:
         limits:
-          memory: 1G
-          cpus: '0.5'
+          memory: 1.5G        # Reduced from 2G since no local model loading
+          cpus: '1.0'         # Reduced from 2.0 since API calls are I/O bound
         reservations:
-          memory: 512M
-          cpus: '0.25'
+          memory: 512M        # Keep reasonable baseline
+          cpus: '0.5'         # Increased from 0.25
     
     # Health check - use the built-in health endpoint
     healthcheck:

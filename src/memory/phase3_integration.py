@@ -10,6 +10,7 @@ Phase 3: Multi-Dimensional Memory Networks
 
 import logging
 import asyncio
+import os
 from datetime import datetime, timezone, timedelta
 from typing import Dict, List, Optional, Any, Tuple
 from dataclasses import dataclass, asdict
@@ -53,12 +54,18 @@ class Phase3MemoryNetworks:
         self.importance_engine = MemoryImportanceEngine()
         self.pattern_detector = CrossReferencePatternDetector()
         
+        # Performance limits to prevent excessive processing
+        self.max_memories_for_analysis = int(os.getenv('PHASE3_MAX_MEMORIES', '50'))
+        self.memory_selection_strategy = os.getenv('PHASE3_MEMORY_STRATEGY', 'recent_important')  # recent_important, recent, important
+        self.analysis_timeout = int(os.getenv('PHASE3_ANALYSIS_TIMEOUT', '60'))  # seconds
+        
         # Integration state
         self.network_states = {}
         self.processing_queue = {}
         self.insights_cache = {}
         
-        logger.info("Phase 3 Memory Networks initialized")
+        logger.info(f"Phase 3 Memory Networks initialized with max_memories={self.max_memories_for_analysis}, strategy={self.memory_selection_strategy}")
+    
     
     async def analyze_complete_memory_network(self, user_id: str, memory_manager) -> Dict[str, Any]:
         """
@@ -71,8 +78,25 @@ class Phase3MemoryNetworks:
         Returns:
             Complete memory network analysis
         """
-        logger.info(f"Starting complete memory network analysis for user {user_id}")
+        logger.info(f"Starting complete memory network analysis for user {user_id} (timeout: {self.analysis_timeout}s)")
         
+        try:
+            # Run the analysis with timeout protection
+            return await asyncio.wait_for(
+                self._perform_memory_analysis(user_id, memory_manager),
+                timeout=self.analysis_timeout
+            )
+        except asyncio.TimeoutError:
+            logger.error(f"Memory network analysis timed out after {self.analysis_timeout} seconds for user {user_id}")
+            self._update_processing_status(user_id, "timeout")
+            return self._create_minimal_analysis_result(user_id)
+        except Exception as e:
+            logger.error(f"Memory network analysis failed for user {user_id}: {e}")
+            self._update_processing_status(user_id, "error")
+            return self._create_minimal_analysis_result(user_id)
+    
+    async def _perform_memory_analysis(self, user_id: str, memory_manager) -> Dict[str, Any]:
+        """Internal method to perform the actual memory analysis"""
         try:
             # Update processing status
             self._update_processing_status(user_id, "analyzing")
@@ -129,13 +153,16 @@ class Phase3MemoryNetworks:
             return self._create_error_analysis_result(user_id, str(e))
     
     async def _fetch_user_memories(self, user_id: str, memory_manager) -> List[Dict]:
-        """Fetch all user memories for analysis"""
+        """Fetch user memories for analysis with intelligent selection"""
         try:
-            memories = await memory_manager.get_memories_by_user(user_id)
+            all_memories = await memory_manager.get_memories_by_user(user_id)
+            total_memories = len(all_memories)
+            
+            logger.debug(f"Retrieved {total_memories} total memories for user {user_id}")
             
             # Format memories for consistent processing
             formatted_memories = []
-            for memory in memories:
+            for memory in all_memories:
                 formatted_memory = {
                     'id': memory.get('id', memory.get('memory_id', '')),
                     'memory_id': memory.get('id', memory.get('memory_id', '')),
@@ -148,12 +175,54 @@ class Phase3MemoryNetworks:
                 }
                 formatted_memories.append(formatted_memory)
             
-            logger.debug(f"Fetched {len(formatted_memories)} memories for user {user_id}")
+            # Apply memory selection strategy if we have too many memories
+            if len(formatted_memories) > self.max_memories_for_analysis:
+                logger.info(f"Limiting memory analysis from {len(formatted_memories)} to {self.max_memories_for_analysis} memories using strategy: {self.memory_selection_strategy}")
+                formatted_memories = self._select_memories_for_analysis(formatted_memories)
+            
+            logger.debug(f"Using {len(formatted_memories)} memories for Phase 3 analysis")
             return formatted_memories
             
         except Exception as e:
             logger.error(f"Error fetching user memories: {e}")
             return []
+    
+    def _select_memories_for_analysis(self, memories: List[Dict]) -> List[Dict]:
+        """Select most relevant memories for analysis based on strategy"""
+        if len(memories) <= self.max_memories_for_analysis:
+            return memories
+        
+        if self.memory_selection_strategy == 'recent':
+            # Sort by timestamp (most recent first)
+            sorted_memories = sorted(memories, key=lambda m: m['timestamp'], reverse=True)
+            return sorted_memories[:self.max_memories_for_analysis]
+            
+        elif self.memory_selection_strategy == 'important':
+            # Sort by importance score (highest first)
+            sorted_memories = sorted(memories, key=lambda m: m['importance_score'], reverse=True)
+            return sorted_memories[:self.max_memories_for_analysis]
+            
+        elif self.memory_selection_strategy == 'recent_important':
+            # Balanced approach: take top half by importance, then sort by recency
+            half_limit = self.max_memories_for_analysis // 2
+            
+            # Get most important memories
+            by_importance = sorted(memories, key=lambda m: m['importance_score'], reverse=True)
+            important_memories = by_importance[:half_limit]
+            
+            # Get most recent memories from remaining
+            remaining_memories = by_importance[half_limit:]
+            by_recency = sorted(remaining_memories, key=lambda m: m['timestamp'], reverse=True)
+            recent_memories = by_recency[:self.max_memories_for_analysis - half_limit]
+            
+            # Combine and sort by timestamp for final ordering
+            selected_memories = important_memories + recent_memories
+            return sorted(selected_memories, key=lambda m: m['timestamp'], reverse=True)
+        
+        else:
+            # Default: most recent
+            sorted_memories = sorted(memories, key=lambda m: m['timestamp'], reverse=True)
+            return sorted_memories[:self.max_memories_for_analysis]
     
     async def _fetch_conversation_history(self, user_id: str, memory_manager) -> List[Dict]:
         """Fetch conversation history for pattern analysis"""
