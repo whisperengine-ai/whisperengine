@@ -121,9 +121,13 @@ class WhisperEngineDesktopApp:
         
         sys.exit(0)
     
-    def create_components(self):
+    async def initialize_components(self):
         """Create and configure application components"""
         try:
+            # Force SQLite for desktop mode
+            os.environ['WHISPERENGINE_DATABASE_TYPE'] = 'sqlite'
+            os.environ['WHISPERENGINE_MODE'] = 'desktop'
+            
             # Initialize configuration manager
             config_manager = AdaptiveConfigManager()
             
@@ -131,8 +135,9 @@ class WhisperEngineDesktopApp:
             db_manager = None
             try:
                 db_manager = DatabaseIntegrationManager()
+                logging.info("✅ Database initialized with SQLite for desktop mode")
             except Exception as e:
-                logging.warning(f"Database initialization failed (optional): {e}")
+                logging.warning(f"Database initialization failed: {e}")
             
             # Create web UI
             self.web_ui = create_web_ui(db_manager, config_manager)
@@ -218,8 +223,8 @@ class WhisperEngineDesktopApp:
             logging.error(f"Server error: {e}")
             raise
     
-    def run(self):
-        """Run the desktop application"""
+    async def run_async(self):
+        """Run the desktop application async"""
         try:
             # Setup
             self.setup_logging()
@@ -238,10 +243,10 @@ class WhisperEngineDesktopApp:
                 print("⚠️  System tray requested but not available (missing pystray/Pillow)")
             
             # Create components
-            self.create_components()
+            await self.initialize_components()
             
             # Start server
-            asyncio.run(self.start_server())
+            await self.start_server()
             
         except KeyboardInterrupt:
             print("\nGoodbye!")
@@ -249,11 +254,22 @@ class WhisperEngineDesktopApp:
             logging.error(f"Application error: {e}")
             print(f"\nError: {e}")
             print("Please check the logs for more details.")
-            sys.exit(1)
         finally:
             # Ensure cleanup
             if self.system_tray:
                 self.system_tray.stop()
+    
+    def run(self):
+        """Run the desktop application"""
+        try:
+            asyncio.run(self.run_async())
+        except KeyboardInterrupt:
+            print("\nGoodbye!")
+        except Exception as e:
+            logging.error(f"Application error: {e}")
+            print(f"\nError: {e}")
+            print("Please check the logs for more details.")
+            sys.exit(1)
 
 
 def main():
