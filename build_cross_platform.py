@@ -289,13 +289,48 @@ app = BUNDLE(
             result = subprocess.run(cmd, cwd=self.project_root, capture_output=True, text=True)
             
             if result.returncode == 0:
-                output_path = self.dist_dir / config["executable"]
-                if output_path.exists():
+                # Check for output - be more flexible about file locations
+                config = self.platforms[target_platform]
+                possible_outputs = []
+                
+                if target_platform == "darwin":
+                    possible_outputs = [
+                        self.dist_dir / config["executable"],  # WhisperEngine.app
+                    ]
+                elif target_platform == "windows":
+                    possible_outputs = [
+                        self.dist_dir / config["executable"],  # WhisperEngine.exe
+                        self.dist_dir / config["executable"].split(".")[0] / config["executable"],  # WhisperEngine/WhisperEngine.exe
+                        self.dist_dir / config["executable"].split(".")[0] / config["executable"].split(".")[0],  # WhisperEngine/WhisperEngine
+                    ]
+                else:  # linux
+                    possible_outputs = [
+                        self.dist_dir / config["executable"],  # WhisperEngine
+                        self.dist_dir / config["executable"] / config["executable"],  # WhisperEngine/WhisperEngine
+                    ]
+                
+                # Find the actual output
+                output_path = None
+                for path in possible_outputs:
+                    if path.exists():
+                        output_path = path
+                        break
+                
+                if output_path:
                     print(f"✅ {config['name']} build successful!")
                     print(f"📦 Output: {output_path}")
                     return True
                 else:
-                    print(f"❌ Build completed but output not found: {output_path}")
+                    print(f"❌ Build completed but output not found")
+                    print(f"   Checked locations:")
+                    for path in possible_outputs:
+                        print(f"     - {path}")
+                    print(f"   Available files in dist/:")
+                    try:
+                        for item in self.dist_dir.iterdir():
+                            print(f"     - {item}")
+                    except:
+                        print("     (could not list dist directory)")
                     return False
             else:
                 print(f"❌ {config['name']} build failed!")
