@@ -244,12 +244,21 @@ class DatastoreFactory:
             return BasicMemoryCache()
     
     def create_vector_storage(self, **kwargs) -> Union[LocalVectorStorageAdapter, Any]:
-        """Create vector storage based on deployment mode"""
+        """Create vector storage based on deployment mode and preferences"""
         vector_type = self.db_config.vector_type
         
-        if vector_type == 'local_chromadb' or not CHROMADB_AVAILABLE:
-            # Use local vector storage for desktop/development mode
-            logger.info("Using LocalVectorStorage for vector operations")
+        # Check for explicit ChromaDB preference
+        prefer_chromadb = kwargs.get('prefer_chromadb_consistency', False)
+        
+        if vector_type == 'local_chromadb' and CHROMADB_AVAILABLE and prefer_chromadb:
+            # Use ChromaDB PersistentClient for perfect server consistency
+            logger.info("Using ChromaDB PersistentClient for consistent API experience")
+            chromadb_path = kwargs.get('chromadb_path') or (Path.home() / '.whisperengine' / 'chromadb')
+            return self._create_chromadb_manager('local_chromadb', chromadb_path=chromadb_path, **kwargs)
+        
+        elif vector_type == 'local_chromadb' or not CHROMADB_AVAILABLE:
+            # Use FAISS-based local storage for high performance desktop mode
+            logger.info("Using FAISS-based LocalVectorStorage for high-performance vector operations")
             storage_dir = kwargs.get('storage_dir') or (Path.home() / '.whisperengine' / 'vectors')
             return LocalVectorStorageAdapter(
                 storage_dir=storage_dir,
@@ -257,14 +266,12 @@ class DatastoreFactory:
             )
         
         elif vector_type in ['http_chromadb', 'distributed_chromadb'] and CHROMADB_AVAILABLE:
-            # Use ChromaDB for production/cloud mode
+            # Use ChromaDB HTTP/distributed for production/cloud mode
             logger.info(f"Using ChromaDB ({vector_type}) for vector operations")
-            # Return appropriate ChromaDB implementation
-            # This would need to be implemented based on the specific ChromaDB manager
             return self._create_chromadb_manager(vector_type, **kwargs)
         
         else:
-            logger.warning(f"Unknown vector type '{vector_type}', falling back to local vector storage")
+            logger.warning(f"Unknown vector type '{vector_type}', falling back to FAISS-based local storage")
             storage_dir = kwargs.get('storage_dir') or (Path.home() / '.whisperengine' / 'vectors')
             return LocalVectorStorageAdapter(
                 storage_dir=storage_dir,
@@ -276,18 +283,30 @@ class DatastoreFactory:
         if not CHROMADB_AVAILABLE:
             raise RuntimeError("ChromaDB not available but required for vector_type: " + vector_type)
         
-        # This is a placeholder - would need to be implemented based on actual ChromaDB manager classes
-        if OPTIMIZED_MEMORY_AVAILABLE and OptimizedMemoryAdapter and ChromaDBManagerSimple:
-            logger.info("Using OptimizedMemoryAdapter for ChromaDB operations")
-            return OptimizedMemoryAdapter(
-                chromadb_manager=ChromaDBManagerSimple(),
-                **kwargs
-            )
-        elif ChromaDBManagerSimple:
-            logger.info("Using ChromaDBManagerSimple for vector operations")
-            return ChromaDBManagerSimple()
+        if vector_type == 'local_chromadb':
+            # Use ChromaDB PersistentClient for local desktop mode
+            logger.info("Creating ChromaDB PersistentClient for local storage")
+            chromadb_path = kwargs.get('chromadb_path', './chromadb_data')
+            if ChromaDBManagerSimple:
+                return ChromaDBManagerSimple(persist_directory=str(chromadb_path))
+            else:
+                raise RuntimeError("ChromaDBManagerSimple not available for local ChromaDB")
+                
+        elif vector_type in ['http_chromadb', 'distributed_chromadb']:
+            # Use ChromaDB HTTP client for server/distributed modes
+            if OPTIMIZED_MEMORY_AVAILABLE and OptimizedMemoryAdapter and ChromaDBManagerSimple:
+                logger.info("Using OptimizedMemoryAdapter for ChromaDB operations")
+                return OptimizedMemoryAdapter(
+                    chromadb_manager=ChromaDBManagerSimple(),
+                    **kwargs
+                )
+            elif ChromaDBManagerSimple:
+                logger.info("Using ChromaDBManagerSimple for vector operations")
+                return ChromaDBManagerSimple()
+            else:
+                raise RuntimeError("ChromaDB components not available")
         else:
-            raise RuntimeError("ChromaDB components not available")
+            raise RuntimeError(f"Unknown ChromaDB vector type: {vector_type}")
     
     def create_memory_manager(self, **kwargs):
         """Create unified memory manager that coordinates all memory systems"""
