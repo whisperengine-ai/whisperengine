@@ -17,10 +17,15 @@ from enum import Enum
 import numpy as np
 from collections import defaultdict, Counter
 import json
-from sentence_transformers import SentenceTransformer
 from sklearn.cluster import DBSCAN, AgglomerativeClustering
 from sklearn.metrics.pairwise import cosine_similarity
 import pickle
+import concurrent.futures
+import multiprocessing
+import os
+
+# Import external embedding manager instead of SentenceTransformer
+from src.utils.embedding_manager import ExternalEmbeddingManager
 
 logger = logging.getLogger(__name__)
 
@@ -59,13 +64,20 @@ class SemanticMemoryClusterer:
     
     def __init__(self):
         """Initialize semantic memory clusterer"""
-        self.embedding_model = SentenceTransformer('all-Mpnet-BASE-v2')
+        # Use external embedding manager instead of local SentenceTransformers
+        self.embedding_manager = ExternalEmbeddingManager()
+        
+        # No need for local model or process pools - API calls are async
         self.clustering_algorithm = 'hierarchical'
         self.similarity_threshold = 0.8
         self.max_cluster_size = 50
         self.min_cluster_size = 2
         self.clusters_cache = {}
         self.embeddings_cache = {}
+        
+        # Performance limits to prevent blocking
+        self.max_memories_per_batch = int(os.getenv('SEMANTIC_CLUSTERING_MAX_MEMORIES', '20'))
+        self.embedding_timeout = int(os.getenv('SEMANTIC_CLUSTERING_TIMEOUT', '30'))  # seconds
         
         # Clustering parameters
         self.clustering_params = {
@@ -81,7 +93,13 @@ class SemanticMemoryClusterer:
             }
         }
         
-        logger.info("Semantic Memory Clusterer initialized")
+        logger.info(f"Semantic Memory Clusterer initialized with external embeddings: {self.embedding_manager.use_external}")
+    
+    @property
+    def embedding_model(self):
+        """Compatibility property - no longer used with external embeddings"""
+        logger.warning("embedding_model property accessed - should use embedding_manager instead")
+        return None
     
     async def create_memory_clusters(self, user_id: str, memory_manager) -> Dict[str, Any]:
         """
@@ -171,31 +189,59 @@ class SemanticMemoryClusterer:
         )
     
     async def _generate_memory_embeddings(self, memories: List[Dict]) -> Dict[str, np.ndarray]:
-        """Generate embeddings for memory contents"""
-        logger.debug(f"Generating embeddings for {len(memories)} memories")
+        """Generate embeddings for memory contents using external API"""
+        total_memories = len(memories)
+        logger.debug(f"Generating embeddings for {total_memories} memories using external API")
+        
+        # Limit the number of memories to prevent excessive processing
+        if total_memories > self.max_memories_per_batch:
+            logger.warning(f"Limiting memory processing from {total_memories} to {self.max_memories_per_batch} for performance")
+            # Take the most recent memories
+            memories = memories[-self.max_memories_per_batch:]
         
         embeddings = {}
         texts = []
         memory_ids = []
         
         for memory in memories:
+            # Check embeddings cache first
+            memory_id = memory['memory_id']
+            if memory_id in self.embeddings_cache:
+                embeddings[memory_id] = self.embeddings_cache[memory_id]
+                continue
+                
             # Combine content and topic for richer embedding
             text = f"{memory['content']} {memory.get('topic', '')}"
             texts.append(text)
-            memory_ids.append(memory['memory_id'])
+            memory_ids.append(memory_id)
+        
+        if not texts:
+            logger.debug("All embeddings found in cache")
+            return embeddings
         
         try:
-            # Generate embeddings in batch for efficiency
-            batch_embeddings = self.embedding_model.encode(texts)
+            logger.debug(f"Computing embeddings for {len(texts)} new memories via external API")
             
+            # Use external embedding manager - much faster than local processing
+            batch_embeddings = await asyncio.wait_for(
+                self.embedding_manager.get_embeddings(texts),
+                timeout=self.embedding_timeout
+            )
+            
+            # Store results and cache them
             for i, memory_id in enumerate(memory_ids):
-                embeddings[memory_id] = batch_embeddings[i]
+                embedding = np.array(batch_embeddings[i])  # Convert to numpy array
+                embeddings[memory_id] = embedding
+                self.embeddings_cache[memory_id] = embedding
                 
-            logger.debug(f"Generated embeddings for {len(embeddings)} memories")
+            logger.debug(f"Generated embeddings for {len(texts)} memories via API, total {len(embeddings)} available")
             return embeddings
             
+        except asyncio.TimeoutError:
+            logger.error(f"Embedding generation timed out after {self.embedding_timeout} seconds")
+            return {}
         except Exception as e:
-            logger.error(f"Error generating embeddings: {e}")
+            logger.error(f"Error generating embeddings via external API: {e}")
             return {}
     
     async def _cluster_by_topics(self, user_id: str, memories: List[Dict], 
@@ -863,3 +909,8 @@ class SemanticMemoryClusterer:
         }
         
         return stats
+    
+    def cleanup(self):
+        """Cleanup resources"""
+        # No longer using thread/process pools with external API
+        logger.debug("Semantic clusterer cleanup completed (using external API)")
