@@ -2,13 +2,7 @@
 Event handlers for the Discord bot.
 
 Extracted from main.py to improve code organization and maintainability.
-Contains on_rea        # Start heartbeat monitor if available
-        if self.heartbeat_monitor:
-            try:
-                self.heartbeat_monitor.start()
-                logger.info("✅ Heartbeat monitor started successfully")
-            except Exception as e:
-                logger.error(f"Failed to start heartbeat monitor: {e}")on_message event handlers with all their complex logic.
+Contains on_ready and on_message event handlers with all their complex logic.
 """
 
 import asyncio
@@ -32,6 +26,16 @@ from src.utils.exceptions import (
     MemoryRetrievalError, MemoryStorageError, ValidationError
 )
 from src.security.input_validator import validate_user_input
+
+# Universal Chat Platform Integration
+from src.platforms.universal_chat import (
+    UniversalChatOrchestrator,
+    DiscordChatAdapter,
+    ChatPlatform,
+    MessageType
+)
+from src.config.adaptive_config import AdaptiveConfigManager
+from src.database.database_integration import DatabaseIntegrationManager
 
 logger = logging.getLogger(__name__)
 
@@ -73,8 +77,50 @@ class BotEventHandlers:
         self.enable_emotional_intelligence = True  # Always enabled in unified AI system
         self.voice_support_enabled = getattr(bot_core, 'voice_support_enabled', False)
         
+        # Initialize Universal Chat Orchestrator
+        self.chat_orchestrator = None
+        # Note: Universal Chat will be initialized asynchronously in setup_universal_chat()
+        
         # Register event handlers
         self._register_events()
+    
+    async def setup_universal_chat(self):
+        """Setup Universal Chat Orchestrator for proper layered architecture"""
+        try:
+            logger.info("🌐 Setting up Universal Chat Orchestrator for Discord integration...")
+            
+            # Create configuration and database managers
+            config_manager = AdaptiveConfigManager()
+            db_manager = DatabaseIntegrationManager(config_manager)
+            
+            # Create universal chat orchestrator
+            self.chat_orchestrator = UniversalChatOrchestrator(
+                config_manager=config_manager,
+                db_manager=db_manager
+            )
+            
+            # Initialize the orchestrator
+            success = await self.chat_orchestrator.initialize()
+            if not success:
+                logger.warning("Failed to initialize Universal Chat Orchestrator")
+                self.chat_orchestrator = None
+                return False
+            
+            # Setup Discord adapter and set bot instance
+            if hasattr(self.chat_orchestrator, 'adapters') and ChatPlatform.DISCORD in self.chat_orchestrator.adapters:
+                discord_adapter = self.chat_orchestrator.adapters[ChatPlatform.DISCORD]
+                if hasattr(discord_adapter, 'set_bot_instance'):
+                    discord_adapter.set_bot_instance(self.bot)
+                    logger.info("✅ Discord adapter configured with bot instance")
+            
+            logger.info("✅ Universal Chat Orchestrator setup complete")
+            return True
+            
+        except Exception as e:
+            logger.error(f"❌ Failed to setup Universal Chat Orchestrator: {e}")
+            logger.warning("Falling back to direct LLM client calls")
+            self.chat_orchestrator = None
+            return False
     
     def _register_events(self):
         """Register event handlers with the Discord bot."""
@@ -140,6 +186,18 @@ class BotEventHandlers:
                 logger.info("✅ Job scheduler started successfully")
             except Exception as e:
                 logger.error(f"Failed to start job scheduler: {e}")
+        
+        # Initialize Universal Chat Orchestrator
+        if self.chat_orchestrator is None:
+            try:
+                logger.info("🌐 Initializing Universal Chat Orchestrator...")
+                success = await self.setup_universal_chat()
+                if success:
+                    logger.info("✅ Universal Chat Orchestrator ready for Discord integration")
+                else:
+                    logger.warning("⚠️ Universal Chat Orchestrator initialization failed - using fallback")
+            except Exception as e:
+                logger.error(f"Failed to initialize Universal Chat Orchestrator: {e}")
         
         # Start heartbeat monitor
         if self.heartbeat_monitor:
@@ -678,29 +736,39 @@ class BotEventHandlers:
     async def _generate_and_send_response(self, reply_channel, message, user_id, conversation_context, 
                                          current_emotion_data, external_emotion_data, phase2_context,
                                          phase4_context=None, comprehensive_context=None, original_content=None):
-        """Generate LLM response and send to channel."""
-        # Check if LLM client is available
-        if self.llm_client is None:
-            logger.error("LLM client is not initialized")
-            await reply_channel.send("The threads of consciousness are not yet woven. My deeper mind remains unreachable for now.")
-            return
-            
-        # Check LLM connection
-        if not await self.llm_client.check_connection_async():
-            logger.warning("LLM connection unavailable when trying to respond")
-            await reply_channel.send("⚠️ I can't connect to the LLM server right now. Make sure your LLM provider is running.")
-            return
-        
+        """Generate AI response and send to channel using Universal Chat Architecture."""
         # Show typing indicator
         async with reply_channel.typing():
             logger.debug("Started typing indicator - simulating thinking and typing process")
             try:
-                logger.debug("Sending request to LLM...")
-                logger.debug(f"Conversation context: {len(conversation_context)} messages")
+                logger.debug("Processing message through Universal Chat Orchestrator...")
                 
-                # Get response from LLM
-                response = await self.llm_client.generate_chat_completion_safe(conversation_context)
-                logger.debug(f"Received LLM response: {len(response)} characters")
+                # Use Universal Chat Orchestrator if available
+                if self.chat_orchestrator:
+                    logger.debug("Using Universal Chat Orchestrator for proper layered architecture")
+                    
+                    # Convert Discord message to universal format
+                    if hasattr(self.chat_orchestrator, 'adapters') and ChatPlatform.DISCORD in self.chat_orchestrator.adapters:
+                        discord_adapter = self.chat_orchestrator.adapters[ChatPlatform.DISCORD]
+                        universal_message = discord_adapter.discord_message_to_universal_message(message)
+                        
+                        # Get or create conversation
+                        conversation = await self.chat_orchestrator.get_or_create_conversation(universal_message)
+                        
+                        # Generate AI response through orchestrator
+                        ai_response = await self.chat_orchestrator.generate_ai_response(universal_message, conversation)
+                        
+                        response = ai_response.content
+                        logger.debug(f"Universal Chat response: {len(response)} characters")
+                        logger.debug(f"Model used: {ai_response.model_used}, Tokens: {ai_response.tokens_used}")
+                        
+                    else:
+                        logger.warning("Discord adapter not found in orchestrator, falling back to direct LLM")
+                        response = await self._fallback_direct_llm_response(conversation_context)
+                        
+                else:
+                    logger.warning("Universal Chat Orchestrator not available, falling back to direct LLM")
+                    response = await self._fallback_direct_llm_response(conversation_context)
                 
                 # Security scan for system leakage
                 leakage_scan = scan_response_for_system_leakage(response)
@@ -748,8 +816,28 @@ class BotEventHandlers:
                 logger.error(f"LLM error: {e}")
                 await reply_channel.send("*The threads of thought grow tangled for a moment...* Please, speak again, and I shall attend to thy words more clearly.")
             except Exception as e:
-                logger.error(f"Unexpected error processing LLM request: {e}")
+                logger.error(f"Unexpected error processing message through Universal Chat: {e}")
                 await reply_channel.send("*Something stirs in the darkness beyond my understanding...* Perhaps we might try this exchange anew?")
+    
+    async def _fallback_direct_llm_response(self, conversation_context):
+        """Fallback to direct LLM client when Universal Chat is unavailable."""
+        if self.llm_client is None:
+            logger.error("LLM client is not initialized")
+            return "The threads of consciousness are not yet woven. My deeper mind remains unreachable for now."
+            
+        # Check LLM connection
+        if not await self.llm_client.check_connection_async():
+            logger.warning("LLM connection unavailable when trying to respond")
+            return "⚠️ I can't connect to the LLM server right now. Make sure your LLM provider is running."
+        
+        logger.debug("Sending request to LLM (fallback)...")
+        logger.debug(f"Conversation context: {len(conversation_context)} messages")
+        
+        # Get response from LLM directly
+        response = await self.llm_client.generate_chat_completion_safe(conversation_context)
+        logger.debug(f"Received LLM response (fallback): {len(response)} characters")
+        
+        return response
     
     async def _store_conversation_memory(self, message, user_id, response, current_emotion_data, 
                                        external_emotion_data, phase2_context, phase4_context, 

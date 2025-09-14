@@ -246,20 +246,27 @@ class WebUIChatAdapter(AbstractChatAdapter):
 
 
 class DiscordChatAdapter(AbstractChatAdapter):
-    """Discord chat adapter (existing WhisperEngine integration)"""
+    """Discord chat adapter for Discord bot integration"""
     
     def __init__(self, config: Dict[str, Any]):
         super().__init__(ChatPlatform.DISCORD, config)
         self.bot = None
+        self.guild_cache = {}
+        
+    def set_bot_instance(self, bot):
+        """Set the Discord bot instance for integration"""
+        self.bot = bot
     
     async def connect(self) -> bool:
-        """Connect to Discord"""
+        """Connect to Discord (delegates to existing bot connection)"""
         try:
-            # This would integrate with existing Discord bot setup
+            # Discord connection is handled by the main bot instance
+            # This adapter just provides message abstraction
             self.connected = True
+            logging.info("Discord chat adapter connected")
             return True
         except Exception as e:
-            logging.error(f"Failed to connect to Discord: {e}")
+            logging.error(f"Failed to connect Discord chat adapter: {e}")
             return False
     
     async def disconnect(self) -> None:
@@ -271,20 +278,112 @@ class DiscordChatAdapter(AbstractChatAdapter):
                 logging.warning(f"Error closing Discord bot: {e}")
         self.connected = False
     
+    def discord_message_to_universal_message(self, discord_message) -> Message:
+        """Convert Discord message to universal message format"""
+        # Handle content - can be string or include attachments
+        content = discord_message.content
+        if discord_message.attachments:
+            # Add attachment info to content
+            attachment_info = []
+            for attachment in discord_message.attachments:
+                attachment_info.append(f"[Attachment: {attachment.filename}]")
+            if content:
+                content += "\n" + "\n".join(attachment_info)
+            else:
+                content = "\n".join(attachment_info)
+        
+        # Create User object
+        user = User(
+            user_id=str(discord_message.author.id),
+            username=discord_message.author.name,
+            display_name=discord_message.author.display_name,
+            platform=ChatPlatform.DISCORD
+        )
+        
+        return Message(
+            message_id=str(discord_message.id),
+            user_id=str(discord_message.author.id),
+            content=content,
+            platform=ChatPlatform.DISCORD,
+            channel_id=str(discord_message.channel.id),
+            message_type=MessageType.TEXT,
+            timestamp=discord_message.created_at,
+            metadata={
+                "user": user,
+                "original_message": discord_message,  # Keep reference for Discord-specific operations
+                "guild_id": str(discord_message.guild.id) if discord_message.guild else None,
+                "username": discord_message.author.name,
+                "display_name": discord_message.author.display_name
+            }
+        )
+    
     async def send_message(self, user_id: str, content: str, channel_id: Optional[str] = None) -> bool:
         """Send Discord message"""
-        # Implementation would use existing Discord bot methods
-        return True
+        try:
+            if not self.bot:
+                logging.error("Discord bot instance not set")
+                return False
+            
+            if channel_id:
+                channel = self.bot.get_channel(int(channel_id))
+                if channel:
+                    await channel.send(content)
+                    return True
+            else:
+                # Send DM
+                user = self.bot.get_user(int(user_id))
+                if user:
+                    await user.send(content)
+                    return True
+            
+            return False
+        except Exception as e:
+            logging.error(f"Failed to send Discord message: {e}")
+            return False
     
     async def get_user_info(self, user_id: str) -> Optional[User]:
         """Get Discord user info"""
-        # Implementation would use Discord API
-        return None
+        try:
+            if not self.bot:
+                return None
+            
+            discord_user = self.bot.get_user(int(user_id))
+            if not discord_user:
+                # Try fetching if not in cache
+                discord_user = await self.bot.fetch_user(int(user_id))
+            
+            if discord_user:
+                return User(
+                    user_id=str(discord_user.id),
+                    username=discord_user.name,
+                    display_name=discord_user.display_name,
+                    platform=ChatPlatform.DISCORD
+                )
+            
+            return None
+        except Exception as e:
+            logging.error(f"Failed to get Discord user info: {e}")
+            return None
     
     async def get_conversation_history(self, conversation_id: str, limit: int = 50) -> List[Message]:
         """Get Discord conversation history"""
-        # Implementation would use Discord message history
-        return []
+        try:
+            if not self.bot:
+                return []
+            
+            channel = self.bot.get_channel(int(conversation_id))
+            if not channel:
+                return []
+            
+            messages = []
+            async for discord_msg in channel.history(limit=limit):
+                universal_msg = self.discord_message_to_universal_message(discord_msg)
+                messages.append(universal_msg)
+            
+            return list(reversed(messages))  # Return in chronological order
+        except Exception as e:
+            logging.error(f"Failed to get Discord conversation history: {e}")
+            return []
 
 
 class SlackChatAdapter(AbstractChatAdapter):
@@ -508,32 +607,92 @@ class UniversalChatOrchestrator:
     
     async def generate_ai_response(self, message: Message, conversation: Conversation) -> AIResponse:
         """Generate AI response using existing WhisperEngine logic"""
-        # Create request context for cost optimization
-        messages_count = len(conversation.messages) if conversation.messages else 0
-        prompt_tokens = int(len(message.content.split()) * 1.3)  # Rough estimate
-        
-        context = RequestContext(
-            user_id=message.user_id,
-            conversation_length=messages_count,
-            prompt_tokens=prompt_tokens,
-            expected_output_tokens=200,
-            conversation_type="general",
-            priority="normal"
-        )
-        
-        # Select optimal model
-        selected_model = await self.cost_optimizer.select_optimal_model(context)
-        
-        # Generate response (this would integrate with existing AI system)
-        # For now, return a mock response
-        return AIResponse(
-            content=f"I understand your message: '{message.content}'. This response was generated using {selected_model}.",
-            model_used=selected_model,
-            tokens_used=150,
-            cost=0.001,
-            generation_time_ms=500,
-            confidence=0.85
-        )
+        try:
+            # Import LLM client
+            from src.llm.llm_client import LLMClient
+            
+            # Initialize LLM client if not already done
+            if not hasattr(self, 'llm_client'):
+                self.llm_client = LLMClient()
+            
+            # Create request context for cost optimization
+            messages_count = len(conversation.messages) if conversation.messages else 0
+            prompt_tokens = int(len(message.content.split()) * 1.3)  # Rough estimate
+            
+            context = RequestContext(
+                user_id=message.user_id,
+                conversation_length=messages_count,
+                prompt_tokens=prompt_tokens,
+                expected_output_tokens=200,
+                conversation_type="general",
+                priority="normal"
+            )
+            
+            # Select optimal model
+            selected_model = await self.cost_optimizer.select_optimal_model(context)
+            
+            # Build conversation history for context
+            chat_messages = [
+                {
+                    "role": "system",
+                    "content": """You are WhisperEngine, an advanced AI conversation platform with emotional intelligence and memory capabilities.
+
+You provide:
+- 🧠 Advanced conversation memory and context awareness
+- 💭 Emotional intelligence and empathy
+- 🔒 Privacy-focused interactions
+- 🚀 Multi-platform support (Discord, Web, Slack, API)
+
+You adapt your responses based on the platform and conversation context. Be helpful, engaging, and demonstrate emotional intelligence in your responses."""
+                }
+            ]
+            
+            # Add conversation history (last 10 messages for context)
+            recent_messages = conversation.messages[-10:] if conversation.messages else []
+            for msg in recent_messages:
+                role = "assistant" if msg.user_id == "assistant" else "user"
+                chat_messages.append({
+                    "role": role,
+                    "content": msg.content
+                })
+            
+            # Add current message
+            chat_messages.append({
+                "role": "user",
+                "content": message.content
+            })
+            
+            # Generate response using actual LLM
+            start_time = datetime.now()
+            response_text = self.llm_client.get_chat_response(chat_messages)
+            end_time = datetime.now()
+            
+            generation_time_ms = int((end_time - start_time).total_seconds() * 1000)
+            
+            # Estimate tokens and cost (rough approximation)
+            estimated_tokens = len(response_text.split()) * 1.3
+            estimated_cost = estimated_tokens * 0.00001  # Rough cost estimate
+            
+            return AIResponse(
+                content=response_text,
+                model_used=selected_model,
+                tokens_used=int(estimated_tokens),
+                cost=estimated_cost,
+                generation_time_ms=generation_time_ms,
+                confidence=0.85
+            )
+            
+        except Exception as e:
+            logging.error(f"Error generating AI response: {e}")
+            # Fallback response
+            return AIResponse(
+                content="I apologize, but I encountered an error while processing your message. Please try again or check the system configuration.",
+                model_used="fallback",
+                tokens_used=20,
+                cost=0.0,
+                generation_time_ms=100,
+                confidence=0.0
+            )
     
     async def store_conversation(self, conversation: Conversation, ai_response: AIResponse):
         """Store conversation and AI response in database"""
