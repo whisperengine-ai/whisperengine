@@ -333,4 +333,16 @@ kill $DESKTOP_PID
 
 ---
 
+## **🛠️ Development Phase Context**
+
+**Note**: We're currently in the **development phase** with no production users. Focus on:
+- ✅ **Core functionality validation** - Does the architecture work?
+- ✅ **Development workflow** - Can we iterate effectively?
+- ✅ **Concept proof** - Do the unified scaling ideas work in practice?
+- ❌ **Production concerns** - Migration scripts, hardening, etc. can wait
+
+See `docs/project/DEVELOPMENT_PHASE_STATUS.md` for current development priorities.
+
+---
+
 *Run these tests in order to validate the complete unified scaling architecture implementation.*
