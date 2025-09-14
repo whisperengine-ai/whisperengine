@@ -44,7 +44,8 @@ check_docker() {
     if command -v docker-compose &> /dev/null; then
         compose_cmd="docker-compose"
     elif docker compose version &> /dev/null; then
-        compose_cmd="docker compose"
+        compose_cmd="docker"
+        export COMPOSE_SUBCMD="compose"
     else
         print_error "Docker Compose is not installed."
         echo "Install Docker Compose: https://docs.docker.com/compose/install/"
@@ -285,7 +286,11 @@ start_bot() {
             ;;
         "dev")
             echo "🚀 Starting Discord Bot in Development Mode..."
-            $COMPOSE_CMD -f docker-compose.yml -f docker-compose.dev.yml up -d --build
+            if [ -n "${COMPOSE_SUBCMD:-}" ]; then
+                $COMPOSE_CMD $COMPOSE_SUBCMD -f docker-compose.yml -f docker-compose.dev.yml up -d --build
+            else
+                $COMPOSE_CMD -f docker-compose.yml -f docker-compose.dev.yml up -d --build
+            fi
             
             # Use improved health check waiting
             if wait_for_services "-f docker-compose.yml -f docker-compose.dev.yml"; then
