@@ -18,8 +18,10 @@ try:
     import pystray
     from PIL import Image, ImageDraw
     TRAY_AVAILABLE = True
+    RUMPS_AVAILABLE = True  # For compatibility
 except ImportError:
     TRAY_AVAILABLE = False
+    RUMPS_AVAILABLE = False  # For compatibility
     pystray = None
     Image = None
     ImageDraw = None
@@ -681,8 +683,8 @@ def create_macos_menu_bar(app_instance, host: str = "127.0.0.1", port: int = 808
     Returns:
         WhisperEngineMacOSApp instance or None if not available
     """
-    if not RUMPS_AVAILABLE:
-        logging.getLogger(__name__).warning("macOS menu bar not available - rumps not installed")
+    if not globals().get('TRAY_AVAILABLE', False):
+        logging.getLogger(__name__).warning("macOS menu bar not available - pystray not installed")
         return None
     
     try:
@@ -694,4 +696,12 @@ def create_macos_menu_bar(app_instance, host: str = "127.0.0.1", port: int = 808
 
 def is_macos_menu_available() -> bool:
     """Check if macOS menu bar functionality is available"""
-    return RUMPS_AVAILABLE and sys.platform == "darwin"
+    try:
+        # Check platform first (most important)
+        if sys.platform != "darwin":
+            return False
+        
+        # Check if pystray is available (using global variable)
+        return globals().get('TRAY_AVAILABLE', False)
+    except:
+        return False
