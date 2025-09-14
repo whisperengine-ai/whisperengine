@@ -243,15 +243,22 @@ How can I assist you today?"""
                 import threading
                 threading.Thread(target=open_browser_delayed, daemon=True).start()
             
-            # Start server
+            # Start server with proper signal handling
             config = uvicorn.Config(
                 app=self.app,
                 host=host,
                 port=port,
-                log_level="info"
+                log_level="info",
+                access_log=False  # Reduce noise in desktop app
             )
             server = uvicorn.Server(config)
-            await server.serve()
+            
+            # Handle shutdown gracefully
+            try:
+                await server.serve()
+            except KeyboardInterrupt:
+                logging.info("Web UI shutting down...")
+                await server.shutdown()
         
         except Exception as e:
             logging.error(f"Error starting web UI: {e}")

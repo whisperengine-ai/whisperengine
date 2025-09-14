@@ -310,6 +310,31 @@ class AdaptiveConfigManager:
         self.config = self.optimizer.generate_optimal_config()
         self._apply_overrides(config_override)
     
+    @property
+    def scale_tier(self) -> int:
+        """Get the current scale tier"""
+        return self.config.scale_tier
+    
+    @property
+    def environment(self) -> str:
+        """Get the current environment"""
+        return self.config.environment
+    
+    @property
+    def deployment_mode(self) -> str:
+        """Get the current deployment mode"""
+        return self.config.deployment_mode
+    
+    def get_storage_configuration(self) -> Dict[str, Any]:
+        """Get storage configuration details"""
+        return {
+            'primary_database': self.config.database.primary_type,
+            'vector_database': self.config.database.vector_type,
+            'cache_type': self.config.database.cache_type,
+            'connection_pool_size': self.config.database.connection_pool_size,
+            'backup_enabled': self.config.database.backup_enabled
+        }
+    
     def _apply_overrides(self, overrides: Optional[Dict[str, Any]]):
         """Apply manual configuration overrides"""
         if not overrides:

@@ -20,7 +20,7 @@ python desktop_app.py
 - ✅ Web UI opens automatically in browser (http://127.0.0.1:8080)
 - ✅ SQLite database created at `~/.whisperengine/database.db`
 - ✅ Can interact with web interface
-- ✅ Graceful shutdown with Ctrl+C
+- ✅ **Graceful shutdown with Ctrl+C** *(Fixed: Now responds properly)*
 
 ### **1.2 Packaged Desktop App Test**
 ```bash

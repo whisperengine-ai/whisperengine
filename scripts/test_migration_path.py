@@ -15,7 +15,7 @@ from pathlib import Path
 from datetime import datetime
 
 # Add src to path for imports
-sys.path.insert(0, str(Path(__file__).parent / "src"))
+sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from src.database.database_integration import WhisperEngineSchema
 
@@ -23,6 +23,11 @@ def create_test_sqlite_data():
     """Create test data in SQLite database"""
     db_path = Path.home() / ".whisperengine" / "test_migration.db"
     db_path.parent.mkdir(exist_ok=True)
+    
+    # Clean up existing database
+    if db_path.exists():
+        db_path.unlink()
+        print(f"🧹 Cleaned up existing test database")
     
     print(f"📝 Creating test data in {db_path}")
     
