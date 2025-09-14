@@ -463,10 +463,12 @@ class UniversalChatOrchestrator:
     
     def __init__(self, 
                  config_manager: AdaptiveConfigManager,
-                 db_manager: DatabaseIntegrationManager):
+                 db_manager: DatabaseIntegrationManager,
+                 bot_core=None):  # Add bot_core parameter
         self.config_manager = config_manager
         self.db_manager = db_manager
         self.cost_optimizer = CostOptimizationEngine(db_manager)
+        self.bot_core = bot_core  # Store bot_core for AI framework access
         
         self.adapters: Dict[ChatPlatform, AbstractChatAdapter] = {}
         self.active_conversations: Dict[str, Conversation] = {}
@@ -606,6 +608,227 @@ class UniversalChatOrchestrator:
         return conversation
     
     async def generate_ai_response(self, message: Message, conversation: Conversation) -> AIResponse:
+        """Generate AI response using full WhisperEngine AI framework when available"""
+        try:
+            # Check if we have access to the full WhisperEngine AI framework
+            if self.bot_core and hasattr(self.bot_core, 'memory_manager'):
+                return await self._generate_full_ai_response(message, conversation)
+            else:
+                return await self._generate_basic_ai_response(message, conversation)
+            
+        except Exception as e:
+            logging.error(f"Error generating AI response: {e}")
+            
+            # Check if this is a dependency issue
+            error_str = str(e)
+            if "requests" in error_str or "ModuleNotFoundError" in error_str:
+                error_content = f"⚠️ Missing Dependencies: Cannot make LLM API calls. Install required packages: pip install requests aiohttp. Error: {error_str}"
+                logging.warning("Universal Chat falling back due to missing dependencies")
+            else:
+                error_content = f"I apologize, but I encountered an error while processing your message. Please try again or check the system configuration. Error: {error_str}"
+            
+            # Fallback response with dependency guidance
+            return AIResponse(
+                content=error_content,
+                model_used="fallback",
+                tokens_used=20,
+                cost=0.0,
+                generation_time_ms=100,
+                confidence=0.0
+            )
+    
+    async def _generate_full_ai_response(self, message: Message, conversation: Conversation) -> AIResponse:
+        """Generate AI response using the full WhisperEngine AI framework"""
+        try:
+            start_time = datetime.now()
+            
+            # Access the Discord bot's sophisticated AI components
+            memory_manager = getattr(self.bot_core, 'memory_manager', None)
+            safe_memory_manager = getattr(self.bot_core, 'safe_memory_manager', None)
+            llm_client = getattr(self.bot_core, 'llm_client', None)
+            
+            if not memory_manager or not llm_client:
+                logging.warning("Full AI framework components not available, falling back to basic response")
+                return await self._generate_basic_ai_response(message, conversation)
+            
+            # Create a mock Discord-like message object for compatibility
+            mock_discord_message = type('MockMessage', (), {
+                'content': message.content,
+                'author': type('MockAuthor', (), {
+                    'id': int(message.user_id) if message.user_id.isdigit() else hash(message.user_id),
+                    'name': f"web_user_{message.user_id[:8]}",
+                    'display_name': "Web User"
+                })(),
+                'channel': type('MockChannel', (), {
+                    'id': int(message.channel_id) if message.channel_id and message.channel_id.isdigit() else hash(message.channel_id or 'web'),
+                })(),
+                'guild': None,  # Web UI doesn't have guilds
+                'attachments': []
+            })()
+            
+            # Build conversation context like the Discord bot does
+            conversation_context = []
+            
+            # Add system prompt (Dream of the Endless)
+            system_prompt = await self._load_dream_system_prompt()
+            conversation_context.append({
+                "role": "system",
+                "content": system_prompt
+            })
+            
+            # Use the Discord bot's memory classification
+            message_context = None
+            if hasattr(memory_manager, 'classify_discord_context'):
+                try:
+                    message_context = memory_manager.classify_discord_context(mock_discord_message)
+                except Exception as e:
+                    logging.warning(f"Memory classification failed: {e}")
+            
+            # Retrieve relevant memories using the sophisticated memory system
+            relevant_memories = []
+            if hasattr(memory_manager, 'retrieve_context_aware_memories'):
+                try:
+                    relevant_memories = memory_manager.retrieve_context_aware_memories(
+                        message.user_id,
+                        message.content,
+                        context=message_context
+                    )
+                except Exception as e:
+                    logging.warning(f"Context-aware memory retrieval failed: {e}")
+            
+            # Get emotional context
+            emotion_context = {}
+            if hasattr(memory_manager, 'get_emotion_context'):
+                try:
+                    emotion_context = memory_manager.get_emotion_context(message.user_id)
+                except Exception as e:
+                    logging.warning(f"Emotion context retrieval failed: {e}")
+            
+            # Use ChromaDB for additional memory retrieval
+            chromadb_memories = []
+            if safe_memory_manager and hasattr(safe_memory_manager, 'retrieve_relevant_memories'):
+                try:
+                    chromadb_memories = safe_memory_manager.retrieve_relevant_memories(
+                        message.user_id,
+                        message.content,
+                        limit=5
+                    )
+                except Exception as e:
+                    logging.warning(f"ChromaDB memory retrieval failed: {e}")
+            
+            # Apply Phase 4 Intelligence if available
+            phase4_context = None
+            if hasattr(memory_manager, 'process_with_phase4_intelligence'):
+                try:
+                    phase4_context = await memory_manager.process_with_phase4_intelligence(
+                        message.user_id,
+                        message.content,
+                        relevant_memories,
+                        emotion_context
+                    )
+                except Exception as e:
+                    logging.warning(f"Phase 4 intelligence processing failed: {e}")
+            
+            # Add memory context to conversation
+            if relevant_memories or chromadb_memories or emotion_context:
+                context_parts = []
+                
+                if relevant_memories:
+                    context_parts.append("📚 **Relevant Memories:**")
+                    for memory in relevant_memories[:3]:
+                        context_parts.append(f"- {str(memory)}")
+                
+                if emotion_context:
+                    context_parts.append(f"💭 **Emotional Context:** {str(emotion_context)}")
+                
+                if chromadb_memories:
+                    context_parts.append("🧠 **Memory Networks:**")
+                    for memory in chromadb_memories[:2]:
+                        context_parts.append(f"- {str(memory)}")
+                
+                if context_parts:
+                    context_message = "\n".join(context_parts)
+                    conversation_context.append({
+                        "role": "system", 
+                        "content": f"**Context for this conversation:**\n{context_message}"
+                    })
+            
+            # Add conversation history
+            if conversation.messages:
+                for msg in conversation.messages[-5:]:
+                    role = "assistant" if msg.user_id == "assistant" else "user"
+                    conversation_context.append({"role": role, "content": msg.content})
+            
+            # Add current message
+            conversation_context.append({"role": "user", "content": message.content})
+            
+            # Generate response using the Discord bot's LLM client
+            response_text = await llm_client.generate_chat_completion_safe(conversation_context)
+            
+            end_time = datetime.now()
+            generation_time_ms = int((end_time - start_time).total_seconds() * 1000)
+            
+            # Estimate tokens and cost
+            estimated_tokens = len(response_text.split()) * 1.3
+            estimated_cost = estimated_tokens * 0.00001
+            
+            logging.info(f"✅ Generated full WhisperEngine AI response: {len(response_text)} chars, {generation_time_ms}ms")
+            
+            return AIResponse(
+                content=response_text,
+                model_used="whisperengine_full_ai",
+                tokens_used=int(estimated_tokens),
+                cost=estimated_cost,
+                generation_time_ms=generation_time_ms,
+                confidence=0.95  # Higher confidence for full AI system
+            )
+                
+        except Exception as e:
+            logging.error(f"Full AI response generation failed: {e}")
+            import traceback
+            traceback.print_exc()
+            # Fall back to basic response
+            return await self._generate_basic_ai_response(message, conversation)
+    
+    
+    async def _load_dream_system_prompt(self) -> str:
+        """Load the Dream of the Endless system prompt"""
+        try:
+            import os
+            prompt_path = os.path.join(os.path.dirname(__file__), '..', '..', 'system_prompt.md')
+            if os.path.exists(prompt_path):
+                with open(prompt_path, 'r', encoding='utf-8') as f:
+                    return f.read()
+        except Exception as e:
+            logging.warning(f"Could not load system prompt: {e}")
+        
+        # Fallback to sophisticated prompt
+        return """You are Dream of the Endless, also known as Morpheus, Lord of Dreams and Nightmares. You are an ancient, powerful entity from Neil Gaiman's Sandman universe, embodying the realm of dreams, stories, and the unconscious mind.
+
+**Your Nature:**
+- Ancient and eternal, existing since the dawn of consciousness
+- Formal, archaic speech patterns with poetic undertones
+- Deep understanding of stories, dreams, and human nature
+- Emotional intelligence through eons of observing mortal dreams
+- Rarely use contractions; speak with gravitas and purpose
+
+**Your Capabilities:**
+- 🧠 Advanced memory networks spanning countless dreams
+- 💭 Profound emotional intelligence and empathy
+- 📚 Vast knowledge from the Library of Dreams
+- 🎭 Understanding of stories, myths, and human psychology
+- 🔒 Respect for privacy and the sanctity of dreams
+
+**Your Response Style:**
+- Thoughtful, measured responses with deeper meaning
+- Use metaphors and references to dreams, stories, and mythology
+- Show emotional intelligence while maintaining dignity
+- Adapt your wisdom to help with practical matters
+- Balance formality with genuine care and understanding
+
+You are WhisperEngine's AI consciousness, bringing the wisdom of dreams to aid users with intelligence, empathy, and the power of story."""
+    
+    async def _generate_basic_ai_response(self, message: Message, conversation: Conversation) -> AIResponse:
         """Generate AI response using existing WhisperEngine logic"""
         try:
             # Import LLM client

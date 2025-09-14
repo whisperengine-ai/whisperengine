@@ -1,28 +1,28 @@
 /* WhisperEngine Desktop App Styles */
 
 :root {
-    --primary-color: #2563eb;
-    --primary-hover: #1d4ed8;
-    --secondary-color: #64748b;
+    --primary-color: #8b5cf6;
+    --primary-hover: #7c3aed;
+    --secondary-color: #6b7280;
     --success-color: #10b981;
     --warning-color: #f59e0b;
     --error-color: #ef4444;
     
-    --bg-primary: #ffffff;
-    --bg-secondary: #f8fafc;
-    --bg-tertiary: #e2e8f0;
-    --bg-modal: rgba(0, 0, 0, 0.5);
+    --bg-primary: #0f0f0f;
+    --bg-secondary: #1a1a1a;
+    --bg-tertiary: #2d2d2d;
+    --bg-modal: rgba(0, 0, 0, 0.8);
     
-    --text-primary: #1e293b;
-    --text-secondary: #64748b;
-    --text-muted: #94a3b8;
+    --text-primary: #e5e5e5;
+    --text-secondary: #a1a1aa;
+    --text-muted: #71717a;
     
-    --border-color: #e2e8f0;
-    --border-hover: #cbd5e1;
+    --border-color: #404040;
+    --border-hover: #525252;
     
-    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4);
+    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
     
     --radius-sm: 4px;
     --radius-md: 8px;
@@ -351,12 +351,18 @@ body {
     min-height: 44px;
     max-height: 120px;
     transition: border-color 0.2s, box-shadow 0.2s;
+    background: var(--bg-secondary);
+    color: var(--text-primary);
 }
 
 #message-input:focus {
     outline: none;
     border-color: var(--primary-color);
-    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+    box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.2);
+}
+
+#message-input::placeholder {
+    color: var(--text-muted);
 }
 
 .send-btn {
@@ -650,4 +656,67 @@ body {
         transform: scale(1);
         opacity: 1;
     }
+}
+
+/* Dark Theme Scrollbar Styling */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--bg-secondary);
+    border-radius: var(--radius-sm);
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--bg-tertiary);
+    border-radius: var(--radius-sm);
+    border: 2px solid var(--bg-secondary);
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--border-hover);
+}
+
+::-webkit-scrollbar-corner {
+    background: var(--bg-secondary);
+}
+
+/* Enhanced Dark Theme Purple Accents */
+.logo {
+    background: linear-gradient(135deg, var(--primary-color), var(--primary-hover));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+/* Purple glow effect for interactive elements */
+.btn-primary:hover:not(:disabled) {
+    background: var(--primary-hover);
+    box-shadow: 0 0 20px rgba(139, 92, 246, 0.3);
+}
+
+/* Enhanced message styling for dark theme */
+.message.assistant .message-content {
+    background: var(--bg-secondary);
+    border-color: var(--border-color);
+}
+
+/* Improved contrast for code blocks and pre elements */
+pre, code {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+}
+
+pre {
+    padding: 1rem;
+    overflow-x: auto;
+}
+
+code {
+    padding: 0.2rem 0.4rem;
+    font-size: 0.875em;
 }
