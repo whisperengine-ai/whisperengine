@@ -26,6 +26,21 @@ WhisperEngine implements a **unified scaling architecture** that enables the sam
 
 ---
 
+## 🤖 AI Pipeline Architecture
+
+### **LLM Integration Strategy**
+WhisperEngine uses a **hybrid HTTP API approach** for Local Large Language Model integration that provides flexibility and resource efficiency across all deployment modes.
+
+**Key Features:**
+- **Auto-Detection**: Automatically discovers LM Studio, Ollama, and other local LLM servers
+- **Intelligent Fallbacks**: LM Studio → Ollama → OpenRouter cloud API fallback chain  
+- **Resource-Aware Setup**: Recommends optimal LLM configuration based on system capabilities
+- **Universal Compatibility**: Same LLM interface works in desktop and container modes
+
+See **[LLM Strategy Documentation](./LLM_STRATEGY.md)** for detailed implementation plan and configuration options.
+
+---
+
 ## 📊 Storage Architecture
 
 ### **Multi-Tier Data Store Strategy**
