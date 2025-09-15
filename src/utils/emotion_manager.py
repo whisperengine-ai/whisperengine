@@ -74,14 +74,104 @@ class SentimentAnalyzer:
         self.llm_client = llm_client
 
     def analyze_emotion(self, message: str) -> EmotionProfile:
-        """Legacy emotion analysis - now returns neutral (Phase 2 handles emotion analysis)"""
+        """Analyze emotion using LLM client as fallback when Phase 2 is not available"""
         
-        # Legacy method - Phase 2 Emotional Intelligence handles all emotion analysis now
-        logger.info("Legacy emotion analysis called - Phase 2 handles this functionality")
+        if self.llm_client:
+            try:
+                logger.debug("Using LLM client for fallback emotion analysis")
+                
+                # Use a simple emotion analysis prompt
+                prompt = f"""Analyze the emotion in this message and respond with JSON only:
+
+Message: "{message}"
+
+Respond with exactly this format:
+{{
+  "emotion": "happy|sad|angry|excited|frustrated|worried|grateful|curious|disappointed|neutral",
+  "confidence": 0.0-1.0,
+  "intensity": 0.0-1.0,
+  "triggers": ["word1", "word2"]
+}}"""
+
+                messages = [{"role": "user", "content": prompt}]
+                
+                # Use emotion-specific endpoint if available, otherwise main endpoint
+                if hasattr(self.llm_client, 'generate_emotion_chat_completion') and self.llm_client.emotion_chat_endpoint:
+                    response = self.llm_client.generate_emotion_chat_completion(
+                        messages=messages,
+                        temperature=0.1,
+                        max_tokens=self.llm_client.max_tokens_emotion
+                    )
+                else:
+                    response = self.llm_client.generate_chat_completion(
+                        messages=messages,
+                        temperature=0.1,
+                        max_tokens=150
+                    )
+                
+                content = response['choices'][0]['message']['content'].strip()
+                
+                # Parse JSON response
+                import json
+                if content.startswith('{') and content.endswith('}'):
+                    emotion_data = json.loads(content)
+                else:
+                    # Try to extract JSON from the response
+                    start = content.find('{')
+                    end = content.rfind('}') + 1
+                    if start >= 0 and end > start:
+                        emotion_data = json.loads(content[start:end])
+                    else:
+                        raise ValueError("No valid JSON found in response")
+                
+                # Map emotion string to EmotionalState enum
+                emotion_mapping = {
+                    'happy': EmotionalState.HAPPY,
+                    'sad': EmotionalState.SAD,
+                    'angry': EmotionalState.ANGRY,
+                    'excited': EmotionalState.EXCITED,
+                    'frustrated': EmotionalState.FRUSTRATED,
+                    'worried': EmotionalState.WORRIED,
+                    'grateful': EmotionalState.GRATEFUL,
+                    'curious': EmotionalState.CURIOUS,
+                    'disappointed': EmotionalState.DISAPPOINTED,
+                    'neutral': EmotionalState.NEUTRAL
+                }
+                
+                detected_emotion = emotion_mapping.get(
+                    emotion_data.get('emotion', 'neutral').lower(), 
+                    EmotionalState.NEUTRAL
+                )
+                
+                confidence = float(emotion_data.get('confidence', 0.5))
+                intensity = float(emotion_data.get('intensity', 0.5))
+                triggers = emotion_data.get('triggers', [])
+                
+                # Ensure triggers is a list of strings
+                if not isinstance(triggers, list):
+                    triggers = []
+                triggers = [str(t) for t in triggers if t][:5]  # Limit to 5 triggers
+                
+                logger.debug(f"LLM emotion analysis: {detected_emotion.value} (confidence: {confidence:.2f})")
+                
+                return EmotionProfile(
+                    detected_emotion=detected_emotion,
+                    confidence=confidence,
+                    triggers=triggers,
+                    intensity=intensity,
+                    timestamp=datetime.now()
+                )
+                
+            except Exception as e:
+                logger.warning(f"LLM emotion analysis failed: {e}")
+                # Fall through to neutral fallback
+        
+        # Final fallback - return neutral with low confidence
+        logger.debug("Using neutral fallback for emotion analysis")
         return EmotionProfile(
             detected_emotion=EmotionalState.NEUTRAL,
-            confidence=0.0,
-            triggers=["legacy_system_deprecated"],
+            confidence=0.1,  # Low confidence since we couldn't analyze
+            triggers=["no_analysis_available"],
             intensity=0.0,
             timestamp=datetime.now()
         )
