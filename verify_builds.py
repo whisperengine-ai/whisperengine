@@ -103,7 +103,7 @@ def verify_builds():
     print("   • For production: build on native platform or use CI/CD")
     print()
     print("🚀 To test functionality:")
-    print("   python test_desktop_app.py")
+    print("   python test_desktop_llm_complete.py")
 
 
 if __name__ == "__main__":

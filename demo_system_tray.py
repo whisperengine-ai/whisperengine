@@ -73,7 +73,7 @@ def main():
     print("   • Clean shutdown via context menu")
     
     print("\n🚀 Ready for production use!")
-    print("   Run: python desktop_app.py")
+    print("   Run: python universal_native_app.py")
     print("   Look for the WhisperEngine icon in your system tray")
 
 

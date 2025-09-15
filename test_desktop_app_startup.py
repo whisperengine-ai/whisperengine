@@ -118,7 +118,7 @@ async def main():
     
     if success:
         print("\n✅ Desktop app is ready to launch with local databases!")
-        print("💡 You can now run: python desktop_app.py")
+        print("💡 You can now run: python universal_native_app.py")
         sys.exit(0)
     else:
         print("\n❌ Desktop app startup test failed")

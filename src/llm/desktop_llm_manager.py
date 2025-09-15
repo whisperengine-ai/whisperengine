@@ -250,6 +250,68 @@ async def initialize_desktop_llm() -> Dict[str, Any]:
     return await manager.initialize_llm_for_desktop()
 
 
+async def configure_llamacpp_for_desktop() -> Dict[str, Any]:
+    """Configure llama-cpp-python for desktop app"""
+    logger.info("🔧 Configuring llama-cpp-python for desktop app...")
+    
+    result = {
+        'status': 'not_configured',
+        'model_path': None,
+        'auto_detected': False,
+        'instructions': []
+    }
+    
+    try:
+        # Check for GGUF models in models directory
+        models_dir = Path("./models")
+        if models_dir.exists():
+            gguf_files = list(models_dir.glob("*.gguf"))
+            if gguf_files:
+                model_path = str(gguf_files[0])
+                logger.info(f"🎯 Auto-detected GGUF model: {model_path}")
+                
+                # Configure environment
+                os.environ["LLM_CHAT_API_URL"] = "llamacpp://local"
+                os.environ["LLAMACPP_MODEL_PATH"] = model_path
+                
+                result['status'] = 'configured'
+                result['model_path'] = model_path
+                result['auto_detected'] = True
+                result['instructions'] = [
+                    f"Configured llama-cpp-python with {model_path}",
+                    "Ready to use for local AI inference"
+                ]
+                
+                return result
+        
+        # No models found, provide setup instructions
+        result['status'] = 'setup_needed'
+        result['instructions'] = [
+            "No GGUF models found. To use llama-cpp-python:",
+            "1. Create models directory: mkdir -p ./models",
+            "2. Download a GGUF model (e.g., from HuggingFace)",
+            "3. Place the .gguf file in ./models/",
+            "4. Restart the application",
+            "",
+            "Example download commands:",
+            "wget https://huggingface.co/microsoft/Phi-3-mini-4k-instruct-gguf/resolve/main/Phi-3-mini-4k-instruct-q4.gguf",
+            "mv Phi-3-mini-4k-instruct-q4.gguf ./models/",
+            "",
+            "Benefits of llama-cpp-python:",
+            "- Faster inference than PyTorch",
+            "- Lower memory usage",
+            "- Better CPU performance",
+            "- No internet required"
+        ]
+        
+    except Exception as e:
+        logger.error(f"❌ Failed to configure llama-cpp-python: {e}")
+        result['status'] = 'error'
+        result['error'] = str(e)
+    
+    return result
+
+
 # Validation function for UI
 async def validate_desktop_llm() -> Dict[str, Any]:
     """Validate current LLM configuration - convenience function"""
