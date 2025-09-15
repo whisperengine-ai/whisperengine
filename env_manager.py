@@ -22,9 +22,10 @@ class EnvironmentManager:
         Load environment configuration with proper precedence.
         
         Loading order:
-        1. Docker Compose provides base configuration via environment variables
-        2. Mode-specific .env.{mode} file (e.g., .env.desktop, .env.development)
-        3. Generic .env file provides local overrides and secrets
+        1. DOTENV_PATH environment variable (highest priority - for deployment subdirectories)
+        2. Docker Compose provides base configuration via environment variables
+        3. Mode-specific .env.{mode} file (e.g., .env.desktop, .env.development)
+        4. Generic .env file provides local overrides and secrets
         
         Args:
             mode: Environment mode (used for logging only)
@@ -32,6 +33,18 @@ class EnvironmentManager:
         """
         if force_reload:
             self._clear_bot_env_vars()
+            
+        # Check for explicit DOTENV_PATH first (deployment subdirectories)
+        explicit_dotenv_path = os.getenv('DOTENV_PATH')
+        if explicit_dotenv_path:
+            dotenv_path = Path(explicit_dotenv_path)
+            if dotenv_path.exists():
+                load_dotenv(dotenv_path, override=True)
+                self.loaded_files.append(str(dotenv_path))
+                logging.info(f"✅ Explicit .env loaded from: {dotenv_path}")
+                return True
+            else:
+                logging.warning(f"⚠️ DOTENV_PATH specified but file not found: {dotenv_path}")
             
         # Auto-detect mode if not specified
         if mode is None:

@@ -31,7 +31,10 @@
 - 🏗️ **[Deployment Guide](DEPLOYMENT_GUIDE.md)** - Production deployment scenarios
 - 📄 **[Setup Card](SETUP_CARD.md)** - One-page reference for quick setup
 
-**🎯 Super Quick Start**: Run `./setup.sh && python desktop_app.py` for instant AI chat!
+**🎯 Super Quick Start**: 
+- Discord Bot: `python discord-bot/run-discord.py` for cloud-powered Discord bot
+- Desktop App: `python desktop-app/run-desktop.py` for private local AI chat
+- See [Deployment Structure Guide](DEPLOYMENT_STRUCTURE.md) for details
 
 ## ✨ **Key Features**
 
