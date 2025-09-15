@@ -2,7 +2,19 @@
 Emotion and Relationship State Management System
 
 This module implements dynamic emotional and relationship awareness for the chatbot,
-following the design specification for emotion states, escalation, and relationship levels.
+using a two-tier emotion analysis system:
+
+1. Phase 2 Predictive Emotional Intelligence (Primary): 
+   - Sophisticated AI-powered emotional analysis with multi-dimensional assessment
+   - Mood detection, stress analysis, and emotional prediction
+   - Always attempted first for comprehensive emotional understanding
+
+2. LLM-based Sentiment Analysis (Fallback):
+   - Simple emotion detection using configured LLM model
+   - JSON-structured prompts for consistent classification
+   - Used only when Phase 2 fails due to runtime errors
+
+The system ensures reliable emotion analysis while prioritizing sophisticated AI capabilities.
 """
 
 import json
@@ -67,14 +79,26 @@ class UserProfile:
             self.trust_indicators = []
 
 class SentimentAnalyzer:
-    """Analyzes user messages to detect emotional state using LLM"""
+    """
+    LLM-based emotion analysis for fallback scenarios
+    
+    This analyzer provides simple but reliable emotion detection using the configured
+    LLM model when Phase 2 Predictive Emotional Intelligence fails. It uses structured
+    JSON prompts to classify emotions into 10 core emotional states with confidence scores.
+    """
     
     def __init__(self, llm_client=None):
         """Initialize with LLM client for emotion detection"""
         self.llm_client = llm_client
 
     def analyze_emotion(self, message: str) -> EmotionProfile:
-        """Analyze emotion using LLM client as fallback when Phase 2 is not available"""
+        """
+        Analyze emotion using LLM client as fallback when Phase 2 fails
+        
+        This method provides reliable emotion detection using the configured LLM model
+        with structured JSON prompts. It's designed as a fallback for when the primary
+        Phase 2 Predictive Emotional Intelligence system encounters runtime errors.
+        """
         
         if self.llm_client:
             try:
@@ -106,7 +130,7 @@ Respond with exactly this format:
                     response = self.llm_client.generate_chat_completion(
                         messages=messages,
                         temperature=0.1,
-                        max_tokens=150
+                        max_tokens=self.llm_client.max_tokens_emotion  # Use emotion limit even on main endpoint
                     )
                 
                 content = response['choices'][0]['message']['content'].strip()
@@ -166,12 +190,13 @@ Respond with exactly this format:
                 logger.warning(f"LLM emotion analysis failed: {e}")
                 # Fall through to neutral fallback
         
-        # Final fallback - return neutral with low confidence
-        logger.debug("Using neutral fallback for emotion analysis")
+        # Final safety fallback - return neutral with low confidence
+        # This ensures the system never crashes due to emotion analysis failures
+        logger.debug("Using neutral safety fallback for emotion analysis")
         return EmotionProfile(
             detected_emotion=EmotionalState.NEUTRAL,
             confidence=0.1,  # Low confidence since we couldn't analyze
-            triggers=["no_analysis_available"],
+            triggers=["analysis_failed"],
             intensity=0.0,
             timestamp=datetime.now()
         )
@@ -447,108 +472,106 @@ class EmotionManager:
             logger.info("PostgreSQL connection pool set for EmotionManager")
 
     async def _analyze_emotion_with_phase2(self, message: str, user_id: str) -> EmotionProfile:
-        """Analyze emotion using Phase 2 Predictive Emotional Intelligence system when available"""
-        if self.phase2_integration:
-            try:
-                # Use Phase 2 Predictive Emotional Intelligence system
-                conversation_context = {
-                    'topic': 'general',
-                    'communication_style': 'casual',
-                    'user_id': user_id,
-                    'message_length': len(message),
-                    'timestamp': datetime.now().isoformat(),
-                    'context': 'emotion_analysis'
+        """Analyze emotion using Phase 2 Predictive Emotional Intelligence system"""
+        try:
+            # Use Phase 2 Predictive Emotional Intelligence system
+            conversation_context = {
+                'topic': 'general',
+                'communication_style': 'casual',
+                'user_id': user_id,
+                'message_length': len(message),
+                'timestamp': datetime.now().isoformat(),
+                'context': 'emotion_analysis'
+            }
+            
+            result = await self.phase2_integration.process_message_with_emotional_intelligence(
+                user_id=user_id,
+                message=message,
+                conversation_context=conversation_context
+            )
+            
+            # Extract emotional intelligence assessment from result
+            ei_data = result.get('emotional_intelligence', {})
+            assessment = ei_data.get('assessment')
+            
+            if assessment:
+                # Convert Phase 2 assessment to EmotionProfile format
+                mood_category = assessment.mood_assessment.mood_category.value
+                predicted_emotion = assessment.emotional_prediction.predicted_emotion
+                confidence = assessment.confidence_score
+                
+                # Map mood/emotion to our EmotionalState enum
+                emotion_mapping = {
+                    'very_positive': EmotionalState.HAPPY,
+                    'positive': EmotionalState.HAPPY,
+                    'neutral': EmotionalState.NEUTRAL,
+                    'negative': EmotionalState.SAD,
+                    'very_negative': EmotionalState.SAD,
+                    'joy': EmotionalState.HAPPY,
+                    'happiness': EmotionalState.HAPPY,
+                    'excited': EmotionalState.EXCITED,
+                    'excitement': EmotionalState.EXCITED,
+                    'angry': EmotionalState.ANGRY,
+                    'anger': EmotionalState.ANGRY,
+                    'frustrated': EmotionalState.FRUSTRATED,
+                    'frustration': EmotionalState.FRUSTRATED,
+                    'sad': EmotionalState.SAD,
+                    'sadness': EmotionalState.SAD,
+                    'disappointed': EmotionalState.DISAPPOINTED,
+                    'disappointment': EmotionalState.DISAPPOINTED,
+                    'curious': EmotionalState.CURIOUS,
+                    'curiosity': EmotionalState.CURIOUS,
+                    'worried': EmotionalState.WORRIED,
+                    'worry': EmotionalState.WORRIED,
+                    'grateful': EmotionalState.GRATEFUL,
+                    'gratitude': EmotionalState.GRATEFUL
                 }
                 
-                result = await self.phase2_integration.process_message_with_emotional_intelligence(
-                    user_id=user_id,
-                    message=message,
-                    conversation_context=conversation_context
+                # Try to map predicted emotion first, then mood category
+                detected_emotion = emotion_mapping.get(predicted_emotion.lower(), 
+                                                     emotion_mapping.get(mood_category.lower(), 
+                                                                       EmotionalState.NEUTRAL))
+                
+                # Extract triggers from assessment
+                triggers = []
+                if hasattr(assessment.mood_assessment, 'evidence_keywords'):
+                    triggers.extend(assessment.mood_assessment.evidence_keywords)
+                if hasattr(assessment.stress_assessment, 'indicators'):
+                    triggers.extend(assessment.stress_assessment.indicators)
+                if not triggers:
+                    triggers = [predicted_emotion, mood_category]  # Fallback
+                
+                # Use stress level as intensity
+                stress_level = assessment.stress_assessment.stress_level.value
+                intensity_mapping = {
+                    'none': 0.1,
+                    'low': 0.3,
+                    'moderate': 0.5,
+                    'high': 0.7,
+                    'severe': 0.9
+                }
+                intensity = intensity_mapping.get(stress_level, confidence)
+                
+                # Ensure intensity is never None
+                if intensity is None:
+                    intensity = 0.5  # Default fallback value
+                
+                logger.debug(f"Phase 2 emotion analysis: {detected_emotion.value} "
+                           f"(mood: {mood_category}, prediction: {predicted_emotion}, "
+                           f"confidence: {confidence:.2f})")
+                
+                return EmotionProfile(
+                    detected_emotion=detected_emotion,
+                    confidence=confidence,
+                    triggers=triggers[:5],  # Limit triggers for readability
+                    intensity=intensity,
+                    timestamp=datetime.now()
                 )
                 
-                # Extract emotional intelligence assessment from result
-                ei_data = result.get('emotional_intelligence', {})
-                assessment = ei_data.get('assessment')
-                
-                if assessment:
-                    # Convert Phase 2 assessment to EmotionProfile format
-                    mood_category = assessment.mood_assessment.mood_category.value
-                    predicted_emotion = assessment.emotional_prediction.predicted_emotion
-                    confidence = assessment.confidence_score
-                    
-                    # Map mood/emotion to our EmotionalState enum
-                    emotion_mapping = {
-                        'very_positive': EmotionalState.HAPPY,
-                        'positive': EmotionalState.HAPPY,
-                        'neutral': EmotionalState.NEUTRAL,
-                        'negative': EmotionalState.SAD,
-                        'very_negative': EmotionalState.SAD,
-                        'joy': EmotionalState.HAPPY,
-                        'happiness': EmotionalState.HAPPY,
-                        'excited': EmotionalState.EXCITED,
-                        'excitement': EmotionalState.EXCITED,
-                        'angry': EmotionalState.ANGRY,
-                        'anger': EmotionalState.ANGRY,
-                        'frustrated': EmotionalState.FRUSTRATED,
-                        'frustration': EmotionalState.FRUSTRATED,
-                        'sad': EmotionalState.SAD,
-                        'sadness': EmotionalState.SAD,
-                        'disappointed': EmotionalState.DISAPPOINTED,
-                        'disappointment': EmotionalState.DISAPPOINTED,
-                        'curious': EmotionalState.CURIOUS,
-                        'curiosity': EmotionalState.CURIOUS,
-                        'worried': EmotionalState.WORRIED,
-                        'worry': EmotionalState.WORRIED,
-                        'grateful': EmotionalState.GRATEFUL,
-                        'gratitude': EmotionalState.GRATEFUL
-                    }
-                    
-                    # Try to map predicted emotion first, then mood category
-                    detected_emotion = emotion_mapping.get(predicted_emotion.lower(), 
-                                                         emotion_mapping.get(mood_category.lower(), 
-                                                                           EmotionalState.NEUTRAL))
-                    
-                    # Extract triggers from assessment
-                    triggers = []
-                    if hasattr(assessment.mood_assessment, 'evidence_keywords'):
-                        triggers.extend(assessment.mood_assessment.evidence_keywords)
-                    if hasattr(assessment.stress_assessment, 'indicators'):
-                        triggers.extend(assessment.stress_assessment.indicators)
-                    if not triggers:
-                        triggers = [predicted_emotion, mood_category]  # Fallback
-                    
-                    # Use stress level as intensity
-                    stress_level = assessment.stress_assessment.stress_level.value
-                    intensity_mapping = {
-                        'none': 0.1,
-                        'low': 0.3,
-                        'moderate': 0.5,
-                        'high': 0.7,
-                        'severe': 0.9
-                    }
-                    intensity = intensity_mapping.get(stress_level, confidence)
-                    
-                    # Ensure intensity is never None
-                    if intensity is None:
-                        intensity = 0.5  # Default fallback value
-                    
-                    logger.debug(f"Phase 2 emotion analysis: {detected_emotion.value} "
-                               f"(mood: {mood_category}, prediction: {predicted_emotion}, "
-                               f"confidence: {confidence:.2f})")
-                    
-                    return EmotionProfile(
-                        detected_emotion=detected_emotion,
-                        confidence=confidence,
-                        triggers=triggers[:5],  # Limit triggers for readability
-                        intensity=intensity,
-                        timestamp=datetime.now()
-                    )
-                
-            except Exception as e:
-                logger.warning(f"Phase 2 emotion analysis failed, falling back to legacy: {e}")
-        
-        # Fallback to legacy system (returns neutral)
-        return self.sentiment_analyzer.analyze_emotion(message)
+        except Exception as e:
+            logger.warning(f"Phase 2 emotion analysis failed, falling back to LLM: {e}")
+            # Fallback to LLM-based sentiment analysis
+            return self.sentiment_analyzer.analyze_emotion(message)
 
     def load_profiles(self):
         """Load user profiles from persistent storage"""
@@ -825,33 +848,30 @@ class EmotionManager:
         """Analyze emotion and update user state, returning the data for later storage"""
         profile = self.get_or_create_profile(user_id, display_name)
         
-        # Analyze emotion using Phase 2 system when available
-        if self.phase2_integration:
-            # Use asyncio to run the async emotion analysis
-            import asyncio
-            try:
-                # Try to get current event loop
-                loop = asyncio.get_event_loop()
-                if loop.is_running():
-                    # If loop is running, we need to handle this differently
-                    # For now, fall back to legacy system to avoid conflicts
-                    logger.debug("Event loop running, using legacy emotion analysis")
-                    emotion_profile = self.sentiment_analyzer.analyze_emotion(message)
-                else:
-                    # Run async emotion analysis
-                    emotion_profile = loop.run_until_complete(
-                        self._analyze_emotion_with_phase2(message, user_id)
-                    )
-            except RuntimeError:
-                # No event loop, create one
-                emotion_profile = asyncio.run(
+        # Primary: Use Phase 2 Predictive Emotional Intelligence (always available)
+        # Fallback: Use LLM-based sentiment analysis only for runtime failures
+        import asyncio
+        try:
+            # Try to get current event loop
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                # If loop is running, we need to handle this differently
+                # For now, fall back to LLM system to avoid conflicts
+                logger.debug("Event loop running, using LLM emotion analysis fallback")
+                emotion_profile = self.sentiment_analyzer.analyze_emotion(message)
+            else:
+                # Run async Phase 2 emotion analysis
+                emotion_profile = loop.run_until_complete(
                     self._analyze_emotion_with_phase2(message, user_id)
                 )
-            except Exception as e:
-                logger.warning(f"Phase 2 emotion analysis failed: {e}")
-                emotion_profile = self.sentiment_analyzer.analyze_emotion(message)
-        else:
-            # Fall back to legacy system
+        except RuntimeError:
+            # No event loop, create one for Phase 2 analysis
+            emotion_profile = asyncio.run(
+                self._analyze_emotion_with_phase2(message, user_id)
+            )
+        except Exception as e:
+            logger.warning(f"Phase 2 emotion analysis failed with error: {e}")
+            logger.debug("Falling back to LLM-based sentiment analysis")
             emotion_profile = self.sentiment_analyzer.analyze_emotion(message)
         
         # Update user profile
@@ -910,90 +930,7 @@ class EmotionManager:
 
     def process_interaction(self, user_id: str, message: str, display_name: Optional[str] = None) -> Tuple[UserProfile, EmotionProfile]:
         """Process a user interaction - wrapper for analyze_and_update_emotion"""
-        profile = self.get_or_create_profile(user_id, display_name)
-        
-        # Analyze emotion using Phase 2 system when available
-        if self.phase2_integration:
-            # Use asyncio to run the async emotion analysis
-            import asyncio
-            try:
-                # Try to get current event loop
-                loop = asyncio.get_event_loop()
-                if loop.is_running():
-                    # If loop is running, we need to handle this differently
-                    # For now, fall back to legacy system to avoid conflicts
-                    logger.debug("Event loop running, using legacy emotion analysis")
-                    emotion_profile = self.sentiment_analyzer.analyze_emotion(message)
-                else:
-                    # Run async emotion analysis
-                    emotion_profile = loop.run_until_complete(
-                        self._analyze_emotion_with_phase2(message, user_id)
-                    )
-            except RuntimeError:
-                # No event loop, create one
-                emotion_profile = asyncio.run(
-                    self._analyze_emotion_with_phase2(message, user_id)
-                )
-            except Exception as e:
-                logger.warning(f"Phase 2 emotion analysis failed: {e}")
-                emotion_profile = self.sentiment_analyzer.analyze_emotion(message)
-        else:
-            # Fall back to legacy system
-            emotion_profile = self.sentiment_analyzer.analyze_emotion(message)
-        
-        # Update user profile
-        profile.interaction_count += 1
-        profile.last_interaction = datetime.now()
-        profile.current_emotion = emotion_profile.detected_emotion
-        
-        # Add to emotion history (keep last 50 emotions)
-        if profile.emotion_history is None:
-            profile.emotion_history = []
-        profile.emotion_history.append(emotion_profile)
-        if len(profile.emotion_history) > 50:
-            profile.emotion_history = profile.emotion_history[-50:]
-        
-        # Detect trust indicators (personal info extraction now handled by memory manager)
-        trust_indicators = self.relationship_manager.detect_trust_indicators(message)
-        if profile.trust_indicators is None:
-            profile.trust_indicators = []
-        elif not isinstance(profile.trust_indicators, list):
-            # Handle cases where trust_indicators is a string or other type
-            logger.warning(f"trust_indicators for user {user_id} is not a list (type: {type(profile.trust_indicators)}), resetting to empty list")
-            profile.trust_indicators = []
-        profile.trust_indicators.extend(trust_indicators)
-        
-        # Check for relationship progression
-        if self.relationship_manager.should_progress_relationship(profile):
-            new_level = self.relationship_manager.get_next_relationship_level(profile.relationship_level)
-            if new_level:
-                old_level = profile.relationship_level
-                profile.relationship_level = new_level
-                logger.info(f"User {user_id} relationship progressed from {old_level.value} to {new_level.value}")
-        
-        # Track negative emotion escalation
-        if emotion_profile.detected_emotion in [EmotionalState.FRUSTRATED, EmotionalState.ANGRY, 
-                                              EmotionalState.SAD, EmotionalState.DISAPPOINTED]:
-            profile.escalation_count += 1
-        else:
-            # Reset escalation count on positive interactions
-            if emotion_profile.detected_emotion in [EmotionalState.HAPPY, EmotionalState.EXCITED, 
-                                                  EmotionalState.GRATEFUL]:
-                profile.escalation_count = max(0, profile.escalation_count - 1)
-        
-        # Mark changes for auto-save
-        self._mark_unsaved_changes(user_id)
-        
-        # Save profiles periodically but less frequently to reduce conflicts
-        # Save every 50 interactions OR if there are many pending saves  
-        should_save = (profile.interaction_count % 50 == 0 or 
-                      len(self._pending_saves) >= self._save_batch_size or
-                      time.time() - self._last_batch_save > 60)  # Or every minute
-        
-        if should_save:
-            self.save_profiles()
-        
-        return profile, emotion_profile
+        return self.analyze_and_update_emotion(user_id, message, display_name)
 
     async def analyze_and_update_emotion_async(self, user_id: str, message: str, display_name: Optional[str] = None) -> Tuple[UserProfile, EmotionProfile]:
         """Async version of analyze_and_update_emotion for use in async contexts"""

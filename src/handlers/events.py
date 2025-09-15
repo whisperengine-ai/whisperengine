@@ -74,7 +74,6 @@ class BotEventHandlers:
         self.external_emotion_ai = getattr(bot_core, 'external_emotion_ai', None)
         
         # Configuration flags - unified AI system always enabled
-        self.enable_emotional_intelligence = True  # Always enabled in unified AI system
         self.voice_support_enabled = getattr(bot_core, 'voice_support_enabled', False)
         
         # Initialize Universal Chat Orchestrator
@@ -327,17 +326,17 @@ class BotEventHandlers:
             message, relevant_memories, emotion_context, recent_messages, enhanced_system_prompt
         )
         
-        # External API emotion analysis
+        # External API emotion analysis (always available when configured)
         external_emotion_data = None
-        if self.external_emotion_ai and self.enable_emotional_intelligence:
+        if self.external_emotion_ai:
             external_emotion_data = await self._analyze_external_emotion(
                 message.content, user_id, conversation_context
             )
         
-        # Phase 2: Emotional Intelligence Analysis
+        # Phase 2: Emotional Intelligence Analysis (always available when configured)
         phase2_context = None
         current_emotion_data = None
-        if self.phase2_integration and self.enable_emotional_intelligence:
+        if self.phase2_integration:
             phase2_context, current_emotion_data = await self._analyze_phase2_emotion(
                 user_id, message.content, message
             )
@@ -428,17 +427,17 @@ class BotEventHandlers:
             message, relevant_memories, emotion_context, recent_messages, None, content
         )
         
-        # External emotion analysis for guild message
+        # External emotion analysis for guild message (always available when configured)
         external_emotion_data = None
-        if self.external_emotion_ai and self.enable_emotional_intelligence:
+        if self.external_emotion_ai:
             external_emotion_data = await self._analyze_external_emotion(
                 content, user_id, conversation_context
             )
         
-        # Phase 2 emotional intelligence for guild message
+        # Phase 2 emotional intelligence for guild message (always available when configured)
         phase2_context = None
         current_emotion_data = None
-        if self.phase2_integration and self.enable_emotional_intelligence:
+        if self.phase2_integration:
             phase2_context, current_emotion_data = await self._analyze_phase2_emotion(
                 user_id, content, message, context_type='guild_message'
             )
