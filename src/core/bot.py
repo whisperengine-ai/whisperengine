@@ -186,14 +186,16 @@ class DiscordBotCore:
                 
                 # Initialize graph-integrated emotion manager
                 # Note: phase2_integration will be set later in initialize_ai_enhancements
-                graph_emotion_manager = GraphIntegratedEmotionManager(
-                    llm_client=base_llm_client,
-                    memory_manager=base_memory_manager,
-                    phase2_integration=None  # Will be updated later
-                )
-                
-                # Store reference to update later
-                self.graph_emotion_manager = graph_emotion_manager
+                if GRAPH_MEMORY_AVAILABLE and GraphIntegratedEmotionManager is not None:
+                    graph_emotion_manager = GraphIntegratedEmotionManager(
+                        llm_client=base_llm_client,
+                        memory_manager=base_memory_manager,
+                        phase2_integration=None  # Will be updated later
+                    )
+                    # Store reference to update later
+                    self.graph_emotion_manager = graph_emotion_manager
+                else:
+                    self.graph_emotion_manager = None
                 
                 # Initialize integrated memory manager (bridges ChromaDB and Neo4j)
                 integrated_memory_manager = IntegratedMemoryManager(
@@ -296,13 +298,12 @@ class DiscordBotCore:
             # All AI features are always enabled - unified AI system
             
             if EXTERNAL_EMOTION_AI_AVAILABLE and ExternalAPIEmotionAI is not None:
-                llm_api_url = os.getenv("LLM_CHAT_API_URL", "http://localhost:1234")
                 openai_api_key = os.getenv("OPENAI_API_KEY")
                 huggingface_api_key = os.getenv("HUGGINGFACE_API_KEY")
                 
-                # Always use full capabilities - no more tiers
+                # Pass LLM client to enable proper emotion model configuration
                 self.external_emotion_ai = ExternalAPIEmotionAI(
-                    llm_api_url=llm_api_url,
+                    llm_client=self.llm_client,
                     openai_api_key=openai_api_key,
                     huggingface_api_key=huggingface_api_key,
                     logger=self.logger

@@ -52,13 +52,25 @@ class ExternalAPIEmotionAI:
     """
     
     def __init__(self, 
-                 llm_api_url: str = "http://localhost:1234",
+                 llm_client=None,
+                 llm_api_url: Optional[str] = None,  # Deprecated, kept for compatibility
                  openai_api_key: Optional[str] = None,
                  huggingface_api_key: Optional[str] = None,  # Deprecated but kept for compatibility
                  logger=None):
         
-        # API Configuration
-        self.llm_api_url = llm_api_url.rstrip('/')
+        # LLM Client integration - preferred method
+        self.llm_client = llm_client
+        
+        # Fallback API Configuration (deprecated)
+        if llm_api_url is not None:
+            self.llm_api_url = llm_api_url.rstrip('/')
+        elif llm_client is not None:
+            # Extract URL from LLM client for compatibility with existing embedding calls
+            self.llm_api_url = llm_client.api_url
+        else:
+            # Final fallback
+            self.llm_api_url = os.getenv("LLM_CHAT_API_URL", "http://localhost:1234").rstrip('/')
+            
         self.openai_api_key = openai_api_key or os.getenv('OPENAI_API_KEY')
         self.huggingface_api_key = huggingface_api_key or os.getenv('HUGGINGFACE_API_KEY')
         self.logger = logger
@@ -102,8 +114,14 @@ class ExternalAPIEmotionAI:
         )
         
         if self.logger:
-            self.logger.info("🌐 External API Emotion AI initialized with full capabilities")
-            self.logger.info(f"🔗 LLM provider: {self.llm_api_url}")
+            if self.llm_client:
+                self.logger.info("🌐 External API Emotion AI initialized with LLM client integration")
+                self.logger.info(f"🔗 LLM provider: {self.llm_api_url}")
+                self.logger.info(f"🎭 Emotion model: {getattr(self.llm_client, 'emotion_model_name', 'default')}")
+                self.logger.info(f"🔄 Emotion endpoint: {getattr(self.llm_client, 'emotion_chat_endpoint', 'same as main')}")
+            else:
+                self.logger.info("🌐 External API Emotion AI initialized with direct HTTP (legacy mode)")
+                self.logger.info(f"🔗 LLM provider: {self.llm_api_url}")
             self.logger.info(f"🧠 External Embeddings: {'✅' if self.embedding_manager.use_external else '?'}")
     
     async def initialize(self):
@@ -248,26 +266,52 @@ Response format:
         
         try:
             self.api_calls += 1
-            if not self.session:
-                return None
+            
+            # Use LLM client if available (preferred method)
+            if self.llm_client:
+                messages = [{"role": "user", "content": prompt}]
                 
-            async with self.session.post(
-                f"{self.llm_api_url}/v1/chat/completions",
-                json={
-                    "model": "local-llm",
-                    "messages": [{"role": "user", "content": prompt}],
-                    "temperature": 0.1,
-                    "max_tokens": 100
-                }
-            ) as response:
-                if response.status == 200:
-                    data = await response.json()
-                    content = data['choices'][0]['message']['content'].strip()
+                # Use emotion-specific endpoint if configured
+                if hasattr(self.llm_client, 'generate_emotion_chat_completion') and self.llm_client.emotion_chat_endpoint:
+                    response = self.llm_client.generate_emotion_chat_completion(
+                        messages=messages,
+                        temperature=0.1,
+                        max_tokens=self.llm_client.max_tokens_emotion  # Use emotion-specific token limit
+                    )
+                else:
+                    # Fallback to main endpoint
+                    response = self.llm_client.generate_chat_completion(
+                        messages=messages,
+                        temperature=0.1,
+                        max_tokens=100
+                    )
+                
+                content = response['choices'][0]['message']['content'].strip()
+                
+                # Parse JSON response
+                if content.startswith('{') and content.endswith('}'):
+                    emotion_data = json.loads(content)
+                    return emotion_data
                     
-                    # Parse JSON response
-                    if content.startswith('{') and content.endswith('}'):
-                        emotion_data = json.loads(content)
-                        return emotion_data
+            # Legacy fallback using direct HTTP session
+            elif self.session:
+                async with self.session.post(
+                    f"{self.llm_api_url}/v1/chat/completions",
+                    json={
+                        "model": "local-llm",
+                        "messages": [{"role": "user", "content": prompt}],
+                        "temperature": 0.1,
+                        "max_tokens": 100
+                    }
+                ) as response:
+                    if response.status == 200:
+                        data = await response.json()
+                        content = data['choices'][0]['message']['content'].strip()
+                        
+                        # Parse JSON response
+                        if content.startswith('{') and content.endswith('}'):
+                            emotion_data = json.loads(content)
+                            return emotion_data
                     
         except Exception as e:
             if self.logger:
@@ -298,28 +342,61 @@ Respond with ONLY a JSON object:
         
         try:
             self.api_calls += 1
-            if not self.session:
-                return self._analyze_with_keywords(text)
+            
+            # Use LLM client if available (preferred method)
+            if self.llm_client:
+                messages = [{"role": "user", "content": prompt}]
                 
-            async with self.session.post(
-                f"{self.llm_api_url}/v1/chat/completions",
-                json={
-                    "model": "local-llm",
-                    "messages": [{"role": "user", "content": prompt}],
-                    "temperature": 0.2,
-                    "max_tokens": 200
-                }
-            ) as response:
-                if response.status == 200:
-                    data = await response.json()
-                    content = data['choices'][0]['message']['content'].strip()
-                    
+                # Use emotion-specific endpoint if configured
+                if hasattr(self.llm_client, 'generate_emotion_chat_completion') and self.llm_client.emotion_chat_endpoint:
+                    response = self.llm_client.generate_emotion_chat_completion(
+                        messages=messages,
+                        temperature=0.2,
+                        max_tokens=self.llm_client.max_tokens_emotion  # Use emotion-specific token limit
+                    )
+                else:
+                    # Fallback to main endpoint
+                    response = self.llm_client.generate_chat_completion(
+                        messages=messages,
+                        temperature=0.2,
+                        max_tokens=200
+                    )
+                
+                content = response['choices'][0]['message']['content'].strip()
+                
+                # Parse JSON response
+                if content.startswith('{') and content.endswith('}'):
+                    emotion_data = json.loads(content)
+                    return emotion_data
+                else:
                     # Extract JSON from response
                     start = content.find('{')
                     end = content.rfind('}') + 1
                     if start >= 0 and end > start:
                         emotion_data = json.loads(content[start:end])
                         return emotion_data
+                    
+            # Legacy fallback using direct HTTP session
+            elif self.session:
+                async with self.session.post(
+                    f"{self.llm_api_url}/v1/chat/completions",
+                    json={
+                        "model": "local-llm",
+                        "messages": [{"role": "user", "content": prompt}],
+                        "temperature": 0.2,
+                        "max_tokens": 200
+                    }
+                ) as response:
+                    if response.status == 200:
+                        data = await response.json()
+                        content = data['choices'][0]['message']['content'].strip()
+                    
+                        # Extract JSON from response
+                        start = content.find('{')
+                        end = content.rfind('}') + 1
+                        if start >= 0 and end > start:
+                            emotion_data = json.loads(content[start:end])
+                            return emotion_data
                     
         except Exception as e:
             if self.logger:
