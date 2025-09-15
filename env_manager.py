@@ -21,9 +21,10 @@ class EnvironmentManager:
         """
         Load environment configuration with proper precedence.
         
-        Simplified approach:
+        Loading order:
         1. Docker Compose provides base configuration via environment variables
-        2. .env file provides local overrides and secrets
+        2. Mode-specific .env.{mode} file (e.g., .env.desktop, .env.development)
+        3. Generic .env file provides local overrides and secrets
         
         Args:
             mode: Environment mode (used for logging only)
@@ -32,19 +33,31 @@ class EnvironmentManager:
         if force_reload:
             self._clear_bot_env_vars()
             
-        # Auto-detect mode if not specified (for logging purposes)
+        # Auto-detect mode if not specified
         if mode is None:
             mode = self._detect_environment_mode()
             
-        # Load local .env file (overrides Docker Compose environment)
         success = False
+        
+        # First, try to load mode-specific environment file
+        if mode:
+            mode_env = self.project_root / f'.env.{mode}'
+            if mode_env.exists():
+                load_dotenv(mode_env, override=True)
+                self.loaded_files.append(str(mode_env))
+                success = True
+                logging.info(f"✅ Mode-specific .env.{mode} loaded")
+        
+        # Then load local .env file (overrides mode-specific and Docker environment)
         local_env = self.project_root / '.env'
         if local_env.exists():
-            load_dotenv(local_env, override=True)  # Override Docker environment
+            load_dotenv(local_env, override=True)  # Override everything else
             self.loaded_files.append(str(local_env))
             success = True
             logging.info(f"✅ Local .env loaded for {mode} mode")
             logging.debug(f"Loaded files: {', '.join(self.loaded_files)}")
+        elif success:
+            logging.info(f"✅ Using mode-specific .env.{mode} for {mode} mode")
         else:
             logging.info(f"✅ Using Docker Compose environment for {mode} mode (no local .env)")
             success = True  # Docker provides the base config

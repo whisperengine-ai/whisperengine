@@ -254,7 +254,7 @@ Response format:
             async with self.session.post(
                 f"{self.llm_api_url}/v1/chat/completions",
                 json={
-                    "model": "local-model",
+                    "model": "local-llm",
                     "messages": [{"role": "user", "content": prompt}],
                     "temperature": 0.1,
                     "max_tokens": 100
@@ -304,7 +304,7 @@ Respond with ONLY a JSON object:
             async with self.session.post(
                 f"{self.llm_api_url}/v1/chat/completions",
                 json={
-                    "model": "local-model",
+                    "model": "local-llm",
                     "messages": [{"role": "user", "content": prompt}],
                     "temperature": 0.2,
                     "max_tokens": 200

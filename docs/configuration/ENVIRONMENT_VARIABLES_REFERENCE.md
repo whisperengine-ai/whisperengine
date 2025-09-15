@@ -163,28 +163,56 @@ NLP_SPACY_MODEL=en_core_web_lg              # Default: en_core_web_lg (spaCy mod
 ### Phase 2: Emotional Intelligence
 ```bash
 # Enable/disable emotional intelligence
-ENABLE_EMOTIONAL_INTELLIGENCE=false         # Default: false (Enable Phase 2 emotional intelligence)
+ENABLE_EMOTIONAL_INTELLIGENCE=true          # Default: true (Enable Phase 2 emotional intelligence)
 EMOTION_ANALYSIS_DEPTH=contextual           # Default: contextual (Options: basic, contextual, deep)
-EMOTION_AI_TIER=advanced                      # Default: advanced (Emotion AI processing level: basic/advanced)
+EMOTION_AI_TIER=advanced                     # Default: advanced (Emotion AI processing level: basic/advanced)
+
+# Performance tuning for emotional intelligence
+EMOTION_API_TIMEOUT=5                        # Default: 5 (External emotion API timeout in seconds)
+EMOTION_CACHE_SIZE=1000                      # Default: 1000 (Emotional state cache entries)
+EMOTION_CONFIDENCE_THRESHOLD=0.7             # Default: 0.7 (Minimum confidence for emotion detection)
 ```
 
 ### Phase 3: Memory Networks
 ```bash
 # Enable/disable memory networks
-ENABLE_PHASE3_MEMORY=false                  # Default: false (Enable Phase 3 memory networks)
+ENABLE_PHASE3_MEMORY=true                   # Default: true (Enable Phase 3 memory networks)
 MEMORY_SEARCH_STRATEGY=enhanced             # Default: enhanced (Options: basic, enhanced, comprehensive)
+
+# Memory performance tuning
+MEMORY_RETENTION_DAYS=30                    # Default: 30 (Memory retention period in days)
+MEMORY_MAX_ENTRIES=10000                    # Default: 10000 (Maximum memory entries per user)
+ENABLE_MEMORY_COMPRESSION=true              # Default: true (Compress old memories for efficiency)
+CHROMA_BATCH_SIZE=100                       # Default: 100 (ChromaDB batch processing size)
+MEMORY_SEARCH_LIMIT=20                      # Default: 20 (Maximum memory search results)
 ```
 
 ### Phase 4: Human-like Intelligence
 ```bash
 # Enable/disable Phase 4 features
-ENABLE_PHASE4_HUMAN_LIKE=true               # Default: true (Enable Phase 4 human-like intelligence)
+ENABLE_PHASE4_INTELLIGENCE=true             # Default: true (Enable Phase 4 human-like intelligence)
 
 # Phase 4 configuration
 PHASE4_CONVERSATION_MODE=adaptive           # Default: adaptive (Options: human_like, analytical, balanced, adaptive)
 PHASE4_MEMORY_OPTIMIZATION=true            # Default: true (Advanced memory optimization)
 PHASE4_EMOTIONAL_RESONANCE=true            # Default: true (Deep emotional understanding)
 PHASE4_ADAPTIVE_MODE=true                   # Default: true (Learn and adapt to user preferences)
+
+# Personality adaptation
+PERSONALITY_ADAPTATION_ENABLED=true         # Default: true (Dynamic personality adjustment)
+CONVERSATION_CONTEXT_DEPTH=10               # Default: 10 (Conversation history depth for adaptation)
+```
+
+### AI Performance Configuration
+```bash
+# Prompt optimization for bundled models
+ENABLE_PROMPT_OPTIMIZATION=true             # Default: true (Use optimized prompts for bundled models)
+OPTIMIZED_PROMPT_MODE=auto                  # Default: auto (Options: auto, always, never - automatic selection)
+
+# AI operation limits and timeouts
+MAX_CONCURRENT_AI_OPERATIONS=3              # Default: 3 (Limit concurrent AI operations)
+AI_RESPONSE_TIMEOUT=30                      # Default: 30 (AI response timeout in seconds)
+ENABLE_AI_CACHING=true                      # Default: true (Cache AI responses for performance)
 ```
 
 ---

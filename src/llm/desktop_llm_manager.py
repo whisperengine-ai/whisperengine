@@ -61,7 +61,7 @@ class DesktopLLMManager:
                     result['server_info'] = server
                     result['configuration'] = {
                         'LLM_CHAT_API_URL': server.url,
-                        'LLM_MODEL_NAME': server.models[0] if server.models else 'local-model'
+                        'LLM_MODEL_NAME': server.models[0] if server.models else 'local-llm'
                     }
                     result['next_steps'] = ['test_connection', 'ready_for_use']
                     
@@ -116,7 +116,7 @@ class DesktopLLMManager:
         return {
             'LLM_CHAT_API_URL': os.getenv('LLM_CHAT_API_URL', ''),
             'LLM_CHAT_API_KEY': os.getenv('LLM_CHAT_API_KEY', ''),
-            'LLM_MODEL_NAME': os.getenv('LLM_MODEL_NAME', 'local-model')
+            'LLM_MODEL_NAME': os.getenv('LLM_MODEL_NAME', 'local-llm')
         }
     
     async def _apply_server_configuration(self, server_info) -> bool:

@@ -6,6 +6,33 @@
 
 **Create deeply personalized AI characters that run completely locally.** Your conversations, personality configurations, and memories never leave your computer. No subscriptions, no censorship, no data mining.
 
+## 🎯 **Choose Your Path**
+
+### 👤 **Non-Technical Users** - Just Want to Chat with AI?
+**[📥 DOWNLOAD PRE-BUILT APP](USERS.md)** - Ready-to-run executables (~18GB)
+- Download → Extract → Run → Chat immediately
+- No technical setup required
+- Works completely offline
+- 100% private and secure
+
+### 🔧 **Developers & Technical Users** - Want to Customize?
+**[⚡ DEVELOPER SETUP](DEVELOPERS.md)** - Source code installation
+- Full customization capabilities
+- Discord bot integration
+- Docker deployment options
+- Contribute to development
+
+---
+
+## 📚 **Quick Navigation**
+
+- 🚀 **[60-Second Setup](QUICK_START.md)** - Get WhisperEngine running immediately
+- 📖 **[Complete Build & User Guide](BUILD_AND_USER_GUIDE.md)** - Comprehensive setup instructions  
+- 🏗️ **[Deployment Guide](DEPLOYMENT_GUIDE.md)** - Production deployment scenarios
+- 📄 **[Setup Card](SETUP_CARD.md)** - One-page reference for quick setup
+
+**🎯 Super Quick Start**: Run `./setup.sh && python desktop_app.py` for instant AI chat!
+
 ## ✨ **Key Features**
 
 ### � **Multi-Phase AI Intelligence**

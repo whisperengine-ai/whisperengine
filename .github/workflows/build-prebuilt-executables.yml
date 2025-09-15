@@ -1,0 +1,146 @@
+name: Build Pre-Built Executables
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version tag for release'
+        required: true
+        default: 'v1.0.0'
+
+jobs:
+  build-executables:
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-20.04
+            platform: linux
+            artifact: WhisperEngine-linux-x86_64
+            executable: WhisperEngine
+          - os: windows-2019  
+            platform: windows
+            artifact: WhisperEngine-windows-x86_64
+            executable: WhisperEngine.exe
+          - os: macos-12
+            platform: macos
+            artifact: WhisperEngine-macos-arm64
+            executable: WhisperEngine.app
+    
+    runs-on: ${{ matrix.os }}
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+        
+    - name: Create virtual environment
+      run: |
+        python -m venv .venv
+        
+    - name: Activate virtual environment (Windows)
+      if: matrix.platform == 'windows'
+      run: |
+        .venv\Scripts\activate
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        
+    - name: Activate virtual environment (Unix)
+      if: matrix.platform != 'windows'
+      run: |
+        source .venv/bin/activate
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        
+    - name: Download AI models
+      run: |
+        ${{ matrix.platform == 'windows' && '.venv\Scripts\activate &&' || 'source .venv/bin/activate &&' }} python download_models.py
+        
+    - name: Build executable
+      run: |
+        ${{ matrix.platform == 'windows' && '.venv\Scripts\activate &&' || 'source .venv/bin/activate &&' }} pyinstaller --clean --noconfirm whisperengine-unified.spec
+        
+    - name: Test executable
+      run: |
+        ${{ matrix.platform == 'windows' && '.venv\Scripts\activate &&' || 'source .venv/bin/activate &&' }} python scripts/build_prebuilt_executables.py --test-only
+        
+    - name: Create release archive (Windows)
+      if: matrix.platform == 'windows'
+      run: |
+        Compress-Archive -Path "dist\WhisperEngine" -DestinationPath "${{ matrix.artifact }}.zip"
+        
+    - name: Create release archive (Unix)
+      if: matrix.platform != 'windows'
+      run: |
+        cd dist
+        zip -r "../${{ matrix.artifact }}.zip" "${{ matrix.executable }}"
+        
+    - name: Create installation guide
+      run: |
+        mkdir -p releases
+        ${{ matrix.platform == 'windows' && '.venv\Scripts\activate &&' || 'source .venv/bin/activate &&' }} python -c "
+        from scripts.build_prebuilt_executables import PreBuiltExecutableBuilder
+        from pathlib import Path
+        builder = PreBuiltExecutableBuilder('releases')
+        builder.current_platform = '${{ matrix.platform }}'
+        builder.create_installation_guide(Path('${{ matrix.artifact }}.zip'))
+        "
+        
+    - name: Upload executable artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: ${{ matrix.artifact }}
+        path: ${{ matrix.artifact }}.zip
+        retention-days: 30
+        
+    - name: Upload installation guide
+      uses: actions/upload-artifact@v3
+      with:
+        name: INSTALL-${{ matrix.platform }}
+        path: releases/INSTALL-${{ matrix.platform }}.md
+        retention-days: 30
+        
+    - name: Get file size
+      id: filesize
+      run: |
+        ${{ matrix.platform == 'windows' && 'echo "size=$(Get-Item \"${{ matrix.artifact }}.zip\" | Select-Object -ExpandProperty Length)" >> $env:GITHUB_OUTPUT' || 'echo "size=$(stat -c%s \"${{ matrix.artifact }}.zip\")" >> $GITHUB_OUTPUT' }}
+        
+    - name: Release executable
+      if: github.event_name == 'release'
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ github.event.release.upload_url }}
+        asset_path: ${{ matrix.artifact }}.zip
+        asset_name: ${{ matrix.artifact }}.zip
+        asset_content_type: application/zip
+
+  summary:
+    needs: build-executables
+    runs-on: ubuntu-latest
+    steps:
+    - name: Create build summary
+      run: |
+        echo "## 🎉 WhisperEngine Pre-Built Executables Ready!" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "Complete standalone executables with all AI models bundled:" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "- **Windows x86_64**: WhisperEngine-windows-x86_64.zip (~18GB)" >> $GITHUB_STEP_SUMMARY
+        echo "- **macOS ARM64**: WhisperEngine-macos-arm64.zip (~18GB)" >> $GITHUB_STEP_SUMMARY  
+        echo "- **Linux x86_64**: WhisperEngine-linux-x86_64.zip (~18GB)" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 📋 Non-Technical User Instructions:" >> $GITHUB_STEP_SUMMARY
+        echo "1. Download the appropriate file for your operating system" >> $GITHUB_STEP_SUMMARY
+        echo "2. Extract the zip file" >> $GITHUB_STEP_SUMMARY
+        echo "3. Run the executable (no installation required!)" >> $GITHUB_STEP_SUMMARY
+        echo "4. Start chatting with AI immediately" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "✅ **No internet required** - fully offline AI chat" >> $GITHUB_STEP_SUMMARY
+        echo "✅ **No technical setup** - just download and run" >> $GITHUB_STEP_SUMMARY
+        echo "✅ **Privacy first** - all processing happens locally" >> $GITHUB_STEP_SUMMARY

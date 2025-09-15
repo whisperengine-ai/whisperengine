@@ -34,26 +34,38 @@ class UserMemoryManager:
         if persist_directory is None:
             persist_directory = os.getenv("CHROMADB_PATH", "./chromadb_data")
         if enable_auto_facts is None:
-            enable_auto_facts = os.getenv("ENABLE_AUTO_FACTS", "true").lower() == "true"
+            enable_auto_facts = True  # Always enabled in unified AI system
         if enable_global_facts is None:
-            enable_global_facts = os.getenv("ENABLE_GLOBAL_FACTS", "false").lower() == "true"
+            enable_global_facts = True  # Always enabled for better memory
         if enable_emotions is None:
-            enable_emotions = os.getenv("ENABLE_EMOTIONS", "true").lower() == "true"
+            enable_emotions = True  # Always enabled for emotional intelligence
         
         try:
             # Use environment variable for telemetry setting
             telemetry_enabled = os.getenv("ANONYMIZED_TELEMETRY", "false").lower() == "true"
             settings = Settings(anonymized_telemetry=telemetry_enabled)
             
-            # Use HTTP client for containerized ChromaDB service
-            chromadb_host = os.getenv("CHROMADB_HOST", "localhost")
-            chromadb_port = int(os.getenv("CHROMADB_PORT", "8000"))
-            self.client = chromadb.HttpClient(
-                host=chromadb_host,
-                port=chromadb_port,
-                settings=settings
-            )
-            logger.info(f"Using ChromaDB HTTP client: {chromadb_host}:{chromadb_port}")
+            # Check if we should use HTTP client or local file persistence
+            use_chromadb_http = os.getenv("USE_CHROMADB_HTTP", "true").lower() == "true"
+            
+            if use_chromadb_http:
+                # Use HTTP client for containerized ChromaDB service
+                chromadb_host = os.getenv("CHROMADB_HOST", "localhost")
+                chromadb_port = int(os.getenv("CHROMADB_PORT", "8000"))
+                self.client = chromadb.HttpClient(
+                    host=chromadb_host,
+                    port=chromadb_port,
+                    settings=settings
+                )
+                logger.info(f"Using ChromaDB HTTP client: {chromadb_host}:{chromadb_port}")
+            else:
+                # Use local file persistence for desktop mode
+                chromadb_path = os.path.expanduser(os.getenv("CHROMADB_PATH", persist_directory))
+                self.client = chromadb.PersistentClient(
+                    path=chromadb_path,
+                    settings=settings
+                )
+                logger.info(f"Using ChromaDB local file persistence: {chromadb_path}")
             
             # Store the LLM client for emotion analysis
             self.llm_client = llm_client
@@ -79,24 +91,29 @@ class UserMemoryManager:
                     )
                     self.add_documents_with_embeddings = add_documents_with_embeddings
                     self.query_with_embeddings = query_with_embeddings
-                    logger.info("External embedding support initialized")
-                except ImportError as e:
-                    logger.error(f"Failed to import external embedding functions: {e}")
-                    # Fallback to local embeddings
-                    self.use_external_embeddings = False
-                    # Use standardized variable name
-                    embedding_model = os.getenv("LLM_LOCAL_EMBEDDING_MODEL", "all-Mpnet-BASE-v2")
+                    logger.info("External embeddings configured")
+                except ImportError:
+                    logger.warning("External embeddings module not available")
+            else:
+                # Use local embedding model (check for bundled models first)
+                use_local_models = os.getenv("USE_LOCAL_MODELS", "false").lower() == "true"
+                local_models_dir = os.getenv("LOCAL_MODELS_DIR", "./models")
+                embedding_model = os.getenv("LLM_LOCAL_EMBEDDING_MODEL", "all-Mpnet-BASE-v2")
+                
+                if use_local_models and os.path.exists(os.path.join(local_models_dir, embedding_model)):
+                    # Use bundled local model
+                    model_path = os.path.join(local_models_dir, embedding_model)
+                    logger.info(f"Using bundled local embedding model: {model_path}")
+                    self.embedding_function = embedding_functions.SentenceTransformerEmbeddingFunction(
+                        model_name=model_path
+                    )
+                else:
+                    # Use online model (will download if not cached)
                     self.embedding_function = embedding_functions.SentenceTransformerEmbeddingFunction(
                         model_name=embedding_model
                     )
-                    logger.warning("Falling back to local embeddings")
-            else:
-                # Use local ChromaDB embeddings (current behavior)
-                # Use standardized variable name
-                embedding_model = os.getenv("LLM_LOCAL_EMBEDDING_MODEL", "all-Mpnet-BASE-v2")
-                self.embedding_function = embedding_functions.SentenceTransformerEmbeddingFunction(
-                    model_name=embedding_model
-                )
+                    logger.info(f"Local embedding model: {embedding_model}")
+                
                 self.add_documents_with_embeddings = None
                 self.query_with_embeddings = None
             
@@ -201,11 +218,21 @@ class UserMemoryManager:
         
         user_id = user_id.strip()
         
-        # Allow test user IDs (for testing) or Discord user IDs (numeric)
-        if user_id.startswith("test_") or user_id.isdigit():
+        # Allow test user IDs (for testing), Discord user IDs (numeric), UUIDs, or desktop user
+        if (user_id.startswith("test_") or 
+            user_id.isdigit() or 
+            user_id == "desktop_admin" or
+            self._is_valid_uuid(user_id)):
             return user_id
         else:
             raise ValidationError(f"Invalid user ID format: {user_id}")
+
+    def _is_valid_uuid(self, user_id: str) -> bool:
+        """Check if user_id is a valid UUID format"""
+        import re
+        # UUID pattern: 8-4-4-4-12 hexadecimal digits
+        uuid_pattern = r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+        return bool(re.match(uuid_pattern, user_id.lower()))
 
     def _is_synthetic_message(self, message: str) -> bool:
         """Detect if a message is synthetic/system-generated"""

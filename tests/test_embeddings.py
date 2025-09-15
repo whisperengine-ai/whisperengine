@@ -135,7 +135,7 @@ async def test_chromadb_integration():
             collection = client.create_collection("test_collection")
         else:
             # Create collection with local embedding function
-            embedding_model = os.getenv("LOCAL_EMBEDDING_MODEL", "all-MiniLM-L6-v2")
+            embedding_model = os.getenv("LOCAL_EMBEDDING_MODEL", "all-mpnet-base-v2")
             embedding_function = embedding_functions.SentenceTransformerEmbeddingFunction(
                 model_name=embedding_model
             )
