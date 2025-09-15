@@ -70,36 +70,10 @@ class CrossPlatformBuilder:
         
         return {
             "data_files": [
-                (str(ui_path / "templates" / "index.html"), "src/ui/templates/"),
-                (str(ui_path / "static" / "style.css"), "src/ui/static/"),
-                (str(ui_path / "static" / "app.js"), "src/ui/static/"),
-                (str(ui_path / "static" / "favicon.ico"), "src/ui/static/"),
+                # No web UI files needed for native Qt app
             ],
             "hidden_imports": [
-                'fastapi',
-                'uvicorn',
-                'uvicorn.lifespan',
-                'uvicorn.lifespan.on', 
-                'uvicorn.loops',
-                'uvicorn.loops.auto',
-                'uvicorn.protocols',
-                'uvicorn.protocols.http',
-                'uvicorn.protocols.http.auto',
-                'uvicorn.protocols.websockets',
-                'uvicorn.protocols.websockets.auto',
-                'starlette',
-                'starlette.applications',
-                'starlette.routing',
-                'starlette.staticfiles',
-                'starlette.templating',
-                'starlette.responses',
-                'starlette.middleware',
-                'starlette.middleware.cors',
-                'jinja2',
-                'python_multipart',
-                'websockets',
-                'websockets.legacy',
-                'websockets.legacy.server',
+                # Core Python modules
                 'sqlite3',
                 'json',
                 'asyncio',
@@ -107,11 +81,14 @@ class CrossPlatformBuilder:
                 'webbrowser',
                 'threading',
                 'signal',
+                
+                # UI and system tray
                 'pystray',
                 'PIL',
                 'PIL.Image',
                 'PIL.ImageDraw',
-                'src.ui.web_ui',
+                
+                # Application modules (only native UI related)
                 'src.ui.system_tray',
                 'src.config.adaptive_config',
                 'src.database.database_integration',
@@ -178,7 +155,7 @@ data_files = {common["data_files"]!r}
 hidden_imports = {common["hidden_imports"]!r}
 
 a = Analysis(
-    ['desktop_app.py'],
+    ['universal_native_app.py'],
     pathex=[str(app_path)],
     binaries=[],
     datas=data_files,

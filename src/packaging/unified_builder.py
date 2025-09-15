@@ -324,8 +324,7 @@ async def main():
     """Main entry point for native desktop app"""
     try:
         # Import after path setup
-        from src.platforms.universal_chat import create_universal_chat_platform
-        from src.ui.web_ui import WhisperEngineWebUI
+        from src.platforms.universal_chat import UniversalChatOrchestrator
         from src.config.adaptive_config import AdaptiveConfigManager, EnvironmentDetector
         from src.database.database_integration import DatabaseIntegrationManager
         

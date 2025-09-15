@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Attachment Indicator Test</title>
+    <style>
+        .attachment-indicator {
+            background: #f0f0f0;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            padding: 10px;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        
+        .attachment-indicator.hidden {
+            display: none;
+        }
+        
+        .input-container {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        
+        #message-input {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+        
+        button {
+            padding: 10px 15px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        
+        .file-preview {
+            border: 1px solid #ddd;
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 5px;
+            background: #f9f9f9;
+        }
+    </style>
+</head>
+<body>
+    <h2>File Attachment Test</h2>
+    
+    <!-- File Attachment Indicator -->
+    <div id="attachment-indicator" class="attachment-indicator hidden">
+        <div class="indicator-content">
+            <span class="indicator-icon">📎</span>
+            <span id="attachment-count">0 files attached</span>
+            <button class="btn-clear" onclick="clearAllAttachments()">✕</button>
+        </div>
+    </div>
+    
+    <!-- File Upload Area -->
+    <div id="file-upload-area" style="border: 1px solid #ccc; padding: 20px; margin: 10px 0;">
+        <p>File Upload Area</p>
+        <input type="file" id="file-input" multiple>
+        <div id="file-preview-area"></div>
+    </div>
+    
+    <!-- Input Container -->
+    <div class="input-container">
+        <button id="attach-btn" onclick="showFileUpload()">📎 Attach</button>
+        <input type="text" id="message-input" placeholder="Type your message...">
+        <button id="send-btn">📤 Send</button>
+    </div>
+
+    <script>
+        function showFileUpload() {
+            document.getElementById('file-upload-area').style.display = 'block';
+        }
+        
+        function updateAttachmentIndicator() {
+            const filePreviewArea = document.getElementById('file-preview-area');
+            const filePreviews = filePreviewArea.querySelectorAll('.file-preview');
+            const indicator = document.getElementById('attachment-indicator');
+            const countSpan = document.getElementById('attachment-count');
+            
+            console.log('📎 Found', filePreviews.length, 'file previews');
+            
+            if (filePreviews.length > 0) {
+                indicator.classList.remove('hidden');
+                countSpan.textContent = `${filePreviews.length} file(s) attached`;
+                console.log('📎 Showing indicator');
+            } else {
+                indicator.classList.add('hidden');
+                console.log('📎 Hiding indicator');
+            }
+        }
+        
+        function createFilePreview(file) {
+            const preview = document.createElement('div');
+            preview.className = 'file-preview';
+            preview.innerHTML = `
+                <div>
+                    <strong>${file.name}</strong> (${file.size} bytes)
+                    <button onclick="removeFilePreview(this)" style="float: right;">✕</button>
+                </div>
+            `;
+            return preview;
+        }
+        
+        function removeFilePreview(button) {
+            const preview = button.closest('.file-preview');
+            if (preview) {
+                preview.remove();
+                updateAttachmentIndicator();
+            }
+        }
+        
+        function clearAllAttachments() {
+            const filePreviewArea = document.getElementById('file-preview-area');
+            filePreviewArea.innerHTML = '';
+            updateAttachmentIndicator();
+        }
+        
+        // File input handler
+        document.getElementById('file-input').addEventListener('change', function(e) {
+            const filePreviewArea = document.getElementById('file-preview-area');
+            
+            for (let file of e.target.files) {
+                const preview = createFilePreview(file);
+                filePreviewArea.appendChild(preview);
+            }
+            
+            updateAttachmentIndicator();
+        });
+        
+        // Test button
+        document.getElementById('send-btn').addEventListener('click', function() {
+            alert('Files attached: ' + document.querySelectorAll('.file-preview').length);
+        });
+    </script>
+</body>
+</html>

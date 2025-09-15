@@ -15,13 +15,13 @@ ui_path = src_path / "ui"
 block_cipher = None
 
 # Data files (templates, static assets)
-data_files = [('/Users/markcastillo/git/whisperengine/src/ui/templates/index.html', 'src/ui/templates/'), ('/Users/markcastillo/git/whisperengine/src/ui/static/style.css', 'src/ui/static/'), ('/Users/markcastillo/git/whisperengine/src/ui/static/app.js', 'src/ui/static/'), ('/Users/markcastillo/git/whisperengine/src/ui/static/favicon.ico', 'src/ui/static/')]
+data_files = []
 
 # Hidden imports (modules not automatically detected)
-hidden_imports = ['fastapi', 'uvicorn', 'uvicorn.lifespan', 'uvicorn.lifespan.on', 'uvicorn.loops', 'uvicorn.loops.auto', 'uvicorn.protocols', 'uvicorn.protocols.http', 'uvicorn.protocols.http.auto', 'uvicorn.protocols.websockets', 'uvicorn.protocols.websockets.auto', 'starlette', 'starlette.applications', 'starlette.routing', 'starlette.staticfiles', 'starlette.templating', 'starlette.responses', 'starlette.middleware', 'starlette.middleware.cors', 'jinja2', 'python_multipart', 'websockets', 'websockets.legacy', 'websockets.legacy.server', 'sqlite3', 'json', 'asyncio', 'logging', 'webbrowser', 'threading', 'signal', 'pystray', 'PIL', 'PIL.Image', 'PIL.ImageDraw', 'src.ui.web_ui', 'src.ui.system_tray', 'src.config.adaptive_config', 'src.database.database_integration', 'src.optimization.cost_optimizer', 'win32api', 'win32gui', 'win32con', 'pywintypes']
+hidden_imports = ['sqlite3', 'json', 'asyncio', 'logging', 'threading', 'signal', 'pystray', 'PIL', 'PIL.Image', 'PIL.ImageDraw', 'src.ui.system_tray', 'src.config.adaptive_config', 'src.database.database_integration', 'src.optimization.cost_optimizer', 'src.core.native_ai_service', 'src.platforms.universal_chat', 'win32api', 'win32gui', 'win32con', 'pywintypes']
 
 a = Analysis(
-    ['desktop_app.py'],
+    ['universal_native_app.py'],
     pathex=[str(app_path)],
     binaries=[],
     datas=data_files,
