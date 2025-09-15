@@ -142,7 +142,7 @@ class AsyncSystemPromptLoader:
         import os
         
         if prompt_file is None:
-            prompt_file = os.getenv('BOT_SYSTEM_PROMPT_FILE', './system_prompt.md')
+            prompt_file = os.getenv('BOT_SYSTEM_PROMPT_FILE', './prompts/default.md')
         
         try:
             async with aiofiles.open(prompt_file, 'r', encoding='utf-8') as f:

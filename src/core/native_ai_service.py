@@ -79,6 +79,28 @@ class NativeAIService:
             if not load_environment():
                 self.logger.warning("Failed to load desktop environment, continuing with defaults")
             
+            # Auto-configure optimal LLM backend (respects user overrides)
+            try:
+                from src.llm.smart_backend_selector import get_smart_backend_selector
+                backend_selector = get_smart_backend_selector()
+                
+                # Check if user has configured their own settings
+                user_config = backend_selector.has_user_configuration()
+                if any(user_config.values()):
+                    self.logger.info("🔧 Using user-configured LLM settings")
+                else:
+                    # Auto-configure optimal backend for desktop app
+                    # Priority: 1) Local servers (Ollama/LM Studio), 2) Python APIs (MLX/llama-cpp-python)
+                    if backend_selector.auto_configure_environment(respect_user_overrides=True):
+                        effective_config = backend_selector.get_effective_configuration()
+                        self.logger.info(f"✅ Auto-configured LLM backend: {effective_config.get('backend_name', 'Unknown')}")
+                    else:
+                        self.logger.warning("⚠️ No suitable LLM backend found - may need manual configuration")
+                        
+            except Exception as e:
+                self.logger.warning(f"Failed to auto-configure LLM backend: {e}")
+                self.logger.info("Continuing with manual/environment configuration...")
+            
             # Import and initialize components
             from src.config.adaptive_config import AdaptiveConfigManager
             from src.database.database_integration import DatabaseIntegrationManager

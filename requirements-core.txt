@@ -1,0 +1,37 @@
+# WhisperEngine Core Dependencies
+# Shared across Discord Bot and Desktop App
+
+# Core utilities and environment management
+python-dotenv==1.1.1
+psutil==6.1.0
+aiofiles==24.1.0
+
+# HTTP Client Dependencies  
+aiohttp==3.12.15
+requests==2.32.5
+httpx
+
+# Database abstraction
+aiosqlite==0.21.0
+
+# AI/ML and Memory System Dependencies (Core)
+chromadb
+sentence-transformers==5.1.0
+numpy==2.3.2
+
+# Advanced NLP Dependencies (Phase 1)
+spacy>=3.6.0
+transformers>=4.30.0
+
+# Optimized Local LLM Inference
+llama-cpp-python>=0.2.0
+
+# Redis Dependencies
+redis==5.2.1
+
+# Image Processing Dependencies
+Pillow==11.3.0
+
+# Testing Dependencies (development only)
+pytest==8.4.2
+pytest-asyncio==1.1.0

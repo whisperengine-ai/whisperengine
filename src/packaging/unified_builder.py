@@ -1,6 +1,16 @@
 """
-Unified Packaging System for WhisperEngine
+WhisperEngine Unified Packaging System
 Builds native apps, Docker containers, and cloud deployments from same codebase.
+
+Deployment Targets:
+- NATIVE_DESKTOP: PyInstaller-built native desktop app (no containers)
+- DISCORD_BOT: Discord bot optimized build 
+- DOCKER_SINGLE: Single Docker container for Discord bot
+- DOCKER_COMPOSE: Multi-container Docker setup for Discord bot
+- WEB_DEPLOYMENT: Web-based deployment
+- CLOUD_DEPLOYMENT: Cloud platform deployment
+
+Note: Desktop apps are NEVER containerized - they're built as native executables.
 """
 
 import os
@@ -519,36 +529,41 @@ app = BUNDLE(
         return spec_file
     
     async def _install_dependencies(self, source_dir: Path):
-        """Install dependencies for build"""
-        # Create minimal requirements for native build
-        native_requirements = [
-            "fastapi",
-            "uvicorn[standard]",
-            "jinja2",
-            "aiosqlite",
-            "pystray",
-            "pillow",
-            "openai",
-            "requests",
-            "pyyaml",
-            "pyinstaller",
-        ]
+        """Install dependencies for build using new multi-tier dependency structure"""
         
-        # Add Discord dependencies if enabled
-        if self.config.include_discord:
-            native_requirements.extend([
-                "discord.py",
-                "PyNaCl",
-            ])
-        
-        # Write requirements file
-        req_file = source_dir / "requirements_native.txt"
-        req_file.write_text("\n".join(native_requirements))
-        
-        # Install dependencies
+        # Install core dependencies (always needed)
         self._run_command([
-            sys.executable, "-m", "pip", "install", "-r", "requirements_native.txt"
+            sys.executable, "-m", "pip", "install", "-r", "requirements-core.txt"
         ], cwd=source_dir)
+        
+        # Install platform-specific optimizations
+        self._run_command([
+            sys.executable, "-m", "pip", "install", "-r", "requirements-platform.txt"
+        ], cwd=source_dir)
+        
+        # Install application-specific dependencies based on build target
+        if self.config.deployment_target == DeploymentTarget.DISCORD_BOT:
+            # Discord bot dependencies
+            self._run_command([
+                sys.executable, "-m", "pip", "install", "-r", "requirements-discord.txt"
+            ], cwd=source_dir)
+        elif self.config.deployment_target == DeploymentTarget.NATIVE_DESKTOP:
+            # Desktop app dependencies
+            self._run_command([
+                sys.executable, "-m", "pip", "install", "-r", "requirements-desktop.txt"
+            ], cwd=source_dir)
+        else:
+            # For other targets (Docker, web deployment), only install Discord bot dependencies
+            if self.config.include_discord:
+                self._run_command([
+                    sys.executable, "-m", "pip", "install", "-r", "requirements-discord.txt"
+                ], cwd=source_dir)
+        
+        # Install PyInstaller for native builds only
+        if self.config.deployment_target == DeploymentTarget.NATIVE_DESKTOP:
+            self._run_command([
+                sys.executable, "-m", "pip", "install", "pyinstaller"
+            ], cwd=source_dir)
 
 
 class DockerBuilder(BaseBuildStrategy):

@@ -1,0 +1,12 @@
+# Platform-Specific Optimizations
+# These are automatically included based on platform detection
+
+# NVIDIA GPU acceleration (Windows/Linux with NVIDIA)
+# torch with CUDA support - uncomment if needed
+# torch>=2.0.0+cu118; sys_platform != "darwin"
+
+# AMD GPU acceleration (Linux with ROCm)
+# torch>=2.0.0+rocm5.6; sys_platform == "linux"
+
+# Apple Metal acceleration (already included with PyTorch)
+torch>=2.0.0; sys_platform == "darwin"

@@ -37,20 +37,51 @@ cp .env.example .env
 
 ### Running Applications
 
+**✅ Recommended Development Workflow (Simple & Fast):**
+
 #### Discord Bot
 ```bash
+# From project root - recommended for development
 source .venv/bin/activate && python run.py
 ```
 
 #### Desktop App
 ```bash
-source .venv/bin/activate && python desktop_app.py
+# From project root - recommended for development
+source .venv/bin/activate && python universal_native_app.py
 ```
 
-#### Docker Development
+**Alternative Approaches:**
+
+#### Using Infrastructure Services (Optional)
 ```bash
-./scripts/deployment/docker-dev.sh dev
+# Start infrastructure services (PostgreSQL, Redis, ChromaDB, Neo4j)
+./bot.sh start infrastructure
+
+# Then run bot natively
+source .venv/bin/activate && python run.py
 ```
+
+#### Using Subdirectory Launchers
+```bash
+# Discord Bot from subdirectory  
+cd discord-bot && source ../.venv/bin/activate && python run-discord.py
+
+# Desktop App from subdirectory
+cd desktop-app && source ../.venv/bin/activate && python run-desktop.py
+```
+
+#### Full Container Deployment (Production Testing)
+```bash
+# Full production deployment (Discord bot + all services in containers)
+./bot.sh start prod
+```
+
+**💡 Development Tips:**
+- **For daily development**: Use direct Python execution (`python run.py`) - fastest and simplest
+- **Need infrastructure**: Use `./bot.sh start infrastructure` then run bot natively  
+- **Production testing**: Use `./bot.sh start prod` for full containerized deployment
+- **Environment switching**: Each approach uses appropriate `.env` files automatically
 
 ## 🏗️ Architecture Overview
 

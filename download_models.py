@@ -38,45 +38,20 @@ def download_models():
         except Exception as e:
             print(f"❌ Failed to download {model_name}: {e}")
     
-    # Download small LLM for quick-start testing
-    print(f"\n🤖 Downloading Phi-3-Mini model for offline testing...")
-    small_llms = [
-        {
-            "name": "microsoft/Phi-3-mini-4k-instruct", 
-            "size": "~2GB",
-            "description": "High-quality 4K context conversational model"
-        }
-    ]
-    
-    try:
-        from transformers import AutoTokenizer, AutoModelForCausalLM
         
-        for llm_info in small_llms:
-            model_name = llm_info["name"]
-            print(f"📦 Downloading {model_name} ({llm_info['size']}) - {llm_info['description']}...")
-            try:
-                model_path = models_dir / model_name.replace("/", "_")
-                model_path.mkdir(exist_ok=True)
-                
-                # Download tokenizer and model
-                tokenizer = AutoTokenizer.from_pretrained(model_name)
-                model = AutoModelForCausalLM.from_pretrained(model_name)
-                
-                # Add padding token if missing (needed for DialoGPT)
-                if tokenizer.pad_token is None:
-                    tokenizer.pad_token = tokenizer.eos_token
-                
-                # Save locally
-                tokenizer.save_pretrained(str(model_path))
-                model.save_pretrained(str(model_path))
-                
-                print(f"✅ {model_name} saved to {model_path}")
-                
-            except Exception as e:
-                print(f"❌ Failed to download {model_name}: {e}")
-                
-    except ImportError:
-        print("⚠️ transformers library not available, skipping LLM models")
+    print("✅ Model downloads completed!")
+    print("\n📝 Note: For local LLM inference, install either:")
+    print("   • LM Studio (http://lmstudio.ai) for easy model management")
+    print("   • Ollama (https://ollama.ai) for command-line model management")
+    print("   • Or use remote APIs like OpenAI or OpenRouter")
+    
+    # Download emotion analysis models (required for emotional intelligence features)
+    emotion_models = [
+        "cardiffnlp/twitter-roberta-base-sentiment-latest",
+    print("\n� Note: For local LLM inference, install either:")
+    print("   • LM Studio (http://lmstudio.ai) for easy model management")
+    print("   • Ollama (https://ollama.ai) for command-line model management")
+    print("   • Or use remote APIs like OpenAI or OpenRouter")
     
     # Download emotion analysis models (required for emotional intelligence features)
     emotion_models = [
@@ -184,6 +159,11 @@ FALLBACK_EMBEDDING_MODEL=all-mpnet-base-v2
 USE_LOCAL_LLM=true
 LOCAL_LLM_MODEL=microsoft_Phi-3-mini-4k-instruct
 LLM_CHAT_API_URL=local://models  # Special URL for local LLM loading
+
+# HTTP API Endpoints (Recommended approach)
+# LLM_CHAT_API_URL=http://localhost:1234/v1    # LM Studio
+# LLM_CHAT_API_URL=http://localhost:11434/v1   # Ollama HTTP API
+# LLM_EMOTION_API_URL=ollama://llama3.2:1b
 
 # Fallback to external LLM if local fails
 # LLM_CHAT_API_URL=http://localhost:1234/v1  # LM Studio
@@ -328,6 +308,43 @@ hiddenimports=[
     
     print(f"✅ Created build configuration guide: {build_file}")
 
+def list_available_models():
+    """List available local models"""
+    print("\n📋 Available Local Models:")
+    print("=" * 40)
+    
+    # Check Ollama models (via HTTP API - user manages independently)
+    try:
+        import ollama
+        print("\n🦙 Ollama Models:")
+        models = ollama.list()
+        if hasattr(models, 'models') and models.models:
+            for model in models.models:
+                name = getattr(model, 'model', 'Unknown')
+                size = getattr(model, 'size', 0)
+                size_mb = size // (1024 * 1024) if isinstance(size, int) and size > 0 else 'Unknown size'
+                print(f"  ollama://{name} ({size_mb}MB)")
+        else:
+            print("  No models found - run 'ollama pull llama3.2:3b' to download")
+    except ImportError:
+        print("\n🦙 Ollama Models: Library not installed")
+        print("  💡 Install with: pip install ollama")
+    except Exception as e:
+        print(f"\n🦙 Ollama Models: Error accessing Ollama - {e}")
+        print("  💡 Make sure Ollama server is running: 'ollama serve'")
+    
+    # Check embedding models
+    embedding_dir = Path("models")
+    print("\n🔤 Embedding Models:")
+    embedding_models = ["all-mpnet-base-v2"]
+    for model_name in embedding_models:
+        model_path = embedding_dir / model_name
+        if model_path.exists():
+            size = get_directory_size(model_path)
+            print(f"  ✅ {model_name} ({size:.1f}MB)")
+        else:
+            print(f"  ❌ {model_name} (not downloaded)")
+
 def main():
     """Main function"""
     print("🚀 WhisperEngine Model Bundling Setup")
@@ -338,9 +355,31 @@ def main():
         print("❌ Please run this script from the WhisperEngine root directory")
         sys.exit(1)
     
+    import argparse
+    parser = argparse.ArgumentParser(description="Download models for WhisperEngine")
+    parser.add_argument("--list", action="store_true", help="List available models")
+    parser.add_argument("--minimal", action="store_true", help="Download only embeddings")
+    parser.add_argument("--ollama-only", action="store_true", help="Download only Ollama models")
+    parser.add_argument("--auto-install", action="store_true", help="Automatically install missing dependencies")
+    args = parser.parse_args()
+    
+    if args.list:
+        list_available_models()
+        return
+    
+    if args.minimal:
+        print("📦 Downloading minimal models (embeddings only)")
+        download_embeddings_only()
+        return
+    
+    if args.ollama_only:
+        print("🦙 Downloading Ollama models only")
+        download_ollama_models_only(auto_install=args.auto_install)
+        return
+    
     # All AI features are enabled by default, so download all models
     print("📦 Downloading all models for full WhisperEngine functionality")
-    print("� This includes: Phi-3-Mini, embeddings, and emotion analysis models")
+    print("🧠 This includes: embeddings and emotion analysis models")
     
     try:
         download_models()  # Download all models - emotions are now mandatory
@@ -350,11 +389,12 @@ def main():
         
         print("\n🎉 Model bundling setup completed!")
         print("\nNext steps:")
-        print("1. The models are now downloaded in ./models/")
-        print("2. Desktop config updated to use local models")
-        print("3. Use the LocalModelManager for offline model loading")
-        print("4. Update your build process to include the models directory")
-        print("5. Set HF_DATASETS_OFFLINE=1 and TRANSFORMERS_OFFLINE=1 in production")
+        print("1. Embedding models are now available in ./models/")
+        print("2. Install local LLM servers separately:")
+        print("   - LM Studio: http://lmstudio.ai") 
+        print("   - Ollama: https://ollama.ai")
+        print("3. Use toggle_models.py to switch between remote and local APIs")
+        print("4. Set HF_DATASETS_OFFLINE=1 and TRANSFORMERS_OFFLINE=1 in production")
         
     except Exception as e:
         print(f"❌ Error during setup: {e}")

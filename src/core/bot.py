@@ -287,6 +287,12 @@ class DiscordBotCore:
             if hasattr(self, 'graph_emotion_manager') and self.graph_emotion_manager:
                 self.graph_emotion_manager.phase2_integration = self.phase2_integration
                 self.logger.info("✅ Updated emotion manager with Phase 2 integration")
+            
+            # Also update the memory manager's emotion manager if it exists
+            if (hasattr(self, 'memory_manager') and self.memory_manager and 
+                hasattr(self.memory_manager, 'emotion_manager') and self.memory_manager.emotion_manager):
+                self.memory_manager.emotion_manager.phase2_integration = self.phase2_integration
+                self.logger.info("✅ Updated memory manager's emotion manager with Phase 2 integration")
                 
         except Exception as e:
             self.logger.error(f"Failed to initialize emotional intelligence: {e}")

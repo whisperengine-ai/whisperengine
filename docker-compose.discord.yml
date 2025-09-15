@@ -3,7 +3,7 @@ services:
     build: .
     working_dir: /app
     environment:
-      - DOTENV_PATH=/app/discord-bot/.env
+      - DOTENV_PATH=/app/.env.discord
     volumes:
       - .:/app
       - /app/.venv  # Exclude virtual environment
@@ -14,7 +14,7 @@ services:
       - postgres
       - chromadb
     restart: unless-stopped
-    command: python discord-bot/run-discord.py
+    command: python run.py
 
   redis:
     image: redis:7-alpine

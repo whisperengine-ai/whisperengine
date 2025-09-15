@@ -425,9 +425,19 @@ class EmotionManager:
             import os  # Import os here for environment variable access
             use_postgresql = os.getenv('USE_POSTGRESQL', 'true').lower() == 'true'
             if not use_postgresql:
-                logger.info("PostgreSQL is disabled, emotion profiles will be stored in memory only")
-                self.database = None
-                self.is_async_db = False
+                logger.info("PostgreSQL is disabled, using SQLite database for emotion profiles")
+                try:
+                    # Use SQLite database as fallback
+                    from src.utils.user_profile_db import UserProfileDatabase
+                    self.database = UserProfileDatabase()
+                    self.database.init_database()  # Initialize SQLite schema
+                    logger.info("Using SQLite database for user profiles")
+                    self.is_async_db = False
+                except (ImportError, Exception) as e:
+                    logger.error(f"SQLite database not available: {e}")
+                    logger.info("Falling back to memory-only emotion profiles")
+                    self.database = None
+                    self.is_async_db = False
             else:
                 try:
                     # Use synchronous PostgreSQL database to avoid event loop conflicts
@@ -452,9 +462,19 @@ class EmotionManager:
                         self.is_async_db = True
                     except (ImportError, Exception) as e2:
                         logger.error(f"PostgreSQL database not available: {e2}")
-                        logger.info("Falling back to memory-only emotion profiles")
-                        self.database = None
-                        self.is_async_db = False
+                        logger.info("Falling back to SQLite database for emotion profiles")
+                        try:
+                            # Fallback to SQLite database
+                            from src.utils.user_profile_db import UserProfileDatabase
+                            self.database = UserProfileDatabase()
+                            self.database.init_database()  # Initialize SQLite schema
+                            logger.info("Using SQLite database as fallback for user profiles")
+                            self.is_async_db = False
+                        except (ImportError, Exception) as e3:
+                            logger.error(f"SQLite database also not available: {e3}")
+                            logger.info("Falling back to memory-only emotion profiles")
+                            self.database = None
+                            self.is_async_db = False
         else:
             self.database = None
             self.is_async_db = False
@@ -577,8 +597,8 @@ class EmotionManager:
         """Load user profiles from persistent storage"""
         if self.use_database and self.database:
             try:
-                # Initialize database if needed
-                if hasattr(self.database, 'initialize') and (not hasattr(self.database, 'pool') or not self.database.pool):
+                # Initialize database if needed (only for PostgreSQL databases with pools)
+                if hasattr(self.database, 'initialize') and hasattr(self.database, 'pool') and (not hasattr(self.database, 'pool') or not self.database.pool):
                     if self.is_async_db:
                         # For async database, we need to initialize it properly
                         import asyncio
@@ -686,8 +706,8 @@ class EmotionManager:
         if not self.database:
             return 0
         
-        # Initialize database if needed
-        if not hasattr(self.database, 'pool') or not self.database.pool:
+        # Initialize database if needed (only for PostgreSQL databases with pools)
+        if hasattr(self.database, 'pool') and (not hasattr(self.database, 'pool') or not self.database.pool):
             self.database.initialize()
         
         saved_count = 0

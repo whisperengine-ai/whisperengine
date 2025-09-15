@@ -535,7 +535,6 @@ class LLMClient:
                 }],
                 "error": str(e)
             }
-    
     def check_connection(self) -> bool:
         """Check if the LLM service is running and accessible"""
         try:

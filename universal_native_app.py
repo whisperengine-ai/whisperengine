@@ -83,6 +83,15 @@ class PlatformAdapter:
         
     def get_platform_style(self) -> str:
         """Get platform-specific stylesheet"""
+        
+        # Platform-specific font families that Qt can properly resolve
+        if self.is_macos:
+            font_family = "'Helvetica Neue', Helvetica, Arial"
+        elif self.is_windows:
+            font_family = "'Segoe UI', 'Segoe UI Variable', 'Segoe UI Symbol'"
+        else:  # Linux and others
+            font_family = "'Ubuntu', 'Liberation Sans', 'DejaVu Sans'"
+        
         base_style = """
             QMainWindow {
                 background-color: #1e1e1e;
@@ -95,7 +104,7 @@ class PlatformAdapter:
                 border: 1px solid #404040;
                 border-radius: 8px;
                 padding: 12px;
-                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                font-family: """ + font_family + """;
                 font-size: 14px;
                 line-height: 1.4;
             }
@@ -106,7 +115,7 @@ class PlatformAdapter:
                 border: 2px solid #404040;
                 border-radius: 8px;
                 padding: 12px;
-                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                font-family: """ + font_family + """;
                 font-size: 14px;
             }
             
@@ -139,7 +148,7 @@ class PlatformAdapter:
             
             QLabel {
                 color: #ffffff;
-                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                font-family: """ + font_family + """;
             }
             
             QScrollBar:vertical {
@@ -166,10 +175,10 @@ class PlatformAdapter:
                     background-color: #1c1c1e;
                 }
                 QPushButton {
-                    font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+                    font-family: """ + font_family + """;
                 }
                 QTextEdit, QLineEdit {
-                    font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+                    font-family: """ + font_family + """;
                 }
             """
         elif self.is_windows:
@@ -179,11 +188,11 @@ class PlatformAdapter:
                     background-color: #202020;
                 }
                 QPushButton {
-                    font-family: 'Segoe UI', sans-serif;
+                    font-family: """ + font_family + """;
                     border-radius: 4px;
                 }
                 QTextEdit, QLineEdit {
-                    font-family: 'Segoe UI', sans-serif;
+                    font-family: """ + font_family + """;
                     border-radius: 4px;
                 }
             """
@@ -191,10 +200,10 @@ class PlatformAdapter:
             # Linux styling
             return base_style + """
                 QPushButton {
-                    font-family: system-ui, sans-serif;
+                    font-family: """ + font_family + """;
                 }
                 QTextEdit, QLineEdit {
-                    font-family: system-ui, sans-serif;
+                    font-family: """ + font_family + """;
                 }
             """
     
@@ -715,6 +724,17 @@ class WhisperEngineUniversalApp(QMainWindow):
                 margin: 3px 30% 3px 30%; 
                 text-align: center;
                 display: block;
+            }
+            .typing-indicator { 
+                background-color: #2a2a2a; 
+                color: #888888; 
+                border: 1px solid #404040;
+                padding: 8px 12px; 
+                border-radius: 15px; 
+                margin: 5px 20% 5px 0; 
+                text-align: left;
+                display: block;
+                font-style: italic;
             }
             .timestamp { 
                 font-size: 10px; 
@@ -1568,10 +1588,13 @@ class WhisperEngineUniversalApp(QMainWindow):
         # Disable input while processing
         self.message_input.setEnabled(False)
         self.send_button.setEnabled(False)
-        self.send_button.setText("Sending...")
+        self.send_button.setText("Thinking...")
         
         # Add user message to chat
         self.append_message(message, "user")
+        
+        # Add typing indicator
+        self.typing_indicator_id = self.append_typing_indicator()
         
         # Clear input
         self.message_input.clear()
@@ -1585,10 +1608,18 @@ class WhisperEngineUniversalApp(QMainWindow):
     
     def on_ai_response(self, response: str):
         """Handle AI response"""
+        # Remove typing indicator
+        self.remove_typing_indicator()
+        
+        # Add AI response
         self.append_message(response, "assistant")
     
     def on_ai_error(self, error: str):
         """Handle AI error"""
+        # Remove typing indicator
+        self.remove_typing_indicator()
+        
+        # Add error message
         self.append_message(f"❌ {error}", "system")
     
     def on_ai_finished(self):
@@ -1658,6 +1689,121 @@ class WhisperEngineUniversalApp(QMainWindow):
         # Auto-scroll to bottom
         scrollbar = self.chat_display.verticalScrollBar()
         scrollbar.setValue(scrollbar.maximum())
+    
+    def append_typing_indicator(self) -> int:
+        """Add typing indicator with animated dots"""
+        # Remove any existing typing indicator first
+        if hasattr(self, 'typing_indicator_id'):
+            self.remove_typing_indicator()
+        
+        # Create animated typing indicator
+        self.typing_dot_count = 0
+        self.typing_timer = QTimer()
+        self.typing_timer.timeout.connect(self.update_typing_dots)
+        
+        # Initial typing indicator
+        typing_html = """
+        <table width="100%" cellpadding="0" cellspacing="0" style="margin: 6px 0;" id="typing-indicator">
+            <tr>
+                <td width="25%"></td>
+                <td style="background-color: #2a2a2a; border: 1px solid #404040; border-radius: 15px; padding: 10px 14px; text-align: left;">
+                    <div style="color: #888888; font-size: 14px; line-height: 1.4;">
+                        <span>WhisperEngine is thinking</span>
+                        <span id="typing-dots">.</span>
+                    </div>
+                    <div style="color: #666666; font-size: 11px; margin-top: 4px;">AI • Processing</div>
+                </td>
+                <td width="25%"></td>
+            </tr>
+        </table>
+        """
+        
+        cursor = self.chat_display.textCursor()
+        cursor.movePosition(QTextCursor.MoveOperation.End)
+        position = cursor.position()
+        cursor.insertHtml(typing_html)
+        
+        # Store state for updates
+        self.typing_indicator_position = position
+        self.typing_indicator_id = True
+        
+        # Start the animation timer (500ms intervals)
+        self.typing_timer.start(500)
+        
+        # Auto-scroll to bottom
+        scrollbar = self.chat_display.verticalScrollBar()
+        scrollbar.setValue(scrollbar.maximum())
+        
+        return position
+    
+    def update_typing_dots(self):
+        """Update the typing dots animation"""
+        if not hasattr(self, 'typing_indicator_id'):
+            return
+            
+        self.typing_dot_count = (self.typing_dot_count + 1) % 4
+        dots = "." * (self.typing_dot_count if self.typing_dot_count > 0 else 3)
+        
+        # Get current HTML and update just the dots part
+        html_content = self.chat_display.toHtml()
+        
+        # Replace the typing dots
+        import re
+        pattern = r'(<span id="typing-dots">)[^<]*(</span>)'
+        replacement = f'\\1{dots}\\2'
+        updated_html = re.sub(pattern, replacement, html_content)
+        
+        # Update the display if changed
+        if updated_html != html_content:
+            # Store cursor position
+            cursor = self.chat_display.textCursor()
+            current_pos = cursor.position()
+            
+            # Update content
+            self.chat_display.setHtml(updated_html)
+            
+            # Restore cursor position
+            cursor.setPosition(min(current_pos, len(self.chat_display.toPlainText())))
+            self.chat_display.setTextCursor(cursor)
+            
+            # Auto-scroll to bottom
+            scrollbar = self.chat_display.verticalScrollBar()
+            scrollbar.setValue(scrollbar.maximum())
+    
+    def remove_typing_indicator(self):
+        """Remove the typing indicator"""
+        # Stop the timer
+        if hasattr(self, 'typing_timer'):
+            self.typing_timer.stop()
+            delattr(self, 'typing_timer')
+        
+        if hasattr(self, 'typing_indicator_id'):
+            # Get all HTML content
+            html_content = self.chat_display.toHtml()
+            
+            # Remove typing indicator HTML
+            import re
+            # Remove the typing indicator table
+            updated_html = re.sub(
+                r'<table[^>]*id="typing-indicator"[^>]*>.*?</table>',
+                '',
+                html_content,
+                flags=re.DOTALL
+            )
+            
+            # Update the display
+            self.chat_display.setHtml(updated_html)
+            
+            # Auto-scroll to bottom
+            scrollbar = self.chat_display.verticalScrollBar()
+            scrollbar.setValue(scrollbar.maximum())
+            
+            # Clear the indicator attributes
+            delattr(self, 'typing_indicator_id')
+            if hasattr(self, 'typing_indicator_position'):
+                delattr(self, 'typing_indicator_position')
+            if hasattr(self, 'typing_dot_count'):
+                delattr(self, 'typing_dot_count')
     
     def save_window_state(self):
         """Save window position and size"""

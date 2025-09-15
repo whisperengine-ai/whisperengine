@@ -117,7 +117,7 @@ services:
     environment:
       POSTGRES_DB: \${POSTGRES_DB:-whisper_engine}
       POSTGRES_USER: \${POSTGRES_USER:-bot_user}
-      POSTGRES_PASSWORD: \${POSTGRES_PASSWORD:-bot_password_change_me}
+      POSTGRES_PASSWORD: \${POSTGRES_PASSWORD:-}
       POSTGRES_INITDB_ARGS: "--auth-host=scram-sha-256"
     volumes:
       - postgres_data:/var/lib/postgresql/data
@@ -141,7 +141,7 @@ services:
     container_name: whisperengine-neo4j
     restart: unless-stopped
     environment:
-      NEO4J_AUTH: \${NEO4J_USERNAME:-neo4j}/\${NEO4J_PASSWORD:-neo4j_password_change_me}
+      NEO4J_AUTH: \${NEO4J_USERNAME:-neo4j}/\${NEO4J_PASSWORD:-neo4j}
       NEO4J_ACCEPT_LICENSE_AGREEMENT: "yes"
       NEO4J_dbms_security_procedures_unrestricted: "gds.*,apoc.*"
     volumes:
@@ -199,7 +199,7 @@ POSTGRES_HOST=postgres
 POSTGRES_PORT=5432
 POSTGRES_DB=whisper_engine
 POSTGRES_USER=bot_user
-POSTGRES_PASSWORD=bot_password_change_me
+POSTGRES_PASSWORD=
 CHROMADB_HOST=chromadb
 CHROMADB_PORT=8000
 
@@ -208,7 +208,7 @@ ENABLE_GRAPH_DATABASE=false
 NEO4J_HOST=neo4j
 NEO4J_PORT=7687
 NEO4J_USERNAME=neo4j
-NEO4J_PASSWORD=neo4j_password_change_me
+NEO4J_PASSWORD=neo4j
 
 # Advanced Features
 DEBUG_MODE=false
