@@ -131,18 +131,9 @@ class Phase4HumanLikeIntegration:
         Returns:
             Phase4Context with all analysis results
         """
-        # Check if Phase 4 is enabled
-        enable_phase4 = os.getenv('ENABLE_PHASE4_HUMAN_LIKE', 'true').lower() == 'true'
-        if not enable_phase4:
-            logger.debug("⏭️ Phase 4 disabled via ENABLE_PHASE4_HUMAN_LIKE=false")
-            # Return minimal context with just the message
-            return Phase4Context(
-                user_id=user_id,
-                message=message,
-                conversation_mode=ConversationMode.BALANCED,
-                interaction_type=InteractionType.CASUAL_CHAT,
-                processing_metadata={'phases_executed': [], 'performance_metrics': {}}
-            )
+        # Check if Phase 4 is enabled - Always enabled for full AI experience
+        enable_phase4 = True  # Always enabled in unified AI system
+        # Note: Phase 4 is permanently enabled for full AI capabilities
         
         processing_start = datetime.now(timezone.utc)
         logger.debug(f"Starting Phase 4 comprehensive processing for user {user_id}")
@@ -200,8 +191,8 @@ class Phase4HumanLikeIntegration:
                     phase4_context.phase2_results = None
             
             # Step 3: Execute Phase 3 (Memory Networks) if available and enabled
-            enable_phase3 = os.getenv('ENABLE_PHASE3_MEMORY', 'true').lower() == 'true'
-            enable_phase3_background = os.getenv('ENABLE_PHASE3_BACKGROUND', 'true').lower() == 'true'
+            enable_phase3 = True  # Always enabled in unified AI system
+            enable_phase3_background = True  # Always enabled for better performance
             
             if self.phase3_memory_networks and self.memory_manager and enable_phase3:
                 try:
@@ -232,8 +223,6 @@ class Phase4HumanLikeIntegration:
                 except Exception as e:
                     logger.error(f"Phase 3 processing failed: {e}")
                     phase4_context.phase3_results = None
-            elif not enable_phase3:
-                logger.debug("⏭️ Phase 3 disabled via ENABLE_PHASE3_MEMORY=false")
             
             # Step 4: Execute Enhanced Memory Query Processing
             if self.enhanced_query_processor:

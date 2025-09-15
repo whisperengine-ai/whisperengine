@@ -14,8 +14,10 @@ ui_path = src_path / "ui"
 
 block_cipher = None
 
-# Collect data files (no web UI files needed for native Qt app)
-data_files = []
+# Collect data files (including bundled models for offline use)
+data_files = [
+    ('models', 'models'),  # Bundle all downloaded models
+]
 
 # Hidden imports (modules not automatically detected)
 hidden_imports = [
@@ -54,6 +56,17 @@ hidden_imports = [
     'src.config.adaptive_config',
     'src.database.database_integration',
     'src.optimization.cost_optimizer',
+    # Model-related imports for offline use
+    'sentence_transformers',
+    'transformers', 
+    'torch',
+    'numpy',
+    'sklearn',
+    'src.utils.local_model_loader',
+    'src.utils.embedding_manager',
+    # Local LLM support
+    'transformers.models.gpt2', 'transformers.tokenization_utils_base',
+    'transformers.models.auto.modeling_auto', 'transformers.models.auto.tokenization_auto'
 ]
 
 a = Analysis(
@@ -128,6 +141,15 @@ app = BUNDLE(
         'NSRequiresAquaSystemAppearance': False,
         'LSEnvironment': {
             'PYTHONPATH': '.',
+            # AI Features - All enabled by default for bundled executable
+            'ENABLE_EMOTIONAL_INTELLIGENCE': 'true',
+            'ENABLE_PHASE3_MEMORY': 'true', 
+            'ENABLE_PHASE4_INTELLIGENCE': 'true',
+            'PERSONALITY_ADAPTATION_ENABLED': 'true',
+            'ENABLE_PROMPT_OPTIMIZATION': 'true',
+            'OPTIMIZED_PROMPT_MODE': 'auto',
+            'ENABLE_AI_CACHING': 'true',
+            'USE_LOCAL_MODELS': 'true',
         },
     },
 )

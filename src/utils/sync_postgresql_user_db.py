@@ -61,6 +61,11 @@ class SyncPostgreSQLUserDB:
         self.pool = None
         self._lock = threading.RLock()  # Use threading lock for sync operations
         
+        # Check if PostgreSQL is enabled before attempting connection
+        use_postgresql = os.getenv('USE_POSTGRESQL', 'true').lower() == 'true'
+        if not use_postgresql:
+            raise Exception("PostgreSQL is disabled (USE_POSTGRESQL=false)")
+        
         self._connection_params = {
             'host': os.getenv('POSTGRES_HOST', 'localhost'),
             'port': int(os.getenv('POSTGRES_PORT', '5432')),
@@ -69,6 +74,10 @@ class SyncPostgreSQLUserDB:
             'password': os.getenv('POSTGRES_PASSWORD', 'bot_password_change_me'),
         }
         
+        # Validate port number
+        if self._connection_params['port'] <= 0 or self._connection_params['port'] > 65535:
+            raise Exception(f"Invalid port number: {self._connection_params['port']}")
+    
     def initialize(self):
         """Initialize the database connection pool and create tables"""
         if self.pool is not None:

@@ -17,6 +17,21 @@ from datetime import datetime
 from typing import Optional, List, Dict, Any
 from pathlib import Path
 
+# Set environment mode for desktop at startup
+os.environ['ENV_MODE'] = 'desktop'
+
+# Load desktop environment configuration early
+project_root = Path(__file__).parent.absolute()
+if str(project_root) not in sys.path:
+    sys.path.insert(0, str(project_root))
+
+try:
+    from env_manager import load_environment
+    load_environment()
+    print("✅ Desktop environment configuration loaded")
+except Exception as e:
+    print(f"⚠️ Warning: Could not load environment configuration: {e}")
+
 # Qt/PySide6 imports
 try:
     from PySide6.QtWidgets import (
@@ -37,11 +52,6 @@ except ImportError:
     print("❌ PySide6 not available. Install with: pip install PySide6")
     PYSIDE6_AVAILABLE = False
     sys.exit(1)
-
-# Add project root to path for imports
-project_root = Path(__file__).parent.absolute()
-if str(project_root) not in sys.path:
-    sys.path.insert(0, str(project_root))
 
 # WhisperEngine imports
 try:
@@ -1681,6 +1691,13 @@ class WhisperEngineUniversalApp(QMainWindow):
         if self.ai_worker and self.ai_worker.isRunning():
             self.ai_worker.terminate()
             self.ai_worker.wait(3000)  # Wait up to 3 seconds
+        
+        # Clean up AI service event loop
+        if hasattr(self, 'ai_service') and self.ai_service:
+            try:
+                self.ai_service.stop_event_loop()
+            except Exception as e:
+                logger.warning(f"Error stopping AI service: {e}")
         
         # Hide tray icon
         if hasattr(self, 'tray_icon'):

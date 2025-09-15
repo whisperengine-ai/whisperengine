@@ -257,8 +257,8 @@ class DatastoreFactory:
             return self._create_chromadb_manager('local_chromadb', chromadb_path=chromadb_path, **kwargs)
         
         elif vector_type == 'local_chromadb' or not CHROMADB_AVAILABLE:
-            # Use FAISS-based local storage for high performance desktop mode
-            logger.info("Using FAISS-based LocalVectorStorage for high-performance vector operations")
+            # Use local vector storage for desktop mode
+            logger.info("Using LocalVectorStorage for local vector operations")
             storage_dir = kwargs.get('storage_dir') or (Path.home() / '.whisperengine' / 'vectors')
             return LocalVectorStorageAdapter(
                 storage_dir=storage_dir,
@@ -271,7 +271,7 @@ class DatastoreFactory:
             return self._create_chromadb_manager(vector_type, **kwargs)
         
         else:
-            logger.warning(f"Unknown vector type '{vector_type}', falling back to FAISS-based local storage")
+            logger.warning(f"Unknown vector type '{vector_type}', falling back to local vector storage")
             storage_dir = kwargs.get('storage_dir') or (Path.home() / '.whisperengine' / 'vectors')
             return LocalVectorStorageAdapter(
                 storage_dir=storage_dir,

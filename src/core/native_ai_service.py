@@ -48,7 +48,8 @@ class NativeAIService:
         """Initialize the AI service with core components"""
         self.logger = logging.getLogger(__name__)
         self.is_initialized = False
-        self.current_user_id = user_id or "native_user"
+        # Use Discord-like user ID format for compatibility with memory system
+        self.current_user_id = user_id or "123456789012345678"  # 18-digit Discord-like ID
         self.current_conversation_id = None
         
         # AI components (will be initialized)
@@ -68,6 +69,15 @@ class NativeAIService:
         """Initialize AI components asynchronously"""
         try:
             self.logger.info("Initializing Native AI Service...")
+            
+            # Set environment mode to desktop for proper configuration
+            import os
+            os.environ['ENV_MODE'] = 'desktop'
+            
+            # Load desktop environment configuration
+            from env_manager import load_environment
+            if not load_environment():
+                self.logger.warning("Failed to load desktop environment, continuing with defaults")
             
             # Import and initialize components
             from src.config.adaptive_config import AdaptiveConfigManager
@@ -123,11 +133,16 @@ class NativeAIService:
             asyncio.set_event_loop(self.event_loop)
             
             # Initialize AI components
-            init_task = self.event_loop.create_task(self.initialize())
-            self.event_loop.run_until_complete(init_task)
-            
-            # Keep loop running
-            self.event_loop.run_forever()
+            try:
+                init_task = self.event_loop.create_task(self.initialize())
+                self.event_loop.run_until_complete(init_task)
+                
+                # Keep loop running until stopped
+                self.event_loop.run_forever()
+            except Exception as e:
+                self.logger.error(f"Event loop error: {e}")
+            finally:
+                self.event_loop.close()
         
         self.loop_thread = threading.Thread(target=run_loop, daemon=True)
         self.loop_thread.start()
@@ -141,8 +156,12 @@ class NativeAIService:
     
     def stop_event_loop(self):
         """Stop the async event loop"""
-        if self.event_loop:
-            self.event_loop.call_soon_threadsafe(self.event_loop.stop)
+        if self.event_loop and not self.event_loop.is_closed():
+            try:
+                self.event_loop.call_soon_threadsafe(self.event_loop.stop)
+                self.logger.info("AI service event loop stopped")
+            except Exception as e:
+                self.logger.warning(f"Error stopping event loop: {e}")
     
     async def process_message_async(self, message: str, conversation_id: Optional[str] = None) -> AIMessage:
         """Process a message asynchronously"""

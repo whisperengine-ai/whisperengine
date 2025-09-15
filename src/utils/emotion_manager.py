@@ -306,30 +306,40 @@ class EmotionManager:
         
         # Initialize database connection if using database
         if self.use_database:
-            try:
-                # Use synchronous PostgreSQL database to avoid event loop conflicts
-                from src.utils.sync_postgresql_user_db import SyncPostgreSQLUserDB
-                import os
-                
-                # Initialize synchronous PostgreSQL database
-                self.database = SyncPostgreSQLUserDB()
-                logger.info("Using synchronous PostgreSQL database for user profiles")
+            # Check if PostgreSQL is actually enabled before attempting to use it
+            import os  # Import os here for environment variable access
+            use_postgresql = os.getenv('USE_POSTGRESQL', 'true').lower() == 'true'
+            if not use_postgresql:
+                logger.info("PostgreSQL is disabled, emotion profiles will be stored in memory only")
+                self.database = None
                 self.is_async_db = False
-                    
-            except ImportError as e:
-                logger.error(f"Synchronous PostgreSQL database not available: {e}")
-                # Fallback to async PostgreSQL if sync version fails
+            else:
                 try:
-                    from src.utils.postgresql_user_db import PostgreSQLUserDB
-                    self.database = PostgreSQLUserDB()
-                    if self.postgres_pool:
-                        self.database.pool = self.postgres_pool
-                        logger.info("Using shared PostgreSQL connection pool for user profiles")
-                    else:
-                        logger.info("Using PostgreSQL database for user profiles (will initialize pool)")
-                    self.is_async_db = True
-                except ImportError:
-                    raise RuntimeError("PostgreSQL database is required but not available")
+                    # Use synchronous PostgreSQL database to avoid event loop conflicts
+                    from src.utils.sync_postgresql_user_db import SyncPostgreSQLUserDB
+                    
+                    # Initialize synchronous PostgreSQL database
+                    self.database = SyncPostgreSQLUserDB()
+                    logger.info("Using synchronous PostgreSQL database for user profiles")
+                    self.is_async_db = False
+                        
+                except (ImportError, Exception) as e:
+                    logger.error(f"Synchronous PostgreSQL database not available: {e}")
+                    # Fallback to async PostgreSQL if sync version fails
+                    try:
+                        from src.utils.postgresql_user_db import PostgreSQLUserDB
+                        self.database = PostgreSQLUserDB()
+                        if self.postgres_pool:
+                            self.database.pool = self.postgres_pool
+                            logger.info("Using shared PostgreSQL connection pool for user profiles")
+                        else:
+                            logger.info("Using PostgreSQL database for user profiles (will initialize pool)")
+                        self.is_async_db = True
+                    except (ImportError, Exception) as e2:
+                        logger.error(f"PostgreSQL database not available: {e2}")
+                        logger.info("Falling back to memory-only emotion profiles")
+                        self.database = None
+                        self.is_async_db = False
         else:
             self.database = None
             self.is_async_db = False
@@ -469,7 +479,8 @@ class EmotionManager:
                         except RuntimeError:
                             pass
                         # Initialize in new event loop
-                        asyncio.run(self.database.initialize())
+                        if self.database and hasattr(self.database, 'initialize'):
+                            asyncio.run(self.database.initialize())
                     else:
                         # For sync database, initialize directly
                         self.database.initialize()

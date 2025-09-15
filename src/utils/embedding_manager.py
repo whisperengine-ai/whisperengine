@@ -94,11 +94,26 @@ class ExternalEmbeddingManager:
         if not self.use_external:
             try:
                 from chromadb.utils import embedding_functions
+                
+                # Check if we should use bundled local models
+                use_local_models = os.getenv("USE_LOCAL_MODELS", "false").lower() == "true"
+                local_models_dir = os.getenv("LOCAL_MODELS_DIR", "./models")
                 local_model = os.getenv("LLM_LOCAL_EMBEDDING_MODEL", "all-mpnet-base-v2")
-                self.local_embedding_function = embedding_functions.SentenceTransformerEmbeddingFunction(
-                    model_name=local_model
-                )
-                logger.info(f"Local embedding model initialized: {local_model}")
+                
+                if use_local_models and os.path.exists(os.path.join(local_models_dir, local_model)):
+                    # Use bundled local model
+                    model_path = os.path.join(local_models_dir, local_model)
+                    logger.info(f"Using bundled local embedding model: {model_path}")
+                    self.local_embedding_function = embedding_functions.SentenceTransformerEmbeddingFunction(
+                        model_name=model_path
+                    )
+                else:
+                    # Use online model (will download if not cached)
+                    self.local_embedding_function = embedding_functions.SentenceTransformerEmbeddingFunction(
+                        model_name=local_model
+                    )
+                    logger.info(f"Local embedding model initialized: {local_model}")
+                
             except ImportError as e:
                 logger.error(f"Failed to import ChromaDB embedding functions: {e}")
             except Exception as e:
@@ -108,11 +123,24 @@ class ExternalEmbeddingManager:
             if self.load_fallback_models:
                 try:
                     from chromadb.utils import embedding_functions
-                    local_model = os.getenv("FALLBACK_EMBEDDING_MODEL", "all-mpnet-base-v2")
-                    self.local_embedding_function = embedding_functions.SentenceTransformerEmbeddingFunction(
-                        model_name=local_model
-                    )
-                    logger.info(f"Fallback embedding model initialized: {local_model}")
+                    
+                    # Check for bundled fallback model first
+                    use_local_models = os.getenv("USE_LOCAL_MODELS", "false").lower() == "true"
+                    local_models_dir = os.getenv("LOCAL_MODELS_DIR", "./models")
+                    fallback_model = os.getenv("FALLBACK_EMBEDDING_MODEL", "all-mpnet-base-v2")
+                    
+                    if use_local_models and os.path.exists(os.path.join(local_models_dir, fallback_model)):
+                        model_path = os.path.join(local_models_dir, fallback_model)
+                        logger.info(f"Using bundled fallback embedding model: {model_path}")
+                        self.local_embedding_function = embedding_functions.SentenceTransformerEmbeddingFunction(
+                            model_name=model_path
+                        )
+                    else:
+                        self.local_embedding_function = embedding_functions.SentenceTransformerEmbeddingFunction(
+                            model_name=fallback_model
+                        )
+                        logger.info(f"Fallback embedding model initialized: {fallback_model}")
+                        
                 except Exception as e:
                     logger.warning(f"Failed to initialize fallback embeddings: {e}")
             else:

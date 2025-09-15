@@ -91,6 +91,7 @@ class LLMClient:
         self.is_openrouter = "openrouter.ai" in self.api_url
         self.is_ollama = "11434" in self.api_url or "ollama" in self.api_url.lower()
         self.is_local_studio = self.api_url.startswith("http://localhost:1234") or self.api_url.startswith("http://127.0.0.1:1234")
+        self.is_local_llm = self.api_url.startswith("local://")
         
         # Determine service name for logging and display
         if self.is_openrouter:
@@ -99,6 +100,8 @@ class LLMClient:
             self.service_name = "Ollama"
         elif self.is_local_studio:
             self.service_name = "LM Studio"
+        elif self.is_local_llm:
+            self.service_name = "Local Bundled LLM"
         else:
             self.service_name = "Custom LLM API"
         
@@ -142,12 +145,21 @@ class LLMClient:
             self.facts_is_local_studio = False
             self.facts_service_name = "Not Configured"
         
+        # Initialize logger early for use in local LLM initialization
+        self.logger = logging.getLogger(__name__)
+        
+        # Initialize local LLM if using local:// protocol
+        self.local_model = None
+        self.local_tokenizer = None
+        if self.is_local_llm:
+            self._initialize_local_llm()
+        
         self.chat_endpoint = f"{self.api_url}/chat/completions"
         self.completions_endpoint = f"{self.api_url}/completions"
         self.emotion_chat_endpoint = f"{self.emotion_api_url}/chat/completions" if self.emotion_api_url else None
         self.facts_chat_endpoint = f"{self.facts_api_url}/chat/completions" if self.facts_api_url else None
         
-        self.logger = logging.getLogger(__name__)
+        # Remove duplicate logger initialization that was here before
         
         # Load token limits from environment variables with sensible defaults
         self.default_max_tokens_chat = int(os.getenv("LLM_MAX_TOKENS_CHAT", "4096"))
@@ -236,9 +248,201 @@ class LLMClient:
         if hasattr(self, 'session'):
             self.session.close()
     
+    def _initialize_local_llm(self):
+        """Initialize local LLM model for offline inference"""
+        try:
+            from transformers import AutoTokenizer, AutoModelForCausalLM
+            import torch
+            
+            # Get model path from environment
+            local_model_name = os.getenv("LOCAL_LLM_MODEL", "microsoft_Phi-3-mini-4k-instruct")
+            models_dir = os.getenv("LOCAL_MODELS_DIR", "./models")
+            model_path = os.path.join(models_dir, local_model_name)
+            
+            if not os.path.exists(model_path):
+                self.logger.warning(f"Local LLM model not found at {model_path}. Please run download_models.py")
+                return
+            
+            self.logger.info(f"Loading local LLM from {model_path}...")
+            
+            # Load tokenizer and model
+            self.local_tokenizer = AutoTokenizer.from_pretrained(model_path)
+            
+            # Determine the best device for loading
+            if torch.cuda.is_available():
+                device = "cuda"
+                self.logger.info("🔥 CUDA detected - loading model on CUDA")
+            elif torch.backends.mps.is_available():
+                device = "mps"
+                self.logger.info("🍎 MPS (Apple Silicon) detected - loading model on MPS")
+            else:
+                device = "cpu"
+                self.logger.info("💻 No GPU detected - loading model on CPU")
+            
+            # Load model and move to device
+            self.local_model = AutoModelForCausalLM.from_pretrained(
+                model_path,
+                dtype=torch.float32  # Use float32 for better compatibility
+            )
+            
+            # Move model to the target device
+            self.local_model = self.local_model.to(device)
+            self.logger.info(f"✅ Model loaded on device: {device}")
+            
+            # Ensure we have a pad token
+            if self.local_tokenizer.pad_token is None:
+                self.local_tokenizer.pad_token = self.local_tokenizer.eos_token
+            
+            self.logger.info(f"✅ Local LLM loaded successfully: {local_model_name}")
+            
+        except ImportError:
+            self.logger.error("transformers or torch not available for local LLM")
+        except Exception as e:
+            self.logger.error(f"Failed to initialize local LLM: {e}")
+    
+    def _generate_local_chat_completion(self, messages: List[Dict[str, str]], temperature: float = 0.7, max_tokens: Optional[int] = None) -> Dict[str, Any]:
+        """Generate chat completion using local LLM"""
+        try:
+            import torch
+            
+            # Check if models are loaded
+            if not self.local_model or not self.local_tokenizer:
+                raise RuntimeError("Local LLM models not properly loaded")
+            
+            if max_tokens is None:
+                max_tokens = self.default_max_tokens_chat
+            
+            # Get model name to determine format
+            local_model_name = os.getenv("LOCAL_LLM_MODEL", "microsoft_Phi-3-mini-4k-instruct")
+            
+            # Use proper chat template for Phi-3 or fallback to DialoGPT format
+            if "Phi-3" in local_model_name or "phi-3" in local_model_name:
+                # Use Phi-3 chat template if available
+                if hasattr(self.local_tokenizer, 'apply_chat_template'):
+                    prompt_text = self.local_tokenizer.apply_chat_template(
+                        messages, 
+                        tokenize=False, 
+                        add_generation_prompt=True
+                    )
+                else:
+                    # Fallback Phi-3 format
+                    prompt_text = ""
+                    for message in messages:
+                        role = message.get('role', '')
+                        content = message.get('content', '')
+                        
+                        if role == 'system':
+                            prompt_text += f"<|system|>\n{content}<|end|>\n"
+                        elif role == 'user':
+                            prompt_text += f"<|user|>\n{content}<|end|>\n"
+                        elif role == 'assistant':
+                            prompt_text += f"<|assistant|>\n{content}<|end|>\n"
+                    
+                    prompt_text += "<|assistant|>\n"
+            else:
+                # DialoGPT format (legacy)
+                prompt_text = ""
+                for message in messages:
+                    role = message.get('role', '')
+                    content = message.get('content', '')
+                    
+                    if role == 'system':
+                        prompt_text += f"System: {content}\n"
+                    elif role == 'user':
+                        prompt_text += f"User: {content}\n"
+                    elif role == 'assistant':
+                        prompt_text += f"Assistant: {content}\n"
+                
+                # Add the final assistant prompt
+                prompt_text += "Assistant:"
+            
+            # Tokenize input with proper handling and attention mask
+            tokenized = self.local_tokenizer(
+                prompt_text, 
+                return_tensors='pt', 
+                truncation=True, 
+                max_length=4096, 
+                padding=False,
+                return_attention_mask=True
+            )
+            inputs = tokenized['input_ids']
+            attention_mask = tokenized['attention_mask']
+            
+            # Move inputs to the same device as the model
+            model_device = next(self.local_model.parameters()).device
+            inputs = inputs.to(model_device)
+            attention_mask = attention_mask.to(model_device)
+            
+            input_length = inputs.shape[1]
+            
+            # Generate response with improved parameters for Phi-3
+            with torch.no_grad():
+                outputs = self.local_model.generate(
+                    inputs,
+                    attention_mask=attention_mask,
+                    max_new_tokens=max_tokens,  # Use max_new_tokens instead of max_length for newer models
+                    temperature=temperature,
+                    do_sample=temperature > 0,
+                    pad_token_id=self.local_tokenizer.eos_token_id,
+                    eos_token_id=self.local_tokenizer.eos_token_id,
+                    repetition_penalty=1.1,  # Better for Phi-3
+                    use_cache=True
+                )
+            
+            # Decode response
+            response_text = self.local_tokenizer.decode(outputs[0], skip_special_tokens=True)
+            
+            # Extract only the new generated text
+            generated_text = response_text[len(prompt_text):].strip()
+            
+            # Clean up Phi-3 end tokens if present
+            if "<|end|>" in generated_text:
+                generated_text = generated_text.split("<|end|>")[0].strip()
+            
+            # Calculate token usage
+            output_length = outputs[0].shape[0] if hasattr(outputs[0], 'shape') else len(outputs[0])
+            completion_tokens = max(0, output_length - input_length)
+            
+            # Format response to match OpenAI API structure
+            return {
+                "choices": [{
+                    "message": {
+                        "role": "assistant",
+                        "content": generated_text
+                    },
+                    "finish_reason": "stop"
+                }],
+                "usage": {
+                    "prompt_tokens": input_length,
+                    "completion_tokens": completion_tokens,
+                    "total_tokens": input_length + completion_tokens
+                },
+                "model": "local-model"
+            }
+            
+        except Exception as e:
+            self.logger.error(f"Local LLM generation failed: {e}")
+            # Fallback to error response
+            return {
+                "choices": [{
+                    "message": {
+                        "role": "assistant", 
+                        "content": f"Sorry, I'm having trouble processing your request. Local LLM error: {str(e)}"
+                    },
+                    "finish_reason": "stop"
+                }],
+                "error": str(e)
+            }
+    
     def check_connection(self) -> bool:
         """Check if the LLM service is running and accessible"""
         try:
+            # For local models, check if the model is loaded
+            if self.is_local_llm:
+                is_connected = (self.local_model is not None and self.local_tokenizer is not None)
+                self.logger.debug(f"Local LLM connection check: {is_connected}")
+                return is_connected
+            
             self.logger.debug(f"Checking connection to {self.service_name} server...")
             
             # SECURITY ENHANCEMENT: Prepare headers with secure credential handling
@@ -306,6 +510,10 @@ class LLMClient:
         Returns:
             The response from the API
         """
+        # Handle local LLM inference first
+        if self.is_local_llm and self.local_model and self.local_tokenizer:
+            return self._generate_local_chat_completion(messages, temperature, max_tokens)
+        
         # Use environment default if model not specified
         if model is None:
             model = self.default_model_name

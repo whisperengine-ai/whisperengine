@@ -29,7 +29,7 @@ class ChromaDBLocalDatabaseManager(DatabaseIntegrationManager):
     Database integration manager using ChromaDB PersistentClient for local installations.
     
     Provides perfect consistency with server deployments:
-    - ChromaDB PersistentClient instead of FAISS
+    - ChromaDB PersistentClient for vector storage
     - Same API surface as HTTP ChromaDB deployments
     - Seamless migration between desktop ↔ server
     - Local graph storage for relationships (Neo4j replacement)

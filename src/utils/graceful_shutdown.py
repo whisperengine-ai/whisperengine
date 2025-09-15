@@ -23,9 +23,17 @@ class GracefulShutdownManager:
         self.bot = bot  # Discord bot reference for proper shutdown
         self.signal_count = 0  # Track how many times shutdown signal was received
         
-        # Register signal handlers
-        signal.signal(signal.SIGINT, self._signal_handler)
-        signal.signal(signal.SIGTERM, self._signal_handler)
+        # Register signal handlers only if we're in the main thread
+        try:
+            if threading.current_thread() == threading.main_thread():
+                signal.signal(signal.SIGINT, self._signal_handler)
+                signal.signal(signal.SIGTERM, self._signal_handler)
+                logger.debug("Signal handlers registered in main thread")
+            else:
+                logger.debug("Skipping signal handler registration - not in main thread")
+        except (ValueError, OSError) as e:
+            logger.warning(f"Could not register signal handlers: {e}")
+        
         atexit.register(self._emergency_cleanup)
         
     def _signal_handler(self, signum, frame):
