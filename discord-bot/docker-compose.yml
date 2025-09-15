@@ -1,0 +1,58 @@
+services:
+  whisperengine-bot:
+    build: .
+    working_dir: /app
+    environment:
+      - DOTENV_PATH=/app/discord-bot/.env
+    volumes:
+      - .:/app
+      - /app/.venv  # Exclude virtual environment
+    networks:
+      - whisperengine-network
+    depends_on:
+      - redis
+      - postgres
+      - chromadb
+    restart: unless-stopped
+    command: python discord-bot/run-discord.py
+
+  redis:
+    image: redis:7-alpine
+    volumes:
+      - redis_data:/data
+    networks:
+      - whisperengine-network
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: whisper_engine
+      POSTGRES_USER: bot_user
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change_this_password}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - whisperengine-network
+    restart: unless-stopped
+
+  chromadb:
+    image: ghcr.io/chroma-core/chroma:latest
+    volumes:
+      - chromadb_data:/chroma/chroma
+    environment:
+      - IS_PERSISTENT=TRUE
+    networks:
+      - whisperengine-network
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+
+volumes:
+  redis_data:
+  postgres_data:
+  chromadb_data:
+
+networks:
+  whisperengine-network:
+    driver: bridge
