@@ -67,7 +67,30 @@ class ExternalEmbeddingManager:
         # Initialize local embedding fallback
         self._init_local_embeddings()
         
+        # Validate configuration and warn about common issues
+        self._validate_configuration()
+        
         logger.info(f"ExternalEmbeddingManager initialized - External: {self.use_external}")
+    
+    def _validate_configuration(self):
+        """Validate embedding configuration and warn about common issues"""
+        # Check if user has configured OpenRouter for embeddings
+        if self.use_external and 'openrouter.ai' in self.embedding_api_url.lower():
+            logger.warning("⚠️  CONFIGURATION WARNING: OpenRouter does not support embeddings API!")
+            logger.warning("OpenRouter only supports chat completions, not text embeddings.")
+            logger.warning("Please either:")
+            logger.warning("1. Set USE_EXTERNAL_EMBEDDINGS=false to use local embeddings, OR")
+            logger.warning("2. Configure OpenAI API for embeddings: LLM_EMBEDDING_API_URL=https://api.openai.com/v1")
+            logger.warning("Falling back to local embeddings for now...")
+            # Force disable external embeddings
+            self.use_external = False
+        
+        # Check if external embeddings are enabled but no API key
+        elif self.use_external and not self.embedding_api_key:
+            logger.warning("⚠️  External embeddings enabled but no API key configured")
+            logger.warning("Set LLM_EMBEDDING_API_KEY or OPENAI_API_KEY environment variable")
+            logger.warning("Falling back to local embeddings...")
+            self.use_external = False
     
     def _supports_embeddings(self, api_url: str) -> bool:
         """Check if the given API URL supports embedding endpoints"""
@@ -78,12 +101,18 @@ class ExternalEmbeddingManager:
         embedding_providers = [
             'openai.com',
             'api.openai.com', 
-            'openrouter.ai',
+            # Note: OpenRouter does NOT support embeddings API
+            # 'openrouter.ai',  # Removed - OpenRouter doesn't have embeddings endpoint
             'api.anthropic.com',  # If they add embedding support
             'localhost',  # Local servers like LM Studio, Ollama
             '127.0.0.1',  # Local servers
             'host.docker.internal'  # Docker host reference
         ]
+        
+        # Explicitly warn about OpenRouter
+        if 'openrouter.ai' in api_url.lower():
+            logger.warning("OpenRouter does not support embeddings API - falling back to local embeddings")
+            return False
         
         return any(provider in api_url.lower() for provider in embedding_providers)
     

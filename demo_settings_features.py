@@ -118,7 +118,7 @@ Be helpful, accurate, and provide practical examples."""
     print("=" * 60)
     
     print("Access the settings through the web UI:")
-    print("1. Start the desktop app: python desktop_app.py")
+    print("1. Start the desktop app: python universal_native_app.py")
     print("2. Click '⚙️ Settings' in the top-right corner")
     print("3. Use the tabbed interface to configure:")
     print("   • 📝 System Prompt (edit, upload files)")

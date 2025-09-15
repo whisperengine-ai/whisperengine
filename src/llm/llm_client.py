@@ -92,6 +92,7 @@ class LLMClient:
         self.is_ollama = "11434" in self.api_url or "ollama" in self.api_url.lower()
         self.is_local_studio = self.api_url.startswith("http://localhost:1234") or self.api_url.startswith("http://127.0.0.1:1234")
         self.is_local_llm = self.api_url.startswith("local://")
+        self.is_llamacpp = self.api_url.startswith("llamacpp://")
         
         # Determine service name for logging and display
         if self.is_openrouter:
@@ -102,6 +103,8 @@ class LLMClient:
             self.service_name = "LM Studio"
         elif self.is_local_llm:
             self.service_name = "Local Bundled LLM"
+        elif self.is_llamacpp:
+            self.service_name = "llama-cpp-python"
         else:
             self.service_name = "Custom LLM API"
         
@@ -153,6 +156,11 @@ class LLMClient:
         self.local_tokenizer = None
         if self.is_local_llm:
             self._initialize_local_llm()
+        
+        # Initialize llama-cpp-python if using llamacpp:// protocol
+        self.llamacpp_model = None
+        if self.is_llamacpp:
+            self._initialize_llamacpp_llm()
         
         self.chat_endpoint = f"{self.api_url}/chat/completions"
         self.completions_endpoint = f"{self.api_url}/completions"
@@ -300,6 +308,65 @@ class LLMClient:
         except Exception as e:
             self.logger.error(f"Failed to initialize local LLM: {e}")
     
+    def _initialize_llamacpp_llm(self):
+        """Initialize llama-cpp-python for optimized local inference"""
+        try:
+            from llama_cpp import Llama
+            
+            # Get model path from environment
+            model_path = os.getenv("LLAMACPP_MODEL_PATH")
+            if not model_path:
+                # Try to find GGUF models in models directory
+                models_dir = os.getenv("LOCAL_MODELS_DIR", "./models")
+                import glob
+                gguf_files = glob.glob(os.path.join(models_dir, "*.gguf"))
+                if gguf_files:
+                    model_path = gguf_files[0]  # Use first GGUF file found
+                    self.logger.info(f"Auto-detected GGUF model: {model_path}")
+                else:
+                    self.logger.warning(f"No GGUF models found in {models_dir} and LLAMACPP_MODEL_PATH not set")
+                    return
+            
+            if not os.path.exists(model_path):
+                self.logger.warning(f"llama-cpp-python model not found at {model_path}")
+                return
+            
+            self.logger.info(f"Loading llama-cpp-python model from {model_path}...")
+            
+            # Configure based on available hardware
+            n_gpu_layers = 0
+            if os.getenv("LLAMACPP_USE_GPU", "auto").lower() == "true":
+                n_gpu_layers = -1  # Use all GPU layers
+            elif os.getenv("LLAMACPP_USE_GPU", "auto").lower() == "auto":
+                # Auto-detect GPU support
+                try:
+                    import torch
+                    if torch.cuda.is_available():
+                        n_gpu_layers = -1
+                        self.logger.info("🔥 CUDA detected - enabling GPU acceleration")
+                    elif torch.backends.mps.is_available():
+                        n_gpu_layers = 1  # Use some GPU layers for MPS
+                        self.logger.info("🍎 MPS detected - enabling partial GPU acceleration")
+                except ImportError:
+                    pass  # No torch available, stay on CPU
+            
+            # Initialize llama-cpp-python model
+            self.llamacpp_model = Llama(
+                model_path=model_path,
+                n_ctx=int(os.getenv("LLAMACPP_CONTEXT_SIZE", "4096")),
+                n_threads=int(os.getenv("LLAMACPP_THREADS", "4")),
+                n_gpu_layers=n_gpu_layers,
+                verbose=False,
+                chat_format="chatml"  # Use ChatML format by default
+            )
+            
+            self.logger.info(f"✅ llama-cpp-python model loaded successfully")
+            
+        except ImportError:
+            self.logger.error("llama-cpp-python not available. Install with: pip install llama-cpp-python")
+        except Exception as e:
+            self.logger.error(f"Failed to initialize llama-cpp-python model: {e}")
+    
     def _generate_local_chat_completion(self, messages: List[Dict[str, str]], temperature: float = 0.7, max_tokens: Optional[int] = None) -> Dict[str, Any]:
         """Generate chat completion using local LLM"""
         try:
@@ -434,6 +501,41 @@ class LLMClient:
                 "error": str(e)
             }
     
+    def _generate_llamacpp_chat_completion(self, messages: List[Dict[str, str]], temperature: float = 0.7, max_tokens: Optional[int] = None) -> Dict[str, Any]:
+        """Generate chat completion using llama-cpp-python"""
+        try:
+            # Check if model is loaded
+            if not self.llamacpp_model:
+                raise RuntimeError("llama-cpp-python model not properly loaded")
+            
+            if max_tokens is None:
+                max_tokens = self.default_max_tokens_chat
+            
+            # Use llama-cpp-python's chat completion
+            response = self.llamacpp_model.create_chat_completion(
+                messages=messages,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                stream=False
+            )
+            
+            # llama-cpp-python returns OpenAI-compatible format, so we can return it directly
+            return response
+            
+        except Exception as e:
+            self.logger.error(f"llama-cpp-python generation failed: {e}")
+            # Fallback to error response in OpenAI format
+            return {
+                "choices": [{
+                    "message": {
+                        "role": "assistant", 
+                        "content": f"Sorry, I'm having trouble processing your request. llama-cpp-python error: {str(e)}"
+                    },
+                    "finish_reason": "stop"
+                }],
+                "error": str(e)
+            }
+    
     def check_connection(self) -> bool:
         """Check if the LLM service is running and accessible"""
         try:
@@ -441,6 +543,12 @@ class LLMClient:
             if self.is_local_llm:
                 is_connected = (self.local_model is not None and self.local_tokenizer is not None)
                 self.logger.debug(f"Local LLM connection check: {is_connected}")
+                return is_connected
+            
+            # For llama-cpp-python models, check if the model is loaded
+            if self.is_llamacpp:
+                is_connected = (self.llamacpp_model is not None)
+                self.logger.debug(f"llama-cpp-python connection check: {is_connected}")
                 return is_connected
             
             self.logger.debug(f"Checking connection to {self.service_name} server...")
@@ -513,6 +621,23 @@ class LLMClient:
         # Handle local LLM inference first
         if self.is_local_llm and self.local_model and self.local_tokenizer:
             return self._generate_local_chat_completion(messages, temperature, max_tokens)
+        
+        # Handle llama-cpp-python inference
+        if self.is_llamacpp:
+            if self.llamacpp_model:
+                return self._generate_llamacpp_chat_completion(messages, temperature, max_tokens)
+            else:
+                # Return error response when llamacpp is configured but model not loaded
+                return {
+                    "choices": [{
+                        "message": {
+                            "role": "assistant", 
+                            "content": "Sorry, llama-cpp-python model is not loaded. Please check your LLAMACPP_MODEL_PATH or ensure a .gguf model exists in ./models/"
+                        },
+                        "finish_reason": "stop"
+                    }],
+                    "error": "llama-cpp-python model not loaded"
+                }
         
         # Use environment default if model not specified
         if model is None:

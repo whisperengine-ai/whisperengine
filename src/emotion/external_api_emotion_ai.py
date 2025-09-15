@@ -477,9 +477,7 @@ Respond with ONLY a JSON object:
             }
             
             # Get embedding for the input text
-            if not self.embedding_manager.use_external:
-                return None
-                
+            # Note: We can use either external or local embeddings for emotion analysis
             text_embedding = await self.embedding_manager.get_embeddings([text])
             if not text_embedding or len(text_embedding) == 0:
                 return None

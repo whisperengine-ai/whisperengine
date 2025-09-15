@@ -114,6 +114,7 @@ cp .env.minimal .env
 nano .env  # Set DISCORD_BOT_TOKEN
 
 # 3. Start your local LLM (LM Studio, Ollama, etc.)
+#    OR use optimized llama-cpp-python: python setup_llamacpp.py
 
 # 4. Launch bot
 ./bot.sh start
@@ -205,9 +206,12 @@ BOT_SYSTEM_PROMPT_FILE=./prompts/casual_friend_template.md       # Casual chat b
 📖 **[Full Customization Guide](docs/character/SYSTEM_PROMPT_CUSTOMIZATION.md)** - Complete setup instructions
 
 ### **LLM Provider Support**
-- **Local**: LM Studio, Ollama, GPT4All
+- **Local Optimized**: llama-cpp-python (GGUF models) - **Recommended for best performance** 🚀
+- **Local HTTP**: LM Studio, Ollama, GPT4All
 - **Cloud**: OpenAI, OpenRouter, Anthropic
 - **Self-Hosted**: Any OpenAI-compatible API
+
+📖 **[llama-cpp-python Setup Guide](LLAMACPP_INTEGRATION.md)** - Optimized local inference
 
 ### **Memory & Intelligence**
 - **Vector Memory**: Semantic similarity search across conversations

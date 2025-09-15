@@ -6,7 +6,7 @@ WhisperEngine is a privacy-first AI conversation platform that can run as both a
 
 **Core Deployment Modes:**
 - **Discord Bot** (`python run.py`) - Full AI-powered Discord bot with advanced memory
-- **Desktop App** (`python desktop_app.py`) - ChatGPT-like standalone application with local privacy
+- **Desktop App** (`python universal_native_app.py`) - Native Qt-based standalone application with local privacy
 - **Docker Compose** - Multi-container deployment for teams and production
 
 ## 🏗️ Architecture Fundamentals
@@ -45,13 +45,8 @@ ENABLE_PHASE3_MEMORY = os.getenv('ENABLE_PHASE3_MEMORY', 'true')
 
 ```bash
 # ✅ CORRECT - Always activate venv first
-source .venv/bin/activate && python desktop_app.py
-source .venv/bin/activate && python run.py
-source .venv/bin/activate && python test_something.py
-
-# ❌ WRONG - Will fail with missing dependencies
-python desktop_app.py
-python3 desktop_app.py
+# Native desktop app
+source .venv/bin/activate && python universal_native_app.py
 pip install something
 ```
 
@@ -75,8 +70,8 @@ if not load_environment():
 # Discord bot (fully functional) - ALWAYS use venv
 source .venv/bin/activate && python run.py
 
-# Desktop app (works with local UI) - ALWAYS use venv
-source .venv/bin/activate && python desktop_app.py
+# Native desktop app (Qt-based) - ALWAYS use venv
+source .venv/bin/activate && python universal_native_app.py
 
 # Docker development (external containers provide dependencies)
 ./scripts/deployment/docker-dev.sh dev  # or docker-compose -f docker-compose.dev.yml up
@@ -91,7 +86,6 @@ source .venv/bin/activate && pytest -m integration       # Real LLM integration 
 source .venv/bin/activate && pytest -m llm               # All LLM-related tests
 
 # Desktop app workflow testing - ALWAYS use venv
-source .venv/bin/activate && python test_complete_desktop_workflow.py
 source .venv/bin/activate && python test_desktop_llm_complete.py
 ```
 
@@ -117,29 +111,14 @@ safe_memory = ThreadSafeMemoryManager(context_memory_manager)
 
 ## 🖥️ Desktop App Architecture 
 
-### FastAPI Web UI Pattern
-Desktop app runs a FastAPI server with WebSocket real-time chat:
+### Qt Native Application
+Desktop app is a Qt-based native application with full AI integration:
 ```python
-# src/ui/web_ui.py - Core desktop UI
-class WhisperEngineWebUI:
-    def setup_routes(self):
-        @self.app.websocket("/ws")  # Real-time chat
-        @self.app.post("/api/chat")  # REST API
-        @self.app.get("/", response_class=HTMLResponse)  # Main UI
+# universal_native_app.py - Core desktop UI
+# Native Qt-based application with system tray, settings, and local privacy
 ```
 
-**Static file serving**: `src/ui/static/` mounted at `/static/`
-**Templates**: `src/ui/templates/index.html` for main chat interface
 **Universal chat**: Same AI components work in Discord and desktop modes
-
-### Desktop App UI Fixes Pattern
-When modifying `src/ui/static/app.js` or `style.css`:
-```bash
-# Files may not refresh in browser due to caching
-# Solution: Force server restart and clear browser cache - ALWAYS use venv
-pkill -f "desktop_app" && source .venv/bin/activate && python desktop_app.py
-# Then hard refresh browser (Cmd+Shift+R on macOS)
-```
 
 ## 🔌 Integration Patterns
 
@@ -242,10 +221,7 @@ if not validation['valid']:
 - **Advanced Intelligence**: `src/intelligence/phase4_integration.py` (human-like adaptation)
 
 ### Desktop & UI
-- **Desktop Entry**: `desktop_app.py` (FastAPI + WebSocket server)
-- **Web UI**: `src/ui/web_ui.py` (main FastAPI application)
-- **Static Assets**: `src/ui/static/` (CSS, JS, served at `/static/`)
-- **Templates**: `src/ui/templates/index.html` (main chat interface)
+- **Desktop Entry**: `universal_native_app.py` (Qt-based native application)
 
 ### Configuration & Environment
 - **Environment Manager**: `env_manager.py` (centralized config loading)

@@ -145,7 +145,7 @@ def main():
         print("⚠️  Some tests failed. Check dependencies and environment.")
     
     print("\n💡 To test in GUI environment:")
-    print("   1. Run desktop app: python desktop_app.py")
+    print("   1. Run desktop app: python universal_native_app.py")
     print("   2. Look for WhisperEngine icon in system tray")
     print("   3. Right-click for context menu")
 
