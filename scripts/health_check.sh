@@ -39,7 +39,7 @@ echo
 echo "🔄 Testing Datastore Connectivity:"
 
 # PostgreSQL
-test_service "PostgreSQL" "PGPASSWORD=bot_password_change_me psql -h localhost -p 5432 -U bot_user -d whisper_engine -c 'SELECT 1'" "1"
+test_service "PostgreSQL" "PGPASSWORD=\${POSTGRES_PASSWORD:-} psql -h localhost -p 5432 -U bot_user -d whisper_engine -c 'SELECT 1'" "1"
 
 # Redis
 test_service "Redis" "redis-cli -h localhost -p 6379 ping" "PONG"

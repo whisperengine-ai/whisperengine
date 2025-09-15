@@ -38,15 +38,25 @@ class ExternalEmbeddingManager:
         )
         self.embedding_model = os.getenv("LLM_EMBEDDING_MODEL", "text-embedding-nomic-embed-text-v1.5")
         
-        # Control whether to use external embeddings - auto-detect based on API URL configuration
+        # Control whether to use external embeddings - respect explicit configuration
         # This matches the pattern used in memory_manager.py for consistency
-        self.use_external = (
-            os.getenv("LLM_EMBEDDING_API_URL") is not None or
-            os.getenv("USE_EXTERNAL_EMBEDDINGS", "false").lower() == "true" or
-            (os.getenv("LLM_EMBEDDING_API_URL") is None and 
-             os.getenv("LLM_CHAT_API_URL") is not None and
-             self._supports_embeddings(os.getenv("LLM_CHAT_API_URL", "")))
-        )
+        use_external_env = os.getenv("USE_EXTERNAL_EMBEDDINGS", "false").lower() == "true"
+        has_embedding_url = os.getenv("LLM_EMBEDDING_API_URL") is not None
+        
+        # Respect explicit false setting - don't auto-detect if explicitly disabled
+        if os.getenv("USE_EXTERNAL_EMBEDDINGS", "false").lower() == "false":
+            # User explicitly disabled external embeddings
+            self.use_external = False
+        else:
+            # Only auto-detect if not explicitly disabled
+            auto_detect_external = (
+                not has_embedding_url and 
+                use_external_env and
+                os.getenv("LLM_CHAT_API_URL") is not None and
+                self._supports_embeddings(os.getenv("LLM_CHAT_API_URL", ""))
+            )
+            
+            self.use_external = has_embedding_url or use_external_env or auto_detect_external
         
         # Batch processing settings
         self.max_batch_size = int(os.getenv("EMBEDDING_BATCH_SIZE", "100"))
@@ -76,20 +86,25 @@ class ExternalEmbeddingManager:
         """Validate embedding configuration and warn about common issues"""
         # Check if user has configured OpenRouter for embeddings
         if self.use_external and 'openrouter.ai' in self.embedding_api_url.lower():
-            logger.warning("⚠️  CONFIGURATION WARNING: OpenRouter does not support embeddings API!")
-            logger.warning("OpenRouter only supports chat completions, not text embeddings.")
-            logger.warning("Please either:")
-            logger.warning("1. Set USE_EXTERNAL_EMBEDDINGS=false to use local embeddings, OR")
-            logger.warning("2. Configure OpenAI API for embeddings: LLM_EMBEDDING_API_URL=https://api.openai.com/v1")
-            logger.warning("Falling back to local embeddings for now...")
+            # Only show this warning once per session
+            if not hasattr(self, '_config_warning_shown'):
+                logger.warning("⚠️  CONFIGURATION WARNING: OpenRouter does not support embeddings API!")
+                logger.warning("OpenRouter only supports chat completions, not text embeddings.")
+                logger.warning("Please either:")
+                logger.warning("1. Set USE_EXTERNAL_EMBEDDINGS=false to use local embeddings, OR")
+                logger.warning("2. Configure OpenAI API for embeddings: LLM_EMBEDDING_API_URL=https://api.openai.com/v1")
+                logger.warning("Falling back to local embeddings for now...")
+                self._config_warning_shown = True
             # Force disable external embeddings
             self.use_external = False
         
         # Check if external embeddings are enabled but no API key
         elif self.use_external and not self.embedding_api_key:
-            logger.warning("⚠️  External embeddings enabled but no API key configured")
-            logger.warning("Set LLM_EMBEDDING_API_KEY or OPENAI_API_KEY environment variable")
-            logger.warning("Falling back to local embeddings...")
+            if not hasattr(self, '_api_key_warning_shown'):
+                logger.warning("⚠️  External embeddings enabled but no API key configured")
+                logger.warning("Set LLM_EMBEDDING_API_KEY or OPENAI_API_KEY environment variable")
+                logger.warning("Falling back to local embeddings...")
+                self._api_key_warning_shown = True
             self.use_external = False
     
     def _supports_embeddings(self, api_url: str) -> bool:
@@ -109,9 +124,11 @@ class ExternalEmbeddingManager:
             'host.docker.internal'  # Docker host reference
         ]
         
-        # Explicitly warn about OpenRouter
+        # Explicitly warn about OpenRouter (but only once per session)
         if 'openrouter.ai' in api_url.lower():
-            logger.warning("OpenRouter does not support embeddings API - falling back to local embeddings")
+            if not hasattr(self, '_openrouter_warning_shown'):
+                logger.warning("OpenRouter does not support embeddings API - falling back to local embeddings")
+                self._openrouter_warning_shown = True
             return False
         
         return any(provider in api_url.lower() for provider in embedding_providers)

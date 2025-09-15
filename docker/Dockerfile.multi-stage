@@ -21,10 +21,16 @@ RUN apt-get update && apt-get install -y \
 # Development stage
 FROM base as development
 
-# Install development dependencies with cache mount
-COPY requirements.txt requirements-dev.txt* ./
+# Copy dependency files for better layer caching
+COPY requirements-core.txt requirements-platform.txt ./
+COPY discord-bot/requirements-discord.txt ./discord-bot/
+COPY requirements-dev.txt* ./
+
+# Install dependencies with cache mount
 RUN --mount=type=cache,target=/root/.cache/pip \
-    pip install -r requirements.txt && \
+    pip install -r requirements-core.txt && \
+    pip install -r requirements-platform.txt && \
+    pip install -r discord-bot/requirements-discord.txt && \
     if [ -f requirements-dev.txt ]; then pip install -r requirements-dev.txt; fi && \
     python -m spacy download en_core_web_sm
 
@@ -45,12 +51,15 @@ CMD ["sh", "-c", "python validate_config.py && python run.py"]
 # Production stage  
 FROM base as production
 
-# Copy only requirements first (for better caching)
-COPY requirements.txt ./
+# Copy dependency files for better layer caching
+COPY requirements-core.txt requirements-platform.txt ./
+COPY discord-bot/requirements-discord.txt ./discord-bot/
 
 # Install Python dependencies with cache mount for faster builds
 RUN --mount=type=cache,target=/root/.cache/pip \
-    pip install --no-cache-dir -r requirements.txt && \
+    pip install --no-cache-dir -r requirements-core.txt && \
+    pip install --no-cache-dir -r requirements-platform.txt && \
+    pip install --no-cache-dir -r discord-bot/requirements-discord.txt && \
     python -m spacy download en_core_web_sm
 
 # Copy only necessary application files
@@ -92,9 +101,14 @@ RUN apk add --no-cache \
     ffmpeg opus-dev wget netcat-openbsd procps && \
     pip install --upgrade pip
 
-# Copy and install requirements
-COPY requirements.txt ./
-RUN pip install --no-cache-dir -r requirements.txt && \
+# Copy dependency files for better layer caching
+COPY requirements-core.txt requirements-platform.txt ./
+COPY discord-bot/requirements-discord.txt ./discord-bot/
+
+# Install dependencies in stages for better error tracking
+RUN pip install --no-cache-dir -r requirements-core.txt && \
+    pip install --no-cache-dir -r requirements-platform.txt && \
+    pip install --no-cache-dir -r discord-bot/requirements-discord.txt && \
     python -m spacy download en_core_web_sm && \
     apk del gcc musl-dev libffi-dev openssl-dev
 

@@ -24,10 +24,15 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/* \
     && pip install --no-cache-dir --upgrade pip
 
-# Copy and install Python dependencies
-COPY requirements.txt .
+# Copy and install Python dependencies using new multi-tier structure
+COPY requirements-core.txt requirements-platform.txt ./
+COPY discord-bot/requirements-discord.txt ./discord-bot/
+
 RUN --mount=type=cache,target=/root/.cache/pip \
-    pip install --no-cache-dir -r requirements.txt
+    pip install --no-cache-dir -r requirements-core.txt && \
+    pip install --no-cache-dir -r requirements-platform.txt && \
+    pip install --no-cache-dir -r discord-bot/requirements-discord.txt
+
 # Add spaCy model download with cache
 RUN --mount=type=cache,target=/root/.cache/pip \
     python -m spacy download en_core_web_sm

@@ -32,8 +32,8 @@
 - 📄 **[Setup Card](SETUP_CARD.md)** - One-page reference for quick setup
 
 **🎯 Super Quick Start**: 
-- Discord Bot: `python discord-bot/run-discord.py` for cloud-powered Discord bot
-- Desktop App: `python desktop-app/run-desktop.py` for private local AI chat
+- Discord Bot: `python run.py` - cloud-powered Discord bot (from project root)
+- Desktop App: `python universal_native_app.py` - private local AI chat (from project root)
 - See [Deployment Structure Guide](DEPLOYMENT_STRUCTURE.md) for details
 
 ## ✨ **Key Features**
@@ -137,6 +137,8 @@ nano .env  # Set DISCORD_BOT_TOKEN
 | **[💻 Development Guide](docs/development/DEVELOPMENT_GUIDE.md)** | Developers | 30 min | Customize and extend the bot |
 | **[🔑 API Configuration](docs/configuration/API_KEY_CONFIGURATION.md)** | All Users | 10 min | LLM provider setup |
 | **[🐳 Docker Hub Publishing](docs/deployment/DOCKER_HUB_SETUP.md)** | Maintainers | 15 min | Automated Docker publishing setup |
+| **[🍎 MLX Integration Guide](MLX_INTEGRATION_GUIDE.md)** | Apple Users | 20 min | Native Apple Silicon optimization |
+| **[🧪 MLX Testing Guide](MLX_TESTING_GUIDE.md)** | Developers | 15 min | Comprehensive MLX validation |
 | **[🧠 Memory System](docs/ai-systems/MEMORY_SYSTEM_README.md)** | Advanced | 20 min | Understanding AI memory |
 | **[🎭 Character Creation](docs/character/character_prompt_guide.md)** | All Users | 15 min | Creating unique personalities |
 
@@ -227,11 +229,17 @@ BOT_SYSTEM_PROMPT_FILE=./prompts/casual_friend_template.md       # Casual chat b
 ### **Development Mode**
 ```bash
 # Native development with hot-reload
-./bot.sh start native
+```bash
+# Recommended: Simple native development
 python run.py
 
-# Full containerized development  
-./bot.sh start dev
+# Alternative: Infrastructure services + native bot
+./bot.sh start infrastructure
+python run.py
+
+# Full containerized production deployment  
+./bot.sh start prod
+```
 ```
 
 ### **Production Deployment**

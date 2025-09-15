@@ -48,6 +48,10 @@ class ResourceInfo:
     memory_gb: float
     cpu_cores: int
     gpu_available: bool
+    platform: str = "Unknown"
+    architecture: str = "Unknown"
+    apple_silicon: bool = False
+    mlx_available: bool = False
     platform: str
     architecture: str
 
@@ -233,17 +237,25 @@ class LocalLLMDetector:
         """Detect system resources for recommendations"""
         try:
             memory_gb = psutil.virtual_memory().total / (1024**3)
-            cpu_cores = psutil.cpu_count(logical=True)
+            cpu_cores = psutil.cpu_count(logical=True) or 4  # Default to 4 if None
             gpu_available = self._detect_gpu()
             platform_name = platform.system()
             architecture = platform.machine()
+            
+            # Check for Apple Silicon
+            apple_silicon = (platform_name == 'Darwin' and architecture == 'arm64')
+            
+            # Check MLX availability
+            mlx_available = self._detect_mlx_availability()
             
             return ResourceInfo(
                 memory_gb=memory_gb,
                 cpu_cores=cpu_cores,
                 gpu_available=gpu_available,
                 platform=platform_name,
-                architecture=architecture
+                architecture=architecture,
+                apple_silicon=apple_silicon,
+                mlx_available=mlx_available
             )
         except Exception as e:
             logger.warning(f"Resource detection failed: {e}")
@@ -252,8 +264,24 @@ class LocalLLMDetector:
                 cpu_cores=4,
                 gpu_available=False,
                 platform="Unknown",
-                architecture="Unknown"
+                architecture="Unknown",
+                apple_silicon=False,
+                mlx_available=False
             )
+    
+    def _detect_mlx_availability(self) -> bool:
+        """Check if MLX is available on Apple Silicon"""
+        try:
+            # Only available on Apple Silicon
+            if platform.system() != 'Darwin' or platform.machine() != 'arm64':
+                return False
+            
+            # Try to import MLX
+            import mlx.core  # type: ignore
+            from mlx_lm import load  # type: ignore
+            return True
+        except ImportError:
+            return False
     
     def _detect_gpu(self) -> bool:
         """Detect GPU availability"""
@@ -280,7 +308,56 @@ class LocalLLMDetector:
     def get_setup_recommendation(self, resources: ResourceInfo) -> SetupRecommendation:
         """Provide setup recommendations based on system resources"""
         
-        if resources.memory_gb >= 32 and resources.gpu_available:
+        # Apple Silicon with MLX gets special treatment
+        if resources.apple_silicon and resources.mlx_available:
+            if resources.memory_gb >= 16:
+                return SetupRecommendation(
+                    preferred_server="MLX (Apple Silicon Optimized)",
+                    recommended_models=["llama-3.1-8b-instruct-mlx", "mistral-7b-instruct-mlx"],
+                    setup_url="https://github.com/ml-explore/mlx-examples",
+                    memory_note="🍎 MLX provides optimal performance on Apple Silicon with unified memory",
+                    installation_steps=[
+                        "1. MLX is already installed and detected",
+                        "2. Download MLX-optimized models to ./models/mlx/",
+                        "3. Use: python -m mlx_lm.convert --hf-path <model> --mlx-path ./models/mlx/<model>",
+                        "4. MLX models will be automatically preferred on Apple Silicon",
+                        "5. Fallback to Ollama/LM Studio if MLX models unavailable"
+                    ]
+                )
+            else:
+                return SetupRecommendation(
+                    preferred_server="MLX + Ollama (Hybrid)",
+                    recommended_models=["llama3.2:3b", "phi3:mini"],
+                    setup_url="https://ollama.ai/",
+                    memory_note="🍎 MLX preferred for local models, Ollama for convenience",
+                    installation_steps=[
+                        "1. MLX detected for optimal Apple Silicon performance",
+                        "2. Install Ollama as backup: brew install ollama",
+                        "3. Start Ollama: ollama serve",
+                        "4. Pull model: ollama pull llama3.2:3b",
+                        "5. WhisperEngine will prefer MLX when models available"
+                    ]
+                )
+        
+        # Apple Silicon without MLX
+        elif resources.apple_silicon:
+            return SetupRecommendation(
+                preferred_server="LM Studio (Apple Silicon)",
+                recommended_models=["llama-3.1-8b-instruct", "mistral-7b-instruct"],
+                setup_url="https://lmstudio.ai/",
+                memory_note="🍎 LM Studio optimized for Apple Silicon with Metal acceleration",
+                installation_steps=[
+                    "1. Download LM Studio from https://lmstudio.ai/",
+                    "2. Install and launch LM Studio (Apple Silicon native)",
+                    "3. Browse models and download Apple Silicon optimized models",
+                    "4. Enable Metal GPU acceleration in settings",
+                    "5. Start the local server (click 'Start Server' tab)",
+                    "6. Optional: Install MLX for even better performance: pip install mlx-lm"
+                ]
+            )
+        
+        # High-end systems
+        elif resources.memory_gb >= 32 and resources.gpu_available:
             return SetupRecommendation(
                 preferred_server="LM Studio",
                 recommended_models=["llama-3.1-8b-instruct", "mistral-7b-instruct", "codellama-7b"],

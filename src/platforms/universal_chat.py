@@ -830,8 +830,15 @@ class UniversalChatOrchestrator:
             # Add current message to conversation context
             conversation_context.append({"role": "user", "content": message.content})
             
-            # Generate response using the Discord bot's LLM client
-            response_text = await llm_client.generate_chat_completion_safe(conversation_context)
+            # Generate response using the Discord bot's LLM client (run in thread to avoid blocking)
+            response_text = await asyncio.to_thread(
+                llm_client.generate_chat_completion,
+                conversation_context
+            )
+            
+            # Extract the response content if it's in OpenAI format
+            if isinstance(response_text, dict) and 'choices' in response_text:
+                response_text = response_text['choices'][0]['message']['content']
             
             end_time = datetime.now()
             generation_time_ms = int((end_time - start_time).total_seconds() * 1000)
@@ -942,9 +949,12 @@ You adapt your responses based on the platform and conversation context. Be help
                 }
                 chat_messages.insert(0, system_prompt)
             
-            # Generate response using actual LLM
+            # Generate response using actual LLM (run in thread to avoid blocking)
             start_time = datetime.now()
-            response_text = self.llm_client.get_chat_response(chat_messages)
+            response_text = await asyncio.to_thread(
+                self.llm_client.get_chat_response,
+                chat_messages
+            )
             end_time = datetime.now()
             
             generation_time_ms = int((end_time - start_time).total_seconds() * 1000)

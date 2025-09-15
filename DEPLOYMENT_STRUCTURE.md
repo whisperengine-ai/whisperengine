@@ -1,18 +1,16 @@
 # WhisperEngine Deployment Structure
 
-This repository now supports clean separation between Discord bot and desktop app deployments using subdirectories.
+This repository uses a unified root structure with environment-specific configurations.
 
 ## 🏗️ Directory Structure
 
 ```
 whisperengine/                   # Main repository
-├── discord-bot/                 # Discord bot deployment
-│   ├── .env                     # Discord bot configuration
-│   ├── docker-compose.yml       # Docker services for Discord bot
-│   └── run-discord.py           # Discord bot launcher
-├── desktop-app/                 # Desktop app deployment
-│   ├── .env                     # Desktop app configuration
-│   └── run-desktop.py           # Desktop app launcher
+├── .env                         # Default configuration
+├── .env.discord                 # Discord bot configuration  
+├── .env.desktop-app             # Desktop app configuration
+├── run.py                       # Discord bot entry point
+├── universal_native_app.py      # Desktop app entry point
 ├── src/                         # Shared core code
 ├── requirements.txt             # Shared dependencies
 └── README.md                    # Main documentation
@@ -22,35 +20,34 @@ whisperengine/                   # Main repository
 
 ### Discord Bot (Cloud APIs)
 ```bash
-# Method 1: Using launcher
-python discord-bot/run-discord.py
+# Method 1: Using default configuration
+python run.py
 
-# Method 2: Using Docker
-cd discord-bot
-docker-compose up
+# Method 2: Using Discord-specific environment
+DOTENV_PATH=.env.discord python run.py
 
 # Method 3: Direct with environment
-DOTENV_PATH=discord-bot/.env python run.py
+DOTENV_PATH=.env.discord python run.py
 ```
 
 ### Desktop App (Local Models)
 ```bash
-# Method 1: Using launcher
-python desktop-app/run-desktop.py
+# Method 1: Using default configuration
+python universal_native_app.py
 
-# Method 2: Direct with environment  
-DOTENV_PATH=desktop-app/.env python universal_native_app.py
+# Method 2: Using desktop-specific environment  
+DOTENV_PATH=.env.desktop-app python universal_native_app.py
 ```
 
 ## ⚙️ Configuration Differences
 
-### Discord Bot (`discord-bot/.env`)
+### Discord Bot (`.env.discord`)
 - 🌐 **OpenRouter APIs** for scalable cloud deployment
 - 🐳 **Docker services** (Redis, PostgreSQL, ChromaDB)
 - 🔊 **Voice capabilities** enabled
 - 🚀 **High performance** settings
 
-### Desktop App (`desktop-app/.env`)
+### Desktop App (`.env.desktop-app`)
 - 🖥️ **llama-cpp-python** for local privacy
 - 💾 **SQLite database** for local storage
 - 🔇 **Voice disabled** by default
@@ -68,19 +65,19 @@ git commit -m "Add new AI feature"
 ### Testing Different Deployments
 ```bash
 # Test Discord bot
-python discord-bot/run-discord.py
+python run.py
 
 # Test desktop app
-python desktop-app/run-desktop.py
+python universal_native_app.py
 ```
 
-### Adding Deployment-Specific Features
+### Environment-Specific Configuration
 ```bash
-# Discord bot specific
-vim discord-bot/run-discord.py
+# Discord bot with specific environment
+DOTENV_PATH=.env.discord python run.py
 
-# Desktop app specific  
-vim desktop-app/run-desktop.py
+# Desktop app with specific environment
+DOTENV_PATH=.env.desktop-app python universal_native_app.py
 ```
 
 ## 🔧 Environment Priority
@@ -105,9 +102,9 @@ The environment loading follows this priority:
 If you have separate repositories, you can migrate like this:
 
 ```bash
-# Copy specific configs to subdirectories
-cp ../whisperengine-discord/.env discord-bot/
-cp ../whisperengine-desktop/.env desktop-app/
+# Copy specific configs to root directory
+cp ../whisperengine-discord/.env .env.discord
+cp ../whisperengine-desktop/.env .env.desktop-app
 
 # Core code is already shared in src/
 ```
@@ -116,12 +113,12 @@ cp ../whisperengine-desktop/.env desktop-app/
 
 ```bash
 # Discord bot development
-python discord-bot/run-discord.py
+python run.py
 
 # Desktop app development  
-python desktop-app/run-desktop.py
+python universal_native_app.py
 
 # Run tests with specific config
-DOTENV_PATH=discord-bot/.env python test_discord_integration.py
-DOTENV_PATH=desktop-app/.env python test_desktop_integration.py
+DOTENV_PATH=.env.discord python test_discord_integration.py
+DOTENV_PATH=.env.desktop-app python test_desktop_integration.py
 ```

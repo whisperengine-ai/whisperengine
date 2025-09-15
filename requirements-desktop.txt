@@ -1,0 +1,18 @@
+# Desktop App Specific Dependencies
+# Install with: pip install -r requirements-core.txt -r requirements-desktop.txt
+
+# Desktop UI Framework (cross-platform)
+PySide6>=6.5.0
+
+# System tray and desktop integration
+pystray==0.19.5
+
+# macOS-specific dependencies (only on macOS)
+pyobjc-core>=9.0; sys_platform == "darwin"
+pyobjc-framework-Cocoa>=9.0; sys_platform == "darwin"
+
+# Windows-specific dependencies (only on Windows)
+pywin32>=306; sys_platform == "win32"
+
+# Linux-specific dependencies (only on Linux)
+python3-xlib>=0.15; sys_platform == "linux"

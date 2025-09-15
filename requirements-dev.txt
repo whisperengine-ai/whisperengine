@@ -1,0 +1,42 @@
+# Development and Testing Dependencies
+# Install with: pip install -r requirements-dev.txt
+
+# All core dependencies
+-r requirements-core.txt
+
+# Testing frameworks
+pytest==8.4.2
+pytest-asyncio==1.1.0
+pytest-mock==3.11.1
+pytest-cov==4.1.0
+
+# Code quality and linting
+black==23.9.1
+isort==5.12.0
+flake8==6.1.0
+mypy==1.6.1
+
+# Documentation
+sphinx>=7.1.0
+sphinx-rtd-theme>=1.3.0
+
+# Performance profiling
+memory-profiler==0.61.0
+py-spy==0.3.14
+
+# Security scanning
+bandit==1.7.5
+safety==2.3.5
+
+# Build and packaging
+build==1.0.3
+wheel==0.41.2
+setuptools>=68.2.0
+
+# Cross-platform building
+PyInstaller>=6.0.0
+cx-Freeze>=6.15.0
+
+# Jupyter for development notebooks (optional)
+jupyter>=1.0.0
+ipykernel>=6.25.0

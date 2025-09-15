@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Dependency checker for WhisperEngine Web UI
-Checks for missing dependencies and provides installation guidance
+Dependency checker for WhisperEngine
+Checks for missing dependencies using the new multi-tier dependency structure
 """
 
 import sys
@@ -10,36 +10,56 @@ import subprocess
 from typing import List, Dict, Tuple
 
 class DependencyChecker:
-    """Check for missing dependencies and provide installation guidance"""
+    """Check for missing dependencies using new multi-tier structure"""
     
-    # Core dependencies required for Web UI functionality
+    # Core dependencies (requirements-core.txt) - required for all deployments
     CORE_DEPENDENCIES = {
         "requests": "HTTP client for LLM API calls",
-        "fastapi": "Web framework for UI server",
-        "uvicorn": "ASGI server for FastAPI",
         "aiohttp": "Async HTTP client",
         "python-dotenv": "Environment configuration",
-        "psutil": "System monitoring"
-    }
-    
-    # AI/ML dependencies for advanced features
-    AI_DEPENDENCIES = {
+        "psutil": "System monitoring",
         "chromadb": "Vector database for memory",
         "sentence-transformers": "Text embeddings",
         "numpy": "Numerical computing",
-        "transformers": "NLP models"
+        "transformers": "NLP models",
+        "llama_cpp": "Local LLM inference (llama-cpp-python)"
     }
     
-    # Optional dependencies
-    OPTIONAL_DEPENDENCIES = {
-        "redis": "Conversation caching",
+    # Discord bot dependencies (requirements-discord.txt)
+    DISCORD_DEPENDENCIES = {
+        "discord": "Discord API library",
         "asyncpg": "PostgreSQL async support",
-        "neo4j": "Graph database support"
+        "psycopg2": "PostgreSQL binary driver",
+        "redis": "Conversation caching",
+        "PyNaCl": "Voice support"
+    }
+    
+    # Desktop app dependencies (requirements-desktop.txt)  
+    DESKTOP_DEPENDENCIES = {
+        "PySide6": "Cross-platform GUI framework",
+        "fastapi": "Web framework for local UI",
+        "uvicorn": "ASGI server for FastAPI",
+        "aiosqlite": "SQLite async support",
+        "pystray": "System tray integration"
+    }
+    
+    # Platform-specific optimizations (requirements-platform.txt)
+    PLATFORM_DEPENDENCIES = {
+        "mlx": "Apple Silicon optimization (macOS ARM64 only)",
+    }
+    
+    # Optional dependencies for advanced features
+    OPTIONAL_DEPENDENCIES = {
+        "neo4j": "Graph database support",
+        "elevenlabs": "Voice synthesis",
+        "audioop": "Audio processing"
     }
     
     def __init__(self):
         self.missing_core = []
-        self.missing_ai = []
+        self.missing_discord = []
+        self.missing_desktop = []
+        self.missing_platform = []
         self.missing_optional = []
         
     def check_dependency(self, package_name: str) -> bool:
@@ -50,18 +70,33 @@ class DependencyChecker:
         except ImportError:
             return False
     
-    def check_all_dependencies(self) -> Dict[str, List[Tuple[str, str]]]:
-        """Check all dependencies and categorize missing ones"""
+    def check_all_dependencies(self, deployment_type: str = "all") -> Dict[str, List[Tuple[str, str]]]:
+        """Check dependencies based on deployment type
         
-        # Check core dependencies
+        Args:
+            deployment_type: "discord", "desktop", "all"
+        """
+        
+        # Check core dependencies (always required)
         for package, description in self.CORE_DEPENDENCIES.items():
             if not self.check_dependency(package):
                 self.missing_core.append((package, description))
         
-        # Check AI dependencies
-        for package, description in self.AI_DEPENDENCIES.items():
+        # Check deployment-specific dependencies
+        if deployment_type in ["discord", "all"]:
+            for package, description in self.DISCORD_DEPENDENCIES.items():
+                if not self.check_dependency(package):
+                    self.missing_discord.append((package, description))
+        
+        if deployment_type in ["desktop", "all"]:
+            for package, description in self.DESKTOP_DEPENDENCIES.items():
+                if not self.check_dependency(package):
+                    self.missing_desktop.append((package, description))
+        
+        # Check platform-specific dependencies
+        for package, description in self.PLATFORM_DEPENDENCIES.items():
             if not self.check_dependency(package):
-                self.missing_ai.append((package, description))
+                self.missing_platform.append((package, description))
         
         # Check optional dependencies
         for package, description in self.OPTIONAL_DEPENDENCIES.items():
@@ -70,55 +105,70 @@ class DependencyChecker:
         
         return {
             "core": self.missing_core,
-            "ai": self.missing_ai,
+            "discord": self.missing_discord,
+            "desktop": self.missing_desktop,
+            "platform": self.missing_platform,
             "optional": self.missing_optional
         }
     
     def generate_install_commands(self) -> Dict[str, str]:
-        """Generate installation commands for missing dependencies"""
+        """Generate installation commands using new multi-tier structure"""
         commands = {}
         
-        if self.missing_core:
-            core_packages = " ".join([pkg for pkg, _ in self.missing_core])
-            commands["core"] = f"pip install {core_packages}"
+        # Use new multi-tier dependency files
+        commands["core"] = "pip install -r requirements-core.txt"
+        commands["platform"] = "pip install -r requirements-platform.txt"
+        commands["discord"] = "pip install -r requirements-discord.txt"
+        commands["desktop"] = "pip install -r requirements-desktop.txt"
         
-        if self.missing_ai:
-            ai_packages = " ".join([pkg for pkg, _ in self.missing_ai])
-            commands["ai"] = f"pip install {ai_packages}"
-        
-        if self.missing_optional:
-            optional_packages = " ".join([pkg for pkg, _ in self.missing_optional])
-            commands["optional"] = f"pip install {optional_packages}"
-        
-        # Full requirements file command
-        commands["all"] = "pip install -r requirements.txt"
+        # Automated installers
+        commands["auto_discord"] = "./scripts/install-discord.sh  # or .bat for Windows"
+        commands["auto_desktop"] = "./scripts/install-desktop.sh  # or .bat for Windows"
         
         return commands
     
-    def print_dependency_report(self):
-        """Print a comprehensive dependency report"""
-        missing = self.check_all_dependencies()
+    def print_dependency_report(self, deployment_type: str = "all"):
+        """Print a comprehensive dependency report using new multi-tier structure"""
+        missing = self.check_all_dependencies(deployment_type)
         
-        print("🔍 WhisperEngine Dependency Check")
-        print("=" * 50)
+        print("🔍 WhisperEngine Multi-Tier Dependency Check")
+        print("=" * 60)
+        print(f"Deployment Type: {deployment_type}")
+        print()
         
         # Core dependencies
         if missing["core"]:
-            print("❌ MISSING CORE DEPENDENCIES (Required for basic functionality):")
+            print("❌ MISSING CORE DEPENDENCIES (Required for all deployments):")
             for package, description in missing["core"]:
                 print(f"   • {package:20} - {description}")
             print()
         else:
             print("✅ All core dependencies are installed")
         
-        # AI dependencies
-        if missing["ai"]:
-            print("⚠️  MISSING AI DEPENDENCIES (Required for advanced AI features):")
-            for package, description in missing["ai"]:
+        # Discord dependencies
+        if deployment_type in ["discord", "all"] and missing["discord"]:
+            print("❌ MISSING DISCORD BOT DEPENDENCIES:")
+            for package, description in missing["discord"]:
                 print(f"   • {package:20} - {description}")
             print()
-        else:
-            print("✅ All AI dependencies are installed")
+        elif deployment_type in ["discord", "all"]:
+            print("✅ All Discord bot dependencies are installed")
+        
+        # Desktop dependencies  
+        if deployment_type in ["desktop", "all"] and missing["desktop"]:
+            print("❌ MISSING DESKTOP APP DEPENDENCIES:")
+            for package, description in missing["desktop"]:
+                print(f"   • {package:20} - {description}")
+            print()
+        elif deployment_type in ["desktop", "all"]:
+            print("✅ All desktop app dependencies are installed")
+        
+        # Platform dependencies
+        if missing["platform"]:
+            print("⚠️  MISSING PLATFORM OPTIMIZATIONS:")
+            for package, description in missing["platform"]:
+                print(f"   • {package:20} - {description}")
+            print()
         
         # Optional dependencies
         if missing["optional"]:
@@ -129,46 +179,64 @@ class DependencyChecker:
         
         # Installation commands
         if any(missing.values()):
-            print("🛠️  INSTALLATION COMMANDS:")
+            print("🛠️  INSTALLATION COMMANDS (New Multi-Tier Structure):")
             commands = self.generate_install_commands()
             
-            if "core" in commands:
-                print(f"   Core packages:     {commands['core']}")
-            if "ai" in commands:
-                print(f"   AI packages:       {commands['ai']}")
-            if "optional" in commands:
-                print(f"   Optional packages: {commands['optional']}")
+            print("   Manual Installation:")
+            print(f"     Core dependencies:     {commands['core']}")
+            print(f"     Platform optimizations: {commands['platform']}")
+            if deployment_type in ["discord", "all"]:
+                print(f"     Discord bot:           {commands['discord']}")
+            if deployment_type in ["desktop", "all"]:
+                print(f"     Desktop app:           {commands['desktop']}")
             
-            print(f"\n   Install all:       {commands['all']}")
+            print("\n   Automated Installation:")
+            if deployment_type in ["discord", "all"]:
+                print(f"     Discord bot:           {commands['auto_discord']}")
+            if deployment_type in ["desktop", "all"]:
+                print(f"     Desktop app:           {commands['auto_desktop']}")
+            
+            print("\n   For full documentation: DEPENDENCY_MANAGEMENT.md")
             
             # Platform-specific guidance
             print("\n📋 PLATFORM-SPECIFIC NOTES:")
+            print("   • Apple Silicon (M1/M2/M3):")
+            print("     Automatic MLX optimization available")
             print("   • macOS with Homebrew Python:")
-            print("     pip install --user -r requirements.txt")
+            print("     Use virtual environment: python3 -m venv .venv")
             print("   • Externally managed environments:")
-            print("     python3 -m venv venv && source venv/bin/activate")
-            print("     pip install -r requirements.txt")
+            print("     python3 -m venv .venv && source .venv/bin/activate")
             
         else:
-            print("🎉 All dependencies are installed! Web UI should work with real AI responses.")
+            print("🎉 All dependencies are installed! WhisperEngine should work properly.")
         
         return len(missing["core"]) == 0
     
-    def is_web_ui_ready(self) -> bool:
-        """Check if Web UI can run with real AI responses"""
-        missing = self.check_all_dependencies()
+    def is_deployment_ready(self, deployment_type: str = "all") -> bool:
+        """Check if deployment is ready for specified type"""
+        missing = self.check_all_dependencies(deployment_type)
         return len(missing["core"]) == 0
 
 def main():
     """Main function for command-line usage"""
+    import argparse
+    
+    parser = argparse.ArgumentParser(description="Check WhisperEngine dependencies")
+    parser.add_argument("--deployment", "-d", 
+                       choices=["discord", "desktop", "all"],
+                       default="all",
+                       help="Deployment type to check")
+    
+    args = parser.parse_args()
+    
     checker = DependencyChecker()
-    is_ready = checker.print_dependency_report()
+    is_ready = checker.print_dependency_report(args.deployment)
     
     if is_ready:
-        print("\n✅ Ready to run Web UI with real AI responses!")
+        print(f"\n✅ Ready to run WhisperEngine ({args.deployment})!")
         sys.exit(0)
     else:
-        print("\n❌ Install missing dependencies before running Web UI")
+        print(f"\n❌ Install missing dependencies before running {args.deployment} deployment")
         sys.exit(1)
 
 if __name__ == "__main__":
