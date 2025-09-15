@@ -84,9 +84,20 @@ class ModularBotManager:
                 logger.info("🤖 WhisperEngine bot initialization complete - all systems ready!")
             
         except Exception as e:
-            logger.error(f"💥 Failed to initialize bot: {e}")
-            import traceback
-            logger.error(f"Traceback: {traceback.format_exc()}")
+            # Check if this is a memory initialization error and provide cleaner messaging
+            error_msg = str(e)
+            if "Failed to initialize memory system" in error_msg or "ChromaDB" in error_msg:
+                logger.error(f"💥 Failed to initialize bot: {e}")
+                if "ChromaDB server is not available" in error_msg:
+                    logger.error("💡 Solution: Start ChromaDB with 'docker compose up chromadb' or set USE_CHROMADB_HTTP=false")
+                elif "ChromaDB server connection test failed" in error_msg:
+                    logger.error("💡 Solution: Ensure ChromaDB server is running and accessible")
+                # Don't print full traceback for known ChromaDB issues
+            else:
+                # For other errors, print full details
+                logger.error(f"💥 Failed to initialize bot: {e}")
+                import traceback
+                logger.error(f"Traceback: {traceback.format_exc()}")
             raise
     
     async def _initialize_command_handlers(self):
@@ -254,9 +265,14 @@ async def main():
     except KeyboardInterrupt:
         logger.info("Bot stopped by user")
     except Exception as e:
-        logger.error(f"Fatal error: {e}")
-        import traceback
-        logger.error(f"Traceback: {traceback.format_exc()}")
+        error_msg = str(e)
+        if "Failed to initialize memory system" in error_msg or "ChromaDB" in error_msg:
+            logger.error(f"Fatal error: {e}")
+            # Don't print full traceback for known ChromaDB configuration issues
+        else:
+            logger.error(f"Fatal error: {e}")
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
         return 1
     finally:
         if bot_manager:

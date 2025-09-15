@@ -78,9 +78,30 @@ class PostgreSQLUserDB:
             self.pool = await asyncpg.create_pool(**self._connection_params)
             await self._create_tables()
             logger.info("PostgreSQL database initialized successfully")
+        except asyncpg.InvalidCatalogNameError as e:
+            error_msg = f"PostgreSQL database '{self._connection_params['database']}' does not exist"
+            logger.error(error_msg)
+            logger.info("To fix: Create the database or check POSTGRES_DB environment variable")
+            raise ConnectionError(error_msg) from e
+        except asyncpg.InvalidPasswordError as e:
+            error_msg = f"PostgreSQL authentication failed for user '{self._connection_params['user']}'"
+            logger.error(error_msg)
+            logger.info("To fix: Check POSTGRES_USER and POSTGRES_PASSWORD environment variables")
+            raise ConnectionError(error_msg) from e
+        except asyncpg.CannotConnectNowError as e:
+            error_msg = f"PostgreSQL server is not accepting connections at {self._connection_params['host']}:{self._connection_params['port']}"
+            logger.error(error_msg)
+            logger.info("To fix: Start PostgreSQL with 'docker compose up postgres' or check server status")
+            raise ConnectionError(error_msg) from e
+        except (asyncpg.ConnectionDoesNotExistError, OSError) as e:
+            error_msg = f"PostgreSQL server is not available at {self._connection_params['host']}:{self._connection_params['port']}"
+            logger.error(error_msg)
+            logger.info("To fix: Start PostgreSQL server or check POSTGRES_HOST/POSTGRES_PORT settings")
+            raise ConnectionError(error_msg) from e
         except Exception as e:
-            logger.error(f"Failed to initialize PostgreSQL database: {e}")
-            raise
+            error_msg = f"Unexpected PostgreSQL connection error: {e}"
+            logger.error(error_msg)
+            raise ConnectionError(error_msg) from e
     
     async def _create_tables(self):
         """Create the user profiles table if it doesn't exist"""

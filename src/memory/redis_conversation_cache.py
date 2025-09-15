@@ -68,9 +68,25 @@ class RedisConversationCache:
             await self.redis.ping()
             logger.info("Redis connection established successfully")
             
+        except redis.ConnectionError as e:
+            error_msg = f"Redis server is not available at {self.redis_host}:{self.redis_port}"
+            logger.error(error_msg)
+            logger.info("To fix: Start Redis with 'docker compose up redis' or disable Redis cache")
+            raise ConnectionError(error_msg) from e
+        except redis.AuthenticationError as e:
+            error_msg = f"Redis authentication failed for {self.redis_host}:{self.redis_port}"
+            logger.error(error_msg)
+            logger.info("To fix: Check REDIS_PASSWORD environment variable")
+            raise ConnectionError(error_msg) from e
+        except redis.ResponseError as e:
+            error_msg = f"Redis configuration error: {e}"
+            logger.error(error_msg)
+            logger.info("To fix: Check Redis server configuration and database number")
+            raise ConnectionError(error_msg) from e
         except Exception as e:
-            logger.error(f"Failed to connect to Redis: {e}")
-            raise
+            error_msg = f"Unexpected Redis connection error: {e}"
+            logger.error(error_msg)
+            raise ConnectionError(error_msg) from e
     
     async def cleanup(self):
         """Cleanup Redis connection"""

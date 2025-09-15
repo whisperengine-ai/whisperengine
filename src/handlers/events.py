@@ -164,8 +164,12 @@ class BotEventHandlers:
                 # Database tables are automatically initialized by PostgreSQLUserDB.initialize()
                 logger.info("✅ Database tables initialized/verified")
                 
+            except ConnectionError as e:
+                # Clean error message for PostgreSQL connection failures
+                logger.error(f"PostgreSQL connection failed: {e}")
+                logger.warning("Bot will continue without PostgreSQL support")
             except Exception as e:
-                logger.error(f"Failed to initialize PostgreSQL pool: {e}")
+                logger.error(f"Unexpected error initializing PostgreSQL: {e}")
                 logger.warning("Bot will continue without PostgreSQL support")
         
         # Initialize Redis conversation cache if using Redis
@@ -174,8 +178,12 @@ class BotEventHandlers:
                 logger.info("Initializing Redis conversation cache...")
                 await self.conversation_cache.initialize()
                 logger.info("✅ Redis conversation cache initialized successfully")
+            except ConnectionError as e:
+                # Clean error message for Redis connection failures
+                logger.error(f"Redis connection failed: {e}")
+                logger.warning("Bot will continue with in-memory conversation cache")
             except Exception as e:
-                logger.error(f"Failed to initialize Redis conversation cache: {e}")
+                logger.error(f"Unexpected error initializing Redis conversation cache: {e}")
                 logger.warning("Bot will continue with limited conversation cache functionality")
         
         # Start job scheduler if available

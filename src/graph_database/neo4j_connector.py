@@ -68,9 +68,26 @@ class Neo4jConnector:
             # Initialize schema
             await self._initialize_schema()
             
+        except ServiceUnavailable as e:
+            error_msg = f"Neo4j server is not available at {self.config.uri}"
+            logger.error(error_msg)
+            logger.info("To fix: Start Neo4j with 'docker compose up neo4j' or disable graph database")
+            raise ConnectionError(error_msg) from e
         except Exception as e:
-            logger.error(f"Failed to connect to Neo4j: {e}")
-            raise
+            if "authentication" in str(e).lower() or "unauthorized" in str(e).lower():
+                error_msg = f"Neo4j authentication failed for user '{self.config.username}'"
+                logger.error(error_msg)
+                logger.info("To fix: Check NEO4J_USERNAME and NEO4J_PASSWORD environment variables")
+                raise ConnectionError(error_msg) from e
+            elif "connection" in str(e).lower() or "refused" in str(e).lower():
+                error_msg = f"Cannot connect to Neo4j server at {self.config.uri}"
+                logger.error(error_msg)
+                logger.info("To fix: Ensure Neo4j server is running and accessible")
+                raise ConnectionError(error_msg) from e
+            else:
+                error_msg = f"Unexpected Neo4j connection error: {e}"
+                logger.error(error_msg)
+                raise ConnectionError(error_msg) from e
     
     async def disconnect(self) -> None:
         """Close Neo4j connection."""
