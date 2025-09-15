@@ -517,4 +517,3 @@ if __name__ == "__main__":
     print("Original messages:", len(test_messages))
     print("Processed messages:", len(secure_messages))
     print("Security report:", processor.get_security_report())
-print('TEST: Security module loaded with live changes!')

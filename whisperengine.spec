@@ -14,13 +14,8 @@ ui_path = src_path / "ui"
 
 block_cipher = None
 
-# Collect data files (templates, static assets)
-data_files = [
-    (str(ui_path / "templates" / "index.html"), "src/ui/templates/"),
-    (str(ui_path / "static" / "style.css"), "src/ui/static/"),
-    (str(ui_path / "static" / "app.js"), "src/ui/static/"),
-    (str(ui_path / "static" / "favicon.ico"), "src/ui/static/"),
-]
+# Collect data files (no web UI files needed for native Qt app)
+data_files = []
 
 # Hidden imports (modules not automatically detected)
 hidden_imports = [

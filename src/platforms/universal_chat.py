@@ -490,6 +490,10 @@ class UniversalChatOrchestrator:
         self.active_conversations: Dict[str, Conversation] = {}
         self.ai_engine = None  # Would integrate with existing AI system
         
+        # Simple in-memory conversation history storage
+        # Format: {user_id_channel_id: [{'user_message': str, 'assistant_response': str, 'timestamp': datetime}, ...]}
+        self.conversation_history: Dict[str, List[Dict[str, Any]]] = {}
+        
         # Load platform configurations
         self.platform_configs = self._load_platform_configs()
     
@@ -1118,44 +1122,64 @@ You adapt your responses based on the platform and conversation context. Be help
     def _get_recent_conversation_pairs(self, user_id: str, channel_id: str, limit: int = 5) -> List[Dict[str, str]]:
         """Get recent conversation pairs from memory system (Discord architecture)"""
         try:
-            # Try to get from memory manager first
+            # First try our simple in-memory storage (guaranteed to work)
+            conversation_key = f"{user_id}_{channel_id}"
+            if conversation_key in self.conversation_history:
+                recent_entries = self.conversation_history[conversation_key][-limit:]
+                pairs = []
+                for entry in recent_entries:
+                    pairs.append({
+                        'user_message': entry['user_message'],
+                        'assistant_response': entry['assistant_response']
+                    })
+                if pairs:
+                    logging.debug(f"✅ Retrieved {len(pairs)} conversation pairs from memory for user {user_id}")
+                    return pairs
+            
+            # Try to get from memory manager as fallback
             if self.bot_core and hasattr(self.bot_core, 'memory_manager'):
                 memory_manager = self.bot_core.memory_manager
                 if memory_manager:  # Add null check
-                    # Try various memory retrieval methods depending on what's available
-                    if hasattr(memory_manager, 'get_recent_conversations'):
+                    # Check for get_conversation_history method
+                    if hasattr(memory_manager, 'get_conversation_history'):
                         try:
-                            conversations = memory_manager.get_recent_conversations(user_id, limit=limit)
+                            # Use async call if available
+                            if asyncio.iscoroutinefunction(memory_manager.get_conversation_history):
+                                # Need to handle async in sync context - use current event loop if available
+                                try:
+                                    loop = asyncio.get_event_loop()
+                                    if loop.is_running():
+                                        # Create a task for later execution
+                                        conversations = []
+                                    else:
+                                        conversations = loop.run_until_complete(
+                                            memory_manager.get_conversation_history(user_id, limit=limit)
+                                        )
+                                except RuntimeError:
+                                    # No event loop, skip async call
+                                    conversations = []
+                            else:
+                                conversations = memory_manager.get_conversation_history(user_id, limit=limit)
+                            
                             pairs = []
                             for conv in conversations:
-                                if isinstance(conv, dict) and 'user_message' in conv and 'assistant_response' in conv:
-                                    pairs.append({
-                                        'user_message': conv['user_message'],
-                                        'assistant_response': conv['assistant_response']
-                                    })
-                            return pairs
+                                if isinstance(conv, dict):
+                                    # Look for user_message and assistant_response or similar fields
+                                    user_msg = conv.get('user_message') or conv.get('message') or conv.get('content')
+                                    ai_response = conv.get('assistant_response') or conv.get('response') or conv.get('ai_response')
+                                    
+                                    if user_msg and ai_response:
+                                        pairs.append({
+                                            'user_message': str(user_msg),
+                                            'assistant_response': str(ai_response)
+                                        })
+                            if pairs:
+                                return pairs
                         except Exception as e:
                             logging.warning(f"Memory manager conversation retrieval failed: {e}")
-                    elif hasattr(memory_manager, 'retrieve_memories'):
-                        try:
-                            # Try alternative memory retrieval method
-                            memories = memory_manager.retrieve_memories(user_id, limit=limit)
-                            pairs = []
-                            for memory in memories:
-                                if isinstance(memory, dict):
-                                    # Try to extract user/assistant pairs from memory data
-                                    memory_str = str(memory)
-                                    if 'user:' in memory_str.lower() and 'assistant:' in memory_str.lower():
-                                        # This is a rough approximation - would need better parsing in real implementation
-                                        pairs.append({
-                                            'user_message': f"Previous conversation context: {memory_str[:100]}...",
-                                            'assistant_response': "I recall our previous discussion."
-                                        })
-                            return pairs[:limit]
-                        except Exception as e:
-                            logging.warning(f"Alternative memory retrieval failed: {e}")
             
             # Return empty if no data available - this is fine, just means no conversation history
+            logging.debug(f"No conversation history found for user {user_id}, channel {channel_id}")
             return []
             
         except Exception as e:
@@ -1165,6 +1189,25 @@ You adapt your responses based on the platform and conversation context. Be help
     async def store_conversation_pair(self, user_id: str, channel_id: str, user_message: str, assistant_response: str):
         """Store a conversation pair using Discord architecture"""
         try:
+            # Store in simple in-memory storage first (guaranteed to work)
+            conversation_key = f"{user_id}_{channel_id}"
+            if conversation_key not in self.conversation_history:
+                self.conversation_history[conversation_key] = []
+            
+            conversation_entry = {
+                'user_message': user_message,
+                'assistant_response': assistant_response,
+                'timestamp': datetime.now()
+            }
+            
+            self.conversation_history[conversation_key].append(conversation_entry)
+            
+            # Keep only last 20 conversation pairs to manage memory
+            if len(self.conversation_history[conversation_key]) > 20:
+                self.conversation_history[conversation_key] = self.conversation_history[conversation_key][-20:]
+            
+            logging.debug(f"✅ Stored conversation pair in memory for user {user_id}, channel {channel_id}")
+            
             # Store using memory manager (primary method)
             if self.bot_core and hasattr(self.bot_core, 'memory_manager'):
                 memory_manager = self.bot_core.memory_manager

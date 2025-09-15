@@ -1,0 +1,435 @@
+name: Build Cross-Platform Releases
+
+on:
+  push:
+    tags:
+      - 'v*'
+  pull_request:
+    branches:
+      - main
+      - feature/unified-scaling-architecture
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to build (e.g., v1.0.0)'
+        required: false
+        default: 'development'
+
+concurrency:
+  group: build-releases-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: '3.11'
+  
+jobs:
+  # ====================================
+  # macOS Build Job
+  # ====================================
+  build-macos:
+    runs-on: macos-latest
+    strategy:
+      matrix:
+        arch: [x64, arm64]
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          architecture: ${{ matrix.arch }}
+
+      - name: Get version
+        id: version
+        run: |
+          if [ "${{ github.event.inputs.version }}" != "" ]; then
+            echo "VERSION=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          elif [ "${{ github.ref_type }}" == "tag" ]; then
+            echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          else
+            echo "VERSION=development-$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Cache Python dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+          # Install macOS-specific dependencies
+          pip install pyobjc-framework-Cocoa
+          pip install pystray[darwin]
+
+      - name: Install UPX (for compression)
+        run: |
+          brew install upx
+
+      - name: Set up environment
+        run: |
+          python setup_native_env.py
+          mkdir -p build dist
+
+      - name: Build macOS app
+        run: |
+          echo "🍎 Building WhisperEngine for macOS (${{ matrix.arch }})"
+          python build_cross_platform.py --platform darwin --clean
+          
+          # Create simple ZIP for distribution
+          cd dist
+          if [ -d "WhisperEngine.app" ]; then
+            zip -r "WhisperEngine-macOS-${{ matrix.arch }}-${{ steps.version.outputs.VERSION }}.zip" WhisperEngine.app
+          fi
+
+      - name: Sign macOS app (if certificates available)
+        if: runner.os == 'macOS' && env.APPLE_CERTIFICATE != ''
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+        run: |
+          # Import certificate
+          echo "$APPLE_CERTIFICATE" | base64 --decode > certificate.p12
+          security create-keychain -p "$APPLE_CERTIFICATE_PASSWORD" build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p "$APPLE_CERTIFICATE_PASSWORD" build.keychain
+          security import certificate.p12 -k build.keychain -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$APPLE_CERTIFICATE_PASSWORD" build.keychain
+          
+          # Sign the app
+          find dist -name "*.app" -exec codesign --force --verify --verbose --sign "$APPLE_SIGNING_IDENTITY" {} \;
+
+      - name: Create macOS installer DMG
+        run: |
+          # Simple DMG creation without external tools
+          cd dist
+          if [ -d "WhisperEngine.app" ]; then
+            # Create a simple disk image
+            hdiutil create -volname "WhisperEngine" -srcfolder WhisperEngine.app -ov -format UDZO "WhisperEngine-macOS-${{ matrix.arch }}-${{ steps.version.outputs.VERSION }}.dmg"
+          fi
+
+      - name: Upload macOS artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: whisperengine-macos-${{ matrix.arch }}-${{ steps.version.outputs.VERSION }}
+          path: |
+            dist/*.app
+            dist/*.dmg
+            dist/*.zip
+          retention-days: 30
+
+  # ====================================
+  # Windows Build Job
+  # ====================================
+  build-windows:
+    runs-on: windows-latest
+    strategy:
+      matrix:
+        arch: [x64, x86]
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          architecture: ${{ matrix.arch }}
+
+      - name: Get version
+        id: version
+        shell: bash
+        run: |
+          if [ "${{ github.event.inputs.version }}" != "" ]; then
+            echo "VERSION=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          elif [ "${{ github.ref_type }}" == "tag" ]; then
+            echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          else
+            echo "VERSION=development-$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Cache Python dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~\AppData\Local\pip\Cache
+          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+          # Install Windows-specific dependencies
+          pip install pywin32
+          pip install pystray[win32]
+
+      - name: Install UPX (for compression)
+        run: |
+          choco install upx
+
+      - name: Set up environment
+        run: |
+          python setup_native_env.py
+          mkdir build
+          mkdir dist
+
+      - name: Build Windows executable
+        shell: bash
+        run: |
+          echo "🪟 Building WhisperEngine for Windows (${{ matrix.arch }})"
+          python build_cross_platform.py --platform windows --clean
+          
+          # Create simple ZIP for distribution
+          cd dist
+          if [ -f "WhisperEngine.exe" ]; then
+            zip "WhisperEngine-Windows-${{ matrix.arch }}-${{ steps.version.outputs.VERSION }}.zip" WhisperEngine.exe
+          fi
+
+      - name: Sign Windows executable (if certificates available)
+        if: env.WINDOWS_CERTIFICATE != ''
+        env:
+          WINDOWS_CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE }}
+          WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+        shell: powershell
+        run: |
+          # Import certificate and sign
+          $certBytes = [Convert]::FromBase64String("$env:WINDOWS_CERTIFICATE")
+          $cert = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2($certBytes, "$env:WINDOWS_CERTIFICATE_PASSWORD")
+          Set-AuthenticodeSignature -FilePath "dist\WhisperEngine.exe" -Certificate $cert
+
+      - name: Create Windows installer
+        run: |
+          # Simple copy of executable for now
+          # Future: Add NSIS installer creation here
+          echo "Windows executable ready for distribution"
+
+      - name: Upload Windows artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: whisperengine-windows-${{ matrix.arch }}-${{ steps.version.outputs.VERSION }}
+          path: |
+            dist/*.exe
+            dist/*.zip
+          retention-days: 30
+
+  # ====================================
+  # Linux Build Job
+  # ====================================
+  build-linux:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        arch: [x64, arm64]
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Set up cross-compilation for ARM64
+        if: matrix.arch == 'arm64'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-aarch64-linux-gnu
+          export CC=aarch64-linux-gnu-gcc
+
+      - name: Get version
+        id: version
+        run: |
+          if [ "${{ github.event.inputs.version }}" != "" ]; then
+            echo "VERSION=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          elif [ "${{ github.ref_type }}" == "tag" ]; then
+            echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          else
+            echo "VERSION=development-$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Cache Python dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            pkg-config \
+            libdbus-1-dev \
+            libdbus-glib-1-dev \
+            libgirepository1.0-dev \
+            libcairo2-dev \
+            libgtk-3-dev
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+          # Install Linux-specific dependencies
+          pip install pystray[linux]
+
+      - name: Set up environment
+        run: |
+          python setup_native_env.py
+          mkdir -p build dist
+
+      - name: Build Linux executable
+        run: |
+          echo "🐧 Building WhisperEngine for Linux (${{ matrix.arch }})"
+          python build_cross_platform.py --platform linux --clean
+          
+          # Create simple TAR.GZ for distribution
+          cd dist
+          if [ -f "WhisperEngine" ]; then
+            tar -czf "WhisperEngine-Linux-${{ matrix.arch }}-${{ steps.version.outputs.VERSION }}.tar.gz" WhisperEngine
+          fi
+
+      - name: Create Linux packages
+        run: |
+          # Simple packaging for now
+          # Future: Add AppImage, DEB, RPM creation here
+          echo "Linux executable ready for distribution"
+
+      - name: Upload Linux artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: whisperengine-linux-${{ matrix.arch }}-${{ steps.version.outputs.VERSION }}
+          path: |
+            dist/WhisperEngine
+            dist/*.tar.gz
+          retention-days: 30
+
+  # ====================================
+  # Create GitHub Release
+  # ====================================
+  create-release:
+    needs: [build-macos, build-windows, build-linux]
+    runs-on: ubuntu-latest
+    if: github.ref_type == 'tag' || github.event_name == 'workflow_dispatch'
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Get version
+        id: version
+        run: |
+          if [ "${{ github.event.inputs.version }}" != "" ]; then
+            echo "VERSION=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          elif [ "${{ github.ref_type }}" == "tag" ]; then
+            echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          else
+            echo "VERSION=development-$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v3
+        with:
+          path: artifacts
+
+      - name: Organize release files
+        run: |
+          mkdir -p release
+          find artifacts -type f \( -name "*.app" -o -name "*.dmg" -o -name "*.exe" -o -name "*.zip" -o -name "*.tar.gz" -o -name "WhisperEngine" \) -exec cp {} release/ \;
+
+      - name: Generate release notes
+        run: |
+          cat > release_notes.md << EOF
+          # WhisperEngine ${{ steps.version.outputs.VERSION }}
+          
+          ## 🚀 Downloads
+          
+          ### macOS
+          - **Intel Macs**: WhisperEngine-macOS-x64-${{ steps.version.outputs.VERSION }}.dmg
+          - **Apple Silicon**: WhisperEngine-macOS-arm64-${{ steps.version.outputs.VERSION }}.dmg
+          - **Portable**: WhisperEngine-macOS-[arch]-${{ steps.version.outputs.VERSION }}.zip
+          
+          ### Windows
+          - **64-bit**: WhisperEngine-Windows-x64-${{ steps.version.outputs.VERSION }}.zip
+          - **32-bit**: WhisperEngine-Windows-x86-${{ steps.version.outputs.VERSION }}.zip
+          
+          ### Linux
+          - **64-bit**: WhisperEngine-Linux-x64-${{ steps.version.outputs.VERSION }}.tar.gz
+          - **ARM64**: WhisperEngine-Linux-arm64-${{ steps.version.outputs.VERSION }}.tar.gz
+          
+          ## 📦 Installation
+          
+          ### macOS
+          1. Download the .dmg file for your architecture
+          2. Open the .dmg file and drag WhisperEngine.app to Applications
+          3. Or extract the .zip file and copy WhisperEngine.app to Applications
+          
+          ### Windows
+          1. Download and extract the .zip file
+          2. Run WhisperEngine.exe directly (portable)
+          3. For permanent installation, copy to Program Files
+          
+          ### Linux
+          1. Download the .tar.gz file
+          2. Extract: \`tar -xzf WhisperEngine-Linux-*.tar.gz\`
+          3. Make executable: \`chmod +x WhisperEngine\`
+          4. Run: \`./WhisperEngine\`
+          
+          ## 🔧 System Requirements
+          
+          - **macOS**: 10.15+ (Intel or Apple Silicon)
+          - **Windows**: Windows 10+ (32-bit or 64-bit)
+          - **Linux**: Most modern distributions with glibc 2.17+
+          
+          ## 🐳 Docker Alternative
+          
+          If you prefer containerized deployment:
+          \`\`\`bash
+          docker run -p 8080:8080 whisperengine/whisperengine:${{ steps.version.outputs.VERSION }}
+          \`\`\`
+          
+          Built with ❤️ using GitHub Actions
+          EOF
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        if: github.ref_type == 'tag'
+        with:
+          tag_name: ${{ steps.version.outputs.VERSION }}
+          name: WhisperEngine ${{ steps.version.outputs.VERSION }}
+          body_path: release_notes.md
+          files: |
+            release/*
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload development release
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v3
+        with:
+          name: whisperengine-development-release
+          path: release/
+          retention-days: 7
