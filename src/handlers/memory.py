@@ -508,26 +508,51 @@ class MemoryCommandHandlers:
                 )
                 
                 try:
-                    # Get recent messages for analysis - ALWAYS use memory manager for consistent results
+                    # Get recent messages for analysis - CROSS-CONTEXT for personality (user-scoped, not context-scoped)
                     recent_messages = []
                     
-                    # Try to get stored conversations from memory manager (unified across all contexts)
+                    # For personality analysis, we need ALL user messages across contexts, not just current context
                     try:
-                        message_context = self.memory_manager.classify_discord_context(ctx.message)
-                        recent_context = await self.safe_memory_manager.get_recent_conversations(
-                            user_id, limit=20, context=message_context
-                        )
-                        if recent_context and hasattr(recent_context, 'conversations'):
-                            for conv in recent_context.conversations:
-                                if hasattr(conv, 'user_message') and conv.user_message:
-                                    recent_messages.append(conv.user_message)
+                        # Get messages from base memory manager without context filtering for personality analysis
+                        base_memory_manager = getattr(self.safe_memory_manager, 'base_memory_manager', self.memory_manager)
                         
-                        logger.debug(f"Retrieved {len(recent_messages)} messages from memory manager for personality analysis")
+                        if base_memory_manager and hasattr(base_memory_manager, 'retrieve_relevant_memories'):
+                            # Retrieve user's conversation history across ALL contexts for personality profiling
+                            cross_context_memories = base_memory_manager.retrieve_relevant_memories(
+                                user_id, query="conversation messages recent", limit=25
+                            )
+                            
+                            # Extract user messages from memory
+                            for memory in cross_context_memories:
+                                metadata = memory.get('metadata', {})
+                                if metadata.get('user_message') and not metadata.get('user_message', '').startswith('!'):
+                                    recent_messages.append(metadata['user_message'])
+                            
+                            logger.debug(f"Retrieved {len(recent_messages)} cross-context messages for personality analysis")
+                        else:
+                            logger.debug("Base memory manager not available for cross-context retrieval")
+                        
+                        # If we don't have enough messages from ChromaDB, supplement with current context
+                        if len(recent_messages) < 10:
+                            try:
+                                message_context = self.memory_manager.classify_discord_context(ctx.message)
+                                recent_context = await self.safe_memory_manager.get_recent_conversations(
+                                    user_id, limit=15, context=message_context
+                                )
+                                if recent_context and hasattr(recent_context, 'conversations'):
+                                    for conv in recent_context.conversations:
+                                        if hasattr(conv, 'user_message') and conv.user_message and not conv.user_message.startswith('!'):
+                                            if conv.user_message not in recent_messages:  # Avoid duplicates
+                                                recent_messages.append(conv.user_message)
+                                
+                                logger.debug(f"Supplemented with current context: now have {len(recent_messages)} messages")
+                            except Exception as e:
+                                logger.debug(f"Could not supplement with current context: {e}")
                         
                     except Exception as e:
-                        logger.debug(f"Could not retrieve recent conversations for personality display: {e}")
+                        logger.debug(f"Could not retrieve cross-context memories for personality display: {e}")
                         
-                        # Fallback: Try to get messages from current channel if memory manager fails
+                        # Fallback: Try to get messages from current channel if memory manager completely fails
                         if ctx.guild is None:  # Only fallback in DM if memory manager completely fails
                             logger.debug("Falling back to Discord channel history for DM personality analysis")
                             async for msg in ctx.channel.history(limit=20):
