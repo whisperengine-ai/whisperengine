@@ -99,7 +99,7 @@ class WhisperEngineSystemTray:
             # On macOS, we can use osascript for native dialogs
             if sys.platform == "darwin":
                 os.system(f'''
-                osascript -e 'display dialog "WhisperEngine Desktop App\\n\\nAI Conversation Platform\\nRunning on http://{self.host}:{self.port}\\n\\nCreated with Dream AI Intelligence" with title "About WhisperEngine" buttons {{"OK"}} default button "OK"'
+                osascript -e 'display dialog "WhisperEngine Desktop App\\n\\nAI Conversation Platform\\nRunning on http://{self.host}:{self.port}\\n\\nPowered by Advanced AI Intelligence" with title "About WhisperEngine" buttons {{"OK"}} default button "OK"'
                 ''')
             else:
                 # For other platforms, just open in browser
