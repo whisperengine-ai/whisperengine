@@ -2,6 +2,7 @@
 Privacy command handlers for Discord bot
 Includes privacy settings, privacy level management, privacy audit, and privacy help
 """
+
 import logging
 import discord
 from discord.ext import commands
@@ -9,95 +10,110 @@ from typing import Optional
 
 logger = logging.getLogger(__name__)
 
+
 class PrivacyCommandHandlers:
     """Handles privacy-related commands"""
-    
+
     def __init__(self, bot):
         self.bot = bot
-    
+
     def register_commands(self):
         """Register all privacy commands"""
-        
+
         # Capture self reference for nested functions
         privacy_handler_instance = self
-        
-        @self.bot.command(name='privacy')
+
+        @self.bot.command(name="privacy")
         async def privacy_settings(ctx):
             """Show current privacy settings"""
             await privacy_handler_instance._privacy_handler(ctx)
-        
-        @self.bot.command(name='privacy_level')
+
+        @self.bot.command(name="privacy_level")
         async def set_privacy_level(ctx, level: Optional[str] = None):
             """Set privacy level (strict, moderate, permissive)"""
             await privacy_handler_instance._privacy_level_handler(ctx, level)
-        
-        @self.bot.command(name='privacy_audit')
+
+        @self.bot.command(name="privacy_audit")
         async def privacy_audit(ctx, limit: int = 10):
             """View recent privacy decisions"""
             await privacy_handler_instance._privacy_audit_handler(ctx, limit)
-        
-        @self.bot.command(name='privacy_help')
+
+        @self.bot.command(name="privacy_help")
         async def privacy_help(ctx):
             """Show detailed privacy help"""
             await privacy_handler_instance._privacy_help_handler(ctx)
-    
+
     async def _privacy_handler(self, ctx):
         """Handle privacy command"""
         user_id = str(ctx.author.id)
-        
+
         try:
-            from src.security.context_boundaries_security import get_async_context_boundaries_manager, PrivacyLevel, ConsentStatus
-            
+            from src.security.context_boundaries_security import (
+                get_async_context_boundaries_manager,
+                PrivacyLevel,
+                ConsentStatus,
+            )
+
             boundaries_manager = get_async_context_boundaries_manager()
             await boundaries_manager.initialize()
             preferences = await boundaries_manager.get_user_preferences(user_id)
-            
+
             embed = discord.Embed(
                 title="🔒 Your Privacy Settings",
                 description="Control how your information is shared between different contexts",
-                color=0x3498db
+                color=0x3498DB,
             )
-            
+
             # Current privacy level
             level_descriptions = {
                 PrivacyLevel.STRICT: "🔒 **Strict** - Maximum privacy, minimal cross-context sharing",
                 PrivacyLevel.MODERATE: "⚖️ **Moderate** - Balanced privacy with some cross-context sharing",
-                PrivacyLevel.PERMISSIVE: "🔓 **Permissive** - More sharing allowed for convenience"
+                PrivacyLevel.PERMISSIVE: "🔓 **Permissive** - More sharing allowed for convenience",
             }
-            
+
             embed.add_field(
                 name="Privacy Level",
-                value=level_descriptions.get(preferences.privacy_level, f"Unknown: {preferences.privacy_level}"),
-                inline=False
+                value=level_descriptions.get(
+                    preferences.privacy_level, f"Unknown: {preferences.privacy_level}"
+                ),
+                inline=False,
             )
-            
+
             # Cross-context permissions
             permissions = []
-            permissions.append(f"🌐 Cross-server sharing: {'✅ Allowed' if preferences.allow_cross_server else '❌ Blocked'}")
-            permissions.append(f"📤 DM to server sharing: {'✅ Allowed' if preferences.allow_dm_to_server else '❌ Blocked'}")
-            permissions.append(f"📥 Server to DM sharing: {'✅ Allowed' if preferences.allow_server_to_dm else '❌ Blocked'}")
-            permissions.append(f"🔓 Private to public sharing: {'✅ Allowed' if preferences.allow_private_to_public else '❌ Blocked'}")
-            
-            embed.add_field(
-                name="Cross-Context Permissions",
-                value="\n".join(permissions),
-                inline=False
+            permissions.append(
+                f"🌐 Cross-server sharing: {'✅ Allowed' if preferences.allow_cross_server else '❌ Blocked'}"
             )
-            
+            permissions.append(
+                f"📤 DM to server sharing: {'✅ Allowed' if preferences.allow_dm_to_server else '❌ Blocked'}"
+            )
+            permissions.append(
+                f"📥 Server to DM sharing: {'✅ Allowed' if preferences.allow_server_to_dm else '❌ Blocked'}"
+            )
+            permissions.append(
+                f"🔓 Private to public sharing: {'✅ Allowed' if preferences.allow_private_to_public else '❌ Blocked'}"
+            )
+
+            embed.add_field(
+                name="Cross-Context Permissions", value="\n".join(permissions), inline=False
+            )
+
             # Consent status
             consent_info = {
                 ConsentStatus.NOT_ASKED: "⏳ Not asked yet",
                 ConsentStatus.GRANTED: "✅ Granted",
                 ConsentStatus.DENIED: "❌ Denied",
-                ConsentStatus.EXPIRED: "⏰ Expired"
+                ConsentStatus.EXPIRED: "⏰ Expired",
             }
-            
+
             embed.add_field(
                 name="Consent Status",
-                value=consent_info.get(preferences.consent_status, f"Unknown: {preferences.consent_status}"),
-                inline=True
+                value=consent_info.get(
+                    preferences.consent_status, f"Unknown: {preferences.consent_status}"
+                ),
+                inline=True,
             )
-            
+
             # Usage instructions
             embed.add_field(
                 name="Commands",
@@ -106,31 +122,36 @@ class PrivacyCommandHandlers:
                 `!privacy_audit` - View recent privacy decisions
                 `!privacy_help` - Get detailed help
                 """,
-                inline=False
+                inline=False,
             )
-            
+
             embed.timestamp = discord.utils.utcnow()
             embed.set_footer(text=f"Last updated: {preferences.updated_timestamp}")
-            
+
             await ctx.send(embed=embed)
-            
+
         except Exception as e:
             logger.error(f"Error showing privacy settings for user {user_id}: {e}")
             await ctx.send("❌ Error retrieving your privacy settings. Please try again later.")
-    
+
     async def _privacy_level_handler(self, ctx, level):
         """Handle privacy level command"""
         user_id = str(ctx.author.id)
-        
+
         if not level:
-            await ctx.send("❌ Please specify a privacy level: `strict`, `moderate`, or `permissive`")
+            await ctx.send(
+                "❌ Please specify a privacy level: `strict`, `moderate`, or `permissive`"
+            )
             return
-        
+
         level = level.lower()
-        
+
         try:
-            from src.security.context_boundaries_security import get_async_context_boundaries_manager, PrivacyLevel
-            
+            from src.security.context_boundaries_security import (
+                get_async_context_boundaries_manager,
+                PrivacyLevel,
+            )
+
             if level == "strict":
                 new_level = PrivacyLevel.STRICT
             elif level == "moderate":
@@ -138,104 +159,107 @@ class PrivacyCommandHandlers:
             elif level == "permissive":
                 new_level = PrivacyLevel.PERMISSIVE
             else:
-                await ctx.send("❌ Invalid privacy level. Choose from: `strict`, `moderate`, `permissive`")
+                await ctx.send(
+                    "❌ Invalid privacy level. Choose from: `strict`, `moderate`, `permissive`"
+                )
                 return
-            
+
             boundaries_manager = get_async_context_boundaries_manager()
             await boundaries_manager.initialize()
             await boundaries_manager.update_user_preferences(
-                user_id=user_id,
-                privacy_level=new_level
+                user_id=user_id, privacy_level=new_level
             )
-            
+
             level_descriptions = {
                 PrivacyLevel.STRICT: "🔒 **Strict** - Maximum privacy protection",
-                PrivacyLevel.MODERATE: "⚖️ **Moderate** - Balanced privacy settings", 
-                PrivacyLevel.PERMISSIVE: "🔓 **Permissive** - More sharing for convenience"
+                PrivacyLevel.MODERATE: "⚖️ **Moderate** - Balanced privacy settings",
+                PrivacyLevel.PERMISSIVE: "🔓 **Permissive** - More sharing for convenience",
             }
-            
+
             embed = discord.Embed(
                 title="✅ Privacy Level Updated",
                 description=f"Your privacy level has been set to: {level_descriptions[new_level]}",
-                color=0x2ecc71
+                color=0x2ECC71,
             )
-            
+
             await ctx.send(embed=embed)
             logger.info(f"User {user_id} updated privacy level to {new_level.value}")
-            
+
         except Exception as e:
             logger.error(f"Error updating privacy level for user {user_id}: {e}")
             await ctx.send("❌ Error updating your privacy level. Please try again later.")
-    
+
     async def _privacy_audit_handler(self, ctx, limit):
         """Handle privacy audit command"""
         user_id = str(ctx.author.id)
-        
+
         if limit > 50:
             limit = 50  # Cap at 50 for performance
-        
+
         try:
-            from src.security.context_boundaries_security import get_async_context_boundaries_manager
-            
+            from src.security.context_boundaries_security import (
+                get_async_context_boundaries_manager,
+            )
+
             boundaries_manager = get_async_context_boundaries_manager()
             await boundaries_manager.initialize()
             audit_entries = await boundaries_manager.get_audit_history(user_id, limit)
-            
+
             if not audit_entries:
                 embed = discord.Embed(
                     title="📋 Privacy Audit Log",
                     description="No privacy decisions recorded yet.",
-                    color=0x95a5a6
+                    color=0x95A5A6,
                 )
                 await ctx.send(embed=embed)
                 return
-            
+
             embed = discord.Embed(
                 title=f"📋 Privacy Audit Log (Last {len(audit_entries)} entries)",
                 description="Recent privacy boundary decisions",
-                color=0x3498db
+                color=0x3498DB,
             )
-            
+
             for i, entry in enumerate(audit_entries[:10]):  # Show max 10 in embed
-                timestamp = entry['request_timestamp']
-                if hasattr(timestamp, 'strftime'):
+                timestamp = entry["request_timestamp"]
+                if hasattr(timestamp, "strftime"):
                     time_str = timestamp.strftime("%Y-%m-%d %H:%M")
                 else:
                     time_str = str(timestamp)[:16]  # Truncate if string
-                
+
                 decision_emoji = {
-                    'allowed': '✅',
-                    'blocked': '❌', 
-                    'consent_requested': '❓',
-                    'allowed_once': '✅',
-                    'denied_once': '❌',
-                    'allowed_always': '✅',
-                    'denied_always': '❌'
-                }.get(entry['decision'], '❔')
-                
+                    "allowed": "✅",
+                    "blocked": "❌",
+                    "consent_requested": "❓",
+                    "allowed_once": "✅",
+                    "denied_once": "❌",
+                    "allowed_always": "✅",
+                    "denied_always": "❌",
+                }.get(entry["decision"], "❔")
+
                 embed.add_field(
                     name=f"{decision_emoji} {entry['source_context']} → {entry['target_context']}",
                     value=f"{entry['reason']}\n*{time_str}*",
-                    inline=False
+                    inline=False,
                 )
-            
+
             if len(audit_entries) > 10:
                 embed.set_footer(text=f"Showing 10 of {len(audit_entries)} entries")
-            
+
             await ctx.send(embed=embed)
-            
+
         except Exception as e:
             logger.error(f"Error showing privacy audit for user {user_id}: {e}")
             await ctx.send("❌ Error retrieving your privacy audit log. Please try again later.")
-    
+
     async def _privacy_help_handler(self, ctx):
         """Handle privacy help command"""
         embed = discord.Embed(
             title="🔒 Privacy System Help",
             description="Understanding your privacy controls",
-            color=0x3498db
+            color=0x3498DB,
         )
-        
+
         embed.add_field(
             name="Privacy Levels",
             value="""
@@ -253,9 +277,9 @@ class PrivacyCommandHandlers:
             • Most sharing allowed
             • Still protects private → public
             """,
-            inline=False
+            inline=False,
         )
-        
+
         embed.add_field(
             name="Context Types",
             value="""
@@ -264,9 +288,9 @@ class PrivacyCommandHandlers:
             **Private Channel** - Private server channels
             **Cross-Server** - Between different servers
             """,
-            inline=False
+            inline=False,
         )
-        
+
         embed.add_field(
             name="Commands",
             value="""
@@ -274,9 +298,9 @@ class PrivacyCommandHandlers:
             `!privacy_level <level>` - Change privacy level
             `!privacy_audit [limit]` - View decision history
             """,
-            inline=False
+            inline=False,
         )
-        
+
         embed.add_field(
             name="Data Protection",
             value="""
@@ -285,7 +309,7 @@ class PrivacyCommandHandlers:
             • You control your data sharing
             • Settings persist across sessions
             """,
-            inline=False
+            inline=False,
         )
-        
+
         await ctx.send(embed=embed)

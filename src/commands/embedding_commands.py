@@ -10,33 +10,36 @@ from typing import Dict, Any
 from src.utils.embedding_manager import embedding_manager, get_embedding_config
 from src.memory.chromadb_external_embeddings import test_embedding_setup
 
+
 async def handle_embedding_test_command(message) -> str:
     """
     Handle !embedding_test command - test the embedding system
-    
+
     Usage: !embedding_test
     Returns: Embedding system status and test results
     """
     try:
         # Get configuration
         config = get_embedding_config()
-        
+
         # Test connection
         connection_test = await embedding_manager.test_connection()
-        
+
         # Test embedding generation
         test_texts = ["Hello world", "This is a test"]
         embeddings = await embedding_manager.get_embeddings(test_texts)
-        
+
         # Format response
         response = f"🔧 **Embedding System Status**\n\n"
         response += f"**Configuration:**\n"
-        response += f"• External Embeddings: {'✅ Enabled' if config['use_external'] else '❌ Disabled'}\n"
+        response += (
+            f"• External Embeddings: {'✅ Enabled' if config['use_external'] else '❌ Disabled'}\n"
+        )
         response += f"• API URL: `{config['embedding_api_url']}`\n"
         response += f"• Model: `{config['embedding_model']}`\n"
         response += f"• Has API Key: {'✅ Yes' if config['has_api_key'] else '❌ No'}\n"
         response += f"• Batch Size: {config['max_batch_size']}\n\n"
-        
+
         response += f"**Connection Test:**\n"
         if connection_test["success"]:
             response += f"✅ **Connected Successfully**\n"
@@ -47,7 +50,7 @@ async def handle_embedding_test_command(message) -> str:
         else:
             response += f"❌ **Connection Failed**\n"
             response += f"• Error: {connection_test.get('error', 'Unknown error')}\n"
-        
+
         response += f"\n**Embedding Test:**\n"
         if embeddings and len(embeddings) > 0:
             response += f"✅ **Generated {len(embeddings)} embeddings**\n"
@@ -55,9 +58,9 @@ async def handle_embedding_test_command(message) -> str:
             response += f"• Sample values: {[f'{x:.4f}' for x in embeddings[0][:5]]}\n"
         else:
             response += f"❌ **Failed to generate embeddings**\n"
-        
+
         return response
-        
+
     except Exception as e:
         return f"❌ **Embedding test failed:** {str(e)}"
 
@@ -65,15 +68,15 @@ async def handle_embedding_test_command(message) -> str:
 async def handle_embedding_config_command(message) -> str:
     """
     Handle !embedding_config command - show configuration
-    
+
     Usage: !embedding_config
     Returns: Current embedding configuration
     """
     try:
         config = get_embedding_config()
-        
+
         response = f"⚙️ **Embedding Configuration**\n\n"
-        
+
         for key, value in config.items():
             if key == "has_api_key":
                 display_value = "✅ Set" if value else "❌ Not set"
@@ -83,18 +86,18 @@ async def handle_embedding_config_command(message) -> str:
                 display_value = "✅ Enabled" if value else "❌ Disabled"
             else:
                 display_value = str(value)
-            
+
             # Format key name
-            display_key = key.replace('_', ' ').title()
+            display_key = key.replace("_", " ").title()
             response += f"• **{display_key}:** `{display_value}`\n"
-        
+
         response += f"\n**To change configuration:**\n"
         response += f"1. Update your `.env` file\n"
         response += f"2. Set `USE_EXTERNAL_EMBEDDINGS=true/false`\n"
         response += f"3. Restart the bot\n"
-        
+
         return response
-        
+
     except Exception as e:
         return f"❌ **Failed to get configuration:** {str(e)}"
 
@@ -102,37 +105,37 @@ async def handle_embedding_config_command(message) -> str:
 async def handle_embedding_performance_command(message) -> str:
     """
     Handle !embedding_performance command - analyze embedding performance
-    
+
     Usage: !embedding_performance
     Returns: Performance analysis and recommendations
     """
     try:
         from src.utils.chromadb_performance_monitor import check_chromadb_performance
-        
+
         perf_info = await check_chromadb_performance()
-        
+
         response = f"🔍 **ChromaDB Embedding Performance Analysis**\n\n"
-        
+
         # System information
         system_info = perf_info.get("system_info", {})
         response += f"**System Information:**\n"
         response += f"• Platform: {system_info.get('platform', 'unknown')}\n"
         response += f"• Architecture: {system_info.get('machine', 'unknown')}\n"
-        
+
         # GPU information
         gpu_info = perf_info.get("gpu_info", {})
         response += f"• GPU Available: {'✅ Yes' if gpu_info.get('available') else '❌ No'}\n"
         if not gpu_info.get("available"):
             response += f"• Reason: {gpu_info.get('reason', 'unknown')}\n"
-        
+
         # Performance estimate
         perf_est = perf_info.get("performance_estimate", {})
         tokens_per_sec = perf_est.get("tokens_per_second", 0)
         if tokens_per_sec > 0:
             response += f"• Estimated Speed: ~{tokens_per_sec:,.0f} tokens/sec\n"
-        
+
         response += f"\n"
-        
+
         # Warnings
         warnings = perf_info.get("warnings", [])
         if warnings:
@@ -140,7 +143,7 @@ async def handle_embedding_performance_command(message) -> str:
             for warning in warnings:
                 response += f"• {warning}\n"
             response += f"\n"
-        
+
         # Recommendations
         recommendations = perf_info.get("recommendations", [])
         if recommendations:
@@ -148,27 +151,31 @@ async def handle_embedding_performance_command(message) -> str:
             for rec in recommendations:
                 response += f"• {rec}\n"
             response += f"\n"
-        
+
         # Current configuration
         from src.utils.embedding_manager import is_external_embedding_configured
+
         external_configured = is_external_embedding_configured()
         response += f"**Current Configuration:**\n"
         response += f"• External Embeddings: {'✅ Configured' if external_configured else '❌ Not configured'}\n"
-        
+
         if external_configured:
             # Show the actual API URL being used (including fallback)
             embedding_url = (
-                os.getenv("LLM_EMBEDDING_API_URL") or 
-                os.getenv("LLM_CHAT_API_URL") or  # Fallback to main LLM API URL
-                "Not set"
+                os.getenv("LLM_EMBEDDING_API_URL")
+                or os.getenv("LLM_CHAT_API_URL")  # Fallback to main LLM API URL
+                or "Not set"
             )
             response += f"• API URL: `{embedding_url}`\n"
-            if os.getenv("LLM_EMBEDDING_API_URL") is None and os.getenv("LLM_CHAT_API_URL") is not None:
+            if (
+                os.getenv("LLM_EMBEDDING_API_URL") is None
+                and os.getenv("LLM_CHAT_API_URL") is not None
+            ):
                 response += f"  (using LLM_CHAT_API_URL as fallback)\n"
             response += f"• Model: `{os.getenv('LLM_EMBEDDING_MODEL', 'not set')}`\n"
         else:
             response += f"• Using: ChromaDB default embeddings (CPU-based)\n"
-        
+
         # Configuration suggestions
         external_recommended = perf_info.get("external_embedding_recommended", False)
         if external_recommended and not external_configured:
@@ -179,9 +186,9 @@ async def handle_embedding_performance_command(message) -> str:
             response += f"LLM_EMBEDDING_MODEL=text-embedding-nomic-embed-text-v1.5\n"
             response += f"```\n"
             response += f"Then restart the bot for better performance.\n"
-        
+
         return response
-        
+
     except Exception as e:
         return f"❌ **Performance analysis failed:** {str(e)}"
 
@@ -189,19 +196,19 @@ async def handle_embedding_performance_command(message) -> str:
 async def handle_embedding_switch_command(message, args) -> str:
     """
     Handle !embedding_switch command - switch embedding modes
-    
+
     Usage: !embedding_switch <external|local>
     Returns: Switch status
     """
-    if not args or args[0].lower() not in ['external', 'local']:
+    if not args or args[0].lower() not in ["external", "local"]:
         return "Usage: `!embedding_switch <external|local>`"
-    
+
     mode = args[0].lower()
-    
+
     response = f"⚠️ **Embedding Mode Switch Request**\n\n"
     response += f"You requested to switch to **{mode}** embeddings.\n\n"
     response += f"**To switch modes:**\n"
-    
+
     if mode == "external":
         response += f"1. Add to your `.env` file:\n"
         response += f"```\n"
@@ -222,9 +229,9 @@ async def handle_embedding_switch_command(message, args) -> str:
         response += f"2. Restart the bot\n\n"
         response += f"Local embeddings will use ChromaDB's built-in models.\n"
         response += f"**Note:** May be slower, especially on macOS.\n"
-    
+
     response += f"\n⚡ **Note:** Configuration changes require a bot restart to take effect."
-    
+
     return response
 
 
@@ -232,11 +239,11 @@ async def handle_embedding_switch_command(message, args) -> str:
 def add_embedding_commands_to_bot(bot):
     """
     Add embedding test commands to your Discord bot
-    
+
     Call this function in your bot setup to add the commands
     """
-    
-    @bot.command(name='embedding_test')
+
+    @bot.command(name="embedding_test")
     async def embedding_test(ctx):
         """Test the embedding system"""
         try:
@@ -248,8 +255,8 @@ def add_embedding_commands_to_bot(bot):
                 await ctx.send("❌ This command requires administrator permissions.")
         except Exception as e:
             await ctx.send(f"❌ Command failed: {str(e)}")
-    
-    @bot.command(name='embedding_config')
+
+    @bot.command(name="embedding_config")
     async def embedding_config(ctx):
         """Show embedding configuration"""
         try:
@@ -260,8 +267,8 @@ def add_embedding_commands_to_bot(bot):
                 await ctx.send("❌ This command requires administrator permissions.")
         except Exception as e:
             await ctx.send(f"❌ Command failed: {str(e)}")
-    
-    @bot.command(name='embedding_switch')
+
+    @bot.command(name="embedding_switch")
     async def embedding_switch(ctx, mode=None):
         """Switch embedding modes"""
         try:
@@ -273,8 +280,8 @@ def add_embedding_commands_to_bot(bot):
                 await ctx.send("❌ This command requires administrator permissions.")
         except Exception as e:
             await ctx.send(f"❌ Command failed: {str(e)}")
-    
-    @bot.command(name='embedding_performance')
+
+    @bot.command(name="embedding_performance")
     async def embedding_performance(ctx):
         """Analyze embedding performance"""
         try:
@@ -291,27 +298,27 @@ def add_embedding_commands_to_bot(bot):
 async def handle_embedding_commands(message, command, args):
     """
     Handle embedding-related commands manually
-    
+
     Args:
         message: Discord message object
         command: Command name (without !)
         args: List of command arguments
-    
+
     Returns:
         Response string to send back
     """
     if command == "embedding_test":
         return await handle_embedding_test_command(message)
-    
+
     elif command == "embedding_config":
         return await handle_embedding_config_command(message)
-    
+
     elif command == "embedding_switch":
         return await handle_embedding_switch_command(message, args)
-    
+
     elif command == "embedding_performance":
         return await handle_embedding_performance_command(message)
-    
+
     else:
         return None  # Command not handled
 
