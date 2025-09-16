@@ -207,6 +207,28 @@ class CriticalPathTester:
             results["connection_discovery"] = True
             logger.info(f"✅ Memory connection discovery: {len(connections)} connections found")
 
+            # Create conversation context for subsequent tests
+            context = ConversationContext(
+                user_id=test_user,
+                context_id="critical_path_test",
+                current_message="I'm thinking about my career goals again",
+                topic_keywords=["career", "goals"],
+                emotional_state=(
+                    EmotionalState.JOY if EMOTIONAL_CONTEXT_AVAILABLE else None
+                ),
+                conversation_phase="middle",
+                recent_messages=[
+                    "I'm thinking about my career goals again"
+                ],
+                conversation_length=1,
+                current_relationship_depth=0.5,
+                current_trust_level=0.5,
+                current_engagement_level=0.7,
+                time_since_last_conversation=None,
+                conversation_frequency=1.0,
+                recently_triggered_moments=[]
+            )
+
             # Test 2: Memory moment generation
             logger.info("💭 Testing memory moment generation...")
             moments = await self.framework.memory_moments.generate_memory_moments(
@@ -237,7 +259,20 @@ class CriticalPathTester:
             try:
                 # Test with invalid data
                 invalid_context = ConversationContext(
-                    user_id="", context_id="", current_message="", emotional_state=None
+                    user_id="",
+                    context_id="",
+                    current_message="",
+                    topic_keywords=[],
+                    emotional_state=None,
+                    conversation_phase="",
+                    recent_messages=[],
+                    conversation_length=0,
+                    current_relationship_depth=0.0,
+                    current_trust_level=0.0,
+                    current_engagement_level=0.0,
+                    time_since_last_conversation=None,
+                    conversation_frequency=0.0,
+                    recently_triggered_moments=[]
                 )
                 (
                     await self.framework.memory_moments.analyze_conversation_for_memories(

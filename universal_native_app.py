@@ -1635,7 +1635,8 @@ class WhisperEngineUniversalApp(QMainWindow):
 
             except Exception as e:
                 logger.error(f"Failed to initialize AI service: {e}")
-                QTimer.singleShot(0, lambda: self.on_ai_service_error(str(e)))
+                error_msg = str(e)
+                QTimer.singleShot(0, lambda: self.on_ai_service_error(error_msg))
 
         # Initialize in background thread
         import threading

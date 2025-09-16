@@ -5,6 +5,7 @@ Backup and recovery system for ChromaDB HTTP service data
 import json
 import logging
 import os
+import shutil
 from datetime import datetime
 from pathlib import Path
 
