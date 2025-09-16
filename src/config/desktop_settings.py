@@ -127,7 +127,7 @@ class DesktopSettingsManager:
     def _get_built_in_prompt(self) -> str:
         """Get built-in system prompt"""
         try:
-            prompt_file = Path(__file__).parent.parent.parent / "system_prompt.md"
+            prompt_file = Path(__file__).parent.parent.parent / "prompts" / "default.md"
             if prompt_file.exists():
                 return prompt_file.read_text()
             else:
