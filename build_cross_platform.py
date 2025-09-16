@@ -16,13 +16,13 @@ import argparse
 
 class CrossPlatformBuilder:
     """Manages cross-platform builds for WhisperEngine"""
-    
+
     def __init__(self):
         self.project_root = Path(__file__).parent
         self.build_dir = self.project_root / "build"
         self.dist_dir = self.project_root / "dist"
         self.current_platform = platform.system().lower()
-        
+
         # Platform configurations
         self.platforms = {
             "darwin": {
@@ -36,7 +36,7 @@ class CrossPlatformBuilder:
             "windows": {
                 "name": "Windows",
                 "executable": "WhisperEngine.exe",
-                "spec_file": "whisperengine-windows.spec", 
+                "spec_file": "whisperengine-windows.spec",
                 "bundle": False,
                 "console": False,
                 "upx": True,
@@ -48,9 +48,9 @@ class CrossPlatformBuilder:
                 "bundle": False,
                 "console": False,
                 "upx": False,  # UPX often causes issues on Linux
-            }
+            },
         }
-    
+
     def detect_platform(self) -> str:
         """Detect current platform"""
         system = platform.system().lower()
@@ -62,76 +62,78 @@ class CrossPlatformBuilder:
             return "linux"
         else:
             raise ValueError(f"Unsupported platform: {system}")
-    
+
     def get_common_config(self) -> Dict:
         """Get common configuration for all platforms"""
         src_path = self.project_root / "src"
         ui_path = src_path / "ui"
-        
+
         return {
             "data_files": [
                 # No web UI files needed for native Qt app
             ],
             "hidden_imports": [
                 # Core Python modules
-                'sqlite3',
-                'json',
-                'asyncio',
-                'logging',
-                'webbrowser',
-                'threading',
-                'signal',
-                
+                "sqlite3",
+                "json",
+                "asyncio",
+                "logging",
+                "webbrowser",
+                "threading",
+                "signal",
                 # UI and system tray
-                'pystray',
-                'PIL',
-                'PIL.Image',
-                'PIL.ImageDraw',
-                
+                "pystray",
+                "PIL",
+                "PIL.Image",
+                "PIL.ImageDraw",
                 # Application modules (only native UI related)
-                'src.ui.system_tray',
-                'src.config.adaptive_config',
-                'src.database.database_integration',
-                'src.optimization.cost_optimizer',
+                "src.ui.system_tray",
+                "src.config.adaptive_config",
+                "src.database.database_integration",
+                "src.optimization.cost_optimizer",
             ],
             "excludes": [
-                'tkinter',
-                'matplotlib',
-                'numpy',
-                'pandas',
-                'scipy',
-                'PIL.ImageTk',
-                'PIL.ImageWin',
-                'PIL.ImageQt',
-                'test_*',
-                'tests',
-            ]
+                "tkinter",
+                "matplotlib",
+                "numpy",
+                "pandas",
+                "scipy",
+                "PIL.ImageTk",
+                "PIL.ImageWin",
+                "PIL.ImageQt",
+                "test_*",
+                "tests",
+            ],
         }
-    
+
     def generate_spec_file(self, target_platform: str) -> Path:
         """Generate platform-specific .spec file"""
         config = self.platforms[target_platform]
         common = self.get_common_config()
         spec_path = self.project_root / config["spec_file"]
-        
+
         # Platform-specific adjustments
         if target_platform == "windows":
             # Windows-specific hidden imports
-            common["hidden_imports"].extend([
-                'win32api',
-                'win32gui', 
-                'win32con',
-                'pywintypes',
-            ])
+            common["hidden_imports"].extend(
+                [
+                    "win32api",
+                    "win32gui",
+                    "win32con",
+                    "pywintypes",
+                ]
+            )
         elif target_platform == "linux":
             # Linux-specific hidden imports
-            common["hidden_imports"].extend([
-                'gi',
-                'gi.repository',
-                'gi.repository.Gtk',
-                'gi.repository.GLib',
-            ])
-        
+            common["hidden_imports"].extend(
+                [
+                    "gi",
+                    "gi.repository",
+                    "gi.repository.Gtk",
+                    "gi.repository.GLib",
+                ]
+            )
+
         spec_content = f'''# -*- mode: python ; coding: utf-8 -*-
 """
 PyInstaller spec file for WhisperEngine Desktop App - {config["name"]}
@@ -202,10 +204,10 @@ coll = COLLECT(
     name='{config["executable"].split(".")[0]}',
 )
 '''
-        
+
         # Add macOS-specific bundle configuration
         if target_platform == "darwin":
-            spec_content += f'''
+            spec_content += f"""
 app = BUNDLE(
     coll,
     name='{config["executable"]}',
@@ -224,60 +226,64 @@ app = BUNDLE(
         }},
     }},
 )
-'''
-        
+"""
+
         # Write spec file
-        with open(spec_path, 'w', encoding='utf-8') as f:
+        with open(spec_path, "w", encoding="utf-8") as f:
             f.write(spec_content)
-        
+
         print(f"✅ Generated {config['name']} spec file: {spec_path}")
         return spec_path
-    
+
     def build_platform(self, target_platform: str, clean: bool = True) -> bool:
         """Build for specific platform"""
         if target_platform not in self.platforms:
             print(f"❌ Unsupported platform: {target_platform}")
             return False
-        
+
         config = self.platforms[target_platform]
-        
+
         # Check for cross-compilation
         is_cross_compile = target_platform != self.current_platform
         if is_cross_compile:
-            print(f"⚠️  Cross-compilation detected: {self.platforms[self.current_platform]['name']} → {config['name']}")
-            print(f"   Note: This creates a {config['name']}-configured build but may not be fully native")
+            print(
+                f"⚠️  Cross-compilation detected: {self.platforms[self.current_platform]['name']} → {config['name']}"
+            )
+            print(
+                f"   Note: This creates a {config['name']}-configured build but may not be fully native"
+            )
             print(f"   For best results, build on native {config['name']} system")
-        
+
         print(f"🔨 Building WhisperEngine for {config['name']}...")
-        
+
         try:
             # Generate spec file
             spec_file = self.generate_spec_file(target_platform)
-            
+
             # Prepare build command
             python_exe = sys.executable
             pyinstaller_path = Path(python_exe).parent / "pyinstaller"
-            
+
             # Use pyinstaller from current Python environment
             if pyinstaller_path.exists():
                 cmd = [str(pyinstaller_path)]
             else:
                 # Fallback to module execution
                 cmd = [python_exe, "-m", "PyInstaller"]
-            
+
             if clean:
                 cmd.append("--clean")
             cmd.extend(["--noconfirm", str(spec_file)])
-            
+
             # Run PyInstaller
             print(f"🚀 Running: {' '.join(cmd)}")
             result = subprocess.run(cmd, cwd=self.project_root, capture_output=True, text=True)
-            
+
             if result.returncode == 0:
                 # Check for output - be more flexible about file locations
                 config = self.platforms[target_platform]
                 possible_outputs = []
-                
+
                 if target_platform == "darwin":
                     possible_outputs = [
                         self.dist_dir / config["executable"],  # WhisperEngine.app
@@ -285,22 +291,28 @@ app = BUNDLE(
                 elif target_platform == "windows":
                     possible_outputs = [
                         self.dist_dir / config["executable"],  # WhisperEngine.exe
-                        self.dist_dir / config["executable"].split(".")[0] / config["executable"],  # WhisperEngine/WhisperEngine.exe
-                        self.dist_dir / config["executable"].split(".")[0] / config["executable"].split(".")[0],  # WhisperEngine/WhisperEngine
+                        self.dist_dir
+                        / config["executable"].split(".")[0]
+                        / config["executable"],  # WhisperEngine/WhisperEngine.exe
+                        self.dist_dir
+                        / config["executable"].split(".")[0]
+                        / config["executable"].split(".")[0],  # WhisperEngine/WhisperEngine
                     ]
                 else:  # linux
                     possible_outputs = [
                         self.dist_dir / config["executable"],  # WhisperEngine
-                        self.dist_dir / config["executable"] / config["executable"],  # WhisperEngine/WhisperEngine
+                        self.dist_dir
+                        / config["executable"]
+                        / config["executable"],  # WhisperEngine/WhisperEngine
                     ]
-                
+
                 # Find the actual output
                 output_path = None
                 for path in possible_outputs:
                     if path.exists():
                         output_path = path
                         break
-                
+
                 if output_path:
                     print(f"✅ {config['name']} build successful!")
                     print(f"📦 Output: {output_path}")
@@ -321,57 +333,61 @@ app = BUNDLE(
                 print(f"❌ {config['name']} build failed!")
                 print(f"Error: {result.stderr}")
                 return False
-                
+
         except Exception as e:
             print(f"❌ Build error: {e}")
             return False
-    
+
     def build_current_platform(self, clean: bool = True) -> bool:
         """Build for current platform"""
         current = self.detect_platform()
         return self.build_platform(current, clean)
-    
+
     def build_all_supported(self, clean: bool = True) -> Dict[str, bool]:
         """Build for all supported platforms (if possible)"""
         results = {}
-        
+
         print("🌍 Cross-platform build initiated...")
         print(f"📍 Current platform: {self.platforms[self.current_platform]['name']}")
-        
+
         for platform_key in self.platforms:
             if platform_key == self.current_platform:
                 print(f"\n🎯 Building for current platform: {self.platforms[platform_key]['name']}")
                 results[platform_key] = self.build_platform(platform_key, clean)
             else:
-                print(f"\n🔄 Attempting cross-compilation to: {self.platforms[platform_key]['name']}")
+                print(
+                    f"\n🔄 Attempting cross-compilation to: {self.platforms[platform_key]['name']}"
+                )
                 print(f"   ⚠️  Note: Cross-compiled builds may have limitations")
-                print(f"   💡 For production use, build on native {self.platforms[platform_key]['name']} system")
+                print(
+                    f"   💡 For production use, build on native {self.platforms[platform_key]['name']} system"
+                )
                 results[platform_key] = self.build_platform(platform_key, clean)
-        
+
         return results
-    
+
     def clean_build_artifacts(self):
         """Clean build artifacts"""
         print("🧹 Cleaning build artifacts...")
-        
+
         # Remove build and dist directories
         if self.build_dir.exists():
             shutil.rmtree(self.build_dir)
             print(f"🗑️  Removed: {self.build_dir}")
-        
+
         if self.dist_dir.exists():
             shutil.rmtree(self.dist_dir)
             print(f"🗑️  Removed: {self.dist_dir}")
-        
+
         # Remove spec files
         for platform_config in self.platforms.values():
             spec_path = self.project_root / platform_config["spec_file"]
             if spec_path.exists():
                 spec_path.unlink()
                 print(f"🗑️  Removed: {spec_path}")
-        
+
         print("✅ Cleanup complete")
-    
+
     def get_build_info(self) -> Dict:
         """Get build environment information"""
         return {
@@ -389,59 +405,55 @@ def main():
     """Main CLI interface"""
     parser = argparse.ArgumentParser(description="WhisperEngine Cross-Platform Builder")
     parser.add_argument(
-        "command",
-        choices=["build", "build-all", "clean", "info"],
-        help="Build command to execute"
+        "command", choices=["build", "build-all", "clean", "info"], help="Build command to execute"
     )
     parser.add_argument(
-        "--platform", 
+        "--platform",
         choices=["darwin", "windows", "linux"],
-        help="Target platform (default: current platform)"
+        help="Target platform (default: current platform)",
     )
     parser.add_argument(
-        "--no-clean",
-        action="store_true",
-        help="Skip cleaning build artifacts before building"
+        "--no-clean", action="store_true", help="Skip cleaning build artifacts before building"
     )
-    
+
     args = parser.parse_args()
-    
+
     builder = CrossPlatformBuilder()
-    
+
     print("🤖 WhisperEngine Cross-Platform Builder")
     print("=" * 50)
-    
+
     if args.command == "info":
         info = builder.get_build_info()
         print("📊 Build Environment Information:")
         for key, value in info.items():
             print(f"   {key}: {value}")
-    
+
     elif args.command == "clean":
         builder.clean_build_artifacts()
-    
+
     elif args.command == "build":
         clean = not args.no_clean
         if args.platform:
             success = builder.build_platform(args.platform, clean)
         else:
             success = builder.build_current_platform(clean)
-        
+
         if success:
             print("\n🎉 Build completed successfully!")
         else:
             print("\n💥 Build failed!")
             sys.exit(1)
-    
+
     elif args.command == "build-all":
         clean = not args.no_clean
         results = builder.build_all_supported(clean)
-        
+
         print("\n📊 Build Results:")
         for platform, success in results.items():
             status = "✅ Success" if success else "❌ Failed"
             print(f"   {builder.platforms[platform]['name']}: {status}")
-        
+
         if any(results.values()):
             print("\n🎉 At least one build succeeded!")
         else:

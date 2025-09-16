@@ -12,40 +12,42 @@ from src.utils.enhanced_memory_manager import create_enhanced_memory_manager
 
 logger = logging.getLogger(__name__)
 
+
 def apply_memory_enhancement_patch(memory_manager):
     """
     Apply the enhanced memory system to the existing memory manager
-    
+
     Args:
         memory_manager: Existing memory manager instance
-        
+
     Returns:
         Enhanced memory manager with optimized query processing
     """
     try:
         logger.info("Applying enhanced memory system patch...")
-        
+
         # Create enhanced wrapper
         enhanced_manager = create_enhanced_memory_manager(memory_manager)
-        
+
         # Configure enhancement settings
         enhanced_manager.max_queries_per_search = 3  # Balance performance vs thoroughness
-        enhanced_manager.min_query_weight = 0.4      # Lower threshold for broader search
-        enhanced_manager.combine_results = True      # Use result combination for better relevance
-        
+        enhanced_manager.min_query_weight = 0.4  # Lower threshold for broader search
+        enhanced_manager.combine_results = True  # Use result combination for better relevance
+
         logger.info("✅ Enhanced memory system patch applied successfully")
         logger.info("🎯 Benefits:")
         logger.info("  • Improved topic recall from past conversations")
-        logger.info("  • Better semantic search with noise reduction")  
+        logger.info("  • Better semantic search with noise reduction")
         logger.info("  • Multi-query strategy for comprehensive retrieval")
         logger.info("  • Weighted scoring for better relevance ranking")
-        
+
         return enhanced_manager
-        
+
     except Exception as e:
         logger.error(f"❌ Failed to apply enhanced memory system patch: {e}")
         logger.warning("🔄 Falling back to original memory manager")
         return memory_manager
+
 
 def create_integration_guide():
     """Create integration guide for developers"""
@@ -120,34 +122,36 @@ Based on testing:
 - Reduced noise in search results
 - More contextually aware bot responses
 """
-    
+
     return guide
+
 
 def validate_integration(memory_manager):
     """
     Validate that the integration was successful
-    
+
     Args:
         memory_manager: Memory manager to validate
-        
+
     Returns:
         bool: True if enhanced features are available
     """
     try:
         # Check if enhanced methods exist
-        has_enhanced_retrieval = hasattr(memory_manager, 'retrieve_relevant_memories_enhanced')
-        has_query_processor = hasattr(memory_manager, 'query_processor')
-        
+        has_enhanced_retrieval = hasattr(memory_manager, "retrieve_relevant_memories_enhanced")
+        has_query_processor = hasattr(memory_manager, "query_processor")
+
         if has_enhanced_retrieval and has_query_processor:
             logger.info("✅ Enhanced memory system validation passed")
             return True
         else:
             logger.warning("⚠️ Enhanced memory system validation failed - some features missing")
             return False
-            
+
     except Exception as e:
         logger.error(f"❌ Enhanced memory system validation error: {e}")
         return False
+
 
 if __name__ == "__main__":
     print("📚 Enhanced Memory System Integration Guide")

@@ -14,6 +14,7 @@ import json
 
 try:
     from neo4j import GraphDatabase, AsyncGraphDatabase
+
     NEO4J_AVAILABLE = True
 except ImportError:
     NEO4J_AVAILABLE = False
@@ -22,9 +23,11 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
+
 @dataclass
 class GraphMemoryConfig:
     """Configuration for graph database connection"""
+
     uri: str = "bolt://localhost:7687"
     username: str = "neo4j"
     password: str = "password"
@@ -32,43 +35,43 @@ class GraphMemoryConfig:
     max_connection_lifetime: int = 3600
     max_connection_pool_size: int = 50
 
+
 class GraphMemoryManager:
     """Enhanced memory manager using Neo4j for relationship modeling"""
-    
+
     def __init__(self, config: GraphMemoryConfig, memory_manager=None):
         if not NEO4J_AVAILABLE:
             logger.warning("Neo4j driver not available. Graph features disabled.")
             self.enabled = False
             return
-            
+
         self.config = config
         self.memory_manager = memory_manager  # Reference to existing ChromaDB manager
         self.driver = None
         self.enabled = True
-        
+
     async def initialize(self):
         """Initialize Neo4j connection and create constraints/indexes"""
         if not self.enabled:
             return
-            
+
         try:
             self.driver = AsyncGraphDatabase.driver(
-                self.config.uri,
-                auth=(self.config.username, self.config.password)
+                self.config.uri, auth=(self.config.username, self.config.password)
             )
-            
+
             # Test connection
             await self.driver.verify_connectivity()
-            
+
             # Create schema
             await self._create_schema()
-            
+
             logger.info("Graph database initialized successfully")
-            
+
         except Exception as e:
             logger.error(f"Failed to initialize graph database: {e}")
             self.enabled = False
-            
+
     async def _create_schema(self):
         """Create necessary constraints and indexes"""
         schema_queries = [
@@ -77,14 +80,13 @@ class GraphMemoryManager:
             "CREATE CONSTRAINT topic_name_unique IF NOT EXISTS FOR (t:Topic) REQUIRE t.name IS UNIQUE",
             "CREATE CONSTRAINT memory_id_unique IF NOT EXISTS FOR (m:Memory) REQUIRE m.id IS UNIQUE",
             "CREATE CONSTRAINT emotion_id_unique IF NOT EXISTS FOR (e:EmotionContext) REQUIRE e.id IS UNIQUE",
-            
             # Indexes for performance
             "CREATE INDEX user_discord_id IF NOT EXISTS FOR (u:User) ON (u.discord_id)",
             "CREATE INDEX topic_category IF NOT EXISTS FOR (t:Topic) ON (t.category)",
             "CREATE INDEX memory_timestamp IF NOT EXISTS FOR (m:Memory) ON (m.timestamp)",
             "CREATE INDEX emotion_timestamp IF NOT EXISTS FOR (e:EmotionContext) ON (e.timestamp)",
         ]
-        
+
         async with self.driver.session(database=self.config.database) as session:
             for query in schema_queries:
                 try:
@@ -93,13 +95,18 @@ class GraphMemoryManager:
                 except Exception as e:
                     logger.warning(f"Schema query failed: {query}, Error: {e}")
 
-    async def create_or_update_user(self, user_id: str, discord_id: str, name: Optional[str] = None,
-                                  personality_traits: Optional[List[str]] = None,
-                                  communication_style: Optional[str] = None) -> bool:
+    async def create_or_update_user(
+        self,
+        user_id: str,
+        discord_id: str,
+        name: Optional[str] = None,
+        personality_traits: Optional[List[str]] = None,
+        communication_style: Optional[str] = None,
+    ) -> bool:
         """Create or update user node"""
         if not self.enabled:
             return False
-            
+
         query = """
         MERGE (u:User {id: $user_id})
         SET u.discord_id = $discord_id,
@@ -110,33 +117,39 @@ class GraphMemoryManager:
         ON CREATE SET u.created_at = datetime()
         RETURN u
         """
-        
+
         try:
             async with self.driver.session(database=self.config.database) as session:
-                result = await session.run(query, 
+                result = await session.run(
+                    query,
                     user_id=user_id,
                     discord_id=discord_id,
                     name=name,
                     personality_traits=personality_traits or [],
-                    communication_style=communication_style
+                    communication_style=communication_style,
                 )
                 await result.consume()
                 return True
-                
+
         except Exception as e:
             logger.error(f"Failed to create/update user {user_id}: {e}")
             return False
 
-    async def create_memory_with_relationships(self, user_id: str, chromadb_id: str,
-                                             summary: str, topics: List[str],
-                                             emotion_data: Optional[Dict] = None,
-                                             importance: float = 0.5) -> bool:
+    async def create_memory_with_relationships(
+        self,
+        user_id: str,
+        chromadb_id: str,
+        summary: str,
+        topics: List[str],
+        emotion_data: Optional[Dict] = None,
+        importance: float = 0.5,
+    ) -> bool:
         """Create memory node and establish relationships"""
         if not self.enabled:
             return False
-            
+
         memory_id = f"{user_id}_{chromadb_id}_{int(datetime.now().timestamp())}"
-        
+
         # Create memory node
         memory_query = """
         MATCH (u:User {id: $user_id})
@@ -155,28 +168,31 @@ class GraphMemoryManager:
         }]->(m)
         RETURN m
         """
-        
+
         try:
             async with self.driver.session(database=self.config.database) as session:
                 # Create memory
-                await session.run(memory_query,
+                await session.run(
+                    memory_query,
                     user_id=user_id,
                     memory_id=memory_id,
                     chromadb_id=chromadb_id,
                     summary=summary,
-                    importance=importance
+                    importance=importance,
                 )
-                
+
                 # Create topic relationships
                 for topic in topics:
                     await self._create_topic_relationship(session, memory_id, topic, user_id)
-                
+
                 # Create emotion context if provided
                 if emotion_data:
-                    await self._create_emotion_relationship(session, memory_id, emotion_data, user_id)
-                
+                    await self._create_emotion_relationship(
+                        session, memory_id, emotion_data, user_id
+                    )
+
                 return True
-                
+
         except Exception as e:
             logger.error(f"Failed to create memory relationships: {e}")
             return False
@@ -202,14 +218,15 @@ class GraphMemoryManager:
         ON CREATE SET i.strength = 0.3, i.since = datetime()
         SET i.strength = i.strength + 0.1
         """
-        
+
         await session.run(topic_query, topic=topic, memory_id=memory_id, user_id=user_id)
 
-    async def _create_emotion_relationship(self, session, memory_id: str, 
-                                         emotion_data: Dict, user_id: str):
+    async def _create_emotion_relationship(
+        self, session, memory_id: str, emotion_data: Dict, user_id: str
+    ):
         """Create emotion context and relationships"""
         emotion_id = f"emotion_{memory_id}_{emotion_data.get('detected_emotion', 'neutral')}"
-        
+
         emotion_query = """
         CREATE (e:EmotionContext {
             id: $emotion_id,
@@ -232,21 +249,22 @@ class GraphMemoryManager:
             timestamp: datetime()
         }]->(e)
         """
-        
-        await session.run(emotion_query,
+
+        await session.run(
+            emotion_query,
             emotion_id=emotion_id,
-            emotion=emotion_data.get('detected_emotion', 'neutral'),
-            intensity=emotion_data.get('intensity', 0.5),
-            trigger_event=emotion_data.get('trigger_event', 'conversation'),
+            emotion=emotion_data.get("detected_emotion", "neutral"),
+            intensity=emotion_data.get("intensity", 0.5),
+            trigger_event=emotion_data.get("trigger_event", "conversation"),
             memory_id=memory_id,
-            user_id=user_id
+            user_id=user_id,
         )
 
     async def get_relationship_context(self, user_id: str) -> Dict:
         """Get comprehensive relationship context for personalized responses"""
         if not self.enabled:
             return {}
-            
+
         context_query = """
         MATCH (u:User {id: $user_id})
         OPTIONAL MATCH (u)-[r:REMEMBERS]->(m:Memory)
@@ -275,13 +293,13 @@ class GraphMemoryManager:
             END
         } as context
         """
-        
+
         try:
             async with self.driver.session(database=self.config.database) as session:
                 result = await session.run(context_query, user_id=user_id)
                 record = await result.single()
-                return record['context'] if record else {}
-                
+                return record["context"] if record else {}
+
         except Exception as e:
             logger.error(f"Failed to get relationship context for {user_id}: {e}")
             return {}
@@ -290,7 +308,7 @@ class GraphMemoryManager:
         """Analyze emotional patterns and triggers"""
         if not self.enabled:
             return {}
-            
+
         pattern_query = """
         MATCH (u:User {id: $user_id})-[:EXPERIENCED]->(e:EmotionContext)
         WITH u, e.emotion as emotion, count(e) as frequency, avg(e.intensity) as avg_intensity
@@ -316,23 +334,24 @@ class GraphMemoryManager:
             dominant_emotions: emotion_patterns[0..3]
         } as emotional_analysis
         """
-        
+
         try:
             async with self.driver.session(database=self.config.database) as session:
                 result = await session.run(pattern_query, user_id=user_id)
                 record = await result.single()
-                return record['emotional_analysis'] if record else {}
-                
+                return record["emotional_analysis"] if record else {}
+
         except Exception as e:
             logger.error(f"Failed to get emotional patterns for {user_id}: {e}")
             return {}
 
-    async def find_related_memories(self, user_id: str, current_topics: List[str], 
-                                  limit: int = 5) -> List[Dict]:
+    async def find_related_memories(
+        self, user_id: str, current_topics: List[str], limit: int = 5
+    ) -> List[Dict]:
         """Find memories related to current topics with emotional context"""
         if not self.enabled:
             return []
-            
+
         related_query = """
         MATCH (u:User {id: $user_id})-[:REMEMBERS]->(m:Memory)-[:ABOUT]->(t:Topic)
         WHERE t.name IN $topics
@@ -356,31 +375,30 @@ class GraphMemoryManager:
             relevance_score: relevance_score
         } as related_memory
         """
-        
+
         try:
             async with self.driver.session(database=self.config.database) as session:
-                result = await session.run(related_query, 
-                    user_id=user_id, 
-                    topics=current_topics, 
-                    limit=limit
+                result = await session.run(
+                    related_query, user_id=user_id, topics=current_topics, limit=limit
                 )
-                
+
                 memories = []
                 async for record in result:
-                    memories.append(record['related_memory'])
-                
+                    memories.append(record["related_memory"])
+
                 return memories
-                
+
         except Exception as e:
             logger.error(f"Failed to find related memories: {e}")
             return []
 
-    async def update_relationship_milestone(self, user_id: str, milestone_type: str, 
-                                          context: Optional[str] = None):
+    async def update_relationship_milestone(
+        self, user_id: str, milestone_type: str, context: Optional[str] = None
+    ):
         """Track relationship progression milestones"""
         if not self.enabled:
             return
-            
+
         milestone_query = """
         MATCH (u:User {id: $user_id})
         MERGE (bot:User {id: 'bot', name: 'Assistant'})
@@ -390,15 +408,16 @@ class GraphMemoryManager:
             context: $context
         }]->(bot)
         """
-        
+
         try:
             async with self.driver.session(database=self.config.database) as session:
-                await session.run(milestone_query,
+                await session.run(
+                    milestone_query,
                     user_id=user_id,
                     milestone_type=milestone_type,
-                    context=context or ''
+                    context=context or "",
                 )
-                
+
         except Exception as e:
             logger.error(f"Failed to update relationship milestone: {e}")
 

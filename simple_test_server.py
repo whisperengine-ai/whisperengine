@@ -88,53 +88,56 @@ app = FastAPI()
 # Store active connections
 connections = set()
 
+
 @app.get("/")
 async def get():
     return HTMLResponse(HTML_CONTENT)
+
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
     connections.add(websocket)
-    
+
     try:
         # Send welcome message
-        await websocket.send_text(json.dumps({
-            "type": "system",
-            "content": "Connected to simple test server"
-        }))
-        
+        await websocket.send_text(
+            json.dumps({"type": "system", "content": "Connected to simple test server"})
+        )
+
         while True:
             data = await websocket.receive_text()
             message_data = json.loads(data)
-            
+
             # Echo back with simple processing
             response = {
                 "type": "response",
                 "content": f"Echo: {message_data.get('content', 'No content')}",
-                "original": message_data
+                "original": message_data,
             }
-            
+
             await websocket.send_text(json.dumps(response))
-            
+
     except Exception as e:
         print(f"WebSocket error: {e}")
     finally:
         connections.discard(websocket)
 
+
 def signal_handler(signum, frame):
     print(f"\nReceived signal {signum}, shutting down gracefully...")
     sys.exit(0)
+
 
 if __name__ == "__main__":
     # Set up signal handlers
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
-    
+
     print("🧪 Starting simple WebSocket test server...")
     print("📱 Open http://127.0.0.1:8080 to test")
     print("🛑 Press Ctrl+C to stop")
-    
+
     try:
         uvicorn.run(app, host="127.0.0.1", port=8080, log_level="info")
     except KeyboardInterrupt:

@@ -8,12 +8,19 @@ from typing import Optional
 
 logger = logging.getLogger(__name__)
 
-async def store_conversation_atomic(safe_memory_manager, conversation_cache, 
-                                  channel_id: str, user_id: str, 
-                                  user_message: str, bot_response: str, **kwargs) -> bool:
+
+async def store_conversation_atomic(
+    safe_memory_manager,
+    conversation_cache,
+    channel_id: str,
+    user_id: str,
+    user_message: str,
+    bot_response: str,
+    **kwargs,
+) -> bool:
     """
     Atomically store conversation and update cache
-    
+
     Args:
         safe_memory_manager: Thread-safe memory manager instance
         conversation_cache: Conversation cache instance (can be None)
@@ -22,7 +29,7 @@ async def store_conversation_atomic(safe_memory_manager, conversation_cache,
         user_message: User's message content
         bot_response: Bot's response
         **kwargs: Additional storage parameters
-        
+
     Returns:
         bool: True if storage was successful
     """
@@ -34,11 +41,11 @@ async def store_conversation_atomic(safe_memory_manager, conversation_cache,
     except Exception as e:
         logger.error(f"Failed to store conversation in memory: {e}")
         storage_success = False
-    
+
     # Then, update cache based on storage result
     if conversation_cache:
         # For now, we don't have the message object here
         # This would need to be called from the message handler
         logger.debug(f"Storage result for channel {channel_id}: {storage_success}")
-    
+
     return storage_success

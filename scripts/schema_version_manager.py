@@ -14,25 +14,28 @@ from typing import Dict, List, Optional, Tuple, Any
 
 logger = logging.getLogger(__name__)
 
+
 class SchemaVersionManager:
     """Manages database schema versions and migrations"""
-    
-    def __init__(self, 
-                 postgres_host: str = "localhost",
-                 postgres_port: int = 5432,
-                 postgres_db: str = "discord_bot",
-                 postgres_user: str = "bot_user",
-                 postgres_password: str = "bot_password_change_me"):
+
+    def __init__(
+        self,
+        postgres_host: str = "localhost",
+        postgres_port: int = 5432,
+        postgres_db: str = "discord_bot",
+        postgres_user: str = "bot_user",
+        postgres_password: str = "bot_password_change_me",
+    ):
         """Initialize schema version manager"""
         self.postgres_config = {
-            'host': postgres_host,
-            'port': postgres_port,
-            'database': postgres_db,
-            'user': postgres_user,
-            'password': postgres_password
+            "host": postgres_host,
+            "port": postgres_port,
+            "database": postgres_db,
+            "user": postgres_user,
+            "password": postgres_password,
         }
         self.pool: Optional[asyncpg.Pool] = None
-        
+
         # Schema version definitions
         self.schema_versions = {
             "postgresql": {
@@ -41,19 +44,19 @@ class SchemaVersionManager:
                     1: {
                         "description": "Initial users, emotion_history, interactions tables",
                         "file": "scripts/migrations/v1_initial_schema.sql",
-                        "date": "2025-09-12"
+                        "date": "2025-09-12",
                     },
                     2: {
                         "description": "Added privacy tables and context boundaries",
-                        "file": "scripts/migrations/v2_privacy_schema.sql", 
-                        "date": "2025-09-12"
+                        "file": "scripts/migrations/v2_privacy_schema.sql",
+                        "date": "2025-09-12",
                     },
                     3: {
                         "description": "Added job scheduler and follow-up system tables",
                         "file": "scripts/migrations/v3_scheduler_schema.sql",
-                        "date": "2025-09-12"
-                    }
-                }
+                        "date": "2025-09-12",
+                    },
+                },
             },
             "chromadb": {
                 "current_version": 1,
@@ -61,9 +64,9 @@ class SchemaVersionManager:
                     1: {
                         "description": "Initial user_memories and global_facts collections",
                         "script": "scripts/init_chromadb.py",
-                        "date": "2025-09-12"
+                        "date": "2025-09-12",
                     }
-                }
+                },
             },
             "redis": {
                 "current_version": 1,
@@ -71,9 +74,9 @@ class SchemaVersionManager:
                     1: {
                         "description": "Redis cache structure for conversations",
                         "description_detail": "Key patterns: discord_cache:messages:*, discord_cache:meta:*",
-                        "date": "2025-09-12"
+                        "date": "2025-09-12",
                     }
-                }
+                },
             },
             "neo4j": {
                 "current_version": 1,
@@ -81,53 +84,54 @@ class SchemaVersionManager:
                     1: {
                         "description": "Initial graph schema with User, Topic, Memory, EmotionContext nodes",
                         "script": "scripts/setup_neo4j.sh",
-                        "date": "2025-09-12"
+                        "date": "2025-09-12",
                     }
-                }
-            }
+                },
+            },
         }
-    
+
     async def initialize(self) -> bool:
         """Initialize schema version tracking"""
         try:
             logger.info("🔄 Initializing schema version manager...")
-            
+
             # Connect to PostgreSQL
             if not await self._connect_postgres():
                 return False
-            
+
             # Create schema version table
             if not await self._create_version_table():
                 return False
-            
+
             logger.info("✅ Schema version manager initialized")
             return True
-            
+
         except Exception as e:
             logger.error(f"❌ Failed to initialize schema version manager: {e}")
             return False
-    
+
     async def _connect_postgres(self) -> bool:
         """Connect to PostgreSQL for version tracking"""
         try:
             self.pool = await asyncpg.create_pool(**self.postgres_config)
-            
+
             # Test connection
             async with self.pool.acquire() as conn:
                 await conn.execute("SELECT 1")
-            
+
             logger.info("Connected to PostgreSQL for schema versioning")
             return True
-            
+
         except Exception as e:
             logger.error(f"Failed to connect to PostgreSQL: {e}")
             return False
-    
+
     async def _create_version_table(self) -> bool:
         """Create the schema_versions table"""
         try:
             async with self.pool.acquire() as conn:
-                await conn.execute("""
+                await conn.execute(
+                    """
                     CREATE TABLE IF NOT EXISTS schema_versions (
                         component TEXT PRIMARY KEY,  -- postgresql, chromadb, redis, neo4j
                         current_version INTEGER NOT NULL,
@@ -136,10 +140,12 @@ class SchemaVersionManager:
                         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
                         updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
                     )
-                """)
-                
+                """
+                )
+
                 # Create update trigger
-                await conn.execute("""
+                await conn.execute(
+                    """
                     CREATE OR REPLACE FUNCTION update_schema_versions_updated_at()
                     RETURNS TRIGGER AS $$
                     BEGIN
@@ -153,59 +159,61 @@ class SchemaVersionManager:
                         BEFORE UPDATE ON schema_versions
                         FOR EACH ROW
                         EXECUTE FUNCTION update_schema_versions_updated_at();
-                """)
-            
+                """
+                )
+
             logger.info("Schema versions table created/verified")
             return True
-            
+
         except Exception as e:
             logger.error(f"Failed to create schema versions table: {e}")
             return False
-    
+
     async def get_current_version(self, component: str) -> Optional[int]:
         """Get current schema version for a component"""
         try:
             if not self.pool:
                 logger.error("PostgreSQL pool not initialized")
                 return None
-                
+
             async with self.pool.acquire() as conn:
                 result = await conn.fetchval(
-                    "SELECT current_version FROM schema_versions WHERE component = $1",
-                    component
+                    "SELECT current_version FROM schema_versions WHERE component = $1", component
                 )
                 return result
         except Exception as e:
             logger.error(f"Failed to get version for {component}: {e}")
             return None
-    
-    async def set_version(self, component: str, version: int, migration_info: Optional[Dict] = None) -> bool:
+
+    async def set_version(
+        self, component: str, version: int, migration_info: Optional[Dict] = None
+    ) -> bool:
         """Set schema version for a component"""
         try:
             if not self.pool:
                 logger.error("PostgreSQL pool not initialized")
                 return False
-                
+
             async with self.pool.acquire() as conn:
                 # Get existing migration history
                 existing = await conn.fetchrow(
-                    "SELECT migration_history FROM schema_versions WHERE component = $1",
-                    component
+                    "SELECT migration_history FROM schema_versions WHERE component = $1", component
                 )
-                
-                migration_history = existing['migration_history'] if existing else []
-                
+
+                migration_history = existing["migration_history"] if existing else []
+
                 # Add new migration entry
                 if migration_info:
                     migration_entry = {
                         "version": version,
                         "timestamp": datetime.now(timezone.utc).isoformat(),
-                        **migration_info
+                        **migration_info,
                     }
                     migration_history.append(migration_entry)
-                
+
                 # Upsert version record
-                await conn.execute("""
+                await conn.execute(
+                    """
                     INSERT INTO schema_versions (component, current_version, last_migration_date, migration_history)
                     VALUES ($1, $2, $3, $4)
                     ON CONFLICT (component) DO UPDATE SET
@@ -213,44 +221,51 @@ class SchemaVersionManager:
                         last_migration_date = EXCLUDED.last_migration_date,
                         migration_history = EXCLUDED.migration_history,
                         updated_at = CURRENT_TIMESTAMP
-                """, component, version, datetime.now(timezone.utc), json.dumps(migration_history))
-            
+                """,
+                    component,
+                    version,
+                    datetime.now(timezone.utc),
+                    json.dumps(migration_history),
+                )
+
             logger.info(f"Set {component} schema version to {version}")
             return True
-            
+
         except Exception as e:
             logger.error(f"Failed to set version for {component}: {e}")
             return False
-    
+
     async def check_migrations_needed(self) -> Dict[str, List[int]]:
         """Check which components need migrations"""
         migrations_needed = {}
-        
+
         for component, schema_info in self.schema_versions.items():
             current_db_version = await self.get_current_version(component)
             target_version = schema_info["current_version"]
-            
+
             if current_db_version is None:
                 # Component not tracked yet, needs all migrations
                 migrations_needed[component] = list(range(1, target_version + 1))
             elif current_db_version < target_version:
                 # Needs migrations from current+1 to target
-                migrations_needed[component] = list(range(current_db_version + 1, target_version + 1))
-        
+                migrations_needed[component] = list(
+                    range(current_db_version + 1, target_version + 1)
+                )
+
         return migrations_needed
-    
+
     async def get_status_report(self) -> Dict[str, Any]:
         """Get comprehensive status report of all schema versions"""
         report = {
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "components": {},
-            "migrations_needed": await self.check_migrations_needed()
+            "migrations_needed": await self.check_migrations_needed(),
         }
-        
+
         for component, schema_info in self.schema_versions.items():
             current_version = await self.get_current_version(component)
             target_version = schema_info["current_version"]
-            
+
             # Get migration history
             try:
                 if not self.pool:
@@ -258,50 +273,54 @@ class SchemaVersionManager:
                 else:
                     async with self.pool.acquire() as conn:
                         result = await conn.fetchrow(
-                            "SELECT * FROM schema_versions WHERE component = $1",
-                            component
+                            "SELECT * FROM schema_versions WHERE component = $1", component
                         )
-                        history = result['migration_history'] if result else []
+                        history = result["migration_history"] if result else []
             except Exception:
                 history = []
-            
+
             report["components"][component] = {
                 "current_version": current_version,
                 "target_version": target_version,
                 "up_to_date": current_version == target_version if current_version else False,
                 "migration_history": history,
-                "available_versions": schema_info["versions"]
+                "available_versions": schema_info["versions"],
             }
-        
+
         return report
-    
+
     async def initialize_component_versions(self) -> bool:
         """Initialize version tracking for all components"""
         try:
             logger.info("🔄 Initializing component version tracking...")
-            
+
             for component, schema_info in self.schema_versions.items():
                 current_version = await self.get_current_version(component)
-                
+
                 if current_version is None:
                     # Set to version 0 initially (will be updated after migrations)
-                    await self.set_version(component, 0, {
-                        "description": f"Initial version tracking for {component}",
-                        "auto_initialized": True
-                    })
+                    await self.set_version(
+                        component,
+                        0,
+                        {
+                            "description": f"Initial version tracking for {component}",
+                            "auto_initialized": True,
+                        },
+                    )
                     logger.info(f"Initialized version tracking for {component}")
-            
+
             logger.info("✅ Component version tracking initialized")
             return True
-            
+
         except Exception as e:
             logger.error(f"❌ Failed to initialize component versions: {e}")
             return False
-    
+
     async def close(self):
         """Close database connections"""
         if self.pool:
             await self.pool.close()
+
 
 def get_postgres_config() -> Dict[str, Any]:
     """Get PostgreSQL configuration from environment"""
@@ -310,44 +329,44 @@ def get_postgres_config() -> Dict[str, Any]:
         "postgres_port": int(os.getenv("POSTGRES_PORT", "5432")),
         "postgres_db": os.getenv("POSTGRES_DB", "discord_bot"),
         "postgres_user": os.getenv("POSTGRES_USER", "bot_user"),
-        "postgres_password": os.getenv("POSTGRES_PASSWORD", "bot_password_change_me")
+        "postgres_password": os.getenv("POSTGRES_PASSWORD", "bot_password_change_me"),
     }
+
 
 async def main():
     """Main function for command-line usage"""
     logging.basicConfig(
-        level=logging.INFO,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+        level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
     )
-    
+
     print("🔄 Database Schema Version Manager")
     print("=" * 50)
-    
+
     # Get configuration
     config = get_postgres_config()
-    
+
     # Initialize version manager
     manager = SchemaVersionManager(**config)
-    
+
     try:
         # Initialize
         if not await manager.initialize():
             print("❌ Failed to initialize schema version manager")
             return
-        
+
         # Initialize component version tracking
         await manager.initialize_component_versions()
-        
+
         # Get status report
         print("\n📊 Schema Version Status:")
         report = await manager.get_status_report()
-        
+
         for component, info in report["components"].items():
             status = "✅" if info["up_to_date"] else "⚠️"
             current = info["current_version"] or "untracked"
             target = info["target_version"]
             print(f"{status} {component}: {current} / {target}")
-        
+
         # Show needed migrations
         if report["migrations_needed"]:
             print("\n🔄 Migrations Needed:")
@@ -355,11 +374,12 @@ async def main():
                 print(f"  {component}: versions {versions}")
         else:
             print("\n✅ All components up to date!")
-        
+
     except Exception as e:
         print(f"❌ Error: {e}")
     finally:
         await manager.close()
+
 
 if __name__ == "__main__":
     asyncio.run(main())

@@ -13,6 +13,7 @@ sys.path.insert(0, project_root)
 
 # Load appropriate environment configuration
 from env_manager import load_environment
+
 if not load_environment():  # Auto-detects development vs production mode
     print("❌ Failed to load environment configuration")
     print("💡 Run: python setup_env.py --template minimal")
@@ -21,17 +22,12 @@ if not load_environment():  # Auto-detects development vs production mode
 # Configure logging using the proper logging configuration
 from src.utils.logging_config import setup_logging
 
-debug_mode = os.getenv('DEBUG_MODE', 'false').lower() == 'true'
-environment = os.getenv('ENVIRONMENT', 'development')
-log_dir = os.getenv('LOG_DIR', 'logs')
-app_name = os.getenv('LOG_APP_NAME', 'discord_bot')
+debug_mode = os.getenv("DEBUG_MODE", "false").lower() == "true"
+environment = os.getenv("ENVIRONMENT", "development")
+log_dir = os.getenv("LOG_DIR", "logs")
+app_name = os.getenv("LOG_APP_NAME", "discord_bot")
 
-setup_logging(
-    debug=debug_mode,
-    environment=environment,
-    log_dir=log_dir,
-    app_name=app_name
-)
+setup_logging(debug=debug_mode, environment=environment, log_dir=log_dir, app_name=app_name)
 
 # Import and run the main function (logging is now configured)
 from src.main import sync_main
