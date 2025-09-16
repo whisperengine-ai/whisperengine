@@ -7,6 +7,7 @@ import os
 from typing import List, Dict, Optional, Tuple
 from datetime import datetime
 import asyncio
+import time
 
 logger = logging.getLogger(__name__)
 
@@ -16,6 +17,14 @@ from src.utils.fact_extractor import FactExtractor, GlobalFactExtractor
 from src.memory.chromadb_manager_simple import ChromaDBManagerSimple as ChromaDBManager
 from src.utils.emotion_manager import EmotionManager, UserProfile, EmotionProfile
 from src.utils.embedding_manager import ExternalEmbeddingManager
+
+# Import memory tier system for optimization
+try:
+    from src.memory.memory_tiers import MemoryTierManager, memory_tier_manager
+    MEMORY_TIERS_AVAILABLE = True
+except ImportError:
+    MEMORY_TIERS_AVAILABLE = False
+    logger.warning("Memory tiers system not available - using basic storage")
 
 # Import graph memory manager for hybrid storage
 try:
@@ -999,8 +1008,8 @@ class UserMemoryManager:
             logger.error(f"Error deleting global fact {fact_id}: {e}")
             return False
 
-    def store_user_fact(self, user_id: str, fact: str, context: str = ""):
-        """Store a specific fact about the user"""
+    def store_user_fact(self, user_id: str, fact: str, context: str = "", memory_context=None):
+        """Store a specific fact about the user with proper context metadata for privacy"""
         try:
             # Validate inputs
             user_id = self._validate_user_id(user_id)
@@ -1016,6 +1025,7 @@ class UserMemoryManager:
             if context:
                 fact_text += f"\nContext: {context}"
             
+            # Base metadata
             metadata = {
                 "user_id": user_id,
                 "timestamp": timestamp,
@@ -1023,6 +1033,25 @@ class UserMemoryManager:
                 "fact": fact,
                 "context": context
             }
+            
+            # Add context metadata for privacy boundaries if provided
+            if memory_context:
+                metadata.update({
+                    "context_type": memory_context.context_type.value,
+                    "security_level": memory_context.security_level.value,
+                    "server_id": memory_context.server_id,
+                    "channel_id": memory_context.channel_id,
+                    "is_private": memory_context.is_private
+                })
+            else:
+                # Default to most private context for safety
+                metadata.update({
+                    "context_type": "dm",
+                    "security_level": "private_dm",
+                    "server_id": None,
+                    "channel_id": None,
+                    "is_private": True
+                })
             
             # Store in ChromaDB using appropriate method
             if self.use_external_embeddings and self.add_documents_with_embeddings:
@@ -1054,6 +1083,274 @@ class UserMemoryManager:
         except Exception as e:
             logger.error(f"Error storing user fact: {e}")
             raise MemoryStorageError(f"Failed to store user fact: {e}")
+
+    def store_personality_fact(self, user_id: str, fact_content: str, context_metadata=None):
+        """
+        Store a fact using the new personality-driven classification system with memory tiers
+        
+        This replaces the global/user fact distinction with personality-focused categorization
+        that enhances AI companion relationships while respecting privacy boundaries.
+        
+        Args:
+            user_id: User ID
+            fact_content: The fact text to store
+            context_metadata: Optional context information about the conversation
+            
+        Returns:
+            PersonalityFact object with classification details
+        """
+        try:
+            # Import here to avoid circular imports
+            from src.memory.personality_facts import get_personality_fact_classifier
+            
+            # Validate inputs
+            user_id = self._validate_user_id(user_id)
+            fact_content = self._validate_input(fact_content)
+            
+            if context_metadata is None:
+                context_metadata = {
+                    "extraction_source": "manual",
+                    "timestamp": datetime.now().isoformat()
+                }
+            
+            # Get context_id for memory tier analysis
+            context_id = context_metadata.get("channel_id", "dm")
+            
+            # Classify the fact for personality enhancement
+            classifier = get_personality_fact_classifier()
+            personality_fact = classifier.classify_fact(fact_content, context_metadata, user_id)
+            
+            # Use memory tier manager for optimization if available
+            if MEMORY_TIERS_AVAILABLE:
+                start_time = time.time()
+                
+                # Get memory tier assignment from tier manager
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                try:
+                    memory_tier, tier_reason = loop.run_until_complete(
+                        memory_tier_manager.classify_memory_tier(
+                            personality_relevance=personality_fact.relevance_score,
+                            emotional_weight=personality_fact.emotional_weight,
+                            user_id=user_id,
+                            context_id=context_id
+                        )
+                    )
+                    
+                    # Update personality fact with optimized tier assignment
+                    personality_fact.memory_tier = memory_tier
+                    
+                    retrieval_time_ms = (time.time() - start_time) * 1000
+                    
+                    # Record the storage operation as an access pattern
+                    loop.run_until_complete(
+                        memory_tier_manager.record_access(
+                            fact_id=f"{user_id}_{hash(fact_content) % 10000}",
+                            user_id=user_id,
+                            context_id=context_id,
+                            retrieval_time_ms=retrieval_time_ms,
+                            was_cache_hit=False  # New storage, not a cache hit
+                        )
+                    )
+                    
+                    logger.debug("Memory tier assignment: %s - %s", memory_tier.value, tier_reason)
+                    
+                finally:
+                    loop.close()
+            
+            # Store based on memory tier assignment
+            storage_metadata = personality_fact.to_storage_dict()
+            
+            # Create document content with personality context
+            fact_text = f"Personality fact [{personality_fact.fact_type.value}]: {fact_content}"
+            if personality_fact.relevance.value != "minimal":
+                fact_text += f"\nPersonality relevance: {personality_fact.relevance.value} ({personality_fact.relevance_score:.2f})"
+            
+            # Add memory tier information
+            fact_text += f"\nMemory tier: {personality_fact.memory_tier.value}"
+            
+            # Use appropriate collection based on memory tier
+            if personality_fact.memory_tier.value == "hot":
+                # Store in main collection for fast access
+                target_collection = self.collection
+                doc_id = f"{user_id}_personality_hot_{datetime.now().isoformat()}_{hash(fact_content) % 10000}"
+            elif personality_fact.memory_tier.value == "warm":
+                # Store in main collection but mark for caching
+                target_collection = self.collection
+                doc_id = f"{user_id}_personality_warm_{datetime.now().isoformat()}_{hash(fact_content) % 10000}"
+            else:
+                # Store in main collection but mark for cold storage
+                target_collection = self.collection
+                doc_id = f"{user_id}_personality_cold_{datetime.now().isoformat()}_{hash(fact_content) % 10000}"
+            
+            # Add memory tier metadata
+            storage_metadata["memory_tier"] = personality_fact.memory_tier.value
+            storage_metadata["tier_assignment_time"] = datetime.now().isoformat()
+            
+            # Store using appropriate embedding method
+            if self.use_external_embeddings and self.add_documents_with_embeddings:
+                from src.memory.chromadb_external_embeddings import run_async_method
+                success = run_async_method(
+                    self.add_documents_with_embeddings,
+                    target_collection,
+                    [fact_text],
+                    [storage_metadata],
+                    [doc_id]
+                )
+                if not success:
+                    raise MemoryStorageError("Failed to store personality fact with external embeddings")
+            else:
+                target_collection.add(
+                    documents=[fact_text],
+                    metadatas=[storage_metadata],
+                    ids=[doc_id]
+                )
+            
+            logger.debug("Stored personality fact for %s: %s (relevance: %.2f, tier: %s)", 
+                        user_id, personality_fact.fact_type.value, 
+                        personality_fact.relevance_score, personality_fact.memory_tier.value)
+            
+            return personality_fact
+            
+        except ValidationError:
+            raise
+        except Exception as e:
+            logger.error("Error storing personality fact: %s", e)
+            raise MemoryStorageError(f"Failed to store personality fact: {e}")
+
+    def retrieve_personality_facts(self, user_id: str, query: str = "", 
+                                 fact_types: List = None, 
+                                 min_relevance: float = 0.0,
+                                 memory_tiers: List = None,
+                                 limit: int = 10) -> List[Dict]:
+        """
+        Retrieve personality facts with advanced filtering for AI companion enhancement
+        
+        Args:
+            user_id: User ID
+            query: Optional semantic search query
+            fact_types: Optional list of PersonalityFactType values to filter by
+            min_relevance: Minimum relevance score (0.0-1.0)
+            memory_tiers: Optional list of MemoryTier values to filter by  
+            limit: Maximum number of facts to return
+            
+        Returns:
+            List of personality facts with metadata
+        """
+        try:
+            # Validate inputs
+            user_id = self._validate_user_id(user_id)
+            if query:
+                query = self._validate_input(query, max_length=1000)
+            
+            # Build filter conditions
+            where_conditions = {"user_id": user_id}
+            
+            # Filter by fact types if specified
+            if fact_types:
+                where_conditions["fact_type"] = {"$in": fact_types}
+            
+            # Filter by memory tiers if specified  
+            if memory_tiers:
+                where_conditions["memory_tier"] = {"$in": memory_tiers}
+            
+            # Filter by minimum relevance
+            if min_relevance > 0.0:
+                where_conditions["relevance_score"] = {"$gte": min_relevance}
+            
+            # Perform search
+            if query:
+                # Semantic search with filters
+                if self.external_embedding_manager.use_external:
+                    try:
+                        embeddings = self.external_embedding_manager.get_embeddings_sync([query])
+                        if embeddings:
+                            results = self.collection.query(
+                                query_embeddings=[embeddings[0]],
+                                where=where_conditions,
+                                n_results=limit
+                            )
+                        else:
+                            results = self.collection.query(
+                                query_texts=[query],
+                                where=where_conditions,
+                                n_results=limit
+                            )
+                    except Exception as e:
+                        logger.error(f"Failed to use external embeddings: {e}")
+                        results = self.collection.query(
+                            query_texts=[query],
+                            where=where_conditions,
+                            n_results=limit
+                        )
+                else:
+                    results = self.collection.query(
+                        query_texts=[query],
+                        where=where_conditions,
+                        n_results=limit
+                    )
+            else:
+                # Filter-only retrieval (no semantic search)
+                results = self.collection.get(
+                    where=where_conditions,
+                    limit=limit
+                )
+            
+            # Process results
+            personality_facts = []
+            if results.get('documents'):
+                documents = results['documents']
+                metadatas = results.get('metadatas', [])
+                distances = results.get('distances', [[]])
+                ids = results.get('ids', [])
+                
+                # Handle both query and get result formats
+                if isinstance(documents[0], list):
+                    # Query results format
+                    for i, doc in enumerate(documents[0] if documents[0] else []):
+                        metadata = metadatas[0][i] if metadatas and metadatas[0] else {}
+                        distance = distances[0][i] if distances and distances[0] else None
+                        fact_id = ids[0][i] if ids and ids[0] else None
+                        
+                        # Only include personality facts (filter out legacy facts)
+                        if metadata.get('version') == 'personality_v1':
+                            personality_facts.append({
+                                "id": fact_id,
+                                "content": doc,
+                                "metadata": metadata,
+                                "relevance_score": 1 - distance if distance else 1.0,
+                                "fact_type": metadata.get('fact_type'),
+                                "personality_relevance": metadata.get('relevance'),
+                                "memory_tier": metadata.get('memory_tier'),
+                                "emotional_weight": metadata.get('emotional_weight', 0.0)
+                            })
+                else:
+                    # Get results format
+                    for i, doc in enumerate(documents):
+                        metadata = metadatas[i] if metadatas else {}
+                        fact_id = ids[i] if ids else None
+                        
+                        if metadata.get('version') == 'personality_v1':
+                            personality_facts.append({
+                                "id": fact_id,
+                                "content": doc,
+                                "metadata": metadata,
+                                "relevance_score": metadata.get('relevance_score', 0.5),
+                                "fact_type": metadata.get('fact_type'),
+                                "personality_relevance": metadata.get('relevance'),
+                                "memory_tier": metadata.get('memory_tier'),
+                                "emotional_weight": metadata.get('emotional_weight', 0.0)
+                            })
+            
+            # Sort by relevance score (highest first)
+            personality_facts.sort(key=lambda x: x['relevance_score'], reverse=True)
+            
+            logger.debug(f"Retrieved {len(personality_facts)} personality facts for user {user_id}")
+            return personality_facts
+            
+        except Exception as e:
+            logger.error(f"Error retrieving personality facts: {e}")
+            return []
 
     async def get_memories_by_user(self, user_id: str, limit: int = 100) -> List[Dict]:
         """Retrieve all memories for a specific user"""
