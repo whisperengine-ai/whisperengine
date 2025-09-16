@@ -219,11 +219,15 @@ class IntegratedMemoryManager:
         importance += getattr(emotion_profile, "intensity", 0.0) * 0.3
 
         # High confidence emotions are more important
-        if emotion_profile and hasattr(emotion_profile, 'confidence'):
+        if emotion_profile and hasattr(emotion_profile, "confidence"):
             importance += emotion_profile.confidence * 0.2
 
         # Relationship milestones increase importance
-        if user_profile and hasattr(user_profile, 'relationship_level') and hasattr(user_profile.relationship_level, 'value'):
+        if (
+            user_profile
+            and hasattr(user_profile, "relationship_level")
+            and hasattr(user_profile.relationship_level, "value")
+        ):
             if user_profile.relationship_level.value in ["friend", "close_friend"]:
                 importance += 0.2
 
@@ -237,7 +241,11 @@ class IntegratedMemoryManager:
             importance += 0.2
 
         # Strong emotions are important
-        if emotion_profile and hasattr(emotion_profile, 'detected_emotion') and hasattr(emotion_profile.detected_emotion, 'value'):
+        if (
+            emotion_profile
+            and hasattr(emotion_profile, "detected_emotion")
+            and hasattr(emotion_profile.detected_emotion, "value")
+        ):
             if emotion_profile.detected_emotion.value in [
                 "angry",
                 "frustrated",
