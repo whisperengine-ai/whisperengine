@@ -26,7 +26,6 @@ def test_faiss_availability():
     try:
         import faiss
 
-
         # Test basic FAISS functionality
         dimension = 384
         index = faiss.IndexFlatIP(dimension)
@@ -42,7 +41,6 @@ def test_faiss_availability():
         query = np.random.random((1, dimension)).astype(np.float32)
         faiss.normalize_L2(query)
         scores, indices = index.search(query, 3)
-
 
         return True
 
@@ -158,7 +156,6 @@ async def test_enhanced_memory_system():
             similarity_threshold=0.1,  # Low threshold for test
         )
 
-
         for i, _memory in enumerate(search_result.memory_nodes):
             (
                 search_result.similarity_scores[i]
@@ -247,7 +244,6 @@ async def test_chromadb_adapter():
             query_embedding=query_embedding, user_id="test_user", limit=5
         )
 
-
         return True
 
     except ImportError:
@@ -283,7 +279,6 @@ async def run_comprehensive_test():
     passed_tests = sum(
         [faiss_basic, faiss_engine, enhanced_memory, production_integration, chromadb_adapter]
     )
-
 
     if passed_tests == total_tests:
         pass

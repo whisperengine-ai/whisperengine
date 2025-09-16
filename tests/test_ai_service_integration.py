@@ -42,7 +42,6 @@ async def test_ai_service():
 
         response = await ai_service.process_message_async(test_message)
 
-
         if response.message_type == "error":
             return False
         else:

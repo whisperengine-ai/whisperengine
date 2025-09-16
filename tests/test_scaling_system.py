@@ -24,7 +24,6 @@ async def test_adaptive_configuration():
     config_manager = AdaptiveConfigManager()
     config_manager.get_deployment_info()
 
-
     return True
 
 
@@ -165,7 +164,6 @@ async def main():
     # Summary
     passed = sum(results)
     total = len(results)
-
 
     if passed == total:
         generate_summary_report()

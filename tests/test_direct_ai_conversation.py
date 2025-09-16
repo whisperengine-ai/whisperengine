@@ -79,14 +79,12 @@ async def test_direct_ai_conversation():
             message_type=MessageType.TEXT,
         )
 
-
         # Create conversation
         await orchestrator.get_or_create_conversation(test_message)
 
         # Generate AI response
         try:
             ai_response = await orchestrator.generate_ai_response(test_message, [])
-
 
             if len(ai_response.content) > 50 and "error" not in ai_response.content.lower():
                 ai_success = True
@@ -128,7 +126,6 @@ async def test_direct_ai_conversation():
                     "timestamp": "2025-09-14T15:47:01",
                 },
             )
-
 
             # Test user creation in graph
             await db_manager.create_user_in_graph(

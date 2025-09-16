@@ -21,7 +21,6 @@ async def test_special_token_cleanup():
         if not MLXBackend.is_available():
             return True
 
-
         # Test the cleanup logic directly
         MLXBackend()
 
@@ -50,7 +49,6 @@ async def test_special_token_cleanup():
             for token in special_tokens_to_remove:
                 cleaned = cleaned.replace(token, "")
             cleaned = cleaned.strip()
-
 
         return True
 

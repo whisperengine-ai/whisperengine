@@ -20,7 +20,6 @@ logger = logging.getLogger(__name__)
 def test_memory_manager_llm_facts():
     """Test LLM-based fact extraction through the memory manager"""
 
-
     try:
         # Initialize LLM client
         llm_client = LMStudioClient()
@@ -31,7 +30,6 @@ def test_memory_manager_llm_facts():
         # Check if LM Studio is running
         if not llm_client.check_connection():
             return False
-
 
         # Initialize memory manager with LLM support
         memory_manager = UserMemoryManager(enable_auto_facts=True, llm_client=llm_client)
@@ -54,7 +52,6 @@ def test_memory_manager_llm_facts():
                 "bot": "That was indeed a significant acquisition in the tech industry.",
             },
         ]
-
 
         for _i, conversation in enumerate(test_conversations, 1):
 

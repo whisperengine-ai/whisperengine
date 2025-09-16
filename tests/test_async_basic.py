@@ -124,7 +124,6 @@ async def main():
         except Exception:
             pass
 
-
     if passed == total:
         pass
     else:

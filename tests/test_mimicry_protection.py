@@ -123,7 +123,6 @@ if __name__ == "__main__":
         test_legitimate_user_messages_with_similar_content()
         test_edge_cases()
 
-
     except Exception:
         import traceback
 

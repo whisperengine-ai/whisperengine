@@ -294,7 +294,6 @@ class BuildValidator:
         """Print validation summary"""
         report = self.generate_report()
 
-
         for _check, status in self.results.items():
             {"pass": "✅", "fail": "❌", "skip": "⚠️"}.get(status, "❓")
 

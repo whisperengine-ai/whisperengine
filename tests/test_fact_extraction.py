@@ -58,7 +58,6 @@ def test_fact_extraction():
         except Exception:
             pass
 
-
     if passed_tests == total_tests:
         pass
     elif passed_tests > 0:

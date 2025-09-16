@@ -351,9 +351,7 @@ class Phase4HumanLikeIntegration:
                 processing_metadata={
                     "error": str(e),
                     "phases_executed": [],
-                    "total_duration": (
-                        datetime.now(UTC) - processing_start
-                    ).total_seconds(),
+                    "total_duration": (datetime.now(UTC) - processing_start).total_seconds(),
                 },
             )
 

@@ -61,7 +61,6 @@ def test_voice_max_response_length():
     ), "Response not properly truncated"  # +3 for "..."
     assert truncated_response.endswith("..."), "Truncated response should end with '...'"
 
-
     # Cleanup
     os.environ.pop("VOICE_MAX_RESPONSE_LENGTH", None)
 

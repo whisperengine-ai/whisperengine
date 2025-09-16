@@ -39,20 +39,17 @@ def _run_emotion_without_name_extraction_test(em):
         "I'm very excited",
     ]
 
-
     for i, message in enumerate(test_cases):
         user_id = f"test_user_{i}"
 
         # Process the interaction
         profile, emotion = em.process_interaction(user_id, message)
 
-
         # Check if a name was incorrectly extracted
         if profile.name:
             pass
         else:
             pass
-
 
 
 if __name__ == "__main__":

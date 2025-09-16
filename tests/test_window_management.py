@@ -307,5 +307,4 @@ if __name__ == "__main__":
     test_window_enumeration()
     test_preference_management()
 
-
     # Ask if user wants to clean up

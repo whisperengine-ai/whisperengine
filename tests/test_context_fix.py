@@ -64,7 +64,6 @@ def test_system_prompt_cleanliness():
         not has_temporal
     ), f"System prompt should not contain temporal context: {DEFAULT_SYSTEM_PROMPT[:200]}..."
 
-
     return True
 
 
@@ -99,7 +98,6 @@ if __name__ == "__main__":
         test_context_placement()
         test_system_prompt_cleanliness()
         test_emotion_context_format()
-
 
     except Exception:
         import traceback

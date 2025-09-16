@@ -45,7 +45,6 @@ def test_name_capture():
         except Exception:
             pass
 
-
     # List all users to verify
     all_profiles = db.load_all_profiles()
 
@@ -53,9 +52,7 @@ def test_name_capture():
         pass
 
     # Count users with names
-    sum(
-        1 for profile in all_profiles.values() if profile.name and profile.name != "No name"
-    )
+    sum(1 for profile in all_profiles.values() if profile.name and profile.name != "No name")
 
     if created_users >= len(test_cases):
         return True

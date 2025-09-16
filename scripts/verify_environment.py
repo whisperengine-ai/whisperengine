@@ -231,7 +231,6 @@ async def main():
     else:
         pass
 
-
     return all_functional
 
 

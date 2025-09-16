@@ -61,7 +61,6 @@ def verify_logs_system():
     except ImportError:
         return False
 
-
     return True
 
 

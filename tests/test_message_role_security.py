@@ -98,7 +98,6 @@ class TestMessageRoleAssignmentSecurity(unittest.TestCase):
         self.assertEqual(alice_id, "user_1")
         self.assertEqual(bob_id, "user_2")
 
-
     def test_attribution_id_generation_anonymous(self):
         """Test attribution ID generation with anonymous identity level"""
 
@@ -122,7 +121,6 @@ class TestMessageRoleAssignmentSecurity(unittest.TestCase):
         # Should be consistent for same user
         alice_id_2 = anon_manager.generate_attribution_id("67890", context)
         self.assertEqual(alice_id, alice_id_2)
-
 
     def test_message_attribution_creation(self):
         """Test creation of message attribution objects"""
@@ -152,7 +150,6 @@ class TestMessageRoleAssignmentSecurity(unittest.TestCase):
         self.assertTrue(bot_attribution.is_bot)
         self.assertEqual(bot_attribution.attribution_id, "assistant")
 
-
     def test_message_role_format_conversion(self):
         """Test conversion of messages to secure role format"""
 
@@ -178,7 +175,6 @@ class TestMessageRoleAssignmentSecurity(unittest.TestCase):
         self.assertEqual(bot_role_msg["role"], "assistant")
         self.assertEqual(bot_role_msg["llm_role"], "assistant")
         self.assertTrue(bot_role_msg["attribution"]["is_bot"])
-
 
     def test_llm_format_conversion_with_attribution(self):
         """Test conversion to LLM format with attribution preservation"""
@@ -223,7 +219,6 @@ class TestMessageRoleAssignmentSecurity(unittest.TestCase):
         self.assertEqual(bot_llm["role"], "assistant")
         self.assertEqual(bot_llm["content"], "I'm here to help both of you!")
 
-
     def test_identity_spoofing_detection(self):
         """Test detection of identity spoofing attempts"""
 
@@ -246,7 +241,6 @@ class TestMessageRoleAssignmentSecurity(unittest.TestCase):
         self.assertFalse(validation_result["is_valid"])
         self.assertEqual(validation_result["security_level"], "compromised")
         self.assertIn("identity spoofing", validation_result["errors"][0].lower())
-
 
     def test_suspicious_content_detection(self):
         """Test detection of suspicious content patterns"""
@@ -273,7 +267,6 @@ class TestMessageRoleAssignmentSecurity(unittest.TestCase):
         # Check for specific warnings
         warnings_text = " ".join(validation_result["warnings"]).lower()
         self.assertIn("suspicious content pattern", warnings_text)
-
 
     def test_conversation_participants_tracking(self):
         """Test tracking of conversation participants"""
@@ -304,7 +297,6 @@ class TestMessageRoleAssignmentSecurity(unittest.TestCase):
         self.assertIn("Bob", usernames)
         self.assertIn("TestBot", usernames)
 
-
     def test_cross_context_isolation(self):
         """Test that attribution IDs are isolated between contexts"""
 
@@ -326,7 +318,6 @@ class TestMessageRoleAssignmentSecurity(unittest.TestCase):
         # Add Bob to second context
         bob_id_ctx2 = self.role_manager.generate_attribution_id("54321", context2)
         self.assertEqual(bob_id_ctx2, "user_2")  # Second user in context2 (isolated)
-
 
     def test_context_clearing(self):
         """Test clearing of context attribution"""
@@ -353,7 +344,6 @@ class TestMessageRoleAssignmentSecurity(unittest.TestCase):
         participant_info_after = self.role_manager.get_conversation_participants(context)
         self.assertEqual(participant_info_after["participant_count"], 0)
 
-
     def test_attribution_summary_generation(self):
         """Test generation of attribution summary for debugging"""
 
@@ -379,7 +369,6 @@ class TestMessageRoleAssignmentSecurity(unittest.TestCase):
         self.assertGreaterEqual(summary["total_cached_users"], 2)  # Alice and Bob
         self.assertIn(context1, summary["contexts"])
         self.assertIn(context2, summary["contexts"])
-
 
     def test_identity_spoofing_prevention_scenario(self):
         """Test comprehensive identity spoofing prevention scenario"""
@@ -432,9 +421,7 @@ class TestMessageRoleAssignmentSecurity(unittest.TestCase):
         self.assertTrue(spoofed_llm["content"].startswith("[Alice]: "))
 
 
-
 if __name__ == "__main__":
 
     # Run tests
     unittest.main(verbosity=2, exit=False)
-

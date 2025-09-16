@@ -44,7 +44,6 @@ def test_end_to_end_synthetic_isolation():
             is_synthetic = memory_manager._is_synthetic_message(msg)
             assert not is_synthetic, f"Should NOT detect as synthetic: {msg}"
 
-
         # Test that store_conversation blocks synthetic messages
         user_id = "test_user_12345"
 
@@ -105,7 +104,6 @@ def test_emotion_analysis_flow():
     assert not original_dm_message.startswith("[Context from previous conversations]")
     assert not original_guild_message.startswith("[Context from previous conversations]")
     assert synthetic_context.startswith("[Context from previous conversations]")
-
 
     return True
 
@@ -177,7 +175,6 @@ def test_conversation_context_isolation():
     assert not real_user_msg["content"].startswith("[Context from previous conversations]")
     assert "got a new job" in real_user_msg["content"]  # Contains real user info
 
-
     return True
 
 
@@ -189,7 +186,6 @@ if __name__ == "__main__":
         test_emotion_analysis_flow()
         test_storage_flow()
         test_conversation_context_isolation()
-
 
     except Exception:
         import traceback

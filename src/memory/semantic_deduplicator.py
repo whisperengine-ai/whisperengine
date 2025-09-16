@@ -365,9 +365,7 @@ class SemanticDeduplicator:
                 return memory_id
         return None
 
-    def _find_semantic_duplicate(
-        self, fingerprint: MemoryFingerprint
-    ) -> tuple[str | None, float]:
+    def _find_semantic_duplicate(self, fingerprint: MemoryFingerprint) -> tuple[str | None, float]:
         """Find semantic duplicates using embedding similarity"""
         if not self.embedding_manager or not fingerprint.embedding_preview:
             return None, 0.0

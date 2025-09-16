@@ -579,4 +579,3 @@ if __name__ == "__main__":
 
     processor = LLMMessageRoleSecurityProcessor()
     secure_messages = processor.secure_message_processing(test_messages)
-

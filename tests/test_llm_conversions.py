@@ -62,7 +62,6 @@ def test_llm_conversions():
         "You make me feel comfortable sharing my thoughts with you.",
     ]
 
-
     # Test 1: User Fact Extraction
 
     fact_extractor = FactExtractor(llm_client=llm_client)
@@ -138,7 +137,6 @@ def test_llm_conversions():
         profile, emotion_profile = emotion_manager.analyze_and_update_emotion(
             test_user_id, test_message
         )
-
 
         # Test personal info and trust detection through relationship manager
         personal_info = emotion_manager.relationship_manager.detect_personal_info(test_message)

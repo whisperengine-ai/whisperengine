@@ -23,7 +23,6 @@ async def test_bundled_llm():
     if not api_url or not api_url.startswith("local://"):
         return False
 
-
     try:
         # Initialize LLM client
         llm_client = LLMClient()

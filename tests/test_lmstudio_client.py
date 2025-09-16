@@ -15,7 +15,6 @@ def main():
     if not client.check_connection():
         sys.exit(1)
 
-
     # Test a simple chat completion
     messages = [
         {"role": "system", "content": "You are a helpful assistant."},

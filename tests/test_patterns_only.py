@@ -70,7 +70,6 @@ def test_fact_extraction_patterns():
             pass
 
 
-
 class MockDiscordUser:
     """Mock Discord user for testing"""
 
@@ -109,7 +108,6 @@ def test_discord_user_functions():
         store_discord_user_info(user, mock_memory)
 
 
-
 def main():
     """Run all tests"""
 
@@ -117,7 +115,6 @@ def main():
         test_time_awareness()
         test_fact_extraction_patterns()
         test_discord_user_functions()
-
 
     except Exception:
         import traceback

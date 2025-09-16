@@ -16,7 +16,6 @@ logger = logging.getLogger(__name__)
 async def test_full_production_activation():
     """Test the complete production optimization activation flow"""
 
-
     # Import and create bot core
     from src.core.bot import DiscordBotCore
 
@@ -26,7 +25,6 @@ async def test_full_production_activation():
         bot_core.initialize_all()
     except Exception:
         return False
-
 
     if bot_core.production_adapter:
         try:

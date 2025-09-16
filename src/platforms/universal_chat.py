@@ -150,9 +150,7 @@ class AbstractChatAdapter(ABC):
         pass
 
     @abstractmethod
-    async def send_message(
-        self, user_id: str, content: str, channel_id: str | None = None
-    ) -> bool:
+    async def send_message(self, user_id: str, content: str, channel_id: str | None = None) -> bool:
         """Send a message to the platform"""
         pass
 
@@ -198,9 +196,7 @@ class WebUIChatAdapter(AbstractChatAdapter):
         self.active_sessions.clear()
         self.connected = False
 
-    async def send_message(
-        self, user_id: str, content: str, channel_id: str | None = None
-    ) -> bool:
+    async def send_message(self, user_id: str, content: str, channel_id: str | None = None) -> bool:
         """Send message via WebSocket or store for retrieval"""
         try:
             session_id = channel_id or f"web_{user_id}"
@@ -332,9 +328,7 @@ class DiscordChatAdapter(AbstractChatAdapter):
             },
         )
 
-    async def send_message(
-        self, user_id: str, content: str, channel_id: str | None = None
-    ) -> bool:
+    async def send_message(self, user_id: str, content: str, channel_id: str | None = None) -> bool:
         """Send Discord message"""
         try:
             if not self.bot:
@@ -426,9 +420,7 @@ class SlackChatAdapter(AbstractChatAdapter):
         """Disconnect from Slack"""
         self.connected = False
 
-    async def send_message(
-        self, user_id: str, content: str, channel_id: str | None = None
-    ) -> bool:
+    async def send_message(self, user_id: str, content: str, channel_id: str | None = None) -> bool:
         """Send Slack message"""
         # Implementation would use Slack Web API
         return True
@@ -462,9 +454,7 @@ class APIChatAdapter(AbstractChatAdapter):
         """No connection to close for API"""
         self.connected = False
 
-    async def send_message(
-        self, user_id: str, content: str, channel_id: str | None = None
-    ) -> bool:
+    async def send_message(self, user_id: str, content: str, channel_id: str | None = None) -> bool:
         """Store API response for retrieval"""
         # Implementation would store response in database or cache
         return True

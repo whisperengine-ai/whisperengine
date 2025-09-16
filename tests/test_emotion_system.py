@@ -73,7 +73,6 @@ def _run_emotion_detection_test(emotion_manager):
         emotion_manager.get_emotion_context(user_id)
 
 
-
 @pytest.mark.unit
 def test_relationship_progression_mock(mock_llm_client, temp_profiles_file):
     """Test relationship progression with mock LLM client"""
@@ -121,7 +120,6 @@ def _run_relationship_progression_test(emotion_manager):
 
         profile, emotion = emotion_manager.process_interaction(user_id, message)
 
-
         if i in [3, 6, 10, 16]:  # Show full context at key milestones
             emotion_manager.get_emotion_context(user_id)
 
@@ -159,7 +157,6 @@ def _run_escalation_handling_test(emotion_manager):
     for _i, message in enumerate(escalation_sequence, 1):
 
         profile, emotion = emotion_manager.process_interaction(user_id, message)
-
 
         if profile.escalation_count >= 3:
             pass
@@ -213,9 +210,7 @@ def _run_memory_integration_test(llm_client):
                 pass
 
         # Test emotion-aware context retrieval
-        memory_manager.get_emotion_aware_context(
-            user_id, "help with programming", limit=3
-        )
+        memory_manager.get_emotion_aware_context(user_id, "help with programming", limit=3)
 
         # Get stats
         memory_manager.get_collection_stats()
@@ -229,7 +224,6 @@ def _run_memory_integration_test(llm_client):
 def main():
     """Run all tests using pytest"""
     setup_test_logging()
-
 
 
 if __name__ == "__main__":

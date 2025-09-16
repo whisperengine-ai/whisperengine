@@ -18,7 +18,6 @@ from conversation_cache import HybridConversationCache
 async def test_user_specific_filtering():
     """Test that user-specific conversation context properly filters messages by user ID."""
 
-
     # Create mock Discord messages from different users
     def create_mock_message(
         user_id: int, content: str, message_id: int = None, is_bot: bool = False
@@ -69,7 +68,6 @@ async def test_user_specific_filtering():
             "messages": deque(test_messages, maxlen=50),
             "last_bootstrap": 999999999,  # High timestamp to avoid re-bootstrap
         }
-
 
     # Test 1: Get messages using OLD vulnerable method (simulated)
     all_messages = await cache.get_conversation_context(mock_channel, limit=10)
@@ -133,7 +131,6 @@ async def test_user_specific_filtering():
         return False
     else:
         pass
-
 
     return True
 

@@ -16,7 +16,6 @@ from lmstudio_client import LMStudioClient
 def test_fact_extraction_fix():
     """Test that the problematic messages no longer generate hallucinated facts"""
 
-
     # Create the LLM client (this will connect to LM Studio if running)
     try:
         llm_client = LMStudioClient()
@@ -36,7 +35,6 @@ def test_fact_extraction_fix():
         "what?",
     ]
 
-
     for message in test_messages:
         try:
             facts = fact_extractor.extract_facts_from_message(message)
@@ -49,7 +47,6 @@ def test_fact_extraction_fix():
 
         except Exception:
             pass
-
 
     legitimate_messages = [
         "I play guitar every weekend",

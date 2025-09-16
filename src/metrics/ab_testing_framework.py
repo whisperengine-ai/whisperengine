@@ -250,9 +250,7 @@ class ABTestingFramework:
         logger.info(f"Started A/B test: {test_id}")
         return True
 
-    async def get_user_variant(
-        self, user_id: str, test_type: TestType
-    ) -> TestConfiguration | None:
+    async def get_user_variant(self, user_id: str, test_type: TestType) -> TestConfiguration | None:
         """Get the test variant for a user"""
 
         # Find active test for this type

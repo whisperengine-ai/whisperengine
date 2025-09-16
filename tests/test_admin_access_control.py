@@ -95,7 +95,6 @@ class TestAdminAccessControl(unittest.TestCase):
         super_admin_level = self.controller.get_user_admin_level(self.mock_super_admin_ctx)
         self.assertEqual(super_admin_level, AdminLevel.SUPER_ADMIN)
 
-
     def test_admin_session_creation(self):
         """Test admin session creation and validation"""
 
@@ -109,7 +108,6 @@ class TestAdminAccessControl(unittest.TestCase):
         # Test session creation for non-admin user (should fail)
         no_session = self.controller.create_admin_session(self.mock_ctx)
         self.assertIsNone(no_session)
-
 
     def test_session_timeout(self):
         """Test admin session timeout functionality"""
@@ -128,7 +126,6 @@ class TestAdminAccessControl(unittest.TestCase):
         # Validate session (should be expired)
         expired_session = self.controller.validate_admin_session(self.mock_admin_user.id)
         self.assertIsNone(expired_session)
-
 
     def test_operation_permission_checks(self):
         """Test operation-level permission checking"""
@@ -152,7 +149,6 @@ class TestAdminAccessControl(unittest.TestCase):
         )
         self.assertTrue(allowed)
 
-
     def test_privilege_elevation(self):
         """Test privilege elevation for sensitive operations"""
 
@@ -175,7 +171,6 @@ class TestAdminAccessControl(unittest.TestCase):
         self.assertFalse(success)
         self.assertIn("requires Super Admin", message)
 
-
     def test_failed_attempt_tracking(self):
         """Test failed access attempt tracking and lockout"""
 
@@ -192,7 +187,6 @@ class TestAdminAccessControl(unittest.TestCase):
         # Admin level check should return NONE for locked user
         level = self.controller.get_user_admin_level(self.mock_ctx)
         self.assertEqual(level, AdminLevel.NONE)
-
 
     def test_admin_audit_logging(self):
         """Test admin operation audit logging"""
@@ -224,7 +218,6 @@ class TestAdminAccessControl(unittest.TestCase):
         self.assertEqual(second_entry.operation, AdminOperation.REMOVE_GLOBAL_FACT)
         self.assertFalse(second_entry.success)
 
-
     def test_admin_status_reporting(self):
         """Test admin status information retrieval"""
 
@@ -240,7 +233,6 @@ class TestAdminAccessControl(unittest.TestCase):
         self.assertEqual(status["admin_level"], "ADMINISTRATOR")
         self.assertTrue(status["has_session"])
         self.assertFalse(status["is_locked"])
-
 
     def test_audit_summary_generation(self):
         """Test audit summary generation"""
@@ -263,7 +255,6 @@ class TestAdminAccessControl(unittest.TestCase):
         self.assertEqual(summary["failed_operations"], 2)
         self.assertEqual(summary["unique_users"], 1)
 
-
     def test_session_cleanup(self):
         """Test cleanup of expired sessions"""
 
@@ -280,7 +271,6 @@ class TestAdminAccessControl(unittest.TestCase):
         # Verify cleanup
         self.assertEqual(cleaned_count, 1)
         self.assertEqual(len(self.controller.active_sessions), 0)
-
 
     def test_privilege_elevation_timeout(self):
         """Test privilege elevation timeout"""
@@ -300,7 +290,6 @@ class TestAdminAccessControl(unittest.TestCase):
         updated_session = self.controller.validate_admin_session(self.mock_super_admin_user.id)
         self.assertFalse(updated_session.is_elevated)
         self.assertIsNone(updated_session.elevation_expires)
-
 
     def test_operation_requires_elevation(self):
         """Test operations that require privilege elevation"""
@@ -325,7 +314,6 @@ class TestAdminAccessControl(unittest.TestCase):
         )
         self.assertTrue(allowed)
 
-
     def test_lockout_expiration(self):
         """Test that user lockouts expire after timeout"""
 
@@ -345,9 +333,7 @@ class TestAdminAccessControl(unittest.TestCase):
         self.assertFalse(self.controller._is_user_locked(user_id))
 
 
-
 if __name__ == "__main__":
 
     # Run the tests
     unittest.main(verbosity=0, exit=False)
-

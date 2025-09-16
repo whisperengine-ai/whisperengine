@@ -195,7 +195,6 @@ def print_table(data: list[dict], title: str):
     if not data:
         return
 
-
     # Get all unique keys
     all_keys = set()
     for item in data:

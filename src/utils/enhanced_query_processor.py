@@ -506,11 +506,9 @@ def test_query_processor():
         "I went to the park yesterday with my friends and had a great time",
     ]
 
-
     for _i, message in enumerate(test_messages, 1):
 
         result = processor.process_message(message)
-
 
         for _j, _query in enumerate(result.primary_queries, 1):
             pass

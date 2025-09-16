@@ -20,12 +20,5 @@ async def test_personality_commands():
     """Test personality command functionality."""
 
 
-
-
-
-
-
-
-
 if __name__ == "__main__":
     asyncio.run(test_personality_commands())

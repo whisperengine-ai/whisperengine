@@ -29,7 +29,6 @@ def create_mock_message(user_id: int, content: str, is_bot: bool = False, messag
 async def test_integration_functionality():
     """Test that bot functionality still works with security fix"""
 
-
     # Test that get_user_conversation_context still provides good conversation flow
     cache = HybridConversationCache()
     mock_channel = Mock()
@@ -87,7 +86,6 @@ async def test_integration_functionality():
         assert alice_context[1].author.bot, "Should be followed by bot"
         assert alice_context[2].author.id == user_alice, "Should continue with user"
 
-
         # Test with limit to ensure it respects limits
         limited_context = await cache.get_user_conversation_context(
             mock_channel, user_alice, limit=3
@@ -98,7 +96,6 @@ async def test_integration_functionality():
         assert "web scraper" in limited_context[-2].content, "Should include recent user message"
         assert "BeautifulSoup" in limited_context[-1].content, "Should include latest bot response"
 
-
         # Test exclude_message_id functionality
         excluded_context = await cache.get_user_conversation_context(
             mock_channel, user_alice, limit=10, exclude_message_id=5
@@ -108,11 +105,8 @@ async def test_integration_functionality():
         assert len(excluded_context) == 5, "Should have 5 messages after excluding 1"
 
 
-
-
 async def test_performance_impact():
     """Test that the security fix doesn't significantly impact performance"""
-
 
     import time
 
@@ -146,7 +140,6 @@ async def test_performance_impact():
         end_time = time.time()
         avg_time = (end_time - start_time) / 10
 
-
         # Performance should be reasonable (under 0.1 seconds for this test)
         assert avg_time < 0.1, f"Filtering too slow: {avg_time:.4f}s"
 
@@ -160,18 +153,12 @@ async def test_performance_impact():
         assert len(other_user_msgs) == 0, "Should not include other users' messages"
 
 
-
-
 if __name__ == "__main__":
 
     async def run_tests():
         try:
             await test_integration_functionality()
             await test_performance_impact()
-
-
-
-
 
         except Exception:
             import traceback

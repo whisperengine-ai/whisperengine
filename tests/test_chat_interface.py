@@ -31,7 +31,6 @@ async def test_chat_flow():
         if not success:
             return False
 
-
         # Test message processing
         test_messages = [
             "Hello! What can you help me with?",
@@ -46,7 +45,6 @@ async def test_chat_flow():
             if response.message_type == "error":
                 return False
 
-
             # Test conversation continuity
             if i > 1:
                 # Check if response shows awareness of previous messages
@@ -55,7 +53,6 @@ async def test_chat_flow():
                     for word in ["previous", "earlier", "before", "context"]
                 ):
                     pass
-
 
         # Test conversation info
         conversations = ai_service.get_conversations()

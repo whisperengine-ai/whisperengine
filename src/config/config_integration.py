@@ -244,8 +244,6 @@ class WhisperEngineConfigIntegrator:
         self.get_ai_config()
         self.get_database_config()
 
-
-
         # Performance recommendations
         recommendations = self.get_performance_recommendations()
         for _rec in recommendations["recommendations"][:3]:  # Show top 3
@@ -253,7 +251,6 @@ class WhisperEngineConfigIntegrator:
 
         if len(recommendations["recommendations"]) > 3:
             pass
-
 
 
 # CLI interface for testing and configuration generation

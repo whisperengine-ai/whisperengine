@@ -91,7 +91,6 @@ class TestContextAwareMemorySecurity(unittest.TestCase):
         self.assertIsNone(context.server_id)
         self.assertEqual(context.channel_id, "123456789")
 
-
     def test_context_classification_public_server(self):
         """Test public server channel context classification"""
 
@@ -116,7 +115,6 @@ class TestContextAwareMemorySecurity(unittest.TestCase):
         self.assertFalse(context.is_private)
         self.assertEqual(context.server_id, "987654321")
         self.assertEqual(context.channel_id, "555666777")
-
 
     def test_context_classification_private_server(self):
         """Test private server channel context classification"""
@@ -143,7 +141,6 @@ class TestContextAwareMemorySecurity(unittest.TestCase):
         self.assertEqual(context.server_id, "111222333")
         self.assertEqual(context.channel_id, "444555666")
 
-
     def test_dm_context_filtering(self):
         """Test that DM context only retrieves DM memories"""
 
@@ -164,7 +161,6 @@ class TestContextAwareMemorySecurity(unittest.TestCase):
             security_level = metadata.get("security_level", "private_dm")
             self.assertIn(security_level, ["private_dm", "cross_server"])
 
-
     def test_public_server_context_filtering(self):
         """Test that public server context filters out private memories"""
 
@@ -183,7 +179,6 @@ class TestContextAwareMemorySecurity(unittest.TestCase):
             metadata = memory["metadata"]
             security_level = metadata.get("security_level", "private_dm")
             self.assertNotEqual(security_level, "private_dm")
-
 
     def test_cross_server_content_sharing(self):
         """Test that cross-server safe content is available everywhere"""
@@ -221,7 +216,6 @@ class TestContextAwareMemorySecurity(unittest.TestCase):
             public_cross_server, "Public context should have access to cross-server content"
         )
 
-
     def test_context_aware_storage(self):
         """Test that conversation storage includes context metadata"""
 
@@ -249,7 +243,6 @@ class TestContextAwareMemorySecurity(unittest.TestCase):
         self.assertEqual(metadata["security_level"], "private_channel")
         self.assertTrue(metadata["is_private"])
 
-
     def test_emergency_safe_retrieval(self):
         """Test emergency fallback that only returns safe memories"""
 
@@ -267,7 +260,6 @@ class TestContextAwareMemorySecurity(unittest.TestCase):
 
         # Should return empty list when base memory fails
         self.assertEqual(len(safe_memories), 0)
-
 
     def test_privacy_leak_prevention_scenario(self):
         """Test realistic privacy leak prevention scenario"""
@@ -323,7 +315,6 @@ class TestContextAwareMemorySecurity(unittest.TestCase):
         self.assertTrue(hobby_mentioned, "Public hobby info should be available")
 
 
-
 def run_context_security_tests():
     """Run all context-aware memory security tests"""
 
@@ -336,8 +327,6 @@ def run_context_security_tests():
 
     # Print summary
     if result.wasSuccessful():
-
-
 
         return True
     else:

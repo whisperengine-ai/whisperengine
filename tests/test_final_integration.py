@@ -44,6 +44,5 @@ def test_full_system_integration():
     db.delete_user_profile("final_test_user")
 
 
-
 if __name__ == "__main__":
     test_full_system_integration()

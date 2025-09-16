@@ -85,7 +85,6 @@ def test_integration_completeness():
     partial_count = sum(1 for status in results.values() if status.startswith("⚠️"))
     total_count = len(results)
 
-
     return success_count, partial_count, total_count
 
 
@@ -163,7 +162,6 @@ if __name__ == "__main__":
 
     # Test 3: Component registration
     registration_success = test_component_registration()
-
 
     if success >= 5 and syntax_success >= 3 and registration_success:
         sys.exit(0)

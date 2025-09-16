@@ -94,7 +94,6 @@ async def test_vectorized_emotion_processing():
     if not LIBRARIES_AVAILABLE:
         return
 
-
     try:
         from src.emotion.vectorized_emotion_engine import (
             ProductionEmotionEngine,
@@ -124,12 +123,10 @@ async def test_vectorized_emotion_processing():
             processor.process_batch(texts, user_ids, metadata_list)
             time.time() - start_time
 
-
             # Test async processing
             start_time = time.time()
             await processor.process_batch_async(texts, user_ids, metadata_list)
             time.time() - start_time
-
 
             # Test ProductionEmotionEngine (with caching)
             engine = ProductionEmotionEngine(max_workers=config["workers"])
@@ -138,19 +135,16 @@ async def test_vectorized_emotion_processing():
             await engine.analyze_emotions_batch(texts, user_ids, metadata_list)
             time.time() - start_time
 
-
             # Test caching performance (process same batch again)
             start_time = time.time()
             await engine.analyze_emotions_batch(texts, user_ids, metadata_list)
             time.time() - start_time
-
 
             # Get performance stats
             engine.get_comprehensive_stats()
 
             await engine.shutdown()
             processor.shutdown()
-
 
     except Exception:
         import traceback
@@ -163,7 +157,6 @@ async def test_emotion_streaming():
 
     if not LIBRARIES_AVAILABLE:
         return
-
 
     try:
         from src.emotion.vectorized_emotion_engine import VectorizedEmotionProcessor
@@ -194,7 +187,6 @@ async def test_emotion_streaming():
         sum(result.batch_size for result in results)
         sum(result.processing_time for result in results)
 
-
         processor.shutdown()
 
     except Exception:
@@ -221,7 +213,6 @@ async def test_emotion_accuracy():
     if not LIBRARIES_AVAILABLE:
         return
 
-
     try:
         from src.emotion.vectorized_emotion_engine import ProductionEmotionEngine
 
@@ -239,7 +230,6 @@ async def test_emotion_accuracy():
             {"text": "Surprised by the unexpected results!", "expected": "surprise"},
         ]
 
-
         correct_predictions = 0
 
         for i, case in enumerate(test_cases):
@@ -248,7 +238,6 @@ async def test_emotion_accuracy():
             is_correct = emotion.primary_emotion == case["expected"]
             if is_correct:
                 correct_predictions += 1
-
 
         correct_predictions / len(test_cases)
 
@@ -276,7 +265,6 @@ async def test_concurrent_emotion_processing():
     if not LIBRARIES_AVAILABLE:
         return
 
-
     try:
         from src.emotion.vectorized_emotion_engine import ProductionEmotionEngine
 
@@ -285,7 +273,6 @@ async def test_concurrent_emotion_processing():
         # Simulate concurrent users
         num_users = 20
         messages_per_user = 5
-
 
         async def process_user_emotions(user_id: str):
             """Process emotions for a single user"""
@@ -317,7 +304,6 @@ async def test_concurrent_emotion_processing():
         sum(r["message_count"] for r in results)
         np.mean([r["processing_time"] for r in results])
 
-
         # Check cache performance
         engine.get_comprehensive_stats()
 
@@ -330,7 +316,6 @@ async def test_concurrent_emotion_processing():
 async def main():
     """Run all emotion processing performance tests"""
 
-
     if not LIBRARIES_AVAILABLE:
         return
 
@@ -339,7 +324,6 @@ async def main():
     await test_emotion_streaming()
     await test_emotion_accuracy()
     await test_concurrent_emotion_processing()
-
 
 
 if __name__ == "__main__":

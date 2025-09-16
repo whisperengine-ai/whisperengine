@@ -31,7 +31,6 @@ def test_no_bot_response_extraction():
     bot_facts = [f for f in facts if "bot" in f["source"]]
     [f for f in facts if "user" in f["source"]]
 
-
     if bot_facts:
         for _fact in bot_facts:
             pass

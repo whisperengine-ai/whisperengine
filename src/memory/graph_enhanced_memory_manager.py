@@ -146,9 +146,7 @@ class GraphEnhancedMemoryManager(UserMemoryManager):
             importance=importance,
         )
 
-    async def _calculate_importance(
-        self, message: str, emotion_data: dict | None = None
-    ) -> float:
+    async def _calculate_importance(self, message: str, emotion_data: dict | None = None) -> float:
         """Calculate memory importance based on content and emotion."""
         importance = 0.5  # Base importance
 

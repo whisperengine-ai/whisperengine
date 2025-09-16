@@ -20,7 +20,6 @@ def test_settings_system():
     try:
         from src.ui.native_settings_manager import NativeSettingsManager
 
-
         # Initialize settings manager
         settings_manager = NativeSettingsManager()
 
@@ -28,7 +27,6 @@ def test_settings_system():
         ui_config = settings_manager.get_ui_config()
         llm_config = settings_manager.get_llm_config()
         settings_manager.get_platform_config()
-
 
         # Test configuration availability
         if llm_config.api_url and llm_config.model_name:

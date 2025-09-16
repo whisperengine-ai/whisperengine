@@ -32,7 +32,6 @@ async def test_memory_system():
         if not memory_manager:
             return False
 
-
         # Test user ID for desktop mode
         test_user_id = "desktop_test_user"
 

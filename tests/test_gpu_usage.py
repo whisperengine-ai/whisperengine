@@ -25,7 +25,6 @@ def check_gpu_availability():
     try:
         import torch
 
-
         # Check CUDA availability
         cuda_available = torch.cuda.is_available()
 
@@ -53,7 +52,6 @@ def check_model_configuration():
     model_name = os.getenv("LLM_MODEL_NAME", "not_set")
     local_model = os.getenv("LOCAL_LLM_MODEL", "not_set")
     os.getenv("USE_LOCAL_LLM", "false")
-
 
     # Determine the execution path
     is_local_llm = llm_url == "local://"

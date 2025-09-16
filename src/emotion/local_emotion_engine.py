@@ -401,11 +401,9 @@ async def test_local_emotion_engine():
         ):
             continue
 
-
         start_time = time.time()
         results = await engine.analyze_emotions_batch(test_texts[:2], method=method)
         time.time() - start_time
-
 
         for _text, _result in zip(test_texts[:2], results, strict=False):
             pass

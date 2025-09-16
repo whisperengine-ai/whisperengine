@@ -64,7 +64,6 @@ async def test_desktop_app_startup():
             # Cleanup
             await db_integration.cleanup()
 
-
             return True
 
         else:

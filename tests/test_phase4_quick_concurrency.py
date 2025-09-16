@@ -143,9 +143,7 @@ async def test_engagement_engine_concurrency():
 
         for message in messages:
             try:
-                await engagement_engine.analyze_conversation_engagement(
-                    user_id, message, []
-                )
+                await engagement_engine.analyze_conversation_engagement(user_id, message, [])
                 successful_ops += 1
                 await asyncio.sleep(0.01)  # Small delay
             except Exception as e:

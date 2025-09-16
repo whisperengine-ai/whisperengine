@@ -51,7 +51,6 @@ def export_global_facts(
         if not global_facts:
             return None
 
-
         # Generate output filename if not provided
         if not output_file:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -83,7 +82,6 @@ def export_global_facts(
         output_path = Path(output_file)
         with open(output_path, "w", encoding="utf-8") as f:
             json.dump(export_data, f, indent=2, ensure_ascii=False)
-
 
         return str(output_path)
 

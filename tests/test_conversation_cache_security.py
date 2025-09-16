@@ -57,7 +57,6 @@ def create_mock_channel(channel_id: int):
 async def test_user_specific_filtering():
     """Test that user-specific filtering works correctly"""
 
-
     cache = HybridConversationCache()
     mock_channel = create_mock_channel(12345)
 
@@ -86,7 +85,6 @@ async def test_user_specific_filtering():
     # Add all messages to cache
     for msg in messages:
         cache.add_message(str(mock_channel.id), msg)
-
 
     # Test Alice's conversation context - should only see Alice + bot messages
     alice_context = await cache.get_user_conversation_context(mock_channel, user_alice, limit=10)
@@ -125,7 +123,6 @@ async def test_user_specific_filtering():
     ), "Alice should NOT see Charlie's secret"
     assert "Hey bot, I'm Bob" not in all_alice_content, "Alice should NOT see Bob's messages"
 
-
     # Test Bob's conversation context
     bob_context = await cache.get_user_conversation_context(mock_channel, user_bob, limit=10)
 
@@ -152,7 +149,6 @@ async def test_user_specific_filtering():
         "Secret message from Charlie" not in all_bob_content
     ), "Bob should NOT see Charlie's secret"
     assert "weather" not in all_bob_content, "Bob should NOT see Alice's weather question"
-
 
     # Test Charlie's conversation context (should only see his own message)
     charlie_context = await cache.get_user_conversation_context(
@@ -186,11 +182,8 @@ async def test_user_specific_filtering():
     assert "Bob" not in all_charlie_content, "Charlie should NOT see Bob's name or messages"
 
 
-
-
 async def test_dm_security():
     """Test security in DM context where cache mixing is still possible"""
-
 
     cache = HybridConversationCache()
 
@@ -235,7 +228,6 @@ async def test_dm_security():
     for msg in bob_messages:
         cache.add_message(str(bob_dm_channel.id), msg)
 
-
     # Test Alice's DM context - should only see Alice + bot from her DM
     alice_dm_context = await cache.get_user_conversation_context(
         alice_dm_channel, user_alice, limit=10
@@ -265,10 +257,8 @@ async def test_dm_security():
     assert "surprise" not in bob_dm_content, "Bob should NOT see Alice's party planning"
 
 
-
 async def test_bot_response_filtering():
     """Test that bot responses are correctly included and attributed"""
-
 
     cache = HybridConversationCache()
     mock_channel = create_mock_channel(30001)
@@ -294,7 +284,6 @@ async def test_bot_response_filtering():
     # Add all messages to cache
     for msg in messages:
         cache.add_message(str(mock_channel.id), msg)
-
 
     # Test Alice's context - should see her messages + all bot responses
     alice_context = await cache.get_user_conversation_context(mock_channel, user_alice, limit=10)
@@ -333,10 +322,8 @@ async def test_bot_response_filtering():
     # those that are contextually relevant to the current user
 
 
-
 async def test_performance_and_limits():
     """Test that the security filtering doesn't cause performance issues"""
-
 
     cache = HybridConversationCache()
     mock_channel = create_mock_channel(40001)
@@ -362,12 +349,10 @@ async def test_performance_and_limits():
         cache.add_message(str(mock_channel.id), msg)
     time.time() - start_time
 
-
     # Test retrieval performance
     start_time = time.time()
     alice_context = await cache.get_user_conversation_context(mock_channel, user_alice, limit=10)
     retrieval_time = time.time() - start_time
-
 
     # Validate we get the expected limit
     assert len(alice_context) == 10, f"Should get exactly 10 messages, got {len(alice_context)}"
@@ -376,10 +361,8 @@ async def test_performance_and_limits():
     assert retrieval_time < 1.0, f"Context retrieval took too long: {retrieval_time:.3f}s"
 
 
-
 async def test_edge_cases():
     """Test edge cases like empty channels, no bot messages, etc."""
-
 
     cache = HybridConversationCache()
 
@@ -430,7 +413,6 @@ async def test_edge_cases():
     ), f"Alice should see bot messages, got {len(alice_bot_context)}"
 
 
-
 if __name__ == "__main__":
 
     async def run_all_tests():
@@ -440,10 +422,6 @@ if __name__ == "__main__":
             await test_bot_response_filtering()
             await test_performance_and_limits()
             await test_edge_cases()
-
-
-
-
 
         except Exception:
             import traceback

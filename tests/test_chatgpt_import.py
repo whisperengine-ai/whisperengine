@@ -386,7 +386,6 @@ def create_sample_export_files():
         json.dump(simple_format, f, indent=2)
 
 
-
 if __name__ == "__main__":
     import sys
 

@@ -10,12 +10,10 @@ import time
 async def test_ui_responsiveness():
     """Test that UI operations are non-blocking"""
 
-
     # This should not block the main thread anymore
     start_time = time.time()
 
     # Test with a simple message that will trigger LLM processing
-
 
     # The actual LLM call would happen here in the desktop app
     # We're just testing the async structure

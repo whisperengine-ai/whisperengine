@@ -340,7 +340,6 @@ async def main():
         level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
     )
 
-
     # Get configuration
     config = get_postgres_config()
 

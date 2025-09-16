@@ -150,13 +150,11 @@ class ConcurrencyTester:
         total_operations = num_users * messages_per_user
         expected_stored = len(self.mock_memory.stored_conversations)
 
-
         # Verify thread safety - no corrupted data
         user_counts = {}
         for conv in self.mock_memory.stored_conversations:
             user_id = conv["user_id"]
             user_counts[user_id] = user_counts.get(user_id, 0) + 1
-
 
         return {
             "total_time": total_time,
@@ -194,7 +192,6 @@ class ConcurrencyTester:
         # Analyze rate limiting effectiveness
         all_durations = [r["duration"] for user_results in results for r in user_results]
         avg_duration = sum(all_durations) / len(all_durations)
-
 
         return {
             "total_time": total_time,
@@ -268,7 +265,6 @@ class ConcurrencyTester:
         avg_duration = sum(op["duration"] for op in all_operations) / len(all_operations)
 
         cache_stats = self.cache.get_cache_stats()
-
 
         return {
             "total_time": total_time,
@@ -352,7 +348,6 @@ class ConcurrencyTester:
         total_operations = sum(completed_operations.values())
         throughput = total_operations / duration_seconds
 
-
         return {
             "duration": duration_seconds,
             "operations": completed_operations,
@@ -385,7 +380,6 @@ class ConcurrencyTester:
             test_results["mixed_workload"] = await asyncio.wait_for(
                 self.test_mixed_workload(duration_seconds=3), timeout=15
             )
-
 
             # Summary
             for _test_name, results in test_results.items():

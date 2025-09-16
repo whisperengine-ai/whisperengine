@@ -18,7 +18,6 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 def test_phase_integration_optimizer():
     """Test the phase integration optimizer functionality"""
 
-
     try:
         from src.intelligence.phase_integration_optimizer import (
             OptimizationLevel,
@@ -26,7 +25,6 @@ def test_phase_integration_optimizer():
             PhaseIntegrationOptimizer,
             PhaseResult,
         )
-
 
         # Test 1: Initialize optimizer with different configurations
 
@@ -77,7 +75,6 @@ def test_phase_integration_optimizer():
             ),
         }
 
-
         # Test 4: Test performance reporting
 
         # Simulate some performance data
@@ -91,7 +88,6 @@ def test_phase_integration_optimizer():
 
         optimizer_balanced.get_performance_report()
 
-
         # Test 5: Test cache functionality
 
         # Test cache key generation
@@ -100,7 +96,6 @@ def test_phase_integration_optimizer():
         user_id = "test_user_123"
         message = "Hello, how are you?"
         cache_key = hashlib.md5(f"{user_id}:{message}".encode()).hexdigest()
-
 
         # Test cache storage and retrieval
         test_result = PhaseResult(
@@ -112,9 +107,6 @@ def test_phase_integration_optimizer():
             "timestamp": time.time(),
             "results": {"test_phase": test_result},
         }
-
-
-
 
         return True
 
@@ -129,7 +121,6 @@ def test_phase_integration_optimizer():
 
 async def test_async_integration():
     """Test the async integration capabilities"""
-
 
     try:
         from src.intelligence.phase_integration_optimizer import (
@@ -162,7 +153,6 @@ async def test_async_integration():
 
         time.time() - start_time
 
-
         return True
 
     except Exception:
@@ -174,7 +164,6 @@ async def test_async_integration():
 
 def demonstrate_optimization_benefits():
     """Demonstrate the benefits of the optimization system"""
-
 
     # Simulate different scenarios
     scenarios = [
@@ -202,11 +191,8 @@ def demonstrate_optimization_benefits():
         pass
 
 
-
-
 def main():
     """Main test function"""
-
 
     # Run synchronous tests
     sync_success = test_phase_integration_optimizer()
@@ -218,7 +204,6 @@ def main():
         if async_success:
             # Demonstrate benefits
             demonstrate_optimization_benefits()
-
 
             return True
 

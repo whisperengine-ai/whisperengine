@@ -130,7 +130,6 @@ if __name__ == "__main__":
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
 
-
     try:
         uvicorn.run(app, host="127.0.0.1", port=8080, log_level="info")
     except KeyboardInterrupt:

@@ -18,21 +18,16 @@ if not load_environment():
     sys.exit(1)
 
 
-
 async def test_minimal_memory():
     """Minimal test of memory system components"""
     try:
         # Test Phase 3 import
         from src.memory.phase3_integration import Phase3MemoryNetworks
 
-
         # Test memory manager import
-
 
         # Create a test instance
         Phase3MemoryNetworks()
-
-
 
         return True
 

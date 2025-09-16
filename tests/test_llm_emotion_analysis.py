@@ -51,7 +51,6 @@ def test_emotion_analysis():
     # Initialize LLM analyzer
     llm_analyzer = SentimentAnalyzer(llm_client=llm_client)
 
-
     for message, _expected in test_messages:
 
         # Test LLM-based analysis
@@ -59,7 +58,6 @@ def test_emotion_analysis():
             llm_analyzer.analyze_emotion(message)
         except Exception:
             pass
-
 
     return True
 
@@ -72,9 +70,7 @@ def test_direct_llm_emotion():
 
         test_message = "I'm absolutely thrilled about this new project, but also a bit nervous about the deadlines"
 
-
         llm_client.analyze_emotion(test_message)
-
 
         return True
 
@@ -89,4 +85,3 @@ if __name__ == "__main__":
 
     # Test full emotion analysis system
     test_emotion_analysis()
-

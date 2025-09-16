@@ -344,7 +344,6 @@ def test_secure_debug_logging():
     debug_logger.log_user_debug_info(user_id, debug_data, "test_message_123")
 
 
-
 if __name__ == "__main__":
     # Run tests if executed directly
     test_secure_debug_logging()

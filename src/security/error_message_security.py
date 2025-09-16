@@ -417,9 +417,7 @@ class ErrorMessageSecurity:
                 },
             )
 
-    def handle_discord_error(
-        self, error: Exception, context: discord.Message | None = None
-    ) -> str:
+    def handle_discord_error(self, error: Exception, context: discord.Message | None = None) -> str:
         """
         Handle Discord-specific errors with appropriate context awareness.
 
@@ -489,9 +487,7 @@ class ErrorMessageSecurity:
 
         return error_type_mapping.get(error_name, "unknown_error")
 
-    def _notify_admin_async(
-        self, response: SecureErrorResponse, context: discord.Message | None
-    ):
+    def _notify_admin_async(self, response: SecureErrorResponse, context: discord.Message | None):
         """Notify administrators of critical errors (async-safe)"""
 
         # This would integrate with admin notification system

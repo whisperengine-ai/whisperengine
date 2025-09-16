@@ -65,7 +65,6 @@ async def test_universal_chat_direct():
             use_enhanced_core=True,
         )
 
-
         # Test initialization
         success = await orchestrator.initialize()
 
@@ -98,7 +97,6 @@ async def main():
 
     await test_native_ai_service()
     await test_universal_chat_direct()
-
 
 
 if __name__ == "__main__":

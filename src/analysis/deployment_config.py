@@ -213,12 +213,10 @@ def print_deployment_status():
     """Print current deployment status and recommendations."""
     recommendations = get_deployment_recommendations()
 
-
     recommendations["current_config"]
 
     for _rec in recommendations["recommendations"]:
         pass
-
 
 
 if __name__ == "__main__":

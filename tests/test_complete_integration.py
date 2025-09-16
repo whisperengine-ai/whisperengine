@@ -16,7 +16,6 @@ def test_complete_integration():
     emotion_manager = EmotionManager(use_database=True)
     db = UserProfileDatabase()
 
-
     # Simulate Discord bot message processing with name capture
     test_scenarios = [
         {
@@ -31,14 +30,12 @@ def test_complete_integration():
         display_name = scenario["display_name"]
         message = scenario["message"]
 
-
         try:
             # Simulate the complete bot workflow:
             # 1. Analyze emotion and update profile (with name capture)
             profile, emotion = emotion_manager.analyze_and_update_emotion(
                 user_id, message, display_name=display_name
             )
-
 
             # 2. Save profiles (happens automatically in bot)
             emotion_manager.save_profiles()
@@ -53,7 +50,6 @@ def test_complete_integration():
         except Exception:
             return False
 
-
     # Show current database content
     all_profiles = db.load_all_profiles()
     for user_id, _profile in all_profiles.items():
@@ -64,7 +60,6 @@ def test_complete_integration():
         db.delete_user_profile("integration_test_user")
     except Exception:
         pass
-
 
     return True
 

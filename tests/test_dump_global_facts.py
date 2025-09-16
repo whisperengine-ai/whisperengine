@@ -18,7 +18,6 @@ def test_dump_global_facts():
     test_dir = Path(tempfile.mkdtemp())
     chromadb_test_dir = test_dir / "chromadb_data_test"
 
-
     try:
         # Import the memory manager with the test directory
         import sys
@@ -52,17 +51,13 @@ def test_dump_global_facts():
             with open(export_file) as f:
                 json.load(f)
 
-
             # Test import with a fresh memory manager
             fresh_chromadb_dir = test_dir / "chromadb_data_fresh"
             fresh_memory_manager = UserMemoryManager(persist_directory=str(fresh_chromadb_dir))
 
             from dump_global_facts import import_global_facts
 
-            import_global_facts(
-                fresh_memory_manager, str(export_file), confirm=True
-            )
-
+            import_global_facts(fresh_memory_manager, str(export_file), confirm=True)
 
             # Verify the facts were imported
             fresh_memory_manager.get_all_global_facts()

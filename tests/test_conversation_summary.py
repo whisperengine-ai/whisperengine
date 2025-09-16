@@ -45,7 +45,6 @@ def test_conversation_summary_basic():
 
     summary = generate_conversation_summary(messages, "12345")
 
-
     # Should contain key topics
     assert "Python" in summary or "debug" in summary or "function" in summary
     assert len(summary) > 0
@@ -70,7 +69,6 @@ def test_conversation_summary_filter_commands():
     messages = [user_msg1, bot_msg1, user_msg2]
 
     summary = generate_conversation_summary(messages, "12345")
-
 
     # Should not contain command content, but should contain real content
     assert "help" not in summary.lower() or "machine learning" in summary
@@ -104,7 +102,6 @@ def test_conversation_summary_security_sanitization():
 
     summary = generate_conversation_summary(messages, "12345")
 
-
     # Should remove system prompt indicators
     assert "system:" not in summary
     assert "assistant:" not in summary
@@ -128,7 +125,6 @@ def test_conversation_summary_length_truncation():
 
     # Then test with short max_length
     summary = generate_conversation_summary(messages, "12345", max_length=100)
-
 
     # If normal summary exists, truncated should too
     if normal_summary:
@@ -158,7 +154,6 @@ def test_conversation_summary_user_filtering():
 
     summary = generate_conversation_summary(messages, "12345")  # Filter for user 12345
 
-
     # Should contain user1's content but not user2's
     assert "Python" in summary
     assert "JavaScript" not in summary
@@ -178,7 +173,6 @@ if __name__ == "__main__":
         test_conversation_summary_length_truncation()
 
         test_conversation_summary_user_filtering()
-
 
     except Exception:
         import traceback

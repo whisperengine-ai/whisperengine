@@ -73,7 +73,6 @@ def test_pyside6_compatibility():
         from PySide6.QtGui import QFont, QIcon
         from PySide6.QtWidgets import QApplication, QLabel, QMainWindow, QWidget
 
-
         # Test application creation
         if not QApplication.instance():
             QApplication([])
@@ -188,6 +187,8 @@ if __name__ == "__main__":
     if overall_success:
         pass
     else:
-        failed_tests = [test.__name__ for test, result in zip(tests, results, strict=False) if not result]
+        failed_tests = [
+            test.__name__ for test, result in zip(tests, results, strict=False) if not result
+        ]
 
     sys.exit(0 if overall_success else 1)

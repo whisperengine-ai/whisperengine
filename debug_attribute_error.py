@@ -17,7 +17,6 @@ from src.memory.memory_manager import UserMemoryManager
 try:
     manager = UserMemoryManager("test_user_123")
 
-
     # This should fail
     manager.add_documents_with_embeddings()
 

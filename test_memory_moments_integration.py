@@ -37,7 +37,6 @@ async def test_memory_moments_integration():
             personality_profiler=None,  # Can be None for basic testing
         )
 
-
         # Test 2: Bot core can initialize memory moments
 
         # We can't fully test bot core without Discord bot setup,
@@ -65,7 +64,6 @@ async def test_memory_moments_integration():
                 context_id="test_context",
                 message="I've been thinking about our conversation yesterday about goals.",
             )
-
 
         except Exception:
             pass
@@ -99,10 +97,8 @@ async def test_memory_moments_integration():
                 user_id="test_user_123", conversation_context=conversation_context
             )
 
-
         except Exception:
             pass
-
 
         return True
 
@@ -189,14 +185,12 @@ def test_integration_completeness():
     success_count = sum(1 for status in results.values() if status.startswith("✅"))
     total_count = len(results)
 
-
     return success_count == total_count
 
 
 if __name__ == "__main__":
     # Set up logging
     logging.basicConfig(level=logging.ERROR)  # Reduce noise during testing
-
 
     # Test integration completeness
     completeness_passed = test_integration_completeness()

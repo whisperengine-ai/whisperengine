@@ -17,7 +17,6 @@ logging.basicConfig(
 def test_universal_chat_initialization():
     """Test Universal Chat components without FastAPI"""
 
-
     try:
         # Test 1: Can we import the Universal Chat components?
 
@@ -50,9 +49,7 @@ def test_universal_chat_initialization():
         # Test 4: Can we create Universal Chat Orchestrator?
 
         try:
-            UniversalChatOrchestrator(
-                config_manager=config_manager, db_manager=db_manager
-            )
+            UniversalChatOrchestrator(config_manager=config_manager, db_manager=db_manager)
         except Exception:
             import traceback
 
@@ -63,7 +60,6 @@ def test_universal_chat_initialization():
 
         try:
             from src.llm.llm_client import LLMClient
-
 
             # Test if we can create an instance
             LLMClient()

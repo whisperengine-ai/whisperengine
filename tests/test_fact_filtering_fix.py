@@ -37,7 +37,6 @@ def test_filtering():
         ("testing my guitar skills", False),  # Contains "testing" but has more content
     ]
 
-
     for message, should_be_filtered in test_cases:
         cleaned = message.strip()
         is_short = len(cleaned) < 10
@@ -45,7 +44,6 @@ def test_filtering():
             re.match(pattern, cleaned, re.IGNORECASE) for pattern in non_factual_patterns
         )
         would_be_filtered = is_short or matches_pattern
-
 
         if would_be_filtered != should_be_filtered:
             pass
@@ -105,7 +103,6 @@ def test_fact_message_validation():
         ("My favorite hobby is playing guitar", "plays guitar", True),
         ("I currently live in Los Angeles, California", "lives in California", True),
     ]
-
 
     for message, fact, _should_be_supported in test_cases:
         fact_supported_by_message(fact, message)

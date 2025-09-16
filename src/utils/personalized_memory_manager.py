@@ -143,9 +143,7 @@ class PersonalizedMemoryManager(UserMemoryManager):
         # For now, just return detected topics
         return detected_topics[:5]  # Limit to top 5 topics
 
-    def _calculate_memory_importance(
-        self, message: str, emotion_data: dict | None = None
-    ) -> float:
+    def _calculate_memory_importance(self, message: str, emotion_data: dict | None = None) -> float:
         """Calculate importance score for memory storage"""
         importance = 0.5  # Base importance
 
@@ -310,9 +308,7 @@ class PersonalizedMemoryManager(UserMemoryManager):
 
         try:
             # This would be called asynchronously in practice
-            asyncio.ensure_future(
-                self.graph_manager.get_relationship_context(user_id)
-            )
+            asyncio.ensure_future(self.graph_manager.get_relationship_context(user_id))
 
             # For now, return the emotion context as fallback
             base_context = self.get_emotion_context(user_id)

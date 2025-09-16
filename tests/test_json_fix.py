@@ -107,7 +107,6 @@ def test_malformed_json_handling():
                     else:
                         pass
 
-
         except Exception:
             pass
 

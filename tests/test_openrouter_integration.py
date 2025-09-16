@@ -22,7 +22,6 @@ def test_openrouter_config():
     os.getenv("LLM_SENTIMENT_API_KEY", api_key)
     os.getenv("LLM_SENTIMENT_MODEL_NAME", model_name)
 
-
     same_endpoint = sentiment_api_url == api_url
     if same_endpoint:
         pass
@@ -77,7 +76,6 @@ def main():
         pass
     except Exception:
         pass
-
 
     success = test_openrouter_config()
 

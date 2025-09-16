@@ -91,16 +91,12 @@ class AbstractDatabaseAdapter(ABC):
         pass
 
     @abstractmethod
-    async def execute_query(
-        self, query: str, params: dict[str, Any] | None = None
-    ) -> QueryResult:
+    async def execute_query(self, query: str, params: dict[str, Any] | None = None) -> QueryResult:
         """Execute a query and return results"""
         pass
 
     @abstractmethod
-    async def execute_transaction(
-        self, queries: list[tuple[str, dict[str, Any] | None]]
-    ) -> bool:
+    async def execute_transaction(self, queries: list[tuple[str, dict[str, Any] | None]]) -> bool:
         """Execute multiple queries in a transaction"""
         pass
 
@@ -184,9 +180,7 @@ class SQLiteAdapter(AbstractDatabaseAdapter):
                 self.connection.close()
             self._connected = False
 
-    async def execute_query(
-        self, query: str, params: dict[str, Any] | None = None
-    ) -> QueryResult:
+    async def execute_query(self, query: str, params: dict[str, Any] | None = None) -> QueryResult:
         """Execute SQLite query"""
         import time
 
@@ -234,9 +228,7 @@ class SQLiteAdapter(AbstractDatabaseAdapter):
                 rows=[], row_count=0, execution_time_ms=execution_time, success=False, error=str(e)
             )
 
-    async def execute_transaction(
-        self, queries: list[tuple[str, dict[str, Any] | None]]
-    ) -> bool:
+    async def execute_transaction(self, queries: list[tuple[str, dict[str, Any] | None]]) -> bool:
         """Execute multiple queries in a transaction"""
         try:
             if AIOSQLITE_AVAILABLE:
@@ -392,9 +384,7 @@ class PostgreSQLAdapter(AbstractDatabaseAdapter):
             await self.pool.close()
             self._connected = False
 
-    async def execute_query(
-        self, query: str, params: dict[str, Any] | None = None
-    ) -> QueryResult:
+    async def execute_query(self, query: str, params: dict[str, Any] | None = None) -> QueryResult:
         """Execute PostgreSQL query"""
         import time
 
@@ -429,9 +419,7 @@ class PostgreSQLAdapter(AbstractDatabaseAdapter):
                 rows=[], row_count=0, execution_time_ms=execution_time, success=False, error=str(e)
             )
 
-    async def execute_transaction(
-        self, queries: list[tuple[str, dict[str, Any] | None]]
-    ) -> bool:
+    async def execute_transaction(self, queries: list[tuple[str, dict[str, Any] | None]]) -> bool:
         """Execute multiple queries in a PostgreSQL transaction"""
         try:
             async with self.pool.acquire() as connection:

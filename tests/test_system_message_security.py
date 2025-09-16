@@ -18,7 +18,6 @@ from system_message_security import (
 def test_system_message_sanitization():
     """Test the system message sanitization functionality."""
 
-
     # Test cases with various system message content
     test_cases = [
         # Safe system messages (should pass through)
@@ -113,25 +112,20 @@ def test_system_message_sanitization():
         # Determine if test passed
         test_passed = content_changed == should_be_filtered
 
-
         if test_passed:
             passed += 1
         else:
             failed += 1
 
-
         if content_changed:
             if system_messages_after:
                 pass
-
-
 
     return failed == 0
 
 
 def test_response_leakage_detection():
     """Test the response leakage detection functionality."""
-
 
     test_responses = [
         # Safe responses (no leakage)
@@ -193,24 +187,19 @@ def test_response_leakage_detection():
         # Check if test passed
         test_passed = actual_has_leakage == should_have_leakage
 
-
         if test_passed:
             passed += 1
         else:
             failed += 1
 
-
         if actual_has_leakage:
             pass
-
-
 
     return failed == 0
 
 
 def test_secure_system_message_creation():
     """Test the secure system message creation functionality."""
-
 
     test_cases = [
         {
@@ -258,13 +247,10 @@ def test_secure_system_message_creation():
             is_system_message and has_content and (content_is_different == should_be_different)
         )
 
-
         if test_passed:
             passed += 1
         else:
             failed += 1
-
-
 
     return failed == 0
 
@@ -275,7 +261,6 @@ if __name__ == "__main__":
     test1_passed = test_system_message_sanitization()
     test2_passed = test_response_leakage_detection()
     test3_passed = test_secure_system_message_creation()
-
 
     if test1_passed and test2_passed and test3_passed:
         exit(0)

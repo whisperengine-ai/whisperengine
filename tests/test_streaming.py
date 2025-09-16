@@ -23,7 +23,6 @@ async def test_streaming_vs_regular():
     client = ElevenLabsClient(api_key)
     test_text = "This is a test of the ElevenLabs streaming API. The streaming version should start producing audio much faster than the regular version."
 
-
     try:
         # Test regular TTS
         start_time = time.time()
@@ -48,7 +47,6 @@ async def test_streaming_vs_regular():
         time.time() - start_time
         streaming_generator_audio = b"".join(chunks)
 
-
         # Compare results
 
         if first_chunk_time and first_chunk_time < regular_time:
@@ -60,10 +58,8 @@ async def test_streaming_vs_regular():
         else:
             pass
 
-
     except Exception:
         pass
-
 
 
 if __name__ == "__main__":

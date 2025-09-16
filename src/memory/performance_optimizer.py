@@ -801,9 +801,7 @@ class MemoryPerformanceOptimizer:
             logger.warning(f"Query expansion failed: {e}")
             return query_text
 
-    def _optimize_doc_types(
-        self, doc_types: list[str] | None, query_text: str
-    ) -> list[str] | None:
+    def _optimize_doc_types(self, doc_types: list[str] | None, query_text: str) -> list[str] | None:
         """Optimize document type filtering based on query content"""
         if doc_types:
             return doc_types

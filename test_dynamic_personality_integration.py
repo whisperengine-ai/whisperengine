@@ -27,14 +27,12 @@ logger = logging.getLogger(__name__)
 async def test_dynamic_personality_integration():
     """Test the complete dynamic personality profiler integration."""
 
-
     try:
         # Test 1: Import and initialization
 
         from src.intelligence.dynamic_personality_profiler import (
             PersistentDynamicPersonalityProfiler,
         )
-
 
         # Test 2: Environment configuration
 
@@ -106,12 +104,10 @@ async def test_dynamic_personality_integration():
         except Exception:
             pass
 
-
         if profiler.persistence_enabled:
             pass
         else:
             pass
-
 
     except Exception:
         import traceback

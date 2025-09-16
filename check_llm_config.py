@@ -11,12 +11,10 @@ import os
 def check_llm_config():
     """Display current LLM configuration in a clear format."""
 
-
     # Main chat configuration
     main_url = os.getenv("LLM_CHAT_API_URL", "NOT SET")
     main_model = os.getenv("LLM_CHAT_MODEL", "NOT SET")
     main_key = os.getenv("LLM_CHAT_API_KEY")
-
 
     # Emotion analysis configuration
     emotion_url = os.getenv("LLM_EMOTION_API_URL", main_url)
@@ -44,7 +42,6 @@ def check_llm_config():
     else:
         pass
 
-
     # Configuration recommendations
     if emotion_url == main_url and facts_url == main_url:
         pass
@@ -56,7 +53,6 @@ def check_llm_config():
 
     if facts_model != main_model:
         pass
-
 
 
 if __name__ == "__main__":

@@ -871,7 +871,6 @@ class ChromaDBManagerSimple:
                     else:
                         conversations += 1
 
-
             # Create backup if requested
             if create_backup:
                 try:
@@ -953,7 +952,6 @@ class ChromaDBManagerSimple:
             if not user_facts or not user_facts.get("ids"):
                 return False
 
-
             # Create backup if requested
             if create_backup:
                 try:
@@ -983,7 +981,6 @@ class ChromaDBManagerSimple:
         preview = self.preview_conversation_deletion(doc_id)
         if not preview["exists"]:
             return False
-
 
         # Create backup if requested
         if create_backup:
@@ -1026,7 +1023,6 @@ class ChromaDBManagerSimple:
 
             conversations = data.get("conversations", {}).get("data", [])
             facts = data.get("facts", {}).get("data", [])
-
 
             if dry_run:
                 return True
@@ -1193,7 +1189,6 @@ def print_formatted_results(data: list[dict], result_type: str, limit: int | Non
     else:
         display_data = data
 
-
     for _i, item in enumerate(display_data, 1):
         if result_type == "conversations":
 
@@ -1211,9 +1206,7 @@ def print_formatted_results(data: list[dict], result_type: str, limit: int | Non
                 )
             else:
                 # Search results format
-                (
-                    item["metadata"].get("user_message", item.get("document", ""))[:100] + "..."
-                )
+                (item["metadata"].get("user_message", item.get("document", ""))[:100] + "...")
                 (
                     item["metadata"].get("bot_response", "")[:100] + "..."
                     if item["metadata"].get("bot_response")
@@ -1232,7 +1225,6 @@ def print_formatted_results(data: list[dict], result_type: str, limit: int | Non
                 # Search results format
                 item["metadata"].get("fact", item.get("document", ""))
 
-
             context = item.get("context", item["metadata"].get("context", ""))
             if context:
                 context[:100] + "..." if len(context) > 100 else context
@@ -1248,7 +1240,6 @@ def print_formatted_results(data: list[dict], result_type: str, limit: int | Non
             else:
                 # Search results format
                 item["metadata"].get("fact", item.get("document", ""))
-
 
             context = item.get("context", item["metadata"].get("context", ""))
             if context:

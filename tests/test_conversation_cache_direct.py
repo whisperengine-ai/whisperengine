@@ -38,7 +38,6 @@ def create_mock_channel(channel_id: int):
 async def test_user_filtering_logic():
     """Test the user filtering logic directly"""
 
-
     cache = HybridConversationCache()
     mock_channel = create_mock_channel(12345)
 
@@ -93,7 +92,6 @@ async def test_user_filtering_logic():
         assert "Bot response" in alice_content, "Alice should see bot responses"
         assert "Bob secret message" not in alice_content, "Alice should NOT see Bob's secret"
 
-
         # Test Bob's filtered context
         bob_context = await cache.get_user_conversation_context(mock_channel, user_bob, limit=10)
 
@@ -119,11 +117,8 @@ async def test_user_filtering_logic():
         assert "Alice message" not in bob_content, "Bob should NOT see Alice's messages"
 
 
-
-
 async def test_bot_code_fix_validation():
     """Test that the bot code fix is working correctly"""
-
 
     # Import the fixed code and verify it's using the secure method
     try:
@@ -141,7 +136,6 @@ async def test_bot_code_fix_validation():
         # vulnerable_calls = bot_code.count('get_conversation_context(')
         # secure_calls = bot_code.count('get_user_conversation_context(')
 
-
         # We expect to see the secure method being used in both DM and guild processing
         assert secure_calls >= 2, f"Expected at least 2 secure calls, found {secure_calls}"
 
@@ -154,15 +148,12 @@ async def test_bot_code_fix_validation():
         assert dm_security_fix, "DM security fix comment should be present"
         assert fallback_security_fix, "Fallback security fix comment should be present"
 
-
     except Exception:
         raise
 
 
-
 async def test_security_impact():
     """Test the specific security impact of the fix"""
-
 
     cache = HybridConversationCache()
     mock_channel = create_mock_channel(99999)
@@ -198,7 +189,6 @@ async def test_security_impact():
 
         attacker_content = " ".join([msg.content for msg in attacker_context])
 
-
         # CRITICAL SECURITY TESTS
         assert "123-45-6789" not in attacker_content, "🚨 CRITICAL: SSN leaked to attacker!"
         assert (
@@ -208,7 +198,6 @@ async def test_security_impact():
             "personal info" not in attacker_content
             or "I can help you with general" in attacker_content
         ), "Bot response should be generic"
-
 
         # Test that victim can still see their own information
         victim_context = await cache.get_user_conversation_context(
@@ -225,8 +214,6 @@ async def test_security_impact():
         ), "Victim should NOT see attacker's probing"
 
 
-
-
 if __name__ == "__main__":
 
     async def run_tests():
@@ -234,11 +221,6 @@ if __name__ == "__main__":
             await test_user_filtering_logic()
             await test_bot_code_fix_validation()
             await test_security_impact()
-
-
-
-
-
 
         except Exception:
             import traceback

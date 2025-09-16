@@ -193,7 +193,9 @@ class SimpleDatastoreFactory:
                 if metadatas is None:
                     metadatas = [{}] * len(documents)
 
-                for _i, (doc, meta, doc_id) in enumerate(zip(documents, metadatas, ids, strict=False)):
+                for _i, (doc, meta, doc_id) in enumerate(
+                    zip(documents, metadatas, ids, strict=False)
+                ):
                     # Store document text and metadata
                     self.vectors[doc_id] = doc
                     self.metadata[doc_id] = meta

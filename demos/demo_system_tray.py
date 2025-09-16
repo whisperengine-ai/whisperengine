@@ -26,7 +26,6 @@ def main():
     if not is_tray_available():
         return
 
-
     # Create demo app
     demo_app = DemoApp()
 
@@ -36,14 +35,9 @@ def main():
     if not tray:
         return
 
-
     # Setup tray
     if not tray.setup_tray():
         return
-
-
-
-
 
 
 if __name__ == "__main__":

@@ -282,7 +282,6 @@ if __name__ == "__main__":
     # Demo the optimization system
     manager = OptimizedPromptManager()
 
-
     # System analysis
     recommendations = manager.get_prompt_recommendations()
 
