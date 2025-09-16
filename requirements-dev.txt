@@ -11,7 +11,7 @@ pytest-mock==3.11.1
 pytest-cov==4.1.0
 
 # Code quality and linting
-black==23.9.1
+black==24.3.0
 isort==5.12.0
 flake8==6.1.0
 mypy==1.6.1
