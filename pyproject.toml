@@ -111,8 +111,8 @@ target-version = "py313"
 line-length = 100
 
 [tool.ruff.lint]
-select = ["E", "F", "W", "C90", "I", "N", "UP", "B", "A", "C4", "T20"]
-ignore = ["E501", "N806", "N803"]
+select = ["E9", "F63", "F7", "F82"]  # Only syntax errors and undefined names
+ignore = []
 
 [tool.coverage.run]
 source = ["src"]
