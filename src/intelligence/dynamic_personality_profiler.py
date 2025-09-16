@@ -10,6 +10,7 @@ Key Features:
 - Emotional response adaptation based on user preferences
 - Contextual personality state management
 - Relationship depth measurement and adaptation
+- PostgreSQL persistence for long-term personality learning
 
 Personality Dimensions Tracked:
 - Communication Style: formal/casual, brief/detailed, direct/indirect
@@ -21,13 +22,25 @@ Personality Dimensions Tracked:
 - Support Preferences: advice/listening/encouragement, autonomy/guidance
 """
 
+import asyncio
+import json
 import logging
+import os
 from datetime import datetime, timedelta
 from enum import Enum
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, asdict
 from typing import Dict, List, Optional, Any
 from collections import deque, defaultdict
 import statistics
+
+# Database imports
+try:
+    import psycopg2
+    import psycopg2.pool
+    import psycopg2.extras
+    POSTGRES_AVAILABLE = True
+except ImportError:
+    POSTGRES_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
 
@@ -771,6 +784,390 @@ class DynamicPersonalityProfiler:
         sorted_topics = sorted(topic_counts.items(), key=lambda x: x[1], reverse=True)
         return [topic for topic, count in sorted_topics[:5]]
 
+    # Database Persistence Methods
+    
+    def _get_db_connection(self):
+        """Get database connection for personality data persistence"""
+        if not POSTGRES_AVAILABLE:
+            logger.warning("PostgreSQL not available - personality data will not persist")
+            return None
+            
+        try:
+            connection = psycopg2.connect(
+                host=os.getenv('POSTGRES_HOST', 'localhost'),
+                port=int(os.getenv('POSTGRES_PORT', '5432')),
+                database=os.getenv('POSTGRES_DB', 'whisper_engine'),
+                user=os.getenv('POSTGRES_USER', 'bot_user'),
+                password=os.getenv('POSTGRES_PASSWORD', 'bot_password_change_me')
+            )
+            return connection
+        except Exception as e:
+            logger.error(f"Failed to connect to PostgreSQL for personality persistence: {e}")
+            return None
+    
+    def _ensure_personality_tables(self):
+        """Ensure personality tables exist in the database"""
+        if not POSTGRES_AVAILABLE:
+            return False
+            
+        connection = self._get_db_connection()
+        if not connection:
+            return False
+            
+        try:
+            with connection.cursor() as cursor:
+                # Dynamic personality profiles table
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS dynamic_personality_profiles (
+                        user_id VARCHAR(255) PRIMARY KEY,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        total_conversations INTEGER DEFAULT 0,
+                        relationship_depth FLOAT DEFAULT 0.0,
+                        trust_level FLOAT DEFAULT 0.0,
+                        preferred_response_style JSONB DEFAULT '{}'::jsonb
+                    )
+                """)
+                
+                # Personality traits table
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS dynamic_personality_traits (
+                        id SERIAL PRIMARY KEY,
+                        user_id VARCHAR(255),
+                        dimension VARCHAR(100),
+                        value FLOAT,
+                        confidence FLOAT,
+                        last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        evidence_count INTEGER DEFAULT 0,
+                        evidence_sources JSONB DEFAULT '[]'::jsonb,
+                        CONSTRAINT fk_user_profile 
+                            FOREIGN KEY (user_id) 
+                            REFERENCES dynamic_personality_profiles(user_id)
+                            ON DELETE CASCADE
+                    )
+                """)
+                
+                # Conversation analyses table
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS dynamic_conversation_analyses (
+                        id SERIAL PRIMARY KEY,
+                        user_id VARCHAR(255),
+                        context_id VARCHAR(255),
+                        timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        message_length INTEGER,
+                        formality_score FLOAT,
+                        emotional_openness FLOAT,
+                        conversation_depth FLOAT,
+                        topics_discussed JSONB DEFAULT '[]'::jsonb,
+                        emotional_tone VARCHAR(50),
+                        humor_detected BOOLEAN DEFAULT FALSE,
+                        support_seeking BOOLEAN DEFAULT FALSE,
+                        CONSTRAINT fk_user_profile_analysis
+                            FOREIGN KEY (user_id) 
+                            REFERENCES dynamic_personality_profiles(user_id)
+                            ON DELETE CASCADE
+                    )
+                """)
+                
+                # Indexes for performance
+                cursor.execute("""
+                    CREATE INDEX IF NOT EXISTS idx_dynamic_personality_traits_user_id 
+                    ON dynamic_personality_traits(user_id)
+                """)
+                cursor.execute("""
+                    CREATE INDEX IF NOT EXISTS idx_dynamic_conversation_analyses_user_id 
+                    ON dynamic_conversation_analyses(user_id)
+                """)
+                cursor.execute("""
+                    CREATE INDEX IF NOT EXISTS idx_dynamic_conversation_analyses_timestamp 
+                    ON dynamic_conversation_analyses(timestamp)
+                """)
+                
+                connection.commit()
+                logger.info("Dynamic personality database tables ensured")
+                return True
+                
+        except Exception as e:
+            logger.error(f"Failed to create personality tables: {e}")
+            connection.rollback()
+            return False
+        finally:
+            connection.close()
+    
+    async def save_profile_to_db(self, user_id: str, profile: PersonalityProfile):
+        """Save personality profile to PostgreSQL database"""
+        if not POSTGRES_AVAILABLE:
+            return False
+            
+        connection = self._get_db_connection()
+        if not connection:
+            return False
+            
+        try:
+            with connection.cursor() as cursor:
+                # Insert or update profile
+                cursor.execute("""
+                    INSERT INTO dynamic_personality_profiles 
+                    (user_id, updated_at, total_conversations, relationship_depth, trust_level, preferred_response_style)
+                    VALUES (%s, %s, %s, %s, %s, %s)
+                    ON CONFLICT (user_id) DO UPDATE SET
+                        updated_at = EXCLUDED.updated_at,
+                        total_conversations = EXCLUDED.total_conversations,
+                        relationship_depth = EXCLUDED.relationship_depth,
+                        trust_level = EXCLUDED.trust_level,
+                        preferred_response_style = EXCLUDED.preferred_response_style
+                """, (
+                    user_id,
+                    datetime.now(),
+                    profile.total_conversations,
+                    profile.relationship_depth,
+                    profile.trust_level,
+                    json.dumps(profile.preferred_response_style)
+                ))
+                
+                # Delete old traits and insert new ones
+                cursor.execute("DELETE FROM dynamic_personality_traits WHERE user_id = %s", (user_id,))
+                
+                for dimension, trait in profile.traits.items():
+                    cursor.execute("""
+                        INSERT INTO dynamic_personality_traits 
+                        (user_id, dimension, value, confidence, last_updated, evidence_count, evidence_sources)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s)
+                    """, (
+                        user_id,
+                        dimension.value,
+                        trait.value,
+                        trait.confidence,
+                        trait.last_updated,
+                        trait.evidence_count,
+                        json.dumps(trait.evidence_sources)
+                    ))
+                
+                connection.commit()
+                logger.debug(f"Saved personality profile for user {user_id}")
+                return True
+                
+        except Exception as e:
+            logger.error(f"Failed to save personality profile for user {user_id}: {e}")
+            connection.rollback()
+            return False
+        finally:
+            connection.close()
+    
+    def _safe_json_loads(self, value, default=None) -> list:
+        """Safely load JSON data, handling various input types and ensuring list output"""
+        if value is None:
+            return default if default is not None else []
+        
+        # If it's already a list, return it
+        if isinstance(value, list):
+            return value
+        
+        # If it's a dict, convert to list if possible, otherwise return default
+        if isinstance(value, dict):
+            logger.warning(f"Expected list but got dict: {value}")
+            return default if default is not None else []
+        
+        # If it's a string, try to parse it as JSON
+        if isinstance(value, str):
+            if not value.strip():
+                return default if default is not None else []
+            try:
+                result = json.loads(value)
+                # Ensure result is a list
+                if isinstance(result, list):
+                    return result
+                else:
+                    logger.warning(f"JSON parsed to non-list type: {type(result)}")
+                    return default if default is not None else []
+            except (json.JSONDecodeError, ValueError) as e:
+                logger.warning(f"Failed to parse JSON: {value[:50]}... Error: {e}")
+                return default if default is not None else []
+        
+        # For any other type, return default
+        logger.warning(f"Unexpected value type for JSON parsing: {type(value)} - {value}")
+        return default if default is not None else []
 
-# Global instance for use across the application
-dynamic_personality_profiler = DynamicPersonalityProfiler()
+    async def load_profile_from_db(self, user_id: str) -> Optional[PersonalityProfile]:
+        """Load personality profile from PostgreSQL database"""
+        if not POSTGRES_AVAILABLE:
+            return None
+            
+        connection = self._get_db_connection()
+        if not connection:
+            return None
+            
+        try:
+            with connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cursor:
+                # Load profile
+                cursor.execute("""
+                    SELECT * FROM dynamic_personality_profiles WHERE user_id = %s
+                """, (user_id,))
+                profile_row = cursor.fetchone()
+                
+                if not profile_row:
+                    return None
+                
+                # Load traits
+                cursor.execute("""
+                    SELECT * FROM dynamic_personality_traits WHERE user_id = %s
+                """, (user_id,))
+                trait_rows = cursor.fetchall()
+                
+                # Load recent conversation analyses
+                cursor.execute("""
+                    SELECT * FROM dynamic_conversation_analyses 
+                    WHERE user_id = %s 
+                    ORDER BY timestamp DESC 
+                    LIMIT 50
+                """, (user_id,))
+                analysis_rows = cursor.fetchall()
+                
+                # Reconstruct profile
+                traits = {}
+                for trait_row in trait_rows:
+                    dimension = PersonalityDimension(trait_row['dimension'])
+                    traits[dimension] = PersonalityTrait(
+                        dimension=dimension,
+                        value=trait_row['value'],
+                        confidence=trait_row['confidence'],
+                        last_updated=trait_row['last_updated'],
+                        evidence_count=trait_row['evidence_count'],
+                        evidence_sources=self._safe_json_loads(trait_row['evidence_sources'], [])
+                    )
+                
+                conversation_analyses = deque(maxlen=50)
+                for analysis_row in analysis_rows:
+                    analysis = ConversationAnalysis(
+                        user_id=analysis_row['user_id'],
+                        context_id=analysis_row['context_id'],
+                        timestamp=analysis_row['timestamp'],
+                        message_length=analysis_row['message_length'],
+                        response_time_seconds=None,  # Not stored in DB
+                        emotional_tone=analysis_row['emotional_tone'] or 'neutral',
+                        topics_discussed=self._safe_json_loads(analysis_row['topics_discussed'], []),
+                        formality_score=analysis_row['formality_score'] or 0.0,
+                        detail_preference=0.0,  # Can be derived if needed
+                        emotional_openness=analysis_row['emotional_openness'] or 0.0,
+                        question_ratio=0.0,  # Can be derived if needed
+                        humor_detected=analysis_row['humor_detected'] or False,
+                        support_seeking=analysis_row['support_seeking'] or False,
+                        knowledge_sharing=False,  # Can be derived if needed
+                        conversation_depth=analysis_row['conversation_depth'] or 0.0,
+                        trust_indicators=[],  # Can be derived if needed
+                        adaptation_requests=[]  # Can be derived if needed
+                    )
+                    conversation_analyses.append(analysis)
+                
+                profile = PersonalityProfile(
+                    user_id=user_id,
+                    created_at=profile_row['created_at'],
+                    last_updated=profile_row['updated_at'],
+                    traits=traits,
+                    conversation_analyses=conversation_analyses,
+                    total_conversations=profile_row['total_conversations'],
+                    relationship_depth=profile_row['relationship_depth'],
+                    trust_level=profile_row['trust_level'],
+                    adaptation_success_rate=0.5,  # Default value - can be enhanced later
+                    preferred_response_style=json.loads(profile_row['preferred_response_style'] or '{}'),
+                    effective_conversation_patterns=[],  # Can be derived from analysis data
+                    topics_of_high_engagement=[]  # Can be derived from analysis data
+                )
+                
+                logger.debug(f"Loaded personality profile for user {user_id}")
+                return profile
+                
+        except Exception as e:
+            logger.error(f"Failed to load personality profile for user {user_id}: {e}")
+            return None
+        finally:
+            connection.close()
+    
+    async def save_conversation_analysis(self, analysis: ConversationAnalysis):
+        """Save conversation analysis to database"""
+        if not POSTGRES_AVAILABLE:
+            return False
+            
+        connection = self._get_db_connection()
+        if not connection:
+            return False
+            
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute("""
+                    INSERT INTO dynamic_conversation_analyses 
+                    (user_id, context_id, timestamp, message_length, formality_score, 
+                     emotional_openness, conversation_depth, topics_discussed, 
+                     emotional_tone, humor_detected, support_seeking)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                """, (
+                    analysis.user_id,
+                    analysis.context_id,
+                    analysis.timestamp,
+                    analysis.message_length,
+                    analysis.formality_score,
+                    analysis.emotional_openness,
+                    analysis.conversation_depth,
+                    json.dumps(analysis.topics_discussed),
+                    analysis.emotional_tone,
+                    analysis.humor_detected,
+                    analysis.support_seeking
+                ))
+                
+                connection.commit()
+                return True
+                
+        except Exception as e:
+            logger.error(f"Failed to save conversation analysis: {e}")
+            connection.rollback()
+            return False
+        finally:
+            connection.close()
+    
+    async def initialize_persistence(self):
+        """Initialize database persistence for personality profiles"""
+        if POSTGRES_AVAILABLE:
+            self._ensure_personality_tables()
+            logger.info("Dynamic personality persistence initialized")
+        else:
+            logger.warning("PostgreSQL not available - personality profiles will not persist across restarts")
+
+
+# Enhanced DynamicPersonalityProfiler with database persistence
+class PersistentDynamicPersonalityProfiler(DynamicPersonalityProfiler):
+    """
+    Enhanced Dynamic Personality Profiler with automatic database persistence.
+    
+    This class extends the base DynamicPersonalityProfiler to automatically
+    save and load personality profiles from PostgreSQL database.
+    """
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.persistence_enabled = POSTGRES_AVAILABLE
+        
+        # Initialize database schema and load existing profiles
+        if self.persistence_enabled:
+            asyncio.create_task(self.initialize_persistence())
+    
+    async def update_personality_profile(self, analysis: ConversationAnalysis) -> PersonalityProfile:
+        """Update personality profile with automatic database persistence"""
+        # Load existing profile from database if not in memory
+        if analysis.user_id not in self.profiles and self.persistence_enabled:
+            db_profile = await self.load_profile_from_db(analysis.user_id)
+            if db_profile:
+                self.profiles[analysis.user_id] = db_profile
+        
+        # Update profile using parent method
+        profile = await super().update_personality_profile(analysis)
+        
+        # Save to database
+        if self.persistence_enabled:
+            await self.save_profile_to_db(analysis.user_id, profile)
+            await self.save_conversation_analysis(analysis)
+        
+        return profile
+
+
+# Global instance for use across the application - now with persistence!
+dynamic_personality_profiler = PersistentDynamicPersonalityProfiler()

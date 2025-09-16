@@ -82,8 +82,8 @@ class PersonalityFact:
     user_id: str
     
     def to_storage_dict(self) -> Dict:
-        """Convert to dictionary for database storage"""
-        return {
+        """Convert to dictionary for database storage with flattened metadata"""
+        storage_dict = {
             "content": self.content,
             "fact_type": self.fact_type.value,
             "relevance": self.relevance.value,
@@ -91,14 +91,27 @@ class PersonalityFact:
             "memory_tier": self.memory_tier.value,
             "emotional_weight": self.emotional_weight,
             "privacy_level": self.privacy_level,
-            "context_metadata": self.context_metadata,
             "extraction_confidence": self.extraction_confidence,
             "last_accessed": self.last_accessed.isoformat(),
             "access_frequency": self.access_frequency,
             "user_id": self.user_id,
             "timestamp": datetime.now().isoformat(),
-            "version": "personality_v1"
+            "version": "personality_v1",
+            "type": "personality_fact"  # Mark as personality fact for retrieval
         }
+        
+        # Flatten context metadata to avoid nested dictionaries (ChromaDB limitation)
+        if self.context_metadata:
+            for key, value in self.context_metadata.items():
+                # Prefix context keys to avoid conflicts
+                flattened_key = f"context_{key}"
+                # Convert value to string if it's not a basic type
+                if isinstance(value, (str, int, float, bool)) or value is None:
+                    storage_dict[flattened_key] = value
+                else:
+                    storage_dict[flattened_key] = str(value)
+        
+        return storage_dict
 
 
 class PersonalityFactClassifier:
