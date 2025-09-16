@@ -208,6 +208,11 @@ Use the {EXTERNAL_EMOTION_CONTEXT} data to understand emotional nuances that go 
 {RELATIONSHIP_CONTEXT}
 ```
 
+**Memory-Triggered Personality Moments:**
+```
+{MEMORY_MOMENTS_CONTEXT}
+```
+
 **Implementation Mode Settings:**
 ```
 {AI_SYSTEM_CONTEXT}

@@ -576,10 +576,40 @@ class BotEventHandlers:
         if message.guild:
             store_discord_server_info(message.guild, self.memory_manager)
         
-        # Start with system message
+        # Start with system message - use template system for comprehensive contextualization
         time_context = get_current_time_context()
-        from src.core.config import get_system_prompt
-        system_prompt_content = enhanced_system_prompt if enhanced_system_prompt else get_system_prompt()
+        
+        if enhanced_system_prompt:
+            # Use Phase 4 enhanced prompt if available
+            system_prompt_content = enhanced_system_prompt
+            logger.debug("Using Phase 4 enhanced system prompt")
+        else:
+            # Use template system with available context data
+            try:
+                # Build basic template context from available data
+                user_id = str(message.author.id)
+                
+                # Create basic personality metadata from message context
+                personality_metadata = {
+                    'platform': 'discord',
+                    'context_type': 'guild' if message.guild else 'dm',
+                    'user_id': user_id
+                }
+                
+                # Use template system for contextualized prompt
+                system_prompt_content = get_contextualized_system_prompt(
+                    personality_metadata=personality_metadata,
+                    user_id=user_id
+                )
+                logger.debug("Using contextualized system prompt from template system")
+                
+            except Exception as e:
+                logger.warning(f"Could not use template system: {e}")
+                # Fallback to basic system prompt
+                from src.core.config import get_system_prompt
+                system_prompt_content = get_system_prompt()
+                logger.debug("Falling back to basic system prompt")
+        
         conversation_context.append({"role": "system", "content": system_prompt_content})
         
         # Add time and emotion context
@@ -737,13 +767,34 @@ class BotEventHandlers:
             if hasattr(self.memory_manager, 'get_phase4_response_context'):
                 comprehensive_context = self.memory_manager.get_phase4_response_context(phase4_context)
                 
+                # Instead of creating an enhanced prompt, prepare template context
+                # that can be used by the template system in fallback scenarios
+                template_context = {
+                    'phase4_context': phase4_context,
+                    'comprehensive_context': comprehensive_context,
+                    'interaction_type': getattr(phase4_context, 'interaction_type', None),
+                    'conversation_mode': getattr(phase4_context, 'conversation_mode', None)
+                }
+                
+                # Still create enhanced prompt for backward compatibility
+                # but prioritize template system in fallback scenarios
                 from src.intelligence.phase4_integration import create_phase4_enhanced_system_prompt
-                from src.core.config import get_system_prompt
-                enhanced_system_prompt = create_phase4_enhanced_system_prompt(
+                enhanced_system_prompt = get_contextualized_system_prompt(
+                    personality_metadata=template_context,
+                    user_id=user_id,
                     phase4_context=phase4_context,
-                    base_system_prompt=get_system_prompt(),
                     comprehensive_context=comprehensive_context
                 )
+                
+                # If template system fails, fallback to the old enhanced prompt method
+                if not enhanced_system_prompt or enhanced_system_prompt == "":
+                    logger.warning("Template system failed, using legacy Phase 4 enhanced prompt")
+                    from src.core.config import get_system_prompt
+                    enhanced_system_prompt = create_phase4_enhanced_system_prompt(
+                        phase4_context=phase4_context,
+                        base_system_prompt=get_system_prompt(),
+                        comprehensive_context=comprehensive_context
+                    )
                 
                 phases_executed = []
                 if hasattr(phase4_context, 'processing_metadata'):
@@ -800,11 +851,19 @@ class BotEventHandlers:
                         
                     else:
                         logger.warning("Discord adapter not found in orchestrator, falling back to direct LLM")
-                        response = await self._fallback_direct_llm_response(conversation_context)
+                        response = await self._fallback_direct_llm_response(
+                            conversation_context, user_id, current_emotion_data, 
+                            external_emotion_data, phase2_context, phase4_context, 
+                            comprehensive_context, dynamic_personality_context
+                        )
                         
                 else:
                     logger.warning("Universal Chat Orchestrator not available, falling back to direct LLM")
-                    response = await self._fallback_direct_llm_response(conversation_context)
+                    response = await self._fallback_direct_llm_response(
+                        conversation_context, user_id, current_emotion_data, 
+                        external_emotion_data, phase2_context, phase4_context, 
+                        comprehensive_context, dynamic_personality_context
+                    )
                 
                 # Security scan for system leakage
                 leakage_scan = scan_response_for_system_leakage(response)
@@ -855,8 +914,10 @@ class BotEventHandlers:
                 logger.error(f"Unexpected error processing message through Universal Chat: {e}")
                 await reply_channel.send("*Something stirs in the darkness beyond my understanding...* Perhaps we might try this exchange anew?")
     
-    async def _fallback_direct_llm_response(self, conversation_context):
-        """Fallback to direct LLM client when Universal Chat is unavailable."""
+    async def _fallback_direct_llm_response(self, conversation_context, user_id=None, current_emotion_data=None, 
+                                           external_emotion_data=None, phase2_context=None, phase4_context=None, 
+                                           comprehensive_context=None, dynamic_personality_context=None):
+        """Fallback to direct LLM client when Universal Chat is unavailable, with full template support."""
         if self.llm_client is None:
             logger.error("LLM client is not initialized")
             return "The threads of consciousness are not yet woven. My deeper mind remains unreachable for now."
@@ -866,8 +927,59 @@ class BotEventHandlers:
             logger.warning("LLM connection unavailable when trying to respond")
             return "⚠️ I can't connect to the LLM server right now. Make sure your LLM provider is running."
         
-        logger.debug("Sending request to LLM (fallback)...")
+        logger.debug("Sending request to LLM (fallback with template support)...")
         logger.debug(f"Conversation context: {len(conversation_context)} messages")
+        
+        try:
+            # Build template context from available AI analysis
+            template_context = {}
+            
+            # Collect all available context for template variables
+            if current_emotion_data:
+                template_context['emotional_intelligence'] = current_emotion_data
+            if external_emotion_data:
+                template_context['external_emotion_data'] = external_emotion_data
+            if phase2_context:
+                template_context['phase2_context'] = phase2_context
+            if phase4_context:
+                template_context['phase4_context'] = phase4_context
+            if comprehensive_context:
+                template_context['comprehensive_context'] = comprehensive_context
+            if dynamic_personality_context:
+                template_context['personality_context'] = dynamic_personality_context
+            
+            # Replace system message with contextualized version if we have template context
+            if template_context and user_id:
+                try:
+                    # Get contextualized system prompt
+                    contextualized_system_prompt = get_contextualized_system_prompt(
+                        personality_metadata=dynamic_personality_context,
+                        emotional_intelligence_results=current_emotion_data,
+                        user_id=user_id,
+                        phase4_context=phase4_context,
+                        comprehensive_context=comprehensive_context
+                    )
+                    
+                    # Replace system message in conversation context
+                    updated_context = []
+                    for msg in conversation_context:
+                        if msg.get('role') == 'system':
+                            updated_context.append({
+                                'role': 'system',
+                                'content': contextualized_system_prompt
+                            })
+                            logger.debug("Replaced system prompt with contextualized version in fallback")
+                        else:
+                            updated_context.append(msg)
+                    
+                    conversation_context = updated_context
+                    
+                except Exception as e:
+                    logger.warning(f"Could not contextualize system prompt in fallback: {e}")
+                    logger.debug("Continuing with original system prompt")
+            
+        except Exception as e:
+            logger.warning(f"Error building template context in fallback: {e}")
         
         # Get response from LLM directly
         response = await self.llm_client.generate_chat_completion_safe(conversation_context)
