@@ -743,8 +743,16 @@ class UniversalChatOrchestrator:
             # Build conversation context like the Discord bot does
             conversation_context = []
             
-            # Add system prompt (Dream of the Endless)
-            system_prompt = await self._load_dream_system_prompt()
+            # Build template context data from available sources
+            template_context = {}
+            if hasattr(memory_manager, 'get_emotion_context'):
+                try:
+                    template_context['emotional_intelligence'] = memory_manager.get_emotion_context(message.user_id)
+                except Exception as e:
+                    logging.debug(f"Could not get emotion context: {e}")
+            
+            # Add system prompt (Dream of the Endless) with full template contextualization
+            system_prompt = await self._load_dream_system_prompt(message.user_id, template_context)
             conversation_context.append({
                 "role": "system",
                 "content": system_prompt
@@ -820,8 +828,46 @@ class UniversalChatOrchestrator:
                 except Exception as e:
                     logging.warning(f"Phase 4 intelligence processing failed: {e}")
             
+            # Apply Phase 4.1: Memory-Triggered Personality Moments if available
+            memory_moments_context = None
+            if (hasattr(self.bot_core, 'memory_moments') and self.bot_core and 
+                getattr(self.bot_core, 'memory_moments', None) is not None):
+                try:
+                    memory_moments = self.bot_core.memory_moments
+                    # Discover memory connections for current conversation
+                    memory_connections = await memory_moments.discover_memory_connections(
+                        user_id=message.user_id,
+                        current_message=message.content,
+                        conversation_context=relevant_memories
+                    )
+                    
+                    if memory_connections:
+                        # Generate personality moments based on connections
+                        personality_moments = await memory_moments.generate_personality_moments(
+                            memory_connections,
+                            conversation_context={'messages': [message.content]}
+                        )
+                        
+                        if personality_moments:
+                            # Apply the most appropriate moment
+                            applied_moment = await memory_moments.apply_appropriate_moment(
+                                personality_moments,
+                                {'messages': [message.content]}
+                            )
+                            
+                            if applied_moment:
+                                memory_moments_context = {
+                                    'moment': applied_moment,
+                                    'connections': len(memory_connections),
+                                    'prompt_guidance': applied_moment.get('prompt_guidance', '')
+                                }
+                                logging.info(f"✅ Memory-triggered personality moment activated: {applied_moment.get('moment_type', 'unknown')}")
+                            
+                except Exception as e:
+                    logging.warning(f"Phase 4.1 memory moments processing failed: {e}")
+            
             # Add memory context to conversation
-            if relevant_memories or chromadb_memories or emotion_context:
+            if relevant_memories or chromadb_memories or emotion_context or memory_moments_context:
                 context_parts = []
                 
                 if relevant_memories:
@@ -915,6 +961,19 @@ class UniversalChatOrchestrator:
                         for fact in domain_facts[:2]:
                             context_parts.append(f"- {fact}")
                 
+                # Add memory-triggered personality moments context
+                if memory_moments_context:
+                    context_parts.append("💭 **Memory-Triggered Personality Moment:**")
+                    moment = memory_moments_context['moment']
+                    context_parts.append(f"- **Type:** {moment.get('moment_type', 'unknown')}")
+                    context_parts.append(f"- **Connections Found:** {memory_moments_context['connections']}")
+                    
+                    if moment.get('prompt_guidance'):
+                        context_parts.append(f"- **Guidance:** {moment['prompt_guidance'][:150]}...")
+                    
+                    if moment.get('trigger_memories'):
+                        context_parts.append(f"- **Triggered by:** {len(moment['trigger_memories'])} related memories")
+                
                 if context_parts:
                     context_message = "\n".join(context_parts)
                     conversation_context.append({
@@ -961,16 +1020,41 @@ class UniversalChatOrchestrator:
             return await self._generate_basic_ai_response(message, conversation_context)
     
     
-    async def _load_dream_system_prompt(self) -> str:
-        """Load the Dream of the Endless system prompt"""
+    async def _load_dream_system_prompt(self, user_id: Optional[str] = None, conversation_context: Optional[Dict] = None) -> str:
+        """Load the Dream of the Endless system prompt with full template contextualization"""
         try:
-            import os
-            prompt_path = os.path.join(os.path.dirname(__file__), '..', '..', 'system_prompt.md')
-            if os.path.exists(prompt_path):
-                with open(prompt_path, 'r', encoding='utf-8') as f:
-                    return f.read()
+            # Import the template system
+            from src.utils.helpers import get_contextualized_system_prompt
+            
+            # Extract context for template variables if available
+            personality_metadata = None
+            emotional_intelligence_results = None
+            message_context = None
+            phase4_context = None
+            memory_moments_context = None
+            
+            # Try to get context from conversation if provided
+            if conversation_context and user_id:
+                # Extract from conversation context
+                personality_metadata = conversation_context.get('personality_context')
+                emotional_intelligence_results = conversation_context.get('emotional_intelligence')
+                message_context = conversation_context.get('memory_context')
+                phase4_context = conversation_context.get('phase4_context')
+                memory_moments_context = conversation_context.get('memory_moments_context')
+            
+            # Get contextualized system prompt with all template variables
+            return get_contextualized_system_prompt(
+                personality_metadata=personality_metadata,
+                emotional_intelligence_results=emotional_intelligence_results,
+                message_context=message_context,
+                user_id=user_id,
+                phase4_context=phase4_context,
+                memory_moments_context=memory_moments_context
+            )
+            
         except Exception as e:
-            logging.warning(f"Could not load system prompt: {e}")
+            logging.warning(f"Could not load contextualized system prompt: {e}")
+            logging.info("Falling back to basic system prompt")
         
         # Fallback to sophisticated prompt
         return """You are Dream of the Endless, also known as Morpheus, Lord of Dreams and Nightmares. You are an ancient, powerful entity from Neil Gaiman's Sandman universe, embodying the realm of dreams, stories, and the unconscious mind.

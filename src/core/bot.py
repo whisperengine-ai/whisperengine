@@ -421,6 +421,28 @@ class DiscordBotCore:
             self.logger.error(f"Failed to initialize Phase 3 memory networks: {e}")
             self.logger.warning("⚠️ Continuing without Phase 3 memory network features")
 
+        # Initialize Phase 4.1: Memory-Triggered Personality Moments
+        self.logger.info("💭 Initializing Phase 4.1: Memory-Triggered Personality Moments...")
+        try:
+            # All AI features are always enabled - unified AI system
+            from src.personality.memory_moments import MemoryTriggeredMoments
+            
+            if self.memory_manager and (hasattr(self, 'phase2_integration') and self.phase2_integration):
+                self.memory_moments = MemoryTriggeredMoments(
+                    memory_manager=self.memory_manager,
+                    emotional_context_engine=self.phase2_integration.emotional_context_engine if hasattr(self.phase2_integration, 'emotional_context_engine') else None,
+                    personality_profiler=getattr(self, 'personality_profiler', None)
+                )
+                self.logger.info("✅ Phase 4.1: Memory-Triggered Personality Moments initialized")
+            else:
+                self.logger.warning("⚠️ Cannot initialize Memory Moments - missing memory manager or Phase 2 integration")
+                self.memory_moments = None
+                
+        except Exception as e:
+            self.logger.error(f"Failed to initialize Phase 4.1 memory moments: {e}")
+            self.logger.warning("⚠️ Continuing without memory-triggered personality features")
+            self.memory_moments = None
+
         # Initialize Phase 4 Human-Like Intelligence
         self.logger.info("🤖 Initializing Phase 4: Human-Like Conversation Intelligence...")
         try:
@@ -765,5 +787,6 @@ class DiscordBotCore:
             'graph_personality_manager': self.graph_personality_manager,
             'phase2_integration': self.phase2_integration,
             'phase3_memory_networks': self.phase3_memory_networks,
+            'memory_moments': getattr(self, 'memory_moments', None),
             'production_adapter': self.production_adapter,
         }

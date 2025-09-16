@@ -109,6 +109,12 @@ Your bot should generate these context variables:
 {PROACTIVE_SUPPORT_CONTEXT}
 # Example: "Recommend celebrating recent wins, suggest new challenges to maintain momentum"
 
+{EMOTIONAL_INTELLIGENCE_CONTEXT}
+# Example: "Complete emotional awareness combining all intelligence phases"
+
+{MEMORY_MOMENTS_CONTEXT}
+# Example: "Memory-triggered personality moments and relationship insights"
+
 # Phase 3: External Emotional Analysis
 {EXTERNAL_EMOTION_CONTEXT}
 # Example: "External Analysis: Joy (confidence: 0.89, intensity: 0.76), Recent trend: Positive growth, Sentiment: Optimistic"

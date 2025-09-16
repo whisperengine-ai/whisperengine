@@ -789,7 +789,8 @@ def extract_text_for_memory_storage(message_content: str, attachments) -> str:
 
 
 def get_contextualized_system_prompt(personality_metadata=None, emotional_intelligence_results=None, 
-                                   message_context=None, user_id=None, phase4_context=None, comprehensive_context=None):
+                                   message_context=None, user_id=None, phase4_context=None, comprehensive_context=None,
+                                   memory_moments_context=None):
     """
     Get system prompt with AI analysis variables replaced with actual data
     
@@ -919,6 +920,23 @@ def get_contextualized_system_prompt(personality_metadata=None, emotional_intell
         # Basic relationship context - could be enhanced with more data
         relationship_context = f"User interaction context for {user_id}"
     
+    # Memory-triggered personality moments context (Phase 4.1)
+    memory_moments_context_text = ""
+    if memory_moments_context and memory_moments_context.get('moment'):
+        moment = memory_moments_context['moment']
+        moment_type = moment.get('moment_type', 'unknown')
+        connections = memory_moments_context.get('connections', 0)
+        
+        memory_moments_context_text = f"Memory-Triggered Moment: {moment_type.title()} moment activated"
+        memory_moments_context_text += f" (based on {connections} memory connections)"
+        
+        if moment.get('emotional_trigger'):
+            memory_moments_context_text += f", triggered by {moment['emotional_trigger']} emotion"
+            
+        if moment.get('prompt_guidance'):
+            guidance = moment['prompt_guidance'][:100] + "..." if len(moment['prompt_guidance']) > 100 else moment['prompt_guidance']
+            memory_moments_context_text += f". Guidance: {guidance}"
+    
     # Combined emotional intelligence context
     emotional_intelligence_context = ""
     if emotional_state_context or emotional_prediction_context or external_emotion_context:
@@ -937,6 +955,7 @@ def get_contextualized_system_prompt(personality_metadata=None, emotional_intell
     contextualized_prompt = contextualized_prompt.replace("{PROACTIVE_SUPPORT_CONTEXT}", proactive_support_context)
     contextualized_prompt = contextualized_prompt.replace("{RELATIONSHIP_CONTEXT}", relationship_context)
     contextualized_prompt = contextualized_prompt.replace("{EMOTIONAL_INTELLIGENCE_CONTEXT}", emotional_intelligence_context)
+    contextualized_prompt = contextualized_prompt.replace("{MEMORY_MOMENTS_CONTEXT}", memory_moments_context_text)
     
     # Remove any remaining template variables that weren't filled
     import re
@@ -954,6 +973,7 @@ def get_contextualized_system_prompt(personality_metadata=None, emotional_intell
         r'\{PROACTIVE_SUPPORT_CONTEXT\}',
         r'\{EMOTIONAL_INTELLIGENCE_CONTEXT\}',
         r'\{AI_SYSTEM_CONTEXT\}',
+        r'\{MEMORY_MOMENTS_CONTEXT\}',
         # Also remove any standalone context variable names
         r'\bMEMORY_NETWORK_CONTEXT\b',
         r'\bRELATIONSHIP_DEPTH_CONTEXT\b',
@@ -964,7 +984,8 @@ def get_contextualized_system_prompt(personality_metadata=None, emotional_intell
         r'\bRELATIONSHIP_CONTEXT\b',
         r'\bPROACTIVE_SUPPORT_CONTEXT\b',
         r'\bEMOTIONAL_INTELLIGENCE_CONTEXT\b',
-        r'\bAI_SYSTEM_CONTEXT\b'
+        r'\bAI_SYSTEM_CONTEXT\b',
+        r'\bMEMORY_MOMENTS_CONTEXT\b'
     ]
     
     for pattern in context_variable_patterns:

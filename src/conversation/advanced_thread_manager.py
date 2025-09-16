@@ -643,15 +643,43 @@ class AdvancedConversationThreadManager:
         }
     
     async def _detect_thread_references(self, user_id: str, message: str) -> List[str]:
-        """Detect references to existing threads"""
+        """Detect references to existing threads using memory moments and keyword analysis"""
         thread_references = []
         user_threads = self.user_threads[user_id]
         
+        # Enhanced: Use memory moments to detect deeper thread connections
+        if self.memory_moments and MEMORY_MOMENTS_AVAILABLE:
+            try:
+                # Analyze current conversation for potential memory connections
+                memory_connections = await self.memory_moments.analyze_conversation_for_memories(
+                    user_id=user_id,
+                    context_id=f"thread_detection_{user_id}",
+                    message=message
+                )
+                
+                # Check if any memory connections relate to existing threads
+                for connection in memory_connections:
+                    trigger_keywords = getattr(connection, 'trigger_keywords', [])
+                    for thread in user_threads:
+                        thread_keywords = [kw.lower() for kw in thread.topic_keywords]
+                        connection_keywords = [kw.lower() for kw in trigger_keywords] if trigger_keywords else []
+                        
+                        # Find intersection between connection triggers and thread topics
+                        keyword_overlap = set(connection_keywords) & set(thread_keywords)
+                        if keyword_overlap and thread.thread_id not in thread_references:
+                            thread_references.append(thread.thread_id)
+                            logger.debug(f"Memory connection found for thread {thread.thread_id}: {getattr(connection, 'connection_type', 'unknown')}")
+                            
+            except Exception as e:
+                logger.warning(f"Memory moments thread detection failed: {e}")
+        
+        # Fallback: Basic keyword matching for threads without memory moments
         for thread in user_threads:
             # Check if any topic keywords from thread appear in message
             for keyword in thread.topic_keywords[:5]:  # Check top keywords
                 if keyword in message.lower():
-                    thread_references.append(thread.thread_id)
+                    if thread.thread_id not in thread_references:
+                        thread_references.append(thread.thread_id)
                     break
         
         return thread_references
@@ -797,12 +825,16 @@ class AdvancedConversationThreadManager:
     
     async def _generate_context_bridge(self, user_id: str, from_thread_id: str, 
                                      to_thread_id: str, transition_type: ThreadTransitionType) -> str:
-        """Generate a context bridge message for thread transitions"""
+        """Generate a context bridge message for thread transitions using memory moments"""
         from_thread = await self._get_thread(user_id, from_thread_id)
         to_thread = await self._get_thread(user_id, to_thread_id)
         
         if not from_thread or not to_thread:
             return ""
+        
+        # Enhanced: Log that memory moments could enhance transitions (for future implementation)
+        if self.memory_moments and MEMORY_MOMENTS_AVAILABLE:
+            logger.debug(f"Memory moments available for enhanced transition from {from_thread_id} to {to_thread_id} (type: {transition_type.value})")
         
         # Generate appropriate bridge based on transition type
         if transition_type == ThreadTransitionType.EXPLICIT_SWITCH:

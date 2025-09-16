@@ -165,6 +165,8 @@ conversation_context.insert(0, {
 - `{EMOTIONAL_PREDICTION_CONTEXT}` - Emotional prediction insights
 - `{PROACTIVE_SUPPORT_CONTEXT}` - Proactive support recommendations
 - `{RELATIONSHIP_CONTEXT}` - Basic relationship history
+- `{EMOTIONAL_INTELLIGENCE_CONTEXT}` - Complete emotional awareness
+- `{MEMORY_MOMENTS_CONTEXT}` - Memory-triggered personality moments
 
 ## AI System Configuration
 

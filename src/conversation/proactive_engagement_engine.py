@@ -815,7 +815,7 @@ class ProactiveConversationEngagementEngine:
     async def _generate_memory_connections(self,
                                          user_id: str,
                                          recent_messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        """Generate memory-based conversation connections"""
+        """Generate memory-based conversation connections using memory moments"""
         
         connections = []
         
@@ -826,13 +826,58 @@ class ProactiveConversationEngagementEngine:
             # Extract recent conversation context
             recent_content = ' '.join([msg.get('content', '') for msg in recent_messages[-3:]])
             
-            # Simple memory connection for now
-            connection = {
-                'prompt': "This reminds me of something we talked about before - how do you feel about revisiting that topic?",
-                'relevance_score': 0.7,
-                'memory_context': 'previous_conversation'
-            }
-            connections.append(connection)
+            if not recent_content.strip():
+                return connections
+            
+            # Enhanced: Use memory moments for authentic memory connections
+            if MEMORY_MOMENTS_AVAILABLE:
+                try:
+                    # Analyze recent conversation for memory connections
+                    memory_connections = await self.memory_moments.analyze_conversation_for_memories(
+                        user_id=user_id,
+                        context_id=f"proactive_engagement_{user_id}",
+                        message=recent_content
+                    )
+                    
+                    # Convert memory connections to engagement prompts
+                    for connection in memory_connections[:2]:  # Top 2 connections
+                        # Get a natural callback if available
+                        if hasattr(connection, 'source_memory') and hasattr(connection, 'connection_type'):
+                            connection_type = getattr(connection, 'connection_type', 'general')
+                            
+                            if connection_type == 'similar_topic':
+                                prompt = "This conversation reminds me of something we discussed before. Would you like to explore that connection further?"
+                            elif connection_type == 'emotional_echo':
+                                prompt = "I sense a familiar emotional resonance here - it echoes something meaningful from our past conversations."
+                            elif connection_type == 'personal_growth':
+                                prompt = "This seems to connect to your personal journey that we've touched on before. How has your perspective evolved?"
+                            else:
+                                prompt = "This brings back memories of our previous conversations. There might be a deeper connection here worth exploring."
+                            
+                            connections.append({
+                                'prompt': prompt,
+                                'relevance_score': getattr(connection, 'connection_strength', 0.7),
+                                'memory_context': connection_type,
+                                'memory_connection': connection
+                            })
+                            
+                except Exception as memory_error:
+                    logger.debug(f"Memory moments connection failed, using simple fallback: {memory_error}")
+                    # Fallback to simple connection
+                    connection = {
+                        'prompt': "This reminds me of something we talked about before - how do you feel about revisiting that topic?",
+                        'relevance_score': 0.6,
+                        'memory_context': 'previous_conversation'
+                    }
+                    connections.append(connection)
+            else:
+                # Fallback: Simple memory connection
+                connection = {
+                    'prompt': "This reminds me of something we talked about before - how do you feel about revisiting that topic?",
+                    'relevance_score': 0.5,
+                    'memory_context': 'previous_conversation'
+                }
+                connections.append(connection)
             
         except (AttributeError, TypeError, KeyError) as e:
             logger.warning("Failed to generate memory connections: %s", e)
