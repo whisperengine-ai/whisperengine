@@ -24,9 +24,6 @@ vaderSentiment>=3.3.2
 spacy>=3.6.0
 transformers>=4.30.0
 
-# Optimized Local LLM Inference
-llama-cpp-python>=0.2.0
-
 # Redis Dependencies
 redis==5.2.1
 
