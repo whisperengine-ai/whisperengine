@@ -10,16 +10,16 @@ import pytest
 # Use centralized environment management instead of direct dotenv
 from env_manager import load_environment
 
-# Mock imports commented out until test_mocks.py is updated for LLMClient
-# from tests.test_mocks import (
-#     MockLLMClient,
-#     create_mock_llm_client,
-#     create_disconnected_mock_llm_client,
-#     HAPPY_EMOTION_RESPONSES,
-#     PERSONAL_INFO_RESPONSES,
-#     TRUST_INDICATOR_RESPONSES,
-#     USER_FACTS_RESPONSES
-# )
+# Mock imports for testing
+from tests.test_mocks import (
+    MockLMStudioClient,
+    create_mock_llm_client,
+    create_disconnected_mock_llm_client,
+    HAPPY_EMOTION_RESPONSES,
+    PERSONAL_INFO_RESPONSES,
+    TRUST_INDICATOR_RESPONSES,
+    USER_FACTS_RESPONSES
+)
 
 
 @pytest.fixture

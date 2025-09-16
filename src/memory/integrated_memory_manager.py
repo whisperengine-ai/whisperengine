@@ -218,8 +218,41 @@ class IntegratedMemoryManager:
         # Emotional intensity increases importance
         importance += getattr(emotion_profile, "intensity", 0.0) * 0.3
 
+        # High confidence emotions are more important
+        if emotion_profile and hasattr(emotion_profile, 'confidence'):
+            importance += emotion_profile.confidence * 0.2
+
+        # Relationship milestones increase importance
+        if user_profile and hasattr(user_profile, 'relationship_level') and hasattr(user_profile.relationship_level, 'value'):
+            if user_profile.relationship_level.value in ["friend", "close_friend"]:
+                importance += 0.2
+
+        # Personal sharing increases importance
+        personal_indicators = ["my", "i feel", "personal", "secret", "private", "important to me"]
+        if any(indicator in message.lower() for indicator in personal_indicators):
+            importance += 0.3
+
+        # Questions and help requests are important
+        if any(word in message.lower() for word in ["help", "how", "what", "why", "?", "advice"]):
+            importance += 0.2
+
+        # Strong emotions are important
+        if emotion_profile and hasattr(emotion_profile, 'detected_emotion') and hasattr(emotion_profile.detected_emotion, 'value'):
+            if emotion_profile.detected_emotion.value in [
+                "angry",
+                "frustrated",
+                "sad",
+                "excited",
+                "grateful",
+            ]:
+                importance += 0.2
+
+        # Length can indicate importance (detailed messages)
+        if len(message) > 200:
+            importance += 0.1
+
         # Return the calculated importance value
-        return importance
+        return min(importance, 1.0)  # Cap at 1.0
 
     async def get_memories_by_user(self, user_id: str) -> list[dict]:
         """
@@ -293,38 +326,6 @@ class IntegratedMemoryManager:
         except Exception as e:
             logger.error(f"Error retrieving memories for user {user_id}: {e}")
             return []
-
-        # High confidence emotions are more important
-        importance += emotion_profile.confidence * 0.2
-
-        # Relationship milestones increase importance
-        if user_profile.relationship_level.value in ["friend", "close_friend"]:
-            importance += 0.2
-
-        # Personal sharing increases importance
-        personal_indicators = ["my", "i feel", "personal", "secret", "private", "important to me"]
-        if any(indicator in message.lower() for indicator in personal_indicators):
-            importance += 0.3
-
-        # Questions and help requests are important
-        if any(word in message.lower() for word in ["help", "how", "what", "why", "?", "advice"]):
-            importance += 0.2
-
-        # Strong emotions are important
-        if emotion_profile.detected_emotion.value in [
-            "angry",
-            "frustrated",
-            "sad",
-            "excited",
-            "grateful",
-        ]:
-            importance += 0.2
-
-        # Length can indicate importance (detailed messages)
-        if len(message) > 200:
-            importance += 0.1
-
-        return min(importance, 1.0)  # Cap at 1.0
 
     async def retrieve_contextual_memories(
         self, user_id: str, query: str, limit: int = 10

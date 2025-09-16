@@ -89,6 +89,14 @@ except ImportError:
     ChromaDBManagerSimple = None
 
 try:
+    from src.memory.optimized_adapter import OptimizedMemoryAdapter
+
+    OPTIMIZED_MEMORY_AVAILABLE = True
+except ImportError:
+    OPTIMIZED_MEMORY_AVAILABLE = False
+    OptimizedMemoryAdapter = None
+
+try:
     from src.memory.hybrid_conversation_cache import HybridConversationCache
 
     HYBRID_CACHE_AVAILABLE = True
