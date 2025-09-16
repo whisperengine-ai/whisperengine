@@ -65,7 +65,7 @@ except ImportError:
     MEMORY_TIERS_AVAILABLE = False
 
 try:
-    from src.utils.embedding_manager import EmbeddingManager
+    from src.utils.local_embedding_manager import LocalEmbeddingManager
     EMBEDDING_MANAGER_AVAILABLE = True
 except ImportError:
     EMBEDDING_MANAGER_AVAILABLE = False
@@ -120,12 +120,12 @@ class EnhancedMemorySystem:
     and NetworkX for sophisticated memory connection analysis.
     """
     
-    def __init__(self, user_id: str, embedding_dim: int = 768):
+    def __init__(self, user_id: str, embedding_dim: int = 384):
         self.user_id = user_id
-        self.embedding_dim = embedding_dim
+        self.embedding_dim = embedding_dim  # Optimized for all-MiniLM-L6-v2 (384-dim)
         self.logger = logging.getLogger(f"{__name__}.{user_id}")
         
-        # Faiss index for ultra-fast similarity search
+        # Faiss index for ultra-fast similarity search (384-dimensional)
         self.faiss_index = None
         self.memory_nodes: Dict[str, EnhancedMemoryNode] = {}
         self.memory_id_to_faiss_id: Dict[str, int] = {}
@@ -221,7 +221,9 @@ class EnhancedMemorySystem:
             if self.faiss_index is not None:
                 # Normalize embedding for cosine similarity
                 normalized_embedding = embedding / np.linalg.norm(embedding)
-                self.faiss_index.add(normalized_embedding.reshape(1, -1))
+                # Add to FAISS index with proper format
+                embedding_array = normalized_embedding.reshape(1, -1).astype(np.float32)
+                self.faiss_index.add(embedding_array)
                 
                 # Track mapping between memory_id and faiss_id
                 self.memory_id_to_faiss_id[memory_id] = self.next_faiss_id
@@ -329,14 +331,18 @@ class EnhancedMemorySystem:
     ) -> MemorySearchResult:
         """Ultra-fast search using Faiss index"""
         try:
+            # Check if FAISS index is initialized
+            if self.faiss_index is None:
+                self.logger.warning("FAISS index not initialized, falling back to linear search")
+                return await self._fallback_search(query_embedding, limit, similarity_threshold, memory_types)
+            
             # Normalize query embedding for cosine similarity
             normalized_query = query_embedding / np.linalg.norm(query_embedding)
             
-            # Search with Faiss (returns cosine similarities)
-            similarities, faiss_ids = self.faiss_index.search(
-                normalized_query.reshape(1, -1), 
-                min(limit * 2, self.faiss_index.ntotal)  # Get more to filter by type
-            )
+            # Search with Faiss (returns cosine similarities) 
+            query_array = normalized_query.reshape(1, -1).astype(np.float32)
+            search_k = min(limit * 2, len(self.memory_nodes)) if self.memory_nodes else limit
+            similarities, faiss_ids = self.faiss_index.search(query_array, search_k)
             
             # Convert results to memory nodes
             memory_nodes = []
@@ -617,7 +623,7 @@ class EnhancedMemorySystem:
         try:
             # Try to use existing embedding manager
             if EMBEDDING_MANAGER_AVAILABLE:
-                embedding_manager = EmbeddingManager()
+                embedding_manager = LocalEmbeddingManager()
                 embedding = await embedding_manager.get_embedding(text)
                 if embedding is not None:
                     return np.array(embedding)

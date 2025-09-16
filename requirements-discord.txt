@@ -20,3 +20,6 @@ audioop-lts==0.2.2
 
 # API integrations for Discord
 elevenlabs==2.15.0
+
+# Local AI processing for Discord bot
+vaderSentiment>=3.3.2  # Fast local emotion analysis

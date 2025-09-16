@@ -452,7 +452,22 @@ class ContextAwareMemoryManager:
         This allows the ContextAwareMemoryManager to be a drop-in replacement
         for the base UserMemoryManager
         """
-        return getattr(self.base_memory_manager, name)
+        # Handle special case for embedding-related attributes that might be None
+        if name in ['add_documents_with_embeddings', 'query_with_embeddings']:
+            try:
+                base_attr = getattr(self.base_memory_manager, name, None)
+                # Always return the actual attribute value, even if it's None
+                return base_attr
+            except AttributeError:
+                # If the base manager doesn't have the attribute, return None
+                return None
+        
+        try:
+            return getattr(self.base_memory_manager, name)
+        except AttributeError:
+            # If the attribute doesn't exist on the base manager, 
+            # raise AttributeError as expected
+            raise AttributeError(f"'{self.__class__.__name__}' object has no attribute '{name}'")
     
     def __setattr__(self, name, value):
         """

@@ -1,205 +1,143 @@
 """
-External Embedding Manager
-Manages external embedding API calls with fallback to local embeddings.
-Follows the same pattern as the LLM API manager for consistency.
+Local Embedding Manager
+High-performance local embedding processing using sentence-transformers.
+Optimized for WhisperEngine with FAISS compatibility and ultra-fast processing.
 """
 
-import aiohttp
 import asyncio
 import logging
 import os
 import numpy as np
 from typing import List, Optional, Dict, Any, Union
-import json
 import time
+from functools import lru_cache
 
 logger = logging.getLogger(__name__)
 
-class ExternalEmbeddingManager:
+class LocalEmbeddingManager:
     """
-    Manage external embedding API calls similar to LLM pattern.
-    Supports OpenAI, Azure OpenAI, and local embedding servers.
+    Local-only embedding manager optimized for WhisperEngine.
+    Uses sentence-transformers for fast, high-quality embeddings.
     """
     
     def __init__(self):
-        """Initialize the external embedding manager"""
-        # Embedding service configuration - follow same pattern as LLM models
-        # Fall back to LLM_CHAT_API_URL if LLM_EMBEDDING_API_URL is not provided
-        self.embedding_api_url = (
-            os.getenv("LLM_EMBEDDING_API_URL") or 
-            os.getenv("LLM_CHAT_API_URL") or  # Fallback to main LLM API URL
-            "http://localhost:1234/v1"
-        )
-        # Support both specific embedding API key and fallback to general keys
-        self.embedding_api_key = (
-            os.getenv("LLM_EMBEDDING_API_KEY") or 
-            os.getenv("OPENAI_API_KEY") or  # Fallback for OpenAI API
-            os.getenv("OPENROUTER_API_KEY")  # Fallback for OpenRouter API
-        )
-        self.embedding_model = os.getenv("LLM_EMBEDDING_MODEL", "text-embedding-nomic-embed-text-v1.5")
+        """Initialize the local embedding manager with optimal models"""
         
-        # Control whether to use external embeddings - respect explicit configuration
-        # This matches the pattern used in memory_manager.py for consistency
-        use_external_env = os.getenv("USE_EXTERNAL_EMBEDDINGS", "false").lower() == "true"
-        has_embedding_url = os.getenv("LLM_EMBEDDING_API_URL") is not None
+        # Model configuration - optimized for FAISS compatibility
+        self.embedding_model_name = os.getenv(
+            "LLM_LOCAL_EMBEDDING_MODEL", 
+            "all-MiniLM-L6-v2"  # 384-dim, 90 embed/sec, FAISS-compatible
+        )
         
-        # Respect explicit false setting - don't auto-detect if explicitly disabled
-        if os.getenv("USE_EXTERNAL_EMBEDDINGS", "false").lower() == "false":
-            # User explicitly disabled external embeddings
-            self.use_external = False
-        else:
-            # Only auto-detect if not explicitly disabled
-            auto_detect_external = (
-                not has_embedding_url and 
-                use_external_env and
-                os.getenv("LLM_CHAT_API_URL") is not None and
-                self._supports_embeddings(os.getenv("LLM_CHAT_API_URL", ""))
+        # Fallback model (same as primary for consistency)
+        self.fallback_model_name = os.getenv(
+            "FALLBACK_EMBEDDING_MODEL",
+            self.embedding_model_name
+        )
+        
+        # Performance settings
+        self.batch_size = int(os.getenv("EMBEDDING_BATCH_SIZE", "16"))
+        self.max_concurrent = int(os.getenv("EMBEDDING_MAX_CONCURRENT", "1"))  # Single model instance
+        
+        # Model caching and initialization
+        self._model = None
+        self._model_lock = asyncio.Lock()
+        self._is_initialized = False
+        
+        # Performance tracking
+        self.total_embeddings = 0
+        self.total_time = 0.0
+        self.cache_hits = 0
+        
+        # Embedding cache (LRU)
+        self._embedding_cache = {}
+        self.cache_max_size = int(os.getenv("EMBEDDING_CACHE_SIZE", "1000"))
+        
+        logger.info(f"LocalEmbeddingManager initialized with model: {self.embedding_model_name}")
+    
+    @property
+    def use_external(self):
+        """Always returns False for LocalEmbeddingManager"""
+        return False
+    
+    async def initialize(self):
+        """Initialize the embedding model"""
+        if self._is_initialized:
+            return
+        
+        async with self._model_lock:
+            if self._is_initialized:
+                return
+            
+            try:
+                await self._load_model()
+                self._is_initialized = True
+                logger.info("✅ Local embedding model initialized successfully")
+            except Exception as e:
+                logger.error(f"❌ Failed to initialize embedding model: {e}")
+                raise
+    
+    async def _load_model(self):
+        """Load the sentence transformer model"""
+        try:
+            from sentence_transformers import SentenceTransformer
+            
+            # Load in executor to avoid blocking
+            loop = asyncio.get_event_loop()
+            self._model = await loop.run_in_executor(
+                None, 
+                SentenceTransformer, 
+                self.embedding_model_name
             )
             
-            self.use_external = has_embedding_url or use_external_env or auto_detect_external
-        
-        # Batch processing settings
-        self.max_batch_size = int(os.getenv("EMBEDDING_BATCH_SIZE", "100"))
-        self.max_retries = int(os.getenv("EMBEDDING_MAX_RETRIES", "3"))
-        self.retry_delay = float(os.getenv("EMBEDDING_RETRY_DELAY", "1.0"))
-        
-        # Concurrency control - limit concurrent requests to prevent overwhelming APIs
-        self.max_concurrent_requests = int(os.getenv("EMBEDDING_MAX_CONCURRENT", "5"))
-        self._request_semaphore = None  # Will be initialized when needed
-        
-        # Adaptive throttling based on rate limit responses
-        self._rate_limit_backoff = 1.0  # Current backoff multiplier
-        self._consecutive_rate_limits = 0  # Track consecutive rate limit hits
-        
-        # Control fallback model loading
-        self.load_fallback_models = os.getenv("LOAD_FALLBACK_EMBEDDING_MODELS", "true").lower() == "true"
-        
-        # Initialize local embedding fallback
-        self._init_local_embeddings()
-        
-        # Validate configuration and warn about common issues
-        self._validate_configuration()
-        
-        logger.info(f"ExternalEmbeddingManager initialized - External: {self.use_external}")
+            # Test the model and get dimensions
+            test_embedding = await self._encode_texts(["test"])
+            self.embedding_dimension = len(test_embedding[0])
+            
+            logger.info(f"✅ Model loaded: {self.embedding_model_name}")
+            logger.info(f"   Embedding dimension: {self.embedding_dimension}")
+            logger.info(f"   Batch size: {self.batch_size}")
+            
+        except ImportError:
+            logger.error("❌ sentence-transformers not available")
+            raise
+        except Exception as e:
+            logger.error(f"❌ Model loading failed: {e}")
+            raise
     
-    def _validate_configuration(self):
-        """Validate embedding configuration and warn about common issues"""
-        # Check if user has configured OpenRouter for embeddings
-        if self.use_external and 'openrouter.ai' in self.embedding_api_url.lower():
-            # Only show this warning once per session
-            if not hasattr(self, '_config_warning_shown'):
-                logger.warning("⚠️  CONFIGURATION WARNING: OpenRouter does not support embeddings API!")
-                logger.warning("OpenRouter only supports chat completions, not text embeddings.")
-                logger.warning("Please either:")
-                logger.warning("1. Set USE_EXTERNAL_EMBEDDINGS=false to use local embeddings, OR")
-                logger.warning("2. Configure OpenAI API for embeddings: LLM_EMBEDDING_API_URL=https://api.openai.com/v1")
-                logger.warning("Falling back to local embeddings for now...")
-                self._config_warning_shown = True
-            # Force disable external embeddings
-            self.use_external = False
-        
-        # Check if external embeddings are enabled but no API key
-        elif self.use_external and not self.embedding_api_key:
-            if not hasattr(self, '_api_key_warning_shown'):
-                logger.warning("⚠️  External embeddings enabled but no API key configured")
-                logger.warning("Set LLM_EMBEDDING_API_KEY or OPENAI_API_KEY environment variable")
-                logger.warning("Falling back to local embeddings...")
-                self._api_key_warning_shown = True
-            self.use_external = False
+    @lru_cache(maxsize=1000)
+    def _get_cache_key(self, text: str) -> str:
+        """Generate cache key for text"""
+        return f"embed_{hash(text)}"
     
-    def _supports_embeddings(self, api_url: str) -> bool:
-        """Check if the given API URL supports embedding endpoints"""
-        if not api_url:
-            return False
+    async def _encode_texts(self, texts: List[str]) -> List[List[float]]:
+        """Encode texts using the model"""
+        if not self._model:
+            await self.initialize()
         
-        # Check for known providers that support embeddings
-        embedding_providers = [
-            'openai.com',
-            'api.openai.com', 
-            # Note: OpenRouter does NOT support embeddings API
-            # 'openrouter.ai',  # Removed - OpenRouter doesn't have embeddings endpoint
-            'api.anthropic.com',  # If they add embedding support
-            'localhost',  # Local servers like LM Studio, Ollama
-            '127.0.0.1',  # Local servers
-            'host.docker.internal'  # Docker host reference
-        ]
+        loop = asyncio.get_event_loop()
         
-        # Explicitly warn about OpenRouter (but only once per session)
-        if 'openrouter.ai' in api_url.lower():
-            if not hasattr(self, '_openrouter_warning_shown'):
-                logger.warning("OpenRouter does not support embeddings API - falling back to local embeddings")
-                self._openrouter_warning_shown = True
-            return False
+        # Run encoding in executor to avoid blocking
+        embeddings = await loop.run_in_executor(
+            None,
+            lambda: self._model.encode(
+                texts, 
+                batch_size=self.batch_size,
+                show_progress_bar=False,
+                convert_to_numpy=True
+            )
+        )
         
-        return any(provider in api_url.lower() for provider in embedding_providers)
-    
-    def _init_local_embeddings(self):
-        """Initialize local ChromaDB embeddings as fallback"""
-        self.local_embedding_function = None
-        
-        if not self.use_external:
-            try:
-                from chromadb.utils import embedding_functions
-                
-                # Check if we should use bundled local models
-                use_local_models = os.getenv("USE_LOCAL_MODELS", "false").lower() == "true"
-                local_models_dir = os.getenv("LOCAL_MODELS_DIR", "./models")
-                local_model = os.getenv("LLM_LOCAL_EMBEDDING_MODEL", "all-mpnet-base-v2")
-                
-                if use_local_models and os.path.exists(os.path.join(local_models_dir, local_model)):
-                    # Use bundled local model
-                    model_path = os.path.join(local_models_dir, local_model)
-                    logger.info(f"Using bundled local embedding model: {model_path}")
-                    self.local_embedding_function = embedding_functions.SentenceTransformerEmbeddingFunction(
-                        model_name=model_path
-                    )
-                else:
-                    # Use online model (will download if not cached)
-                    self.local_embedding_function = embedding_functions.SentenceTransformerEmbeddingFunction(
-                        model_name=local_model
-                    )
-                    logger.info(f"Local embedding model initialized: {local_model}")
-                
-            except ImportError as e:
-                logger.error(f"Failed to import ChromaDB embedding functions: {e}")
-            except Exception as e:
-                logger.error(f"Failed to initialize local embeddings: {e}")
-        else:
-            # Initialize local embeddings as fallback (only if enabled)
-            if self.load_fallback_models:
-                try:
-                    from chromadb.utils import embedding_functions
-                    
-                    # Check for bundled fallback model first
-                    use_local_models = os.getenv("USE_LOCAL_MODELS", "false").lower() == "true"
-                    local_models_dir = os.getenv("LOCAL_MODELS_DIR", "./models")
-                    fallback_model = os.getenv("FALLBACK_EMBEDDING_MODEL", "all-mpnet-base-v2")
-                    
-                    if use_local_models and os.path.exists(os.path.join(local_models_dir, fallback_model)):
-                        model_path = os.path.join(local_models_dir, fallback_model)
-                        logger.info(f"Using bundled fallback embedding model: {model_path}")
-                        self.local_embedding_function = embedding_functions.SentenceTransformerEmbeddingFunction(
-                            model_name=model_path
-                        )
-                    else:
-                        self.local_embedding_function = embedding_functions.SentenceTransformerEmbeddingFunction(
-                            model_name=fallback_model
-                        )
-                        logger.info(f"Fallback embedding model initialized: {fallback_model}")
-                        
-                except Exception as e:
-                    logger.warning(f"Failed to initialize fallback embeddings: {e}")
-            else:
-                logger.info("Fallback embedding models disabled - external API required")
+        return embeddings.tolist()
     
     async def get_embeddings(self, texts: Union[str, List[str]], 
-                           batch_size: Optional[int] = None) -> List[List[float]]:
+                           use_cache: bool = True) -> List[List[float]]:
         """
-        Get embeddings for text(s) with concurrency control and adaptive throttling
+        Get embeddings for text(s) with local processing only
         
         Args:
             texts: Single text string or list of texts to embed
-            batch_size: Override default batch size for processing
+            use_cache: Whether to use embedding cache
             
         Returns:
             List of embedding vectors (even for single text input)
@@ -211,358 +149,170 @@ class ExternalEmbeddingManager:
         if not texts:
             return []
         
-        # Use local embeddings if external is disabled
-        if not self.use_external:
-            return self._get_local_embeddings(texts)
+        start_time = time.time()
         
-        # Initialize semaphore if needed
-        if self._request_semaphore is None:
-            self._request_semaphore = asyncio.Semaphore(self.max_concurrent_requests)
+        # Check cache first
+        cached_embeddings = []
+        uncached_texts = []
+        uncached_indices = []
         
-        # Use provided batch size or default
-        effective_batch_size = batch_size or self.max_batch_size
-        
-        all_embeddings = []
-        
-        # Process in batches for large requests with concurrency control
-        for i in range(0, len(texts), effective_batch_size):
-            batch = texts[i:i + effective_batch_size]
-            
-            # Use semaphore to limit concurrent requests
-            async with self._request_semaphore:
-                batch_embeddings = await self._get_external_embeddings_batch_with_throttling(batch)
-                all_embeddings.extend(batch_embeddings)
-        
-        return all_embeddings
-    
-    async def _get_external_embeddings_batch_with_throttling(self, texts: List[str]) -> List[List[float]]:
-        """Get embeddings with adaptive throttling based on rate limit responses"""
-        try:
-            # Apply adaptive delay if we've been rate limited recently
-            if self._rate_limit_backoff > 1.0:
-                delay = (self._rate_limit_backoff - 1.0) * 0.5  # Scale back the delay
-                logger.debug(f"Applying adaptive throttling delay: {delay:.2f}s")
-                await asyncio.sleep(delay)
-            
-            # Make the actual request
-            result = await self._get_external_embeddings_batch(texts)
-            
-            # Success - gradually reduce backoff
-            if self._consecutive_rate_limits > 0:
-                self._consecutive_rate_limits = max(0, self._consecutive_rate_limits - 1)
-                self._rate_limit_backoff = max(1.0, self._rate_limit_backoff * 0.8)
-                if self._rate_limit_backoff <= 1.1:  # Close enough to 1.0
-                    self._rate_limit_backoff = 1.0
-                    logger.debug("Rate limit backoff reset - API responding normally")
-            
-            return result
-            
-        except Exception as e:
-            # Check if this was a rate limit error
-            if "rate limit" in str(e).lower() or "429" in str(e):
-                self._consecutive_rate_limits += 1
-                # Exponential backoff, but cap it at reasonable limits
-                self._rate_limit_backoff = min(8.0, self._rate_limit_backoff * 1.5)
-                logger.warning(f"Rate limit detected, increasing backoff to {self._rate_limit_backoff:.1f}x")
-            
-            raise
-    
-    async def _get_external_embeddings_batch(self, texts: List[str]) -> List[List[float]]:
-        """Get embeddings for a batch of texts from external API"""
-        headers = {
-            "Content-Type": "application/json",
-        }
-        
-        if self.embedding_api_key:
-            headers["Authorization"] = f"Bearer {self.embedding_api_key}"
-        
-        # OpenAI-compatible embedding API format
-        payload = {
-            "input": texts,
-            "model": self.embedding_model,
-            "encoding_format": "float"
-        }
-        
-        for attempt in range(self.max_retries):
-            try:
-                timeout = aiohttp.ClientTimeout(total=30)
-                async with aiohttp.ClientSession() as session:
-                    async with session.post(
-                        f"{self.embedding_api_url}/embeddings",
-                        json=payload,
-                        headers=headers,
-                        timeout=timeout
-                    ) as response:
-                        if response.status == 200:
-                            data = await response.json()
-                            embeddings = [item["embedding"] for item in data["data"]]
-                            
-                            logger.debug(f"Got {len(embeddings)} embeddings from external API")
-                            return embeddings
-                            
-                        elif response.status == 429:  # Rate limited
-                            error_text = await response.text()
-                            wait_time = self.retry_delay * (2 ** attempt)
-                            logger.warning(f"Rate limited (attempt {attempt + 1}), waiting {wait_time}s")
-                            await asyncio.sleep(wait_time)
-                            continue
-                            
-                        else:
-                            error_text = await response.text()
-                            logger.error(f"Embedding API error {response.status}: {error_text}")
-                            if attempt == self.max_retries - 1:
-                                # Last attempt failed, use fallback
-                                logger.warning("All external embedding attempts failed, using fallback")
-                                return self._get_local_embeddings(texts)
-                            await asyncio.sleep(self.retry_delay)
-                            
-            except aiohttp.ClientError as e:
-                logger.error(f"External embedding API connection error (attempt {attempt + 1}): {e}")
-                if attempt == self.max_retries - 1:
-                    logger.warning("All external embedding attempts failed due to connection issues, using fallback")
-                    return self._get_local_embeddings(texts)
-                await asyncio.sleep(self.retry_delay)
-                
-            except Exception as e:
-                logger.error(f"Unexpected error in external embedding API (attempt {attempt + 1}): {e}")
-                if attempt == self.max_retries - 1:
-                    logger.warning("All external embedding attempts failed due to unexpected error, using fallback")
-                    return self._get_local_embeddings(texts)
-                await asyncio.sleep(self.retry_delay)
-        
-        # Should not reach here, but fallback just in case
-        return self._get_local_embeddings(texts)
-    
-    def _get_local_embeddings(self, texts: List[str]) -> List[List[float]]:
-        """Fallback to local ChromaDB embeddings"""
-        if not self.local_embedding_function:
-            logger.error("No local embedding function available")
-            # Return zero vectors as last resort
-            return [[0.0] * 768 for _ in texts]  # 768 is mpnet dimension
-        
-        try:
-            embeddings = self.local_embedding_function(texts)
-            logger.debug(f"Generated {len(embeddings)} local embeddings")
-            
-            # Convert to List[List[float]] if needed
-            if embeddings and isinstance(embeddings[0], (list, np.ndarray)):
-                # Ensure all values are regular Python floats
-                return [[float(x) for x in embedding] for embedding in embeddings]
-            else:
-                # Handle other formats
-                return [[float(x) for x in embedding] for embedding in embeddings]
-            
-        except Exception as e:
-            logger.error(f"Local embedding generation failed: {e}")
-            # Return zero vectors as last resort
-            return [[0.0] * 768 for _ in texts]
-    
-    def get_embedding_dimension(self) -> int:
-        """
-        Get the dimension of embeddings produced by the current model
-        
-        Returns:
-            Embedding dimension
-        """
-        if self.use_external:
-            # Common dimensions for popular models
-            model_dimensions = {
-                "text-embedding-ada-002": 1536,
-                "text-embedding-3-small": 1536,
-                "text-embedding-3-large": 3072,
-                "all-Mpnet-BASE-v2": 384,
-                "all-mpnet-base-v2": 768,
-                "text-embedding-nomic-embed-text-v1.5": 768,  # Nomic embed model
-                "nomic-embed-text-v1.5": 768,  # Alternative name
-            }
-            return model_dimensions.get(self.embedding_model, 1536)  # Default to OpenAI dimension
+        if use_cache:
+            for i, text in enumerate(texts):
+                cache_key = self._get_cache_key(text)
+                if cache_key in self._embedding_cache:
+                    cached_embeddings.append((i, self._embedding_cache[cache_key]))
+                    self.cache_hits += 1
+                else:
+                    uncached_texts.append(text)
+                    uncached_indices.append(i)
         else:
-            # Local model dimensions
-            local_model = os.getenv("LLM_LOCAL_EMBEDDING_MODEL", "all-mpnet-base-v2")
-            if "MiniLM" in local_model:
-                return 384
-            elif "mpnet" in local_model:
-                return 768
-            else:
-                return 384  # Safe default
-    
-    def get_embeddings_sync(self, texts: Union[str, List[str]]) -> List[List[float]]:
-        """
-        Synchronous wrapper for get_embeddings that can be called from sync contexts
+            uncached_texts = texts
+            uncached_indices = list(range(len(texts)))
         
-        Args:
-            texts: Text(s) to embed
-        
-        Returns:
-            List of embeddings
-        """
-        import asyncio
-        import threading
-        
-        if isinstance(texts, str):
-            texts = [texts]
-        
-        # Check if we're already in an event loop
-        try:
-            loop = asyncio.get_running_loop()
-            # We're in an async context, run in a new thread
-            def run_in_thread():
-                new_loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(new_loop)
-                try:
-                    return new_loop.run_until_complete(self.get_embeddings(texts))
-                finally:
-                    new_loop.close()
+        # Generate embeddings for uncached texts
+        new_embeddings = []
+        if uncached_texts:
+            new_embeddings = await self._encode_texts(uncached_texts)
             
-            import concurrent.futures
-            with concurrent.futures.ThreadPoolExecutor() as executor:
-                future = executor.submit(run_in_thread)
-                return future.result()
-        except RuntimeError:
-            # No event loop running, we can use asyncio.run
-            return asyncio.run(self.get_embeddings(texts))
+            # Cache new embeddings
+            if use_cache:
+                for text, embedding in zip(uncached_texts, new_embeddings):
+                    cache_key = self._get_cache_key(text)
+                    
+                    # Manage cache size
+                    if len(self._embedding_cache) >= self.cache_max_size:
+                        # Remove oldest entries (simple FIFO)
+                        oldest_keys = list(self._embedding_cache.keys())[:100]
+                        for key in oldest_keys:
+                            del self._embedding_cache[key]
+                    
+                    self._embedding_cache[cache_key] = embedding
+        
+        # Combine cached and new embeddings in correct order
+        result_embeddings = [None] * len(texts)
+        
+        # Fill in cached embeddings
+        for i, embedding in cached_embeddings:
+            result_embeddings[i] = embedding
+        
+        # Fill in new embeddings
+        for i, idx in enumerate(uncached_indices):
+            result_embeddings[idx] = new_embeddings[i]
+        
+        # Update performance tracking
+        self.total_embeddings += len(texts)
+        self.total_time += time.time() - start_time
+        
+        logger.debug(f"Generated {len(texts)} embeddings in {(time.time() - start_time)*1000:.2f}ms")
+        
+        return result_embeddings
     
-    async def test_connection(self) -> Dict[str, Any]:
-        """
-        Test the embedding service connection
-        
-        Returns:
-            Dict with connection test results
-        """
-        test_text = "Hello, this is a test embedding."
-        
-        try:
-            if self.use_external:
-                start_time = time.time()
-                embeddings = await self.get_embeddings([test_text])
-                end_time = time.time()
-                
-                return {
-                    "success": True,
-                    "service": "external",
-                    "model": self.embedding_model,
-                    "api_url": self.embedding_api_url,
-                    "dimension": len(embeddings[0]) if embeddings else 0,
-                    "response_time": end_time - start_time,
-                    "message": "External embedding service connection successful"
-                }
-            else:
-                start_time = time.time()
-                embeddings = self._get_local_embeddings([test_text])
-                end_time = time.time()
-                
-                return {
-                    "success": True,
-                    "service": "local",
-                    "model": os.getenv("LLM_LOCAL_EMBEDDING_MODEL", "all-Mpnet-BASE-v2"),
-                    "dimension": len(embeddings[0]) if embeddings else 0,
-                    "response_time": end_time - start_time,
-                    "message": "Local embedding service connection successful"
-                }
-                
-        except Exception as e:
-            return {
-                "success": False,
-                "service": "external" if self.use_external else "local",
-                "error": str(e),
-                "message": f"Embedding service connection failed: {e}"
-            }
+    async def get_embedding_dimension(self) -> int:
+        """Get the dimension of embeddings from this model"""
+        if not self._is_initialized:
+            await self.initialize()
+        return self.embedding_dimension
     
-    def get_config_info(self) -> Dict[str, Any]:
-        """
-        Get current embedding configuration information
+    def get_performance_stats(self) -> Dict[str, Any]:
+        """Get performance statistics"""
+        avg_time_per_embedding = (
+            self.total_time / max(self.total_embeddings, 1) * 1000
+        )
         
-        Returns:
-            Dict with configuration details
-        """
+        cache_hit_rate = (
+            self.cache_hits / max(self.total_embeddings, 1)
+        )
+        
         return {
-            "use_external": self.use_external,
-            "embedding_api_url": self.embedding_api_url,
-            "embedding_model": self.embedding_model,
-            "local_model": os.getenv("LLM_LOCAL_EMBEDDING_MODEL", "all-mpnet-base-v2"),
-            "max_batch_size": self.max_batch_size,
-            "max_retries": self.max_retries,
-            "has_api_key": bool(self.embedding_api_key),
-            "has_local_function": bool(self.local_embedding_function)
+            "model_name": self.embedding_model_name,
+            "embedding_dimension": getattr(self, 'embedding_dimension', 'unknown'),
+            "total_embeddings": self.total_embeddings,
+            "avg_time_per_embedding_ms": avg_time_per_embedding,
+            "cache_hit_rate": cache_hit_rate,
+            "cache_size": len(self._embedding_cache),
+            "is_initialized": self._is_initialized
         }
-
-
-# Global instance for easy access
-embedding_manager = ExternalEmbeddingManager()
-
-
-# Convenience functions
-async def get_embeddings(texts: Union[str, List[str]], 
-                        batch_size: Optional[int] = None) -> List[List[float]]:
-    """
-    Convenience function for getting embeddings
     
-    Args:
-        texts: Text(s) to embed
-        batch_size: Optional batch size override
+    async def warmup(self, sample_texts: Optional[List[str]] = None):
+        """Warm up the model with sample texts"""
+        if not sample_texts:
+            sample_texts = [
+                "Hello, how are you today?",
+                "I'm having a great conversation!",
+                "Machine learning is fascinating."
+            ]
         
-    Returns:
-        List of embedding vectors
-    """
-    return await embedding_manager.get_embeddings(texts, batch_size)
-
-
-async def test_embedding_connection() -> Dict[str, Any]:
-    """
-    Convenience function for testing embedding connection
-    
-    Returns:
-        Connection test results
-    """
-    return await embedding_manager.test_connection()
-
-
-def get_embedding_config() -> Dict[str, Any]:
-    """
-    Convenience function for getting embedding configuration
-    
-    Returns:
-        Configuration information
-    """
-    return embedding_manager.get_config_info()
-
-
-def is_external_embedding_configured() -> bool:
-    """
-    Check if external embeddings should be used based on configuration.
-    
-    This function provides a consistent way to determine if external embeddings
-    are configured across all modules. It checks:
-    1. Explicit LLM_EMBEDDING_API_URL configuration
-    2. Manual USE_EXTERNAL_EMBEDDINGS flag
-    3. Fallback to LLM_CHAT_API_URL if it supports embeddings
-    
-    Returns:
-        True if external embeddings should be used, False otherwise
-    """
-    # Explicit embedding API configuration
-    if os.getenv("LLM_EMBEDDING_API_URL") is not None:
-        return True
-    
-    # Manual override flag
-    if os.getenv("USE_EXTERNAL_EMBEDDINGS", "false").lower() == "true":
-        return True
-    
-    # Check if main LLM API supports embeddings and can be used as fallback
-    llm_chat_url = os.getenv("LLM_CHAT_API_URL")
-    if llm_chat_url:
-        # Check for known providers that support embeddings
-        embedding_providers = [
-            'openai.com',
-            'api.openai.com', 
-            'openrouter.ai',
-            'api.anthropic.com',  # If they add embedding support
-            'localhost',  # Local servers like LM Studio, Ollama
-            '127.0.0.1',  # Local servers
-            'host.docker.internal'  # Docker host reference
-        ]
+        logger.info("🔥 Warming up embedding model...")
+        start_time = time.time()
         
-        if any(provider in llm_chat_url.lower() for provider in embedding_providers):
-            return True
+        await self.get_embeddings(sample_texts)
+        
+        warmup_time = time.time() - start_time
+        logger.info(f"✅ Model warmup completed in {warmup_time*1000:.2f}ms")
     
-    return False
+    async def shutdown(self):
+        """Clean shutdown"""
+        self._embedding_cache.clear()
+        self._model = None
+        self._is_initialized = False
+        logger.info("✅ LocalEmbeddingManager shutdown complete")
+
+
+# Compatibility alias for existing code
+ExternalEmbeddingManager = LocalEmbeddingManager
+
+# Create default instance
+_default_manager = None
+
+async def get_default_embedding_manager() -> LocalEmbeddingManager:
+    """Get the default embedding manager instance"""
+    global _default_manager
+    if _default_manager is None:
+        _default_manager = LocalEmbeddingManager()
+        await _default_manager.initialize()
+    return _default_manager
+
+async def get_embeddings(texts: Union[str, List[str]]) -> List[List[float]]:
+    """Convenience function for getting embeddings"""
+    manager = await get_default_embedding_manager()
+    return await manager.get_embeddings(texts)
+
+# Test function
+async def test_local_embeddings():
+    """Test the local embedding system"""
+    print("🧪 Testing Local Embedding System")
+    print("=" * 40)
+    
+    manager = LocalEmbeddingManager()
+    await manager.warmup()
+    
+    # Test single embedding
+    result = await manager.get_embeddings("Hello world!")
+    print(f"✅ Single embedding: {len(result[0])} dimensions")
+    
+    # Test batch embedding
+    batch_texts = ["Hello", "World", "AI", "Embeddings"] * 5
+    start_time = time.time()
+    batch_result = await manager.get_embeddings(batch_texts)
+    batch_time = time.time() - start_time
+    
+    print(f"✅ Batch embedding: {len(batch_result)} embeddings in {batch_time*1000:.2f}ms")
+    print(f"   Speed: {len(batch_result)/batch_time:.1f} embeddings/second")
+    
+    # Test caching
+    start_time = time.time()
+    cached_result = await manager.get_embeddings(batch_texts)  # Should be cached
+    cache_time = time.time() - start_time
+    
+    print(f"✅ Cached retrieval: {cache_time*1000:.2f}ms")
+    
+    # Show stats
+    stats = manager.get_performance_stats()
+    print(f"✅ Performance stats:")
+    for key, value in stats.items():
+        print(f"   {key}: {value}")
+    
+    await manager.shutdown()
+
+if __name__ == "__main__":
+    asyncio.run(test_local_embeddings())

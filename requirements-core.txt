@@ -18,6 +18,7 @@ aiosqlite==0.21.0
 chromadb
 sentence-transformers==5.1.0
 numpy==2.3.2
+vaderSentiment>=3.3.2
 
 # Advanced NLP Dependencies (Phase 1)
 spacy>=3.6.0
