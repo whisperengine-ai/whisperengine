@@ -5,20 +5,18 @@ This module provides a synchronous PostgreSQL-based user profile and emotion man
 that avoids asyncio event loop conflicts by using psycopg2 instead of asyncpg.
 """
 
-import psycopg2
-import psycopg2.pool
-import psycopg2.extras
 import json
 import logging
 import os
 import threading
-from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Any
-from dataclasses import dataclass, asdict
-from enum import Enum
+from datetime import datetime
+
+import psycopg2
+import psycopg2.extras
+import psycopg2.pool
 
 # Import the shared emotion and user profile classes from emotion_manager
-from .emotion_manager import EmotionalState, RelationshipLevel, EmotionProfile, UserProfile
+from .emotion_manager import EmotionalState, EmotionProfile, RelationshipLevel, UserProfile
 
 logger = logging.getLogger(__name__)
 
@@ -111,11 +109,11 @@ class SyncPostgreSQLUserDB:
             escalation_count INTEGER DEFAULT 0,
             trust_indicators JSONB DEFAULT '[]'::jsonb
         );
-        
-        CREATE INDEX IF NOT EXISTS idx_user_profiles_last_interaction 
+
+        CREATE INDEX IF NOT EXISTS idx_user_profiles_last_interaction
         ON user_profiles(last_interaction);
-        
-        CREATE INDEX IF NOT EXISTS idx_user_profiles_relationship_level 
+
+        CREATE INDEX IF NOT EXISTS idx_user_profiles_relationship_level
         ON user_profiles(relationship_level);
         """
 
@@ -129,7 +127,7 @@ class SyncPostgreSQLUserDB:
             if connection:
                 self.pool.putconn(connection)
 
-    def get_user_profile(self, user_id: str) -> Optional[UserProfile]:
+    def get_user_profile(self, user_id: str) -> UserProfile | None:
         """Get a user profile by user_id"""
         if not self.pool:
             self.initialize()
@@ -255,7 +253,7 @@ class SyncPostgreSQLUserDB:
             if connection:
                 self.pool.putconn(connection)
 
-    def get_all_profiles(self) -> Dict[str, UserProfile]:
+    def get_all_profiles(self) -> dict[str, UserProfile]:
         """Get all user profiles"""
         if not self.pool:
             self.initialize()
@@ -339,6 +337,6 @@ class SyncPostgreSQLUserDB:
             logger.info("Synchronous PostgreSQL database connection closed")
 
     # Compatibility methods
-    def load_all_profiles(self) -> Dict[str, UserProfile]:
+    def load_all_profiles(self) -> dict[str, UserProfile]:
         """Alias for get_all_profiles to match expected interface"""
         return self.get_all_profiles()

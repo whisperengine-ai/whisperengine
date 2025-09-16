@@ -3,16 +3,13 @@
 Simple WebSocket test server to verify the basic functionality works
 """
 
-import asyncio
 import json
 import signal
 import sys
-from pathlib import Path
 
+import uvicorn
 from fastapi import FastAPI, WebSocket
 from fastapi.responses import HTMLResponse
-from fastapi.staticfiles import StaticFiles
-import uvicorn
 
 # Simple HTML for testing
 HTML_CONTENT = """
@@ -31,30 +28,30 @@ HTML_CONTENT = """
     <script>
         const ws = new WebSocket('ws://localhost:8080/ws');
         const messages = document.getElementById('messages');
-        
+
         ws.onopen = function(event) {
             addMessage('Connected to server');
         };
-        
+
         ws.onmessage = function(event) {
             const data = JSON.parse(event.data);
             addMessage('Server: ' + data.content);
         };
-        
+
         ws.onclose = function(event) {
             addMessage('Connection closed');
         };
-        
+
         ws.onerror = function(error) {
             addMessage('Error: ' + error);
         };
-        
+
         function addMessage(message) {
             const div = document.createElement('div');
             div.textContent = new Date().toLocaleTimeString() + ' - ' + message;
             messages.appendChild(div);
         }
-        
+
         function sendMessage() {
             const input = document.getElementById('messageInput');
             if (input.value.trim()) {
@@ -67,11 +64,11 @@ HTML_CONTENT = """
                 input.value = '';
             }
         }
-        
+
         function testUpload() {
             addMessage('File upload test clicked');
         }
-        
+
         // Send message on Enter key
         document.getElementById('messageInput').addEventListener('keypress', function(e) {
             if (e.key === 'Enter') {
@@ -118,14 +115,13 @@ async def websocket_endpoint(websocket: WebSocket):
 
             await websocket.send_text(json.dumps(response))
 
-    except Exception as e:
-        print(f"WebSocket error: {e}")
+    except Exception:
+        pass
     finally:
         connections.discard(websocket)
 
 
 def signal_handler(signum, frame):
-    print(f"\nReceived signal {signum}, shutting down gracefully...")
     sys.exit(0)
 
 
@@ -134,11 +130,8 @@ if __name__ == "__main__":
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
 
-    print("🧪 Starting simple WebSocket test server...")
-    print("📱 Open http://127.0.0.1:8080 to test")
-    print("🛑 Press Ctrl+C to stop")
 
     try:
         uvicorn.run(app, host="127.0.0.1", port=8080, log_level="info")
     except KeyboardInterrupt:
-        print("\n✅ Server stopped cleanly")
+        pass

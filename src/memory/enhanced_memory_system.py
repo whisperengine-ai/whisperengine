@@ -14,16 +14,14 @@ Key Enhancements:
 Integration with existing ChromaDB maintained for backward compatibility.
 """
 
+import hashlib
 import logging
+from dataclasses import dataclass, field
+from datetime import datetime
+from typing import Any
+
 import numpy as np
 import pandas as pd
-from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Any, Tuple
-from dataclasses import dataclass, field
-from enum import Enum
-import asyncio
-import hashlib
-import json
 
 # Enhanced libraries for ultra-fast memory operations
 try:
@@ -43,8 +41,8 @@ except ImportError:
     logging.warning("NetworkX not available - using basic memory connections")
 
 try:
+    from scipy.cluster.hierarchy import dendrogram, fcluster, linkage
     from scipy.spatial.distance import cosine, euclidean
-    from scipy.cluster.hierarchy import dendrogram, linkage, fcluster
 
     SCIPY_AVAILABLE = True
 except ImportError:
@@ -54,11 +52,11 @@ except ImportError:
 # Import existing systems for integration
 try:
     from src.personality.memory_moments import (
-        MemoryTriggeredMoments,
-        MemoryConnection,
         ConversationContext,
-        MemoryMomentType,
+        MemoryConnection,
         MemoryConnectionType,
+        MemoryMomentType,
+        MemoryTriggeredMoments,
     )
 
     EXISTING_MEMORY_SYSTEM_AVAILABLE = True
@@ -89,10 +87,10 @@ class EnhancedMemoryNode:
     memory_type: str
     importance_score: float
     access_count: int = 0
-    last_accessed: Optional[datetime] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    last_accessed: datetime | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization"""
         return {
             "memory_id": self.memory_id,
@@ -116,8 +114,8 @@ class EnhancedMemoryNode:
 class MemorySearchResult:
     """Enhanced search result with performance metrics"""
 
-    memory_nodes: List[EnhancedMemoryNode]
-    similarity_scores: List[float]
+    memory_nodes: list[EnhancedMemoryNode]
+    similarity_scores: list[float]
     search_time_ms: float
     total_memories_searched: int
     search_algorithm: str
@@ -137,9 +135,9 @@ class EnhancedMemorySystem:
 
         # Faiss index for ultra-fast similarity search (384-dimensional)
         self.faiss_index = None
-        self.memory_nodes: Dict[str, EnhancedMemoryNode] = {}
-        self.memory_id_to_faiss_id: Dict[str, int] = {}
-        self.faiss_id_to_memory_id: Dict[int, str] = {}
+        self.memory_nodes: dict[str, EnhancedMemoryNode] = {}
+        self.memory_id_to_faiss_id: dict[str, int] = {}
+        self.faiss_id_to_memory_id: dict[int, str] = {}
         self.next_faiss_id = 0
 
         # NetworkX graph for memory connections
@@ -195,7 +193,7 @@ class EnhancedMemorySystem:
         content: str,
         memory_type: str,
         importance_score: float = 0.5,
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: dict[str, Any] | None = None,
     ) -> str:
         """
         Add memory with enhanced indexing and connection analysis
@@ -282,7 +280,7 @@ class EnhancedMemorySystem:
         query: str,
         limit: int = 10,
         similarity_threshold: float = 0.7,
-        memory_types: Optional[List[str]] = None,
+        memory_types: list[str] | None = None,
     ) -> MemorySearchResult:
         """
         Search memories using ultra-fast Faiss similarity search
@@ -337,7 +335,7 @@ class EnhancedMemorySystem:
         query_embedding: np.ndarray,
         limit: int,
         similarity_threshold: float,
-        memory_types: Optional[List[str]],
+        memory_types: list[str] | None,
     ) -> MemorySearchResult:
         """Ultra-fast search using Faiss index"""
         try:
@@ -360,7 +358,7 @@ class EnhancedMemorySystem:
             memory_nodes = []
             similarity_scores = []
 
-            for similarity, faiss_id in zip(similarities[0], faiss_ids[0]):
+            for similarity, faiss_id in zip(similarities[0], faiss_ids[0], strict=False):
                 if faiss_id == -1:  # No more results
                     break
 
@@ -407,7 +405,7 @@ class EnhancedMemorySystem:
         query_embedding: np.ndarray,
         limit: int,
         similarity_threshold: float,
-        memory_types: Optional[List[str]],
+        memory_types: list[str] | None,
     ) -> MemorySearchResult:
         """Fallback search using basic similarity calculation"""
         try:
@@ -522,7 +520,7 @@ class EnhancedMemorySystem:
         except Exception as e:
             self.logger.warning(f"DataFrame update failed: {e}")
 
-    async def get_memory_analytics_enhanced(self) -> Dict[str, Any]:
+    async def get_memory_analytics_enhanced(self) -> dict[str, Any]:
         """
         Get comprehensive memory analytics using NetworkX and pandas
         """
@@ -532,7 +530,7 @@ class EnhancedMemorySystem:
             # Basic statistics
             analytics["basic_stats"] = {
                 "total_memories": len(self.memory_nodes),
-                "memory_types": len(set(node.memory_type for node in self.memory_nodes.values())),
+                "memory_types": len({node.memory_type for node in self.memory_nodes.values()}),
                 "avg_importance": (
                     np.mean([node.importance_score for node in self.memory_nodes.values()])
                     if self.memory_nodes
@@ -585,7 +583,7 @@ class EnhancedMemorySystem:
             self.logger.error(f"Memory analytics failed: {e}")
             return {"error": str(e)}
 
-    def _get_most_connected_memories(self) -> List[Dict[str, Any]]:
+    def _get_most_connected_memories(self) -> list[dict[str, Any]]:
         """Get memories with the most connections"""
         try:
             if not self.memory_graph:
@@ -650,7 +648,7 @@ class EnhancedMemorySystem:
             confidence=0.0,
         )
 
-    async def _get_embedding(self, text: str) -> Optional[np.ndarray]:
+    async def _get_embedding(self, text: str) -> np.ndarray | None:
         """Get embedding for text using available embedding systems"""
         try:
             # Try to use existing embedding manager

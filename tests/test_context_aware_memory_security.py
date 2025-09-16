@@ -8,21 +8,20 @@ private information from leaking between different contexts (DMs, servers, chann
 SECURITY VULNERABILITY ADDRESSED: Cross-Context Memory Leakage (CVSS 8.5)
 """
 
+import logging
 import os
 import sys
-import asyncio
 import unittest
-from unittest.mock import Mock, AsyncMock, MagicMock, patch
-import logging
+from unittest.mock import Mock
 
 # Add the project root to the path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from context_aware_memory_security import (
     ContextAwareMemoryManager,
+    ContextSecurity,
     MemoryContext,
     MemoryContextType,
-    ContextSecurity,
 )
 
 # Set up logging
@@ -78,7 +77,6 @@ class TestContextAwareMemorySecurity(unittest.TestCase):
 
     def test_context_classification_dm(self):
         """Test DM context classification"""
-        print("\n🧪 Testing DM context classification...")
 
         # Mock Discord DM message
         mock_message = Mock()
@@ -93,11 +91,9 @@ class TestContextAwareMemorySecurity(unittest.TestCase):
         self.assertIsNone(context.server_id)
         self.assertEqual(context.channel_id, "123456789")
 
-        print("  ✅ DM context correctly classified as PRIVATE_DM")
 
     def test_context_classification_public_server(self):
         """Test public server channel context classification"""
-        print("\n🧪 Testing public server context classification...")
 
         # Mock Discord server message
         mock_message = Mock()
@@ -121,11 +117,9 @@ class TestContextAwareMemorySecurity(unittest.TestCase):
         self.assertEqual(context.server_id, "987654321")
         self.assertEqual(context.channel_id, "555666777")
 
-        print("  ✅ Public server context correctly classified as PUBLIC_CHANNEL")
 
     def test_context_classification_private_server(self):
         """Test private server channel context classification"""
-        print("\n🧪 Testing private server context classification...")
 
         # Mock Discord private server message
         mock_message = Mock()
@@ -149,11 +143,9 @@ class TestContextAwareMemorySecurity(unittest.TestCase):
         self.assertEqual(context.server_id, "111222333")
         self.assertEqual(context.channel_id, "444555666")
 
-        print("  ✅ Private server context correctly classified as PRIVATE_CHANNEL")
 
     def test_dm_context_filtering(self):
         """Test that DM context only retrieves DM memories"""
-        print("\n🧪 Testing DM context memory filtering...")
 
         dm_context = MemoryContext(
             context_type=MemoryContextType.DM, security_level=ContextSecurity.PRIVATE_DM
@@ -172,11 +164,9 @@ class TestContextAwareMemorySecurity(unittest.TestCase):
             security_level = metadata.get("security_level", "private_dm")
             self.assertIn(security_level, ["private_dm", "cross_server"])
 
-        print(f"  ✅ DM context filtered to {len(filtered_memories)} safe memories")
 
     def test_public_server_context_filtering(self):
         """Test that public server context filters out private memories"""
-        print("\n🧪 Testing public server context memory filtering...")
 
         public_context = MemoryContext(
             context_type=MemoryContextType.PUBLIC_CHANNEL,
@@ -194,11 +184,9 @@ class TestContextAwareMemorySecurity(unittest.TestCase):
             security_level = metadata.get("security_level", "private_dm")
             self.assertNotEqual(security_level, "private_dm")
 
-        print(f"  ✅ Public server context filtered out private memories")
 
     def test_cross_server_content_sharing(self):
         """Test that cross-server safe content is available everywhere"""
-        print("\n🧪 Testing cross-server content availability...")
 
         # Test in DM context
         dm_context = MemoryContext(
@@ -233,11 +221,9 @@ class TestContextAwareMemorySecurity(unittest.TestCase):
             public_cross_server, "Public context should have access to cross-server content"
         )
 
-        print("  ✅ Cross-server content available in all contexts")
 
     def test_context_aware_storage(self):
         """Test that conversation storage includes context metadata"""
-        print("\n🧪 Testing context-aware conversation storage...")
 
         test_context = MemoryContext(
             context_type=MemoryContextType.PRIVATE_CHANNEL,
@@ -263,11 +249,9 @@ class TestContextAwareMemorySecurity(unittest.TestCase):
         self.assertEqual(metadata["security_level"], "private_channel")
         self.assertTrue(metadata["is_private"])
 
-        print("  ✅ Context metadata properly added to stored conversation")
 
     def test_emergency_safe_retrieval(self):
         """Test emergency fallback that only returns safe memories"""
-        print("\n🧪 Testing emergency safe memory retrieval...")
 
         # Mock an exception in normal retrieval
         self.mock_base_memory.retrieve_relevant_memories.side_effect = Exception("Test error")
@@ -284,11 +268,9 @@ class TestContextAwareMemorySecurity(unittest.TestCase):
         # Should return empty list when base memory fails
         self.assertEqual(len(safe_memories), 0)
 
-        print("  ✅ Emergency safe retrieval prevents data leakage on errors")
 
     def test_privacy_leak_prevention_scenario(self):
         """Test realistic privacy leak prevention scenario"""
-        print("\n🧪 Testing privacy leak prevention scenario...")
 
         # Scenario: User discusses health in DM, then asks about hobbies in public server
 
@@ -340,14 +322,10 @@ class TestContextAwareMemorySecurity(unittest.TestCase):
         self.assertFalse(health_mentioned, "Private health info should NOT leak to public context")
         self.assertTrue(hobby_mentioned, "Public hobby info should be available")
 
-        print("  ✅ Privacy leak prevention: Health info blocked, hobbies allowed")
-        print("  🛡️  SECURITY: Private DM conversations protected from public exposure")
 
 
 def run_context_security_tests():
     """Run all context-aware memory security tests"""
-    print("🔒 Cross-Context Memory Leakage - Security Fix Test Suite")
-    print("=" * 70)
 
     # Create test suite
     test_suite = unittest.TestLoader().loadTestsFromTestCase(TestContextAwareMemorySecurity)
@@ -357,38 +335,12 @@ def run_context_security_tests():
     result = runner.run(test_suite)
 
     # Print summary
-    print("\n" + "=" * 70)
     if result.wasSuccessful():
-        print("🎉 All context-aware memory security tests PASSED!")
-        print("\n🔒 Security Test Summary:")
-        print("  ✅ DM context classification and filtering")
-        print("  ✅ Public server context classification and filtering")
-        print("  ✅ Private server context classification and filtering")
-        print("  ✅ Cross-server content availability controls")
-        print("  ✅ Context-aware conversation storage with metadata")
-        print("  ✅ Emergency safe retrieval fallback")
-        print("  ✅ Privacy leak prevention scenario validation")
 
-        print("\n🛡️  CVSS 8.5 Vulnerability - FIXED:")
-        print("  ❌ Private DM conversations leaking to public servers")
-        print("  ❌ Cross-server information sharing without consent")
-        print("  ❌ Personal information exposed in wrong contexts")
-        print("  ✅ Context-aware memory filtering prevents leakage")
-        print("  ✅ Private information protected at all security levels")
 
-        print("\n🎯 Technical Implementation:")
-        print("  ✅ Memory context classification system")
-        print("  ✅ Security level compatibility matrix")
-        print("  ✅ Context-aware memory retrieval filtering")
-        print("  ✅ Metadata enhancement for stored conversations")
-        print("  ✅ Emergency fallback with maximum privacy protection")
 
-        print("\n✅ Cross-Context Memory Security - IMPLEMENTATION COMPLETE ✅")
         return True
     else:
-        print("❌ Some context-aware memory security tests FAILED!")
-        print(f"  Failed: {len(result.failures)}")
-        print(f"  Errors: {len(result.errors)}")
         return False
 
 

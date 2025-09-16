@@ -3,12 +3,12 @@ System Message Security Module
 Prevents system prompt leakage and secures system message processing.
 """
 
-import re
 import json
-import os
 import logging
+import os
+import re
 from pathlib import Path
-from typing import List, Dict, Any, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -18,11 +18,11 @@ class SystemMessageSecurityFilter:
     Security filter for system messages to prevent information disclosure and system prompt leakage.
     """
 
-    def _load_configuration(self) -> Dict[str, Any]:
+    def _load_configuration(self) -> dict[str, Any]:
         """Load security patterns from external configuration file."""
         try:
             if os.path.exists(self.config_path):
-                with open(self.config_path, "r") as f:
+                with open(self.config_path) as f:
                     config = json.load(f)
                 # Log only the relative path to avoid exposing full system paths
                 relative_path = os.path.relpath(self.config_path)
@@ -38,7 +38,7 @@ class SystemMessageSecurityFilter:
             logger.error(f"Error loading security configuration: {e}, using fallback patterns")
             return {}
 
-    def _get_sensitive_patterns(self) -> List[str]:
+    def _get_sensitive_patterns(self) -> list[str]:
         """Get sensitive patterns from config or fallback to hardcoded ones."""
         patterns = []
 
@@ -134,7 +134,7 @@ class SystemMessageSecurityFilter:
         r"interaction_count:\s*[0-9]+": "interaction_count: [PROTECTED]",
     }
 
-    def __init__(self, config_path: Optional[str] = None):
+    def __init__(self, config_path: str | None = None):
         """Initialize the system message security filter with external configuration."""
         if config_path is None:
             # Get project root directory dynamically
@@ -158,7 +158,7 @@ class SystemMessageSecurityFilter:
         }
         logger.info("SystemMessageSecurityFilter initialized with configuration")
 
-    def sanitize_system_messages(self, messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    def sanitize_system_messages(self, messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """
         Sanitize system messages to remove sensitive information while preserving functionality.
 
@@ -229,7 +229,7 @@ class SystemMessageSecurityFilter:
 
         return sanitized
 
-    def scan_response_for_leakage(self, response: str) -> Dict[str, Any]:
+    def scan_response_for_leakage(self, response: str) -> dict[str, Any]:
         """
         Scan bot response for potential system message leakage.
 
@@ -310,7 +310,7 @@ class SystemMessageSecurityFilter:
 
     def create_secure_system_message(
         self, content: str, message_type: str = "general"
-    ) -> Dict[str, str]:
+    ) -> dict[str, str]:
         """
         Create a secure system message with minimal sensitive information.
 
@@ -373,7 +373,7 @@ class SystemMessageSecurityFilter:
 system_message_filter = SystemMessageSecurityFilter()
 
 
-def sanitize_system_messages(messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+def sanitize_system_messages(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """
     Convenience function for sanitizing system messages.
 
@@ -386,7 +386,7 @@ def sanitize_system_messages(messages: List[Dict[str, Any]]) -> List[Dict[str, A
     return system_message_filter.sanitize_system_messages(messages)
 
 
-def scan_response_for_system_leakage(response: str) -> Dict[str, Any]:
+def scan_response_for_system_leakage(response: str) -> dict[str, Any]:
     """
     Convenience function for scanning responses for system message leakage.
 
@@ -399,7 +399,7 @@ def scan_response_for_system_leakage(response: str) -> Dict[str, Any]:
     return system_message_filter.scan_response_for_leakage(response)
 
 
-def create_secure_system_message(content: str, message_type: str = "general") -> Dict[str, str]:
+def create_secure_system_message(content: str, message_type: str = "general") -> dict[str, str]:
     """
     Convenience function for creating secure system messages.
 

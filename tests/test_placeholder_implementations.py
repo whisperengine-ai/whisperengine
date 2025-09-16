@@ -29,7 +29,7 @@ async def test_placeholder_implementations():
         logger.info("🧪 Testing MemoryManagerAdapter memory retrieval...")
         from src.integration.production_system_integration import ProductionSystemIntegrator
 
-        integrator = ProductionSystemIntegrator()
+        ProductionSystemIntegrator()
 
         # Create a simplified memory adapter to test
         class SimplifiedMemoryAdapter:

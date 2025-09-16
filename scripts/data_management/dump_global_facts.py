@@ -21,10 +21,8 @@ The export format includes:
 import argparse
 import json
 import sys
-import os
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Any, Optional
 
 # Add the src directory to Python path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
@@ -34,8 +32,8 @@ from src.utils.exceptions import MemoryStorageError, ValidationError
 
 
 def export_global_facts(
-    memory_manager: UserMemoryManager, output_file: Optional[str] = None
-) -> Optional[str]:
+    memory_manager: UserMemoryManager, output_file: str | None = None
+) -> str | None:
     """
     Export all global facts to a JSON file.
 
@@ -48,14 +46,11 @@ def export_global_facts(
     """
     try:
         # Get all global facts
-        print("Retrieving global facts...")
         global_facts = memory_manager.get_all_global_facts()
 
         if not global_facts:
-            print("No global facts found in the database.")
             return None
 
-        print(f"Found {len(global_facts)} global facts")
 
         # Generate output filename if not provided
         if not output_file:
@@ -89,14 +84,10 @@ def export_global_facts(
         with open(output_path, "w", encoding="utf-8") as f:
             json.dump(export_data, f, indent=2, ensure_ascii=False)
 
-        print(f"\nGlobal facts exported successfully!")
-        print(f"File: {output_path.absolute()}")
-        print(f"Total facts exported: {len(global_facts)}")
 
         return str(output_path)
 
-    except Exception as e:
-        print(f"Error exporting global facts: {e}")
+    except Exception:
         raise
 
 
@@ -120,8 +111,7 @@ def import_global_facts(
             raise FileNotFoundError(f"Input file not found: {input_file}")
 
         # Load the export file
-        print(f"Loading global facts from: {input_path.absolute()}")
-        with open(input_path, "r", encoding="utf-8") as f:
+        with open(input_path, encoding="utf-8") as f:
             data = json.load(f)
 
         # Validate file format
@@ -130,22 +120,16 @@ def import_global_facts(
 
         facts_to_import = data["global_facts"]
         if not facts_to_import:
-            print("No global facts found in the file.")
             return 0
 
-        export_info = data.get("export_info", {})
-        print(f"\nFile information:")
-        print(f"  Export date: {export_info.get('export_date', 'Unknown')}")
-        print(f"  Total facts in file: {len(facts_to_import)}")
-        print(f"  Export version: {export_info.get('export_version', 'Unknown')}")
+        data.get("export_info", {})
 
         # Show sample facts
-        print(f"\nSample facts to import:")
         for i, fact in enumerate(facts_to_import[:3]):
-            print(f"  {i+1}. {fact.get('fact', '')[:80]}...")
+            pass
 
         if len(facts_to_import) > 3:
-            print(f"  ... and {len(facts_to_import) - 3} more facts")
+            pass
 
         # Confirmation
         if not confirm:
@@ -153,11 +137,9 @@ def import_global_facts(
                 f"\nDo you want to import {len(facts_to_import)} global facts? [y/N]: "
             )
             if response.lower() not in ["y", "yes"]:
-                print("Import cancelled.")
                 return 0
 
         # Import facts
-        print("\nImporting global facts...")
         imported_count = 0
         errors = []
 
@@ -180,7 +162,7 @@ def import_global_facts(
 
                 # Progress indicator
                 if (i + 1) % 10 == 0:
-                    print(f"  Imported {i + 1}/{len(facts_to_import)} facts...")
+                    pass
 
             except (ValidationError, MemoryStorageError) as e:
                 errors.append(f"Fact {i+1}: {str(e)}")
@@ -188,21 +170,16 @@ def import_global_facts(
                 errors.append(f"Fact {i+1}: Unexpected error - {str(e)}")
 
         # Summary
-        print(f"\nImport completed!")
-        print(f"Successfully imported: {imported_count} facts")
 
         if errors:
-            print(f"Errors encountered: {len(errors)}")
-            print("First few errors:")
-            for error in errors[:5]:
-                print(f"  - {error}")
+            for _error in errors[:5]:
+                pass
             if len(errors) > 5:
-                print(f"  ... and {len(errors) - 5} more errors")
+                pass
 
         return imported_count
 
-    except Exception as e:
-        print(f"Error importing global facts: {e}")
+    except Exception:
         raise
 
 
@@ -214,13 +191,13 @@ def main():
 Examples:
   Export all global facts:
     python dump_global_facts.py export
-    
+
   Export to specific file:
     python dump_global_facts.py export --output my_facts.json
-    
+
   Import global facts:
     python dump_global_facts.py import --input my_facts.json
-    
+
   Import without confirmation prompt:
     python dump_global_facts.py import --input my_facts.json --confirm
         """,
@@ -261,16 +238,10 @@ Examples:
 
     try:
         # Initialize memory manager
-        print("Initializing memory manager...")
         try:
             db_path = getattr(args, "db_path", "./chromadb_data")
             memory_manager = UserMemoryManager(persist_directory=db_path)
-        except Exception as init_error:
-            print(f"❌ Failed to initialize memory system: {init_error}")
-            print("\nPossible solutions:")
-            print("1. Make sure the ChromaDB database is properly initialized")
-            print("2. Try running the Discord bot first to initialize the database")
-            print("3. Check if the chromadb_data directory exists and has proper permissions")
+        except Exception:
             return 1
 
         if args.command == "export":
@@ -283,16 +254,13 @@ Examples:
         elif args.command == "import":
             imported_count = import_global_facts(memory_manager, args.input, args.confirm)
             if imported_count > 0:
-                print(f"\nImport successful: {imported_count} facts imported")
                 return 0
             else:
                 return 1
 
     except KeyboardInterrupt:
-        print("\nOperation cancelled by user.")
         return 1
-    except Exception as e:
-        print(f"Error: {e}")
+    except Exception:
         return 1
 
 

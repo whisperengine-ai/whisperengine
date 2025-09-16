@@ -3,24 +3,20 @@ Async Context Boundaries Manager with PostgreSQL Backend
 This replaces the JSON file approach with PostgreSQL for better data integrity and performance
 """
 
-import asyncio
 import logging
-import os
-from datetime import datetime, timezone
-from typing import Dict, List, Optional, Any
-from enum import Enum
+from datetime import UTC, datetime
+from typing import Any
 
+from src.memory.context_aware_memory_security import MemoryContext, MemoryContextType
 from src.security.context_boundaries_security import (
-    PrivacyLevel,
     ConsentStatus,
+    PrivacyLevel,
     PrivacyPreferences,
-    ContextBoundaryDecision,
 )
 from src.security.postgres_privacy_manager import (
     PostgreSQLPrivacyManager,
     create_privacy_manager_from_env,
 )
-from src.memory.context_aware_memory_security import MemoryContext, MemoryContextType
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +27,7 @@ class AsyncContextBoundariesManager:
     Uses PostgreSQL backend for better performance and data integrity
     """
 
-    def __init__(self, postgres_manager: Optional[PostgreSQLPrivacyManager] = None):
+    def __init__(self, postgres_manager: PostgreSQLPrivacyManager | None = None):
         """Initialize async context boundaries manager"""
         self.postgres_manager = postgres_manager or create_privacy_manager_from_env()
         self._initialized = False
@@ -95,7 +91,7 @@ class AsyncContextBoundariesManager:
                 custom_rules={},
                 consent_status=ConsentStatus.NOT_ASKED,
                 consent_timestamp=None,
-                updated_timestamp=datetime.now(timezone.utc).isoformat(),
+                updated_timestamp=datetime.now(UTC).isoformat(),
             )
 
             await self.postgres_manager.update_user_preferences(preferences)
@@ -106,14 +102,14 @@ class AsyncContextBoundariesManager:
     async def update_user_preferences(
         self,
         user_id: str,
-        privacy_level: Optional[PrivacyLevel] = None,
-        allow_cross_server: Optional[bool] = None,
-        allow_dm_to_server: Optional[bool] = None,
-        allow_server_to_dm: Optional[bool] = None,
-        allow_private_to_public: Optional[bool] = None,
-        custom_rules: Optional[Dict[str, bool]] = None,
-        consent_status: Optional[ConsentStatus] = None,
-        consent_timestamp: Optional[str] = None,
+        privacy_level: PrivacyLevel | None = None,
+        allow_cross_server: bool | None = None,
+        allow_dm_to_server: bool | None = None,
+        allow_server_to_dm: bool | None = None,
+        allow_private_to_public: bool | None = None,
+        custom_rules: dict[str, bool] | None = None,
+        consent_status: ConsentStatus | None = None,
+        consent_timestamp: str | None = None,
     ):
         """Update user privacy preferences"""
         if not self._initialized:
@@ -149,7 +145,7 @@ class AsyncContextBoundariesManager:
             custom_rules=custom_rules or current_prefs.custom_rules,
             consent_status=consent_status or current_prefs.consent_status,
             consent_timestamp=consent_timestamp or current_prefs.consent_timestamp,
-            updated_timestamp=datetime.now(timezone.utc).isoformat(),
+            updated_timestamp=datetime.now(UTC).isoformat(),
         )
 
         await self.postgres_manager.update_user_preferences(updated_prefs)
@@ -403,7 +399,7 @@ class AsyncContextBoundariesManager:
                 user_id=user_id,
                 custom_rules=custom_rules,
                 consent_status=ConsentStatus.GRANTED,
-                consent_timestamp=datetime.now(timezone.utc).isoformat(),
+                consent_timestamp=datetime.now(UTC).isoformat(),
             )
 
             await self._log_decision(
@@ -436,7 +432,7 @@ class AsyncContextBoundariesManager:
                 user_id=user_id,
                 custom_rules=custom_rules,
                 consent_status=ConsentStatus.DENIED,
-                consent_timestamp=datetime.now(timezone.utc).isoformat(),
+                consent_timestamp=datetime.now(UTC).isoformat(),
             )
 
             await self._log_decision(
@@ -453,8 +449,8 @@ class AsyncContextBoundariesManager:
         return False
 
     async def get_audit_history(
-        self, user_id: Optional[str] = None, limit: int = 100
-    ) -> List[Dict[str, Any]]:
+        self, user_id: str | None = None, limit: int = 100
+    ) -> list[dict[str, Any]]:
         """Get audit history for privacy decisions"""
         if not self._initialized:
             await self.initialize()
@@ -470,7 +466,7 @@ class AsyncContextBoundariesManager:
 
 
 # Global instance for backward compatibility
-_global_async_manager: Optional[AsyncContextBoundariesManager] = None
+_global_async_manager: AsyncContextBoundariesManager | None = None
 
 
 def get_async_context_boundaries_manager() -> AsyncContextBoundariesManager:

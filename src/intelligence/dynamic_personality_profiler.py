@@ -26,18 +26,18 @@ import asyncio
 import json
 import logging
 import os
+import statistics
+from collections import defaultdict, deque
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from enum import Enum
-from dataclasses import dataclass, field, asdict
-from typing import Dict, List, Optional, Any
-from collections import deque, defaultdict
-import statistics
+from typing import Any
 
 # Database imports
 try:
     import psycopg2
-    import psycopg2.pool
     import psycopg2.extras
+    import psycopg2.pool
 
     POSTGRES_AVAILABLE = True
 except ImportError:
@@ -85,7 +85,7 @@ class PersonalityTrait:
     confidence: float  # 0.0 to 1.0 confidence in this measurement
     last_updated: datetime
     evidence_count: int  # Number of conversation instances supporting this
-    evidence_sources: List[str] = field(default_factory=list)
+    evidence_sources: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -98,9 +98,9 @@ class ConversationAnalysis:
 
     # Message characteristics
     message_length: int
-    response_time_seconds: Optional[float]
+    response_time_seconds: float | None
     emotional_tone: str  # from emotional AI
-    topics_discussed: List[str]
+    topics_discussed: list[str]
 
     # Personality indicators
     formality_score: float  # -1.0=very formal, 1.0=very casual
@@ -113,8 +113,8 @@ class ConversationAnalysis:
 
     # Conversation context
     conversation_depth: float  # 0.0=surface, 1.0=deep personal
-    trust_indicators: List[str]  # phrases indicating trust/comfort
-    adaptation_requests: List[str]  # explicit requests for AI behavior changes
+    trust_indicators: list[str]  # phrases indicating trust/comfort
+    adaptation_requests: list[str]  # explicit requests for AI behavior changes
 
 
 @dataclass
@@ -126,7 +126,7 @@ class PersonalityProfile:
     last_updated: datetime
 
     # Core personality traits
-    traits: Dict[PersonalityDimension, PersonalityTrait]
+    traits: dict[PersonalityDimension, PersonalityTrait]
 
     # Conversation history analysis
     total_conversations: int
@@ -138,9 +138,9 @@ class PersonalityProfile:
     adaptation_success_rate: float  # How often user responds positively to personality adaptations
 
     # AI companion optimization
-    preferred_response_style: Dict[str, Any]
-    effective_conversation_patterns: List[str]
-    topics_of_high_engagement: List[str]
+    preferred_response_style: dict[str, Any]
+    effective_conversation_patterns: list[str]
+    topics_of_high_engagement: list[str]
 
     def __post_init__(self):
         """Initialize conversation analyses deque with max length"""
@@ -175,7 +175,7 @@ class DynamicPersonalityProfiler:
         self.update_threshold = trait_update_threshold
 
         # User profiles storage
-        self.profiles: Dict[str, PersonalityProfile] = {}
+        self.profiles: dict[str, PersonalityProfile] = {}
 
         # Pattern analysis
         self.conversation_patterns = defaultdict(list)
@@ -191,8 +191,8 @@ class DynamicPersonalityProfiler:
         context_id: str,
         user_message: str,
         bot_response: str,
-        response_time_seconds: Optional[float] = None,
-        emotional_data: Optional[Dict] = None,
+        response_time_seconds: float | None = None,
+        emotional_data: dict | None = None,
     ) -> ConversationAnalysis:
         """
         Analyze a single conversation for personality insights.
@@ -301,7 +301,7 @@ class DynamicPersonalityProfiler:
 
         return profile
 
-    def _extract_topics(self, message: str) -> List[str]:
+    def _extract_topics(self, message: str) -> list[str]:
         """Extract topics from a message"""
         # Simple topic extraction - could be enhanced with NLP
         topics = []
@@ -377,7 +377,7 @@ class DynamicPersonalityProfiler:
         # Shorter, direct messages = brief preference
 
         message_length = len(message)
-        word_count = len(message.split())
+        len(message.split())
 
         # Detail indicators
         detail_indicators = [
@@ -408,7 +408,7 @@ class DynamicPersonalityProfiler:
 
         return min(1.0, max(-1.0, length_score + indicator_score))
 
-    def _analyze_emotional_openness(self, message: str, emotional_data: Optional[Dict]) -> float:
+    def _analyze_emotional_openness(self, message: str, emotional_data: dict | None) -> float:
         """Analyze how emotionally open/expressive the user is"""
         emotional_words = [
             "feel",
@@ -580,7 +580,7 @@ class DynamicPersonalityProfiler:
 
         return min(1.0, depth_score)
 
-    def _extract_trust_indicators(self, message: str) -> List[str]:
+    def _extract_trust_indicators(self, message: str) -> list[str]:
         """Extract indicators of trust/comfort with the AI"""
         trust_phrases = [
             "I trust you",
@@ -607,7 +607,7 @@ class DynamicPersonalityProfiler:
 
         return found_indicators
 
-    def _extract_adaptation_requests(self, user_message: str, _bot_response: str) -> List[str]:
+    def _extract_adaptation_requests(self, user_message: str, _bot_response: str) -> list[str]:
         """Extract explicit requests for AI behavior changes"""
         adaptation_phrases = [
             "be more",
@@ -813,11 +813,11 @@ class DynamicPersonalityProfiler:
             elif "less help" in request_lower or "more independent" in request_lower:
                 profile.preferred_response_style["support_level"] = "low"
 
-    async def get_personality_profile(self, user_id: str) -> Optional[PersonalityProfile]:
+    async def get_personality_profile(self, user_id: str) -> PersonalityProfile | None:
         """Get current personality profile for a user"""
         return self.profiles.get(user_id)
 
-    async def get_adaptation_recommendations(self, user_id: str) -> Dict[str, Any]:
+    async def get_adaptation_recommendations(self, user_id: str) -> dict[str, Any]:
         """Get AI behavior adaptation recommendations for a user"""
         profile = self.profiles.get(user_id)
         if not profile:
@@ -891,7 +891,7 @@ class DynamicPersonalityProfiler:
 
         return recommendations
 
-    async def get_personality_summary(self, user_id: str) -> Dict[str, Any]:
+    async def get_personality_summary(self, user_id: str) -> dict[str, Any]:
         """Get a comprehensive personality summary for a user"""
         profile = self.profiles.get(user_id)
         if not profile:
@@ -948,7 +948,7 @@ class DynamicPersonalityProfiler:
 
         return summary
 
-    def _get_top_topics(self, analyses: List[ConversationAnalysis]) -> List[str]:
+    def _get_top_topics(self, analyses: list[ConversationAnalysis]) -> list[str]:
         """Get most frequently discussed topics from recent conversations"""
         topic_counts = defaultdict(int)
 
@@ -1019,8 +1019,8 @@ class DynamicPersonalityProfiler:
                         last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                         evidence_count INTEGER DEFAULT 0,
                         evidence_sources JSONB DEFAULT '[]'::jsonb,
-                        CONSTRAINT fk_user_profile 
-                            FOREIGN KEY (user_id) 
+                        CONSTRAINT fk_user_profile
+                            FOREIGN KEY (user_id)
                             REFERENCES dynamic_personality_profiles(user_id)
                             ON DELETE CASCADE
                     )
@@ -1044,7 +1044,7 @@ class DynamicPersonalityProfiler:
                         humor_detected BOOLEAN DEFAULT FALSE,
                         support_seeking BOOLEAN DEFAULT FALSE,
                         CONSTRAINT fk_user_profile_analysis
-                            FOREIGN KEY (user_id) 
+                            FOREIGN KEY (user_id)
                             REFERENCES dynamic_personality_profiles(user_id)
                             ON DELETE CASCADE
                     )
@@ -1054,19 +1054,19 @@ class DynamicPersonalityProfiler:
                 # Indexes for performance
                 cursor.execute(
                     """
-                    CREATE INDEX IF NOT EXISTS idx_dynamic_personality_traits_user_id 
+                    CREATE INDEX IF NOT EXISTS idx_dynamic_personality_traits_user_id
                     ON dynamic_personality_traits(user_id)
                 """
                 )
                 cursor.execute(
                     """
-                    CREATE INDEX IF NOT EXISTS idx_dynamic_conversation_analyses_user_id 
+                    CREATE INDEX IF NOT EXISTS idx_dynamic_conversation_analyses_user_id
                     ON dynamic_conversation_analyses(user_id)
                 """
                 )
                 cursor.execute(
                     """
-                    CREATE INDEX IF NOT EXISTS idx_dynamic_conversation_analyses_timestamp 
+                    CREATE INDEX IF NOT EXISTS idx_dynamic_conversation_analyses_timestamp
                     ON dynamic_conversation_analyses(timestamp)
                 """
                 )
@@ -1096,7 +1096,7 @@ class DynamicPersonalityProfiler:
                 # Insert or update profile
                 cursor.execute(
                     """
-                    INSERT INTO dynamic_personality_profiles 
+                    INSERT INTO dynamic_personality_profiles
                     (user_id, updated_at, total_conversations, relationship_depth, trust_level, preferred_response_style)
                     VALUES (%s, %s, %s, %s, %s, %s)
                     ON CONFLICT (user_id) DO UPDATE SET
@@ -1124,7 +1124,7 @@ class DynamicPersonalityProfiler:
                 for dimension, trait in profile.traits.items():
                     cursor.execute(
                         """
-                        INSERT INTO dynamic_personality_traits 
+                        INSERT INTO dynamic_personality_traits
                         (user_id, dimension, value, confidence, last_updated, evidence_count, evidence_sources)
                         VALUES (%s, %s, %s, %s, %s, %s, %s)
                     """,
@@ -1184,7 +1184,7 @@ class DynamicPersonalityProfiler:
         logger.warning(f"Unexpected value type for JSON parsing: {type(value)} - {value}")
         return default if default is not None else []
 
-    async def load_profile_from_db(self, user_id: str) -> Optional[PersonalityProfile]:
+    async def load_profile_from_db(self, user_id: str) -> PersonalityProfile | None:
         """Load personality profile from PostgreSQL database"""
         if not POSTGRES_AVAILABLE:
             return None
@@ -1219,9 +1219,9 @@ class DynamicPersonalityProfiler:
                 # Load recent conversation analyses
                 cursor.execute(
                     """
-                    SELECT * FROM dynamic_conversation_analyses 
-                    WHERE user_id = %s 
-                    ORDER BY timestamp DESC 
+                    SELECT * FROM dynamic_conversation_analyses
+                    WHERE user_id = %s
+                    ORDER BY timestamp DESC
                     LIMIT 50
                 """,
                     (user_id,),
@@ -1305,9 +1305,9 @@ class DynamicPersonalityProfiler:
             with connection.cursor() as cursor:
                 cursor.execute(
                     """
-                    INSERT INTO dynamic_conversation_analyses 
-                    (user_id, context_id, timestamp, message_length, formality_score, 
-                     emotional_openness, conversation_depth, topics_discussed, 
+                    INSERT INTO dynamic_conversation_analyses
+                    (user_id, context_id, timestamp, message_length, formality_score,
+                     emotional_openness, conversation_depth, topics_discussed,
                      emotional_tone, humor_detected, support_seeking)
                     VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """,

@@ -9,21 +9,18 @@ Phase 3: Multi-Dimensional Memory Networks
 """
 
 import logging
-import asyncio
-from datetime import datetime, timezone, timedelta
-from typing import Dict, List, Optional, Any, Tuple
-from dataclasses import dataclass, asdict
-from enum import Enum
-import numpy as np
-from collections import defaultdict, Counter, deque
 import statistics
-import re
+from collections import Counter, defaultdict
+from dataclasses import asdict, dataclass
+from datetime import UTC, datetime
+from enum import Enum
 from itertools import combinations
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
 
-def _safe_get_emotional_context(data: Dict) -> Dict:
+def _safe_get_emotional_context(data: dict) -> dict:
     """
     Safely extract emotional context from data, handling both dict and string types
 
@@ -78,12 +75,12 @@ class DetectedPattern:
     pattern_strength: PatternStrength
     confidence_score: float
     description: str
-    supporting_evidence: List[str]
+    supporting_evidence: list[str]
     frequency: int
-    temporal_span: Dict[str, str]
-    related_memories: List[str]
+    temporal_span: dict[str, str]
+    related_memories: list[str]
     prediction_value: float
-    pattern_metadata: Dict[str, Any]
+    pattern_metadata: dict[str, Any]
     detected_at: datetime
 
 
@@ -97,7 +94,7 @@ class TopicCorrelation:
     co_occurrence_count: int
     total_occurrences_a: int
     total_occurrences_b: int
-    correlation_contexts: List[str]
+    correlation_contexts: list[str]
 
 
 @dataclass
@@ -109,8 +106,8 @@ class EmotionalTrigger:
     trigger_strength: float
     occurrence_count: int
     recovery_time_avg: float
-    context_factors: List[str]
-    trigger_examples: List[str]
+    context_factors: list[str]
+    trigger_examples: list[str]
 
 
 @dataclass
@@ -121,8 +118,8 @@ class BehavioralPattern:
     pattern_description: str
     occurrence_frequency: float
     temporal_pattern: str
-    trigger_conditions: List[str]
-    behavioral_examples: List[str]
+    trigger_conditions: list[str]
+    behavioral_examples: list[str]
 
 
 class CrossReferencePatternDetector:
@@ -152,8 +149,8 @@ class CrossReferencePatternDetector:
         logger.info("Cross-Reference Pattern Detector initialized")
 
     async def detect_memory_patterns(
-        self, user_id: str, memories: List[Dict], conversation_history: List[Dict]
-    ) -> Dict[str, List[DetectedPattern]]:
+        self, user_id: str, memories: list[dict], conversation_history: list[dict]
+    ) -> dict[str, list[DetectedPattern]]:
         """
         Detect comprehensive patterns across memory networks
 
@@ -199,8 +196,8 @@ class CrossReferencePatternDetector:
             return self._create_empty_pattern_result()
 
     async def _find_topic_correlations(
-        self, user_id: str, memories: List[Dict]
-    ) -> List[DetectedPattern]:
+        self, user_id: str, memories: list[dict]
+    ) -> list[DetectedPattern]:
         """Find topics that frequently appear together"""
         logger.debug("Finding topic correlations")
 
@@ -233,7 +230,7 @@ class CrossReferencePatternDetector:
         return correlations
 
     async def _calculate_topic_correlation(
-        self, topic_a: str, topic_b: str, topic_memory_map: Dict, all_memories: List[Dict]
+        self, topic_a: str, topic_b: str, topic_memory_map: dict, all_memories: list[dict]
     ) -> TopicCorrelation:
         """Calculate correlation strength between two topics"""
 
@@ -246,11 +243,11 @@ class CrossReferencePatternDetector:
 
         for mem_a in memories_a:
             content_a = mem_a.get("content", "").lower()
-            timestamp_a = mem_a.get("timestamp", datetime.now(timezone.utc))
+            timestamp_a = mem_a.get("timestamp", datetime.now(UTC))
 
             for mem_b in memories_b:
                 content_b = mem_b.get("content", "").lower()
-                timestamp_b = mem_b.get("timestamp", datetime.now(timezone.utc))
+                timestamp_b = mem_b.get("timestamp", datetime.now(UTC))
 
                 # Check for content overlap or temporal proximity
                 if (
@@ -283,7 +280,7 @@ class CrossReferencePatternDetector:
         )
 
     def _create_correlation_pattern(
-        self, user_id: str, correlation: TopicCorrelation, topic_memory_map: Dict
+        self, user_id: str, correlation: TopicCorrelation, topic_memory_map: dict
     ) -> DetectedPattern:
         """Create pattern object for topic correlation"""
 
@@ -301,7 +298,7 @@ class CrossReferencePatternDetector:
         all_timestamps = []
         for topic in [correlation.topic_a, correlation.topic_b]:
             for memory in topic_memory_map[topic]:
-                timestamp = memory.get("timestamp", datetime.now(timezone.utc))
+                timestamp = memory.get("timestamp", datetime.now(UTC))
                 if isinstance(timestamp, str):
                     timestamp = datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
                 all_timestamps.append(timestamp)
@@ -310,12 +307,12 @@ class CrossReferencePatternDetector:
             "start_date": (
                 min(all_timestamps).isoformat()
                 if all_timestamps
-                else datetime.now(timezone.utc).isoformat()
+                else datetime.now(UTC).isoformat()
             ),
             "end_date": (
                 max(all_timestamps).isoformat()
                 if all_timestamps
-                else datetime.now(timezone.utc).isoformat()
+                else datetime.now(UTC).isoformat()
             ),
         }
 
@@ -340,12 +337,12 @@ class CrossReferencePatternDetector:
                 "topic_b": correlation.topic_b,
                 "correlation_data": asdict(correlation),
             },
-            detected_at=datetime.now(timezone.utc),
+            detected_at=datetime.now(UTC),
         )
 
     async def _identify_emotional_triggers(
-        self, user_id: str, memories: List[Dict], conversation_history: List[Dict]
-    ) -> List[DetectedPattern]:
+        self, user_id: str, memories: list[dict], conversation_history: list[dict]
+    ) -> list[DetectedPattern]:
         """Identify patterns that trigger specific emotions"""
         logger.debug("Identifying emotional triggers")
 
@@ -363,7 +360,7 @@ class CrossReferencePatternDetector:
         logger.debug(f"Identified {len(emotional_patterns)} emotional trigger patterns")
         return emotional_patterns
 
-    def _extract_emotional_sequences(self, conversation_history: List[Dict]) -> List[List[Dict]]:
+    def _extract_emotional_sequences(self, conversation_history: list[dict]) -> list[list[dict]]:
         """Extract sequences of interactions with emotional context"""
         sequences = []
         current_sequence = []
@@ -387,8 +384,8 @@ class CrossReferencePatternDetector:
         return sequences
 
     async def _analyze_emotional_sequence(
-        self, user_id: str, sequence: List[Dict]
-    ) -> Optional[DetectedPattern]:
+        self, user_id: str, sequence: list[dict]
+    ) -> DetectedPattern | None:
         """Analyze emotional sequence for trigger patterns"""
 
         if len(sequence) < 2:
@@ -419,7 +416,7 @@ class CrossReferencePatternDetector:
                             "trigger_content": trigger_keywords,
                             "triggered_emotion": next_emotion,
                             "context": current.get("topic", ""),
-                            "timestamp": current.get("timestamp", datetime.now(timezone.utc)),
+                            "timestamp": current.get("timestamp", datetime.now(UTC)),
                         }
                     )
 
@@ -429,7 +426,7 @@ class CrossReferencePatternDetector:
 
         return None
 
-    def _extract_trigger_keywords(self, content: str) -> List[str]:
+    def _extract_trigger_keywords(self, content: str) -> list[str]:
         """Extract potential emotional trigger keywords from content"""
         # Emotional trigger indicators
         trigger_words = [
@@ -473,7 +470,7 @@ class CrossReferencePatternDetector:
         return found_triggers
 
     def _create_trigger_pattern(
-        self, user_id: str, trigger_candidates: List[Dict], sequence: List[Dict]
+        self, user_id: str, trigger_candidates: list[dict], sequence: list[dict]
     ) -> DetectedPattern:
         """Create emotional trigger pattern"""
 
@@ -508,19 +505,19 @@ class CrossReferencePatternDetector:
 
         # Calculate temporal span
         timestamps = [
-            interaction.get("timestamp", datetime.now(timezone.utc)) for interaction in sequence
+            interaction.get("timestamp", datetime.now(UTC)) for interaction in sequence
         ]
 
         temporal_span = {
             "start_date": (
                 min(timestamps).isoformat()
                 if timestamps
-                else datetime.now(timezone.utc).isoformat()
+                else datetime.now(UTC).isoformat()
             ),
             "end_date": (
                 max(timestamps).isoformat()
                 if timestamps
-                else datetime.now(timezone.utc).isoformat()
+                else datetime.now(UTC).isoformat()
             ),
         }
 
@@ -545,12 +542,12 @@ class CrossReferencePatternDetector:
                 "triggered_emotion": most_common_emotion[0],
                 "trigger_candidates": trigger_candidates,
             },
-            detected_at=datetime.now(timezone.utc),
+            detected_at=datetime.now(UTC),
         )
 
     async def _detect_behavioral_patterns(
-        self, user_id: str, conversation_history: List[Dict]
-    ) -> List[DetectedPattern]:
+        self, user_id: str, conversation_history: list[dict]
+    ) -> list[DetectedPattern]:
         """Detect recurring behavioral patterns"""
         logger.debug("Detecting behavioral patterns")
 
@@ -576,7 +573,7 @@ class CrossReferencePatternDetector:
         logger.debug(f"Detected {len(behavioral_patterns)} behavioral patterns")
         return behavioral_patterns
 
-    def _analyze_conversation_timing(self, conversation_history: List[Dict]) -> Dict[str, Any]:
+    def _analyze_conversation_timing(self, conversation_history: list[dict]) -> dict[str, Any]:
         """Analyze timing patterns in conversations"""
         if len(conversation_history) < 3:
             return {}
@@ -584,7 +581,7 @@ class CrossReferencePatternDetector:
         # Extract timestamps
         timestamps = []
         for interaction in conversation_history:
-            timestamp = interaction.get("timestamp", datetime.now(timezone.utc))
+            timestamp = interaction.get("timestamp", datetime.now(UTC))
             if isinstance(timestamp, str):
                 timestamp = datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
             timestamps.append(timestamp)
@@ -613,7 +610,7 @@ class CrossReferencePatternDetector:
             "total_conversations": len(conversation_history),
         }
 
-    def _analyze_message_lengths(self, conversation_history: List[Dict]) -> Dict[str, Any]:
+    def _analyze_message_lengths(self, conversation_history: list[dict]) -> dict[str, Any]:
         """Analyze message length patterns"""
         lengths = []
 
@@ -632,7 +629,7 @@ class CrossReferencePatternDetector:
             "length_variance": statistics.variance(lengths) if len(lengths) > 1 else 0,
         }
 
-    def _analyze_topic_preferences(self, conversation_history: List[Dict]) -> Dict[str, Any]:
+    def _analyze_topic_preferences(self, conversation_history: list[dict]) -> dict[str, Any]:
         """Analyze topic preference patterns"""
         topics = []
 
@@ -652,7 +649,7 @@ class CrossReferencePatternDetector:
             "total_topic_mentions": len(topics),
         }
 
-    def _create_timing_patterns(self, user_id: str, timing_data: Dict) -> List[DetectedPattern]:
+    def _create_timing_patterns(self, user_id: str, timing_data: dict) -> list[DetectedPattern]:
         """Create behavioral patterns from timing analysis"""
         patterns = []
 
@@ -680,13 +677,13 @@ class CrossReferencePatternDetector:
                         "preferred_hour": hour,
                         "timing_data": timing_data,
                     },
-                    detected_at=datetime.now(timezone.utc),
+                    detected_at=datetime.now(UTC),
                 )
                 patterns.append(pattern)
 
         return patterns
 
-    def _create_length_patterns(self, user_id: str, length_data: Dict) -> List[DetectedPattern]:
+    def _create_length_patterns(self, user_id: str, length_data: dict) -> list[DetectedPattern]:
         """Create behavioral patterns from message length analysis"""
         patterns = []
 
@@ -724,15 +721,15 @@ class CrossReferencePatternDetector:
                     "style": style,
                     "length_data": length_data,
                 },
-                detected_at=datetime.now(timezone.utc),
+                detected_at=datetime.now(UTC),
             )
             patterns.append(pattern)
 
         return patterns
 
     def _create_topic_preference_patterns(
-        self, user_id: str, topic_data: Dict
-    ) -> List[DetectedPattern]:
+        self, user_id: str, topic_data: dict
+    ) -> list[DetectedPattern]:
         """Create behavioral patterns from topic preference analysis"""
         patterns = []
 
@@ -761,15 +758,15 @@ class CrossReferencePatternDetector:
                         "preferred_topic": topic,
                         "topic_data": topic_data,
                     },
-                    detected_at=datetime.now(timezone.utc),
+                    detected_at=datetime.now(UTC),
                 )
                 patterns.append(pattern)
 
         return patterns
 
     async def _track_preference_changes(
-        self, user_id: str, memories: List[Dict]
-    ) -> List[DetectedPattern]:
+        self, user_id: str, memories: list[dict]
+    ) -> list[DetectedPattern]:
         """Track how user preferences evolve over time"""
         logger.debug("Tracking preference evolution")
 
@@ -778,7 +775,7 @@ class CrossReferencePatternDetector:
 
         # Sort memories by timestamp
         sorted_memories = sorted(
-            memories, key=lambda m: m.get("timestamp", datetime.now(timezone.utc))
+            memories, key=lambda m: m.get("timestamp", datetime.now(UTC))
         )
 
         # Split into time periods
@@ -859,14 +856,14 @@ class CrossReferencePatternDetector:
                 "early_frequency": early_freq,
                 "recent_frequency": recent_freq,
             },
-            detected_at=datetime.now(timezone.utc),
+            detected_at=datetime.now(UTC),
         )
 
         return pattern
 
     async def _find_conversation_cycles(
-        self, user_id: str, conversation_history: List[Dict]
-    ) -> List[DetectedPattern]:
+        self, user_id: str, conversation_history: list[dict]
+    ) -> list[DetectedPattern]:
         """Find cyclical patterns in conversations"""
         logger.debug("Finding conversation cycles")
 
@@ -922,7 +919,7 @@ class CrossReferencePatternDetector:
                                 "cycle_interval": avg_interval,
                                 "positions": positions,
                             },
-                            detected_at=datetime.now(timezone.utc),
+                            detected_at=datetime.now(UTC),
                         )
                         cycle_patterns.append(pattern)
 
@@ -930,8 +927,8 @@ class CrossReferencePatternDetector:
         return cycle_patterns
 
     async def _detect_temporal_patterns(
-        self, user_id: str, memories: List[Dict], conversation_history: List[Dict]
-    ) -> List[DetectedPattern]:
+        self, user_id: str, memories: list[dict], conversation_history: list[dict]
+    ) -> list[DetectedPattern]:
         """Detect temporal patterns in behavior and emotions"""
         logger.debug("Detecting temporal patterns")
 
@@ -950,12 +947,12 @@ class CrossReferencePatternDetector:
         logger.debug(f"Detected {len(temporal_patterns)} temporal patterns")
         return temporal_patterns
 
-    def _analyze_daily_patterns(self, conversation_history: List[Dict]) -> Dict[str, Any]:
+    def _analyze_daily_patterns(self, conversation_history: list[dict]) -> dict[str, Any]:
         """Analyze patterns by day of week"""
         weekday_data = defaultdict(list)
 
         for interaction in conversation_history:
-            timestamp = interaction.get("timestamp", datetime.now(timezone.utc))
+            timestamp = interaction.get("timestamp", datetime.now(UTC))
             if isinstance(timestamp, str):
                 timestamp = datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
 
@@ -983,7 +980,7 @@ class CrossReferencePatternDetector:
 
         return patterns
 
-    def _create_daily_patterns(self, user_id: str, daily_data: Dict) -> List[DetectedPattern]:
+    def _create_daily_patterns(self, user_id: str, daily_data: dict) -> list[DetectedPattern]:
         """Create daily temporal patterns"""
         patterns = []
 
@@ -1024,19 +1021,19 @@ class CrossReferencePatternDetector:
                         "dominant_emotion": dominant_emotion,
                         "daily_data": data,
                     },
-                    detected_at=datetime.now(timezone.utc),
+                    detected_at=datetime.now(UTC),
                 )
                 patterns.append(pattern)
 
         return patterns
 
-    def _analyze_seasonal_patterns(self, memories: List[Dict]) -> Dict[str, Any]:
+    def _analyze_seasonal_patterns(self, memories: list[dict]) -> dict[str, Any]:
         """Analyze seasonal patterns in memories"""
         # This is a placeholder for seasonal analysis
         # Would require longer-term data to be meaningful
         return {}
 
-    def _create_seasonal_patterns(self, user_id: str, seasonal_data: Dict) -> List[DetectedPattern]:
+    def _create_seasonal_patterns(self, user_id: str, seasonal_data: dict) -> list[DetectedPattern]:
         """Create seasonal temporal patterns"""
         # Placeholder for seasonal pattern creation
         return []
@@ -1053,8 +1050,8 @@ class CrossReferencePatternDetector:
             return PatternStrength.WEAK
 
     async def predict_pattern_continuation(
-        self, user_id: str, current_context: Dict, memory_manager=None
-    ) -> Dict[str, Any]:
+        self, user_id: str, current_context: dict, memory_manager=None
+    ) -> dict[str, Any]:
         """
         Predict likely pattern continuation based on current context
 
@@ -1083,12 +1080,12 @@ class CrossReferencePatternDetector:
                     current_context, user_patterns
                 ),
                 "confidence_scores": {},
-                "prediction_timestamp": datetime.now(timezone.utc),
+                "prediction_timestamp": datetime.now(UTC),
             }
 
             # Calculate overall prediction confidence
             all_predictions = []
-            for prediction_type, prediction_list in predictions.items():
+            for _prediction_type, prediction_list in predictions.items():
                 if isinstance(prediction_list, list):
                     all_predictions.extend(prediction_list)
 
@@ -1104,7 +1101,7 @@ class CrossReferencePatternDetector:
             logger.error(f"Error predicting pattern continuation: {e}")
             return {"error": str(e)}
 
-    def _predict_topic_patterns(self, current_context: Dict, user_patterns: Dict) -> List[Dict]:
+    def _predict_topic_patterns(self, current_context: dict, user_patterns: dict) -> list[dict]:
         """Predict topic-based pattern continuations"""
         current_topic = current_context.get("topic", "").lower()
 
@@ -1136,7 +1133,7 @@ class CrossReferencePatternDetector:
 
         return predictions
 
-    def _predict_emotional_patterns(self, current_context: Dict, user_patterns: Dict) -> List[Dict]:
+    def _predict_emotional_patterns(self, current_context: dict, user_patterns: dict) -> list[dict]:
         """Predict emotional pattern continuations"""
         current_content = current_context.get("content", "").lower()
 
@@ -1160,15 +1157,15 @@ class CrossReferencePatternDetector:
         return predictions
 
     def _predict_behavioral_patterns(
-        self, current_context: Dict, user_patterns: Dict
-    ) -> List[Dict]:
+        self, current_context: dict, user_patterns: dict
+    ) -> list[dict]:
         """Predict behavioral pattern continuations"""
         # This would analyze current behavioral context and predict likely continuations
         return []
 
-    def _predict_temporal_patterns(self, current_context: Dict, user_patterns: Dict) -> List[Dict]:
+    def _predict_temporal_patterns(self, current_context: dict, user_patterns: dict) -> list[dict]:
         """Predict temporal pattern continuations"""
-        current_time = datetime.now(timezone.utc)
+        current_time = datetime.now(UTC)
         current_weekday = current_time.weekday()
 
         temporal_patterns = user_patterns.get("temporal_patterns", [])
@@ -1182,13 +1179,13 @@ class CrossReferencePatternDetector:
                         "type": "temporal_pattern",
                         "predicted_emotion": metadata.get("dominant_emotion"),
                         "confidence": pattern.confidence_score,
-                        "reasoning": f"Historical pattern for this day of week",
+                        "reasoning": "Historical pattern for this day of week",
                     }
                 )
 
         return predictions
 
-    def _create_empty_pattern_result(self) -> Dict[str, List]:
+    def _create_empty_pattern_result(self) -> dict[str, list]:
         """Create empty pattern result structure"""
         return {
             "topic_correlations": [],
@@ -1199,14 +1196,14 @@ class CrossReferencePatternDetector:
             "temporal_patterns": [],
         }
 
-    def _update_pattern_history(self, user_id: str, patterns: Dict[str, List[DetectedPattern]]):
+    def _update_pattern_history(self, user_id: str, patterns: dict[str, list[DetectedPattern]]):
         """Update pattern history for tracking changes over time"""
         if user_id not in self.pattern_history:
             self.pattern_history[user_id] = []
 
         self.pattern_history[user_id].append(
             {
-                "timestamp": datetime.now(timezone.utc),
+                "timestamp": datetime.now(UTC),
                 "patterns": patterns,
                 "pattern_count": sum(len(pattern_list) for pattern_list in patterns.values()),
             }
@@ -1216,7 +1213,7 @@ class CrossReferencePatternDetector:
         if len(self.pattern_history[user_id]) > 10:
             self.pattern_history[user_id] = self.pattern_history[user_id][-10:]
 
-    def get_pattern_statistics(self, user_id: str) -> Dict[str, Any]:
+    def get_pattern_statistics(self, user_id: str) -> dict[str, Any]:
         """Get pattern detection statistics for user"""
         user_patterns = self.detected_patterns.get(user_id, {})
 
@@ -1227,12 +1224,12 @@ class CrossReferencePatternDetector:
                 for pattern_type, pattern_list in user_patterns.items()
             },
             "pattern_strengths": self._analyze_pattern_strengths(user_patterns),
-            "detection_timestamp": datetime.now(timezone.utc),
+            "detection_timestamp": datetime.now(UTC),
         }
 
         return stats
 
-    def _analyze_pattern_strengths(self, user_patterns: Dict) -> Dict[str, int]:
+    def _analyze_pattern_strengths(self, user_patterns: dict) -> dict[str, int]:
         """Analyze distribution of pattern strengths"""
         strength_counts = Counter()
 

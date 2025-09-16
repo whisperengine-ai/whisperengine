@@ -3,14 +3,14 @@
 Test suite for the conversation summary feature
 """
 
-import sys
 import os
+import sys
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-from basic_discord_bot import generate_conversation_summary
 from unittest.mock import Mock
-import pytest
+
+from basic_discord_bot import generate_conversation_summary
 
 
 def test_conversation_summary_basic():
@@ -45,7 +45,6 @@ def test_conversation_summary_basic():
 
     summary = generate_conversation_summary(messages, "12345")
 
-    print(f"Generated summary: {summary}")
 
     # Should contain key topics
     assert "Python" in summary or "debug" in summary or "function" in summary
@@ -72,7 +71,6 @@ def test_conversation_summary_filter_commands():
 
     summary = generate_conversation_summary(messages, "12345")
 
-    print(f"Filtered summary: {summary}")
 
     # Should not contain command content, but should contain real content
     assert "help" not in summary.lower() or "machine learning" in summary
@@ -106,7 +104,6 @@ def test_conversation_summary_security_sanitization():
 
     summary = generate_conversation_summary(messages, "12345")
 
-    print(f"Sanitized summary: {summary}")
 
     # Should remove system prompt indicators
     assert "system:" not in summary
@@ -128,19 +125,17 @@ def test_conversation_summary_length_truncation():
 
     # First, test with normal length to see what gets generated
     normal_summary = generate_conversation_summary(messages, "12345")
-    print(f"Normal summary (len={len(normal_summary)}): {normal_summary}")
 
     # Then test with short max_length
     summary = generate_conversation_summary(messages, "12345", max_length=100)
 
-    print(f"Truncated summary (len={len(summary)}): {summary}")
 
     # If normal summary exists, truncated should too
     if normal_summary:
         assert len(summary) <= 103  # 100 + "..." = 103
         assert summary.endswith("...")
     else:
-        print("⚠️  Normal summary was empty, checking why...")
+        pass
         # This is the issue - let's see what's happening
 
 
@@ -163,7 +158,6 @@ def test_conversation_summary_user_filtering():
 
     summary = generate_conversation_summary(messages, "12345")  # Filter for user 12345
 
-    print(f"User-filtered summary: {summary}")
 
     # Should contain user1's content but not user2's
     assert "Python" in summary
@@ -171,51 +165,22 @@ def test_conversation_summary_user_filtering():
 
 
 if __name__ == "__main__":
-    print("🧪 Testing Conversation Summary Feature")
-    print("=" * 50)
 
     try:
-        print("\n1. Testing basic summary generation...")
         test_conversation_summary_basic()
-        print("✅ Basic summary test passed")
 
-        print("\n2. Testing command filtering...")
         test_conversation_summary_filter_commands()
-        print("✅ Command filtering test passed")
 
-        print("\n3. Testing empty input handling...")
         test_conversation_summary_empty_input()
-        print("✅ Empty input test passed")
 
-        print("\n4. Testing security sanitization...")
         test_conversation_summary_security_sanitization()
-        print("✅ Security sanitization test passed")
 
-        print("\n5. Testing length truncation...")
         test_conversation_summary_length_truncation()
-        print("✅ Length truncation test passed")
 
-        print("\n6. Testing user filtering...")
         test_conversation_summary_user_filtering()
-        print("✅ User filtering test passed")
 
-        print("\n" + "=" * 50)
-        print("🎉 All conversation summary tests passed!")
-        print("\n📋 Summary of features tested:")
-        print("  ✅ Basic conversation summary generation")
-        print("  ✅ Command filtering (security)")
-        print("  ✅ Empty input handling")
-        print("  ✅ System prompt injection prevention")
-        print("  ✅ Length truncation")
-        print("  ✅ User-specific filtering")
-        print("\n🔒 Security features validated:")
-        print("  ✅ Sanitizes system: role indicators")
-        print("  ✅ Filters out commands")
-        print("  ✅ Truncates excessive content")
-        print("  ✅ User isolation maintained")
 
-    except Exception as e:
-        print(f"❌ Test failed: {e}")
+    except Exception:
         import traceback
 
         traceback.print_exc()

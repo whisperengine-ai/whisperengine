@@ -8,10 +8,9 @@ resource management.
 
 import asyncio
 import logging
-import time
 import random
-from typing import List, Dict, Any
-import numpy as np
+import time
+from typing import Any
 
 # Configure logging
 logging.basicConfig(
@@ -57,7 +56,7 @@ class ConcurrencyDemo:
             await self.engine.stop_engine()
             logger.info("✅ Engine stopped gracefully")
 
-    def generate_realistic_conversations(self) -> List[List[str]]:
+    def generate_realistic_conversations(self) -> list[list[str]]:
         """Generate realistic conversation patterns"""
         conversation_templates = [
             # Career development conversation
@@ -144,7 +143,7 @@ class ConcurrencyDemo:
         failed_users = len(user_results) - successful_users
         total_messages = successful_users * self.messages_per_user
 
-        logger.info(f"📊 CONCURRENCY DEMO RESULTS:")
+        logger.info("📊 CONCURRENCY DEMO RESULTS:")
         logger.info(f"   Total time: {total_time:.2f} seconds")
         logger.info(f"   Successful users: {successful_users}/{self.num_users}")
         logger.info(f"   Failed users: {failed_users}")
@@ -155,7 +154,7 @@ class ConcurrencyDemo:
         # Performance analysis
         if self.engine:
             stats = self.engine.performance_stats
-            logger.info(f"📈 ENGINE PERFORMANCE:")
+            logger.info("📈 ENGINE PERFORMANCE:")
             logger.info(f"   Concurrent users peak: {stats['concurrent_users']}")
             logger.info(f"   Average response time: {stats['avg_response_time_ms']:.1f}ms")
             logger.info(f"   Batch efficiency: {stats['batch_efficiency']*100:.1f}%")
@@ -169,8 +168,8 @@ class ConcurrencyDemo:
         }
 
     async def process_user_conversation(
-        self, user_id: str, conversation: List[str]
-    ) -> Dict[str, Any]:
+        self, user_id: str, conversation: list[str]
+    ) -> dict[str, Any]:
         """Process a full conversation for one user"""
         user_start = time.time()
         message_results = []

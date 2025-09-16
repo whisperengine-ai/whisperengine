@@ -12,17 +12,16 @@ Key features:
 - Conversation resumption detection and handling
 """
 
-import asyncio
 import logging
-from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Any, Tuple
+from datetime import datetime
+from typing import Any
+
 import discord
 
 from src.conversation.boundary_manager import (
     ConversationBoundaryManager,
     ConversationSession,
     ConversationState,
-    TopicTransitionType,
 )
 
 logger = logging.getLogger(__name__)
@@ -37,7 +36,7 @@ class EnhancedConversationContextManager:
     def __init__(
         self,
         conversation_cache,
-        boundary_manager: Optional[ConversationBoundaryManager] = None,
+        boundary_manager: ConversationBoundaryManager | None = None,
         enable_boundary_management: bool = True,
     ):
         """
@@ -65,9 +64,9 @@ class EnhancedConversationContextManager:
         channel,
         user_id: int,
         message_content: str,
-        message_id: Optional[str] = None,
+        message_id: str | None = None,
         limit: int = 15,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Get enhanced conversation context with boundary awareness
 
@@ -136,10 +135,10 @@ class EnhancedConversationContextManager:
     async def handle_multi_user_context(
         self,
         channel,
-        all_recent_messages: List[discord.Message],
+        all_recent_messages: list[discord.Message],
         target_user_id: int,
         limit_per_user: int = 10,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Handle conversation context in multi-user channels
 
@@ -216,7 +215,7 @@ class EnhancedConversationContextManager:
 
     async def detect_conversation_resumption(
         self, channel, user_id: int, message_content: str, time_gap_threshold_minutes: int = 30
-    ) -> Optional[Dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         """
         Detect if user is resuming a previous conversation
 
@@ -262,7 +261,7 @@ class EnhancedConversationContextManager:
 
     async def suggest_conversation_actions(
         self, channel, user_id: int, message_content: str
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """
         Suggest conversation management actions based on context
 
@@ -335,8 +334,8 @@ class EnhancedConversationContextManager:
     # Private helper methods
 
     async def _format_messages_for_context(
-        self, messages: List[discord.Message]
-    ) -> List[Dict[str, Any]]:
+        self, messages: list[discord.Message]
+    ) -> list[dict[str, Any]]:
         """Format Discord messages for conversation context"""
         formatted_messages = []
 
@@ -362,8 +361,8 @@ class EnhancedConversationContextManager:
         return formatted_messages
 
     async def _build_context_metadata(
-        self, session: ConversationSession, boundary_context: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        self, session: ConversationSession, boundary_context: dict[str, Any]
+    ) -> dict[str, Any]:
         """Build context metadata from session and boundary information"""
         metadata = {
             "session_duration_minutes": session.get_duration_minutes(),
@@ -385,9 +384,9 @@ class EnhancedConversationContextManager:
 
     async def _generate_conversation_guidance(
         self, session: ConversationSession, message_content: str
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Generate conversation management guidance"""
-        guidance: Dict[str, Any] = {
+        guidance: dict[str, Any] = {
             "context_awareness_level": "high" if session.is_long_conversation() else "normal",
             "response_strategy": "detailed" if session.message_count < 5 else "concise",
             "topic_management": "track_closely" if len(session.topic_history) > 1 else "normal",
@@ -409,7 +408,7 @@ class EnhancedConversationContextManager:
 
         return guidance
 
-    async def _extract_user_topics(self, messages: List[discord.Message]) -> List[str]:
+    async def _extract_user_topics(self, messages: list[discord.Message]) -> list[str]:
         """Extract topics from user messages for multi-user context"""
         if not messages:
             return []
@@ -473,7 +472,7 @@ class EnhancedConversationContextManager:
         else:
             return "diverse_topics"
 
-    def get_manager_statistics(self) -> Dict[str, Any]:
+    def get_manager_statistics(self) -> dict[str, Any]:
         """Get statistics about the enhanced conversation manager"""
         stats = {
             "boundary_management_enabled": self.enable_boundary_management,

@@ -5,10 +5,10 @@ Test the ultra-fast Faiss memory engine with benchmarks
 """
 
 import asyncio
-import time
-import numpy as np
 import logging
-from typing import List, Dict, Any
+import time
+
+import numpy as np
 
 # Set up logging
 logging.basicConfig(
@@ -142,7 +142,7 @@ async def benchmark_faiss_vs_chromadb():
     logger.info("🔄 Testing batch search performance...")
 
     start_time = time.time()
-    batch_results = await faiss_engine.batch_search_memories(
+    await faiss_engine.batch_search_memories(
         query_embeddings=query_embeddings[:10], user_ids=[f"user_{i % 10}" for i in range(10)], k=5
     )
     batch_time = time.time() - start_time
@@ -200,7 +200,7 @@ async def stress_test_concurrency():
     async def search_memories_for_user(user_id: str, num_searches: int):
         """Perform searches for a specific user"""
         results = []
-        for i in range(num_searches):
+        for _i in range(num_searches):
             query_embedding = np.random.random(384).astype(np.float32)
             search_results = await faiss_engine.search_memories(
                 query_embedding=query_embedding, user_id=user_id, k=5

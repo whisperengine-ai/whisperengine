@@ -6,17 +6,17 @@ Integrates Phase 2 Predictive Emotional Intelligence with the main bot system.
 Provides seamless integration with existing personality profiling and memory systems.
 """
 
-import logging
 import asyncio
-from datetime import datetime, timezone, timedelta
-from typing import Dict, List, Optional, Any, Tuple
 import json
+import logging
+from datetime import UTC, datetime, timedelta, timezone
+from typing import Any, Dict, List, Optional, Tuple
 
-from .emotional_intelligence import PredictiveEmotionalIntelligence, EmotionalIntelligenceAssessment
+from .emotional_intelligence import EmotionalIntelligenceAssessment, PredictiveEmotionalIntelligence
 
 # Phase 3.1 Integration: Import Emotional Context Engine
 try:
-    from .emotional_context_engine import create_emotional_context_engine, EmotionalContextEngine
+    from .emotional_context_engine import EmotionalContextEngine, create_emotional_context_engine
 
     EMOTIONAL_CONTEXT_ENGINE_AVAILABLE = True
 except ImportError:
@@ -89,8 +89,8 @@ class Phase2Integration:
             self.emotional_context_engine = None
 
     async def process_message_with_emotional_intelligence(
-        self, user_id: str, message: str, conversation_context: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        self, user_id: str, message: str, conversation_context: dict[str, Any]
+    ) -> dict[str, Any]:
         """
         Process message with full emotional intelligence capabilities
 
@@ -168,7 +168,7 @@ class Phase2Integration:
             return False
 
         if user_id in self.last_interventions:
-            time_since_last = datetime.now(timezone.utc) - self.last_interventions[user_id]
+            time_since_last = datetime.now(UTC) - self.last_interventions[user_id]
             if time_since_last < self.intervention_cooldown:
                 logger.debug(
                     f"Intervention cooldown active for {user_id}: {time_since_last} < {self.intervention_cooldown}"
@@ -178,8 +178,8 @@ class Phase2Integration:
         return True
 
     async def _execute_automatic_intervention(
-        self, user_id: str, intervention: Any, context: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        self, user_id: str, intervention: Any, context: dict[str, Any]
+    ) -> dict[str, Any]:
         """Execute automatic intervention"""
         logger.info(
             f"Executing automatic intervention for {user_id}: {intervention.intervention_id}"
@@ -199,7 +199,7 @@ class Phase2Integration:
             )
 
             if result["delivered"]:
-                self.last_interventions[user_id] = datetime.now(timezone.utc)
+                self.last_interventions[user_id] = datetime.now(UTC)
                 logger.info(f"Intervention {intervention.intervention_id} executed successfully")
 
             return result
@@ -214,7 +214,7 @@ class Phase2Integration:
 
     def _generate_response_guidance(
         self, assessment: EmotionalIntelligenceAssessment
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Generate guidance for bot response based on emotional assessment"""
 
         guidance = {
@@ -290,8 +290,8 @@ class Phase2Integration:
         user_id: str,
         intervention_id: str,
         user_response: str,
-        response_context: Dict[str, Any],
-    ) -> Dict[str, Any]:
+        response_context: dict[str, Any],
+    ) -> dict[str, Any]:
         """
         Handle user response to an intervention
 
@@ -333,7 +333,7 @@ class Phase2Integration:
             logger.error(f"Error handling intervention response for {user_id}: {str(e)}")
             return {"error": str(e), "intervention_id": intervention_id, "follow_up_needed": True}
 
-    async def get_user_emotional_status(self, user_id: str) -> Dict[str, Any]:
+    async def get_user_emotional_status(self, user_id: str) -> dict[str, Any]:
         """
         Get current emotional status for user
 
@@ -363,7 +363,7 @@ class Phase2Integration:
             logger.error(f"Error getting emotional status for {user_id}: {str(e)}")
             return {"user_id": user_id, "status": "error", "error": str(e)}
 
-    async def generate_proactive_check_in(self, user_id: str) -> Optional[str]:
+    async def generate_proactive_check_in(self, user_id: str) -> str | None:
         """
         Generate proactive check-in message if appropriate
 
@@ -409,10 +409,10 @@ class Phase2Integration:
             if should_check_in and self._should_execute_intervention(user_id):
                 # Generate personalized check-in message
                 check_in_messages = [
-                    f"Hi! I've been thinking about our recent conversations and wanted to check in. How are you doing today?",
-                    f"Just wanted to reach out and see how things are going. I'm here if you need to talk about anything.",
-                    f"I hope you're having a good day! I noticed some patterns in our chats and wanted to make sure you're doing well.",
-                    f"Hi there! How are you feeling today? I'm here to listen if you want to share what's on your mind.",
+                    "Hi! I've been thinking about our recent conversations and wanted to check in. How are you doing today?",
+                    "Just wanted to reach out and see how things are going. I'm here if you need to talk about anything.",
+                    "I hope you're having a good day! I noticed some patterns in our chats and wanted to make sure you're doing well.",
+                    "Hi there! How are you feeling today? I'm here to listen if you want to share what's on your mind.",
                 ]
 
                 # Could be enhanced with personalization based on user preferences
@@ -431,7 +431,7 @@ class Phase2Integration:
             logger.error(f"Error generating proactive check-in for {user_id}: {str(e)}")
             return None
 
-    async def get_system_status(self) -> Dict[str, Any]:
+    async def get_system_status(self) -> dict[str, Any]:
         """Get Phase 2 system status"""
         try:
             health_report = await self.emotional_intelligence.get_system_health_report()
@@ -454,7 +454,7 @@ class Phase2Integration:
                 "integration_status": {"phase_2_active": False, "error": True},
             }
 
-    def configure_auto_intervention(self, enabled: bool, cooldown_hours: Optional[float] = None):
+    def configure_auto_intervention(self, enabled: bool, cooldown_hours: float | None = None):
         """Configure automatic intervention settings"""
         self.auto_intervention_enabled = enabled
 
@@ -466,8 +466,8 @@ class Phase2Integration:
         )
 
     async def force_assessment(
-        self, user_id: str, message: str, context: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        self, user_id: str, message: str, context: dict[str, Any]
+    ) -> dict[str, Any]:
         """Force an immediate emotional assessment (for testing/debugging)"""
         logger.info(f"Forcing emotional assessment for user {user_id}")
 
@@ -483,7 +483,7 @@ class Phase2Integration:
                 "user_id": user_id,
                 "assessment_summary": summary,
                 "full_assessment": assessment,
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
             }
 
         except Exception as e:

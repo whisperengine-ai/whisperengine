@@ -3,10 +3,10 @@ Configuration validation for the Discord bot.
 Validates LLM and embedding endpoints, Discord tokens, and other critical settings.
 """
 
-import os
 import logging
+import os
+
 import requests
-from typing import Dict, Any, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +29,7 @@ def load_system_prompt() -> str:
     """
     prompt_file = os.getenv("BOT_SYSTEM_PROMPT_FILE", "./prompts/default.md")
     try:
-        with open(prompt_file, "r", encoding="utf-8") as f:
+        with open(prompt_file, encoding="utf-8") as f:
             prompt_content = f.read().strip()
     except FileNotFoundError:
         logger.warning(f"System prompt file {prompt_file} not found, using default")
@@ -71,7 +71,7 @@ Your communication style:
 You are here to be a helpful, reliable, and engaging AI companion."""
 
 
-def validate_discord_token() -> Tuple[bool, str]:
+def validate_discord_token() -> tuple[bool, str]:
     """Validate Discord bot token configuration.
 
     Returns:
@@ -110,7 +110,6 @@ def validate_llm_and_embedding_endpoints() -> bool:
     validation_passed = True
 
     logger.info("Validating LLM and embedding endpoints...")
-    print("🔍 Validating LLM and embedding endpoints...")
 
     # Get LLM configuration from environment variables (no fallbacks - validate actual config)
     llm_api_url = os.getenv("LLM_CHAT_API_URL")
@@ -120,9 +119,6 @@ def validate_llm_and_embedding_endpoints() -> bool:
     # Validate required LLM configuration
     if not llm_api_url:
         logger.error("❌ LLM_CHAT_API_URL environment variable not set")
-        print("❌ Missing required configuration: LLM_CHAT_API_URL")
-        print("   Please set this variable in your .env file.")
-        print("   📖 Check .env.example and docs/ENVIRONMENT_VARIABLES_REFERENCE.md for details")
         return False
 
     # Get emotion endpoint (defaults to main LLM if not specified)
@@ -145,20 +141,10 @@ def validate_llm_and_embedding_endpoints() -> bool:
         # Validate required embedding configuration
         if not embedding_api_url:
             logger.error("❌ LLM_EMBEDDING_API_URL environment variable not set")
-            print("❌ Missing required configuration: LLM_EMBEDDING_API_URL")
-            print("   Please set this variable in your .env file.")
-            print(
-                "   📖 Check .env.example and docs/ENVIRONMENT_VARIABLES_REFERENCE.md for details"
-            )
             return False
 
         if not embedding_model:
             logger.error("❌ LLM_EMBEDDING_MODEL environment variable not set")
-            print("❌ Missing required configuration: LLM_EMBEDDING_MODEL")
-            print("   Please set this variable in your .env file.")
-            print(
-                "   📖 Check .env.example and docs/ENVIRONMENT_VARIABLES_REFERENCE.md for details"
-            )
             return False
     else:
         embedding_api_url = None
@@ -169,9 +155,6 @@ def validate_llm_and_embedding_endpoints() -> bool:
         """Test a single LLM endpoint by calling /models"""
         try:
             logger.info(f"Checking {name} endpoint: {url} - Model: {model_name}")
-            print(f"🤖 Checking {name} endpoint")
-            print(f"   URL: {url}")
-            print(f"   Model: {model_name}")
 
             # Prepare headers
             headers = {"Content-Type": "application/json"}
@@ -194,32 +177,21 @@ def validate_llm_and_embedding_endpoints() -> bool:
             logger.info(
                 f"✅ {name} endpoint accessible - URL: {url} - Available models: {len(available_models)}"
             )
-            print(f"✅ {name} endpoint is accessible")
-            print(f"   Available models: {len(available_models)}")
             return True
 
         except requests.exceptions.HTTPError as e:
             if e.response and e.response.status_code == 401:
                 logger.error(f"❌ Authentication error for {name} endpoint - URL: {url}")
-                print(f"❌ Authentication error for {name} endpoint")
-                print(f"   URL: {url}")
-                print(f"   Error: Invalid API key or authentication failed")
-                print(f"   Check your API key configuration in .env file")
             else:
                 logger.error(
                     f"❌ HTTP error for {name} endpoint - URL: {url} - Status: {e.response.status_code if e.response else 'Unknown'}"
                 )
-                print(f"❌ HTTP error for {name} endpoint: {e}")
             return False
-        except requests.exceptions.ConnectionError as e:
+        except requests.exceptions.ConnectionError:
             logger.error(f"❌ Connection error for {name} endpoint - URL: {url}")
-            print(f"❌ Connection error: Cannot reach {name} endpoint")
-            print(f"   URL: {url}")
-            print(f"   Check that the service is running and accessible")
             return False
         except Exception as e:
             logger.error(f"❌ Error validating {name} endpoint - URL: {url} - Error: {e}")
-            print(f"❌ Error validating {name} endpoint: {e}")
             return False
 
     # Test main LLM endpoint
@@ -234,7 +206,6 @@ def validate_llm_and_embedding_endpoints() -> bool:
             validation_passed = False
     else:
         logger.info("Emotion endpoint same as main LLM endpoint - skipping separate validation")
-        print("🎭 Emotion endpoint same as main LLM endpoint - already validated")
 
     # Test facts endpoint (if different from main/emotion)
     if facts_api_url not in [llm_api_url, emotion_api_url]:
@@ -244,12 +215,10 @@ def validate_llm_and_embedding_endpoints() -> bool:
         logger.info(
             "Facts endpoint same as main/emotion LLM endpoint - skipping separate validation"
         )
-        print("📊 Facts endpoint same as main/emotion LLM endpoint - already validated")
 
     # Test embedding endpoint (if using external embeddings)
     if use_external_embeddings:
         logger.info("Checking embedding endpoint...")
-        print("🔗 Checking embedding endpoint...")
 
         if not test_llm_endpoint(
             "Embedding", embedding_api_url, embedding_api_key, embedding_model
@@ -257,15 +226,11 @@ def validate_llm_and_embedding_endpoints() -> bool:
             validation_passed = False
     else:
         logger.info("Using local embeddings - skipping external embedding validation")
-        print("🔗 Using local embeddings - skipping external embedding validation")
 
     if validation_passed:
         logger.info("✅ All LLM and embedding endpoints validated successfully")
-        print("✅ All LLM and embedding endpoints validated successfully")
     else:
         logger.error("❌ One or more endpoints failed validation")
-        print("❌ One or more endpoints failed validation")
-        print("   Please check your service configurations and ensure all services are running")
 
     return validation_passed
 
@@ -282,14 +247,11 @@ def validate_all_config() -> bool:
     token_valid, token_error = validate_discord_token()
     if not token_valid:
         logger.critical(token_error)
-        print(f"❌ ERROR: {token_error}")
         all_valid = False
 
     # Validate LLM endpoints
     if not validate_llm_and_embedding_endpoints():
         logger.critical("LLM/embedding validation failed")
-        print("❌ CRITICAL ERROR: LLM/embedding validation failed")
-        print("The bot cannot run without accessible LLM and embedding services.")
         all_valid = False
 
     return all_valid

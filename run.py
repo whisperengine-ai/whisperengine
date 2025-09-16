@@ -4,8 +4,8 @@ WhisperEngine Bot Launcher - Infrastructure Setup
 This launcher handles environment loading and logging configuration before delegating to the bot logic.
 """
 
-import sys
 import os
+import sys
 
 # Add the project root to Python path
 project_root = os.path.dirname(os.path.abspath(__file__))
@@ -15,8 +15,6 @@ sys.path.insert(0, project_root)
 from env_manager import load_environment
 
 if not load_environment():  # Auto-detects development vs production mode
-    print("❌ Failed to load environment configuration")
-    print("💡 Run: python setup_env.py --template minimal")
     sys.exit(1)
 
 # Configure logging using the proper logging configuration

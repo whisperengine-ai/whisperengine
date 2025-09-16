@@ -3,8 +3,8 @@
 Simple test to interact with WhisperEngine app and generate logs
 """
 
-import time
 import logging
+import time
 
 
 def generate_app_logs():
@@ -64,10 +64,6 @@ def generate_app_logs():
     time.sleep(0.1)
     loggers["main"].info("WhisperEngine session simulation completed")
 
-    print("🎭 Generated realistic application logs")
-    print("📋 Check the System Logs tab to see the activity")
-    print("🔍 Try filtering by different log levels (INFO, WARNING, ERROR)")
-    print("📋 Use 'Copy All' or 'Copy Selected' to copy logs to clipboard")
 
 
 if __name__ == "__main__":

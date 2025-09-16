@@ -3,11 +3,10 @@ Health Monitor for Enhanced Concurrent Discord Bot
 Provides health checks and monitoring for all components
 """
 
-import asyncio
 import logging
 import time
-from typing import Dict, Any, Optional
 from datetime import datetime
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +34,7 @@ class HealthMonitor:
         self.error_counts = {}
         self.start_time = time.time()
 
-    async def perform_health_check(self) -> Dict[str, Any]:
+    async def perform_health_check(self) -> dict[str, Any]:
         """Perform comprehensive health check"""
         self.last_check = datetime.now()
         health_status = {
@@ -60,7 +59,7 @@ class HealthMonitor:
         # Check memory manager
         try:
             # Test memory operations
-            test_result = await self.memory_manager.retrieve_memories_safe(
+            await self.memory_manager.retrieve_memories_safe(
                 "health_check", "test", limit=1
             )
             health_status["components"]["memory"] = {
@@ -135,6 +134,6 @@ class HealthMonitor:
         """Increment error count for a component"""
         self.error_counts[component] = self.error_counts.get(component, 0) + 1
 
-    def get_error_summary(self) -> Dict[str, int]:
+    def get_error_summary(self) -> dict[str, int]:
         """Get error count summary"""
         return self.error_counts.copy()

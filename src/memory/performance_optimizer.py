@@ -21,15 +21,15 @@ Key improvements over the existing system:
 import asyncio
 import hashlib
 import logging
+import threading
 import time
 from collections import OrderedDict
-from datetime import datetime, timedelta
 from dataclasses import dataclass, field
+from datetime import datetime
 from enum import Enum
-from typing import Dict, List, Optional, Any, Tuple, Set, Union
-import json
-import threading
-from statistics import mean, median
+from statistics import mean
+from typing import Any
+
 import psutil
 
 logger = logging.getLogger(__name__)
@@ -64,7 +64,7 @@ class PerformanceMetrics:
     network_latency_ms: float = 0.0
     timestamp: datetime = field(default_factory=datetime.now)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert metrics to dictionary"""
         return {
             "operation_type": self.operation_type,
@@ -85,7 +85,7 @@ class CacheEntry:
     timestamp: datetime
     access_count: int = 0
     last_accessed: datetime = field(default_factory=datetime.now)
-    ttl_seconds: Optional[int] = None
+    ttl_seconds: int | None = None
 
     def is_expired(self) -> bool:
         """Check if cache entry is expired"""
@@ -156,7 +156,7 @@ class AdvancedCache:
             # No event loop running, cleanup will be manual
             logger.debug("No event loop for automatic cache cleanup")
 
-    def get(self, key: str) -> Optional[Any]:
+    def get(self, key: str) -> Any | None:
         """Get value from cache"""
         with self.cache_lock:
             entry = self.cache.get(key)
@@ -178,7 +178,7 @@ class AdvancedCache:
             self.hits += 1
             return entry.data
 
-    def put(self, key: str, value: Any, ttl_seconds: Optional[int] = None) -> None:
+    def put(self, key: str, value: Any, ttl_seconds: int | None = None) -> None:
         """Put value in cache"""
         with self.cache_lock:
             # Use provided TTL or default
@@ -236,7 +236,7 @@ class AdvancedCache:
 
             return cleaned
 
-    def get_statistics(self) -> Dict[str, Any]:
+    def get_statistics(self) -> dict[str, Any]:
         """Get cache statistics"""
         total_requests = self.hits + self.misses
         hit_rate = (self.hits / total_requests * 100) if total_requests > 0 else 0
@@ -304,14 +304,14 @@ class MemoryPerformanceOptimizer:
 
         # Performance monitoring
         if self.enable_monitoring:
-            self.performance_metrics: List[PerformanceMetrics] = []
+            self.performance_metrics: list[PerformanceMetrics] = []
             self.metrics_lock = threading.Lock()
             self.max_metrics_history = 10000
 
         # Batch processing queues
-        self.embedding_queue: List[Tuple[str, asyncio.Future]] = []
-        self.storage_queue: List[Tuple[Dict[str, Any], asyncio.Future]] = []
-        self.query_queue: List[Tuple[Dict[str, Any], asyncio.Future]] = []
+        self.embedding_queue: list[tuple[str, asyncio.Future]] = []
+        self.storage_queue: list[tuple[dict[str, Any], asyncio.Future]] = []
+        self.query_queue: list[tuple[dict[str, Any], asyncio.Future]] = []
 
         # Queue processing tasks
         self.batch_tasks = []
@@ -352,7 +352,7 @@ class MemoryPerformanceOptimizer:
         except RuntimeError:
             logger.debug("No event loop for batch processing")
 
-    async def get_embeddings_optimized(self, texts: List[str]) -> List[List[float]]:
+    async def get_embeddings_optimized(self, texts: list[str]) -> list[list[float]]:
         """Get embeddings with caching and batching optimization"""
         start_time = time.time()
         cached_embeddings = []
@@ -391,7 +391,7 @@ class MemoryPerformanceOptimizer:
                 )  # Longer TTL for embeddings
 
         # Combine cached and new embeddings in original order
-        result_embeddings: List[List[float]] = [[]] * len(texts)
+        result_embeddings: list[list[float]] = [[]] * len(texts)
 
         # Place cached embeddings
         for original_index, embedding in cached_embeddings:
@@ -421,11 +421,11 @@ class MemoryPerformanceOptimizer:
     async def search_memories_optimized(
         self,
         query_text: str,
-        user_id: Optional[str] = None,
+        user_id: str | None = None,
         limit: int = 5,
-        doc_types: Optional[List[str]] = None,
+        doc_types: list[str] | None = None,
         use_cache: bool = True,
-    ) -> List[Dict]:
+    ) -> list[dict]:
         """Search memories with optimization and caching"""
         start_time = time.time()
 
@@ -496,7 +496,7 @@ class MemoryPerformanceOptimizer:
         user_id: str,
         message: str,
         response: str,
-        metadata: Optional[Dict] = None,
+        metadata: dict | None = None,
         use_batch: bool = True,
     ) -> str:
         """Store conversation with optimization"""
@@ -538,7 +538,7 @@ class MemoryPerformanceOptimizer:
 
     async def get_user_conversations_optimized(
         self, user_id: str, limit: int = 10, use_cache: bool = True
-    ) -> List[Dict]:
+    ) -> list[dict]:
         """Get user conversations with caching"""
         start_time = time.time()
 
@@ -671,8 +671,8 @@ class MemoryPerformanceOptimizer:
     # Optimization helpers
 
     async def _optimize_search_query(
-        self, query_text: str, user_id: Optional[str], limit: int, doc_types: Optional[List[str]]
-    ) -> Dict[str, Any]:
+        self, query_text: str, user_id: str | None, limit: int, doc_types: list[str] | None
+    ) -> dict[str, Any]:
         """Apply query optimizations based on optimization level"""
         optimized = {
             "query_text": query_text,
@@ -705,7 +705,7 @@ class MemoryPerformanceOptimizer:
 
         return optimized
 
-    async def _optimize_search_results(self, results: List[Dict], query_text: str) -> List[Dict]:
+    async def _optimize_search_results(self, results: list[dict], query_text: str) -> list[dict]:
         """Optimize search results post-processing"""
         if not results:
             return results
@@ -802,8 +802,8 @@ class MemoryPerformanceOptimizer:
             return query_text
 
     def _optimize_doc_types(
-        self, doc_types: Optional[List[str]], query_text: str
-    ) -> Optional[List[str]]:
+        self, doc_types: list[str] | None, query_text: str
+    ) -> list[str] | None:
         """Optimize document type filtering based on query content"""
         if doc_types:
             return doc_types
@@ -816,7 +816,7 @@ class MemoryPerformanceOptimizer:
 
         return None
 
-    def _filter_by_relevance(self, results: List[Dict], query_text: str) -> List[Dict]:
+    def _filter_by_relevance(self, results: list[dict], query_text: str) -> list[dict]:
         """Filter results by relevance threshold"""
         if not results:
             return results
@@ -835,7 +835,7 @@ class MemoryPerformanceOptimizer:
 
         return filtered
 
-    async def _semantic_rerank(self, results: List[Dict], query_text: str) -> List[Dict]:
+    async def _semantic_rerank(self, results: list[dict], query_text: str) -> list[dict]:
         """Re-rank results using semantic similarity"""
         try:
             if not results or not query_text:
@@ -879,7 +879,7 @@ class MemoryPerformanceOptimizer:
             logger.warning(f"Semantic re-ranking failed: {e}")
             return results
 
-    async def _get_embeddings_batch(self, texts: List[str]) -> List[List[float]]:
+    async def _get_embeddings_batch(self, texts: list[str]) -> list[list[float]]:
         """Get embeddings in optimized batch"""
         try:
             return await self.chromadb_manager.embedding_manager.get_embeddings(texts)
@@ -938,7 +938,7 @@ class MemoryPerformanceOptimizer:
                     -self.max_metrics_history // 2 :
                 ]
 
-    async def _process_individual_query(self, query_data: Dict[str, Any]) -> Any:
+    async def _process_individual_query(self, query_data: dict[str, Any]) -> Any:
         """Process individual query with optimization"""
         try:
             query_text = query_data.get("query", "")
@@ -973,7 +973,7 @@ class MemoryPerformanceOptimizer:
 
     # Performance monitoring and statistics
 
-    def get_performance_statistics(self) -> Dict[str, Any]:
+    def get_performance_statistics(self) -> dict[str, Any]:
         """Get comprehensive performance statistics"""
         if not self.enable_monitoring:
             return {"monitoring_enabled": False}
@@ -1048,7 +1048,7 @@ class MemoryPerformanceOptimizer:
                 "batch_size": self.batch_size,
             }
 
-    async def cleanup_caches(self) -> Dict[str, int]:
+    async def cleanup_caches(self) -> dict[str, int]:
         """Manually trigger cache cleanup"""
         cleanup_results = {}
 
@@ -1062,7 +1062,7 @@ class MemoryPerformanceOptimizer:
 
         return cleanup_results
 
-    async def warm_up_cache(self, common_queries: List[str], user_ids: List[str]) -> None:
+    async def warm_up_cache(self, common_queries: list[str], user_ids: list[str]) -> None:
         """Warm up caches with common queries"""
         logger.info("Starting cache warm-up...")
 
@@ -1081,7 +1081,7 @@ class MemoryPerformanceOptimizer:
         except Exception as e:
             logger.warning(f"Cache warm-up partially failed: {e}")
 
-    def get_cache_summary(self) -> Dict[str, Any]:
+    def get_cache_summary(self) -> dict[str, Any]:
         """Get summary of all cache states"""
         return {
             "query_cache": self.query_cache.get_statistics(),

@@ -11,18 +11,19 @@ Automatically selects the most appropriate prompt template based on:
 This ensures the best possible experience across all deployment scenarios.
 """
 
+import logging
 import os
 import sys
 from pathlib import Path
-from typing import Dict, Optional, Tuple, Any
+from typing import Any
+
 import psutil
-import logging
 
 
 class OptimizedPromptManager:
     """Manages prompt selection based on system capabilities and performance needs"""
 
-    def __init__(self, project_root: Optional[Path] = None):
+    def __init__(self, project_root: Path | None = None):
         self.project_root = project_root or Path(__file__).parent.parent
         self.prompts_dir = self.project_root / "prompts"
         self.optimized_dir = self.prompts_dir / "optimized"
@@ -96,7 +97,7 @@ class OptimizedPromptManager:
         except Exception:
             return 0
 
-    def select_optimal_prompt(self, prompt_type: str = "system") -> Tuple[Path, Dict[str, Any]]:
+    def select_optimal_prompt(self, prompt_type: str = "system") -> tuple[Path, dict[str, Any]]:
         """
         Select the optimal prompt based on system capabilities and requirements
 
@@ -200,7 +201,7 @@ class OptimizedPromptManager:
         )
         return absolute_fallback, selection_metadata
 
-    def load_optimized_prompt(self, prompt_type: str = "system") -> Tuple[str, Dict[str, Any]]:
+    def load_optimized_prompt(self, prompt_type: str = "system") -> tuple[str, dict[str, Any]]:
         """
         Load the optimal prompt content with metadata
 
@@ -223,10 +224,10 @@ class OptimizedPromptManager:
             metadata.update({"load_success": False, "error": str(e)})
 
             # Return minimal fallback content
-            fallback_content = f"You are a helpful AI assistant. Respond naturally and helpfully."
+            fallback_content = "You are a helpful AI assistant. Respond naturally and helpfully."
             return fallback_content, metadata
 
-    def get_prompt_recommendations(self) -> Dict[str, Any]:
+    def get_prompt_recommendations(self) -> dict[str, Any]:
         """Get recommendations for prompt optimization"""
 
         system_perf = self._assess_system_performance()
@@ -261,8 +262,8 @@ class OptimizedPromptManager:
 
 
 def get_optimized_prompt(
-    prompt_type: str = "system", project_root: Optional[Path] = None
-) -> Tuple[str, Dict[str, Any]]:
+    prompt_type: str = "system", project_root: Path | None = None
+) -> tuple[str, dict[str, Any]]:
     """
     Convenience function to get optimized prompt content
 
@@ -281,27 +282,13 @@ if __name__ == "__main__":
     # Demo the optimization system
     manager = OptimizedPromptManager()
 
-    print("🎯 WhisperEngine Prompt Optimization Analysis")
-    print("=" * 50)
 
     # System analysis
     recommendations = manager.get_prompt_recommendations()
-    print(f"Model Type: {recommendations['current_model']}")
-    print(f"System Performance: {recommendations['system_performance']}")
-    print(f"Available Memory: {recommendations['memory_gb']:.1f}GB")
-    print(f"Bundled Executable: {recommendations['is_bundled']}")
-    print()
 
-    print("Recommendations:")
-    for rec in recommendations["recommendations"]:
-        print(f"  {rec}")
-    print()
+    for _rec in recommendations["recommendations"]:
+        pass
 
     # Test prompt selection
     for prompt_type in ["system", "default"]:
         selected_path, metadata = manager.select_optimal_prompt(prompt_type)
-        print(f"{prompt_type.capitalize()} Prompt:")
-        print(f"  Selected: {selected_path.name}")
-        print(f"  Tokens: {metadata['estimated_tokens']}")
-        print(f"  Reason: {metadata['reason']}")
-        print()

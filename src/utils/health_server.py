@@ -3,13 +3,11 @@ Health check web server for container orchestration and monitoring.
 Provides HTTP endpoints for health checks, metrics, and status information.
 """
 
-import asyncio
 import logging
-import json
 from datetime import datetime
-from typing import Dict, Any, Optional
-from aiohttp import web, ClientSession
+
 import discord
+from aiohttp import web
 from discord.ext import commands
 
 logger = logging.getLogger(__name__)
@@ -161,12 +159,12 @@ class HealthCheckServer:
             await self.site.start()
 
             logger.info(f"✅ Health check server started on {self.host}:{self.port}")
-            logger.info(f"Health endpoints available:")
+            logger.info("Health endpoints available:")
             logger.info(f"  - http://{self.host}:{self.port}/health")
             logger.info(f"  - http://{self.host}:{self.port}/ready")
             logger.info(f"  - http://{self.host}:{self.port}/metrics")
             logger.info(f"  - http://{self.host}:{self.port}/status")
-            logger.debug(f"Access logging disabled to prevent health check spam")
+            logger.debug("Access logging disabled to prevent health check spam")
 
         except Exception as e:
             logger.error(f"Failed to start health check server: {e}")

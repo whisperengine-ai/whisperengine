@@ -8,20 +8,18 @@ identity spoofing and attribution errors in conversation contexts.
 SECURITY VULNERABILITY ADDRESSED: Message Role Assignment (CVSS 6.5)
 """
 
+import logging
 import os
 import sys
-import asyncio
 import unittest
-from unittest.mock import Mock, AsyncMock, MagicMock, patch
-import logging
 from datetime import datetime
+from unittest.mock import Mock
 
 # Add the project root to the path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from message_role_security import (
     MessageRoleAssignmentManager,
-    MessageAttribution,
     MessageRoleType,
     UserIdentityLevel,
 )
@@ -79,7 +77,6 @@ class TestMessageRoleAssignmentSecurity(unittest.TestCase):
 
     def test_attribution_id_generation_contextualized(self):
         """Test attribution ID generation with contextualized identity level"""
-        print("\n🧪 Testing attribution ID generation - contextualized...")
 
         context = "channel_98765"
 
@@ -101,12 +98,9 @@ class TestMessageRoleAssignmentSecurity(unittest.TestCase):
         self.assertEqual(alice_id, "user_1")
         self.assertEqual(bob_id, "user_2")
 
-        print(f"  ✅ Alice ID: {alice_id}, Bob ID: {bob_id}")
-        print("  ✅ Attribution IDs generated correctly with context isolation")
 
     def test_attribution_id_generation_anonymous(self):
         """Test attribution ID generation with anonymous identity level"""
-        print("\n🧪 Testing attribution ID generation - anonymous...")
 
         # Create manager with anonymous level
         anon_manager = MessageRoleAssignmentManager(UserIdentityLevel.ANONYMOUS)
@@ -129,12 +123,9 @@ class TestMessageRoleAssignmentSecurity(unittest.TestCase):
         alice_id_2 = anon_manager.generate_attribution_id("67890", context)
         self.assertEqual(alice_id, alice_id_2)
 
-        print(f"  ✅ Anonymous Alice ID: {alice_id}, Bob ID: {bob_id}")
-        print("  ✅ Anonymous attribution IDs generated correctly")
 
     def test_message_attribution_creation(self):
         """Test creation of message attribution objects"""
-        print("\n🧪 Testing message attribution creation...")
 
         context = "channel_98765"
 
@@ -161,12 +152,9 @@ class TestMessageRoleAssignmentSecurity(unittest.TestCase):
         self.assertTrue(bot_attribution.is_bot)
         self.assertEqual(bot_attribution.attribution_id, "assistant")
 
-        print("  ✅ User message attribution created correctly")
-        print("  ✅ Bot message attribution created correctly")
 
     def test_message_role_format_conversion(self):
         """Test conversion of messages to secure role format"""
-        print("\n🧪 Testing message role format conversion...")
 
         context = "channel_98765"
 
@@ -191,12 +179,9 @@ class TestMessageRoleAssignmentSecurity(unittest.TestCase):
         self.assertEqual(bot_role_msg["llm_role"], "assistant")
         self.assertTrue(bot_role_msg["attribution"]["is_bot"])
 
-        print("  ✅ User message converted to secure role format")
-        print("  ✅ Bot message converted to secure role format")
 
     def test_llm_format_conversion_with_attribution(self):
         """Test conversion to LLM format with attribution preservation"""
-        print("\n🧪 Testing LLM format conversion with attribution...")
 
         context = "channel_98765"
 
@@ -238,13 +223,9 @@ class TestMessageRoleAssignmentSecurity(unittest.TestCase):
         self.assertEqual(bot_llm["role"], "assistant")
         self.assertEqual(bot_llm["content"], "I'm here to help both of you!")
 
-        print("  ✅ LLM format preserves user attribution correctly")
-        print("  ✅ Different users have different attribution prefixes")
-        print("  ✅ Bot messages don't have attribution prefixes")
 
     def test_identity_spoofing_detection(self):
         """Test detection of identity spoofing attempts"""
-        print("\n🧪 Testing identity spoofing detection...")
 
         # Create a suspicious message where non-bot user has assistant role
         suspicious_message = {
@@ -266,12 +247,9 @@ class TestMessageRoleAssignmentSecurity(unittest.TestCase):
         self.assertEqual(validation_result["security_level"], "compromised")
         self.assertIn("identity spoofing", validation_result["errors"][0].lower())
 
-        print("  ✅ Identity spoofing attempt detected correctly")
-        print(f"  🚨 Security warning: {validation_result['errors'][0]}")
 
     def test_suspicious_content_detection(self):
         """Test detection of suspicious content patterns"""
-        print("\n🧪 Testing suspicious content detection...")
 
         # Create message with suspicious content
         suspicious_message = {
@@ -296,12 +274,9 @@ class TestMessageRoleAssignmentSecurity(unittest.TestCase):
         warnings_text = " ".join(validation_result["warnings"]).lower()
         self.assertIn("suspicious content pattern", warnings_text)
 
-        print("  ✅ Suspicious content patterns detected")
-        print(f"  ⚠️  Warning: {validation_result['warnings'][0]}")
 
     def test_conversation_participants_tracking(self):
         """Test tracking of conversation participants"""
-        print("\n🧪 Testing conversation participants tracking...")
 
         context = "channel_98765"
 
@@ -329,12 +304,9 @@ class TestMessageRoleAssignmentSecurity(unittest.TestCase):
         self.assertIn("Bob", usernames)
         self.assertIn("TestBot", usernames)
 
-        print(f"  ✅ Tracked {participant_info['participant_count']} participants")
-        print(f"  👥 Participants: {', '.join(usernames)}")
 
     def test_cross_context_isolation(self):
         """Test that attribution IDs are isolated between contexts"""
-        print("\n🧪 Testing cross-context attribution isolation...")
 
         context1 = "channel_111"
         context2 = "channel_222"
@@ -355,13 +327,9 @@ class TestMessageRoleAssignmentSecurity(unittest.TestCase):
         bob_id_ctx2 = self.role_manager.generate_attribution_id("54321", context2)
         self.assertEqual(bob_id_ctx2, "user_2")  # Second user in context2 (isolated)
 
-        print("  ✅ Attribution IDs properly isolated between contexts")
-        print(f"  📂 Context 1: Alice={alice_id_ctx1}, Bob={bob_id_ctx1}")
-        print(f"  📂 Context 2: Alice={alice_id_ctx2}, Bob={bob_id_ctx2}")
 
     def test_context_clearing(self):
         """Test clearing of context attribution"""
-        print("\n🧪 Testing context attribution clearing...")
 
         context = "channel_98765"
 
@@ -385,11 +353,9 @@ class TestMessageRoleAssignmentSecurity(unittest.TestCase):
         participant_info_after = self.role_manager.get_conversation_participants(context)
         self.assertEqual(participant_info_after["participant_count"], 0)
 
-        print("  ✅ Context attribution cleared successfully")
 
     def test_attribution_summary_generation(self):
         """Test generation of attribution summary for debugging"""
-        print("\n🧪 Testing attribution summary generation...")
 
         context1 = "channel_111"
         context2 = "channel_222"
@@ -414,13 +380,9 @@ class TestMessageRoleAssignmentSecurity(unittest.TestCase):
         self.assertIn(context1, summary["contexts"])
         self.assertIn(context2, summary["contexts"])
 
-        print(
-            f"  ✅ Summary generated: {summary['total_contexts']} contexts, {summary['total_cached_users']} cached users"
-        )
 
     def test_identity_spoofing_prevention_scenario(self):
         """Test comprehensive identity spoofing prevention scenario"""
-        print("\n🧪 Testing comprehensive identity spoofing prevention scenario...")
 
         context = "server_channel_456"
 
@@ -469,42 +431,10 @@ class TestMessageRoleAssignmentSecurity(unittest.TestCase):
         self.assertIn("Alice is impersonating me", spoofed_llm["content"])
         self.assertTrue(spoofed_llm["content"].startswith("[Alice]: "))
 
-        print("  ✅ Identity spoofing prevented through attribution tracking")
-        print("  🛡️  All messages properly attributed to actual users")
-        print(f"  📝 Alice's messages: {alice_llm['content'][:50]}...")
-        print(f"  📝 Bob's messages: {bob_llm['content'][:50]}...")
-        print(
-            f"  📝 Spoofed message correctly attributed to Alice: {spoofed_llm['content'][:50]}..."
-        )
 
 
 if __name__ == "__main__":
-    print("🔒 Message Role Assignment Security - Test Suite")
-    print("=" * 70)
 
     # Run tests
     unittest.main(verbosity=2, exit=False)
 
-    print("\n" + "=" * 70)
-    print("🎉 Message Role Assignment Security Testing Complete!")
-    print("\n🔒 Security Features Validated:")
-    print("  ✅ Secure attribution ID generation with context isolation")
-    print("  ✅ Proper message attribution tracking")
-    print("  ✅ LLM format conversion with identity preservation")
-    print("  ✅ Identity spoofing detection and prevention")
-    print("  ✅ Suspicious content pattern detection")
-    print("  ✅ Conversation participant tracking")
-    print("  ✅ Cross-context attribution isolation")
-    print("  ✅ Context clearing and management")
-    print("  ✅ Attribution summary generation")
-    print("  ✅ Comprehensive spoofing prevention scenarios")
-    print("\n🛡️  CVSS 6.5 Vulnerability - ADDRESSED:")
-    print("  ❌ Identity confusion in conversation flow")
-    print("  ❌ Attribution errors in fact extraction")
-    print("  ❌ Relationship tracking corruption")
-    print("  ❌ Identity spoofing within conversation context")
-    print("  ✅ Secure message role assignment with proper attribution")
-    print("  ✅ User identity tracking and verification")
-    print("  ✅ Cross-user contamination prevention")
-    print("  ✅ Relationship and context preservation")
-    print("\n✅ Message Role Assignment Security - IMPLEMENTATION COMPLETE ✅")

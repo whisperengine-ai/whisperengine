@@ -5,13 +5,14 @@ Tests CVSS 5.3 Error Message Information Disclosure vulnerability fixes
 
 import unittest
 from unittest.mock import Mock, patch
+
 import discord
 from error_message_security import (
+    ErrorContext,
     ErrorMessageSecurity,
     ErrorSeverity,
-    ErrorContext,
-    secure_error_handler,
     sanitize_error_for_logging,
+    secure_error_handler,
 )
 
 
@@ -216,7 +217,7 @@ Exception: Database connection failed"""
 
         # Find our pattern in the counts
         pattern_found = False
-        for pattern_hash, data in self.error_security.error_counts.items():
+        for _pattern_hash, data in self.error_security.error_counts.items():
             if data["count"] > 10:
                 pattern_found = True
                 self.assertEqual(data["sample_message"], error_msg[:100])
@@ -332,7 +333,7 @@ class TestErrorSecurityIntegration(unittest.TestCase):
 
                 # Test critical error logging
                 critical_msg = "Authentication bypass detected"
-                response = error_security.sanitize_error_message(
+                error_security.sanitize_error_message(
                     critical_msg, error_type="security_error"
                 )
 

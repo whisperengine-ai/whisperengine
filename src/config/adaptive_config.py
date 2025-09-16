@@ -3,12 +3,12 @@ Adaptive Configuration System for WhisperEngine
 Automatically detects environment and optimizes configuration for available resources.
 """
 
+import json
 import os
 import platform
-import json
-from typing import Dict, Any, Optional
-from dataclasses import dataclass, asdict
+from dataclasses import asdict, dataclass
 from pathlib import Path
+from typing import Any
 
 try:
     import psutil
@@ -66,7 +66,7 @@ class ScalingConfig:
     resources: ResourceInfo
     performance: PerformanceConfig
     database: DatabaseConfig
-    features: Dict[str, bool]
+    features: dict[str, bool]
 
 
 class EnvironmentDetector:
@@ -292,7 +292,7 @@ class ConfigurationOptimizer:
                 backup_enabled=True,
             )
 
-    def _generate_feature_config(self, scale_tier: int) -> Dict[str, bool]:
+    def _generate_feature_config(self, scale_tier: int) -> dict[str, bool]:
         """Generate feature configuration based on scale tier"""
         base_features = {
             "enable_emotions": True,
@@ -314,7 +314,7 @@ class ConfigurationOptimizer:
 class AdaptiveConfigManager:
     """Main configuration manager that adapts to environment"""
 
-    def __init__(self, config_override: Optional[Dict[str, Any]] = None):
+    def __init__(self, config_override: dict[str, Any] | None = None):
         self.optimizer = ConfigurationOptimizer()
         self.config = self.optimizer.generate_optimal_config()
         self._apply_overrides(config_override)
@@ -334,7 +334,7 @@ class AdaptiveConfigManager:
         """Get the current deployment mode"""
         return self.config.deployment_mode
 
-    def get_storage_configuration(self) -> Dict[str, Any]:
+    def get_storage_configuration(self) -> dict[str, Any]:
         """Get storage configuration details"""
         return {
             "primary_database": self.config.database.primary_type,
@@ -344,7 +344,7 @@ class AdaptiveConfigManager:
             "backup_enabled": self.config.database.backup_enabled,
         }
 
-    def _apply_overrides(self, overrides: Optional[Dict[str, Any]]):
+    def _apply_overrides(self, overrides: dict[str, Any] | None):
         """Apply manual configuration overrides"""
         if not overrides:
             return
@@ -357,7 +357,7 @@ class AdaptiveConfigManager:
         # TODO: Implement deep merge of override configuration
         # This would allow fine-grained control over specific settings
 
-    def _load_env_overrides(self) -> Dict[str, Any]:
+    def _load_env_overrides(self) -> dict[str, Any]:
         """Load configuration overrides from environment variables"""
         overrides = {}
 
@@ -385,7 +385,7 @@ class AdaptiveConfigManager:
 
         return overrides
 
-    def get_env_vars(self) -> Dict[str, str]:
+    def get_env_vars(self) -> dict[str, str]:
         """Generate environment variables from current configuration"""
         env_vars = {}
 
@@ -440,13 +440,13 @@ class AdaptiveConfigManager:
 
     def load_config(self, filepath: str):
         """Load configuration from file"""
-        with open(filepath, "r") as f:
-            config_dict = json.load(f)
+        with open(filepath) as f:
+            json.load(f)
 
         # TODO: Implement proper deserialization from dict to ScalingConfig
         # This would require custom serialization/deserialization logic
 
-    def get_deployment_info(self) -> Dict[str, Any]:
+    def get_deployment_info(self) -> dict[str, Any]:
         """Get deployment information for monitoring/debugging"""
         return {
             "deployment_mode": self.config.deployment_mode,
@@ -470,18 +470,15 @@ if __name__ == "__main__":
     config_manager = AdaptiveConfigManager()
 
     # Print deployment information
-    print("=== WhisperEngine Adaptive Configuration ===")
     deployment_info = config_manager.get_deployment_info()
-    for key, value in deployment_info.items():
-        print(f"{key}: {value}")
+    for _key, _value in deployment_info.items():
+        pass
 
-    print("\n=== Generated Environment Variables ===")
     env_vars = config_manager.get_env_vars()
-    for key, value in sorted(env_vars.items()):
-        print(f"{key}={value}")
+    for _key, _value in sorted(env_vars.items()):
+        pass
 
     # Save configuration for review
     config_path = Path("~/.whisperengine/adaptive_config.json").expanduser()
     config_path.parent.mkdir(exist_ok=True)
     config_manager.save_config(str(config_path))
-    print(f"\nConfiguration saved to: {config_path}")

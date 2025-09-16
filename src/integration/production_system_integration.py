@@ -7,8 +7,7 @@ import asyncio
 import logging
 import os
 import time
-from typing import Dict, Any, Optional, Union
-from pathlib import Path
+from typing import Any
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -27,7 +26,7 @@ class ProductionSystemIntegrator:
     - Concurrent Conversation Manager for massive user scaling
     """
 
-    def __init__(self, config: Optional[Dict[str, Any]] = None, bot_core=None):
+    def __init__(self, config: dict[str, Any] | None = None, bot_core=None):
         """Initialize production system integrator"""
         self.config = config or self._load_default_config()
         self.bot_core = bot_core  # Reference to bot core for real integrations
@@ -43,7 +42,7 @@ class ProductionSystemIntegrator:
             "concurrent_sessions": 0,
         }
 
-    def _load_default_config(self) -> Dict[str, Any]:
+    def _load_default_config(self) -> dict[str, Any]:
         """Load default production configuration"""
         return {
             "production_engine": {
@@ -189,7 +188,7 @@ class ProductionSystemIntegrator:
                         user_id: str,
                         message: str,
                         response: str,
-                        metadata: Optional[dict] = None,
+                        metadata: dict | None = None,
                     ):
                         """Adapt to UserMemoryManager.store_conversation interface"""
                         try:
@@ -249,7 +248,7 @@ class ProductionSystemIntegrator:
                         user_id: str,
                         message: str,
                         response: str,
-                        metadata: Optional[dict] = None,
+                        metadata: dict | None = None,
                     ):
                         """Store conversation in memory cache"""
                         conversation = {
@@ -501,8 +500,8 @@ class ProductionSystemIntegrator:
             raise
 
     async def process_message_production(
-        self, user_id: str, message: str, context: Dict[str, Any], priority: str = "normal"
-    ) -> Dict[str, Any]:
+        self, user_id: str, message: str, context: dict[str, Any], priority: str = "normal"
+    ) -> dict[str, Any]:
         """
         Process message through optimized production pipeline
 
@@ -586,7 +585,7 @@ class ProductionSystemIntegrator:
             result["error"] = str(e)
             return result
 
-    def get_production_metrics(self) -> Dict[str, Any]:
+    def get_production_metrics(self) -> dict[str, Any]:
         """Get comprehensive production system metrics"""
         metrics = {
             "system_status": "online" if self.is_initialized else "offline",
@@ -684,8 +683,8 @@ class WhisperEngineProductionAdapter:
             return False
 
     async def process_user_message(
-        self, user_id: str, message: str, context: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        self, user_id: str, message: str, context: dict[str, Any]
+    ) -> dict[str, Any]:
         """
         Process user message with production optimizations if available
 
@@ -709,8 +708,8 @@ class WhisperEngineProductionAdapter:
         return await self._fallback_message_processing(user_id, message, context)
 
     async def _fallback_message_processing(
-        self, user_id: str, message: str, context: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        self, user_id: str, message: str, context: dict[str, Any]
+    ) -> dict[str, Any]:
         """Fallback message processing using standard components"""
 
         # This would integrate with existing WhisperEngine components
@@ -724,7 +723,7 @@ class WhisperEngineProductionAdapter:
             "note": "Processed using standard (non-optimized) pipeline",
         }
 
-    def get_system_status(self) -> Dict[str, Any]:
+    def get_system_status(self) -> dict[str, Any]:
         """Get current system status and performance metrics"""
         if self.production_integrator and not self.fallback_mode:
             return self.production_integrator.get_production_metrics()

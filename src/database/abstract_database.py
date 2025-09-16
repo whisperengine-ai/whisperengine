@@ -4,14 +4,13 @@ Provides unified interface for SQLite (desktop) and PostgreSQL (cloud) deploymen
 """
 
 import asyncio
-import sqlite3
 import os
+import sqlite3
 from abc import ABC, abstractmethod
-from typing import Dict, Any, List, Optional, Union, Tuple
-from pathlib import Path
 from dataclasses import dataclass
 from enum import Enum
-import json
+from pathlib import Path
+from typing import Any
 
 try:
     import asyncpg
@@ -54,11 +53,11 @@ class DatabaseConfig:
 class QueryResult:
     """Standardized query result"""
 
-    rows: List[Dict[str, Any]]
+    rows: list[dict[str, Any]]
     row_count: int
     execution_time_ms: float
     success: bool
-    error: Optional[str] = None
+    error: str | None = None
 
 
 class DatabaseConnectionError(Exception):
@@ -93,20 +92,20 @@ class AbstractDatabaseAdapter(ABC):
 
     @abstractmethod
     async def execute_query(
-        self, query: str, params: Optional[Dict[str, Any]] = None
+        self, query: str, params: dict[str, Any] | None = None
     ) -> QueryResult:
         """Execute a query and return results"""
         pass
 
     @abstractmethod
     async def execute_transaction(
-        self, queries: List[Tuple[str, Optional[Dict[str, Any]]]]
+        self, queries: list[tuple[str, dict[str, Any] | None]]
     ) -> bool:
         """Execute multiple queries in a transaction"""
         pass
 
     @abstractmethod
-    async def create_tables(self, schema: Dict[str, str]) -> bool:
+    async def create_tables(self, schema: dict[str, str]) -> bool:
         """Create database tables from schema"""
         pass
 
@@ -121,7 +120,7 @@ class AbstractDatabaseAdapter(ABC):
         pass
 
     @abstractmethod
-    async def migrate_schema(self, migration_scripts: List[str]) -> bool:
+    async def migrate_schema(self, migration_scripts: list[str]) -> bool:
         """Apply schema migrations"""
         pass
 
@@ -186,7 +185,7 @@ class SQLiteAdapter(AbstractDatabaseAdapter):
             self._connected = False
 
     async def execute_query(
-        self, query: str, params: Optional[Dict[str, Any]] = None
+        self, query: str, params: dict[str, Any] | None = None
     ) -> QueryResult:
         """Execute SQLite query"""
         import time
@@ -205,7 +204,7 @@ class SQLiteAdapter(AbstractDatabaseAdapter):
                     if cursor.description
                     else []
                 )
-                result_rows = [dict(zip(columns, row)) for row in rows]
+                result_rows = [dict(zip(columns, row, strict=False)) for row in rows]
             else:
                 # Synchronous fallback
                 cursor = self.connection.execute(query, params or {})
@@ -218,7 +217,7 @@ class SQLiteAdapter(AbstractDatabaseAdapter):
                     if cursor.description
                     else []
                 )
-                result_rows = [dict(zip(columns, row)) for row in rows]
+                result_rows = [dict(zip(columns, row, strict=False)) for row in rows]
 
             execution_time = (time.time() - start_time) * 1000
 
@@ -236,7 +235,7 @@ class SQLiteAdapter(AbstractDatabaseAdapter):
             )
 
     async def execute_transaction(
-        self, queries: List[Tuple[str, Optional[Dict[str, Any]]]]
+        self, queries: list[tuple[str, dict[str, Any] | None]]
     ) -> bool:
         """Execute multiple queries in a transaction"""
         try:
@@ -260,10 +259,10 @@ class SQLiteAdapter(AbstractDatabaseAdapter):
         except Exception as e:
             raise DatabaseQueryError(f"Transaction failed: {e}")
 
-    async def create_tables(self, schema: Dict[str, str]) -> bool:
+    async def create_tables(self, schema: dict[str, str]) -> bool:
         """Create SQLite tables from schema"""
         try:
-            for table_name, table_sql in schema.items():
+            for _table_name, table_sql in schema.items():
                 await self.execute_query(table_sql)
             return True
         except Exception as e:
@@ -324,7 +323,7 @@ class SQLiteAdapter(AbstractDatabaseAdapter):
         except Exception as e:
             raise DatabaseQueryError(f"Restore failed: {e}")
 
-    async def migrate_schema(self, migration_scripts: List[str]) -> bool:
+    async def migrate_schema(self, migration_scripts: list[str]) -> bool:
         """Apply SQLite schema migrations"""
         try:
             # Create migrations table if it doesn't exist
@@ -394,7 +393,7 @@ class PostgreSQLAdapter(AbstractDatabaseAdapter):
             self._connected = False
 
     async def execute_query(
-        self, query: str, params: Optional[Dict[str, Any]] = None
+        self, query: str, params: dict[str, Any] | None = None
     ) -> QueryResult:
         """Execute PostgreSQL query"""
         import time
@@ -406,7 +405,7 @@ class PostgreSQLAdapter(AbstractDatabaseAdapter):
                 # Convert named parameters to positional for asyncpg
                 if params:
                     # Simple parameter substitution (could be enhanced)
-                    for key, value in params.items():
+                    for key, _value in params.items():
                         query = query.replace(f":{key}", f"${list(params.keys()).index(key) + 1}")
                     rows = await connection.fetch(query, *params.values())
                 else:
@@ -431,7 +430,7 @@ class PostgreSQLAdapter(AbstractDatabaseAdapter):
             )
 
     async def execute_transaction(
-        self, queries: List[Tuple[str, Optional[Dict[str, Any]]]]
+        self, queries: list[tuple[str, dict[str, Any] | None]]
     ) -> bool:
         """Execute multiple queries in a PostgreSQL transaction"""
         try:
@@ -440,7 +439,7 @@ class PostgreSQLAdapter(AbstractDatabaseAdapter):
                     for query, params in queries:
                         if params:
                             # Convert named to positional parameters
-                            for key, value in params.items():
+                            for key, _value in params.items():
                                 query = query.replace(
                                     f":{key}", f"${list(params.keys()).index(key) + 1}"
                                 )
@@ -453,10 +452,10 @@ class PostgreSQLAdapter(AbstractDatabaseAdapter):
         except Exception as e:
             raise DatabaseQueryError(f"Transaction failed: {e}")
 
-    async def create_tables(self, schema: Dict[str, str]) -> bool:
+    async def create_tables(self, schema: dict[str, str]) -> bool:
         """Create PostgreSQL tables from schema"""
         try:
-            for table_name, table_sql in schema.items():
+            for _table_name, table_sql in schema.items():
                 await self.execute_query(table_sql)
             return True
         except Exception as e:
@@ -546,7 +545,7 @@ class PostgreSQLAdapter(AbstractDatabaseAdapter):
         except Exception as e:
             raise DatabaseQueryError(f"Restore failed: {e}")
 
-    async def migrate_schema(self, migration_scripts: List[str]) -> bool:
+    async def migrate_schema(self, migration_scripts: list[str]) -> bool:
         """Apply PostgreSQL schema migrations"""
         try:
             # Create migrations table if it doesn't exist
@@ -608,15 +607,15 @@ class DatabaseManager:
         """Cleanup database resources"""
         await self.adapter.disconnect()
 
-    async def query(self, query: str, params: Optional[Dict[str, Any]] = None) -> QueryResult:
+    async def query(self, query: str, params: dict[str, Any] | None = None) -> QueryResult:
         """Execute a database query"""
         return await self.adapter.execute_query(query, params)
 
-    async def transaction(self, queries: List[Tuple[str, Optional[Dict[str, Any]]]]) -> bool:
+    async def transaction(self, queries: list[tuple[str, dict[str, Any] | None]]) -> bool:
         """Execute queries in a transaction"""
         return await self.adapter.execute_transaction(queries)
 
-    async def setup_schema(self, schema: Dict[str, str]) -> bool:
+    async def setup_schema(self, schema: dict[str, str]) -> bool:
         """Create database schema"""
         return await self.adapter.create_tables(schema)
 
@@ -628,7 +627,7 @@ class DatabaseManager:
         """Restore database from backup"""
         return await self.adapter.restore_database(backup_path)
 
-    async def migrate(self, migration_scripts: List[str]) -> bool:
+    async def migrate(self, migration_scripts: list[str]) -> bool:
         """Apply schema migrations"""
         return await self.adapter.migrate_schema(migration_scripts)
 
@@ -681,7 +680,6 @@ async def main():
     try:
         # Initialize connection
         await sqlite_manager.initialize()
-        print(f"Connected to {sqlite_manager.database_type.value} database")
 
         # Example schema
         schema = {
@@ -706,22 +704,18 @@ async def main():
 
         # Setup schema
         await sqlite_manager.setup_schema(schema)
-        print("Schema created successfully")
 
         # Example query
-        result = await sqlite_manager.query(
+        await sqlite_manager.query(
             "INSERT INTO users (user_id, username) VALUES (:user_id, :username)",
             {"user_id": "123456", "username": "TestUser"},
         )
-        print(f"Insert result: {result.success}")
 
         # Query data
-        result = await sqlite_manager.query("SELECT * FROM users")
-        print(f"Users: {result.rows}")
+        await sqlite_manager.query("SELECT * FROM users")
 
     finally:
         await sqlite_manager.cleanup()
-        print("Database connection closed")
 
 
 if __name__ == "__main__":

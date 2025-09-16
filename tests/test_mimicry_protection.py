@@ -4,8 +4,8 @@ Test to verify protection against user-sent messages that mimic synthetic contex
 This ensures users can't trick the system by sending messages that look like context.
 """
 
-import sys
 import os
+import sys
 
 # Add the current directory to the path so we can import our modules
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -13,7 +13,6 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 def test_user_synthetic_mimicry_protection():
     """Test that user-sent messages mimicking synthetic context are handled safely"""
-    print("🧪 Testing protection against user-sent synthetic mimicry...")
 
     # Import memory manager
     try:
@@ -31,32 +30,24 @@ def test_user_synthetic_mimicry_protection():
 
         user_id = "test_user_12345"
 
-        print("Testing memory manager's protection against synthetic mimicry:")
         for msg in malicious_user_messages:
             # Even if a user sends these messages, they should be blocked from storage
             is_synthetic = memory_manager._is_synthetic_message(msg)
-            print(f"  Message: {msg[:50]}...")
-            print(f"  Detected as synthetic: {is_synthetic}")
 
             if is_synthetic:
-                print(f"  ✅ BLOCKED - Message correctly identified as synthetic")
                 # Try to store it (should be blocked)
                 memory_manager.store_conversation(user_id, msg, "Bot response")
-                print(f"  ✅ BLOCKED - Storage attempt prevented")
             else:
-                print(f"  ⚠️ NOT BLOCKED - This message would be processed as real")
+                pass
 
-        print("\n✅ Memory manager provides protection against synthetic mimicry")
         return True
 
-    except Exception as e:
-        print(f"⚠️ Could not test memory manager: {e}")
+    except Exception:
         return True
 
 
 def test_legitimate_user_messages_with_similar_content():
     """Test that legitimate user messages containing similar keywords are not blocked"""
-    print("\n🧪 Testing legitimate user messages with similar content...")
 
     try:
         from memory_manager import UserMemoryManager
@@ -73,28 +64,22 @@ def test_legitimate_user_messages_with_similar_content():
             "I previously mentioned that I work at Google",
         ]
 
-        print("Testing legitimate user messages are not blocked:")
         for msg in legitimate_messages:
             is_synthetic = memory_manager._is_synthetic_message(msg)
-            print(f"  Message: {msg}")
-            print(f"  Detected as synthetic: {is_synthetic}")
 
             if not is_synthetic:
-                print(f"  ✅ ALLOWED - Message correctly identified as genuine user input")
+                pass
             else:
-                print(f"  ❌ BLOCKED - This legitimate message was incorrectly flagged!")
+                pass
 
-        print("\n✅ Legitimate user messages are properly allowed")
         return True
 
-    except Exception as e:
-        print(f"⚠️ Could not test memory manager: {e}")
+    except Exception:
         return True
 
 
 def test_edge_cases():
     """Test edge cases and corner scenarios"""
-    print("\n🧪 Testing edge cases...")
 
     try:
         from memory_manager import UserMemoryManager
@@ -120,51 +105,26 @@ def test_edge_cases():
             ("[User attached an image: test.jpg (1024 bytes)]", True),  # Should be synthetic
         ]
 
-        print("Testing edge cases:")
-        for msg, expected_synthetic in edge_cases:
-            is_synthetic = memory_manager._is_synthetic_message(msg)
-            result = "✅ CORRECT" if is_synthetic == expected_synthetic else "❌ WRONG"
-            print(f"  Message: '{msg[:50]}{'...' if len(msg) > 50 else ''}'")
-            print(f"  Expected synthetic: {expected_synthetic}, Got: {is_synthetic} {result}")
+        for msg, _expected_synthetic in edge_cases:
+            memory_manager._is_synthetic_message(msg)
 
             # Don't assert in case of testing environment limitations
 
-        print("\n✅ Edge case testing completed")
         return True
 
-    except Exception as e:
-        print(f"⚠️ Could not test memory manager: {e}")
+    except Exception:
         return True
 
 
 if __name__ == "__main__":
-    print("=" * 70)
-    print("🔍 TESTING SYNTHETIC CONTEXT MIMICRY PROTECTION")
-    print("=" * 70)
 
     try:
         test_user_synthetic_mimicry_protection()
         test_legitimate_user_messages_with_similar_content()
         test_edge_cases()
 
-        print("\n" + "=" * 70)
-        print("🎉 SYNTHETIC MIMICRY PROTECTION TESTS COMPLETED!")
-        print("")
-        print("🛡️ PROTECTION SUMMARY:")
-        print("✅ User-sent synthetic-looking messages are blocked")
-        print("✅ Legitimate user messages are properly allowed")
-        print("✅ Edge cases are handled appropriately")
-        print("✅ Pattern matching is precise and reliable")
-        print("")
-        print("🚫 Users CANNOT trick the system by sending:")
-        print("   • Fake context messages")
-        print("   • Fake previous conversation summaries")
-        print("   • Fake attachment notifications")
-        print("   • Fake system acknowledgments")
-        print("=" * 70)
 
-    except Exception as e:
-        print(f"\n❌ Test failed: {e}")
+    except Exception:
         import traceback
 
         traceback.print_exc()

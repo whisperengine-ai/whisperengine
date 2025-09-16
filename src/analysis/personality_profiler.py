@@ -16,11 +16,12 @@ Features:
 
 import logging
 import re
-from datetime import datetime, timezone
-from typing import Dict, List, Optional, Any, Tuple
-from dataclasses import dataclass, asdict
-from enum import Enum
 import statistics
+from dataclasses import asdict, dataclass
+from datetime import UTC, datetime
+from enum import Enum
+from typing import Any
+
 import spacy
 
 logger = logging.getLogger(__name__)
@@ -77,7 +78,7 @@ class PersonalityMetrics:
 
     # Metadata
     total_messages_analyzed: int = 0
-    last_updated: Optional[datetime] = None
+    last_updated: datetime | None = None
     confidence_interval: float = 0.0
 
 
@@ -191,7 +192,7 @@ class PersonalityProfiler:
             ],
         }
 
-    def analyze_personality(self, messages: List[str], user_id: str) -> PersonalityMetrics:
+    def analyze_personality(self, messages: list[str], user_id: str) -> PersonalityMetrics:
         """
         Analyze personality from a collection of messages
 
@@ -211,7 +212,7 @@ class PersonalityProfiler:
         # Initialize analysis containers
         metrics = PersonalityMetrics()
         metrics.total_messages_analyzed = len(messages)
-        metrics.last_updated = datetime.now(timezone.utc)
+        metrics.last_updated = datetime.now(UTC)
 
         # Analyze each message
         message_stats = []
@@ -230,7 +231,7 @@ class PersonalityProfiler:
 
         return metrics
 
-    def _analyze_single_message(self, message: str) -> Dict[str, Any]:
+    def _analyze_single_message(self, message: str) -> dict[str, Any]:
         """Analyze a single message for personality indicators"""
         doc = self.nlp(message.lower())
 
@@ -344,7 +345,7 @@ class PersonalityProfiler:
         emotional_indicators = 0
 
         # Count emotional words
-        for emotion_type, words in self._emotion_indicators.items():
+        for _emotion_type, words in self._emotion_indicators.items():
             for word in words:
                 if word in message_lower:
                     emotional_indicators += 1
@@ -364,7 +365,7 @@ class PersonalityProfiler:
 
         return min(1.0, emotional_indicators / word_count * 5)  # Scale factor
 
-    def _analyze_decision_style(self, message: str) -> Dict[str, int]:
+    def _analyze_decision_style(self, message: str) -> dict[str, int]:
         """Analyze decision-making style indicators"""
         message_lower = message.lower()
         indicators = {"quick": 0, "deliberate": 0, "impulsive": 0, "analytical": 0}
@@ -376,7 +377,7 @@ class PersonalityProfiler:
 
         return indicators
 
-    def _analyze_big_five_indicators(self, message: str, doc) -> Dict[str, float]:
+    def _analyze_big_five_indicators(self, message: str, doc) -> dict[str, float]:
         """Analyze Big Five personality trait indicators"""
         message_lower = message.lower()
         indicators = {
@@ -463,7 +464,7 @@ class PersonalityProfiler:
         return indicators
 
     def _aggregate_personality_metrics(
-        self, message_stats: List[Dict], metrics: PersonalityMetrics
+        self, message_stats: list[dict], metrics: PersonalityMetrics
     ) -> PersonalityMetrics:
         """Aggregate individual message statistics into overall personality metrics"""
         if not message_stats:
@@ -539,7 +540,7 @@ class PersonalityProfiler:
 
         return metrics
 
-    def get_personality_summary(self, metrics: PersonalityMetrics) -> Dict[str, Any]:
+    def get_personality_summary(self, metrics: PersonalityMetrics) -> dict[str, Any]:
         """Generate a human-readable personality summary"""
         summary = {
             "communication_style": {

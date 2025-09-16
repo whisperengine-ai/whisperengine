@@ -2,8 +2,8 @@
 """
 Test specifically for the trailing comma issue we encountered in the emotion analysis
 """
-import re
 import json
+import re
 
 # The exact problematic JSON from the logs
 problematic_json = """
@@ -35,48 +35,30 @@ def clean_json_for_parsing(response_text):
 
 def test_trailing_comma_fix():
     """Test that the specific trailing comma issue is fixed"""
-    print("Testing the exact trailing comma issue from the logs...")
-    print("=" * 60)
 
-    print("Original problematic JSON:")
-    print(problematic_json)
-    print("\n" + "=" * 60)
 
     # Try to parse without fix (should fail)
     try:
         json.loads(problematic_json)
-        print("❌ UNEXPECTED: Original JSON parsed without issues")
-    except json.JSONDecodeError as e:
-        print(f"✅ EXPECTED: Original JSON fails to parse: {e}")
+    except json.JSONDecodeError:
+        pass
 
-    print("\n" + "=" * 60)
 
     # Apply the fix
     cleaned_json = clean_json_for_parsing(problematic_json)
-    print("JSON after trailing comma removal:")
-    print(cleaned_json)
-    print("\n" + "=" * 60)
 
     # Try to parse with fix (should succeed)
     try:
-        parsed_data = json.loads(cleaned_json)
-        print("✅ SUCCESS: Cleaned JSON parsed successfully!")
-        print(f"Primary emotion: {parsed_data['primary_emotion']}")
-        print(f"Confidence: {parsed_data['confidence']}")
-        print(f"Intensity: {parsed_data['intensity']}")
-        print(f"Secondary emotions: {parsed_data['secondary_emotions']}")
-        print(f"Reasoning: {parsed_data['reasoning'][:50]}...")
+        json.loads(cleaned_json)
         return True
-    except json.JSONDecodeError as e:
-        print(f"❌ FAILED: Cleaned JSON still fails to parse: {e}")
+    except json.JSONDecodeError:
         return False
 
 
 if __name__ == "__main__":
     success = test_trailing_comma_fix()
 
-    print("\n" + "=" * 60)
     if success:
-        print("🎉 TRAILING COMMA FIX VERIFIED! The emotion analysis error is resolved.")
+        pass
     else:
-        print("⚠️  Test failed. The fix needs more work.")
+        pass

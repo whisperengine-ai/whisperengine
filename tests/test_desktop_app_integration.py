@@ -5,9 +5,9 @@ Validates that the desktop app properly initializes with LLM auto-detection.
 """
 
 import asyncio
-import sys
-import os
 import logging
+import os
+import sys
 from pathlib import Path
 
 # Add src to path for imports
@@ -32,7 +32,6 @@ async def test_desktop_app_initialization():
         app = WhisperEngineDesktopApp()
 
         # Test initialization up to LLM configuration
-        print("📱 Creating desktop app instance...")
 
         # Force environment for testing
         os.environ["WHISPERENGINE_DATABASE_TYPE"] = "sqlite"
@@ -42,17 +41,14 @@ async def test_desktop_app_initialization():
         # Setup logging like the app does
         app.setup_logging()
 
-        print("🔧 Testing component initialization...")
 
         # Initialize components (this will include LLM auto-detection)
         await app.initialize_components()
 
-        print("✅ Desktop app initialization successful!")
-        print("✅ LLM auto-detection integrated!")
 
         # Clean up
         if hasattr(app, "web_ui") and app.web_ui:
-            print("🧹 Cleaning up test resources...")
+            pass
 
         logger.info("🎉 Desktop app LLM integration test PASSED!")
         return True
@@ -67,19 +63,12 @@ async def test_desktop_app_initialization():
 
 async def main():
     """Main test function"""
-    print("🚀 Starting Desktop App LLM Integration Test")
-    print()
 
     success = await test_desktop_app_initialization()
 
-    print()
     if success:
-        print("🎉 ALL TESTS PASSED - Desktop app ready with LLM auto-detection!")
-        print("✅ Users will get automatic local LLM detection on startup")
-        print("✅ Seamless fallback to cloud APIs when needed")
-        print("✅ Setup guidance displayed when configuration needed")
+        pass
     else:
-        print("❌ Tests failed - desktop app needs fixes")
         sys.exit(1)
 
 

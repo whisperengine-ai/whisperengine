@@ -7,16 +7,16 @@ instead of using embedded/local ChromaDB. This provides better scalability,
 persistence, and separation of concerns.
 """
 
-import os
-import json
-import logging
 import hashlib
-import asyncio
+import logging
+import os
 from datetime import datetime
-from typing import Dict, List, Any, Optional, Tuple, Union
-import httpx
+from typing import Any
+
 import chromadb
+import httpx
 from chromadb.config import Settings
+
 from src.utils.embedding_manager import ExternalEmbeddingManager
 
 logger = logging.getLogger(__name__)
@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 class ChromaDBHTTPManager:
     """ChromaDB manager using HTTP client for containerized service"""
 
-    def __init__(self, host: Optional[str] = None, port: Optional[int] = None):
+    def __init__(self, host: str | None = None, port: int | None = None):
         """Initialize ChromaDB HTTP client"""
         self.host = host or os.getenv("CHROMADB_HOST", "localhost")
         self.port = port or int(os.getenv("CHROMADB_PORT", "8000"))
@@ -132,7 +132,7 @@ class ChromaDBHTTPManager:
             raise
 
     async def store_conversation(
-        self, user_id: str, message: str, response: str, metadata: Optional[Dict] = None
+        self, user_id: str, message: str, response: str, metadata: dict | None = None
     ):
         """Store conversation in ChromaDB"""
         if not self._initialized:
@@ -186,9 +186,9 @@ class ChromaDBHTTPManager:
         self,
         user_id: str,
         fact: str,
-        category: Optional[str] = None,
+        category: str | None = None,
         confidence: float = 1.0,
-        metadata: Optional[Dict] = None,
+        metadata: dict | None = None,
     ):
         """Store user-specific fact in ChromaDB"""
         if not self._initialized:
@@ -235,9 +235,9 @@ class ChromaDBHTTPManager:
     async def store_global_fact(
         self,
         fact: str,
-        category: Optional[str] = None,
+        category: str | None = None,
         confidence: float = 1.0,
-        metadata: Optional[Dict] = None,
+        metadata: dict | None = None,
     ):
         """Store global fact in ChromaDB"""
         if not self._initialized:
@@ -283,10 +283,10 @@ class ChromaDBHTTPManager:
     async def search_memories(
         self,
         query_text: str,
-        user_id: Optional[str] = None,
+        user_id: str | None = None,
         limit: int = 5,
-        doc_types: Optional[List[str]] = None,
-    ) -> List[Dict]:
+        doc_types: list[str] | None = None,
+    ) -> list[dict]:
         """Search for relevant memories using external embeddings"""
         if not self._initialized:
             await self.initialize()
@@ -358,7 +358,7 @@ class ChromaDBHTTPManager:
             logger.error(f"Failed to search memories: {e}")
             return []
 
-    async def get_user_conversations(self, user_id: str, limit: int = 10) -> List[Dict]:
+    async def get_user_conversations(self, user_id: str, limit: int = 10) -> list[dict]:
         """Get recent conversations for a user"""
         if not self._initialized:
             await self.initialize()
@@ -391,8 +391,8 @@ class ChromaDBHTTPManager:
             return []
 
     async def get_user_facts(
-        self, user_id: str, category: Optional[str] = None, limit: int = 20
-    ) -> List[Dict]:
+        self, user_id: str, category: str | None = None, limit: int = 20
+    ) -> list[dict]:
         """Get facts about a specific user"""
         if not self._initialized:
             await self.initialize()
@@ -423,7 +423,7 @@ class ChromaDBHTTPManager:
             logger.error(f"Failed to get user facts: {e}")
             return []
 
-    async def get_collection_stats(self) -> Dict[str, Any]:
+    async def get_collection_stats(self) -> dict[str, Any]:
         """Get statistics about ChromaDB collections"""
         if not self._initialized:
             await self.initialize()
@@ -453,7 +453,7 @@ class ChromaDBHTTPManager:
             logger.error(f"Failed to get collection stats: {e}")
             return {}
 
-    async def health_check(self) -> Dict[str, Any]:
+    async def health_check(self) -> dict[str, Any]:
         """Check ChromaDB service health"""
         try:
             response = await self.http_client.get("/api/v1/heartbeat")
@@ -494,7 +494,7 @@ async def get_chromadb_manager() -> ChromaDBHTTPManager:
 
 # Backward compatibility functions
 async def store_conversation_async(
-    user_id: str, message: str, response: str, metadata: Dict = None
+    user_id: str, message: str, response: str, metadata: dict = None
 ) -> str:
     """Store conversation (async)"""
     manager = await get_chromadb_manager()
@@ -502,7 +502,7 @@ async def store_conversation_async(
 
 
 async def store_user_fact_async(
-    user_id: str, fact: str, category: str = None, confidence: float = 1.0, metadata: Dict = None
+    user_id: str, fact: str, category: str = None, confidence: float = 1.0, metadata: dict = None
 ) -> str:
     """Store user fact (async)"""
     manager = await get_chromadb_manager()
@@ -510,8 +510,8 @@ async def store_user_fact_async(
 
 
 async def search_memories_async(
-    query_text: str, user_id: str = None, limit: int = 5, doc_types: List[str] = None
-) -> List[Dict]:
+    query_text: str, user_id: str = None, limit: int = 5, doc_types: list[str] = None
+) -> list[dict]:
     """Search memories (async)"""
     manager = await get_chromadb_manager()
     return await manager.search_memories(query_text, user_id, limit, doc_types)

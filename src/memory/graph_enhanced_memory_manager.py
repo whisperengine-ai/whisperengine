@@ -1,20 +1,13 @@
 """Graph-enhanced memory manager that integrates with existing ChromaDB system."""
 
+import asyncio
 import logging
 import uuid
 from datetime import datetime
-from typing import Dict, List, Optional, Any, Tuple
-import asyncio
+from typing import Any
 
+from src.graph_database.neo4j_connector import Neo4jConnector, get_neo4j_connector
 from src.memory.memory_manager import UserMemoryManager
-from src.graph_database.neo4j_connector import get_neo4j_connector, Neo4jConnector
-from src.graph_database.models import (
-    UserNode,
-    MemoryNode,
-    TopicNode,
-    EmotionContextNode,
-    RelationshipData,
-)
 
 logger = logging.getLogger(__name__)
 
@@ -25,10 +18,10 @@ class GraphEnhancedMemoryManager(UserMemoryManager):
     def __init__(self, *args, **kwargs):
         """Initialize with graph database support."""
         super().__init__(*args, **kwargs)
-        self._neo4j_connector: Optional[Neo4jConnector] = None
+        self._neo4j_connector: Neo4jConnector | None = None
         self._graph_enabled = True
 
-    async def _get_graph_connector(self) -> Optional[Neo4jConnector]:
+    async def _get_graph_connector(self) -> Neo4jConnector | None:
         """Get Neo4j connector, handling connection failures gracefully."""
         if not self._graph_enabled:
             return None
@@ -47,8 +40,8 @@ class GraphEnhancedMemoryManager(UserMemoryManager):
         user_id: str,
         message: str,
         response: str,
-        emotion_data: Optional[Dict] = None,
-        topics: Optional[List[str]] = None,
+        emotion_data: dict | None = None,
+        topics: list[str] | None = None,
     ) -> str:
         """Store conversation with graph relationship building."""
 
@@ -88,7 +81,7 @@ class GraphEnhancedMemoryManager(UserMemoryManager):
 
         return memory_id
 
-    async def _extract_topics_from_message(self, message: str) -> List[str]:
+    async def _extract_topics_from_message(self, message: str) -> list[str]:
         """Extract topics from message using simple keyword extraction."""
         # Simple topic extraction - in production, you might use NLP
         topics = []
@@ -123,8 +116,8 @@ class GraphEnhancedMemoryManager(UserMemoryManager):
         chromadb_id: str,
         message: str,
         response: str,
-        topics: List[str],
-        emotion_data: Optional[Dict] = None,
+        topics: list[str],
+        emotion_data: dict | None = None,
     ):
         """Create memory node and relationships in graph database."""
 
@@ -154,7 +147,7 @@ class GraphEnhancedMemoryManager(UserMemoryManager):
         )
 
     async def _calculate_importance(
-        self, message: str, emotion_data: Optional[Dict] = None
+        self, message: str, emotion_data: dict | None = None
     ) -> float:
         """Calculate memory importance based on content and emotion."""
         importance = 0.5  # Base importance
@@ -177,7 +170,7 @@ class GraphEnhancedMemoryManager(UserMemoryManager):
 
     async def get_personalized_context(
         self, user_id: str, current_message: str, limit: int = 10
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Get context that considers emotional associations and relationship depth."""
 
         # Get standard ChromaDB context
@@ -316,11 +309,11 @@ class GraphEnhancedMemoryManager(UserMemoryManager):
 
     async def analyze_conversation_for_milestones(
         self, user_id: str, message: str, response: str
-    ) -> Optional[str]:
+    ) -> str | None:
         """Analyze conversation to detect relationship milestones."""
 
         message_lower = message.lower()
-        response_lower = response.lower()
+        response.lower()
 
         # First name sharing
         if any(phrase in message_lower for phrase in ["my name is", "i'm ", "call me"]):
@@ -347,7 +340,7 @@ class GraphEnhancedMemoryManager(UserMemoryManager):
 
         return None
 
-    async def get_graph_health_status(self) -> Dict[str, Any]:
+    async def get_graph_health_status(self) -> dict[str, Any]:
         """Get health status of graph database connection."""
 
         graph_connector = await self._get_graph_connector()

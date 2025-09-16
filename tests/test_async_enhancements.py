@@ -5,13 +5,12 @@ Tests thread safety, rate limiting, and performance under load
 """
 
 import asyncio
-import time
-import threading
+import os
 import random
 import sys
-import os
-from unittest.mock import Mock, MagicMock
-from typing import List, Dict
+import threading
+import time
+from unittest.mock import Mock
 
 # Add the project directory to the path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -19,19 +18,17 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 # Import our modules
 try:
     from async_enhancements import (
-        AsyncMemoryManager,
         AsyncLLMManager,
-        ConcurrentImageProcessor,
+        AsyncMemoryManager,
         AsyncUtilities,
+        ConcurrentImageProcessor,
         initialize_async_components,
     )
     from conversation_cache import HybridConversationCache
-    from memory_manager import UserMemoryManager
     from lmstudio_client import LMStudioClient
+    from memory_manager import UserMemoryManager
 
-    print("✅ Successfully imported all modules")
-except ImportError as e:
-    print(f"❌ Import failed: {e}")
+except ImportError:
     sys.exit(1)
 
 
@@ -129,9 +126,6 @@ class ConcurrencyTester:
 
     async def test_concurrent_memory_storage(self, num_users=5, messages_per_user=3):
         """Test concurrent memory storage operations"""
-        print(
-            f"\n🧪 Testing concurrent memory storage ({num_users} users, {messages_per_user} messages each)"
-        )
 
         async def store_messages_for_user(user_id):
             user_results = []
@@ -149,18 +143,13 @@ class ConcurrencyTester:
 
         start_time = time.time()
         tasks = [store_messages_for_user(i) for i in range(num_users)]
-        results = await asyncio.gather(*tasks)
+        await asyncio.gather(*tasks)
         total_time = time.time() - start_time
 
         # Analyze results
         total_operations = num_users * messages_per_user
         expected_stored = len(self.mock_memory.stored_conversations)
 
-        print(f"✅ Storage test completed:")
-        print(f"   - Total time: {total_time:.2f}s")
-        print(f"   - Operations: {total_operations}")
-        print(f"   - Stored conversations: {expected_stored}")
-        print(f"   - Throughput: {total_operations/total_time:.1f} ops/sec")
 
         # Verify thread safety - no corrupted data
         user_counts = {}
@@ -168,7 +157,6 @@ class ConcurrencyTester:
             user_id = conv["user_id"]
             user_counts[user_id] = user_counts.get(user_id, 0) + 1
 
-        print(f"   - Per-user storage counts: {user_counts}")
 
         return {
             "total_time": total_time,
@@ -180,9 +168,6 @@ class ConcurrencyTester:
 
     async def test_llm_rate_limiting(self, num_users=4, requests_per_user=3):
         """Test LLM rate limiting and concurrency control"""
-        print(
-            f"\n🧪 Testing LLM rate limiting ({num_users} users, {requests_per_user} requests each)"
-        )
 
         async def make_requests_for_user(user_id):
             user_results = []
@@ -210,13 +195,6 @@ class ConcurrencyTester:
         all_durations = [r["duration"] for user_results in results for r in user_results]
         avg_duration = sum(all_durations) / len(all_durations)
 
-        print(f"✅ LLM rate limiting test completed:")
-        print(f"   - Total time: {total_time:.2f}s")
-        print(f"   - Average request duration: {avg_duration:.2f}s")
-        print(f"   - Total LLM requests: {self.mock_llm.request_count}")
-        print(
-            f"   - Concurrent requests handled properly: {len(all_durations) == self.mock_llm.request_count}"
-        )
 
         return {
             "total_time": total_time,
@@ -228,9 +206,6 @@ class ConcurrencyTester:
 
     async def test_cache_concurrent_access(self, num_users=6, operations_per_user=5):
         """Test conversation cache under concurrent access"""
-        print(
-            f"\n🧪 Testing cache concurrent access ({num_users} users, {operations_per_user} operations each)"
-        )
 
         # Create mock Discord objects
         class MockMessage:
@@ -294,13 +269,6 @@ class ConcurrencyTester:
 
         cache_stats = self.cache.get_cache_stats()
 
-        print(f"✅ Cache concurrent access test completed:")
-        print(f"   - Total time: {total_time:.2f}s")
-        print(f"   - Average operation duration: {avg_duration:.4f}s")
-        print(f"   - Cache statistics: {cache_stats}")
-        print(
-            f"   - Thread safety maintained: {len(all_operations) == num_users * operations_per_user}"
-        )
 
         return {
             "total_time": total_time,
@@ -311,7 +279,6 @@ class ConcurrencyTester:
 
     async def test_mixed_workload(self, duration_seconds=5):
         """Test mixed workload with all components under stress"""
-        print(f"\n🧪 Testing mixed workload for {duration_seconds} seconds")
 
         completed_operations = {"storage": 0, "llm": 0, "cache": 0}
         stop_flag = asyncio.Event()
@@ -333,8 +300,8 @@ class ConcurrencyTester:
                     completed_operations["storage"] += 1
                     user_counter += 1
                     await asyncio.sleep(0.2)  # Fixed delay to prevent overwhelming
-            except Exception as e:
-                print(f"Storage worker error: {e}")
+            except Exception:
+                pass
 
         async def llm_worker():
             request_counter = 0
@@ -347,8 +314,8 @@ class ConcurrencyTester:
                     completed_operations["llm"] += 1
                     request_counter += 1
                     await asyncio.sleep(0.3)  # Fixed delay
-            except Exception as e:
-                print(f"LLM worker error: {e}")
+            except Exception:
+                pass
 
         async def cache_worker():
             op_counter = 0
@@ -370,26 +337,21 @@ class ConcurrencyTester:
                     completed_operations["cache"] += 1
                     op_counter += 1
                     await asyncio.sleep(0.1)  # Fixed delay
-            except Exception as e:
-                print(f"Cache worker error: {e}")
+            except Exception:
+                pass
 
         # Run all workers concurrently with timeout
         try:
             workers = [storage_worker(), llm_worker(), cache_worker(), timeout_handler()]
             await asyncio.gather(*workers, return_exceptions=True)
-        except Exception as e:
-            print(f"Mixed workload error: {e}")
+        except Exception:
+            pass
         finally:
             stop_flag.set()  # Ensure all workers stop
 
         total_operations = sum(completed_operations.values())
         throughput = total_operations / duration_seconds
 
-        print(f"✅ Mixed workload test completed:")
-        print(f"   - Duration: {duration_seconds}s")
-        print(f"   - Operations completed: {completed_operations}")
-        print(f"   - Total operations: {total_operations}")
-        print(f"   - Throughput: {throughput:.1f} ops/sec")
 
         return {
             "duration": duration_seconds,
@@ -400,55 +362,43 @@ class ConcurrencyTester:
 
     async def run_all_tests(self):
         """Run all concurrency tests with timeout protection"""
-        print("🚀 Starting comprehensive async/IO concurrency tests")
-        print("=" * 60)
 
         test_results = {}
 
         try:
             # Test 1: Concurrent memory storage
-            print("Running Test 1/4...")
             test_results["memory_storage"] = await asyncio.wait_for(
                 self.test_concurrent_memory_storage(), timeout=30
             )
 
             # Test 2: LLM rate limiting
-            print("Running Test 2/4...")
             test_results["llm_rate_limiting"] = await asyncio.wait_for(
                 self.test_llm_rate_limiting(), timeout=30
             )
 
             # Test 3: Cache concurrent access
-            print("Running Test 3/4...")
             test_results["cache_concurrent"] = await asyncio.wait_for(
                 self.test_cache_concurrent_access(), timeout=30
             )
 
             # Test 4: Mixed workload stress test (shorter duration)
-            print("Running Test 4/4...")
             test_results["mixed_workload"] = await asyncio.wait_for(
                 self.test_mixed_workload(duration_seconds=3), timeout=15
             )
 
-            print("\n" + "=" * 60)
-            print("🎉 ALL TESTS COMPLETED SUCCESSFULLY!")
-            print("=" * 60)
 
             # Summary
-            print("\n📊 TEST SUMMARY:")
-            for test_name, results in test_results.items():
-                print(f"   {test_name}:")
+            for _test_name, results in test_results.items():
                 if "throughput" in results:
-                    print(f"     - Throughput: {results['throughput']:.1f} ops/sec")
+                    pass
                 if "total_time" in results:
-                    print(f"     - Total time: {results['total_time']:.2f}s")
+                    pass
                 if "operations" in results:
-                    print(f"     - Operations: {results['operations']}")
+                    pass
 
             return test_results
 
-        except Exception as e:
-            print(f"\n❌ Test failed with error: {e}")
+        except Exception:
             import traceback
 
             traceback.print_exc()
@@ -456,29 +406,18 @@ class ConcurrencyTester:
         finally:
             # Cleanup
             self.async_memory.cleanup()
-            print("\n🧹 Cleaned up test resources")
 
 
 async def main():
     """Main test function"""
-    print("🧪 Discord Bot Async/IO Concurrency Test Suite")
-    print("Testing thread safety, rate limiting, and performance under load")
-    print("=" * 60)
 
     tester = ConcurrencyTester()
     results = await tester.run_all_tests()
 
     if results:
-        print("\n✅ All async/IO enhancements are working correctly!")
-        print("   - Thread safety: VERIFIED")
-        print("   - Rate limiting: VERIFIED")
-        print("   - Concurrent operations: VERIFIED")
-        print("   - Performance under load: VERIFIED")
 
-        print("\n🎯 Your Discord bot is ready for multiple concurrent users!")
         return True
     else:
-        print("\n❌ Some tests failed. Please review the errors above.")
         return False
 
 
@@ -487,10 +426,8 @@ if __name__ == "__main__":
         success = asyncio.run(main())
         sys.exit(0 if success else 1)
     except KeyboardInterrupt:
-        print("\n⚠️ Tests interrupted by user")
         sys.exit(1)
-    except Exception as e:
-        print(f"\n💥 Unexpected error: {e}")
+    except Exception:
         import traceback
 
         traceback.print_exc()

@@ -4,9 +4,8 @@ LLM Configuration Validator
 Validates and reports the effective LLM configuration for WhisperEngine
 """
 
-import os
 import logging
-from typing import Optional, List
+import os
 from dataclasses import dataclass
 
 logger = logging.getLogger(__name__)
@@ -18,12 +17,12 @@ class LLMConfigStatus:
 
     is_valid: bool
     source: str  # 'user_override', 'auto_detected', 'invalid'
-    api_url: Optional[str]
-    model: Optional[str]
+    api_url: str | None
+    model: str | None
     has_api_key: bool
     backend_name: str
-    issues: List[str]
-    recommendations: List[str]
+    issues: list[str]
+    recommendations: list[str]
 
 
 class LLMConfigValidator:
@@ -156,47 +155,32 @@ class LLMConfigValidator:
         """Print a detailed configuration report"""
         config = self.validate_configuration()
 
-        print("🔧 WhisperEngine LLM Configuration Report")
-        print("=" * 50)
 
         # Status
-        status_icon = "✅" if config.is_valid else "❌"
-        print(f"{status_icon} Status: {'Valid' if config.is_valid else 'Invalid'}")
-        print(f"📍 Source: {config.source}")
-        print(f"🔗 Backend: {config.backend_name}")
 
         # Configuration details
         if config.api_url:
-            print(f"🌐 API URL: {config.api_url}")
+            pass
         else:
-            print("🌐 API URL: Not configured")
+            pass
 
         if config.model:
-            print(f"🤖 Model: {config.model}")
+            pass
         else:
-            print("🤖 Model: Not specified")
+            pass
 
-        print(f"🔑 API Key: {'Configured' if config.has_api_key else 'Not set'}")
 
         # Issues
         if config.issues:
-            print("\n⚠️ Issues:")
-            for issue in config.issues:
-                print(f"   - {issue}")
+            for _issue in config.issues:
+                pass
 
         # Recommendations
         if config.recommendations:
-            print("\n💡 Recommendations:")
-            for rec in config.recommendations:
-                print(f"   - {rec}")
+            for _rec in config.recommendations:
+                pass
 
         # Override instructions
-        print("\n🔧 User Override Variables:")
-        print("   LLM_CHAT_API_URL - Primary API endpoint URL")
-        print("   LLM_BASE_URL - Alternative base URL setting")
-        print("   LLM_CHAT_API_KEY - API authentication key")
-        print("   LLM_CHAT_MODEL - Specific model name")
-        print("\nSet any of these environment variables to override auto-detection.")
 
 
 def validate_llm_config() -> LLMConfigStatus:

@@ -25,10 +25,10 @@ Usage:
 """
 
 import asyncio
-import logging
-from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Any
 import json
+import logging
+from datetime import datetime
+from typing import Any
 
 # Configure logging
 logging.basicConfig(
@@ -92,11 +92,11 @@ class Phase42IntegrationDemo:
     """
 
     def __init__(self):
-        self.thread_manager: Optional[AdvancedConversationThreadManager] = None
-        self.emotional_engine: Optional[EmotionalContextEngine] = None
-        self.personality_profiler: Optional[DynamicPersonalityProfiler] = None
-        self.memory_moments: Optional[MemoryTriggeredMoments] = None
-        self.memory_tier_manager: Optional[MemoryTierManager] = None
+        self.thread_manager: AdvancedConversationThreadManager | None = None
+        self.emotional_engine: EmotionalContextEngine | None = None
+        self.personality_profiler: DynamicPersonalityProfiler | None = None
+        self.memory_moments: MemoryTriggeredMoments | None = None
+        self.memory_tier_manager: MemoryTierManager | None = None
 
         # Demo conversation scenarios
         self.conversation_scenarios = self._create_conversation_scenarios()
@@ -137,7 +137,7 @@ class Phase42IntegrationDemo:
 
         return True
 
-    def _create_conversation_scenarios(self) -> List[Dict[str, Any]]:
+    def _create_conversation_scenarios(self) -> list[dict[str, Any]]:
         """Create realistic conversation scenarios for demonstration"""
         return [
             {
@@ -210,7 +210,7 @@ class Phase42IntegrationDemo:
             },
         ]
 
-    async def run_scenario_demo(self, scenario: Dict[str, Any]) -> Dict[str, Any]:
+    async def run_scenario_demo(self, scenario: dict[str, Any]) -> dict[str, Any]:
         """Run a single conversation scenario and analyze thread management"""
         logger.info(f"\n{'='*60}")
         logger.info(f"🎭 SCENARIO: {scenario['scenario_name']}")
@@ -252,7 +252,7 @@ class Phase42IntegrationDemo:
         return scenario_results
 
     def _analyze_message_result(
-        self, result: Dict[str, Any], scenario_results: Dict[str, Any], message_data: Dict[str, Any]
+        self, result: dict[str, Any], scenario_results: dict[str, Any], message_data: dict[str, Any]
     ):
         """Analyze the result of processing a message"""
 
@@ -301,7 +301,7 @@ class Phase42IntegrationDemo:
                 }
             )
 
-    def _display_thread_state(self, result: Dict[str, Any]):
+    def _display_thread_state(self, result: dict[str, Any]):
         """Display current thread state information"""
         active_threads = result.get("active_threads", [])
 
@@ -325,9 +325,9 @@ class Phase42IntegrationDemo:
             if context.get("theme_tags"):
                 logger.info(f"     Themes: {', '.join(context['theme_tags'][:3])}")
 
-    def _analyze_scenario_completion(self, scenario_results: Dict[str, Any]):
+    def _analyze_scenario_completion(self, scenario_results: dict[str, Any]):
         """Analyze the complete scenario results"""
-        logger.info(f"\n📈 SCENARIO ANALYSIS:")
+        logger.info("\n📈 SCENARIO ANALYSIS:")
         logger.info(f"   Messages processed: {scenario_results['messages_processed']}")
         logger.info(f"   Threads created: {len(scenario_results['threads_created'])}")
         logger.info(f"   Transitions detected: {len(scenario_results['transitions_detected'])}")
@@ -348,7 +348,7 @@ class Phase42IntegrationDemo:
             "priority_system_active": len(scenario_results["priority_changes"]) >= 0,
         }
 
-    async def run_integration_tests(self) -> Dict[str, Any]:
+    async def run_integration_tests(self) -> dict[str, Any]:
         """Run comprehensive integration tests"""
         logger.info("\n🧪 RUNNING INTEGRATION TESTS")
 
@@ -400,7 +400,7 @@ class Phase42IntegrationDemo:
 
         return test_results
 
-    async def run_full_demo(self) -> Dict[str, Any]:
+    async def run_full_demo(self) -> dict[str, Any]:
         """Run the complete Phase 4.2 demonstration"""
         logger.info("🚀 STARTING PHASE 4.2 MULTI-THREAD CONVERSATION MANAGEMENT DEMO")
 
@@ -452,7 +452,7 @@ class Phase42IntegrationDemo:
 
         return demo_results
 
-    def _display_demo_summary(self, results: Dict[str, Any]):
+    def _display_demo_summary(self, results: dict[str, Any]):
         """Display a comprehensive demo summary"""
         logger.info(f"\n{'='*80}")
         logger.info("🎉 PHASE 4.2 MULTI-THREAD CONVERSATION MANAGEMENT DEMO COMPLETE")
@@ -497,12 +497,12 @@ class Phase42IntegrationDemo:
             logger.info(f"   {status} {system_name.replace('_', ' ').title()}")
 
         # Features demonstrated
-        logger.info(f"\n✨ Features Demonstrated:")
+        logger.info("\n✨ Features Demonstrated:")
         for feature in results["features_demonstrated"]:
             logger.info(f"   ✅ {feature}")
 
         logger.info(
-            f"\n🎯 Phase 4.2 Multi-Thread Conversation Management system is fully functional!"
+            "\n🎯 Phase 4.2 Multi-Thread Conversation Management system is fully functional!"
         )
         logger.info("   This system provides sophisticated thread management with intelligent")
         logger.info("   context switching, priority management, and seamless integration with")

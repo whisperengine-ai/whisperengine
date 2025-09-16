@@ -4,11 +4,11 @@ Smart LLM Backend Selector for WhisperEngine
 Automatically detects and selects the optimal LLM backend based on platform capabilities
 """
 
+import logging
 import os
 import platform
-import logging
-from typing import Optional, Dict, Any, List, Tuple
 from dataclasses import dataclass
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +21,7 @@ class BackendInfo:
     priority: int  # Lower = higher priority
     url_scheme: str
     description: str
-    requirements: List[str]
+    requirements: list[str]
     platform_optimized: bool = False
     gpu_accelerated: bool = False
     apple_silicon_optimized: bool = False
@@ -34,7 +34,7 @@ class SmartBackendSelector:
         self.logger = logging.getLogger(__name__)
         self.available_backends = self._detect_available_backends()
 
-    def _detect_available_backends(self) -> List[BackendInfo]:
+    def _detect_available_backends(self) -> list[BackendInfo]:
         """Detect all available LLM backends on the current system
 
         Desktop App Priority Order:
@@ -169,7 +169,7 @@ class SmartBackendSelector:
     def _is_transformers_available(self) -> bool:
         """Check if transformers is available with local models"""
         try:
-            from transformers import AutoTokenizer, AutoModelForCausalLM  # type: ignore
+            from transformers import AutoModelForCausalLM, AutoTokenizer  # type: ignore
 
             # Check for local models
             models_dir = os.getenv("LOCAL_MODELS_DIR", "./models")
@@ -182,7 +182,7 @@ class SmartBackendSelector:
 
     def get_optimal_backend(
         self, prefer_local: bool = True, require_gpu: bool = False
-    ) -> Optional[BackendInfo]:
+    ) -> BackendInfo | None:
         """Get the optimal backend based on preferences and system capabilities
 
         Desktop App Priority:
@@ -235,11 +235,11 @@ class SmartBackendSelector:
 
         return None
 
-    def get_fallback_chain(self) -> List[BackendInfo]:
+    def get_fallback_chain(self) -> list[BackendInfo]:
         """Get a prioritized list of backends for fallback purposes"""
         return self.available_backends
 
-    def get_backend_config(self, backend: BackendInfo) -> Dict[str, Any]:
+    def get_backend_config(self, backend: BackendInfo) -> dict[str, Any]:
         """Get configuration for a specific backend"""
         config = {
             "LLM_CHAT_API_URL": backend.url_scheme,
@@ -323,7 +323,7 @@ class SmartBackendSelector:
         self.logger.info(f"✅ Auto-configured for {optimal_backend.name} backend")
         return True
 
-    def get_setup_recommendations(self) -> List[str]:
+    def get_setup_recommendations(self) -> list[str]:
         """Get setup recommendations for improving LLM backend availability"""
         recommendations = []
 
@@ -351,7 +351,7 @@ class SmartBackendSelector:
 
         return recommendations
 
-    def has_user_configuration(self) -> Dict[str, bool]:
+    def has_user_configuration(self) -> dict[str, bool]:
         """Check which configuration settings have been explicitly set by user"""
         return {
             "api_url": bool(os.getenv("LLM_CHAT_API_URL")),
@@ -360,7 +360,7 @@ class SmartBackendSelector:
             "base_url": bool(os.getenv("LLM_BASE_URL")),  # Alternative URL setting
         }
 
-    def get_effective_configuration(self) -> Dict[str, Any]:
+    def get_effective_configuration(self) -> dict[str, Any]:
         """Get the effective configuration combining user overrides with auto-detection"""
         user_config = self.has_user_configuration()
         config = {
@@ -408,7 +408,7 @@ def get_smart_backend_selector() -> SmartBackendSelector:
     return SmartBackendSelector()
 
 
-def auto_detect_optimal_llm_url() -> Optional[str]:
+def auto_detect_optimal_llm_url() -> str | None:
     """Automatically detect and return the optimal LLM URL for current system
 
     Respects user overrides:
@@ -441,49 +441,30 @@ if __name__ == "__main__":
     # Test the backend selector
     selector = get_smart_backend_selector()
 
-    print("🔍 Available LLM Backends:")
-    for i, backend in enumerate(selector.available_backends, 1):
-        print(f"{i}. {backend.name} - {backend.description}")
-        print(f"   URL: {backend.url_scheme}")
-        print(f"   Priority: {backend.priority}")
+    for _i, backend in enumerate(selector.available_backends, 1):
         if backend.apple_silicon_optimized:
-            print("   🍎 Apple Silicon Optimized")
+            pass
         if backend.gpu_accelerated:
-            print("   🔥 GPU Accelerated")
-        print()
+            pass
 
     # Check for user configuration
     user_config = selector.has_user_configuration()
-    print("👤 User Configuration Status:")
-    for setting, configured in user_config.items():
+    for _setting, configured in user_config.items():
         status = "✅ Configured" if configured else "❌ Not set"
-        print(f"   {setting}: {status}")
-    print()
 
     # Show effective configuration
     effective_config = selector.get_effective_configuration()
-    print(f"⚙️ Effective Configuration ({effective_config['source']}):")
     for key, value in effective_config.items():
         if key not in ["source", "user_overrides"] and value is not None:
-            print(f"   {key}: {value}")
-    print()
+            pass
 
     optimal = selector.get_optimal_backend()
     if optimal:
-        print(f"✅ Optimal Backend: {optimal.name}")
         if not any(user_config.values()):
-            print(f"📋 Auto-detected Configuration: {selector.get_backend_config(optimal)}")
+            pass
         else:
-            print("🔧 Using user configuration overrides")
+            pass
     else:
-        print("❌ No suitable backend found")
-        print("\n💡 Setup Recommendations:")
-        for rec in selector.get_setup_recommendations():
-            print(f"   {rec}")
+        for _rec in selector.get_setup_recommendations():
+            pass
 
-    print("\n🔑 User Override Variables:")
-    print("   LLM_CHAT_API_URL - Primary API endpoint URL")
-    print("   LLM_BASE_URL - Alternative base URL setting")
-    print("   LLM_CHAT_API_KEY - API authentication key")
-    print("   LLM_CHAT_MODEL - Specific model name")
-    print("\nSet any of these environment variables to override auto-detection.")

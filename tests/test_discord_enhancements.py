@@ -4,33 +4,26 @@ Test script for Discord bot enhancements
 Tests user information storage, time awareness, and global facts
 """
 
-import sys
-import os
 import logging
-from datetime import datetime, timezone
+import os
+import sys
 
 # Add the project root to the path
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-from memory_manager import UserMemoryManager
-from fact_extractor import FactExtractor, GlobalFactExtractor
 from basic_discord_bot import get_current_time_context, store_discord_user_info
+from fact_extractor import FactExtractor, GlobalFactExtractor
+from memory_manager import UserMemoryManager
 
 
 def test_time_awareness():
     """Test the time awareness functionality"""
-    print("🕐 Testing Time Awareness")
-    print("=" * 40)
 
-    time_context = get_current_time_context()
-    print(f"Current time context: {time_context}")
-    print()
+    get_current_time_context()
 
 
 def test_user_fact_extraction():
     """Test enhanced user fact extraction with Discord patterns"""
-    print("👤 Testing Enhanced User Fact Extraction")
-    print("=" * 40)
 
     extractor = FactExtractor()
 
@@ -42,24 +35,18 @@ def test_user_fact_extraction():
         "My handle is DevCoder and I stream on Twitch sometimes",
     ]
 
-    for i, message in enumerate(test_messages, 1):
-        print(f"Test {i}: {message}")
+    for _i, message in enumerate(test_messages, 1):
         facts = extractor.extract_facts_from_message(message)
 
         if facts:
-            for fact in facts:
-                print(
-                    f"  ✅ Extracted: {fact['fact']} (Category: {fact['category']}, Confidence: {fact['confidence']:.2f})"
-                )
+            for _fact in facts:
+                pass
         else:
-            print("  ❌ No facts extracted")
-        print()
+            pass
 
 
 def test_global_fact_extraction():
     """Test enhanced global fact extraction"""
-    print("🌍 Testing Enhanced Global Fact Extraction")
-    print("=" * 40)
 
     extractor = GlobalFactExtractor()
 
@@ -73,27 +60,19 @@ def test_global_fact_extraction():
         ("GitHub is where developers store code", "GitHub was acquired by Microsoft in 2018"),
     ]
 
-    for i, (user_msg, bot_response) in enumerate(test_conversations, 1):
-        print(f"Test {i}:")
-        print(f"  User: {user_msg}")
-        print(f"  Bot: {bot_response}")
+    for _i, (user_msg, bot_response) in enumerate(test_conversations, 1):
 
         facts = extractor.extract_global_facts_from_message(user_msg, bot_response)
 
         if facts:
-            for fact in facts:
-                print(
-                    f"  ✅ Global fact: {fact['fact']} (Category: {fact['category']}, Confidence: {fact['confidence']:.2f})"
-                )
+            for _fact in facts:
+                pass
         else:
-            print("  ❌ No global facts extracted")
-        print()
+            pass
 
 
 def test_memory_storage():
     """Test memory storage with Discord enhancements"""
-    print("💾 Testing Memory Storage")
-    print("=" * 40)
 
     try:
         # Use test ChromaDB directory
@@ -110,7 +89,6 @@ def test_memory_storage():
 
         # Store the conversation
         memory_manager.store_conversation(user_id, message, response)
-        print(f"✅ Stored conversation for user {user_id}")
 
         # Test storing a global fact about Discord
         global_fact = (
@@ -119,24 +97,21 @@ def test_memory_storage():
         memory_manager.store_global_fact(
             global_fact, "Information about Discord platform", "test_admin"
         )
-        print(f"✅ Stored global fact: {global_fact}")
 
         # Test retrieval
         query = "Discord gaming timezone"
         memories = memory_manager.retrieve_relevant_memories(user_id, query, limit=5)
 
-        print(f"\nRetrieved {len(memories)} relevant memories for query: '{query}'")
         for memory in memories:
             metadata = memory["metadata"]
             if metadata.get("is_global"):
-                print(f"  🌍 Global: {metadata.get('fact', memory['text'])}")
+                pass
             else:
-                print(f"  👤 User: {metadata.get('fact', memory['text'])}")
+                pass
 
-    except Exception as e:
-        print(f"❌ Error testing memory storage: {e}")
+    except Exception:
+        pass
 
-    print()
 
 
 class MockDiscordUser:
@@ -153,8 +128,6 @@ class MockDiscordUser:
 
 def test_discord_user_info_storage():
     """Test Discord user information storage"""
-    print("📱 Testing Discord User Info Storage")
-    print("=" * 40)
 
     try:
         memory_manager = UserMemoryManager(
@@ -171,20 +144,17 @@ def test_discord_user_info_storage():
         # Test storing user info
         for user in users:
             store_discord_user_info(user, memory_manager)
-            print(f"✅ Stored info for {user} (Display: {user.display_name})")
 
         # Test retrieval of user facts
         query = "Discord user CoolGamer"
         global_facts = memory_manager.retrieve_relevant_global_facts(query, limit=5)
 
-        print(f"\nRetrieved {len(global_facts)} global facts for query: '{query}'")
-        for fact in global_facts:
-            print(f"  🌍 {fact['metadata']['fact']}")
+        for _fact in global_facts:
+            pass
 
-    except Exception as e:
-        print(f"❌ Error testing Discord user info storage: {e}")
+    except Exception:
+        pass
 
-    print()
 
 
 def main():
@@ -192,9 +162,6 @@ def main():
     # Set up logging
     logging.basicConfig(level=logging.INFO)
 
-    print("🧪 Testing Discord Bot Enhancements")
-    print("=" * 50)
-    print()
 
     # Run tests
     test_time_awareness()
@@ -203,7 +170,6 @@ def main():
     test_memory_storage()
     test_discord_user_info_storage()
 
-    print("✅ All tests completed!")
 
 
 if __name__ == "__main__":

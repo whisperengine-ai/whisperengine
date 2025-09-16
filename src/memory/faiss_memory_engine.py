@@ -4,15 +4,14 @@ High-performance memory system using Faiss for ultra-fast vector search and para
 """
 
 import asyncio
-import json
 import logging
-import time
-from typing import Dict, List, Optional, Any, Tuple, Union
 import threading
+import time
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 from dataclasses import dataclass
-from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
+from typing import Any
+
 import numpy as np
-import pandas as pd
 
 try:
     import faiss
@@ -32,7 +31,7 @@ class MemoryDocument:
     id: str
     content: str
     embedding: np.ndarray
-    metadata: Dict[str, Any]
+    metadata: dict[str, Any]
     user_id: str
     timestamp: float
     importance: float = 0.5
@@ -67,7 +66,7 @@ class FaissMemoryIndex:
         self.is_trained = False
 
         # Document storage (Faiss only stores vectors)
-        self.documents: Dict[int, MemoryDocument] = {}
+        self.documents: dict[int, MemoryDocument] = {}
         self.next_id = 0
 
         # Thread safety
@@ -113,7 +112,7 @@ class FaissMemoryIndex:
 
         return index
 
-    def add_documents(self, documents: List[MemoryDocument]) -> List[int]:
+    def add_documents(self, documents: list[MemoryDocument]) -> list[int]:
         """Add documents to index with batch optimization"""
 
         if not FAISS_AVAILABLE or faiss is None:
@@ -152,10 +151,10 @@ class FaissMemoryIndex:
         self,
         query_vector: np.ndarray,
         k: int = 10,
-        user_filter: Optional[str] = None,
-        doc_type_filter: Optional[List[str]] = None,
+        user_filter: str | None = None,
+        doc_type_filter: list[str] | None = None,
         min_importance: float = 0.0,
-    ) -> List[Tuple[MemoryDocument, float]]:
+    ) -> list[tuple[MemoryDocument, float]]:
         """Ultra-fast search with optional filtering"""
 
         if not FAISS_AVAILABLE or faiss is None:
@@ -183,7 +182,7 @@ class FaissMemoryIndex:
 
             # Filter and format results
             results = []
-            for score, idx in zip(scores[0], indices[0]):
+            for score, idx in zip(scores[0], indices[0], strict=False):
                 if idx == -1:  # Faiss returns -1 for empty slots
                     continue
 
@@ -215,8 +214,8 @@ class FaissMemoryIndex:
             return results
 
     def batch_search(
-        self, query_vectors: np.ndarray, k: int = 10, user_filters: Optional[List[str]] = None
-    ) -> List[List[Tuple[MemoryDocument, float]]]:
+        self, query_vectors: np.ndarray, k: int = 10, user_filters: list[str] | None = None
+    ) -> list[list[tuple[MemoryDocument, float]]]:
         """Parallel batch search for multiple queries"""
 
         if not FAISS_AVAILABLE or faiss is None:
@@ -238,7 +237,7 @@ class FaissMemoryIndex:
                 query_results = []
                 user_filter = user_filters[i] if user_filters else None
 
-                for score, idx in zip(scores[i], indices[i]):
+                for score, idx in zip(scores[i], indices[i], strict=False):
                     if idx == -1:
                         continue
 
@@ -263,7 +262,7 @@ class FaissMemoryIndex:
 
             return batch_results
 
-    def get_statistics(self) -> Dict[str, Any]:
+    def get_statistics(self) -> dict[str, Any]:
         """Get performance statistics"""
         return {
             "index_type": self.index_type,
@@ -309,7 +308,7 @@ class FaissMemoryEngine:
         self.process_pool = ProcessPoolExecutor(max_workers=max_workers)
 
         # Batch processing queues
-        self.add_queue: Optional[asyncio.Queue] = None
+        self.add_queue: asyncio.Queue | None = None
         self.batch_task = None
 
         # Performance tracking
@@ -335,7 +334,7 @@ class FaissMemoryEngine:
         user_id: str,
         content: str,
         embedding: np.ndarray,
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: dict[str, Any] | None = None,
         importance: float = 0.5,
         doc_type: str = "conversation",
     ) -> str:
@@ -366,11 +365,11 @@ class FaissMemoryEngine:
     async def search_memories(
         self,
         query_embedding: np.ndarray,
-        user_id: Optional[str] = None,
+        user_id: str | None = None,
         k: int = 10,
-        doc_types: Optional[List[str]] = None,
+        doc_types: list[str] | None = None,
         min_importance: float = 0.0,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Ultra-fast memory search with parallel processing"""
 
         # Check cache first
@@ -463,7 +462,7 @@ class FaissMemoryEngine:
                 try:
                     doc = await asyncio.wait_for(self.add_queue.get(), timeout=1.0)
                     batch.append(doc)
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     pass
 
                 # Process batch if ready
@@ -498,7 +497,7 @@ class FaissMemoryEngine:
                 logger.error(f"Batch processor error: {e}")
                 await asyncio.sleep(1.0)
 
-    async def get_performance_stats(self) -> Dict[str, Any]:
+    async def get_performance_stats(self) -> dict[str, Any]:
         """Get comprehensive performance statistics"""
 
         conversation_stats = self.conversation_index.get_statistics()
@@ -548,10 +547,10 @@ class FaissChromaDBAdapter:
     async def search_memories_with_embedding(
         self,
         query_embedding: np.ndarray,
-        user_id: Optional[str] = None,
+        user_id: str | None = None,
         limit: int = 5,
-        doc_types: Optional[List[str]] = None,
-    ) -> List[Dict]:
+        doc_types: list[str] | None = None,
+    ) -> list[dict]:
         """ChromaDB-compatible search with pre-computed embedding"""
 
         if not self.initialized:

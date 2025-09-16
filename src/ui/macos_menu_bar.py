@@ -4,15 +4,15 @@ WhisperEngine macOS Native Menu Bar Integration
 Provides enhanced macOS menu bar with proper keyboard shortcuts and behaviors using pystray.
 """
 
-import os
-import sys
-import webbrowser
+import json
 import logging
 import subprocess
-from pathlib import Path
-from typing import Optional, Callable, Dict, Any
+import sys
 import threading
-import json
+import webbrowser
+from collections.abc import Callable
+from pathlib import Path
+from typing import Any
 
 try:
     import pystray
@@ -60,12 +60,12 @@ class WhisperEngineMacOSApp:
             self._create_tray_icon()
             self._start_status_monitoring()
 
-    def _load_preferences(self) -> Dict[str, Any]:
+    def _load_preferences(self) -> dict[str, Any]:
         """Load user preferences from file"""
         prefs_file = Path.home() / ".whisperengine" / "preferences.json"
         try:
             if prefs_file.exists():
-                with open(prefs_file, "r") as f:
+                with open(prefs_file) as f:
                     return json.load(f)
         except Exception as e:
             self.logger.warning(f"Could not load preferences: {e}")
@@ -222,7 +222,7 @@ class WhisperEngineMacOSApp:
 
             export_file = export_dir / f"conversations_{self._get_timestamp()}.json"
 
-            self._show_notification("WhisperEngine", f"Export started - check Downloads folder")
+            self._show_notification("WhisperEngine", "Export started - check Downloads folder")
             self.logger.info(f"Export requested to {export_file}")
 
             # Open export directory
@@ -292,7 +292,7 @@ class WhisperEngineMacOSApp:
                 with title "Preferences" ¬
                 buttons {"Cancel", "Configure", "OK"} ¬
                 default button "OK"
-            
+
             if button returned of prefs is "Configure" then
                 return "configure"
             else
@@ -463,7 +463,7 @@ class WhisperEngineMacOSApp:
 
 def create_macos_menu_bar(
     app_instance, host: str = "127.0.0.1", port: int = 8080
-) -> Optional[WhisperEngineMacOSApp]:
+) -> WhisperEngineMacOSApp | None:
     """
     Create and return macOS menu bar app
 
@@ -675,7 +675,7 @@ A privacy-first AI conversation platform with sophisticated memory and emotional
 class PreferencesWindow:
     """Simple preferences window using rumps alerts"""
 
-    def __init__(self, preferences: Dict[str, Any], save_callback: Callable):
+    def __init__(self, preferences: dict[str, Any], save_callback: Callable):
         self.preferences = preferences
         self.save_callback = save_callback
 
@@ -709,7 +709,7 @@ class PreferencesWindow:
 
 def create_macos_menu_bar(
     app_instance, host: str = "127.0.0.1", port: int = 8080
-) -> Optional[WhisperEngineMacOSApp]:
+) -> WhisperEngineMacOSApp | None:
     """
     Create and return macOS menu bar app
 

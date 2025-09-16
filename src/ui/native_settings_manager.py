@@ -6,43 +6,40 @@ Handles configuration, preferences, and platform-specific settings.
 
 import json
 import logging
-import os
 import platform
+from dataclasses import asdict, dataclass
 from datetime import datetime
-from pathlib import Path
-from typing import Dict, Any, Optional, List, Tuple
-from dataclasses import dataclass, asdict
 from enum import Enum
+from pathlib import Path
+from typing import Any
 
 try:
-    from PySide6.QtCore import QSettings, QObject, Signal
+    from PySide6.QtCore import QObject, QSettings, Qt, Signal
     from PySide6.QtWidgets import (
-        QDialog,
-        QVBoxLayout,
-        QHBoxLayout,
-        QTabWidget,
-        QWidget,
-        QLabel,
-        QLineEdit,
-        QPushButton,
         QCheckBox,
         QComboBox,
-        QSpinBox,
-        QSlider,
-        QTextEdit,
-        QGroupBox,
-        QFormLayout,
+        QDialog,
         QFileDialog,
-        QMessageBox,
+        QFormLayout,
+        QFrame,
+        QGroupBox,
+        QHBoxLayout,
+        QLabel,
+        QLineEdit,
         QListWidget,
         QListWidgetItem,
-        QPushButton,
+        QMessageBox,
         QProgressBar,
-        QFrame,
+        QPushButton,
+        QSlider,
+        QSpinBox,
+        QTabWidget,
+        QTextEdit,
+        QVBoxLayout,
+        QWidget,
     )
-    from PySide6.QtCore import Qt
 except ImportError:
-    print("PySide6 not available for settings manager")
+    pass
 
 
 # Configuration dataclasses
@@ -170,7 +167,7 @@ class NativeSettingsManager(QObject):
             # Load from JSON file first (primary)
             config_file = self.get_config_file_path()
             if config_file.exists():
-                with open(config_file, "r") as f:
+                with open(config_file) as f:
                     data = json.load(f)
 
                 # Update configuration objects
@@ -352,7 +349,7 @@ class NativeSettingsManager(QObject):
         self.save_settings()
         self.settings_changed.emit("platform", self.platform_config)
 
-    def get_all_configs(self) -> Dict[str, Any]:
+    def get_all_configs(self) -> dict[str, Any]:
         """Get all configuration objects"""
         return {
             "llm": self.llm_config,
@@ -362,7 +359,7 @@ class NativeSettingsManager(QObject):
             "advanced": self.advanced_config,
         }
 
-    def reset_to_defaults(self, category: Optional[str] = None):
+    def reset_to_defaults(self, category: str | None = None):
         """Reset settings to defaults"""
         if category == "llm" or category is None:
             self.llm_config = LLMConfig()
@@ -407,7 +404,7 @@ class NativeSettingsManager(QObject):
     def import_settings(self, file_path: str) -> bool:
         """Import settings from file"""
         try:
-            with open(file_path, "r") as f:
+            with open(file_path) as f:
                 data = json.load(f)
 
             # Validate and import each category
@@ -430,11 +427,12 @@ class NativeSettingsManager(QObject):
             self.logger.error(f"Error importing settings: {e}")
             return False
 
-    def validate_llm_connection(self) -> Tuple[bool, str]:
+    def validate_llm_connection(self) -> tuple[bool, str]:
         """Validate LLM connection with current settings"""
         try:
-            import requests
             import time
+
+            import requests
 
             url = f"{self.llm_config.api_url.rstrip('/')}/models"
 
@@ -468,7 +466,7 @@ class NativeSettingsManager(QObject):
         except Exception as e:
             return False, f"❌ Error: {str(e)}"
 
-    def get_available_models(self) -> List[str]:
+    def get_available_models(self) -> list[str]:
         """Get list of available models from LLM server"""
         try:
             import requests

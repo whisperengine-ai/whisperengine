@@ -6,7 +6,7 @@ into the existing bot without major code changes.
 """
 
 import logging
-from typing import Optional, Dict, Any
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -70,7 +70,7 @@ class LLMMemoryPatch:
         """Check if LLM memory enhancement is enabled"""
         return self.enabled
 
-    def get_enhancement_status(self) -> Dict[str, Any]:
+    def get_enhancement_status(self) -> dict[str, Any]:
         """Get status information about LLM memory enhancement"""
 
         if not self.enabled:

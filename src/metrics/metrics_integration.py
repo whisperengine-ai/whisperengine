@@ -6,14 +6,12 @@ Integrates the holistic AI metrics and A/B testing framework with the existing
 WhisperEngine bot system for seamless performance measurement and optimization.
 """
 
-import asyncio
 import logging
-from datetime import datetime, timezone
-from typing import Dict, List, Optional, Any
 import os
+from typing import Any
 
-from .holistic_ai_metrics import HolisticAIMetrics, ConversationMetrics
 from .ab_testing_framework import ABTestingFramework, TestType
+from .holistic_ai_metrics import ConversationMetrics, HolisticAIMetrics
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +40,7 @@ class MetricsIntegration:
 
     async def process_message_with_metrics(
         self, user_id: str, message: str, memory_manager, emotional_intelligence, phase4_integration
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Process a message with full metrics collection and A/B testing
         """
@@ -89,8 +87,8 @@ class MetricsIntegration:
         memory_manager,
         emotional_intelligence,
         phase4_integration,
-        test_configs: Dict,
-    ) -> Dict[str, Any]:
+        test_configs: dict,
+    ) -> dict[str, Any]:
         """Process message with full instrumentation"""
 
         import time
@@ -157,7 +155,7 @@ class MetricsIntegration:
             "test_configs": test_configs if self.ab_testing_enabled else None,
         }
 
-    async def _get_ab_test_configurations(self, user_id: str) -> Dict[str, Dict]:
+    async def _get_ab_test_configurations(self, user_id: str) -> dict[str, dict]:
         """Get A/B test configurations for user"""
         configs = {}
 
@@ -170,8 +168,8 @@ class MetricsIntegration:
         return configs
 
     async def _retrieve_memories_with_config(
-        self, user_id: str, message: str, memory_manager, config: Dict
-    ) -> List[Dict]:
+        self, user_id: str, message: str, memory_manager, config: dict
+    ) -> list[dict]:
         """Retrieve memories with A/B test configuration"""
         # Apply test configuration to memory retrieval
         limit = config.get("memory_limit", 15)
@@ -193,8 +191,8 @@ class MetricsIntegration:
             return []
 
     async def _analyze_emotion_with_config(
-        self, user_id: str, message: str, emotional_intelligence, config: Dict
-    ) -> Dict:
+        self, user_id: str, message: str, emotional_intelligence, config: dict
+    ) -> dict:
         """Analyze emotion with A/B test configuration"""
         try:
             # Apply test configuration to emotional analysis
@@ -228,11 +226,11 @@ class MetricsIntegration:
         self,
         user_id: str,
         message: str,
-        memory_results: List[Dict],
-        emotion_results: Dict,
+        memory_results: list[dict],
+        emotion_results: dict,
         phase4_integration,
-        config: Dict,
-    ) -> Dict:
+        config: dict,
+    ) -> dict:
         """Generate response context with personality configuration"""
         try:
             # Apply personality test configuration
@@ -266,7 +264,7 @@ class MetricsIntegration:
             logger.error(f"Context generation error: {e}")
             return {"user_id": user_id, "message": message}
 
-    async def _generate_final_response(self, context: Dict, config: Dict) -> str:
+    async def _generate_final_response(self, context: dict, config: dict) -> str:
         """Generate final response with configuration"""
         try:
             # Apply response timing configuration
@@ -289,8 +287,8 @@ class MetricsIntegration:
         user_id: str,
         message: str,
         response: str,
-        memory_results: List[Dict],
-        emotion_results: Dict,
+        memory_results: list[dict],
+        emotion_results: dict,
     ):
         """Calculate quality metrics for the interaction"""
 
@@ -325,7 +323,7 @@ class MetricsIntegration:
         ]
         return sum(factors) / len(factors)
 
-    def _calculate_response_appropriateness(self, emotion_results: Dict, response: str) -> float:
+    def _calculate_response_appropriateness(self, emotion_results: dict, response: str) -> float:
         """Calculate emotional appropriateness of response"""
         detected_emotion = emotion_results.get("detected_emotion", "neutral")
 
@@ -347,7 +345,7 @@ class MetricsIntegration:
         else:
             return 0.5
 
-    def _calculate_memory_effectiveness(self, memory_results: List[Dict], response: str) -> float:
+    def _calculate_memory_effectiveness(self, memory_results: list[dict], response: str) -> float:
         """Calculate how effectively memories were used in response"""
         if not memory_results:
             return 0.5  # Neutral score if no memories
@@ -366,10 +364,10 @@ class MetricsIntegration:
         return 0.5
 
     async def _record_ab_test_data(
-        self, user_id: str, metrics: ConversationMetrics, test_configs: Dict
+        self, user_id: str, metrics: ConversationMetrics, test_configs: dict
     ):
         """Record data for A/B testing analysis"""
-        for test_type_str, config in test_configs.items():
+        for test_type_str, _config in test_configs.items():
             try:
                 test_type = TestType(test_type_str.replace("config", ""))
                 await self.ab_testing.record_test_interaction(user_id, test_type, metrics)
@@ -378,7 +376,7 @@ class MetricsIntegration:
 
     async def _process_message_original(
         self, user_id: str, message: str, memory_manager, emotional_intelligence, phase4_integration
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Fallback to original message processing without metrics"""
         try:
             # Original processing logic (simplified)
@@ -420,7 +418,7 @@ class MetricsIntegration:
         await self.ab_testing.start_test(test_id)
         return test_id
 
-    async def get_metrics_summary(self, time_period: str = "daily") -> Dict[str, Any]:
+    async def get_metrics_summary(self, time_period: str = "daily") -> dict[str, Any]:
         """Get metrics summary"""
         if not self.metrics_enabled:
             return {"error": "Metrics collection is not enabled"}
@@ -428,7 +426,7 @@ class MetricsIntegration:
         system_metrics = await self.metrics_collector.generate_system_metrics(time_period)
         return system_metrics.__dict__ if system_metrics else {}
 
-    async def get_ab_test_results(self, test_id: str) -> Dict[str, Any]:
+    async def get_ab_test_results(self, test_id: str) -> dict[str, Any]:
         """Get A/B test results"""
         if not self.ab_testing_enabled:
             return {"error": "A/B testing is not enabled"}

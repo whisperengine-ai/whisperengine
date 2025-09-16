@@ -3,11 +3,9 @@ WhisperEngine Local Embedding Optimization
 Configures optimal local models for different use cases
 """
 
-import os
 import logging
-from typing import Dict, Any, Optional, List
-import time
 from dataclasses import dataclass
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -84,7 +82,7 @@ class LocalEmbeddingOptimizer:
             },
         }
 
-    def get_optimal_config(self, use_case: str = "balanced") -> Dict[str, Any]:
+    def get_optimal_config(self, use_case: str = "balanced") -> dict[str, Any]:
         """Get optimal configuration for WhisperEngine"""
 
         recommendations = {
@@ -107,7 +105,7 @@ class LocalEmbeddingOptimizer:
 
         return recommendations.get(use_case, recommendations["balanced"])
 
-    def estimate_performance_gain(self) -> Dict[str, Any]:
+    def estimate_performance_gain(self) -> dict[str, Any]:
         """Estimate performance gains from local processing"""
 
         return {
@@ -172,27 +170,15 @@ FAISS_USE_GPU=false
 if __name__ == "__main__":
     optimizer = LocalEmbeddingOptimizer()
 
-    print("🚀 WhisperEngine Local Embedding Optimization")
-    print("=" * 60)
 
     # Show all available configurations
     for use_case in ["fast", "balanced", "quality"]:
         config = optimizer.get_optimal_config(use_case)
-        print(f"\n{use_case.upper()} Configuration:")
-        print(f"  Embedding: {config['embedding_model'].name}")
-        print(f"  Dimensions: {config['embedding_model'].dimensions}")
-        print(f"  Speed: {config['embedding_model'].speed_per_sec} embed/sec")
-        print(f"  Memory: {config['embedding_model'].memory_mb}MB")
-        print(f"  Rationale: {config['rationale']}")
 
     # Show performance gains
-    print(f"\n\nEstimated Performance Gains:")
     gains = optimizer.estimate_performance_gain()
-    for category, improvements in gains.items():
-        print(f"\n{category.replace('_', ' ').title()}:")
-        for metric, value in improvements.items():
-            print(f"  • {metric.replace('_', ' ').title()}: {value}")
+    for _category, improvements in gains.items():
+        for _metric, _value in improvements.items():
+            pass
 
     # Generate recommended config
-    print(f"\n\nRecommended .env Configuration:")
-    print(optimizer.create_optimized_config("balanced"))

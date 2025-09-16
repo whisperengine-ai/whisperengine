@@ -9,16 +9,14 @@ Phase 2: Predictive Emotional Intelligence
 """
 
 import logging
-import asyncio
-from datetime import datetime, timezone, timedelta
-from typing import Dict, List, Optional, Any, Tuple
-from dataclasses import dataclass, asdict
-from enum import Enum
-import statistics
 import re
+import statistics
+from dataclasses import dataclass
+from datetime import UTC, datetime
+from enum import Enum
+from typing import Any
+
 import spacy
-from collections import defaultdict, deque
-import numpy as np
 
 logger = logging.getLogger(__name__)
 
@@ -54,8 +52,8 @@ class MoodAssessment:
     mood_category: MoodCategory
     mood_score: float  # -1.0 to 1.0
     confidence: float
-    contributing_factors: List[str]
-    linguistic_indicators: List[str]
+    contributing_factors: list[str]
+    linguistic_indicators: list[str]
     temporal_context: str
     assessment_timestamp: datetime
 
@@ -66,10 +64,10 @@ class StressAssessment:
 
     stress_level: StressLevel
     stress_score: float  # 0.0 to 1.0
-    immediate_stressors: List[str]
-    physiological_indicators: List[str]
-    cognitive_load_indicators: List[str]
-    coping_indicators: List[str]
+    immediate_stressors: list[str]
+    physiological_indicators: list[str]
+    cognitive_load_indicators: list[str]
+    coping_indicators: list[str]
     assessment_timestamp: datetime
 
 
@@ -80,7 +78,7 @@ class EmotionalAlert:
     alert_type: AlertType
     severity: str  # "low", "medium", "high", "critical"
     description: str
-    evidence: List[str]
+    evidence: list[str]
     recommended_intervention: str
     urgency_level: int  # 1-5
     alert_timestamp: datetime
@@ -298,7 +296,7 @@ class MoodDetector:
             },
         }
 
-    async def assess_current_mood(self, message: str, context: Dict[str, Any]) -> MoodAssessment:
+    async def assess_current_mood(self, message: str, context: dict[str, Any]) -> MoodAssessment:
         """
         Assess current mood from message content and context
 
@@ -312,7 +310,7 @@ class MoodDetector:
         logger.debug(f"Assessing mood from message: {message[:50]}...")
 
         message_lower = message.lower()
-        doc = self.nlp(message)
+        self.nlp(message)
 
         mood_scores = {}
         contributing_factors = []
@@ -349,7 +347,7 @@ class MoodDetector:
             for punct_pattern in indicators.get("punctuation", []):
                 if re.search(punct_pattern, message):
                     score += 0.8
-                    factors.append(f"punctuation: emotional expression")
+                    factors.append("punctuation: emotional expression")
 
             # Special handling for crisis indicators in very_negative
             if mood_cat == "very_negative":
@@ -419,7 +417,7 @@ class MoodDetector:
             contributing_factors=contributing_factors,
             linguistic_indicators=list(set(linguistic_indicators)),
             temporal_context=temporal_context,
-            assessment_timestamp=datetime.now(timezone.utc),
+            assessment_timestamp=datetime.now(UTC),
         )
 
         logger.debug(
@@ -427,7 +425,7 @@ class MoodDetector:
         )
         return assessment
 
-    async def assess_stress_level(self, message: str, context: Dict[str, Any]) -> StressAssessment:
+    async def assess_stress_level(self, message: str, context: dict[str, Any]) -> StressAssessment:
         """
         Assess current stress level from message and context
 
@@ -441,7 +439,7 @@ class MoodDetector:
         logger.debug(f"Assessing stress level from message: {message[:50]}...")
 
         message_lower = message.lower()
-        doc = self.nlp(message)
+        self.nlp(message)
 
         stress_score = 0.0
         immediate_stressors = []
@@ -551,7 +549,7 @@ class MoodDetector:
             physiological_indicators=physiological_indicators,
             cognitive_load_indicators=cognitive_load_indicators,
             coping_indicators=coping_indicators,
-            assessment_timestamp=datetime.now(timezone.utc),
+            assessment_timestamp=datetime.now(UTC),
         )
 
         logger.debug(f"Stress assessment: {stress_level.value} (score: {stress_score:.2f})")
@@ -559,10 +557,10 @@ class MoodDetector:
 
     async def detect_emotional_alerts(
         self,
-        mood_history: List[MoodAssessment],
-        stress_history: List[StressAssessment],
-        conversation_context: Dict[str, Any],
-    ) -> List[EmotionalAlert]:
+        mood_history: list[MoodAssessment],
+        stress_history: list[StressAssessment],
+        conversation_context: dict[str, Any],
+    ) -> list[EmotionalAlert]:
         """
         Detect concerning emotional patterns requiring intervention
 
@@ -594,7 +592,7 @@ class MoodDetector:
                         evidence=[f"Mood scores: {mood_scores}"],
                         recommended_intervention="Proactive emotional support and check-in",
                         urgency_level=4,
-                        alert_timestamp=datetime.now(timezone.utc),
+                        alert_timestamp=datetime.now(UTC),
                     )
                 )
 
@@ -610,7 +608,7 @@ class MoodDetector:
                             evidence=[f"Mood score variation: {mood_scores}"],
                             recommended_intervention="Offer stability and grounding techniques",
                             urgency_level=3,
-                            alert_timestamp=datetime.now(timezone.utc),
+                            alert_timestamp=datetime.now(UTC),
                         )
                     )
 
@@ -631,7 +629,7 @@ class MoodDetector:
                         evidence=[f"Stress indicators: {recent_stress[-1].immediate_stressors}"],
                         recommended_intervention="Immediate stress management support",
                         urgency_level=urgency,
-                        alert_timestamp=datetime.now(timezone.utc),
+                        alert_timestamp=datetime.now(UTC),
                     )
                 )
 
@@ -645,7 +643,7 @@ class MoodDetector:
                         evidence=[f"Stress trend: {stress_scores}"],
                         recommended_intervention="Stress intervention and coping strategies",
                         urgency_level=3,
-                        alert_timestamp=datetime.now(timezone.utc),
+                        alert_timestamp=datetime.now(UTC),
                     )
                 )
 
@@ -667,7 +665,7 @@ class MoodDetector:
                         evidence=overwhelm_indicators,
                         recommended_intervention="Break down tasks and offer structured support",
                         urgency_level=3,
-                        alert_timestamp=datetime.now(timezone.utc),
+                        alert_timestamp=datetime.now(UTC),
                     )
                 )
 
@@ -677,7 +675,7 @@ class MoodDetector:
                 last_interaction = datetime.fromisoformat(
                     conversation_context["last_interaction_time"]
                 )
-                time_since_last = datetime.now(timezone.utc) - last_interaction
+                time_since_last = datetime.now(UTC) - last_interaction
 
                 if time_since_last.days >= 3:
                     alerts.append(
@@ -688,7 +686,7 @@ class MoodDetector:
                             evidence=[f"Last interaction: {last_interaction.strftime('%Y-%m-%d')}"],
                             recommended_intervention="Gentle check-in and re-engagement",
                             urgency_level=2,
-                            alert_timestamp=datetime.now(timezone.utc),
+                            alert_timestamp=datetime.now(UTC),
                         )
                     )
             except (ValueError, TypeError):
@@ -701,8 +699,8 @@ class MoodDetector:
         return alerts
 
     async def generate_intervention_recommendations(
-        self, mood: MoodAssessment, stress: StressAssessment, alerts: List[EmotionalAlert]
-    ) -> Dict[str, Any]:
+        self, mood: MoodAssessment, stress: StressAssessment, alerts: list[EmotionalAlert]
+    ) -> dict[str, Any]:
         """
         Generate specific intervention recommendations based on assessments
 
@@ -836,8 +834,8 @@ class MoodDetector:
         return recommendations
 
     def get_assessment_summary(
-        self, mood: MoodAssessment, stress: StressAssessment, alerts: List[EmotionalAlert]
-    ) -> Dict[str, Any]:
+        self, mood: MoodAssessment, stress: StressAssessment, alerts: list[EmotionalAlert]
+    ) -> dict[str, Any]:
         """Generate human-readable assessment summary"""
         return {
             "mood": {

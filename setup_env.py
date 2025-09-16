@@ -3,11 +3,9 @@
 Environment setup utility - helps developers set up their .env file safely.
 """
 
-import os
-import sys
 import shutil
+import sys
 from pathlib import Path
-from typing import Optional
 
 
 def setup_environment(template: str = "minimal", force: bool = False) -> bool:
@@ -30,21 +28,15 @@ def setup_environment(template: str = "minimal", force: bool = False) -> bool:
     }
 
     if template not in templates:
-        print(f"❌ Unknown template: {template}")
-        print(f"Available templates: {', '.join(templates.keys())}")
         return False
 
     template_file = project_root / templates[template]
 
     if not template_file.exists():
-        print(f"❌ Template file not found: {template_file}")
         return False
 
     # Check if .env already exists
     if env_file.exists() and not force:
-        print(f"⚠️  .env file already exists!")
-        print(f"Current .env file: {env_file}")
-        print(f"Template: {template_file}")
 
         response = (
             input(
@@ -62,36 +54,25 @@ def setup_environment(template: str = "minimal", force: bool = False) -> bool:
             # Create backup
             backup_file = env_file.with_suffix(".env.backup")
             shutil.copy2(env_file, backup_file)
-            print(f"✅ Backed up existing .env to {backup_file}")
         elif response == "o":
-            print("Overwriting existing .env file...")
+            pass
         else:
-            print("Setup cancelled")
             return False
 
     # Copy template to .env
     try:
         shutil.copy2(template_file, env_file)
-        print(f"✅ Created .env from {template} template")
-        print(f"📝 Please edit .env with your specific configuration")
 
         # Show what needs to be configured
         show_required_config()
         return True
 
-    except Exception as e:
-        print(f"❌ Failed to create .env file: {e}")
+    except Exception:
         return False
 
 
 def show_required_config():
     """Show what configuration is required."""
-    print("\n🔧 Required configuration in .env:")
-    print("  • DISCORD_BOT_TOKEN - Your Discord bot token")
-    print("  • LLM_CHAT_API_URL - Your LLM API endpoint")
-    print("  • REDIS_HOST - Redis server host")
-    print("  • POSTGRES_HOST - PostgreSQL server host")
-    print("\n💡 Use 'python env_manager.py --validate' to check your configuration")
 
 
 def list_templates():
@@ -103,7 +84,7 @@ def list_templates():
         if template_file.name not in [".env.backup"]:
             # Read description from file
             try:
-                with open(template_file, "r") as f:
+                with open(template_file) as f:
                     first_lines = [f.readline().strip() for _ in range(3)]
                     description = next(
                         (
@@ -125,9 +106,8 @@ def list_templates():
                 }
             )
 
-    print("\n📋 Available environment templates:")
-    for template in templates:
-        print(f"  {template['key']:12} - {template['description']} ({template['size']} bytes)")
+    for _template in templates:
+        pass
 
 
 if __name__ == "__main__":

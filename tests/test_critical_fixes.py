@@ -4,7 +4,6 @@ Test script to verify critical fixes are working
 """
 import os
 import sys
-import logging
 from pathlib import Path
 
 # Add the project directory to the path
@@ -13,7 +12,6 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 def test_environment_validation():
     """Test environment variable validation"""
-    print("🔍 Testing environment variable validation...")
 
     # Save original token
     original_token = os.getenv("DISCORD_BOT_TOKEN")
@@ -31,19 +29,13 @@ def test_environment_validation():
         )
 
         if "DISCORD_BOT_TOKEN environment variable not set" in result.stdout:
-            print("✅ Environment variable validation working correctly")
             return True
         else:
-            print("❌ Environment variable validation not working")
-            print(f"Output: {result.stdout}")
-            print(f"Error: {result.stderr}")
             return False
 
     except subprocess.TimeoutExpired:
-        print("✅ Script properly exits (timeout expected)")
         return True
-    except Exception as e:
-        print(f"❌ Error testing environment validation: {e}")
+    except Exception:
         return False
     finally:
         # Restore original token
@@ -53,83 +45,70 @@ def test_environment_validation():
 
 def test_memory_manager():
     """Test memory manager with better error handling"""
-    print("🔍 Testing memory manager...")
 
     try:
+        from exceptions import MemoryError, ValidationError
         from memory_manager import UserMemoryManager
-        from exceptions import ValidationError, MemoryError
 
         # Test initialization
         memory_manager = UserMemoryManager()
-        print("✅ Memory manager initialization successful")
 
         # Test input validation
         try:
             memory_manager.store_conversation("", "test", "response")
-            print("❌ Validation should have failed for empty user_id")
             return False
         except ValidationError:
-            print("✅ Input validation working correctly")
+            pass
 
         # Test valid operation
         try:
             memory_manager.store_conversation("123456789", "test message", "test response")
-            print("✅ Valid conversation storage successful")
-        except Exception as e:
-            print(f"❌ Valid operation failed: {e}")
+        except Exception:
             return False
 
         return True
 
-    except ImportError as e:
-        print(f"❌ Import error: {e}")
+    except ImportError:
         return False
-    except Exception as e:
-        print(f"❌ Error testing memory manager: {e}")
+    except Exception:
         return False
 
 
 def test_llm_client():
     """Test LLM client with better error handling"""
-    print("🔍 Testing LLM client...")
 
     try:
-        from lmstudio_client import LMStudioClient
         from exceptions import LLMConnectionError
+        from lmstudio_client import LMStudioClient
 
         # Test initialization
         client = LMStudioClient()
-        print("✅ LLM client initialization successful")
 
         # Test connection (should fail gracefully)
         if client.check_connection():
-            print("✅ LM Studio is running - connection successful")
+            pass
         else:
-            print("⚠️ LM Studio not running - this is expected if server is down")
+            pass
 
         # Test error handling
         try:
             # This should raise proper exception if server is down
-            response = client.get_chat_response([{"role": "user", "content": "test"}])
-            print("✅ Chat response successful (LM Studio is running)")
+            client.get_chat_response([{"role": "user", "content": "test"}])
         except LLMConnectionError:
-            print("✅ Connection error handled correctly")
-        except Exception as e:
-            print(f"✅ Error handled: {type(e).__name__}")
+            pass
+        except Exception:
+            pass
 
         return True
 
-    except ImportError as e:
-        print(f"❌ Import error: {e}")
+    except ImportError:
         return False
-    except Exception as e:
-        print(f"❌ Error testing LLM client: {e}")
+    except Exception:
         return False
 
 
 def test_conversation_history():
     """Test conversation history manager"""
-    print("🔍 Testing conversation history manager...")
 
     try:
         # Import the class directly
@@ -150,9 +129,8 @@ def test_conversation_history():
         # Should have 3 messages (max limit)
         messages = conv_history.get_messages("channel1")
         if len(messages) <= 3:
-            print("✅ Message limit working correctly")
+            pass
         else:
-            print(f"❌ Message limit not working: {len(messages)} messages")
             return False
 
         # Test channel limit
@@ -163,21 +141,18 @@ def test_conversation_history():
 
         stats = conv_history.get_stats()
         if stats["channels"] <= 2:
-            print("✅ Channel limit working correctly")
+            pass
         else:
-            print(f"❌ Channel limit not working: {stats['channels']} channels")
             return False
 
         return True
 
-    except Exception as e:
-        print(f"❌ Error testing conversation history: {e}")
+    except Exception:
         return False
 
 
 def test_backup_system():
     """Test backup system"""
-    print("🔍 Testing backup system...")
 
     try:
         from backup_manager import BackupManager
@@ -186,29 +161,25 @@ def test_backup_system():
         backup_manager = BackupManager(
             chromadb_path="./chromadb_data", backup_path="./test_backups"
         )
-        print("✅ Backup manager initialization successful")
 
         # Test listing backups (should not fail)
-        backups = backup_manager.list_backups()
-        print(f"✅ Backup listing successful: {len(backups)} backups found")
+        backup_manager.list_backups()
 
         # Test backup creation (if ChromaDB exists)
         if Path("./chromadb_data").exists():
             try:
                 backup_path = backup_manager.create_backup(include_metadata=False)
-                print(f"✅ Backup creation successful: {backup_path}")
 
                 # Clean up test backup
                 import shutil
 
                 if Path(backup_path).exists():
                     shutil.rmtree(backup_path)
-                    print("✅ Test backup cleaned up")
 
-            except Exception as e:
-                print(f"⚠️ Backup creation failed (may be normal): {e}")
+            except Exception:
+                pass
         else:
-            print("⚠️ No ChromaDB data to backup (normal for fresh install)")
+            pass
 
         # Clean up test backup directory
         test_backup_dir = Path("./test_backups")
@@ -219,15 +190,12 @@ def test_backup_system():
 
         return True
 
-    except Exception as e:
-        print(f"❌ Error testing backup system: {e}")
+    except Exception:
         return False
 
 
 def main():
     """Run all tests"""
-    print("🚀 Testing Critical Fixes Implementation")
-    print("=" * 50)
 
     tests = [
         ("Environment Validation", test_environment_validation),
@@ -239,36 +207,25 @@ def main():
 
     results = {}
     for test_name, test_func in tests:
-        print(f"\n📋 {test_name}")
-        print("-" * 30)
         try:
             results[test_name] = test_func()
-        except Exception as e:
-            print(f"❌ Test failed with exception: {e}")
+        except Exception:
             results[test_name] = False
 
-    print("\n" + "=" * 50)
-    print("📊 TEST RESULTS SUMMARY")
-    print("=" * 50)
 
     passed = 0
     failed = 0
 
     for test_name, result in results.items():
-        status = "✅ PASS" if result else "❌ FAIL"
-        print(f"{test_name}: {status}")
         if result:
             passed += 1
         else:
             failed += 1
 
-    print(f"\nTotal: {passed} passed, {failed} failed")
 
     if failed == 0:
-        print("🎉 All critical fixes are working correctly!")
         return 0
     else:
-        print("⚠️ Some issues were found. Please review the output above.")
         return 1
 
 

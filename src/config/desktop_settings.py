@@ -7,10 +7,11 @@ Manages user settings for system prompt, LLM configuration, and Discord bot sett
 import json
 import logging
 import os
-import aiohttp
-from pathlib import Path
-from typing import Dict, Any, Optional, List
 from datetime import datetime
+from pathlib import Path
+from typing import Any
+
+import aiohttp
 
 logger = logging.getLogger(__name__)
 
@@ -55,11 +56,11 @@ class DesktopSettingsManager:
         # Load existing settings
         self.settings = self.load_settings()
 
-    def load_settings(self) -> Dict[str, Any]:
+    def load_settings(self) -> dict[str, Any]:
         """Load settings from file"""
         try:
             if self.settings_file.exists():
-                with open(self.settings_file, "r") as f:
+                with open(self.settings_file) as f:
                     loaded_settings = json.load(f)
 
                 # Merge with defaults to handle new settings
@@ -91,7 +92,7 @@ class DesktopSettingsManager:
             logger.error(f"Failed to save settings: {e}")
             return False
 
-    def _deep_update(self, base_dict: Dict, update_dict: Dict):
+    def _deep_update(self, base_dict: dict, update_dict: dict):
         """Deep update dictionary"""
         for key, value in update_dict.items():
             if key in base_dict and isinstance(base_dict[key], dict) and isinstance(value, dict):
@@ -100,7 +101,7 @@ class DesktopSettingsManager:
                 base_dict[key] = value
 
     # System Prompt Management
-    def get_system_prompt_config(self) -> Dict[str, Any]:
+    def get_system_prompt_config(self) -> dict[str, Any]:
         """Get system prompt configuration"""
         return self.settings["system_prompt"].copy()
 
@@ -130,7 +131,7 @@ class DesktopSettingsManager:
                 return """You are WhisperEngine, an advanced AI conversation platform with emotional intelligence and memory capabilities.
 
 You are running in desktop app mode, providing:
-- 🔒 Local privacy with SQLite storage  
+- 🔒 Local privacy with SQLite storage
 - 🧠 Advanced memory networks
 - 💭 Emotional intelligence
 - 🖥️ Native desktop integration
@@ -206,7 +207,7 @@ Be helpful, engaging, and demonstrate your advanced capabilities. Keep responses
             logger.error(f"Failed to delete custom prompt: {e}")
             return False
 
-    def get_uploaded_prompts(self) -> List[str]:
+    def get_uploaded_prompts(self) -> list[str]:
         """Get list of uploaded prompt files"""
         try:
             return [f.name for f in self.system_prompts_dir.glob("*.txt") if f.is_file()]
@@ -215,7 +216,7 @@ Be helpful, engaging, and demonstrate your advanced capabilities. Keep responses
             return []
 
     # LLM Configuration Management
-    def get_llm_config(self) -> Dict[str, Any]:
+    def get_llm_config(self) -> dict[str, Any]:
         """Get LLM configuration"""
         return self.settings["llm_config"].copy()
 
@@ -240,7 +241,7 @@ Be helpful, engaging, and demonstrate your advanced capabilities. Keep responses
             logger.error(f"Failed to set LLM config: {e}")
             return False
 
-    async def validate_llm_config(self) -> Dict[str, Any]:
+    async def validate_llm_config(self) -> dict[str, Any]:
         """Validate LLM configuration and fetch available models"""
         config = self.settings["llm_config"]
         api_url = config["api_url"]
@@ -307,7 +308,7 @@ Be helpful, engaging, and demonstrate your advanced capabilities. Keep responses
         return result
 
     # Discord Configuration Management
-    def get_discord_config(self) -> Dict[str, Any]:
+    def get_discord_config(self) -> dict[str, Any]:
         """Get Discord configuration"""
         return self.settings["discord_config"].copy()
 
@@ -326,7 +327,7 @@ Be helpful, engaging, and demonstrate your advanced capabilities. Keep responses
             logger.error(f"Failed to set Discord token: {e}")
             return False
 
-    async def validate_discord_token(self) -> Dict[str, Any]:
+    async def validate_discord_token(self) -> dict[str, Any]:
         """Validate Discord bot token"""
         token = self.settings["discord_config"]["bot_token"]
 
@@ -374,7 +375,7 @@ Be helpful, engaging, and demonstrate your advanced capabilities. Keep responses
         return result
 
     # UI Preferences
-    def get_ui_preferences(self) -> Dict[str, Any]:
+    def get_ui_preferences(self) -> dict[str, Any]:
         """Get UI preferences"""
         return self.settings["ui_preferences"].copy()
 
@@ -388,7 +389,7 @@ Be helpful, engaging, and demonstrate your advanced capabilities. Keep responses
             return False
 
     # Export/Import
-    def export_settings(self) -> Dict[str, Any]:
+    def export_settings(self) -> dict[str, Any]:
         """Export settings for backup"""
         export_data = self.settings.copy()
 
@@ -404,7 +405,7 @@ Be helpful, engaging, and demonstrate your advanced capabilities. Keep responses
         export_data["uploaded_prompts"] = uploaded_prompts
         return export_data
 
-    def import_settings(self, import_data: Dict[str, Any]) -> bool:
+    def import_settings(self, import_data: dict[str, Any]) -> bool:
         """Import settings from backup"""
         try:
             # Import uploaded prompts

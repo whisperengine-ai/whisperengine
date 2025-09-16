@@ -7,15 +7,14 @@ This module provides secure API key handling, validation, and management
 to prevent credential exposure and enhance security.
 """
 
+import hashlib
+import logging
 import os
 import re
-import logging
-import hashlib
-import secrets
-from typing import Dict, Optional, List, Tuple, Any
-from enum import Enum
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime
+from enum import Enum
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -48,8 +47,8 @@ class APIKeyInfo:
     masked_key: str
     is_valid: bool
     format_score: float
-    security_threats: List[SecurityThreat]
-    last_validated: Optional[datetime] = None
+    security_threats: list[SecurityThreat]
+    last_validated: datetime | None = None
     validation_attempts: int = 0
 
 
@@ -60,8 +59,8 @@ class APIKeySecurityManager:
 
     def __init__(self):
         """Initialize the API key security manager"""
-        self.key_cache: Dict[str, APIKeyInfo] = {}
-        self.security_events: List[Dict[str, Any]] = []
+        self.key_cache: dict[str, APIKeyInfo] = {}
+        self.security_events: list[dict[str, Any]] = []
 
         # API key format patterns for validation
         self.key_patterns = {
@@ -223,7 +222,7 @@ class APIKeySecurityManager:
 
         return APIKeyType.UNKNOWN
 
-    def scan_key_threats(self, key: str) -> List[SecurityThreat]:
+    def scan_key_threats(self, key: str) -> list[SecurityThreat]:
         """
         Scan API key for security threats
 
@@ -342,7 +341,7 @@ class APIKeySecurityManager:
 
         return sanitized
 
-    def validate_environment_keys(self) -> Dict[str, APIKeyInfo]:
+    def validate_environment_keys(self) -> dict[str, APIKeyInfo]:
         """
         Validate all API keys found in environment variables
 
@@ -373,7 +372,7 @@ class APIKeySecurityManager:
 
         return results
 
-    def secure_header_creation(self, api_key: str, header_type: str = "Bearer") -> Dict[str, str]:
+    def secure_header_creation(self, api_key: str, header_type: str = "Bearer") -> dict[str, str]:
         """
         Securely create authorization headers with validation
 
@@ -404,7 +403,7 @@ class APIKeySecurityManager:
             logger.warning(f"Unknown header type: {header_type}")
             return {"Authorization": f"{header_type} {api_key}"}
 
-    def get_security_report(self) -> Dict[str, Any]:
+    def get_security_report(self) -> dict[str, Any]:
         """
         Get a comprehensive security report for API key management
 
@@ -446,8 +445,8 @@ class APIKeySecurityManager:
         }
 
     def _generate_security_recommendations(
-        self, env_validation: Dict[str, APIKeyInfo]
-    ) -> List[str]:
+        self, env_validation: dict[str, APIKeyInfo]
+    ) -> list[str]:
         """Generate security recommendations based on validation results"""
         recommendations = []
 
@@ -506,7 +505,7 @@ def sanitize_for_logging(text: str) -> str:
     return manager.sanitize_for_logging(text)
 
 
-def secure_headers(api_key: str, header_type: str = "Bearer") -> Dict[str, str]:
+def secure_headers(api_key: str, header_type: str = "Bearer") -> dict[str, str]:
     """Convenience function to create secure headers"""
     manager = get_api_key_manager()
     return manager.secure_header_creation(api_key, header_type)
@@ -528,26 +527,15 @@ if __name__ == "__main__":
         ("", APIKeyType.UNKNOWN),
     ]
 
-    print("🔐 API Key Security Manager Test Results")
-    print("=" * 50)
 
     for key, key_type in test_keys:
         result = manager.validate_api_key(key, key_type)
-        print(f"\nKey: {result.masked_key}")
-        print(f"Type: {result.key_type.value}")
-        print(f"Valid: {result.is_valid}")
-        print(f"Score: {result.format_score:.2f}")
-        print(f"Threats: {[t.value for t in result.security_threats]}")
 
     # Test environment validation
-    print("\n" + "=" * 50)
-    print("Environment Key Validation:")
     report = manager.get_security_report()
 
-    for env_var, status in report["key_status"].items():
-        print(f"{env_var}: {status['masked_key']} - {'✅' if status['is_valid'] else '❌'}")
+    for _env_var, _status in report["key_status"].items():
+        pass
 
-    print(f"\nSecurity Score: {report['summary']['security_score']:.1f}%")
-    print("Recommendations:")
-    for rec in report["recommendations"]:
-        print(f"  - {rec}")
+    for _rec in report["recommendations"]:
+        pass

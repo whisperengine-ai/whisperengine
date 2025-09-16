@@ -4,19 +4,19 @@ Optimizes database operations through intelligent batching, caching, and paralle
 """
 
 import asyncio
+import hashlib
+import json
 import logging
-import time
 import threading
+import time
 from collections import defaultdict, deque
-from typing import Dict, List, Optional, Any, Tuple, Callable, Union
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from concurrent.futures import ThreadPoolExecutor, Future
-import json
-import hashlib
+from typing import Any
 
-import pandas as pd
 import numpy as np
+import pandas as pd
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +27,7 @@ class BatchOperation:
 
     operation_type: str  # 'store', 'query', 'update', 'delete'
     user_id: str
-    data: Dict[str, Any]
+    data: dict[str, Any]
     future: asyncio.Future
     timestamp: datetime = field(default_factory=datetime.now)
     priority: int = 0  # Higher priority = processed first
@@ -62,8 +62,8 @@ class SmartCache:
         self.default_ttl = default_ttl
 
         # Cache storage
-        self.cache: Dict[str, Any] = {}
-        self.cache_metadata: Dict[str, Dict[str, Any]] = {}
+        self.cache: dict[str, Any] = {}
+        self.cache_metadata: dict[str, dict[str, Any]] = {}
 
         # Performance tracking
         self.hits = 0
@@ -73,7 +73,7 @@ class SmartCache:
         # Thread safety
         self._lock = threading.RLock()
 
-    def get(self, key: str) -> Optional[Any]:
+    def get(self, key: str) -> Any | None:
         """Get item from cache"""
         with self._lock:
             if key not in self.cache:
@@ -95,7 +95,7 @@ class SmartCache:
             self.hits += 1
             return self.cache[key]
 
-    def put(self, key: str, value: Any, ttl: Optional[int] = None) -> None:
+    def put(self, key: str, value: Any, ttl: int | None = None) -> None:
         """Put item in cache with optional TTL"""
         with self._lock:
             # Evict if necessary
@@ -111,7 +111,7 @@ class SmartCache:
                 "access_count": 1,
             }
 
-    def invalidate(self, pattern: Optional[str] = None) -> int:
+    def invalidate(self, pattern: str | None = None) -> int:
         """Invalidate cache entries matching pattern"""
         with self._lock:
             if pattern is None:
@@ -128,7 +128,7 @@ class SmartCache:
 
             return len(keys_to_remove)
 
-    def _is_expired(self, metadata: Dict[str, Any]) -> bool:
+    def _is_expired(self, metadata: dict[str, Any]) -> bool:
         """Check if cache entry is expired"""
         if not metadata:
             return True
@@ -155,7 +155,7 @@ class SmartCache:
         self.cache.pop(key, None)
         self.cache_metadata.pop(key, None)
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get cache performance statistics"""
         with self._lock:
             total_requests = self.hits + self.misses
@@ -205,7 +205,7 @@ class AdvancedMemoryBatcher:
         self.max_workers = max_workers
 
         # Operation queues by type
-        self.operation_queues: Dict[str, deque] = defaultdict(deque)
+        self.operation_queues: dict[str, deque] = defaultdict(deque)
 
         # Smart caching system
         self.cache = SmartCache(max_size=5000, default_ttl=300)
@@ -215,16 +215,16 @@ class AdvancedMemoryBatcher:
 
         # Performance tracking
         self.metrics = BatchMetrics()
-        self.operation_times: List[float] = []
-        self.batch_sizes: List[int] = []
+        self.operation_times: list[float] = []
+        self.batch_sizes: list[int] = []
 
         # Deduplication tracking
-        self.recent_operations: Dict[str, datetime] = {}
+        self.recent_operations: dict[str, datetime] = {}
         self.dedup_window = timedelta(seconds=5)
 
         # Background processing
         self.running = False
-        self.background_tasks: List[asyncio.Task] = []
+        self.background_tasks: list[asyncio.Task] = []
 
         # Thread safety
         self._lock = threading.RLock()
@@ -264,7 +264,7 @@ class AdvancedMemoryBatcher:
             await asyncio.wait_for(
                 asyncio.gather(*self.background_tasks, return_exceptions=True), timeout=5.0
             )
-        except asyncio.TimeoutError:
+        except TimeoutError:
             logger.warning("Background tasks didn't complete within timeout")
 
         # Flush remaining operations
@@ -280,7 +280,7 @@ class AdvancedMemoryBatcher:
         user_id: str,
         message: str,
         response: str,
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: dict[str, Any] | None = None,
         priority: int = 0,
     ) -> str:
         """Store conversation with batching optimization"""
@@ -315,7 +315,7 @@ class AdvancedMemoryBatcher:
         return result
 
     async def store_user_fact_batch(
-        self, user_id: str, fact: str, metadata: Optional[Dict[str, Any]] = None, priority: int = 0
+        self, user_id: str, fact: str, metadata: dict[str, Any] | None = None, priority: int = 0
     ) -> str:
         """Store user fact with batching optimization"""
 
@@ -343,9 +343,9 @@ class AdvancedMemoryBatcher:
         user_id: str,
         query: str,
         limit: int = 10,
-        doc_types: Optional[List[str]] = None,
+        doc_types: list[str] | None = None,
         use_cache: bool = True,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Query memories with batching and caching optimization"""
 
         # Check cache first
@@ -377,7 +377,7 @@ class AdvancedMemoryBatcher:
 
         return result
 
-    async def batch_store_multiple(self, operations: List[Dict[str, Any]]) -> List[str]:
+    async def batch_store_multiple(self, operations: list[dict[str, Any]]) -> list[str]:
         """Store multiple items in a single optimized batch"""
 
         batch_futures = []
@@ -438,7 +438,7 @@ class AdvancedMemoryBatcher:
                 logger.error(f"Error in {operation_type} processor: {e}")
                 await asyncio.sleep(1.0)  # Back off on error
 
-    def _extract_batch(self, operation_type: str) -> List[BatchOperation]:
+    def _extract_batch(self, operation_type: str) -> list[BatchOperation]:
         """Extract batch of operations from queue"""
 
         with self._lock:
@@ -461,7 +461,7 @@ class AdvancedMemoryBatcher:
 
             return batch
 
-    async def _process_batch(self, operation_type: str, batch: List[BatchOperation]):
+    async def _process_batch(self, operation_type: str, batch: list[BatchOperation]):
         """Process a batch of operations"""
 
         start_time = time.time()
@@ -502,7 +502,7 @@ class AdvancedMemoryBatcher:
 
             self.metrics.failed_operations += len(batch)
 
-    async def _process_store_batch(self, batch: List[BatchOperation]):
+    async def _process_store_batch(self, batch: list[BatchOperation]):
         """Process batch of store operations using pandas optimization"""
 
         if not batch:
@@ -526,7 +526,7 @@ class AdvancedMemoryBatcher:
         if user_facts:
             await self._process_user_fact_batch(user_facts)
 
-    async def _process_conversation_batch(self, conversations: List[BatchOperation]):
+    async def _process_conversation_batch(self, conversations: list[BatchOperation]):
         """Process batch of conversations using vectorized operations"""
 
         # Prepare data for batch processing
@@ -578,7 +578,7 @@ class AdvancedMemoryBatcher:
                     operation.future.set_exception(e)
 
     def _store_single_conversation(
-        self, user_id: str, message: str, response: str, metadata: Dict[str, Any]
+        self, user_id: str, message: str, response: str, metadata: dict[str, Any]
     ) -> str:
         """Store single conversation (thread-safe)"""
         try:
@@ -587,7 +587,7 @@ class AdvancedMemoryBatcher:
             logger.error(f"ChromaDB store error: {e}")
             raise
 
-    async def _process_user_fact_batch(self, user_facts: List[BatchOperation]):
+    async def _process_user_fact_batch(self, user_facts: list[BatchOperation]):
         """Process batch of user facts"""
 
         for operation in user_facts:
@@ -610,7 +610,7 @@ class AdvancedMemoryBatcher:
                 if not operation.future.done():
                     operation.future.set_exception(e)
 
-    def _store_single_user_fact(self, user_id: str, fact: str, metadata: Dict[str, Any]) -> str:
+    def _store_single_user_fact(self, user_id: str, fact: str, metadata: dict[str, Any]) -> str:
         """Store single user fact (thread-safe)"""
         try:
             return self.chromadb_manager.store_user_fact(user_id, fact, metadata)
@@ -618,7 +618,7 @@ class AdvancedMemoryBatcher:
             logger.error(f"ChromaDB fact store error: {e}")
             raise
 
-    async def _process_query_batch(self, batch: List[BatchOperation]):
+    async def _process_query_batch(self, batch: list[BatchOperation]):
         """Process batch of query operations"""
 
         # Group similar queries for optimization
@@ -656,8 +656,8 @@ class AdvancedMemoryBatcher:
                         operation.future.set_exception(e)
 
     def _execute_single_query(
-        self, user_id: str, query: str, limit: int, doc_types: List[str]
-    ) -> List[Dict[str, Any]]:
+        self, user_id: str, query: str, limit: int, doc_types: list[str]
+    ) -> list[dict[str, Any]]:
         """Execute single query (thread-safe)"""
         try:
             return self.chromadb_manager.retrieve_relevant_memories(user_id, query, limit)
@@ -665,7 +665,7 @@ class AdvancedMemoryBatcher:
             logger.error(f"ChromaDB query error: {e}")
             raise
 
-    async def _process_update_batch(self, batch: List[BatchOperation]):
+    async def _process_update_batch(self, batch: list[BatchOperation]):
         """Process batch of update operations"""
         for operation in batch:
             try:
@@ -702,7 +702,7 @@ class AdvancedMemoryBatcher:
                 if not operation.future.done():
                     operation.future.set_exception(e)
 
-    async def _process_delete_batch(self, batch: List[BatchOperation]):
+    async def _process_delete_batch(self, batch: list[BatchOperation]):
         """Process batch of delete operations"""
         for operation in batch:
             try:
@@ -715,7 +715,6 @@ class AdvancedMemoryBatcher:
                     result = await asyncio.get_event_loop().run_in_executor(
                         self.thread_pool, self.chromadb_manager.delete_memory, memory_id
                     )
-                    success = True
                 elif hasattr(self.chromadb_manager, "memory_cache"):
                     # For simplified adapter, remove from cache
                     self.chromadb_manager.memory_cache = [
@@ -724,10 +723,8 @@ class AdvancedMemoryBatcher:
                         if conv.get("memory_id") != memory_id
                     ]
                     result = f"deleted_{memory_id}"
-                    success = True
                 else:
                     result = f"delete_simulated_{memory_id}"
-                    success = True
 
                 if not operation.future.done():
                     operation.future.set_result(result)
@@ -768,7 +765,7 @@ class AdvancedMemoryBatcher:
         return False
 
     def _generate_query_cache_key(
-        self, user_id: str, query: str, limit: int, doc_types: Optional[List[str]]
+        self, user_id: str, query: str, limit: int, doc_types: list[str] | None
     ) -> str:
         """Generate cache key for query"""
 
@@ -816,7 +813,7 @@ class AdvancedMemoryBatcher:
                 logger.error(f"Cache cleanup error: {e}")
                 await asyncio.sleep(60)
 
-    def get_performance_metrics(self) -> Dict[str, Any]:
+    def get_performance_metrics(self) -> dict[str, Any]:
         """Get comprehensive performance metrics"""
 
         # Calculate derived metrics
@@ -886,7 +883,7 @@ class BatchedMemoryAdapter:
             await self.batcher.stop()
 
     async def store_conversation(
-        self, user_id: str, message: str, response: str, metadata: Optional[Dict[str, Any]] = None
+        self, user_id: str, message: str, response: str, metadata: dict[str, Any] | None = None
     ) -> str:
         """Store conversation with optional batching"""
 
@@ -899,7 +896,7 @@ class BatchedMemoryAdapter:
             )
 
     async def store_user_fact(
-        self, user_id: str, fact: str, metadata: Optional[Dict[str, Any]] = None
+        self, user_id: str, fact: str, metadata: dict[str, Any] | None = None
     ) -> str:
         """Store user fact with optional batching"""
 
@@ -911,7 +908,7 @@ class BatchedMemoryAdapter:
 
     async def retrieve_relevant_memories(
         self, user_id: str, query: str, limit: int = 10
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Retrieve memories with optional batching and caching"""
 
         if self.batcher:
@@ -920,7 +917,7 @@ class BatchedMemoryAdapter:
             # Direct call
             return self.chromadb_manager.retrieve_relevant_memories(user_id, query, limit)
 
-    def get_performance_stats(self) -> Dict[str, Any]:
+    def get_performance_stats(self) -> dict[str, Any]:
         """Get performance statistics"""
 
         if self.batcher:

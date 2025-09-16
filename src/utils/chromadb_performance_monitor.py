@@ -4,14 +4,12 @@ ChromaDB Performance Monitor
 Detects GPU availability and provides performance recommendations for embedding generation.
 """
 
-import os
-import sys
-import platform
-import asyncio
 import logging
+import os
+import platform
 import subprocess
-from typing import Dict, Any, Optional
 import time
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +21,7 @@ class ChromaDBPerformanceMonitor:
         self.system_info = self._get_system_info()
         self.docker_available = self._check_docker_available()
 
-    def _get_system_info(self) -> Dict[str, Any]:
+    def _get_system_info(self) -> dict[str, Any]:
         """Get system information"""
         return {
             "platform": platform.system(),
@@ -75,7 +73,7 @@ class ChromaDBPerformanceMonitor:
 
             # Check cgroup (another indicator)
             try:
-                with open("/proc/1/cgroup", "r") as f:
+                with open("/proc/1/cgroup") as f:
                     content = f.read()
                     return "docker" in content or "containerd" in content
             except (FileNotFoundError, PermissionError):
@@ -91,7 +89,7 @@ class ChromaDBPerformanceMonitor:
 
         return is_external_embedding_configured()
 
-    def _check_container_gpu_access(self) -> Dict[str, Any]:
+    def _check_container_gpu_access(self) -> dict[str, Any]:
         """Check if ChromaDB container has GPU access"""
         if not self._check_chromadb_container_running():
             return {"available": False, "reason": "ChromaDB container not running"}
@@ -145,7 +143,7 @@ class ChromaDBPerformanceMonitor:
         except (subprocess.TimeoutExpired, FileNotFoundError, subprocess.CalledProcessError):
             return {"available": False, "reason": "Unable to check container GPU access"}
 
-    def _estimate_embedding_performance(self) -> Dict[str, Any]:
+    def _estimate_embedding_performance(self) -> dict[str, Any]:
         """Estimate embedding performance based on system configuration"""
         # These are rough estimates based on typical performance
         performance_estimates = {
@@ -198,7 +196,7 @@ class ChromaDBPerformanceMonitor:
 
         return performance_estimates[key]
 
-    async def benchmark_embedding_performance(self, test_duration: float = 5.0) -> Dict[str, Any]:
+    async def benchmark_embedding_performance(self, test_duration: float = 5.0) -> dict[str, Any]:
         """Benchmark actual embedding performance"""
         try:
             from src.utils.embedding_manager import embedding_manager
@@ -239,7 +237,7 @@ class ChromaDBPerformanceMonitor:
         except Exception as e:
             return {"error": f"Benchmark failed: {e}"}
 
-    def get_performance_recommendations(self) -> Dict[str, Any]:
+    def get_performance_recommendations(self) -> dict[str, Any]:
         """Get performance recommendations based on system analysis"""
         gpu_info = self._check_container_gpu_access()
         performance_est = self._estimate_embedding_performance()
@@ -307,11 +305,11 @@ class ChromaDBPerformanceMonitor:
 performance_monitor = ChromaDBPerformanceMonitor()
 
 
-async def check_chromadb_performance() -> Dict[str, Any]:
+async def check_chromadb_performance() -> dict[str, Any]:
     """Convenience function to check ChromaDB performance"""
     return performance_monitor.get_performance_recommendations()
 
 
-def check_chromadb_performance_sync() -> Dict[str, Any]:
+def check_chromadb_performance_sync() -> dict[str, Any]:
     """Synchronous version of performance check"""
     return performance_monitor.get_performance_recommendations()

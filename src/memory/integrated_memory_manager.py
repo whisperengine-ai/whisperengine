@@ -5,16 +5,15 @@ This bridges the existing memory manager with the graph-integrated emotion manag
 to provide comprehensive context awareness while preserving existing functionality.
 """
 
-import logging
 import asyncio
-import os
 import json
-from typing import Dict, List, Optional, Any, Tuple
+import logging
+import os
 from datetime import datetime
+from typing import Any
 
-from src.memory.memory_manager import UserMemoryManager
-from src.utils.graph_integrated_emotion_manager import GraphIntegratedEmotionManager
 from src.graph_database.neo4j_connector import get_neo4j_connector
+from src.memory.memory_manager import UserMemoryManager
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +25,7 @@ class IntegratedMemoryManager:
         self,
         memory_manager=None,
         emotion_manager=None,
-        enable_graph_sync: Optional[bool] = None,
+        enable_graph_sync: bool | None = None,
         llm_client=None,
     ):
         """Initialize integrated memory manager"""
@@ -86,9 +85,9 @@ class IntegratedMemoryManager:
         user_id: str,
         user_message: str,
         bot_response: str,
-        channel_id: Optional[str] = None,
-        pre_analyzed_emotion_data: Optional[dict] = None,
-        metadata: Optional[dict] = None,
+        channel_id: str | None = None,
+        pre_analyzed_emotion_data: dict | None = None,
+        metadata: dict | None = None,
     ):
         """Proxy to memory manager's store_conversation method"""
         return self.memory_manager.store_conversation(
@@ -104,7 +103,7 @@ class IntegratedMemoryManager:
         """Proxy to memory manager's retrieve_relevant_memories method"""
         return self.memory_manager.retrieve_relevant_memories(user_id, query, limit)
 
-    def store_user_fact(self, user_id: str, fact: str, metadata: Optional[dict] = None):
+    def store_user_fact(self, user_id: str, fact: str, metadata: dict | None = None):
         """Proxy to memory manager's store_user_fact method"""
         if hasattr(self.memory_manager, "store_user_fact"):
             return self.memory_manager.store_user_fact(user_id, fact, str(metadata or {}))
@@ -120,7 +119,7 @@ class IntegratedMemoryManager:
     # ========================================================================
 
     def store_conversation_with_full_context(
-        self, user_id: str, message: str, response: str, display_name: Optional[str] = None
+        self, user_id: str, message: str, response: str, display_name: str | None = None
     ) -> str:
         """Store conversation with full emotion and graph context"""
 
@@ -222,7 +221,7 @@ class IntegratedMemoryManager:
         # Return the calculated importance value
         return importance
 
-    async def get_memories_by_user(self, user_id: str) -> List[Dict]:
+    async def get_memories_by_user(self, user_id: str) -> list[dict]:
         """
         Retrieve all memories for a specific user
 
@@ -329,7 +328,7 @@ class IntegratedMemoryManager:
 
     async def retrieve_contextual_memories(
         self, user_id: str, query: str, limit: int = 10
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Retrieve memories with enhanced context from emotion and graph systems"""
 
         # Get standard ChromaDB memories (existing functionality)
@@ -366,7 +365,7 @@ class IntegratedMemoryManager:
 
     def get_comprehensive_user_context(
         self, user_id: str, current_message: str = ""
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Get comprehensive user context combining all systems"""
 
         context = {
@@ -462,7 +461,7 @@ class IntegratedMemoryManager:
             interaction_count = context.get("interaction_count", 0)
 
             if relationship_level != "stranger":
-                prompt_parts.append(f"\n=== RELATIONSHIP STATUS ===")
+                prompt_parts.append("\n=== RELATIONSHIP STATUS ===")
                 prompt_parts.append(
                     f"Relationship: {relationship_level.title()} ({interaction_count} interactions)"
                 )
@@ -474,25 +473,25 @@ class IntegratedMemoryManager:
 
             # Add recent memories
             if context.get("recent_memories"):
-                prompt_parts.append(f"\n=== RECENT CONVERSATIONS ===")
+                prompt_parts.append("\n=== RECENT CONVERSATIONS ===")
                 for i, memory in enumerate(context["recent_memories"][:3], 1):
                     prompt_parts.append(f"{i}. {memory}")
 
             # Add user facts
             if context.get("user_facts"):
-                prompt_parts.append(f"\n=== USER FACTS ===")
+                prompt_parts.append("\n=== USER FACTS ===")
                 for fact in context["user_facts"][:5]:
                     prompt_parts.append(f"- {fact}")
 
             # Add graph insights
             if context.get("graph_insights"):
-                prompt_parts.append(f"\n=== CONTEXTUAL INSIGHTS ===")
+                prompt_parts.append("\n=== CONTEXTUAL INSIGHTS ===")
                 prompt_parts.append(context["graph_insights"])
 
             # Add system status
             active_systems = context.get("systems_active", [])
             if active_systems:
-                prompt_parts.append(f"\n=== ACTIVE SYSTEMS ===")
+                prompt_parts.append("\n=== ACTIVE SYSTEMS ===")
                 prompt_parts.append(f"Using: {', '.join(active_systems)}")
 
             return "\n".join(prompt_parts)
@@ -501,7 +500,7 @@ class IntegratedMemoryManager:
             logger.error(f"Failed to generate system prompt context: {e}")
             return "Error: Unable to generate user context"
 
-    async def health_check(self) -> Dict[str, Any]:
+    async def health_check(self) -> dict[str, Any]:
         """Comprehensive health check of all integrated systems"""
 
         health_status = {
@@ -512,7 +511,7 @@ class IntegratedMemoryManager:
 
         # Check base memory manager
         try:
-            test_memories = self.retrieve_relevant_memories("health_check", "test", limit=1)
+            self.retrieve_relevant_memories("health_check", "test", limit=1)
             health_status["components"]["chromadb"] = {"status": "healthy"}
         except Exception as e:
             health_status["components"]["chromadb"] = {"status": "error", "error": str(e)}
@@ -531,7 +530,7 @@ class IntegratedMemoryManager:
         # Check fact extraction
         if self.enable_auto_facts and self.fact_extractor:
             try:
-                test_facts = self.fact_extractor.extract_facts("I am a test user")
+                self.fact_extractor.extract_facts("I am a test user")
                 health_status["components"]["fact_extraction"] = {"status": "healthy"}
             except Exception as e:
                 health_status["components"]["fact_extraction"] = {

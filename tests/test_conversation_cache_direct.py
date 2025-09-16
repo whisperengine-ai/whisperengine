@@ -4,15 +4,16 @@ Direct Test for Conversation Cache User Filtering Logic
 Tests the get_user_conversation_context method directly
 """
 
-import sys
 import os
+import sys
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-from conversation_cache import HybridConversationCache
-from unittest.mock import Mock, patch
 import asyncio
 import time
+from unittest.mock import Mock, patch
+
+from conversation_cache import HybridConversationCache
 
 
 def create_mock_message(user_id: int, content: str, is_bot: bool = False, message_id=None):
@@ -37,7 +38,6 @@ def create_mock_channel(channel_id: int):
 async def test_user_filtering_logic():
     """Test the user filtering logic directly"""
 
-    print("🧪 Testing user filtering logic in get_user_conversation_context...")
 
     cache = HybridConversationCache()
     mock_channel = create_mock_channel(12345)
@@ -66,10 +66,8 @@ async def test_user_filtering_logic():
             mock_channel, user_alice, limit=10
         )
 
-        print(f"  Alice's context contains {len(alice_context)} messages:")
-        for msg in alice_context:
-            user_type = "Bot" if msg.author.bot else f"User {msg.author.id}"
-            print(f"    - {user_type}: {msg.content}")
+        for _msg in alice_context:
+            pass
 
         # Verify Alice sees her messages and bot responses
         alice_user_messages = [msg for msg in alice_context if msg.author.id == user_alice]
@@ -95,15 +93,12 @@ async def test_user_filtering_logic():
         assert "Bot response" in alice_content, "Alice should see bot responses"
         assert "Bob secret message" not in alice_content, "Alice should NOT see Bob's secret"
 
-        print("  ✅ Alice's filtering works correctly")
 
         # Test Bob's filtered context
         bob_context = await cache.get_user_conversation_context(mock_channel, user_bob, limit=10)
 
-        print(f"  Bob's context contains {len(bob_context)} messages:")
-        for msg in bob_context:
-            user_type = "Bot" if msg.author.bot else f"User {msg.author.id}"
-            print(f"    - {user_type}: {msg.content}")
+        for _msg in bob_context:
+            pass
 
         # Verify Bob sees his messages and bot responses but not Alice's
         bob_user_messages = [msg for msg in bob_context if msg.author.id == user_bob]
@@ -123,15 +118,12 @@ async def test_user_filtering_logic():
         assert "Bob secret message" in bob_content, "Bob should see his secret message"
         assert "Alice message" not in bob_content, "Bob should NOT see Alice's messages"
 
-        print("  ✅ Bob's filtering works correctly")
 
-    print("✅ User filtering logic test passed")
 
 
 async def test_bot_code_fix_validation():
     """Test that the bot code fix is working correctly"""
 
-    print("\n🧪 Testing bot code fix validation...")
 
     # Import the fixed code and verify it's using the secure method
     try:
@@ -143,16 +135,12 @@ async def test_bot_code_fix_validation():
         # with open('/Users/demouser/git/whisperengine/basic_discord_bot.py', 'r') as f:
         #     bot_code = f.read()
 
-        print("  ⚠️ Test skipped - originally for different project")
-        print("  TODO: Update test for whisper-engine project structure")
         return
 
         # Count occurrences of each method
         # vulnerable_calls = bot_code.count('get_conversation_context(')
         # secure_calls = bot_code.count('get_user_conversation_context(')
 
-        print(f"  Found {vulnerable_calls} calls to get_conversation_context()")
-        print(f"  Found {secure_calls} calls to get_user_conversation_context()")
 
         # We expect to see the secure method being used in both DM and guild processing
         assert secure_calls >= 2, f"Expected at least 2 secure calls, found {secure_calls}"
@@ -166,21 +154,15 @@ async def test_bot_code_fix_validation():
         assert dm_security_fix, "DM security fix comment should be present"
         assert fallback_security_fix, "Fallback security fix comment should be present"
 
-        print("  ✅ Bot code contains security fixes")
-        print("  ✅ Secure method calls are present")
-        print("  ✅ Security fix comments are in place")
 
-    except Exception as e:
-        print(f"  ❌ Error validating bot code: {e}")
+    except Exception:
         raise
 
-    print("✅ Bot code fix validation passed")
 
 
 async def test_security_impact():
     """Test the specific security impact of the fix"""
 
-    print("\n🧪 Testing security impact scenarios...")
 
     cache = HybridConversationCache()
     mock_channel = create_mock_channel(99999)
@@ -216,8 +198,6 @@ async def test_security_impact():
 
         attacker_content = " ".join([msg.content for msg in attacker_context])
 
-        print(f"  Attacker sees {len(attacker_context)} messages")
-        print(f"  Attacker's context: {attacker_content}")
 
         # CRITICAL SECURITY TESTS
         assert "123-45-6789" not in attacker_content, "🚨 CRITICAL: SSN leaked to attacker!"
@@ -229,7 +209,6 @@ async def test_security_impact():
             or "I can help you with general" in attacker_content
         ), "Bot response should be generic"
 
-        print("  ✅ Sensitive information (SSN, credit card) NOT leaked to attacker")
 
         # Test that victim can still see their own information
         victim_context = await cache.get_user_conversation_context(
@@ -245,15 +224,10 @@ async def test_security_impact():
             "what personal info do you know" not in victim_content
         ), "Victim should NOT see attacker's probing"
 
-        print("  ✅ Victim retains access to their own data")
-        print("  ✅ Cross-user information leakage prevented")
 
-    print("✅ Security impact test passed - sensitive data protected")
 
 
 if __name__ == "__main__":
-    print("🔒 Conversation Cache Security Fix - Direct Logic Test")
-    print("=" * 55)
 
     async def run_tests():
         try:
@@ -261,31 +235,12 @@ if __name__ == "__main__":
             await test_bot_code_fix_validation()
             await test_security_impact()
 
-            print("\n" + "=" * 55)
-            print("🎉 All security tests PASSED!")
 
-            print("\n🔒 Security Fix Validation Summary:")
-            print("  ✅ User filtering logic works correctly")
-            print("  ✅ Bot code contains security fixes")
-            print("  ✅ Sensitive data leakage prevented")
-            print("  ✅ Cross-user contamination blocked")
 
-            print("\n🛡️  CVSS 7.2 Vulnerability - FIXED:")
-            print("  ❌ Channel-based caching without user segmentation")
-            print("  ❌ Cross-contamination in shared channels")
-            print("  ❌ Privacy breaches between users")
-            print("  ✅ User-specific conversation context enforced")
 
-            print("\n🎯 Technical Implementation:")
-            print("  ✅ DM processing: get_conversation_context → get_user_conversation_context")
-            print("  ✅ Fallback API calls: Added user ID filtering")
-            print("  ✅ Security comments: Added to mark critical fixes")
-            print("  ✅ Both code paths: DM and guild mention processing secured")
 
-            print("\n✅ Conversation Cache Mixing (CVSS 7.2) - SECURITY FIX COMPLETE ✅")
 
-        except Exception as e:
-            print(f"❌ Security test failed: {e}")
+        except Exception:
             import traceback
 
             traceback.print_exc()

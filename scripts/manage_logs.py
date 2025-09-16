@@ -5,15 +5,13 @@ Provides utilities for log cleanup, archival, and maintenance.
 Part of DevOps best practices implementation.
 """
 
-import os
-import sys
-import gzip
-import shutil
 import argparse
-from pathlib import Path
-from datetime import datetime, timedelta
-from typing import List, Optional
+import gzip
 import logging
+import shutil
+import sys
+from datetime import datetime, timedelta
+from pathlib import Path
 
 
 def setup_script_logging():
@@ -22,12 +20,12 @@ def setup_script_logging():
     return logging.getLogger(__name__)
 
 
-def get_log_files(log_dir: Path, pattern: str = "*.log*") -> List[Path]:
+def get_log_files(log_dir: Path, pattern: str = "*.log*") -> list[Path]:
     """Get all log files matching pattern"""
     return list(log_dir.glob(pattern))
 
 
-def compress_log_file(log_file: Path) -> Optional[Path]:
+def compress_log_file(log_file: Path) -> Path | None:
     """Compress a log file using gzip"""
     logger = logging.getLogger(__name__)
 
@@ -185,13 +183,7 @@ def main():
 
     try:
         if args.action == "stats":
-            stats = get_log_stats(log_dir)
-            print(f"\n📊 Log Statistics for {log_dir}:")
-            print(f"  Total files: {stats['total_files']}")
-            print(f"  Total size: {stats['total_size_mb']} MB")
-            print(f"  Compressed files: {stats['compressed_files']}")
-            print(f"  Archived files: {stats['archived_files']}")
-            print(f"  Recent files (24h): {stats['recent_files']}")
+            get_log_stats(log_dir)
 
         elif args.action == "archive":
             if not args.dry_run:

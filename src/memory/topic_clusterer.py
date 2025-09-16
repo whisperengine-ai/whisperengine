@@ -3,16 +3,16 @@ Advanced Topic Clustering System for Memory Organization
 Groups conversations and memories by semantic topics for better retrieval
 """
 
-import logging
-import numpy as np
 import json
-from typing import Dict, List, Optional, Tuple, Any
+import logging
+from collections import Counter, defaultdict
+from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta
-from dataclasses import dataclass, asdict
-from collections import defaultdict, Counter
-from sklearn.cluster import KMeans, DBSCAN
+from typing import Any
+
+import numpy as np
+from sklearn.cluster import DBSCAN, KMeans
 from sklearn.metrics.pairwise import cosine_similarity
-from sklearn.decomposition import PCA
 
 logger = logging.getLogger(__name__)
 
@@ -24,19 +24,19 @@ class TopicCluster:
     cluster_id: str
     name: str
     description: str
-    keywords: List[str]
-    centroid_embedding: List[float]
-    memory_ids: List[str]
+    keywords: list[str]
+    centroid_embedding: list[float]
+    memory_ids: list[str]
     conversation_count: int
     last_updated: str
     confidence_score: float
-    related_clusters: List[str]
+    related_clusters: list[str]
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "TopicCluster":
+    def from_dict(cls, data: dict[str, Any]) -> "TopicCluster":
         return cls(**data)
 
 
@@ -46,10 +46,10 @@ class MemoryTopicInfo:
 
     memory_id: str
     primary_topic: str
-    secondary_topics: List[str]
+    secondary_topics: list[str]
     topic_confidence: float
-    keywords_extracted: List[str]
-    embedding_vector: List[float]
+    keywords_extracted: list[str]
+    embedding_vector: list[float]
     classification_timestamp: str
 
 
@@ -65,9 +65,9 @@ class AdvancedTopicClusterer:
         self.logger = logging.getLogger(__name__)
 
         # Topic storage
-        self.topic_clusters: Dict[str, TopicCluster] = {}
-        self.memory_topic_info: Dict[str, MemoryTopicInfo] = {}
-        self.topic_embeddings: Dict[str, np.ndarray] = {}
+        self.topic_clusters: dict[str, TopicCluster] = {}
+        self.memory_topic_info: dict[str, MemoryTopicInfo] = {}
+        self.topic_embeddings: dict[str, np.ndarray] = {}
 
         # Configuration
         self.min_cluster_size = 3
@@ -93,7 +93,7 @@ class AdvancedTopicClusterer:
         self.cache_ttl = timedelta(hours=6)
 
     async def classify_memory_topic(
-        self, memory_id: str, content: str, existing_topics: Optional[List[str]] = None
+        self, memory_id: str, content: str, existing_topics: list[str] | None = None
     ) -> MemoryTopicInfo:
         """
         Classify a memory into topic clusters and return topic information
@@ -139,7 +139,7 @@ class AdvancedTopicClusterer:
 
     async def get_topic_recommendations(
         self, content: str, limit: int = 5
-    ) -> List[Tuple[str, float]]:
+    ) -> list[tuple[str, float]]:
         """
         Get topic recommendations for given content without storing
         """
@@ -160,7 +160,7 @@ class AdvancedTopicClusterer:
         return recommendations[:limit]
 
     async def create_new_topic_cluster(
-        self, name: str, initial_memories: List[str], description: Optional[str] = None
+        self, name: str, initial_memories: list[str], description: str | None = None
     ) -> TopicCluster:
         """
         Create a new topic cluster with initial memories
@@ -222,7 +222,7 @@ class AdvancedTopicClusterer:
         )
         return cluster
 
-    async def recluster_all_topics(self, force: bool = False) -> Dict[str, Any]:
+    async def recluster_all_topics(self, force: bool = False) -> dict[str, Any]:
         """
         Perform complete reclustering of all topics using advanced algorithms
         """
@@ -282,7 +282,7 @@ class AdvancedTopicClusterer:
         self.logger.info("Reclustering completed: %s", result)
         return result
 
-    async def get_cluster_summary(self, cluster_id: str) -> Optional[Dict[str, Any]]:
+    async def get_cluster_summary(self, cluster_id: str) -> dict[str, Any] | None:
         """
         Get comprehensive summary of a topic cluster
         """
@@ -331,7 +331,7 @@ class AdvancedTopicClusterer:
 
     async def find_similar_clusters(
         self, cluster_id: str, limit: int = 5
-    ) -> List[Tuple[str, float]]:
+    ) -> list[tuple[str, float]]:
         """
         Find clusters similar to the given cluster
         """
@@ -357,8 +357,8 @@ class AdvancedTopicClusterer:
         return similarities[:limit]
 
     async def merge_clusters(
-        self, cluster_id1: str, cluster_id2: str, new_name: Optional[str] = None
-    ) -> Optional[str]:
+        self, cluster_id1: str, cluster_id2: str, new_name: str | None = None
+    ) -> str | None:
         """
         Merge two clusters into one
         """
@@ -423,7 +423,7 @@ class AdvancedTopicClusterer:
 
     # Private methods
 
-    async def _get_content_embedding(self, content: str) -> Optional[np.ndarray]:
+    async def _get_content_embedding(self, content: str) -> np.ndarray | None:
         """Get embedding for content"""
         if not self.embedding_manager:
             return None
@@ -435,7 +435,7 @@ class AdvancedTopicClusterer:
             self.logger.debug("Failed to generate embedding: %s", str(e))
             return None
 
-    async def _extract_content_keywords(self, content: str) -> List[str]:
+    async def _extract_content_keywords(self, content: str) -> list[str]:
         """Extract keywords from content using multiple methods"""
         keywords = []
 
@@ -455,13 +455,13 @@ class AdvancedTopicClusterer:
         unique_keywords = list(dict.fromkeys(keywords))  # Preserve order while deduplicating
         return unique_keywords[: self.keyword_extraction_limit]
 
-    async def _llm_extract_keywords(self, content: str) -> List[str]:
+    async def _llm_extract_keywords(self, content: str) -> list[str]:
         """Extract keywords using LLM"""
-        prompt = f"""Extract the most important keywords and key phrases from this text. 
+        prompt = f"""Extract the most important keywords and key phrases from this text.
         Focus on concrete topics, entities, and concepts.
-        
+
         Text: {content[:1000]}
-        
+
         Return only a JSON list of 5-10 keywords:
         ["keyword1", "keyword2", "keyword3"]"""
 
@@ -492,7 +492,7 @@ class AdvancedTopicClusterer:
 
         return []
 
-    def _statistical_keyword_extraction(self, content: str) -> List[str]:
+    def _statistical_keyword_extraction(self, content: str) -> list[str]:
         """Extract keywords using statistical methods"""
         import re
         from collections import Counter
@@ -570,9 +570,9 @@ class AdvancedTopicClusterer:
     async def _find_best_cluster_match(
         self,
         embedding: np.ndarray,
-        keywords: List[str],
-        existing_topics: Optional[List[str]] = None,
-    ) -> Tuple[str, float]:
+        keywords: list[str],
+        existing_topics: list[str] | None = None,
+    ) -> tuple[str, float]:
         """Find the best matching cluster for the given embedding and keywords"""
         if not self.topic_clusters:
             # Create first cluster
@@ -599,7 +599,7 @@ class AdvancedTopicClusterer:
         return best_cluster, best_score
 
     async def _calculate_cluster_match_score(
-        self, embedding: np.ndarray, keywords: List[str], cluster: TopicCluster
+        self, embedding: np.ndarray, keywords: list[str], cluster: TopicCluster
     ) -> float:
         """Calculate how well content matches a cluster"""
         scores = []
@@ -632,8 +632,8 @@ class AdvancedTopicClusterer:
         self,
         embedding: np.ndarray,
         primary_cluster: str,
-        existing_topics: Optional[List[str]] = None,
-    ) -> List[str]:
+        existing_topics: list[str] | None = None,
+    ) -> list[str]:
         """Find secondary topic matches"""
         secondary = []
 
@@ -652,7 +652,7 @@ class AdvancedTopicClusterer:
 
         return secondary[:3]  # Limit to 3 secondary topics
 
-    async def _create_initial_cluster(self, embedding: np.ndarray, keywords: List[str]) -> str:
+    async def _create_initial_cluster(self, embedding: np.ndarray, keywords: list[str]) -> str:
         """Create the first cluster"""
         cluster_id = "topic_0_general"
 
@@ -674,7 +674,7 @@ class AdvancedTopicClusterer:
         return cluster_id
 
     async def _create_new_cluster_from_content(
-        self, embedding: np.ndarray, keywords: List[str]
+        self, embedding: np.ndarray, keywords: list[str]
     ) -> str:
         """Create a new cluster from content that doesn't match existing clusters"""
         cluster_count = len(self.topic_clusters)
@@ -703,7 +703,7 @@ class AdvancedTopicClusterer:
         return cluster_id
 
     async def _update_cluster_membership(
-        self, memory_id: str, cluster_id: str, embedding: np.ndarray, keywords: List[str]
+        self, memory_id: str, cluster_id: str, embedding: np.ndarray, keywords: list[str]
     ):
         """Update cluster membership and centroid"""
         if cluster_id not in self.topic_clusters:
@@ -818,8 +818,8 @@ class AdvancedTopicClusterer:
             return await self._kmeans_clustering(embedding_matrix)
 
     async def _create_clusters_from_labels(
-        self, memory_ids: List[str], embeddings: List[np.ndarray], cluster_labels: np.ndarray
-    ) -> Dict[str, TopicCluster]:
+        self, memory_ids: list[str], embeddings: list[np.ndarray], cluster_labels: np.ndarray
+    ) -> dict[str, TopicCluster]:
         """Create TopicCluster objects from clustering results"""
         clusters = {}
 
@@ -880,7 +880,7 @@ class AdvancedTopicClusterer:
         return clusters
 
     async def _update_memory_cluster_assignments(
-        self, memory_ids: List[str], cluster_labels: np.ndarray
+        self, memory_ids: list[str], cluster_labels: np.ndarray
     ):
         """Update memory topic info with new cluster assignments"""
         for i, memory_id in enumerate(memory_ids):
@@ -920,7 +920,7 @@ class AdvancedTopicClusterer:
             cluster1.related_clusters = related
 
     async def _generate_cluster_description(
-        self, name: str, keywords: List[str], memory_ids: List[str]
+        self, name: str, keywords: list[str], memory_ids: list[str]
     ) -> str:
         """Generate a description for a cluster using LLM"""
         if not self.llm_client:
@@ -928,11 +928,11 @@ class AdvancedTopicClusterer:
 
         try:
             prompt = f"""Create a brief description for a conversation topic cluster.
-            
+
             Cluster name: {name}
             Keywords: {', '.join(keywords[:5])}
             Number of conversations: {len(memory_ids)}
-            
+
             Write a 1-2 sentence description that explains what this cluster is about."""
 
             messages = [
@@ -956,7 +956,7 @@ class AdvancedTopicClusterer:
 
         return f"Topic cluster about {name} with {len(memory_ids)} conversations"
 
-    def get_clustering_stats(self) -> Dict[str, Any]:
+    def get_clustering_stats(self) -> dict[str, Any]:
         """Get comprehensive clustering statistics"""
         total_memories = len(self.memory_topic_info)
         clustered_memories = sum(

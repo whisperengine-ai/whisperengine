@@ -6,49 +6,44 @@ Contains on_ready and on_message event handlers with all their complex logic.
 """
 
 import asyncio
-import os
-import time
 import logging
-from datetime import datetime, timezone
-import discord
-from typing import Optional
+import os
+from datetime import UTC, datetime
 
-from src.utils.helpers import (
-    is_admin,
-    generate_conversation_summary,
-    process_message_with_images,
-    get_current_time_context,
-    add_debug_info_to_response,
-    store_discord_user_info,
-    store_discord_server_info,
-    get_message_content,
-    get_message_author_id,
-    message_equals_bot_user,
-    fix_message_alternation,
-    extract_text_for_memory_storage,
-    get_contextualized_system_prompt,
+import discord
+
+from src.config.adaptive_config import AdaptiveConfigManager
+from src.database.database_integration import DatabaseIntegrationManager
+
+# Universal Chat Platform Integration
+from src.platforms.universal_chat import (
+    ChatPlatform,
+    UniversalChatOrchestrator,
 )
+from src.security.input_validator import validate_user_input
 from src.security.system_message_security import scan_response_for_system_leakage
 from src.utils.exceptions import (
     LLMConnectionError,
-    LLMTimeoutError,
-    LLMRateLimitError,
     LLMError,
+    LLMRateLimitError,
+    LLMTimeoutError,
     MemoryRetrievalError,
     MemoryStorageError,
     ValidationError,
 )
-from src.security.input_validator import validate_user_input
-
-# Universal Chat Platform Integration
-from src.platforms.universal_chat import (
-    UniversalChatOrchestrator,
-    DiscordChatAdapter,
-    ChatPlatform,
-    MessageType,
+from src.utils.helpers import (
+    add_debug_info_to_response,
+    extract_text_for_memory_storage,
+    fix_message_alternation,
+    generate_conversation_summary,
+    get_contextualized_system_prompt,
+    get_current_time_context,
+    get_message_content,
+    message_equals_bot_user,
+    process_message_with_images,
+    store_discord_server_info,
+    store_discord_user_info,
 )
-from src.config.adaptive_config import AdaptiveConfigManager
-from src.database.database_integration import DatabaseIntegrationManager
 
 logger = logging.getLogger(__name__)
 
@@ -162,7 +157,6 @@ class BotEventHandlers:
         if self.postgres_pool is None:
             try:
                 logger.info("Initializing PostgreSQL connection pool...")
-                import asyncpg
                 from src.utils.postgresql_user_db import PostgreSQLUserDB
 
                 postgres_db = PostgreSQLUserDB()
@@ -1376,7 +1370,7 @@ class BotEventHandlers:
                                 {
                                     "channel_id": str(message.channel.id),
                                     "guild_id": str(message.guild.id) if message.guild else None,
-                                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                                    "timestamp": datetime.now(UTC).isoformat(),
                                     "context": "discord_conversation",
                                 },
                             )
@@ -1437,7 +1431,7 @@ class BotEventHandlers:
                 context = {
                     "channel_id": str(message.channel.id),
                     "guild_id": str(message.guild.id) if message.guild else None,
-                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                    "timestamp": datetime.now(UTC).isoformat(),
                     "context": "discord_conversation",
                 }
 

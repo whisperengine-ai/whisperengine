@@ -14,12 +14,12 @@ Date: September 11, 2025
 
 import asyncio
 import logging
-from typing import Dict, List, Any, Optional, Tuple
-from datetime import datetime
-import spacy
-import numpy as np
 from collections import Counter
-import re
+from datetime import datetime
+from typing import Any
+
+import numpy as np
+import spacy
 
 # Use existing external embedding manager instead of local sentence transformers
 from src.utils.embedding_manager import ExternalEmbeddingManager, is_external_embedding_configured
@@ -30,14 +30,14 @@ logger = logging.getLogger(__name__)
 class AdvancedTopicExtractor:
     """Advanced topic extraction using multiple NLP techniques."""
 
-    def __init__(self, config: Optional[Dict] = None):
+    def __init__(self, config: dict | None = None):
         """Initialize the advanced topic extractor."""
         self.config = self._load_config(config)
         self.nlp = None
         self.embedding_manager = None
         self._initialized = False
 
-    def _load_config(self, user_config: Optional[Dict]) -> Dict:
+    def _load_config(self, user_config: dict | None) -> dict:
         """Load configuration with defaults."""
         default_config = {
             "spacy_model": "en_core_web_lg",
@@ -89,7 +89,7 @@ class AdvancedTopicExtractor:
             logger.error(f"Failed to initialize Advanced Topic Extractor: {e}")
             raise
 
-    async def extract_topics_enhanced(self, message: str) -> Dict[str, Any]:
+    async def extract_topics_enhanced(self, message: str) -> dict[str, Any]:
         """
         Extract topics with comprehensive analysis.
 
@@ -147,7 +147,7 @@ class AdvancedTopicExtractor:
             logger.error(f"Error in topic extraction: {e}")
             return self._get_error_result(str(e))
 
-    async def _extract_named_entities(self, doc) -> List[Dict]:
+    async def _extract_named_entities(self, doc) -> list[dict]:
         """Extract named entities with confidence and context."""
         entities = []
 
@@ -219,7 +219,7 @@ class AdvancedTopicExtractor:
 
         return min(max(confidence, 0.1), 1.0)
 
-    async def _extract_key_phrases(self, doc) -> List[str]:
+    async def _extract_key_phrases(self, doc) -> list[str]:
         """Extract important noun phrases and concepts."""
         phrases = []
 
@@ -262,7 +262,7 @@ class AdvancedTopicExtractor:
         }
         return phrase in common_phrases
 
-    async def _extract_semantic_topics(self, message: str, doc) -> List[Dict]:
+    async def _extract_semantic_topics(self, message: str, doc) -> list[dict]:
         """Extract semantic topics using external embedding API."""
         if not self.embedding_manager:
             logger.debug(
@@ -279,7 +279,7 @@ class AdvancedTopicExtractor:
 
             # Use external embedding manager for each sentence
             topics = []
-            for i, sentence in enumerate(sentences):
+            for _i, sentence in enumerate(sentences):
                 try:
                     # Get embedding via external API (returns list of embeddings for batch)
                     embeddings = await self.embedding_manager.get_embeddings([sentence])
@@ -356,7 +356,7 @@ class AdvancedTopicExtractor:
 
         return min(strength, 1.0)
 
-    async def _analyze_sentiment(self, doc) -> Dict[str, Any]:
+    async def _analyze_sentiment(self, doc) -> dict[str, Any]:
         """Analyze sentiment with detailed breakdown."""
         sentiment_scores = {
             "polarity": 0.0,
@@ -463,7 +463,7 @@ class AdvancedTopicExtractor:
                 break
         return depth
 
-    def _get_error_result(self, error_message: str) -> Dict[str, Any]:
+    def _get_error_result(self, error_message: str) -> dict[str, Any]:
         """Return error result structure."""
         return {
             "entities": [],
@@ -486,7 +486,7 @@ class AdvancedTopicExtractor:
             },
         }
 
-    async def health_check(self) -> Dict[str, Any]:
+    async def health_check(self) -> dict[str, Any]:
         """Perform health check on the topic extractor."""
         try:
             if not self._initialized:
@@ -526,17 +526,10 @@ async def test_topic_extraction():
         "My family and I went to New York last weekend. The weather was terrible but we had fun.",
     ]
 
-    for i, message in enumerate(test_messages, 1):
-        print(f"\n--- Test Message {i} ---")
-        print(f"Input: {message}")
+    for _i, message in enumerate(test_messages, 1):
 
-        result = await extractor.extract_topics_enhanced(message)
+        await extractor.extract_topics_enhanced(message)
 
-        print(f"Entities: {[e['text'] for e in result['entities']]}")
-        print(f"Key Phrases: {result['key_phrases']}")
-        print(f"Complexity Score: {result['complexity_score']:.3f}")
-        print(f"Sentiment Polarity: {result['sentiment']['polarity']:.3f}")
-        print(f"Processing Time: {result['metadata']['processing_time_seconds']:.3f}s")
 
 
 if __name__ == "__main__":

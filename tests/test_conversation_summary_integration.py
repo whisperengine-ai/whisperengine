@@ -3,19 +3,19 @@
 Integration test for conversation summary feature in the bot
 """
 
-import sys
 import os
+import sys
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-from basic_discord_bot import generate_conversation_summary
 from unittest.mock import Mock
+
+from basic_discord_bot import generate_conversation_summary
 
 
 def test_real_conversation_scenario():
     """Test with a realistic multi-turn conversation"""
 
-    print("🧪 Testing realistic conversation scenario...")
 
     # Simulate a conversation about AI and programming
     messages = []
@@ -57,8 +57,6 @@ def test_real_conversation_scenario():
     # Generate summary
     summary = generate_conversation_summary(messages, "123456789")
 
-    print(f"Generated summary: {summary}")
-    print(f"Summary length: {len(summary)} characters")
 
     # Verify the summary captures key elements
     assert len(summary) > 0, "Summary should not be empty"
@@ -71,14 +69,12 @@ def test_real_conversation_scenario():
     assert "3 user messages" in summary, "Should count user messages correctly"
     assert "2 responses" in summary, "Should count bot responses correctly"
 
-    print("✅ Realistic conversation test passed!")
     return summary
 
 
 def test_mixed_users_scenario():
     """Test that summary properly filters for specific user in multi-user channel"""
 
-    print("\n🧪 Testing multi-user channel scenario...")
 
     messages = []
 
@@ -117,7 +113,6 @@ def test_mixed_users_scenario():
     # Generate summary for User A only
     summary_a = generate_conversation_summary(messages, "111111111")
 
-    print(f"User A summary: {summary_a}")
 
     # Should only contain User A's content
     assert "Python" in summary_a, "Should contain User A's Python content"
@@ -128,14 +123,12 @@ def test_mixed_users_scenario():
     assert "React" not in summary_a, "Should not contain User B's content"
     assert "Rust" not in summary_a, "Should not contain User C's content"
 
-    print("✅ Multi-user filtering test passed!")
     return summary_a
 
 
 def test_command_filtering_scenario():
     """Test that commands and their responses are properly filtered"""
 
-    print("\n🧪 Testing command filtering scenario...")
 
     messages = []
 
@@ -176,7 +169,6 @@ def test_command_filtering_scenario():
     # Generate summary
     summary = generate_conversation_summary(messages, "444444444")
 
-    print(f"Command-filtered summary: {summary}")
 
     # Should contain real content but not commands
     assert "quantum computing" in summary.lower(), "Should contain real conversation content"
@@ -184,13 +176,10 @@ def test_command_filtering_scenario():
     assert "available commands" not in summary.lower(), "Should not contain command response"
     assert "status" not in summary.lower(), "Should not contain command content"
 
-    print("✅ Command filtering test passed!")
     return summary
 
 
 if __name__ == "__main__":
-    print("🚀 Running Conversation Summary Integration Tests")
-    print("=" * 60)
 
     try:
         # Test realistic conversation
@@ -202,31 +191,11 @@ if __name__ == "__main__":
         # Test command filtering
         command_summary = test_command_filtering_scenario()
 
-        print("\n" + "=" * 60)
-        print("🎉 All integration tests passed!")
 
-        print("\n📊 Summary Examples:")
-        print(f"  📖 Realistic conversation: {realistic_summary[:100]}...")
-        print(f"  👥 Multi-user filtered: {multiuser_summary[:100]}...")
-        print(f"  🛡️  Command filtered: {command_summary[:100]}...")
 
-        print("\n✅ Conversation Summary Feature Ready for Production!")
-        print("\n🔧 Features validated:")
-        print("  ✅ Multi-turn conversation summarization")
-        print("  ✅ User-specific filtering in multi-user channels")
-        print("  ✅ Command filtering for clean summaries")
-        print("  ✅ Security sanitization of system prompts")
-        print("  ✅ Length management and truncation")
-        print("  ✅ Structured summary format")
 
-        print("\n🔒 Security benefits:")
-        print("  ✅ Prevents system prompt injection via summaries")
-        print("  ✅ Maintains user isolation in multi-user contexts")
-        print("  ✅ Filters sensitive command interactions")
-        print("  ✅ Provides structured context easier to sanitize than raw messages")
 
-    except Exception as e:
-        print(f"❌ Integration test failed: {e}")
+    except Exception:
         import traceback
 
         traceback.print_exc()

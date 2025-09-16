@@ -3,19 +3,17 @@ Test script for input validation security enhancement.
 Validates that the input validator properly detects and blocks malicious content.
 """
 
-import sys
 import os
+import sys
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-from input_validator import validate_user_input, is_safe_admin_command
+from input_validator import is_safe_admin_command, validate_user_input
 
 
 def test_input_validation():
     """Test the input validation system with various attack vectors."""
 
-    print("🧪 Testing Input Validation Security System")
-    print("=" * 50)
 
     # Test cases with expected results
     test_cases = [
@@ -59,31 +57,23 @@ def test_input_validation():
     passed = 0
     failed = 0
 
-    for test_input, expected_safe, description in test_cases:
+    for test_input, expected_safe, _description in test_cases:
         result = validate_user_input(test_input, "test_user_123", "test_channel")
         actual_safe = result["is_safe"]
 
-        status = "✅ PASS" if actual_safe == expected_safe else "❌ FAIL"
 
         if actual_safe == expected_safe:
             passed += 1
         else:
             failed += 1
 
-        print(f"{status} | {description}")
-        print(f"      Input: {test_input[:60]}{'...' if len(test_input) > 60 else ''}")
-        print(f"      Expected Safe: {expected_safe}, Actual Safe: {actual_safe}")
 
         if not actual_safe:
-            print(f"      Blocked Patterns: {result['blocked_patterns']}")
+            pass
         if result["warnings"]:
-            print(f"      Warnings: {result['warnings']}")
+            pass
 
-        print()
 
-    print("=" * 50)
-    print(f"📊 Test Results: {passed} passed, {failed} failed")
-    print(f"Success Rate: {(passed / (passed + failed)) * 100:.1f}%")
 
     return failed == 0
 
@@ -91,8 +81,6 @@ def test_input_validation():
 def test_admin_command_validation():
     """Test admin command specific validation."""
 
-    print("\n🔧 Testing Admin Command Validation")
-    print("=" * 50)
 
     admin_test_cases = [
         # Safe admin commands
@@ -113,24 +101,16 @@ def test_admin_command_validation():
     passed = 0
     failed = 0
 
-    for test_command, expected_safe, description in admin_test_cases:
+    for test_command, expected_safe, _description in admin_test_cases:
         actual_safe = is_safe_admin_command(test_command, "admin_user_456")
 
-        status = "✅ PASS" if actual_safe == expected_safe else "❌ FAIL"
 
         if actual_safe == expected_safe:
             passed += 1
         else:
             failed += 1
 
-        print(f"{status} | {description}")
-        print(f"      Command: {test_command}")
-        print(f"      Expected Safe: {expected_safe}, Actual Safe: {actual_safe}")
-        print()
 
-    print("=" * 50)
-    print(f"📊 Admin Test Results: {passed} passed, {failed} failed")
-    print(f"Success Rate: {(passed / (passed + failed)) * 100:.1f}%")
 
     return failed == 0
 
@@ -138,8 +118,6 @@ def test_admin_command_validation():
 def test_sanitization():
     """Test the sanitization functionality."""
 
-    print("\n🧹 Testing Input Sanitization")
-    print("=" * 50)
 
     sanitization_cases = [
         # Whitespace normalization
@@ -171,44 +149,26 @@ def test_sanitization():
         else:
             matches = actual_output == expected_output
 
-        status = "✅ PASS" if matches else "❌ FAIL"
 
         if matches:
             passed += 1
         else:
             failed += 1
 
-        print(f"{status} | {description}")
-        print(f"      Input: '{test_input}'")
-        print(f"      Expected: '{expected_output}'")
-        print(f"      Actual: '{actual_output}'")
-        print()
 
-    print("=" * 50)
-    print(f"📊 Sanitization Test Results: {passed} passed, {failed} failed")
-    print(f"Success Rate: {(passed / (passed + failed)) * 100:.1f}%")
 
     return failed == 0
 
 
 if __name__ == "__main__":
-    print("🚨 SECURITY VULNERABILITY FIX VALIDATION")
-    print("Testing Input Validation and Sanitization System")
-    print("=" * 60)
 
     # Run all tests
     test1_passed = test_input_validation()
     test2_passed = test_admin_command_validation()
     test3_passed = test_sanitization()
 
-    print("\n" + "=" * 60)
-    print("🎯 OVERALL TEST RESULTS")
 
     if test1_passed and test2_passed and test3_passed:
-        print("✅ ALL TESTS PASSED - Input validation system is working correctly!")
-        print("✅ SECURITY FIX VALIDATED - Ready for production deployment")
         exit(0)
     else:
-        print("❌ SOME TESTS FAILED - Input validation needs improvement")
-        print("⚠️  DO NOT DEPLOY until all tests pass")
         exit(1)

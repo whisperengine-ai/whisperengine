@@ -2,16 +2,13 @@
 
 import logging
 import uuid
-from typing import Dict, List, Optional, Any, Tuple
-from datetime import datetime
+from typing import Any
 
-from ..graph_database.neo4j_connector import get_neo4j_connector, Neo4jConnector
 from ..graph_database.models import (
-    GlobalFactNode,
-    KnowledgeDomainNode,
     FactRelationshipTypes,
     KnowledgeDomains,
 )
+from ..graph_database.neo4j_connector import Neo4jConnector, get_neo4j_connector
 
 logger = logging.getLogger(__name__)
 
@@ -20,7 +17,7 @@ class GraphMemoryManager:
     """Manages global facts with hybrid ChromaDB + Neo4j storage."""
 
     def __init__(self):
-        self._neo4j_connector: Optional[Neo4jConnector] = None
+        self._neo4j_connector: Neo4jConnector | None = None
         self._initialized = False
 
     async def initialize(self) -> None:
@@ -105,7 +102,7 @@ class GraphMemoryManager:
         confidence_score: float = 0.8,
         source: str = "learned",
         fact_type: str = "declarative",
-        tags: Optional[List[str]] = None,
+        tags: list[str] | None = None,
     ) -> str:
         """Store a global fact in both ChromaDB (via existing system) and Neo4j."""
         if not self._initialized:
@@ -117,7 +114,7 @@ class GraphMemoryManager:
         # Store in Neo4j graph database
         try:
             if self._neo4j_connector:
-                result = await self._neo4j_connector.store_global_fact(
+                await self._neo4j_connector.store_global_fact(
                     fact_id=fact_id,
                     chromadb_id=chromadb_id,
                     fact_content=fact_content,
@@ -142,7 +139,7 @@ class GraphMemoryManager:
         fact_id_2: str,
         relationship_type: str = FactRelationshipTypes.RELATES_TO,
         strength: float = 1.0,
-        properties: Optional[Dict[str, Any]] = None,
+        properties: dict[str, Any] | None = None,
     ) -> bool:
         """Create a relationship between two global facts using ChromaDB IDs or Graph IDs."""
         if not self._initialized:
@@ -195,8 +192,8 @@ class GraphMemoryManager:
             return False
 
     async def get_related_facts(
-        self, chromadb_id: str, relationship_types: Optional[List[str]] = None, max_depth: int = 2
-    ) -> List[Dict[str, Any]]:
+        self, chromadb_id: str, relationship_types: list[str] | None = None, max_depth: int = 2
+    ) -> list[dict[str, Any]]:
         """Get facts related to a given fact through graph relationships."""
         if not self._initialized:
             await self.initialize()
@@ -225,7 +222,7 @@ class GraphMemoryManager:
 
     async def search_facts_by_domain(
         self, knowledge_domain: str, include_subdomain: bool = True, limit: int = 50
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Search for facts within a knowledge domain."""
         if not self._initialized:
             await self.initialize()
@@ -244,7 +241,7 @@ class GraphMemoryManager:
             return []
 
     async def update_fact_verification(
-        self, chromadb_id: str, verification_status: str, confidence_score: Optional[float] = None
+        self, chromadb_id: str, verification_status: str, confidence_score: float | None = None
     ) -> bool:
         """Update the verification status and confidence of a fact."""
         if not self._initialized:
@@ -272,7 +269,7 @@ class GraphMemoryManager:
             logger.error(f"Failed to update fact verification: {e}")
             return False
 
-    async def analyze_fact_contradictions(self, chromadb_id: str) -> List[Dict[str, Any]]:
+    async def analyze_fact_contradictions(self, chromadb_id: str) -> list[dict[str, Any]]:
         """Analyze if a fact contradicts any existing facts."""
         contradicting_facts = await self.get_related_facts(
             chromadb_id=chromadb_id,
@@ -284,7 +281,7 @@ class GraphMemoryManager:
 
     async def find_supporting_facts(
         self, chromadb_id: str, max_depth: int = 2
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Find facts that support a given fact."""
         supporting_facts = await self.get_related_facts(
             chromadb_id=chromadb_id,
@@ -294,7 +291,7 @@ class GraphMemoryManager:
 
         return supporting_facts
 
-    async def get_knowledge_domain_hierarchy(self, domain_name: str) -> Dict[str, Any]:
+    async def get_knowledge_domain_hierarchy(self, domain_name: str) -> dict[str, Any]:
         """Get the hierarchy structure of a knowledge domain."""
         if not self._initialized:
             await self.initialize()
@@ -307,7 +304,7 @@ class GraphMemoryManager:
             MATCH (domain:KnowledgeDomain {name: $domain_name})
             OPTIONAL MATCH (domain)<-[:BELONGS_TO]-(child:KnowledgeDomain)
             OPTIONAL MATCH (domain)-[:BELONGS_TO]->(parent:KnowledgeDomain)
-            
+
             RETURN {
                 domain: domain,
                 parent: parent,
@@ -322,7 +319,7 @@ class GraphMemoryManager:
             logger.error(f"Failed to get domain hierarchy: {e}")
             return {}
 
-    async def get_graph_statistics(self) -> Dict[str, Any]:
+    async def get_graph_statistics(self) -> dict[str, Any]:
         """Get statistics about the global facts graph."""
         if not self._initialized:
             await self.initialize()
@@ -337,11 +334,11 @@ class GraphMemoryManager:
             WITH count(DISTINCT gf) as total_facts,
                  count(DISTINCT r) as total_relationships,
                  avg(gf.confidence_score) as avg_confidence
-            
+
             MATCH (kd:KnowledgeDomain)
             WITH total_facts, total_relationships, avg_confidence,
                  count(kd) as total_domains
-            
+
             RETURN {
                 total_facts: total_facts,
                 total_relationships: total_relationships,
@@ -358,7 +355,7 @@ class GraphMemoryManager:
 
 
 # Global instance
-_graph_memory_manager: Optional[GraphMemoryManager] = None
+_graph_memory_manager: GraphMemoryManager | None = None
 
 
 async def get_graph_memory_manager() -> GraphMemoryManager:

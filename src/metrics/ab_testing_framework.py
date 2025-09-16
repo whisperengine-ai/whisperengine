@@ -6,18 +6,15 @@ Infrastructure for testing different configurations and measuring
 improvements to the overall human-like AI performance.
 """
 
-import asyncio
-import logging
-import random
-from datetime import datetime, timezone, timedelta
-from typing import Dict, List, Optional, Any, Tuple, Union
-from dataclasses import dataclass, asdict
-from enum import Enum
-import json
-import statistics
 import hashlib
+import logging
+import statistics
+from dataclasses import asdict, dataclass
+from datetime import UTC, datetime, timedelta
+from enum import Enum
+from typing import Any
 
-from .holistic_ai_metrics import HolisticAIMetrics, ConversationMetrics, SystemMetrics
+from .holistic_ai_metrics import ConversationMetrics, HolisticAIMetrics
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +46,7 @@ class TestConfiguration:
     test_id: str
     variant_name: str
     test_type: TestType
-    configuration: Dict[str, Any]
+    configuration: dict[str, Any]
     traffic_percentage: float  # 0.0 to 1.0
     description: str
 
@@ -68,7 +65,7 @@ class TestResult:
     avg_response_time: float
     user_satisfaction: float
     statistical_significance: float
-    confidence_interval: Tuple[float, float]
+    confidence_interval: tuple[float, float]
 
 
 @dataclass
@@ -80,8 +77,8 @@ class ABTest:
     test_type: TestType
     status: TestStatus
     start_date: datetime
-    end_date: Optional[datetime]
-    variants: List[TestConfiguration]
+    end_date: datetime | None
+    variants: list[TestConfiguration]
     success_metric: str
     minimum_sample_size: int
     target_confidence: float  # e.g., 0.95 for 95%
@@ -101,13 +98,13 @@ class ABTestingFramework:
         self.database_manager = database_manager
 
         # Active tests cache
-        self.active_tests: Dict[str, ABTest] = {}
-        self.user_assignments: Dict[str, Dict[str, str]] = {}  # user_id -> {test_id: variant}
+        self.active_tests: dict[str, ABTest] = {}
+        self.user_assignments: dict[str, dict[str, str]] = {}  # user_id -> {test_id: variant}
 
         # Pre-defined test configurations
         self.test_configurations = self._initialize_test_configurations()
 
-    def _initialize_test_configurations(self) -> Dict[str, Dict]:
+    def _initialize_test_configurations(self) -> dict[str, dict]:
         """Initialize standard test configurations"""
         return {
             "memory_optimization": {
@@ -196,7 +193,7 @@ class ABTestingFramework:
         self,
         test_name: str,
         test_type: TestType,
-        variants: List[Dict[str, Any]],
+        variants: list[dict[str, Any]],
         success_metric: str = "conversation_naturalness",
         duration_days: int = 7,
         minimum_sample_size: int = 100,
@@ -225,8 +222,8 @@ class ABTestingFramework:
             test_name=test_name,
             test_type=test_type,
             status=TestStatus.PLANNING,
-            start_date=datetime.now(timezone.utc),
-            end_date=datetime.now(timezone.utc) + timedelta(days=duration_days),
+            start_date=datetime.now(UTC),
+            end_date=datetime.now(UTC) + timedelta(days=duration_days),
             variants=test_variants,
             success_metric=success_metric,
             minimum_sample_size=minimum_sample_size,
@@ -255,7 +252,7 @@ class ABTestingFramework:
 
     async def get_user_variant(
         self, user_id: str, test_type: TestType
-    ) -> Optional[TestConfiguration]:
+    ) -> TestConfiguration | None:
         """Get the test variant for a user"""
 
         # Find active test for this type
@@ -319,12 +316,12 @@ class ABTestingFramework:
             "variant_name": variant.variant_name,
             "user_id": user_id,
             "metrics": asdict(metrics),
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         }
 
         await self._store_test_interaction(interaction_data)
 
-    async def analyze_test_results(self, test_id: str) -> Dict[str, TestResult]:
+    async def analyze_test_results(self, test_id: str) -> dict[str, TestResult]:
         """Analyze A/B test results"""
         if test_id not in self.active_tests:
             logger.error(f"Test {test_id} not found")
@@ -373,7 +370,7 @@ class ABTestingFramework:
             result = TestResult(
                 test_id=test_id,
                 variant_name=variant.variant_name,
-                user_count=len(set(data["user_id"] for data in variant_data)),
+                user_count=len({data["user_id"] for data in variant_data}),
                 conversation_count=len(variant_data),
                 avg_conversation_naturalness=avg_cns,
                 avg_memory_effectiveness=avg_memory,
@@ -388,7 +385,7 @@ class ABTestingFramework:
 
         return results
 
-    async def get_test_recommendations(self, test_id: str) -> Dict[str, Any]:
+    async def get_test_recommendations(self, test_id: str) -> dict[str, Any]:
         """Get recommendations based on test results"""
         results = await self.analyze_test_results(test_id)
 
@@ -456,8 +453,8 @@ class ABTestingFramework:
         return await self.create_test(test_name=test_name, test_type=test_type, variants=variants)
 
     def _calculate_statistical_significance(
-        self, data: List[float], target_confidence: float
-    ) -> Tuple[float, Tuple[float, float]]:
+        self, data: list[float], target_confidence: float
+    ) -> tuple[float, tuple[float, float]]:
         """Calculate statistical significance and confidence interval"""
         if len(data) < 10:
             return 0.0, (0.0, 0.0)
@@ -492,12 +489,12 @@ class ABTestingFramework:
         if self.redis_client:
             await self.redis_client.set(f"ab_test:{test_id}:user:{user_id}", variant_name)
 
-    async def _store_test_interaction(self, interaction_data: Dict):
+    async def _store_test_interaction(self, interaction_data: dict):
         """Store test interaction data"""
         if self.database_manager:
             await self.database_manager.store_test_interaction(interaction_data)
 
-    async def _get_variant_data(self, test_id: str, variant_name: str) -> List[Dict]:
+    async def _get_variant_data(self, test_id: str, variant_name: str) -> list[dict]:
         """Get interaction data for a specific variant"""
         if self.database_manager:
             return await self.database_manager.get_variant_interactions(test_id, variant_name)

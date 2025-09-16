@@ -7,11 +7,10 @@ optimization specifically for chatbots that need to feel natural and emotionally
 
 import json
 import logging
-from typing import List, Dict, Optional, Any, Tuple
 from dataclasses import dataclass
+from typing import Any
 
 from .human_like_memory_optimizer import (
-    HumanLikeChatbotOptimizer,
     ConversationalMemoryOptimizer,
     create_human_like_memory_optimizer,
 )
@@ -39,9 +38,9 @@ class HumanLikeSearchQuery:
 class HumanLikeQueryResult:
     """Result optimized for natural conversation flow"""
 
-    primary_queries: List[HumanLikeSearchQuery]
+    primary_queries: list[HumanLikeSearchQuery]
     fallback_query: str
-    emotional_context: Optional[str]
+    emotional_context: str | None
     conversation_purpose: str
     relationship_tone: str
     memory_priority: str  # What type of memory would be most helpful right now
@@ -65,9 +64,9 @@ class HumanLikeLLMProcessor:
         self,
         message: str,
         user_id: str,
-        conversation_history: Optional[List[str]] = None,
-        relationship_context: Optional[Dict] = None,
-        emotional_state: Optional[str] = None,
+        conversation_history: list[str] | None = None,
+        relationship_context: dict | None = None,
+        emotional_state: str | None = None,
     ) -> HumanLikeQueryResult:
         """
         Process message for human-like conversational memory search
@@ -102,8 +101,8 @@ class HumanLikeLLMProcessor:
             return self._create_human_fallback(message, conversation_history)
 
     async def _call_human_optimized_llm(
-        self, system_prompt: str, user_prompt: str, flow_optimization: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        self, system_prompt: str, user_prompt: str, flow_optimization: dict[str, Any]
+    ) -> dict[str, Any]:
         """Call LLM with human-optimized prompts"""
 
         # Enhance user prompt with conversation flow context
@@ -141,7 +140,7 @@ Flow analysis: {flow_optimization.get('flow_analysis', {})}"""
             raise
 
     def _parse_human_like_response(
-        self, response: Dict[str, Any], original_message: str, flow_optimization: Dict[str, Any]
+        self, response: dict[str, Any], original_message: str, flow_optimization: dict[str, Any]
     ) -> HumanLikeQueryResult:
         """Parse LLM response into human-like query result"""
 
@@ -225,7 +224,7 @@ Flow analysis: {flow_optimization.get('flow_analysis', {})}"""
         return min(1.0, emotional_score * 0.2)
 
     def _calculate_relationship_relevance(
-        self, query: str, flow_optimization: Dict[str, Any]
+        self, query: str, flow_optimization: dict[str, Any]
     ) -> float:
         """Calculate how relevant a query is to the ongoing relationship"""
 
@@ -306,7 +305,7 @@ Flow analysis: {flow_optimization.get('flow_analysis', {})}"""
         return " ".join(meaningful_words) if meaningful_words else message[:30]
 
     def _create_human_fallback(
-        self, message: str, conversation_history: Optional[List[str]]
+        self, message: str, conversation_history: list[str] | None
     ) -> HumanLikeQueryResult:
         """Create human-like fallback when LLM processing fails"""
 
@@ -335,7 +334,7 @@ Flow analysis: {flow_optimization.get('flow_analysis', {})}"""
             human_association="maintaining conversation flow",
         )
 
-    def _detect_basic_emotion(self, message: str) -> Optional[str]:
+    def _detect_basic_emotion(self, message: str) -> str | None:
         """Basic emotion detection for fallback"""
 
         message_lower = message.lower()
@@ -378,10 +377,10 @@ class HumanLikeMemorySearch:
         self,
         user_id: str,
         message: str,
-        conversation_history: Optional[List[str]] = None,
-        relationship_context: Optional[Dict] = None,
+        conversation_history: list[str] | None = None,
+        relationship_context: dict | None = None,
         limit: int = 20,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Search memories the way a caring human friend would naturally recall shared experiences
         """
@@ -467,7 +466,7 @@ class HumanLikeMemorySearch:
 
     def _calculate_human_relevance(
         self,
-        memory: Dict[str, Any],
+        memory: dict[str, Any],
         query: HumanLikeSearchQuery,
         human_result: HumanLikeQueryResult,
     ) -> float:
@@ -492,8 +491,8 @@ class HumanLikeMemorySearch:
         return min(1.0, human_score)
 
     def _rank_memories_like_human(
-        self, memories: List[Dict[str, Any]], human_result: HumanLikeQueryResult, limit: int
-    ) -> List[Dict[str, Any]]:
+        self, memories: list[dict[str, Any]], human_result: HumanLikeQueryResult, limit: int
+    ) -> list[dict[str, Any]]:
         """Rank memories the way a caring human friend would prioritize them"""
 
         # Remove duplicates while keeping best human relevance scores
@@ -526,7 +525,7 @@ class HumanLikeMemorySearch:
 
     async def _caring_fallback_search(
         self, user_id: str, message: str, limit: int
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Caring fallback when human-like processing fails"""
 
         try:

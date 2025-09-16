@@ -6,8 +6,6 @@ Validates the enhanced HTTP API approach for local LLM integration.
 
 import asyncio
 import logging
-import os
-from pathlib import Path
 
 # Set up logging
 logging.basicConfig(level=logging.INFO, format="%(levelname)s - %(message)s")
@@ -26,7 +24,7 @@ async def test_local_llm_detection():
 
         # Test system resource detection
         resources = detector.get_system_resources()
-        logger.info(f"💻 System Resources Detected:")
+        logger.info("💻 System Resources Detected:")
         logger.info(f"   Memory: {resources.memory_gb:.1f} GB")
         logger.info(f"   CPU Cores: {resources.cpu_cores}")
         logger.info(f"   GPU Available: {resources.gpu_available}")
@@ -34,10 +32,10 @@ async def test_local_llm_detection():
 
         # Test server detection
         servers = await detector.detect_available_servers()
-        logger.info(f"\n🌐 Server Detection Results:")
+        logger.info("\n🌐 Server Detection Results:")
 
         available_count = 0
-        for server_id, server in servers.items():
+        for _server_id, server in servers.items():
             status_emoji = {
                 "available": "✅",
                 "no_models": "⚠️",
@@ -58,13 +56,13 @@ async def test_local_llm_detection():
 
         # Test setup recommendations
         recommendation = detector.get_setup_recommendation(resources)
-        logger.info(f"\n💡 Setup Recommendation:")
+        logger.info("\n💡 Setup Recommendation:")
         logger.info(f"   Preferred Server: {recommendation.preferred_server}")
         logger.info(f"   Recommended Models: {', '.join(recommendation.recommended_models)}")
         logger.info(f"   Setup URL: {recommendation.setup_url}")
         logger.info(f"   Memory Note: {recommendation.memory_note}")
 
-        logger.info(f"\n📋 Installation Steps:")
+        logger.info("\n📋 Installation Steps:")
         for step in recommendation.installation_steps:
             logger.info(f"   {step}")
 
@@ -88,7 +86,7 @@ async def test_auto_configuration():
         # Run auto-configuration
         config_result = await detect_and_configure_local_llm()
 
-        logger.info(f"📊 Auto-Configuration Results:")
+        logger.info("📊 Auto-Configuration Results:")
         logger.info(
             f"   Configuration Applied: {config_result.get('configuration_applied', False)}"
         )
@@ -121,7 +119,7 @@ async def test_llm_client_integration():
         client = LLMClient()
         config = client.get_client_config()
 
-        logger.info(f"📡 Current LLMClient Configuration:")
+        logger.info("📡 Current LLMClient Configuration:")
         logger.info(f"   Service: {config.get('service_name', 'Unknown')}")
         logger.info(f"   URL: {config.get('api_url', 'Not set')}")
         logger.info(f"   Model: {config.get('chat_model', 'Not set')}")

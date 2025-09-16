@@ -5,12 +5,13 @@ Abstracts conversation handling to support web UI, Discord, Slack, Teams, and ot
 
 import asyncio
 import json
+import logging
 from abc import ABC, abstractmethod
-from typing import Dict, List, Optional, Any, Callable, Union
-from dataclasses import dataclass, asdict
+from collections.abc import Callable
+from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
-import logging
+from typing import Any
 
 from src.config.adaptive_config import AdaptiveConfigManager
 from src.database.database_integration import DatabaseIntegrationManager
@@ -46,11 +47,11 @@ class User:
 
     user_id: str
     username: str
-    display_name: Optional[str] = None
+    display_name: str | None = None
     platform: ChatPlatform = ChatPlatform.WEB_UI
-    platform_user_id: Optional[str] = None  # Platform-specific ID
-    preferences: Optional[Dict[str, Any]] = None
-    created_at: Optional[datetime] = None
+    platform_user_id: str | None = None  # Platform-specific ID
+    preferences: dict[str, Any] | None = None
+    created_at: datetime | None = None
 
     def __post_init__(self):
         if self.preferences is None:
@@ -68,12 +69,12 @@ class Message:
     content: str
     message_type: MessageType = MessageType.TEXT
     platform: ChatPlatform = ChatPlatform.WEB_UI
-    channel_id: Optional[str] = None
-    thread_id: Optional[str] = None
-    reply_to: Optional[str] = None
-    attachments: Optional[List[str]] = None
-    metadata: Optional[Dict[str, Any]] = None
-    timestamp: Optional[datetime] = None
+    channel_id: str | None = None
+    thread_id: str | None = None
+    reply_to: str | None = None
+    attachments: list[str] | None = None
+    metadata: dict[str, Any] | None = None
+    timestamp: datetime | None = None
 
     def __post_init__(self):
         if self.attachments is None:
@@ -91,12 +92,12 @@ class Conversation:
     conversation_id: str
     user_id: str
     platform: ChatPlatform
-    channel_id: Optional[str] = None
-    title: Optional[str] = None
-    messages: Optional[List[Message]] = None
-    created_at: Optional[datetime] = None
-    last_activity: Optional[datetime] = None
-    metadata: Optional[Dict[str, Any]] = None
+    channel_id: str | None = None
+    title: str | None = None
+    messages: list[Message] | None = None
+    created_at: datetime | None = None
+    last_activity: datetime | None = None
+    metadata: dict[str, Any] | None = None
 
     def __post_init__(self):
         if self.messages is None:
@@ -119,8 +120,8 @@ class AIResponse:
     cost: float
     generation_time_ms: int
     confidence: float = 0.8
-    sources: Optional[List[str]] = None
-    suggestions: Optional[List[str]] = None
+    sources: list[str] | None = None
+    suggestions: list[str] | None = None
 
     def __post_init__(self):
         if self.sources is None:
@@ -132,10 +133,10 @@ class AIResponse:
 class AbstractChatAdapter(ABC):
     """Abstract base class for chat platform adapters"""
 
-    def __init__(self, platform: ChatPlatform, config: Dict[str, Any]):
+    def __init__(self, platform: ChatPlatform, config: dict[str, Any]):
         self.platform = platform
         self.config = config
-        self.message_handlers: List[Callable] = []
+        self.message_handlers: list[Callable] = []
         self.connected = False
 
     @abstractmethod
@@ -150,20 +151,20 @@ class AbstractChatAdapter(ABC):
 
     @abstractmethod
     async def send_message(
-        self, user_id: str, content: str, channel_id: Optional[str] = None
+        self, user_id: str, content: str, channel_id: str | None = None
     ) -> bool:
         """Send a message to the platform"""
         pass
 
     @abstractmethod
-    async def get_user_info(self, user_id: str) -> Optional[User]:
+    async def get_user_info(self, user_id: str) -> User | None:
         """Get user information from the platform"""
         pass
 
     @abstractmethod
     async def get_conversation_history(
         self, conversation_id: str, limit: int = 50
-    ) -> List[Message]:
+    ) -> list[Message]:
         """Get conversation history"""
         pass
 
@@ -183,9 +184,9 @@ class AbstractChatAdapter(ABC):
 class WebUIChatAdapter(AbstractChatAdapter):
     """Web UI chat adapter for standalone usage"""
 
-    def __init__(self, config: Dict[str, Any]):
+    def __init__(self, config: dict[str, Any]):
         super().__init__(ChatPlatform.WEB_UI, config)
-        self.active_sessions: Dict[str, Dict[str, Any]] = {}
+        self.active_sessions: dict[str, dict[str, Any]] = {}
 
     async def connect(self) -> bool:
         """Web UI is always connected"""
@@ -198,7 +199,7 @@ class WebUIChatAdapter(AbstractChatAdapter):
         self.connected = False
 
     async def send_message(
-        self, user_id: str, content: str, channel_id: Optional[str] = None
+        self, user_id: str, content: str, channel_id: str | None = None
     ) -> bool:
         """Send message via WebSocket or store for retrieval"""
         try:
@@ -230,7 +231,7 @@ class WebUIChatAdapter(AbstractChatAdapter):
             logging.error(f"Failed to send web UI message: {e}")
             return False
 
-    async def get_user_info(self, user_id: str) -> Optional[User]:
+    async def get_user_info(self, user_id: str) -> User | None:
         """Create web UI user info"""
         return User(
             user_id=user_id,
@@ -242,7 +243,7 @@ class WebUIChatAdapter(AbstractChatAdapter):
 
     async def get_conversation_history(
         self, conversation_id: str, limit: int = 50
-    ) -> List[Message]:
+    ) -> list[Message]:
         """Get web UI conversation history"""
         # This would typically come from the database
         return []
@@ -252,7 +253,7 @@ class WebUIChatAdapter(AbstractChatAdapter):
         if session_id in self.active_sessions:
             self.active_sessions[session_id]["websocket"] = websocket
 
-    def get_session_messages(self, session_id: str) -> List[Dict[str, Any]]:
+    def get_session_messages(self, session_id: str) -> list[dict[str, Any]]:
         """Get messages for a web session"""
         if session_id in self.active_sessions:
             return self.active_sessions[session_id]["messages"]
@@ -262,7 +263,7 @@ class WebUIChatAdapter(AbstractChatAdapter):
 class DiscordChatAdapter(AbstractChatAdapter):
     """Discord chat adapter for Discord bot integration"""
 
-    def __init__(self, config: Dict[str, Any]):
+    def __init__(self, config: dict[str, Any]):
         super().__init__(ChatPlatform.DISCORD, config)
         self.bot = None
         self.guild_cache = {}
@@ -285,7 +286,7 @@ class DiscordChatAdapter(AbstractChatAdapter):
 
     async def disconnect(self) -> None:
         """Disconnect from Discord"""
-        if self.bot and hasattr(self.bot, "close") and callable(getattr(self.bot, "close")):
+        if self.bot and hasattr(self.bot, "close") and callable(self.bot.close):
             try:
                 await self.bot.close()
             except Exception as e:
@@ -332,7 +333,7 @@ class DiscordChatAdapter(AbstractChatAdapter):
         )
 
     async def send_message(
-        self, user_id: str, content: str, channel_id: Optional[str] = None
+        self, user_id: str, content: str, channel_id: str | None = None
     ) -> bool:
         """Send Discord message"""
         try:
@@ -357,7 +358,7 @@ class DiscordChatAdapter(AbstractChatAdapter):
             logging.error(f"Failed to send Discord message: {e}")
             return False
 
-    async def get_user_info(self, user_id: str) -> Optional[User]:
+    async def get_user_info(self, user_id: str) -> User | None:
         """Get Discord user info"""
         try:
             if not self.bot:
@@ -383,7 +384,7 @@ class DiscordChatAdapter(AbstractChatAdapter):
 
     async def get_conversation_history(
         self, conversation_id: str, limit: int = 50
-    ) -> List[Message]:
+    ) -> list[Message]:
         """Get Discord conversation history"""
         try:
             if not self.bot:
@@ -407,7 +408,7 @@ class DiscordChatAdapter(AbstractChatAdapter):
 class SlackChatAdapter(AbstractChatAdapter):
     """Slack chat adapter for enterprise integration"""
 
-    def __init__(self, config: Dict[str, Any]):
+    def __init__(self, config: dict[str, Any]):
         super().__init__(ChatPlatform.SLACK, config)
         self.slack_token = config.get("slack_token")
 
@@ -426,20 +427,20 @@ class SlackChatAdapter(AbstractChatAdapter):
         self.connected = False
 
     async def send_message(
-        self, user_id: str, content: str, channel_id: Optional[str] = None
+        self, user_id: str, content: str, channel_id: str | None = None
     ) -> bool:
         """Send Slack message"""
         # Implementation would use Slack Web API
         return True
 
-    async def get_user_info(self, user_id: str) -> Optional[User]:
+    async def get_user_info(self, user_id: str) -> User | None:
         """Get Slack user info"""
         # Implementation would use Slack API
         return None
 
     async def get_conversation_history(
         self, conversation_id: str, limit: int = 50
-    ) -> List[Message]:
+    ) -> list[Message]:
         """Get Slack conversation history"""
         # Implementation would use Slack conversations API
         return []
@@ -448,9 +449,9 @@ class SlackChatAdapter(AbstractChatAdapter):
 class APIChatAdapter(AbstractChatAdapter):
     """REST API adapter for programmatic access"""
 
-    def __init__(self, config: Dict[str, Any]):
+    def __init__(self, config: dict[str, Any]):
         super().__init__(ChatPlatform.API, config)
-        self.api_keys: Dict[str, str] = config.get("api_keys", {})
+        self.api_keys: dict[str, str] = config.get("api_keys", {})
 
     async def connect(self) -> bool:
         """API is always connected"""
@@ -462,13 +463,13 @@ class APIChatAdapter(AbstractChatAdapter):
         self.connected = False
 
     async def send_message(
-        self, user_id: str, content: str, channel_id: Optional[str] = None
+        self, user_id: str, content: str, channel_id: str | None = None
     ) -> bool:
         """Store API response for retrieval"""
         # Implementation would store response in database or cache
         return True
 
-    async def get_user_info(self, user_id: str) -> Optional[User]:
+    async def get_user_info(self, user_id: str) -> User | None:
         """Get API user info"""
         return User(
             user_id=user_id,
@@ -479,7 +480,7 @@ class APIChatAdapter(AbstractChatAdapter):
 
     async def get_conversation_history(
         self, conversation_id: str, limit: int = 50
-    ) -> List[Message]:
+    ) -> list[Message]:
         """Get API conversation history"""
         return []
 
@@ -502,6 +503,7 @@ class UniversalChatOrchestrator:
         if bot_core is None and use_enhanced_core:
             try:
                 import os
+
                 from src.core.enhanced_bot_core import create_enhanced_bot_core
 
                 self.bot_core = create_enhanced_bot_core(
@@ -519,18 +521,18 @@ class UniversalChatOrchestrator:
         else:
             self.bot_core = bot_core
 
-        self.adapters: Dict[ChatPlatform, AbstractChatAdapter] = {}
-        self.active_conversations: Dict[str, Conversation] = {}
+        self.adapters: dict[ChatPlatform, AbstractChatAdapter] = {}
+        self.active_conversations: dict[str, Conversation] = {}
         self.ai_engine = None  # Would integrate with existing AI system
 
         # Simple in-memory conversation history storage
         # Format: {user_id_channel_id: [{'user_message': str, 'assistant_response': str, 'timestamp': datetime}, ...]}
-        self.conversation_history: Dict[str, List[Dict[str, Any]]] = {}
+        self.conversation_history: dict[str, list[dict[str, Any]]] = {}
 
         # Load platform configurations
         self.platform_configs = self._load_platform_configs()
 
-    def _load_platform_configs(self) -> Dict[ChatPlatform, Dict[str, Any]]:
+    def _load_platform_configs(self) -> dict[ChatPlatform, dict[str, Any]]:
         """Load platform-specific configurations"""
         return {
             ChatPlatform.WEB_UI: {"enabled": True, "max_sessions": 1000, "session_timeout": 3600},
@@ -559,7 +561,7 @@ class UniversalChatOrchestrator:
 
         return bool(os.environ.get("SLACK_BOT_TOKEN"))
 
-    def _get_env(self, key: str) -> Optional[str]:
+    def _get_env(self, key: str) -> str | None:
         """Get environment variable"""
         import os
 
@@ -660,7 +662,7 @@ class UniversalChatOrchestrator:
 
     async def _load_conversation_from_datastore(
         self, conversation_id: str, message: Message
-    ) -> Optional[Conversation]:
+    ) -> Conversation | None:
         """Load conversation from datastore if available"""
         try:
             if self.bot_core and hasattr(self.bot_core, "conversation_cache"):
@@ -716,7 +718,7 @@ class UniversalChatOrchestrator:
         return None
 
     async def generate_ai_response(
-        self, message: Message, conversation_context: List[Dict[str, str]]
+        self, message: Message, conversation_context: list[dict[str, str]]
     ) -> AIResponse:
         """Generate AI response using conversation context (Discord model)"""
         try:
@@ -756,7 +758,7 @@ class UniversalChatOrchestrator:
             )
 
     async def _generate_full_ai_response(
-        self, message: Message, conversation_context: List[Dict[str, str]]
+        self, message: Message, conversation_context: list[dict[str, str]]
     ) -> AIResponse:
         """Generate AI response using the full WhisperEngine AI framework"""
         try:
@@ -885,10 +887,9 @@ class UniversalChatOrchestrator:
                     logging.warning(f"ChromaDB memory retrieval failed: {e}")
 
             # Apply Phase 4 Intelligence if available
-            phase4_context = None
             if hasattr(memory_manager, "process_with_phase4_intelligence"):
                 try:
-                    phase4_context = await memory_manager.process_with_phase4_intelligence(
+                    await memory_manager.process_with_phase4_intelligence(
                         message.user_id, message.content, relevant_memories, emotion_context
                     )
                 except Exception as e:
@@ -1167,7 +1168,7 @@ class UniversalChatOrchestrator:
             return await self._generate_basic_ai_response(message, conversation_context)
 
     async def _load_system_prompt(
-        self, user_id: Optional[str] = None, template_context: Optional[dict] = None
+        self, user_id: str | None = None, template_context: dict | None = None
     ) -> str:
         """Load the system prompt using the proper config system with template contextualization"""
         try:
@@ -1184,7 +1185,7 @@ class UniversalChatOrchestrator:
                     os.path.dirname(__file__), "..", "..", "prompts", "default.md"
                 )
                 if os.path.exists(prompt_path):
-                    with open(prompt_path, "r", encoding="utf-8") as f:
+                    with open(prompt_path, encoding="utf-8") as f:
                         content = f.read()
                         # Replace {BOT_NAME} placeholder if present
                         bot_name = os.getenv("DISCORD_BOT_NAME", "AI Assistant")
@@ -1223,7 +1224,7 @@ You are here to be a helpful, reliable, and engaging AI companion."""
         return content
 
     async def _generate_basic_ai_response(
-        self, message: Message, conversation_context: List[Dict[str, str]]
+        self, message: Message, conversation_context: list[dict[str, str]]
     ) -> AIResponse:
         """Generate AI response using existing WhisperEngine logic"""
         try:
@@ -1387,16 +1388,16 @@ You adapt your responses based on the platform and conversation context. Be help
 
     async def get_conversation_history(
         self, user_id: str, platform: ChatPlatform, limit: int = 50
-    ) -> List[Message]:
+    ) -> list[Message]:
         """Get conversation history for a user on a platform"""
         # Implementation would query database
         return []
 
-    async def get_active_platforms(self) -> List[ChatPlatform]:
+    async def get_active_platforms(self) -> list[ChatPlatform]:
         """Get list of active chat platforms"""
         return list(self.adapters.keys())
 
-    async def get_platform_stats(self) -> Dict[str, Any]:
+    async def get_platform_stats(self) -> dict[str, Any]:
         """Get statistics for all platforms"""
         stats = {}
         for platform, adapter in self.adapters.items():
@@ -1412,7 +1413,7 @@ You adapt your responses based on the platform and conversation context. Be help
 
     def build_conversation_context(
         self, user_id: str, channel_id: str, current_message: str
-    ) -> List[Dict[str, str]]:
+    ) -> list[dict[str, str]]:
         """Build conversation context from stored message pairs (Discord architecture)"""
         conversation_context = []
 
@@ -1449,7 +1450,7 @@ You adapt your responses based on the platform and conversation context. Be help
 
     def _get_recent_conversation_pairs(
         self, user_id: str, channel_id: str, limit: int = 5
-    ) -> List[Dict[str, str]]:
+    ) -> list[dict[str, str]]:
         """Get recent conversation pairs from memory system (Discord architecture)"""
         try:
             # First try our simple in-memory storage (guaranteed to work)
@@ -1641,7 +1642,7 @@ You adapt your responses based on the platform and conversation context. Be help
 
 You provide:
 - 🧠 Advanced conversation memory and context awareness
-- 💭 Emotional intelligence and empathy  
+- 💭 Emotional intelligence and empathy
 - 🔒 Privacy-focused interactions
 - 🚀 Multi-platform support (Discord, Web, Slack, API)
 
@@ -1657,8 +1658,8 @@ You adapt your responses based on the platform and conversation context. Be help
 
 # Factory function
 def create_universal_chat_platform(
-    config_manager: Optional[AdaptiveConfigManager] = None,
-    db_manager: Optional[DatabaseIntegrationManager] = None,
+    config_manager: AdaptiveConfigManager | None = None,
+    db_manager: DatabaseIntegrationManager | None = None,
 ) -> UniversalChatOrchestrator:
     """Factory function to create universal chat platform"""
     if config_manager is None:
@@ -1678,18 +1679,15 @@ async def main():
     try:
         # Initialize all platforms
         if await chat_platform.initialize():
-            print("Universal chat platform initialized successfully")
 
             # Show active platforms
-            platforms = await chat_platform.get_active_platforms()
-            print(f"Active platforms: {[p.value for p in platforms]}")
+            await chat_platform.get_active_platforms()
 
             # Show platform stats
-            stats = await chat_platform.get_platform_stats()
-            print(f"Platform stats: {stats}")
+            await chat_platform.get_platform_stats()
 
         else:
-            print("Failed to initialize chat platform")
+            pass
 
     finally:
         await chat_platform.cleanup()

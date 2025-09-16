@@ -14,13 +14,14 @@ Integrates with existing PostgreSQL and Redis infrastructure.
 """
 
 import asyncio
-import logging
 import json
-from datetime import datetime, timezone, timedelta
-from typing import Dict, List, Optional, Any, Callable, Awaitable
-from dataclasses import dataclass, asdict
-from enum import Enum
+import logging
 import uuid
+from collections.abc import Callable
+from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
+from enum import Enum
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -49,18 +50,18 @@ class ScheduledJob:
     job_id: str
     job_type: JobType
     scheduled_time: datetime
-    payload: Dict[str, Any]
+    payload: dict[str, Any]
     status: JobStatus = JobStatus.PENDING
-    created_at: Optional[datetime] = None
-    started_at: Optional[datetime] = None
-    completed_at: Optional[datetime] = None
-    error_message: Optional[str] = None
+    created_at: datetime | None = None
+    started_at: datetime | None = None
+    completed_at: datetime | None = None
+    error_message: str | None = None
     retry_count: int = 0
     max_retries: int = 3
 
     def __post_init__(self):
         if self.created_at is None:
-            self.created_at = datetime.now(timezone.utc)
+            self.created_at = datetime.now(UTC)
 
 
 class JobScheduler:
@@ -73,8 +74,8 @@ class JobScheduler:
         self.postgres_pool = postgres_pool
         self.redis_client = redis_client
         self.memory_manager = memory_manager
-        self.job_handlers: Dict[JobType, Callable] = {}
-        self.scheduler_task: Optional[asyncio.Task] = None
+        self.job_handlers: dict[JobType, Callable] = {}
+        self.scheduler_task: asyncio.Task | None = None
         self.running = False
         self.check_interval = 30  # Check for due jobs every 30 seconds
 
@@ -101,11 +102,11 @@ class JobScheduler:
                     retry_count INTEGER DEFAULT 0,
                     max_retries INTEGER DEFAULT 3
                 );
-                
-                CREATE INDEX IF NOT EXISTS idx_scheduled_jobs_time_status 
+
+                CREATE INDEX IF NOT EXISTS idx_scheduled_jobs_time_status
                 ON scheduled_jobs(scheduled_time, status);
-                
-                CREATE INDEX IF NOT EXISTS idx_scheduled_jobs_type 
+
+                CREATE INDEX IF NOT EXISTS idx_scheduled_jobs_type
                 ON scheduled_jobs(job_type);
             """
             )
@@ -123,16 +124,16 @@ class JobScheduler:
                     error_message TEXT,
                     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
                 );
-                
-                CREATE INDEX IF NOT EXISTS idx_job_history_time 
+
+                CREATE INDEX IF NOT EXISTS idx_job_history_time
                 ON job_execution_history(execution_time);
             """
             )
 
     async def _register_default_handlers(self):
         """Register default job type handlers"""
-        from src.jobs.follow_up_handler import FollowUpHandler
         from src.jobs.cleanup_handler import CleanupHandler
+        from src.jobs.follow_up_handler import FollowUpHandler
 
         # Register job handlers with memory manager if available
         follow_up_handler = FollowUpHandler(self.postgres_pool, memory_manager=self.memory_manager)
@@ -156,8 +157,8 @@ class JobScheduler:
         self,
         job_type: JobType,
         scheduled_time: datetime,
-        payload: Dict[str, Any],
-        job_id: Optional[str] = None,
+        payload: dict[str, Any],
+        job_id: str | None = None,
         max_retries: int = 3,
     ) -> str:
         """Schedule a new job"""
@@ -175,7 +176,7 @@ class JobScheduler:
         async with self.postgres_pool.acquire() as conn:
             await conn.execute(
                 """
-                INSERT INTO scheduled_jobs 
+                INSERT INTO scheduled_jobs
                 (job_id, job_type, scheduled_time, payload, status, created_at, max_retries)
                 VALUES ($1, $2, $3, $4, $5, $6, $7)
             """,
@@ -195,11 +196,11 @@ class JobScheduler:
         self,
         user_id: str,
         delay_hours: int = 24,
-        message_context: Optional[Dict] = None,
-        channel_id: Optional[str] = None,
+        message_context: dict | None = None,
+        channel_id: str | None = None,
     ) -> str:
         """Convenience method to schedule follow-up messages"""
-        scheduled_time = datetime.now(timezone.utc) + timedelta(hours=delay_hours)
+        scheduled_time = datetime.now(UTC) + timedelta(hours=delay_hours)
 
         context = message_context or {}
 
@@ -250,15 +251,15 @@ class JobScheduler:
 
     async def _process_due_jobs(self):
         """Process all jobs that are due for execution"""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         async with self.postgres_pool.acquire() as conn:
             # Get all due jobs
             rows = await conn.fetch(
                 """
                 SELECT job_id, job_type, scheduled_time, payload, retry_count, max_retries
-                FROM scheduled_jobs 
-                WHERE status = 'pending' 
+                FROM scheduled_jobs
+                WHERE status = 'pending'
                 AND scheduled_time <= $1
                 ORDER BY scheduled_time ASC
                 LIMIT 50
@@ -281,13 +282,13 @@ class JobScheduler:
 
     async def _execute_job(self, job: ScheduledJob):
         """Execute a single job"""
-        start_time = datetime.now(timezone.utc)
+        start_time = datetime.now(UTC)
 
         # Mark job as running
         async with self.postgres_pool.acquire() as conn:
             await conn.execute(
                 """
-                UPDATE scheduled_jobs 
+                UPDATE scheduled_jobs
                 SET status = 'running', started_at = $1
                 WHERE job_id = $2
             """,
@@ -305,13 +306,13 @@ class JobScheduler:
             await handler.execute(job.payload)
 
             # Mark as completed
-            end_time = datetime.now(timezone.utc)
+            end_time = datetime.now(UTC)
             duration_ms = int((end_time - start_time).total_seconds() * 1000)
 
             async with self.postgres_pool.acquire() as conn:
                 await conn.execute(
                     """
-                    UPDATE scheduled_jobs 
+                    UPDATE scheduled_jobs
                     SET status = 'completed', completed_at = $1
                     WHERE job_id = $2
                 """,
@@ -322,7 +323,7 @@ class JobScheduler:
                 # Log execution history
                 await conn.execute(
                     """
-                    INSERT INTO job_execution_history 
+                    INSERT INTO job_execution_history
                     (job_id, job_type, execution_time, duration_ms, status)
                     VALUES ($1, $2, $3, $4, 'completed')
                 """,
@@ -343,12 +344,12 @@ class JobScheduler:
                 retry_delay = min(
                     300 * (2**job.retry_count), 3600
                 )  # Exponential backoff, max 1 hour
-                retry_time = datetime.now(timezone.utc) + timedelta(seconds=retry_delay)
+                retry_time = datetime.now(UTC) + timedelta(seconds=retry_delay)
 
                 async with self.postgres_pool.acquire() as conn:
                     await conn.execute(
                         """
-                        UPDATE scheduled_jobs 
+                        UPDATE scheduled_jobs
                         SET status = 'pending', scheduled_time = $1, retry_count = $2, error_message = $3
                         WHERE job_id = $4
                     """,
@@ -366,11 +367,11 @@ class JobScheduler:
                 async with self.postgres_pool.acquire() as conn:
                     await conn.execute(
                         """
-                        UPDATE scheduled_jobs 
+                        UPDATE scheduled_jobs
                         SET status = 'failed', completed_at = $1, error_message = $2
                         WHERE job_id = $3
                     """,
-                        datetime.now(timezone.utc),
+                        datetime.now(UTC),
                         str(e),
                         job.job_id,
                     )
@@ -378,7 +379,7 @@ class JobScheduler:
                 # Log failure
                 await conn.execute(
                     """
-                    INSERT INTO job_execution_history 
+                    INSERT INTO job_execution_history
                     (job_id, job_type, execution_time, status, error_message)
                     VALUES ($1, $2, $3, 'failed', $4)
                 """,
@@ -388,7 +389,7 @@ class JobScheduler:
                     str(e),
                 )
 
-    async def get_job_status(self, job_id: str) -> Optional[Dict[str, Any]]:
+    async def get_job_status(self, job_id: str) -> dict[str, Any] | None:
         """Get status of a specific job"""
         async with self.postgres_pool.acquire() as conn:
             row = await conn.fetchrow(
@@ -407,7 +408,7 @@ class JobScheduler:
         async with self.postgres_pool.acquire() as conn:
             result = await conn.execute(
                 """
-                UPDATE scheduled_jobs 
+                UPDATE scheduled_jobs
                 SET status = 'cancelled'
                 WHERE job_id = $1 AND status = 'pending'
             """,
@@ -416,14 +417,14 @@ class JobScheduler:
 
             return result != "UPDATE 0"
 
-    async def get_scheduler_stats(self) -> Dict[str, Any]:
+    async def get_scheduler_stats(self) -> dict[str, Any]:
         """Get scheduler statistics"""
         async with self.postgres_pool.acquire() as conn:
             # Job counts by status
             status_counts = await conn.fetch(
                 """
                 SELECT status, COUNT(*) as count
-                FROM scheduled_jobs 
+                FROM scheduled_jobs
                 GROUP BY status
             """
             )
@@ -431,12 +432,12 @@ class JobScheduler:
             # Recent execution stats
             recent_stats = await conn.fetchrow(
                 """
-                SELECT 
+                SELECT
                     COUNT(*) as total_executions,
                     AVG(duration_ms) as avg_duration_ms,
                     COUNT(*) FILTER (WHERE status = 'completed') as successful_executions,
                     COUNT(*) FILTER (WHERE status = 'failed') as failed_executions
-                FROM job_execution_history 
+                FROM job_execution_history
                 WHERE execution_time >= NOW() - INTERVAL '24 hours'
             """
             )

@@ -4,9 +4,8 @@ Includes privacy settings, privacy level management, privacy audit, and privacy 
 """
 
 import logging
+
 import discord
-from discord.ext import commands
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +28,7 @@ class PrivacyCommandHandlers:
             await privacy_handler_instance._privacy_handler(ctx)
 
         @self.bot.command(name="privacy_level")
-        async def set_privacy_level(ctx, level: Optional[str] = None):
+        async def set_privacy_level(ctx, level: str | None = None):
             """Set privacy level (strict, moderate, permissive)"""
             await privacy_handler_instance._privacy_level_handler(ctx, level)
 
@@ -49,9 +48,9 @@ class PrivacyCommandHandlers:
 
         try:
             from src.security.context_boundaries_security import (
-                get_async_context_boundaries_manager,
-                PrivacyLevel,
                 ConsentStatus,
+                PrivacyLevel,
+                get_async_context_boundaries_manager,
             )
 
             boundaries_manager = get_async_context_boundaries_manager()
@@ -148,8 +147,8 @@ class PrivacyCommandHandlers:
 
         try:
             from src.security.context_boundaries_security import (
-                get_async_context_boundaries_manager,
                 PrivacyLevel,
+                get_async_context_boundaries_manager,
             )
 
             if level == "strict":
@@ -220,7 +219,7 @@ class PrivacyCommandHandlers:
                 color=0x3498DB,
             )
 
-            for i, entry in enumerate(audit_entries[:10]):  # Show max 10 in embed
+            for _i, entry in enumerate(audit_entries[:10]):  # Show max 10 in embed
                 timestamp = entry["request_timestamp"]
                 if hasattr(timestamp, "strftime"):
                     time_str = timestamp.strftime("%Y-%m-%d %H:%M")
@@ -267,12 +266,12 @@ class PrivacyCommandHandlers:
             • No cross-server sharing
             • No DM ↔ server sharing
             • No private → public sharing
-            
+
             **⚖️ Moderate** - Balanced approach
             • Cross-server sharing allowed
             • DM ↔ server sharing blocked
             • Private → public sharing blocked
-            
+
             **🔓 Permissive** - Convenience focused
             • Most sharing allowed
             • Still protects private → public

@@ -17,15 +17,12 @@ using a two-tier emotion analysis system:
 The system ensures reliable emotion analysis while prioritizing sophisticated AI capabilities.
 """
 
-import json
 import logging
 import threading
 import time
-from typing import Dict, List, Optional, Tuple
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from enum import Enum
-from dataclasses import dataclass, asdict
-import re
 
 logger = logging.getLogger(__name__)
 
@@ -60,7 +57,7 @@ class EmotionProfile:
 
     detected_emotion: EmotionalState
     confidence: float
-    triggers: List[str]  # Words/phrases that triggered this emotion
+    triggers: list[str]  # Words/phrases that triggered this emotion
     intensity: float  # 0.0 to 1.0
     timestamp: datetime
 
@@ -70,15 +67,15 @@ class UserProfile:
     """Complete user profile with emotional and relationship state"""
 
     user_id: str
-    name: Optional[str] = None
+    name: str | None = None
     relationship_level: RelationshipLevel = RelationshipLevel.STRANGER
     current_emotion: EmotionalState = EmotionalState.NEUTRAL
     interaction_count: int = 0
-    first_interaction: Optional[datetime] = None
-    last_interaction: Optional[datetime] = None
-    emotion_history: Optional[List[EmotionProfile]] = None
+    first_interaction: datetime | None = None
+    last_interaction: datetime | None = None
+    emotion_history: list[EmotionProfile] | None = None
     escalation_count: int = 0  # Count of negative emotional episodes
-    trust_indicators: Optional[List[str]] = None  # Things that indicate growing trust
+    trust_indicators: list[str] | None = None  # Things that indicate growing trust
 
     def __post_init__(self):
         if self.emotion_history is None:
@@ -253,7 +250,7 @@ class RelationshipManager:
             },
         }
 
-    def detect_personal_info(self, message: str) -> Dict[str, List[str]]:
+    def detect_personal_info(self, message: str) -> dict[str, list[str]]:
         """Detect personal information sharing in a message using LLM"""
         if not self.llm_client:
             logger.warning("No LLM client available for personal info detection")
@@ -309,7 +306,7 @@ class RelationshipManager:
             logger.error(f"Error in LLM personal info detection: {e}")
             raise e
 
-    def detect_trust_indicators(self, message: str) -> List[str]:
+    def detect_trust_indicators(self, message: str) -> list[str]:
         """Detect trust indicators in a message using LLM"""
         if not self.llm_client:
             logger.warning("No LLM client available for trust detection")
@@ -411,7 +408,7 @@ class RelationshipManager:
 
     def get_next_relationship_level(
         self, current_level: RelationshipLevel
-    ) -> Optional[RelationshipLevel]:
+    ) -> RelationshipLevel | None:
         """Get the next relationship level"""
         if current_level in self.relationship_rules:
             return self.relationship_rules[current_level]["progression_to"]
@@ -436,7 +433,7 @@ class EmotionManager:
         self.relationship_manager = RelationshipManager(
             llm_client=llm_client, memory_manager=memory_manager
         )
-        self.user_profiles: Dict[str, UserProfile] = {}
+        self.user_profiles: dict[str, UserProfile] = {}
         self.memory_manager = memory_manager  # Reference to memory system for user facts
         self.phase2_integration = (
             phase2_integration  # Phase 2 Predictive Emotional Intelligence system
@@ -705,7 +702,7 @@ class EmotionManager:
             # Schedule next auto-save
             self._start_auto_save()
 
-    def _mark_unsaved_changes(self, user_id: Optional[str] = None):
+    def _mark_unsaved_changes(self, user_id: str | None = None):
         """Mark that there are unsaved changes, optionally for a specific user"""
         self._unsaved_changes = True
         if user_id:
@@ -753,7 +750,7 @@ class EmotionManager:
             else:
                 logger.error("Database not configured for emotion manager - profiles not saved")
 
-    def _save_sync_database(self, profiles_to_save: Dict[str, UserProfile]) -> int:
+    def _save_sync_database(self, profiles_to_save: dict[str, UserProfile]) -> int:
         """Save profiles using synchronous database"""
         if not self.database:
             return 0
@@ -785,10 +782,10 @@ class EmotionManager:
 
         return saved_count
 
-    def _save_async_database(self, profiles_to_save: Dict[str, UserProfile]) -> int:
+    def _save_async_database(self, profiles_to_save: dict[str, UserProfile]) -> int:
         """Save profiles using async database with thread isolation"""
-        import concurrent.futures
         import asyncio
+        import concurrent.futures
 
         def _run_save_in_thread():
             """Run the async save operation in a dedicated thread"""
@@ -816,7 +813,7 @@ class EmotionManager:
                 logger.error(f"Error in save operation: {e}")
                 return 0
 
-    async def _batch_save_async(self, profiles_to_save: Dict[str, UserProfile]):
+    async def _batch_save_async(self, profiles_to_save: dict[str, UserProfile]):
         """Save multiple profiles in a batch with proper error handling"""
         if not self.database:
             return 0
@@ -901,7 +898,7 @@ class EmotionManager:
         logger.info("EmotionManager cleanup complete")
 
     def get_or_create_profile(
-        self, user_id: str, display_name: Optional[str] = None
+        self, user_id: str, display_name: str | None = None
     ) -> UserProfile:
         """Get existing user profile or create a new one"""
         if user_id not in self.user_profiles:
@@ -921,8 +918,8 @@ class EmotionManager:
         return self.user_profiles[user_id]
 
     def analyze_and_update_emotion(
-        self, user_id: str, message: str, display_name: Optional[str] = None
-    ) -> Tuple[UserProfile, EmotionProfile]:
+        self, user_id: str, message: str, display_name: str | None = None
+    ) -> tuple[UserProfile, EmotionProfile]:
         """Analyze emotion and update user state, returning the data for later storage"""
         profile = self.get_or_create_profile(user_id, display_name)
 
@@ -1021,14 +1018,14 @@ class EmotionManager:
         return profile, emotion_profile
 
     def process_interaction(
-        self, user_id: str, message: str, display_name: Optional[str] = None
-    ) -> Tuple[UserProfile, EmotionProfile]:
+        self, user_id: str, message: str, display_name: str | None = None
+    ) -> tuple[UserProfile, EmotionProfile]:
         """Process a user interaction - wrapper for analyze_and_update_emotion"""
         return self.analyze_and_update_emotion(user_id, message, display_name)
 
     async def analyze_and_update_emotion_async(
-        self, user_id: str, message: str, display_name: Optional[str] = None
-    ) -> Tuple[UserProfile, EmotionProfile]:
+        self, user_id: str, message: str, display_name: str | None = None
+    ) -> tuple[UserProfile, EmotionProfile]:
         """Async version of analyze_and_update_emotion for use in async contexts"""
         profile = self.get_or_create_profile(user_id, display_name)
 
@@ -1105,8 +1102,8 @@ class EmotionManager:
         return profile, emotion_profile
 
     async def process_interaction_async(
-        self, user_id: str, message: str, display_name: Optional[str] = None
-    ) -> Tuple[UserProfile, EmotionProfile]:
+        self, user_id: str, message: str, display_name: str | None = None
+    ) -> tuple[UserProfile, EmotionProfile]:
         """Async version of process_interaction for use in async contexts"""
         return await self.analyze_and_update_emotion_async(user_id, message, display_name)
 
@@ -1271,10 +1268,3 @@ if __name__ == "__main__":
         profile, emotion = emotion_manager.process_interaction(user_id, message)
         context = emotion_manager.get_emotion_context(user_id)
 
-        print(f"\nMessage: {message}")
-        print(
-            f"Detected Emotion: {emotion.detected_emotion.value} (confidence: {emotion.confidence:.2f})"
-        )
-        print(f"Relationship Level: {profile.relationship_level.value}")
-        print(f"Context for LLM: {context}")
-        print("-" * 80)

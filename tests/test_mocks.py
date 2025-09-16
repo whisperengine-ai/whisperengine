@@ -2,8 +2,7 @@
 Mock objects and fixtures for testing LLM-dependent functionality
 """
 
-from unittest.mock import MagicMock, Mock
-from typing import Dict, Any, List, Optional
+from typing import Any
 
 
 class MockLMStudioClient:
@@ -12,10 +11,10 @@ class MockLMStudioClient:
     def __init__(
         self,
         connection_works: bool = True,
-        emotion_responses: Optional[Dict[str, Dict[str, Any]]] = None,
-        personal_info_responses: Optional[Dict[str, Dict[str, Any]]] = None,
-        trust_responses: Optional[Dict[str, Dict[str, Any]]] = None,
-        user_facts_responses: Optional[Dict[str, Dict[str, Any]]] = None,
+        emotion_responses: dict[str, dict[str, Any]] | None = None,
+        personal_info_responses: dict[str, dict[str, Any]] | None = None,
+        trust_responses: dict[str, dict[str, Any]] | None = None,
+        user_facts_responses: dict[str, dict[str, Any]] | None = None,
     ):
         """
         Initialize mock LLM client with configurable responses
@@ -43,7 +42,7 @@ class MockLMStudioClient:
         """Mock connection check"""
         return self.connection_works
 
-    def analyze_emotion(self, message: str) -> Dict[str, Any]:
+    def analyze_emotion(self, message: str) -> dict[str, Any]:
         """Mock emotion analysis"""
         self.analyze_emotion_calls.append(message)
 
@@ -125,7 +124,7 @@ class MockLMStudioClient:
             "reasoning": f"Message '{message}' appears neutral in tone",
         }
 
-    def extract_personal_info(self, message: str) -> Dict[str, Any]:
+    def extract_personal_info(self, message: str) -> dict[str, Any]:
         """Mock personal info extraction"""
         self.extract_personal_info_calls.append(message)
 
@@ -161,7 +160,7 @@ class MockLMStudioClient:
 
         return {"personal_info": personal_info}
 
-    def detect_trust_indicators(self, message: str) -> Dict[str, Any]:
+    def detect_trust_indicators(self, message: str) -> dict[str, Any]:
         """Mock trust indicator detection"""
         self.detect_trust_indicators_calls.append(message)
 
@@ -186,7 +185,7 @@ class MockLMStudioClient:
 
         return {"trust_indicators": trust_indicators}
 
-    def extract_user_facts(self, message: str) -> Dict[str, Any]:
+    def extract_user_facts(self, message: str) -> dict[str, Any]:
         """Mock user facts extraction"""
         self.extract_user_facts_calls.append(message)
 
@@ -215,7 +214,7 @@ class MockLMStudioClient:
 
         return {"extracted_facts": facts}
 
-    def generate_chat_completion(self, messages: List[Dict[str, str]], **kwargs) -> Dict[str, Any]:
+    def generate_chat_completion(self, messages: list[dict[str, str]], **kwargs) -> dict[str, Any]:
         """Mock chat completion"""
         return {
             "choices": [
@@ -231,10 +230,10 @@ class MockLMStudioClient:
 
 def create_mock_llm_client(
     connection_works: bool = True,
-    emotion_responses: Optional[Dict[str, Dict[str, Any]]] = None,
-    personal_info_responses: Optional[Dict[str, Dict[str, Any]]] = None,
-    trust_responses: Optional[Dict[str, Dict[str, Any]]] = None,
-    user_facts_responses: Optional[Dict[str, Dict[str, Any]]] = None,
+    emotion_responses: dict[str, dict[str, Any]] | None = None,
+    personal_info_responses: dict[str, dict[str, Any]] | None = None,
+    trust_responses: dict[str, dict[str, Any]] | None = None,
+    user_facts_responses: dict[str, dict[str, Any]] | None = None,
 ) -> MockLMStudioClient:
     """
     Factory function to create a mock LLM client with specific responses

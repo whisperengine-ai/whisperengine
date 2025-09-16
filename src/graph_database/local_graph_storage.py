@@ -10,20 +10,19 @@ This implementation provides:
 - Advanced graph analytics for AI memory systems
 """
 
-import json
-import sqlite3
-import networkx as nx
-import logging
-import threading
 import asyncio
-from typing import Dict, List, Optional, Any, Tuple, Set
-from pathlib import Path
-from datetime import datetime, timedelta
-from dataclasses import dataclass, asdict
-from contextlib import asynccontextmanager
-import pickle
 import gzip
-import hashlib
+import json
+import logging
+import pickle
+import sqlite3
+import threading
+from dataclasses import dataclass
+from datetime import datetime, timedelta
+from pathlib import Path
+from typing import Any
+
+import networkx as nx
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +33,7 @@ class GraphNode:
 
     id: str
     label: str
-    properties: Dict[str, Any]
+    properties: dict[str, Any]
     created_at: datetime
     updated_at: datetime
 
@@ -46,9 +45,9 @@ class GraphEdge:
     source_id: str
     target_id: str
     relationship_type: str
-    properties: Dict[str, Any]
+    properties: dict[str, Any]
     weight: float = 1.0
-    created_at: Optional[datetime] = None
+    created_at: datetime | None = None
 
 
 class LocalGraphStorage:
@@ -67,7 +66,7 @@ class LocalGraphStorage:
     - Multi-threaded safety
     """
 
-    def __init__(self, db_path: Optional[Path] = None):
+    def __init__(self, db_path: Path | None = None):
         self.db_path = db_path or (Path.home() / ".whisperengine" / "graph.db")
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -220,7 +219,7 @@ class LocalGraphStorage:
         display_name: str = "",
         avatar_url: str = "",
         **kwargs,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Create or update a user node"""
         with self._lock:
             properties = {
@@ -256,7 +255,7 @@ class LocalGraphStorage:
 
     async def create_or_update_topic(
         self, topic_id: str, name: str, description: str = "", category: str = "", **kwargs
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Create or update a topic node"""
         with self._lock:
             properties = {"name": name, "description": description, "category": category, **kwargs}
@@ -288,10 +287,10 @@ class LocalGraphStorage:
         content: str,
         importance: float = 0.5,
         emotional_context: str = "",
-        topics: Optional[List[str]] = None,
-        related_memories: Optional[List[str]] = None,
+        topics: list[str] | None = None,
+        related_memories: list[str] | None = None,
         **kwargs,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Create memory node with relationships"""
         with self._lock:
             # Create memory node
@@ -345,7 +344,7 @@ class LocalGraphStorage:
         source_id: str,
         target_id: str,
         relationship_type: str,
-        properties: Dict[str, Any],
+        properties: dict[str, Any],
         weight: float = 1.0,
     ) -> str:
         """Create relationship between nodes"""
@@ -376,7 +375,7 @@ class LocalGraphStorage:
 
     # ========== Advanced Graph Analytics ==========
 
-    async def get_user_relationship_context(self, user_id: str) -> Dict[str, Any]:
+    async def get_user_relationship_context(self, user_id: str) -> dict[str, Any]:
         """Get comprehensive relationship context for user"""
         with self._lock:
             if not self.graph.has_node(user_id):
@@ -433,7 +432,7 @@ class LocalGraphStorage:
 
     async def get_contextual_memories(
         self, user_id: str, topic: str, max_depth: int = 2, limit: int = 10
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Get memories related to user and topic using graph traversal"""
         with self._lock:
             if not self.graph.has_node(user_id):
@@ -489,7 +488,7 @@ class LocalGraphStorage:
 
             return contextual_memories[:limit]
 
-    async def get_emotional_patterns(self, user_id: str) -> Dict[str, Any]:
+    async def get_emotional_patterns(self, user_id: str) -> dict[str, Any]:
         """Analyze emotional patterns using graph connections"""
         with self._lock:
             if not self.graph.has_node(user_id):
@@ -548,7 +547,7 @@ class LocalGraphStorage:
     # ========== Persistence Methods ==========
 
     async def _persist_node(
-        self, node_id: str, label: str, properties: Dict[str, Any], timestamp: str
+        self, node_id: str, label: str, properties: dict[str, Any], timestamp: str
     ):
         """Persist node to SQLite"""
         with sqlite3.connect(self.db_path) as conn:
@@ -567,7 +566,7 @@ class LocalGraphStorage:
         source_id: str,
         target_id: str,
         relationship_type: str,
-        properties: Dict[str, Any],
+        properties: dict[str, Any],
         weight: float,
     ):
         """Persist edge to SQLite"""
@@ -614,10 +613,10 @@ class LocalGraphStorage:
                 # Keep only last 10 snapshots
                 conn.execute(
                     """
-                    DELETE FROM graph_snapshots 
+                    DELETE FROM graph_snapshots
                     WHERE id NOT IN (
-                        SELECT id FROM graph_snapshots 
-                        ORDER BY created_at DESC 
+                        SELECT id FROM graph_snapshots
+                        ORDER BY created_at DESC
                         LIMIT 10
                     )
                 """
@@ -632,7 +631,7 @@ class LocalGraphStorage:
 
     # ========== Health and Statistics ==========
 
-    async def health_check(self) -> Dict[str, Any]:
+    async def health_check(self) -> dict[str, Any]:
         """Get database health and statistics"""
         with self._lock:
             # Graph statistics
@@ -675,8 +674,8 @@ class LocalGraphStorage:
     # ========== Neo4j Compatibility Methods ==========
 
     async def execute_query(
-        self, query: str, parameters: Optional[Dict[str, Any]] = None
-    ) -> List[Dict[str, Any]]:
+        self, query: str, parameters: dict[str, Any] | None = None
+    ) -> list[dict[str, Any]]:
         """Execute a Cypher-like query (limited compatibility)"""
         # This is a simplified compatibility layer
         # For complex queries, use the specific methods above
@@ -706,8 +705,8 @@ class LocalGraphStorage:
         return []
 
     async def execute_write_query(
-        self, query: str, parameters: Optional[Dict[str, Any]] = None
-    ) -> List[Dict[str, Any]]:
+        self, query: str, parameters: dict[str, Any] | None = None
+    ) -> list[dict[str, Any]]:
         """Execute a write query (limited compatibility)"""
         return await self.execute_query(query, parameters)
 
@@ -715,7 +714,7 @@ class LocalGraphStorage:
 # ========== Factory Function ==========
 
 
-def create_local_graph_storage(db_path: Optional[Path] = None) -> LocalGraphStorage:
+def create_local_graph_storage(db_path: Path | None = None) -> LocalGraphStorage:
     """Factory function to create local graph storage"""
     return LocalGraphStorage(db_path)
 
@@ -756,16 +755,13 @@ async def example_usage():
     )
 
     # Get user context
-    context = await graph_db.get_user_relationship_context("user_123")
-    print(f"User context: {context}")
+    await graph_db.get_user_relationship_context("user_123")
 
     # Get contextual memories
-    memories = await graph_db.get_contextual_memories("user_123", "AI")
-    print(f"Related memories: {memories}")
+    await graph_db.get_contextual_memories("user_123", "AI")
 
     # Health check
-    health = await graph_db.health_check()
-    print(f"Database health: {health}")
+    await graph_db.health_check()
 
     await graph_db.disconnect()
 

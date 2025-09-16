@@ -4,18 +4,19 @@ WhisperEngine Universal Native Chat Application
 Cross-platform native desktop app using PySide6/Qt with platform-specific optimizations
 """
 
-import sys
-import os
-import platform
 import asyncio
 import logging
-import psutil
+import os
+import platform
+import subprocess
+import sys
 import threading
 import time
-import subprocess
 from datetime import datetime
-from typing import Optional, List, Dict, Any
 from pathlib import Path
+from typing import Any
+
+import psutil
 
 # Set environment mode for desktop at startup
 os.environ["ENV_MODE"] = "desktop"
@@ -29,60 +30,56 @@ try:
     from env_manager import load_environment
 
     load_environment()
-    print("✅ Desktop environment configuration loaded")
-except Exception as e:
-    print(f"⚠️ Warning: Could not load environment configuration: {e}")
+except Exception:
+    pass
 
 # Qt/PySide6 imports
 try:
+    from PySide6.QtCore import QSettings, QSize, Qt, QThread, QTimer, Signal
+    from PySide6.QtGui import (
+        QAction,
+        QColor,
+        QFont,
+        QFontDatabase,
+        QIcon,
+        QPalette,
+        QPixmap,
+        QTextCursor,
+        QTextOption,
+    )
     from PySide6.QtWidgets import (
         QApplication,
-        QMainWindow,
-        QWidget,
-        QVBoxLayout,
-        QHBoxLayout,
-        QTextEdit,
-        QLineEdit,
-        QPushButton,
-        QLabel,
-        QScrollArea,
+        QDialog,
         QFrame,
-        QSizePolicy,
-        QSystemTrayIcon,
+        QHBoxLayout,
+        QLabel,
+        QLineEdit,
+        QMainWindow,
         QMenu,
         QMessageBox,
-        QDialog,
+        QPushButton,
+        QScrollArea,
+        QSizePolicy,
+        QSystemTrayIcon,
         QTabWidget,
-    )
-    from PySide6.QtCore import Qt, QThread, Signal, QTimer, QSettings, QSize
-    from PySide6.QtGui import (
-        QFont,
-        QTextCursor,
-        QIcon,
-        QPixmap,
-        QPalette,
-        QColor,
-        QFontDatabase,
-        QAction,
-        QTextOption,
+        QTextEdit,
+        QVBoxLayout,
+        QWidget,
     )
 
     PYSIDE6_AVAILABLE = True
 except ImportError:
-    print("❌ PySide6 not available. Install with: pip install PySide6")
     PYSIDE6_AVAILABLE = False
     sys.exit(1)
 
 # WhisperEngine imports
 try:
-    from src.core.native_ai_service import NativeAIService, AIMessage
-    from src.ui.native_settings_manager import NativeSettingsManager
+    from src.core.native_ai_service import AIMessage, NativeAIService
     from src.ui.native_settings_dialog import NativeSettingsDialog
-    from src.ui.onboarding_wizard import show_onboarding_if_needed, get_current_user_config
+    from src.ui.native_settings_manager import NativeSettingsManager
+    from src.ui.onboarding_wizard import get_current_user_config, show_onboarding_if_needed
     from src.ui.system_logs_widget import SystemLogsWidget
-except ImportError as e:
-    print(f"❌ Failed to import NativeAIService: {e}")
-    print("Make sure you're running from the project root and all dependencies are installed")
+except ImportError:
     sys.exit(1)
 
 # Configure logging
@@ -118,7 +115,7 @@ class PlatformAdapter:
                 background-color: #1e1e1e;
                 color: #ffffff;
             }
-            
+
             QTextEdit {
                 background-color: #2d2d2d;
                 color: #ffffff;
@@ -131,7 +128,7 @@ class PlatformAdapter:
                 font-size: 14px;
                 line-height: 1.4;
             }
-            
+
             QLineEdit {
                 background-color: #2d2d2d;
                 color: #ffffff;
@@ -143,11 +140,11 @@ class PlatformAdapter:
             + """;
                 font-size: 14px;
             }
-            
+
             QLineEdit:focus {
                 border-color: #0078d4;
             }
-            
+
             QPushButton {
                 background-color: #0078d4;
                 color: white;
@@ -157,39 +154,39 @@ class PlatformAdapter:
                 font-weight: 600;
                 font-size: 14px;
             }
-            
+
             QPushButton:hover {
                 background-color: #106ebe;
             }
-            
+
             QPushButton:pressed {
                 background-color: #005a9e;
             }
-            
+
             QPushButton:disabled {
                 background-color: #404040;
                 color: #808080;
             }
-            
+
             QLabel {
                 color: #ffffff;
                 font-family: """
             + font_family
             + """;
             }
-            
+
             QScrollBar:vertical {
                 background-color: #2d2d2d;
                 width: 12px;
                 border-radius: 6px;
             }
-            
+
             QScrollBar::handle:vertical {
                 background-color: #404040;
                 border-radius: 6px;
                 min-height: 20px;
             }
-            
+
             QScrollBar::handle:vertical:hover {
                 background-color: #505050;
             }
@@ -316,13 +313,13 @@ class WhisperEngineUniversalApp(QMainWindow):
         self.platform_adapter = PlatformAdapter()
 
         # User management
-        self.current_user_config: Optional[Dict[str, Any]] = None
-        self.user_id: Optional[str] = None
+        self.current_user_config: dict[str, Any] | None = None
+        self.user_id: str | None = None
 
         # AI service and settings
-        self.ai_service: Optional[NativeAIService] = None
-        self.ai_worker: Optional[AIWorkerThread] = None
-        self.settings_manager: Optional[NativeSettingsManager] = None
+        self.ai_service: NativeAIService | None = None
+        self.ai_worker: AIWorkerThread | None = None
+        self.settings_manager: NativeSettingsManager | None = None
 
         # Settings
         self.settings = QSettings("WhisperEngine", "UniversalChat")
@@ -386,8 +383,8 @@ class WhisperEngineUniversalApp(QMainWindow):
                     )
                 else:
                     # Create a default user if no config exists
-                    import uuid
                     import getpass
+                    import uuid
 
                     default_username = getpass.getuser()
                     self.current_user_config = {
@@ -413,7 +410,7 @@ class WhisperEngineUniversalApp(QMainWindow):
             self.user_id = str(uuid.uuid4())
             self.current_user_config = {"username": "user", "user_id": self.user_id}
 
-    def load_logo(self, size: int = 64) -> Optional[QPixmap]:
+    def load_logo(self, size: int = 64) -> QPixmap | None:
         """Load the WhisperEngine logo at specified size"""
         try:
             # Look for logo in img directory
@@ -760,55 +757,55 @@ class WhisperEngineUniversalApp(QMainWindow):
         # Configure text document for better rendering
         self.chat_display.document().setDefaultStyleSheet(
             """
-            body { 
-                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; 
-                line-height: 1.4; 
+            body {
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+                line-height: 1.4;
                 word-wrap: break-word;
             }
-            .user-message { 
-                background-color: #0066cc; 
-                color: white; 
-                padding: 8px 12px; 
-                border-radius: 15px; 
-                margin: 5px 20% 5px 20%; 
+            .user-message {
+                background-color: #0066cc;
+                color: white;
+                padding: 8px 12px;
+                border-radius: 15px;
+                margin: 5px 20% 5px 20%;
                 text-align: left;
                 display: block;
             }
-            .ai-message { 
-                background-color: #2a2a2a; 
-                color: white; 
+            .ai-message {
+                background-color: #2a2a2a;
+                color: white;
                 border: 1px solid #404040;
-                padding: 8px 12px; 
-                border-radius: 15px; 
-                margin: 5px 20% 5px 0; 
+                padding: 8px 12px;
+                border-radius: 15px;
+                margin: 5px 20% 5px 0;
                 text-align: left;
                 display: block;
             }
-            .system-message { 
-                background-color: rgba(255, 170, 0, 0.1); 
-                color: #ffaa00; 
+            .system-message {
+                background-color: rgba(255, 170, 0, 0.1);
+                color: #ffaa00;
                 border: 1px solid rgba(255, 170, 0, 0.3);
-                padding: 6px 10px; 
-                border-radius: 10px; 
-                margin: 3px 30% 3px 30%; 
+                padding: 6px 10px;
+                border-radius: 10px;
+                margin: 3px 30% 3px 30%;
                 text-align: center;
                 display: block;
             }
-            .typing-indicator { 
-                background-color: #2a2a2a; 
-                color: #888888; 
+            .typing-indicator {
+                background-color: #2a2a2a;
+                color: #888888;
                 border: 1px solid #404040;
-                padding: 8px 12px; 
-                border-radius: 15px; 
-                margin: 5px 20% 5px 0; 
+                padding: 8px 12px;
+                border-radius: 15px;
+                margin: 5px 20% 5px 0;
                 text-align: left;
                 display: block;
                 font-style: italic;
             }
-            .timestamp { 
-                font-size: 10px; 
-                opacity: 0.7; 
-                margin-top: 2px; 
+            .timestamp {
+                font-size: 10px;
+                opacity: 0.7;
+                margin-top: 2px;
             }
         """
         )
@@ -1140,7 +1137,7 @@ class WhisperEngineUniversalApp(QMainWindow):
                 vram_info = ""
                 if "VRAM" in output:
                     lines = output.split("\n")
-                    for i, line in enumerate(lines):
+                    for _i, line in enumerate(lines):
                         if "VRAM" in line:
                             # Extract VRAM size
                             vram_line = line.strip()
@@ -1551,8 +1548,8 @@ class WhisperEngineUniversalApp(QMainWindow):
                 self.user_id = user_config.get("user_id")
 
                 # Save user configuration
-                from pathlib import Path
                 import json
+                from pathlib import Path
 
                 user_config_path = Path.home() / ".whisperengine" / "user_config.json"
                 user_config_path.parent.mkdir(exist_ok=True)
@@ -2025,7 +2022,7 @@ class WhisperEngineUniversalApp(QMainWindow):
             # Try to read from system_prompt.md in project root
             system_prompt_path = Path("system_prompt.md")
             if system_prompt_path.exists():
-                with open(system_prompt_path, "r", encoding="utf-8") as f:
+                with open(system_prompt_path, encoding="utf-8") as f:
                     content = f.read()
                     self.prompt_editor.setPlainText(content)
                     self.prompt_status_label.setText("Status: Loaded from system_prompt.md")
@@ -2065,7 +2062,7 @@ Respond with the dignity and mystery befitting the Lord of Dreams, while being h
             )
 
             if file_path:
-                with open(file_path, "r", encoding="utf-8") as f:
+                with open(file_path, encoding="utf-8") as f:
                     content = f.read()
                     self.prompt_editor.setPlainText(content)
                     self.prompt_status_label.setText(f"Status: Loaded from {Path(file_path).name}")
@@ -2117,22 +2114,17 @@ def main():
     if not hasattr(sys, "real_prefix") and not (
         hasattr(sys, "base_prefix") and sys.base_prefix != sys.prefix
     ):
-        print("⚠️  WARNING: Not running in virtual environment!")
-        print("   Please run: source .venv/bin/activate && python universal_native_app.py")
-        print()
+        pass
 
-    print(f"🤖 Starting WhisperEngine Universal Native App on {platform.system()}...")
-    print(f"   Platform: {platform.platform()}")
-    print(f"   Python: {sys.version.split()[0]}")
 
     # Check PySide6 availability
     if not PYSIDE6_AVAILABLE:
         return 1
 
     try:
-        print(f"   PySide6: {sys.modules['PySide6'].__version__}")
+        pass
     except:
-        print("   PySide6: Version unknown")
+        pass
 
     # Create QApplication
     app = QApplication(sys.argv)
@@ -2154,8 +2146,6 @@ def main():
     window = WhisperEngineUniversalApp()
     window.show()
 
-    print("✅ Application started successfully!")
-    print("   Window should be visible now")
 
     # Run application
     return app.exec()

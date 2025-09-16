@@ -3,12 +3,12 @@ Advanced Conversation Summarization System for Memory Optimization
 Reduces context bloat while preserving critical conversation elements
 """
 
-import logging
-import json
 import hashlib
-from typing import Dict, List, Optional, Any
+import json
+import logging
+from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta
-from dataclasses import dataclass, asdict
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -19,22 +19,22 @@ class ConversationSummary:
 
     summary_id: str
     user_id: str
-    timespan: Dict[str, str]  # start_time, end_time
+    timespan: dict[str, str]  # start_time, end_time
     message_count: int
-    key_topics: List[str]
-    important_facts: List[str]
-    emotional_context: Dict[str, Any]
-    conversation_flow: List[Dict[str, str]]  # Condensed flow
-    context_tags: List[str]
+    key_topics: list[str]
+    important_facts: list[str]
+    emotional_context: dict[str, Any]
+    conversation_flow: list[dict[str, str]]  # Condensed flow
+    context_tags: list[str]
     summary_text: str
     compression_ratio: float
     created_at: str
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "ConversationSummary":
+    def from_dict(cls, data: dict[str, Any]) -> "ConversationSummary":
         return cls(**data)
 
 
@@ -65,7 +65,7 @@ class AdvancedConversationSummarizer:
         self.cache_ttl = timedelta(hours=1)
 
     async def should_summarize_conversation(
-        self, user_id: str, messages: List[Dict[str, Any]]
+        self, user_id: str, messages: list[dict[str, Any]]
     ) -> bool:
         """
         Determine if a conversation should be summarized based on various factors
@@ -96,7 +96,7 @@ class AdvancedConversationSummarizer:
         return False
 
     async def create_conversation_summary(
-        self, user_id: str, messages: List[Dict[str, Any]]
+        self, user_id: str, messages: list[dict[str, Any]]
     ) -> ConversationSummary:
         """
         Create a comprehensive conversation summary with multiple optimization techniques
@@ -164,7 +164,7 @@ class AdvancedConversationSummarizer:
         )
         return summary
 
-    def _extract_timespan(self, messages: List[Dict[str, Any]]) -> Dict[str, str]:
+    def _extract_timespan(self, messages: list[dict[str, Any]]) -> dict[str, str]:
         """Extract the time span of the conversation"""
         timestamps = []
         for msg in messages:
@@ -182,8 +182,8 @@ class AdvancedConversationSummarizer:
             return {"start_time": now.isoformat(), "end_time": now.isoformat()}
 
     async def _analyze_conversation_structure(
-        self, messages: List[Dict[str, Any]]
-    ) -> Dict[str, Any]:
+        self, messages: list[dict[str, Any]]
+    ) -> dict[str, Any]:
         """Analyze the structure and flow of the conversation"""
         analysis = {
             "turn_taking": 0,
@@ -218,7 +218,7 @@ class AdvancedConversationSummarizer:
 
         return analysis
 
-    async def _extract_key_topics(self, messages: List[Dict[str, Any]]) -> List[str]:
+    async def _extract_key_topics(self, messages: list[dict[str, Any]]) -> list[str]:
         """Extract key topics using LLM analysis and keyword extraction"""
         try:
             # Combine all user messages for topic analysis
@@ -233,12 +233,12 @@ class AdvancedConversationSummarizer:
             combined_content = " ".join(user_content)
 
             # Use LLM for topic extraction
-            topic_prompt = f"""Analyze this conversation and extract the main topics discussed. 
+            topic_prompt = f"""Analyze this conversation and extract the main topics discussed.
             Focus on concrete subjects, not abstract concepts.
-            
+
             Conversation content:
-            {combined_content[:2000]}  
-            
+            {combined_content[:2000]}
+
             Return only a JSON list of 3-7 key topics as strings:
             ["topic1", "topic2", "topic3"]"""
 
@@ -273,10 +273,10 @@ class AdvancedConversationSummarizer:
         # Fallback: Simple keyword extraction
         return self._extract_keywords_fallback(messages)
 
-    def _extract_keywords_fallback(self, messages: List[Dict[str, Any]]) -> List[str]:
+    def _extract_keywords_fallback(self, messages: list[dict[str, Any]]) -> list[str]:
         """Fallback keyword extraction using simple techniques"""
-        from collections import Counter
         import re
+        from collections import Counter
 
         # Combine all content
         all_content = " ".join(
@@ -332,7 +332,7 @@ class AdvancedConversationSummarizer:
         word_counts = Counter(filtered_words)
         return [word for word, count in word_counts.most_common(5)]
 
-    async def _extract_important_facts(self, messages: List[Dict[str, Any]]) -> List[str]:
+    async def _extract_important_facts(self, messages: list[dict[str, Any]]) -> list[str]:
         """Extract important facts that should be preserved in the summary"""
         facts = []
 
@@ -356,7 +356,7 @@ class AdvancedConversationSummarizer:
         # Limit to most important facts
         return facts[:10]
 
-    async def _analyze_emotional_evolution(self, messages: List[Dict[str, Any]]) -> Dict[str, Any]:
+    async def _analyze_emotional_evolution(self, messages: list[dict[str, Any]]) -> dict[str, Any]:
         """Analyze how emotions evolved throughout the conversation"""
         emotional_context = {
             "dominant_emotion": "neutral",
@@ -443,8 +443,8 @@ class AdvancedConversationSummarizer:
             return "neutral"
 
     async def _create_conversation_flow(
-        self, messages: List[Dict[str, Any]]
-    ) -> List[Dict[str, str]]:
+        self, messages: list[dict[str, Any]]
+    ) -> list[dict[str, str]]:
         """Create a condensed representation of conversation flow"""
         flow = []
 
@@ -492,8 +492,8 @@ class AdvancedConversationSummarizer:
             return "statement"
 
     async def _generate_context_tags(
-        self, messages: List[Dict[str, Any]], topics: List[str], facts: List[str]
-    ) -> List[str]:
+        self, messages: list[dict[str, Any]], topics: list[str], facts: list[str]
+    ) -> list[str]:
         """Generate tags for better memory retrieval"""
         tags = set()
 
@@ -530,11 +530,11 @@ class AdvancedConversationSummarizer:
 
     async def _generate_natural_summary(
         self,
-        messages: List[Dict[str, Any]],
-        topics: List[str],
-        facts: List[str],
-        emotional_context: Dict[str, Any],
-        conversation_flow: List[Dict[str, str]],
+        messages: list[dict[str, Any]],
+        topics: list[str],
+        facts: list[str],
+        emotional_context: dict[str, Any],
+        conversation_flow: list[dict[str, str]],
     ) -> str:
         """Generate a natural language summary using LLM"""
         _ = conversation_flow  # Reserved for future conversation flow analysis
@@ -555,15 +555,15 @@ class AdvancedConversationSummarizer:
             sample_messages = user_messages[:3] + user_messages[-2:]  # First 3 and last 2
 
             summary_prompt = f"""Create a concise summary of this conversation. Focus on key topics, important information, and overall context.
-            
+
             Conversation metadata:
             - Messages: {context_info['message_count']}
             - Topics: {', '.join(topics)}
             - Emotional tone: {context_info['emotional_tone']}
-            
+
             Key messages sample:
             {chr(10).join(f"- {msg[:150]}..." for msg in sample_messages[:5])}
-            
+
             Create a 2-3 sentence summary that captures the essence of this conversation."""
 
             messages_for_llm = [
@@ -589,7 +589,7 @@ class AdvancedConversationSummarizer:
         return self._generate_fallback_summary(messages, topics, facts)
 
     def _generate_fallback_summary(
-        self, messages: List[Dict[str, Any]], topics: List[str], facts: List[str]
+        self, messages: list[dict[str, Any]], topics: list[str], facts: list[str]
     ) -> str:
         """Generate a simple fallback summary"""
         user_message_count = len([msg for msg in messages if msg.get("role") == "user"])
@@ -602,7 +602,7 @@ class AdvancedConversationSummarizer:
 
         return summary
 
-    def _generate_summary_id(self, user_id: str, timespan: Dict[str, str]) -> str:
+    def _generate_summary_id(self, user_id: str, timespan: dict[str, str]) -> str:
         """Generate a unique ID for the summary"""
         content = f"{user_id}_{timespan['start_time']}_{timespan['end_time']}"
         return hashlib.md5(content.encode()).hexdigest()[:16]
@@ -619,7 +619,7 @@ class AdvancedConversationSummarizer:
         for sid in to_remove:
             del self.summary_cache[sid]
 
-    def get_cached_summary(self, summary_id: str) -> Optional[ConversationSummary]:
+    def get_cached_summary(self, summary_id: str) -> ConversationSummary | None:
         """Retrieve a cached summary"""
         if summary_id in self.summary_cache:
             cached_data = self.summary_cache[summary_id]
@@ -630,8 +630,8 @@ class AdvancedConversationSummarizer:
         return None
 
     async def summarize_if_needed(
-        self, user_id: str, messages: List[Dict[str, Any]]
-    ) -> Optional[ConversationSummary]:
+        self, user_id: str, messages: list[dict[str, Any]]
+    ) -> ConversationSummary | None:
         """
         Check if summarization is needed and create summary if so
         """
@@ -639,7 +639,7 @@ class AdvancedConversationSummarizer:
             return await self.create_conversation_summary(user_id, messages)
         return None
 
-    def get_summary_stats(self) -> Dict[str, Any]:
+    def get_summary_stats(self) -> dict[str, Any]:
         """Get statistics about summarization performance"""
         return {
             "cached_summaries": len(self.summary_cache),

@@ -6,27 +6,26 @@ Captures logging output and displays it in a Qt widget with copying capabilities
 
 import logging
 import threading
-from datetime import datetime
-from typing import List, Optional, Union
 from collections import deque
+from datetime import datetime
 
 try:
+    from PySide6.QtCore import QObject, Qt, QTimer, Signal
+    from PySide6.QtGui import QColor, QFont, QTextCharFormat, QTextCursor
     from PySide6.QtWidgets import (
-        QWidget,
-        QVBoxLayout,
-        QHBoxLayout,
-        QTextEdit,
-        QPushButton,
-        QComboBox,
-        QLabel,
         QCheckBox,
-        QSplitter,
-        QGroupBox,
+        QComboBox,
         QFormLayout,
+        QGroupBox,
+        QHBoxLayout,
+        QLabel,
+        QPushButton,
         QSpinBox,
+        QSplitter,
+        QTextEdit,
+        QVBoxLayout,
+        QWidget,
     )
-    from PySide6.QtCore import Qt, QTimer, Signal, QObject
-    from PySide6.QtGui import QFont, QTextCursor, QColor, QTextCharFormat
 
     PYSIDE6_AVAILABLE = True
 except ImportError:
@@ -66,7 +65,7 @@ class QtLogHandler(logging.Handler):
         self.max_entries = max_entries
         self.log_entries: deque = deque(maxlen=max_entries)
         self.signals = LogSignals()
-        self.lock: Union[threading.Lock, threading.RLock] = threading.RLock()
+        self.lock: threading.Lock | threading.RLock = threading.RLock()
 
         # Set default formatter
         formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
@@ -90,7 +89,7 @@ class QtLogHandler(logging.Handler):
             # Don't let logging errors crash the app
             pass
 
-    def get_logs(self, level_filter: Optional[str] = None) -> List[LogEntry]:
+    def get_logs(self, level_filter: str | None = None) -> list[LogEntry]:
         """Get all logs, optionally filtered by level"""
         with self.lock:
             if level_filter is None:
@@ -110,7 +109,7 @@ class SystemLogsWidget(QWidget):
 
     def __init__(self):
         super().__init__()
-        self.log_handler: Optional[QtLogHandler] = None
+        self.log_handler: QtLogHandler | None = None
         self.auto_scroll = True
         self.max_display_lines = 10000
 

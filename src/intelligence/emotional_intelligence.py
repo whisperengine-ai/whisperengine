@@ -9,21 +9,19 @@ Phase 2: Complete Implementation
 """
 
 import logging
-import asyncio
-from datetime import datetime, timezone, timedelta
-from typing import Dict, List, Optional, Any, Tuple
-from dataclasses import dataclass, asdict
-from enum import Enum
-import statistics
 from collections import defaultdict, deque
+from dataclasses import asdict, dataclass
+from datetime import UTC, datetime, timedelta
+from enum import Enum
+from typing import Any
 
-from .emotion_predictor import EmotionPredictor, EmotionalPrediction
+from .emotion_predictor import EmotionalPrediction, EmotionPredictor
 from .mood_detector import (
-    MoodDetector,
-    MoodAssessment,
-    StressAssessment,
     EmotionalAlert,
+    MoodAssessment,
     MoodCategory,
+    MoodDetector,
+    StressAssessment,
     StressLevel,
 )
 from .proactive_support import (
@@ -55,11 +53,11 @@ class EmotionalIntelligenceAssessment:
     mood_assessment: MoodAssessment
     stress_assessment: StressAssessment
     emotional_prediction: EmotionalPrediction
-    emotional_alerts: List[EmotionalAlert]
+    emotional_alerts: list[EmotionalAlert]
 
     # Support recommendations
-    support_needs: Dict[str, Any]
-    recommended_intervention: Optional[SupportIntervention]
+    support_needs: dict[str, Any]
+    recommended_intervention: SupportIntervention | None
 
     # System status
     phase_status: PhaseStatus
@@ -117,7 +115,7 @@ class PredictiveEmotionalIntelligence:
             crisis_prevention_count=0,
             user_satisfaction_score=0.0,
             average_response_time=0.0,
-            last_updated=datetime.now(timezone.utc),
+            last_updated=datetime.now(UTC),
         )
 
         # Assessment history for learning
@@ -126,7 +124,7 @@ class PredictiveEmotionalIntelligence:
         logger.info("Phase 2 Emotional Intelligence System initialized successfully")
 
     async def comprehensive_emotional_assessment(
-        self, user_id: str, current_message: str, conversation_context: Dict[str, Any]
+        self, user_id: str, current_message: str, conversation_context: dict[str, Any]
     ) -> EmotionalIntelligenceAssessment:
         """
         Perform complete emotional intelligence assessment
@@ -243,7 +241,7 @@ class PredictiveEmotionalIntelligence:
             # Create comprehensive assessment
             assessment = EmotionalIntelligenceAssessment(
                 user_id=user_id,
-                assessment_timestamp=datetime.now(timezone.utc),
+                assessment_timestamp=datetime.now(UTC),
                 mood_assessment=mood_assessment,
                 stress_assessment=stress_assessment,
                 emotional_prediction=emotional_prediction,
@@ -272,7 +270,7 @@ class PredictiveEmotionalIntelligence:
             # Return minimal assessment in case of error
             return EmotionalIntelligenceAssessment(
                 user_id=user_id,
-                assessment_timestamp=datetime.now(timezone.utc),
+                assessment_timestamp=datetime.now(UTC),
                 mood_assessment=MoodAssessment(
                     mood_category=MoodCategory.NEUTRAL,
                     mood_score=0.0,
@@ -280,7 +278,7 @@ class PredictiveEmotionalIntelligence:
                     contributing_factors=["error_in_assessment"],
                     linguistic_indicators=[],
                     temporal_context="unknown",
-                    assessment_timestamp=datetime.now(timezone.utc),
+                    assessment_timestamp=datetime.now(UTC),
                 ),
                 stress_assessment=StressAssessment(
                     stress_level=StressLevel.MINIMAL,
@@ -289,7 +287,7 @@ class PredictiveEmotionalIntelligence:
                     physiological_indicators=[],
                     cognitive_load_indicators=[],
                     coping_indicators=[],
-                    assessment_timestamp=datetime.now(timezone.utc),
+                    assessment_timestamp=datetime.now(UTC),
                 ),
                 emotional_prediction=EmotionalPrediction(
                     predicted_emotion="neutral",
@@ -304,10 +302,10 @@ class PredictiveEmotionalIntelligence:
                 recommended_intervention=None,
                 phase_status=PhaseStatus.MONITORING,
                 confidence_score=0.0,
-                next_assessment_time=datetime.now(timezone.utc) + timedelta(minutes=5),
+                next_assessment_time=datetime.now(UTC) + timedelta(minutes=5),
             )
 
-    async def _get_conversation_history(self, user_id: str) -> List[Dict]:
+    async def _get_conversation_history(self, user_id: str) -> list[dict]:
         """Get conversation history for pattern analysis"""
 
         # IMPORTANT: In Discord, each channel represents one continuous conversation
@@ -344,18 +342,18 @@ class PredictiveEmotionalIntelligence:
 
         return formatted_history
 
-    def _get_recent_mood_history(self, user_id: str) -> List[MoodAssessment]:
+    def _get_recent_mood_history(self, user_id: str) -> list[MoodAssessment]:
         """Get recent mood assessment history"""
         user_assessments = self.user_assessments.get(user_id, deque())
         return [assessment.mood_assessment for assessment in list(user_assessments)[-10:]]
 
-    def _get_recent_stress_history(self, user_id: str) -> List[StressAssessment]:
+    def _get_recent_stress_history(self, user_id: str) -> list[StressAssessment]:
         """Get recent stress assessment history"""
         user_assessments = self.user_assessments.get(user_id, deque())
         return [assessment.stress_assessment for assessment in list(user_assessments)[-10:]]
 
     def _determine_phase_status(
-        self, mood: MoodAssessment, stress: StressAssessment, alerts: List[EmotionalAlert]
+        self, mood: MoodAssessment, stress: StressAssessment, alerts: list[EmotionalAlert]
     ) -> PhaseStatus:
         """Determine current system phase status"""
 
@@ -413,11 +411,11 @@ class PredictiveEmotionalIntelligence:
         return min(1.0, overall_confidence)
 
     def _calculate_next_assessment_time(
-        self, phase_status: PhaseStatus, alerts: List[EmotionalAlert]
+        self, phase_status: PhaseStatus, alerts: list[EmotionalAlert]
     ) -> datetime:
         """Calculate when next assessment should occur"""
 
-        base_time = datetime.now(timezone.utc)
+        base_time = datetime.now(UTC)
 
         if phase_status == PhaseStatus.CRISIS:
             return base_time + timedelta(minutes=5)  # Very frequent monitoring
@@ -449,11 +447,11 @@ class PredictiveEmotionalIntelligence:
             current_avg * (total_assessments - 1) + processing_time
         ) / total_assessments
 
-        self.system_metrics.last_updated = datetime.now(timezone.utc)
+        self.system_metrics.last_updated = datetime.now(UTC)
 
     async def execute_intervention(
-        self, intervention: SupportIntervention, delivery_context: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        self, intervention: SupportIntervention, delivery_context: dict[str, Any]
+    ) -> dict[str, Any]:
         """
         Execute a support intervention
 
@@ -477,7 +475,7 @@ class PredictiveEmotionalIntelligence:
                 self.active_interventions[intervention.intervention_id] = {
                     "intervention": intervention,
                     "delivery_result": delivery_result,
-                    "start_time": datetime.now(timezone.utc),
+                    "start_time": datetime.now(UTC),
                 }
 
                 logger.info(f"Intervention {intervention.intervention_id} delivered successfully")
@@ -497,7 +495,7 @@ class PredictiveEmotionalIntelligence:
             }
 
     async def track_intervention_response(
-        self, intervention_id: str, user_response: str, response_context: Dict[str, Any]
+        self, intervention_id: str, user_response: str, response_context: dict[str, Any]
     ) -> SupportOutcome:
         """
         Track user response to intervention
@@ -521,7 +519,7 @@ class PredictiveEmotionalIntelligence:
             # Update intervention tracking
             if intervention_id in self.active_interventions:
                 self.active_interventions[intervention_id]["outcome"] = outcome
-                self.active_interventions[intervention_id]["end_time"] = datetime.now(timezone.utc)
+                self.active_interventions[intervention_id]["end_time"] = datetime.now(UTC)
 
                 # Update success rate metrics
                 if outcome.effectiveness_score >= 0.6:
@@ -547,7 +545,7 @@ class PredictiveEmotionalIntelligence:
                 effectiveness_score=0.0,
                 follow_up_needed=True,
                 lessons_learned=[f"Error in outcome tracking: {str(e)}"],
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.now(UTC),
             )
 
     def _update_intervention_success_rate(self, success: bool):
@@ -587,7 +585,7 @@ class PredictiveEmotionalIntelligence:
                 optimal_timing={},
                 communication_style="casual",
                 support_history=[],
-                last_updated=datetime.now(timezone.utc),
+                last_updated=datetime.now(UTC),
             )
 
         user_strategy = self.user_strategies[user_id]
@@ -618,9 +616,9 @@ class PredictiveEmotionalIntelligence:
         # Keep only recent history (last 10 interventions)
         user_strategy.support_history = user_strategy.support_history[-10:]
 
-        user_strategy.last_updated = datetime.now(timezone.utc)
+        user_strategy.last_updated = datetime.now(UTC)
 
-    async def get_user_emotional_dashboard(self, user_id: str) -> Dict[str, Any]:
+    async def get_user_emotional_dashboard(self, user_id: str) -> dict[str, Any]:
         """
         Generate comprehensive emotional dashboard for user
 
@@ -695,7 +693,7 @@ class PredictiveEmotionalIntelligence:
 
         return dashboard
 
-    def _calculate_mood_trend(self, assessments: List[EmotionalIntelligenceAssessment]) -> str:
+    def _calculate_mood_trend(self, assessments: list[EmotionalIntelligenceAssessment]) -> str:
         """Calculate mood trend from recent assessments"""
         if len(assessments) < 2:
             return "insufficient_data"
@@ -709,7 +707,7 @@ class PredictiveEmotionalIntelligence:
 
             # Simple linear regression slope
             n = len(x)
-            slope = (n * sum(xi * yi for xi, yi in zip(x, y)) - sum(x) * sum(y)) / (
+            slope = (n * sum(xi * yi for xi, yi in zip(x, y, strict=False)) - sum(x) * sum(y)) / (
                 n * sum(xi**2 for xi in x) - sum(x) ** 2
             )
 
@@ -728,7 +726,7 @@ class PredictiveEmotionalIntelligence:
         else:
             return "stable"
 
-    def _calculate_stress_trend(self, assessments: List[EmotionalIntelligenceAssessment]) -> str:
+    def _calculate_stress_trend(self, assessments: list[EmotionalIntelligenceAssessment]) -> str:
         """Calculate stress trend from recent assessments"""
         if len(assessments) < 2:
             return "insufficient_data"
@@ -759,7 +757,7 @@ class PredictiveEmotionalIntelligence:
         else:
             return "stable"
 
-    async def get_system_health_report(self) -> Dict[str, Any]:
+    async def get_system_health_report(self) -> dict[str, Any]:
         """Generate system health and performance report"""
 
         total_users = len(self.user_assessments)
@@ -789,7 +787,7 @@ class PredictiveEmotionalIntelligence:
 
         report = {
             "system_status": "operational",
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "performance_metrics": asdict(self.system_metrics),
             "user_statistics": {
                 "total_users": total_users,
@@ -811,7 +809,7 @@ class PredictiveEmotionalIntelligence:
 
         return report
 
-    def get_assessment_summary(self, assessment: EmotionalIntelligenceAssessment) -> Dict[str, Any]:
+    def get_assessment_summary(self, assessment: EmotionalIntelligenceAssessment) -> dict[str, Any]:
         """Generate human-readable assessment summary"""
         return {
             "user_id": assessment.user_id,

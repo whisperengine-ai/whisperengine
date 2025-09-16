@@ -4,12 +4,10 @@ Includes fact management, conversation sync, memory viewing, and data deletion
 """
 
 import logging
+from datetime import UTC, datetime
+
 import discord
-from discord.ext import commands
-from typing import Optional
-import asyncio
-from datetime import datetime, timezone
-from src.utils.exceptions import ValidationError, MemoryStorageError
+
 from src.utils.helpers import extract_text_for_memory_storage
 
 logger = logging.getLogger(__name__)
@@ -41,7 +39,8 @@ class MemoryCommandHandlers:
 
         # Default to no-op filter if none provided
         if bot_name_filter is None:
-            bot_name_filter = lambda: lambda func: func
+            def bot_name_filter():
+                return lambda func: func
 
         @self.bot.command(name="list_facts", aliases=["facts"])
         @bot_name_filter()
@@ -56,7 +55,7 @@ class MemoryCommandHandlers:
 
         @self.bot.command(name="personality", aliases=["profile", "my_personality"])
         @bot_name_filter()
-        async def show_personality(ctx, user: Optional[discord.Member] = None):
+        async def show_personality(ctx, user: discord.Member | None = None):
             """Show personality profile for yourself or another user"""
             await self._personality_handler(ctx, user, is_admin)
 
@@ -64,7 +63,7 @@ class MemoryCommandHandlers:
             name="dynamic_personality", aliases=["dynamic_profile", "adaptive_profile"]
         )
         @bot_name_filter()
-        async def show_dynamic_personality(ctx, user: Optional[discord.Member] = None):
+        async def show_dynamic_personality(ctx, user: discord.Member | None = None):
             """Show dynamic personality profile with adaptive insights"""
             await self._dynamic_personality_handler(ctx, user, is_admin)
 
@@ -130,7 +129,7 @@ class MemoryCommandHandlers:
                 )
 
                 if results["documents"]:
-                    facts_with_meta = list(zip(results["documents"], results["metadatas"]))
+                    facts_with_meta = list(zip(results["documents"], results["metadatas"], strict=False))
                     facts_with_meta.sort(key=lambda x: x[1].get("timestamp", ""), reverse=True)
 
                     for doc, metadata in facts_with_meta:
@@ -171,7 +170,7 @@ class MemoryCommandHandlers:
                 title=f"🧠 AI Personality Profile: {ctx.author.display_name}",
                 description=f"Discovered **{len(personality_facts)} personality insights** + {len(legacy_facts)} legacy facts",
                 color=0x9B59B6,
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.now(UTC),
             )
 
             # Group personality facts by type with relevance sorting
@@ -203,7 +202,7 @@ class MemoryCommandHandlers:
                     )
 
                     category_text = ""
-                    for i, fact in enumerate(sorted_facts[:3], 1):
+                    for _i, fact in enumerate(sorted_facts[:3], 1):
                         content = fact.get("content", "Unknown")[:70]
                         relevance = fact.get("relevance_score", 0.0)
                         privacy_tier = fact.get("privacy_tier", "unknown")
@@ -278,10 +277,10 @@ class MemoryCommandHandlers:
                 # Show how facts are used in AI
                 embed.add_field(
                     name="🤖 AI Integration",
-                    value=f"💬 **Conversation Context:** Active\n"
-                    f"🎯 **Response Personalization:** Enabled\n"
-                    f"🧠 **Memory Retrieval:** Semantic search\n"
-                    f"⚙️ **Behavior Adaptation:** Real-time",
+                    value="💬 **Conversation Context:** Active\n"
+                    "🎯 **Response Personalization:** Enabled\n"
+                    "🧠 **Memory Retrieval:** Semantic search\n"
+                    "⚙️ **Behavior Adaptation:** Real-time",
                     inline=True,
                 )
 
@@ -308,9 +307,9 @@ class MemoryCommandHandlers:
             if len(personality_facts) > 10:
                 embed.add_field(
                     name="🔍 Advanced Commands",
-                    value=f"• `!personality` - Full dynamic profile\n"
-                    f"• `!personality_types` - Filter by fact type\n"
-                    f"• `!memory_search <query>` - Find specific insights",
+                    value="• `!personality` - Full dynamic profile\n"
+                    "• `!personality_types` - Filter by fact type\n"
+                    "• `!memory_search <query>` - Find specific insights",
                     inline=False,
                 )
 
@@ -388,7 +387,7 @@ class MemoryCommandHandlers:
             embed = discord.Embed(
                 title=f"🧠 Personality Profile: {target_user.display_name}",
                 color=0x9B59B6,
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.now(UTC),
             )
 
             # Try to get personality profile from graph database first
@@ -624,7 +623,7 @@ class MemoryCommandHandlers:
                                 key=lambda x: x[1].confidence,
                                 reverse=True,
                             )
-                            for i, (trait_name, trait) in enumerate(sorted_traits[:3]):
+                            for _i, (trait_name, trait) in enumerate(sorted_traits[:3]):
                                 trait_display = trait_name.name.replace("_", " ").title()
                                 trait_text += f"**{trait_display}:** {trait.value:.2f} ({trait.confidence:.1f}% confidence)\n"
 
@@ -699,7 +698,7 @@ class MemoryCommandHandlers:
 
         except Exception as e:
             logger.error(f"Error showing personality profile: {e}")
-            await ctx.send(f"❌ **Error:** Could not retrieve personality profile.")
+            await ctx.send("❌ **Error:** Could not retrieve personality profile.")
 
     async def _dynamic_personality_handler(self, ctx, user, is_admin):
         """Handle dynamic personality command - integrated with personality facts"""
@@ -719,7 +718,7 @@ class MemoryCommandHandlers:
                 title=f"🎭 Dynamic Personality Profile: {target_user.display_name}",
                 description="Real-time adaptive personality insights with AI behavior analysis",
                 color=0xE91E63,
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.now(UTC),
             )
 
             dynamic_profile = None
@@ -973,7 +972,7 @@ class MemoryCommandHandlers:
 
         except Exception as e:
             logger.error(f"Error showing dynamic personality profile: {e}")
-            await ctx.send(f"❌ **Error:** Could not retrieve dynamic personality profile.")
+            await ctx.send("❌ **Error:** Could not retrieve dynamic personality profile.")
 
     async def _sync_check_handler(self, ctx):
         """Handle sync check command - now works globally across all contexts"""
@@ -1028,7 +1027,7 @@ class MemoryCommandHandlers:
             # Create enhanced global sync report
             embed = discord.Embed(
                 title=f"🌐 Global Memory Coverage: {ctx.author.display_name}",
-                description=f"Memory analysis across **all contexts** where you've interacted with the bot",
+                description="Memory analysis across **all contexts** where you've interacted with the bot",
                 color=0x3498DB,
             )
 
@@ -1245,7 +1244,7 @@ class MemoryCommandHandlers:
                 logger.debug("User cancelled deletion")
                 await ctx.send("🚫 **Cancelled** - Your data has not been deleted.")
 
-        except asyncio.TimeoutError:
+        except TimeoutError:
             logger.debug("Reaction timeout occurred")
             await ctx.send("⏰ **Timeout** - Data deletion cancelled.")
 
@@ -1278,7 +1277,7 @@ class MemoryCommandHandlers:
             # Create status embed
             embed = discord.Embed(
                 title=f"📥 Import History: {ctx.author.display_name}",
-                description=f"Current memory status and import options",
+                description="Current memory status and import options",
                 color=0xE67E22,
             )
 
@@ -1333,7 +1332,7 @@ class MemoryCommandHandlers:
                             skipped += 1
                             continue
                         if not next_msg.content or not next_msg.content.strip():
-                            logger.debug(f"Skipping empty bot response")
+                            logger.debug("Skipping empty bot response")
                             skipped += 1
                             continue
 
@@ -1349,7 +1348,7 @@ class MemoryCommandHandlers:
                 # Server context - explain limitations
                 embed.add_field(
                     name="⚠️ Server Context Limitation",
-                    value=f"Import currently only works in **DM conversations**.\nSwitch to DMs to import message history.",
+                    value="Import currently only works in **DM conversations**.\nSwitch to DMs to import message history.",
                     inline=False,
                 )
 
@@ -1365,7 +1364,7 @@ class MemoryCommandHandlers:
             # Send success message for DM imports
             result_embed = discord.Embed(
                 title="✅ Import Complete",
-                description=f"Successfully processed message history from this DM",
+                description="Successfully processed message history from this DM",
                 color=0x27AE60,
             )
 
@@ -1392,7 +1391,7 @@ class MemoryCommandHandlers:
 
     async def _auto_facts_handler(self, ctx, setting):
         """Handle auto facts command"""
-        user_id = str(ctx.author.id)
+        str(ctx.author.id)
 
         if setting is None:
             # Show current status
@@ -1465,7 +1464,7 @@ class MemoryCommandHandlers:
                 return
 
             # Sort by confidence score (if available) and timestamp
-            facts_with_meta = list(zip(results["documents"], results["metadatas"]))
+            facts_with_meta = list(zip(results["documents"], results["metadatas"], strict=False))
             facts_with_meta.sort(
                 key=lambda x: (
                     x[1].get("confidence_score", 0.5),  # Sort by confidence
@@ -1482,7 +1481,7 @@ class MemoryCommandHandlers:
 
             # Display facts with confidence scores
             fact_list = []
-            for i, (doc, metadata) in enumerate(facts_with_meta[:15], 1):  # Limit to 15
+            for _i, (doc, metadata) in enumerate(facts_with_meta[:15], 1):  # Limit to 15
                 fact_text = metadata.get("fact", doc)
                 confidence = metadata.get("confidence_score", 0.5)
                 timestamp = metadata.get("timestamp", "Unknown")[:10]
@@ -1541,7 +1540,7 @@ class MemoryCommandHandlers:
 
             if extracted_facts:
                 fact_list = []
-                for i, fact_data in enumerate(extracted_facts, 1):
+                for _i, fact_data in enumerate(extracted_facts, 1):
                     fact = fact_data.get("fact", "Unknown")
                     confidence = fact_data.get("confidence", 0.0)
                     confidence_emoji = (

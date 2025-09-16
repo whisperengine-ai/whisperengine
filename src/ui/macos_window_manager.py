@@ -4,17 +4,14 @@ Native macOS Window Management for WhisperEngine
 Provides native window controls, multi-window support, and proper macOS integration
 """
 
-import os
-import sys
+import json
 import logging
 import subprocess
-import json
-import threading
+import sys
 import time
-from pathlib import Path
-from typing import Dict, List, Optional, Tuple
 from dataclasses import dataclass
 from datetime import datetime
+from pathlib import Path
 
 
 @dataclass
@@ -26,8 +23,8 @@ class WindowInfo:
     url: str
     created_at: datetime
     last_active: datetime
-    position: Tuple[int, int] = (100, 100)
-    size: Tuple[int, int] = (1200, 800)
+    position: tuple[int, int] = (100, 100)
+    size: tuple[int, int] = (1200, 800)
     is_minimized: bool = False
     is_fullscreen: bool = False
 
@@ -51,8 +48,8 @@ class MacOSWindowManager:
         self.logger = logging.getLogger(__name__)
 
         # Window tracking
-        self.windows: Dict[str, WindowInfo] = {}
-        self.active_window: Optional[str] = None
+        self.windows: dict[str, WindowInfo] = {}
+        self.active_window: str | None = None
         self.window_counter = 0
 
         # Settings
@@ -61,12 +58,12 @@ class MacOSWindowManager:
         # Initialize main window
         self._create_main_window()
 
-    def _load_preferences(self) -> Dict:
+    def _load_preferences(self) -> dict:
         """Load window preferences"""
         prefs_file = Path.home() / ".whisperengine" / "window_preferences.json"
         try:
             if prefs_file.exists():
-                with open(prefs_file, "r") as f:
+                with open(prefs_file) as f:
                     return json.load(f)
         except Exception as e:
             self.logger.warning(f"Could not load window preferences: {e}")
@@ -159,7 +156,7 @@ class MacOSWindowManager:
 
             webbrowser.open(window_info.url)
 
-    def create_new_window(self, conversation_id: Optional[str] = None) -> str:
+    def create_new_window(self, conversation_id: str | None = None) -> str:
         """Create a new conversation window"""
         try:
             window_id = self._generate_window_id()
@@ -335,7 +332,7 @@ class MacOSWindowManager:
         except Exception as e:
             self.logger.error(f"Failed to close window: {e}")
 
-    def get_window_list(self) -> List[Dict]:
+    def get_window_list(self) -> list[dict]:
         """Get list of all windows"""
         return [
             {
@@ -418,7 +415,7 @@ class MacOSWindowManager:
             if not positions_file.exists():
                 return
 
-            with open(positions_file, "r") as f:
+            with open(positions_file) as f:
                 positions = json.load(f)
 
             for window_data in positions.values():
@@ -464,7 +461,7 @@ class MacOSWindowManager:
 
 def create_window_manager(
     app_instance, host: str = "127.0.0.1", port: int = 8080
-) -> Optional[MacOSWindowManager]:
+) -> MacOSWindowManager | None:
     """
     Create macOS window manager
 

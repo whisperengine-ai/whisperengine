@@ -4,13 +4,12 @@ WhisperEngine Build Validation System
 Validates all build methods and deployment options
 """
 
-import os
-import sys
-import subprocess
-import json
-from pathlib import Path
-from typing import Dict, List, Tuple, Optional
 import argparse
+import json
+import os
+import subprocess
+import sys
+from pathlib import Path
 
 
 class BuildValidator:
@@ -21,7 +20,7 @@ class BuildValidator:
         self.results = {}
         self.errors = []
 
-    def run_command(self, cmd: List[str], cwd: Optional[Path] = None) -> Tuple[bool, str]:
+    def run_command(self, cmd: list[str], cwd: Path | None = None) -> tuple[bool, str]:
         """Run a command and return success status and output"""
         try:
             result = subprocess.run(
@@ -40,7 +39,6 @@ class BuildValidator:
 
     def validate_environment(self) -> bool:
         """Validate environment configuration"""
-        print("🔍 Validating environment configuration...")
 
         try:
             # Test environment loading
@@ -53,24 +51,20 @@ class BuildValidator:
             )
 
             if success:
-                print("  ✅ Environment configuration valid")
                 self.results["environment"] = "pass"
                 return True
             else:
-                print(f"  ❌ Environment validation failed: {output}")
                 self.results["environment"] = "fail"
                 self.errors.append(f"Environment: {output}")
                 return False
 
         except (ImportError, ValueError, KeyError) as e:
-            print(f"  ❌ Environment validation error: {e}")
             self.results["environment"] = "fail"
             self.errors.append(f"Environment: {e}")
             return False
 
     def validate_dependencies(self) -> bool:
         """Validate all dependency files are consistent"""
-        print("📦 Validating dependencies...")
 
         req_files = [
             "requirements-core.txt",
@@ -84,7 +78,6 @@ class BuildValidator:
         for req_file in req_files:
             req_path = self.project_root / req_file
             if not req_path.exists():
-                print(f"  ❌ Missing {req_file}")
                 all_valid = False
                 self.errors.append(f"Missing requirement file: {req_file}")
                 continue
@@ -95,9 +88,8 @@ class BuildValidator:
             )
 
             if success:
-                print(f"  ✅ {req_file} valid")
+                pass
             else:
-                print(f"  ❌ {req_file} has issues: {output}")
                 all_valid = False
                 self.errors.append(f"{req_file}: {output}")
 
@@ -106,14 +98,12 @@ class BuildValidator:
 
     def validate_pyinstaller_build(self) -> bool:
         """Validate PyInstaller builds"""
-        print("🔨 Validating PyInstaller builds...")
 
         try:
             # Test the cross-platform builder
             success, output = self.run_command([sys.executable, "build_cross_platform.py", "info"])
 
             if success:
-                print("  ✅ PyInstaller builder available")
 
                 # Try a test build (dry run)
                 success, output = self.run_command(
@@ -121,34 +111,28 @@ class BuildValidator:
                 )
 
                 if success:
-                    print("  ✅ PyInstaller build successful")
                     self.results["pyinstaller"] = "pass"
                     return True
                 else:
-                    print(f"  ❌ PyInstaller build failed: {output}")
                     self.results["pyinstaller"] = "fail"
                     self.errors.append(f"PyInstaller build: {output}")
                     return False
             else:
-                print(f"  ❌ PyInstaller builder failed: {output}")
                 self.results["pyinstaller"] = "fail"
                 self.errors.append(f"PyInstaller: {output}")
                 return False
 
         except (subprocess.SubprocessError, OSError, ValueError) as e:
-            print(f"  ❌ PyInstaller validation error: {e}")
             self.results["pyinstaller"] = "fail"
             self.errors.append(f"PyInstaller: {e}")
             return False
 
     def validate_docker_build(self) -> bool:
         """Validate Docker builds"""
-        print("🐳 Validating Docker builds...")
 
         # Check if Docker is available
         success, output = self.run_command(["docker", "--version"])
         if not success:
-            print("  ⚠️ Docker not available, skipping Docker validation")
             self.results["docker"] = "skip"
             return True
 
@@ -156,7 +140,6 @@ class BuildValidator:
             # Validate Dockerfile syntax
             dockerfile_path = self.project_root / "docker" / "Dockerfile.multi-stage"
             if not dockerfile_path.exists():
-                print("  ❌ Dockerfile.multi-stage not found")
                 self.results["docker"] = "fail"
                 self.errors.append("Docker: Dockerfile.multi-stage missing")
                 return False
@@ -177,7 +160,6 @@ class BuildValidator:
             )
 
             if success:
-                print("  ✅ Docker build successful")
 
                 # Clean up test image
                 self.run_command(["docker", "rmi", "whisperengine-validation:test"])
@@ -185,20 +167,17 @@ class BuildValidator:
                 self.results["docker"] = "pass"
                 return True
             else:
-                print(f"  ❌ Docker build failed: {output}")
                 self.results["docker"] = "fail"
                 self.errors.append(f"Docker build: {output}")
                 return False
 
         except (subprocess.SubprocessError, OSError, ValueError) as e:
-            print(f"  ❌ Docker validation error: {e}")
             self.results["docker"] = "fail"
             self.errors.append(f"Docker: {e}")
             return False
 
     def validate_installation_scripts(self) -> bool:
         """Validate installation scripts"""
-        print("📋 Validating installation scripts...")
 
         scripts = [
             "setup.sh",
@@ -212,7 +191,6 @@ class BuildValidator:
         for script in scripts:
             script_path = self.project_root / script
             if not script_path.exists():
-                print(f"  ❌ Missing {script}")
                 all_valid = False
                 self.errors.append(f"Missing script: {script}")
                 continue
@@ -220,13 +198,10 @@ class BuildValidator:
             # Check if script is executable (Unix scripts)
             if script.endswith(".sh"):
                 if not os.access(script_path, os.X_OK):
-                    print(f"  ⚠️ {script} not executable")
                     # Try to fix permissions
                     try:
                         os.chmod(script_path, 0o755)
-                        print(f"  ✅ Fixed permissions for {script}")
-                    except (OSError, PermissionError) as e:
-                        print(f"  ❌ Cannot fix permissions for {script}: {e}")
+                    except (OSError, PermissionError):
                         all_valid = False
                         self.errors.append(f"Script permissions: {script}")
                         continue
@@ -234,31 +209,27 @@ class BuildValidator:
                 # Basic syntax check for shell scripts
                 success, output = self.run_command(["bash", "-n", str(script_path)])
                 if success:
-                    print(f"  ✅ {script} syntax valid")
+                    pass
                 else:
-                    print(f"  ❌ {script} syntax error: {output}")
                     all_valid = False
                     self.errors.append(f"Script syntax: {script}")
             else:
-                print(f"  ✅ {script} exists")
+                pass
 
         self.results["installation_scripts"] = "pass" if all_valid else "fail"
         return all_valid
 
     def validate_github_workflows(self) -> bool:
         """Validate GitHub Actions workflows"""
-        print("🔄 Validating GitHub Actions workflows...")
 
         workflows_dir = self.project_root / ".github" / "workflows"
         if not workflows_dir.exists():
-            print("  ❌ .github/workflows directory missing")
             self.results["github_workflows"] = "fail"
             self.errors.append("GitHub workflows: directory missing")
             return False
 
         workflow_files = list(workflows_dir.glob("*.yml")) + list(workflows_dir.glob("*.yaml"))
         if not workflow_files:
-            print("  ❌ No workflow files found")
             self.results["github_workflows"] = "fail"
             self.errors.append("GitHub workflows: no files found")
             return False
@@ -268,14 +239,11 @@ class BuildValidator:
             try:
                 import yaml
 
-                with open(workflow, "r", encoding="utf-8") as f:
+                with open(workflow, encoding="utf-8") as f:
                     yaml.safe_load(f)
-                print(f"  ✅ {workflow.name} syntax valid")
             except ImportError:
-                print("  ⚠️ PyYAML not available, skipping YAML validation")
                 break
             except (yaml.YAMLError, OSError, ValueError) as e:
-                print(f"  ❌ {workflow.name} invalid: {e}")
                 all_valid = False
                 self.errors.append(f"Workflow {workflow.name}: {e}")
 
@@ -284,8 +252,6 @@ class BuildValidator:
 
     def run_all_validations(self) -> bool:
         """Run all validation checks"""
-        print("🚀 WhisperEngine Build Validation")
-        print("=" * 50)
 
         validations = [
             self.validate_environment,
@@ -301,14 +267,12 @@ class BuildValidator:
             try:
                 if not validation():
                     all_passed = False
-            except (subprocess.SubprocessError, OSError, ValueError) as e:
-                print(f"  ❌ Validation failed with exception: {e}")
+            except (subprocess.SubprocessError, OSError, ValueError):
                 all_passed = False
-            print()
 
         return all_passed
 
-    def generate_report(self) -> Dict:
+    def generate_report(self) -> dict:
         """Generate validation report"""
         return {
             "overall_status": (
@@ -330,29 +294,17 @@ class BuildValidator:
         """Print validation summary"""
         report = self.generate_report()
 
-        print("📊 VALIDATION SUMMARY")
-        print("=" * 50)
 
-        for check, status in self.results.items():
-            emoji = {"pass": "✅", "fail": "❌", "skip": "⚠️"}.get(status, "❓")
-            print(f"{emoji} {check.replace('_', ' ').title()}: {status.upper()}")
+        for _check, status in self.results.items():
+            {"pass": "✅", "fail": "❌", "skip": "⚠️"}.get(status, "❓")
 
-        print()
-        summary = report["summary"]
-        print(
-            f"Total: {summary['total_checks']} | "
-            f"Passed: {summary['passed']} | "
-            f"Failed: {summary['failed']} | "
-            f"Skipped: {summary['skipped']}"
-        )
+        report["summary"]
 
         if self.errors:
-            print("\n❌ ERRORS:")
-            for error in self.errors:
-                print(f"  • {error}")
+            for _error in self.errors:
+                pass
 
         overall = report["overall_status"]
-        print(f"\n🎯 OVERALL STATUS: {overall.upper()}")
 
         return overall == "pass"
 
@@ -377,7 +329,6 @@ def main():
         report = validator.generate_report()
         with open(args.output, "w", encoding="utf-8") as f:
             json.dump(report, f, indent=2)
-        print(f"\n📄 Report saved to {args.output}")
 
     # Exit with appropriate code
     if args.exit_code and not overall_success:

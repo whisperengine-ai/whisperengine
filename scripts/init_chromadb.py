@@ -8,7 +8,8 @@ import asyncio
 import logging
 import os
 import sys
-from typing import Dict, List, Optional, Any
+from datetime import UTC
+from typing import Any
 
 import chromadb
 from chromadb.config import Settings
@@ -114,7 +115,7 @@ class ChromaDBInitializer:
             logger.error(f"Failed to connect to ChromaDB: {e}")
             return False
 
-    async def _create_collection(self, name: str, config: Dict) -> bool:
+    async def _create_collection(self, name: str, config: dict) -> bool:
         """Create a collection with proper configuration"""
         try:
             if not self.client:
@@ -125,7 +126,7 @@ class ChromaDBInitializer:
 
             # Check if collection already exists
             try:
-                existing = self.client.get_collection(name)
+                self.client.get_collection(name)
                 logger.info(f"Collection '{name}' already exists, verifying schema...")
                 return await self._verify_collection_schema(name, config)
             except Exception:
@@ -133,7 +134,7 @@ class ChromaDBInitializer:
                 pass
 
             # Create collection with metadata
-            collection = self.client.create_collection(
+            self.client.create_collection(
                 name=name,
                 metadata={
                     "description": config["description"],
@@ -151,7 +152,7 @@ class ChromaDBInitializer:
             logger.error(f"Failed to create collection '{name}': {e}")
             return False
 
-    async def _verify_collection_schema(self, name: str, config: Dict) -> bool:
+    async def _verify_collection_schema(self, name: str, config: dict) -> bool:
         """Verify existing collection has correct schema"""
         try:
             if not self.client:
@@ -207,11 +208,11 @@ class ChromaDBInitializer:
 
     def _get_timestamp(self) -> str:
         """Get current timestamp in ISO format"""
-        from datetime import datetime, timezone
+        from datetime import datetime
 
-        return datetime.now(timezone.utc).isoformat()
+        return datetime.now(UTC).isoformat()
 
-    async def health_check(self) -> Dict[str, Any]:
+    async def health_check(self) -> dict[str, Any]:
         """Perform health check on ChromaDB setup"""
         health_status = {
             "chromadb_accessible": False,
@@ -263,7 +264,7 @@ class ChromaDBInitializer:
         return health_status
 
 
-def get_chromadb_config() -> Dict[str, Any]:
+def get_chromadb_config() -> dict[str, Any]:
     """Get ChromaDB configuration from environment"""
     return {
         "host": os.getenv("CHROMADB_HOST", "localhost"),
@@ -278,12 +279,9 @@ async def main():
         level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
     )
 
-    print("🗃️ ChromaDB Collection Initializer")
-    print("=" * 50)
 
     # Get configuration
     config = get_chromadb_config()
-    print(f"Connecting to ChromaDB at {config['host']}:{config['port']}")
 
     # Initialize ChromaDB
     initializer = ChromaDBInitializer(**config)
@@ -292,31 +290,24 @@ async def main():
     success = await initializer.initialize()
 
     if success:
-        print("\n🎉 ChromaDB initialization completed successfully!")
 
         # Perform health check
-        print("\n📊 Health Check Results:")
         health = await initializer.health_check()
 
         if health["chromadb_accessible"]:
-            print(f"✅ ChromaDB accessible (version: {health.get('version', 'unknown')})")
-            print(f"✅ Collections: {health['total_collections']} total")
 
-            for name, details in health["collection_details"].items():
+            for _name, details in health["collection_details"].items():
                 if details["exists"]:
-                    usage = details["usage_percent"]
-                    print(f"✅ {name}: {details['document_count']} docs ({usage:.1f}% usage)")
+                    details["usage_percent"]
                 else:
-                    print(f"❌ {name}: {details['error']}")
+                    pass
 
         if health["errors"]:
-            print("\n⚠️ Warnings:")
-            for error in health["errors"]:
-                print(f"  - {error}")
+            for _error in health["errors"]:
+                pass
 
         sys.exit(0)
     else:
-        print("\n❌ ChromaDB initialization failed!")
         sys.exit(1)
 
 

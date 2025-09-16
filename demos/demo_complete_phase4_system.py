@@ -21,11 +21,10 @@ Usage:
 """
 
 import asyncio
+import json
 import logging
 from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Any
-import json
-import uuid
+from typing import Any
 
 # Configure comprehensive logging
 logging.basicConfig(
@@ -93,13 +92,13 @@ class CompletePhase4SystemDemo:
 
     def __init__(self):
         # Phase 4 core components
-        self.memory_moments: Optional[MemoryTriggeredMoments] = None
-        self.thread_manager: Optional[AdvancedConversationThreadManager] = None
-        self.engagement_engine: Optional[ProactiveConversationEngagementEngine] = None
+        self.memory_moments: MemoryTriggeredMoments | None = None
+        self.thread_manager: AdvancedConversationThreadManager | None = None
+        self.engagement_engine: ProactiveConversationEngagementEngine | None = None
 
         # Supporting systems
-        self.emotion_engine: Optional[EmotionalContextEngine] = None
-        self.personality_profiler: Optional[DynamicPersonalityProfiler] = None
+        self.emotion_engine: EmotionalContextEngine | None = None
+        self.personality_profiler: DynamicPersonalityProfiler | None = None
 
         # Demo scenarios showcasing integrated functionality
         self.integrated_scenarios = self._create_integrated_scenarios()
@@ -169,7 +168,7 @@ class CompletePhase4SystemDemo:
 
         return initialization_success
 
-    def _create_integrated_scenarios(self) -> List[Dict[str, Any]]:
+    def _create_integrated_scenarios(self) -> list[dict[str, Any]]:
         """Create scenarios that demonstrate the complete integrated system"""
         return [
             {
@@ -325,7 +324,7 @@ class CompletePhase4SystemDemo:
             },
         ]
 
-    async def run_integrated_scenario(self, scenario: Dict[str, Any]) -> Dict[str, Any]:
+    async def run_integrated_scenario(self, scenario: dict[str, Any]) -> dict[str, Any]:
         """Run a complete integrated scenario showcasing all Phase 4 components"""
         logger.info("")
         logger.info("🎭" + "=" * 78)
@@ -413,7 +412,7 @@ class CompletePhase4SystemDemo:
                 # Phase 4.1: Memory Moments Analysis
                 if self.memory_moments:
                     try:
-                        memory_context = {
+                        {
                             "user_id": scenario["user_id"],
                             "current_topic": conversation["thread_topic"],
                             "recent_messages": thread_messages,
@@ -497,7 +496,7 @@ class CompletePhase4SystemDemo:
 
         return scenario_results
 
-    def _analyze_integration_performance(self, results: Dict[str, Any], scenario: Dict[str, Any]):
+    def _analyze_integration_performance(self, results: dict[str, Any], scenario: dict[str, Any]):
         """Analyze how well the integrated system performed"""
 
         logger.info("")
@@ -544,7 +543,7 @@ class CompletePhase4SystemDemo:
             )
             results["integration_success"] = False
 
-    async def demonstrate_system_capabilities(self) -> Dict[str, Any]:
+    async def demonstrate_system_capabilities(self) -> dict[str, Any]:
         """Demonstrate specific system capabilities"""
 
         logger.info("")
@@ -635,7 +634,7 @@ class CompletePhase4SystemDemo:
 
         return capabilities
 
-    async def run_complete_demonstration(self) -> Dict[str, Any]:
+    async def run_complete_demonstration(self) -> dict[str, Any]:
         """Run the complete Phase 4 system demonstration"""
         logger.info("")
         logger.info("🚀" + "=" * 78)
@@ -693,7 +692,7 @@ class CompletePhase4SystemDemo:
 
         return demo_results
 
-    def _display_complete_system_summary(self, results: Dict[str, Any]):
+    def _display_complete_system_summary(self, results: dict[str, Any]):
         """Display the complete system demonstration summary"""
         logger.info("")
         logger.info("🎉" + "=" * 78)

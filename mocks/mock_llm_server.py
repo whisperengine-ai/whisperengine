@@ -5,12 +5,11 @@ Demonstrates that our architecture fix works with real API calls
 """
 
 import asyncio
-import json
+import time
+
+import uvicorn
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
-import uvicorn
-import threading
-import time
 
 
 class MockLLMServer:
@@ -101,7 +100,6 @@ This response was generated using the **Universal Chat Orchestrator** - proving 
 
     def start_server(self):
         """Start the mock server"""
-        print(f"🤖 Starting Mock LLM Server on port {self.port}")
         config = uvicorn.Config(app=self.app, host="127.0.0.1", port=self.port, log_level="warning")
         server = uvicorn.Server(config)
         asyncio.run(server.serve())
@@ -114,13 +112,6 @@ def run_mock_server():
 
 
 if __name__ == "__main__":
-    print("🧪 Mock LLM Server for Testing Web UI")
-    print("=" * 40)
-    print("This server provides realistic AI responses to test the Web UI")
-    print("Access endpoints:")
-    print("  • Chat: POST http://127.0.0.1:1234/v1/chat/completions")
-    print("  • Health: GET http://127.0.0.1:1234/health")
-    print()
 
     # Start server
     server = MockLLMServer()

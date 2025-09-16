@@ -6,20 +6,20 @@ Connects the adaptive configuration to existing WhisperEngine architecture.
 import os
 import sys
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Any
 
 # Add project root to path for imports
 project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
-from src.config.adaptive_config import AdaptiveConfigManager
 from env_manager import load_environment
+from src.config.adaptive_config import AdaptiveConfigManager
 
 
 class WhisperEngineConfigIntegrator:
     """Integrates adaptive configuration with existing WhisperEngine systems"""
 
-    def __init__(self, config_override: Optional[Dict[str, Any]] = None):
+    def __init__(self, config_override: dict[str, Any] | None = None):
         self.config_manager = AdaptiveConfigManager(config_override)
         self.deployment_info = self.config_manager.get_deployment_info()
         self.env_vars = self.config_manager.get_env_vars()
@@ -29,7 +29,7 @@ class WhisperEngineConfigIntegrator:
         try:
             # First load existing environment
             if not load_environment():
-                print("Warning: Could not load existing environment file")
+                pass
 
             # Apply adaptive configuration environment variables
             for key, value in self.env_vars.items():
@@ -43,11 +43,10 @@ class WhisperEngineConfigIntegrator:
             os.environ["WHISPERENGINE_MEMORY_GB"] = str(round(self.deployment_info["memory_gb"], 1))
 
             return True
-        except Exception as e:
-            print(f"Error setting up adaptive environment: {e}")
+        except Exception:
             return False
 
-    def get_database_config(self) -> Dict[str, Any]:
+    def get_database_config(self) -> dict[str, Any]:
         """Get database configuration for current environment"""
         db_config = self.config_manager.config.database
 
@@ -72,7 +71,7 @@ class WhisperEngineConfigIntegrator:
 
         return config
 
-    def get_ai_config(self) -> Dict[str, Any]:
+    def get_ai_config(self) -> dict[str, Any]:
         """Get AI/ML configuration for current environment"""
         perf_config = self.config_manager.config.performance
         features = self.config_manager.config.features
@@ -92,7 +91,7 @@ class WhisperEngineConfigIntegrator:
             "enable_global_facts": features.get("enable_global_facts", False),
         }
 
-    def get_performance_recommendations(self) -> Dict[str, Any]:
+    def get_performance_recommendations(self) -> dict[str, Any]:
         """Get performance recommendations for current configuration"""
         scale_tier = self.deployment_info["scale_tier"]
         deployment_mode = self.deployment_info["deployment_mode"]
@@ -162,7 +161,7 @@ class WhisperEngineConfigIntegrator:
 
         return recommendations
 
-    def create_desktop_app_config(self) -> Dict[str, Any]:
+    def create_desktop_app_config(self) -> dict[str, Any]:
         """Create configuration optimized for desktop application"""
         return {
             "app_mode": "desktop",
@@ -181,7 +180,7 @@ class WhisperEngineConfigIntegrator:
             "deployment_info": self.deployment_info,
         }
 
-    def generate_env_file(self, output_path: Optional[str] = None) -> str:
+    def generate_env_file(self, output_path: str | None = None) -> str:
         """Generate .env file with adaptive configuration"""
         if output_path is None:
             output_path = os.path.join(os.getcwd(), ".env.adaptive")
@@ -236,55 +235,25 @@ class WhisperEngineConfigIntegrator:
 
     def print_deployment_summary(self):
         """Print a summary of the current deployment configuration"""
-        print("=" * 60)
-        print("WhisperEngine Adaptive Configuration Summary")
-        print("=" * 60)
 
         # Deployment information
-        print(f"Deployment Mode: {self.deployment_info['deployment_mode']}")
-        print(f"Scale Tier: {self.deployment_info['scale_tier']}")
-        print(f"Environment: {self.config_manager.config.environment}")
-        print()
 
         # System resources
-        print("System Resources:")
-        print(
-            f"  Platform: {self.deployment_info['platform']} ({self.deployment_info['architecture']})"
-        )
-        print(f"  CPU Cores: {self.deployment_info['cpu_cores']}")
-        print(f"  Memory: {self.deployment_info['memory_gb']:.1f} GB")
-        print(f"  GPU Available: {self.deployment_info['gpu_available']}")
-        print()
 
         # Configuration summary
-        ai_config = self.get_ai_config()
-        db_config = self.get_database_config()
+        self.get_ai_config()
+        self.get_database_config()
 
-        print("AI Configuration:")
-        print(f"  External Embeddings: {ai_config['use_external_embeddings']}")
-        print(f"  Semantic Clustering: {ai_config['enable_semantic_clustering']}")
-        print(f"  CPU Threads: {ai_config['cpu_threads']}")
-        print(f"  Memory Limit: {ai_config['memory_limit_gb']:.1f} GB")
-        print(f"  Timeout: {ai_config['timeout_seconds']}s")
-        print()
 
-        print("Database Configuration:")
-        print(f"  Primary Database: {'PostgreSQL' if db_config['use_postgresql'] else 'SQLite'}")
-        print(f"  Cache: {'Redis' if db_config['use_redis_cache'] else 'Memory'}")
-        print(f"  Vector Database: {db_config['vector_database_mode']}")
-        print(f"  Connection Pool: {db_config['connection_pool_size']}")
-        print()
 
         # Performance recommendations
         recommendations = self.get_performance_recommendations()
-        print("Performance Recommendations:")
-        for rec in recommendations["recommendations"][:3]:  # Show top 3
-            print(f"  • {rec}")
+        for _rec in recommendations["recommendations"][:3]:  # Show top 3
+            pass
 
         if len(recommendations["recommendations"]) > 3:
-            print(f"  ... and {len(recommendations['recommendations']) - 3} more")
+            pass
 
-        print("=" * 60)
 
 
 # CLI interface for testing and configuration generation
@@ -318,8 +287,7 @@ def main():
         integrator.print_deployment_summary()
 
     if args.generate_env:
-        env_file = integrator.generate_env_file(args.output)
-        print(f"Generated adaptive configuration: {env_file}")
+        integrator.generate_env_file(args.output)
 
     if args.desktop_config:
         desktop_config = integrator.create_desktop_app_config()
@@ -328,7 +296,6 @@ def main():
         config_file = "desktop_app_config.json"
         with open(config_file, "w") as f:
             json.dump(desktop_config, f, indent=2)
-        print(f"Generated desktop app configuration: {config_file}")
 
     if not any([args.summary, args.generate_env, args.desktop_config]):
         integrator.print_deployment_summary()

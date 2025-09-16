@@ -3,8 +3,9 @@
 Test improved fact filtering to ensure bad facts are not extracted
 """
 import logging
-from lmstudio_client import LMStudioClient
+
 from fact_extractor import FactExtractor
+from lmstudio_client import LMStudioClient
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
@@ -41,41 +42,32 @@ def test_fact_filtering():
         llm_client = LMStudioClient()
 
         if not llm_client.check_connection():
-            print("❌ LLM server not available - skipping LLM tests")
             return False
 
         fact_extractor = FactExtractor(llm_client)
 
-        print("🧪 Testing improved fact filtering...")
-        print("=" * 60)
 
         all_passed = True
 
         for message, expected_keywords in test_messages:
-            print(f"\n📝 Testing: '{message}'")
 
             try:
                 # Extract facts using the improved system
                 extracted_facts = fact_extractor.extract_facts_from_message(message)
 
-                print(f"   Extracted {len(extracted_facts)} facts:")
                 for fact in extracted_facts:
-                    print(f"     - {fact['fact']} (confidence: {fact['confidence']:.2f})")
+                    pass
 
                 # Check if extraction matches expectations
                 if not expected_keywords:
                     # Should extract no facts
                     if extracted_facts:
-                        print(f"   ❌ FAIL: Expected no facts, but got {len(extracted_facts)}")
                         all_passed = False
                     else:
-                        print("   ✅ PASS: Correctly rejected inappropriate fact")
+                        pass
                 else:
                     # Should extract facts containing the expected keywords
                     if not extracted_facts:
-                        print(
-                            f"   ❌ FAIL: Expected facts with keywords {expected_keywords}, but got none"
-                        )
                         all_passed = False
                     else:
                         found_match = False
@@ -88,27 +80,21 @@ def test_fact_filtering():
                                 break
 
                         if found_match:
-                            print("   ✅ PASS: Extracted appropriate fact")
+                            pass
                         else:
-                            print(
-                                f"   ❌ FAIL: No fact contained expected keywords {expected_keywords}"
-                            )
                             all_passed = False
 
-            except Exception as e:
-                print(f"   ❌ ERROR: {e}")
+            except Exception:
                 all_passed = False
 
-        print("\n" + "=" * 60)
         if all_passed:
-            print("✅ ALL TESTS PASSED: Fact filtering is working correctly!")
+            pass
         else:
-            print("❌ SOME TESTS FAILED: Fact filtering needs more work")
+            pass
 
         return all_passed
 
-    except Exception as e:
-        print(f"❌ Test setup error: {e}")
+    except Exception:
         return False
 
 

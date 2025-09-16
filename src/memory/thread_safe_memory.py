@@ -3,13 +3,12 @@ Thread-Safe Memory Manager with Proper Concurrency Control
 Addresses: Race conditions, data corruption, concurrent access issues
 """
 
-import threading
 import asyncio
 import logging
-from typing import Dict, Optional, Any
-from contextlib import contextmanager
-from concurrent.futures import ThreadPoolExecutor
+import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
+from contextlib import contextmanager
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +21,7 @@ class ThreadSafeMemoryManager:
         self.max_workers = max_workers
 
         # Per-user locks for fine-grained concurrency
-        self._user_locks: Dict[str, threading.RLock] = {}
+        self._user_locks: dict[str, threading.RLock] = {}
         self._user_locks_manager = threading.Lock()
 
         # Global locks for shared resources

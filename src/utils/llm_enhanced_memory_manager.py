@@ -6,11 +6,11 @@ memory system for even better topic recall and contextual awareness.
 """
 
 import logging
-from typing import List, Dict, Optional, Any
 from dataclasses import dataclass
+from typing import Any
 
-from .llm_query_processor import HybridQueryProcessor, LLMQueryBreakdown
 from .enhanced_memory_manager import EnhancedMemoryManager
+from .llm_query_processor import HybridQueryProcessor, LLMQueryBreakdown
 
 logger = logging.getLogger(__name__)
 
@@ -19,9 +19,9 @@ logger = logging.getLogger(__name__)
 class LLMMemoryResult:
     """Result from LLM-enhanced memory retrieval"""
 
-    memories: List[Dict[str, Any]]
+    memories: list[dict[str, Any]]
     query_breakdown: LLMQueryBreakdown
-    search_performance: Dict[str, Any]
+    search_performance: dict[str, Any]
     processing_method: str  # "llm", "hybrid", "fallback"
 
 
@@ -59,9 +59,9 @@ class LLMEnhancedMemoryManager:
         self,
         user_id: str,
         message: str,
-        context: Optional[Dict] = None,
+        context: dict | None = None,
         limit: int = 20,
-        conversation_context: Optional[str] = None,
+        conversation_context: str | None = None,
     ) -> LLMMemoryResult:
         """
         Retrieve memories using LLM-powered query analysis
@@ -155,8 +155,8 @@ class LLMEnhancedMemoryManager:
             return await self._fallback_retrieval(user_id, message, context, limit)
 
     def _combine_and_rank_memories(
-        self, all_memories: List[Dict], query_breakdown: LLMQueryBreakdown, limit: int
-    ) -> List[Dict]:
+        self, all_memories: list[dict], query_breakdown: LLMQueryBreakdown, limit: int
+    ) -> list[dict]:
         """
         Combine memories from multiple queries and rank by relevance
         """
@@ -221,7 +221,7 @@ class LLMEnhancedMemoryManager:
         return ranked_memories[:limit]
 
     async def _fallback_retrieval(
-        self, user_id: str, message: str, context: Optional[Dict], limit: int
+        self, user_id: str, message: str, context: dict | None, limit: int
     ) -> LLMMemoryResult:
         """
         Fallback to enhanced memory manager when LLM processing fails
@@ -325,7 +325,7 @@ class MemorySearchAnalyzer:
         if len(self.search_history) > 100:
             self.search_history = self.search_history[-100:]
 
-    def get_performance_summary(self) -> Dict[str, Any]:
+    def get_performance_summary(self) -> dict[str, Any]:
         """Get summary of recent search performance"""
 
         if not self.search_history:
@@ -339,11 +339,11 @@ class MemorySearchAnalyzer:
             / len(recent_searches),
             "processing_methods": {
                 method: sum(1 for s in recent_searches if s["processing_method"] == method)
-                for method in set(s["processing_method"] for s in recent_searches)
+                for method in {s["processing_method"] for s in recent_searches}
             },
             "search_strategies": {
                 strategy: sum(1 for s in recent_searches if s["search_strategy"] == strategy)
-                for strategy in set(s["search_strategy"] for s in recent_searches)
+                for strategy in {s["search_strategy"] for s in recent_searches}
             },
             "avg_queries_per_search": sum(s["queries_executed"] for s in recent_searches)
             / len(recent_searches),

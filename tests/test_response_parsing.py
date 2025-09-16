@@ -2,8 +2,8 @@
 Test the response parsing fix for vision models
 """
 
-import sys
 import os
+import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -13,10 +13,9 @@ from lmstudio_client import LMStudioClient
 def test_response_parsing():
     """Test different response formats that vision models might return"""
 
-    client = LMStudioClient()
+    LMStudioClient()
 
     # Test case 1: Standard string response
-    print("🧪 Test 1: Standard string response")
     mock_response_1 = {
         "choices": [{"message": {"content": "  This is a standard text response.  "}}]
     }
@@ -25,13 +24,11 @@ def test_response_parsing():
         # Simulate the response processing
         response_content = mock_response_1["choices"][0]["message"]["content"]
         if isinstance(response_content, str):
-            response_text = response_content.strip()
-        print(f"✅ String response: '{response_text}'")
-    except Exception as e:
-        print(f"❌ Failed: {e}")
+            response_content.strip()
+    except Exception:
+        pass
 
     # Test case 2: Multimodal list response (like what vision models might return)
-    print("\n🧪 Test 2: Multimodal list response")
     mock_response_2 = {
         "choices": [
             {
@@ -52,13 +49,11 @@ def test_response_parsing():
             for part in response_content:
                 if isinstance(part, dict) and part.get("type") == "text":
                     text_parts.append(part.get("text", ""))
-            response_text = "\n".join(text_parts).strip()
-        print(f"✅ Multimodal response: '{response_text}'")
-    except Exception as e:
-        print(f"❌ Failed: {e}")
+            "\n".join(text_parts).strip()
+    except Exception:
+        pass
 
     # Test case 3: Mixed content (text and non-text)
-    print("\n🧪 Test 3: Mixed content response")
     mock_response_3 = {
         "choices": [
             {
@@ -82,13 +77,11 @@ def test_response_parsing():
                     text_parts.append(part.get("text", ""))
                 elif isinstance(part, str):
                     text_parts.append(part)
-            response_text = "\n".join(text_parts).strip()
-        print(f"✅ Mixed content response: '{response_text}'")
-    except Exception as e:
-        print(f"❌ Failed: {e}")
+            "\n".join(text_parts).strip()
+    except Exception:
+        pass
 
     # Test case 4: Unexpected format (fallback test)
-    print("\n🧪 Test 4: Unexpected format (fallback)")
     mock_response_4 = {
         "choices": [{"message": {"content": {"unexpected": "format", "text": "fallback test"}}}]
     }
@@ -96,7 +89,7 @@ def test_response_parsing():
     try:
         response_content = mock_response_4["choices"][0]["message"]["content"]
         if isinstance(response_content, str):
-            response_text = response_content.strip()
+            response_content.strip()
         elif isinstance(response_content, list):
             text_parts = []
             for part in response_content:
@@ -104,15 +97,13 @@ def test_response_parsing():
                     text_parts.append(part.get("text", ""))
                 elif isinstance(part, str):
                     text_parts.append(part)
-            response_text = "\n".join(text_parts).strip()
+            "\n".join(text_parts).strip()
         else:
             # Fallback
-            response_text = str(response_content).strip()
-        print(f"✅ Fallback response: '{response_text}'")
-    except Exception as e:
-        print(f"❌ Failed: {e}")
+            str(response_content).strip()
+    except Exception:
+        pass
 
-    print("\n🎉 All response parsing tests completed!")
 
 
 if __name__ == "__main__":

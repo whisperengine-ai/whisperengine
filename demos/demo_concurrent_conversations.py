@@ -5,23 +5,21 @@ Tests the optimized conversation threading system for massive concurrent user sc
 """
 
 import asyncio
-import time
-import random
 import logging
-from typing import List, Dict, Any
+import random
+import time
+from typing import Any
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 try:
-    import pandas as pd
     import numpy as np
+    import pandas as pd
 
-    print(f"✅ pandas {pd.__version__}, numpy {np.__version__}")
     LIBRARIES_AVAILABLE = True
-except ImportError as e:
-    print(f"❌ Missing libraries: {e}")
+except ImportError:
     LIBRARIES_AVAILABLE = False
 
 
@@ -34,8 +32,8 @@ class MockAdvancedThreadManager:
         self.threads = {}
 
     async def process_user_message(
-        self, user_id: str, message: str, context: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        self, user_id: str, message: str, context: dict[str, Any]
+    ) -> dict[str, Any]:
         """Mock thread processing"""
         await asyncio.sleep(self.processing_delay)
 
@@ -63,7 +61,7 @@ class MockEmotionEngine:
     def __init__(self):
         self.processing_delay = 0.02  # 20ms processing time
 
-    async def analyze_emotion(self, message: str, user_id: str) -> Dict[str, Any]:
+    async def analyze_emotion(self, message: str, user_id: str) -> dict[str, Any]:
         """Mock emotion analysis"""
         await asyncio.sleep(self.processing_delay)
 
@@ -78,7 +76,7 @@ class MockEmotionEngine:
         }
 
 
-def generate_concurrent_users(num_users: int, messages_per_user: int) -> List[Dict[str, Any]]:
+def generate_concurrent_users(num_users: int, messages_per_user: int) -> list[dict[str, Any]]:
     """Generate realistic concurrent user scenarios"""
 
     conversation_scenarios = [
@@ -185,11 +183,8 @@ async def test_concurrent_conversation_processing():
     """Test concurrent conversation processing with realistic load"""
 
     if not LIBRARIES_AVAILABLE:
-        print("❌ Cannot run tests - missing required libraries")
         return
 
-    print("\n👥 Testing Concurrent Conversation Manager Performance")
-    print("=" * 60)
 
     try:
         from src.conversation.concurrent_conversation_manager import ConcurrentConversationManager
@@ -203,10 +198,6 @@ async def test_concurrent_conversation_processing():
         ]
 
         for config in test_configs:
-            print(
-                f"\n📊 Testing {config['name']} "
-                f"({config['users']} users × {config['messages']} messages)"
-            )
 
             # Create mock components
             mock_thread_manager = MockAdvancedThreadManager()
@@ -225,15 +216,13 @@ async def test_concurrent_conversation_processing():
 
             # Generate concurrent users
             users = generate_concurrent_users(config["users"], config["messages"])
-            total_messages = sum(len(user["messages"]) for user in users)
+            sum(len(user["messages"]) for user in users)
 
-            print(f"  📈 Total messages: {total_messages}")
-            print(f"  🔧 Worker threads: {config['workers']}")
 
             # Execute concurrent conversations
             start_time = time.time()
 
-            async def simulate_user_conversation(user_data: Dict[str, Any]):
+            async def simulate_user_conversation(user_data: dict[str, Any]):
                 """Simulate a single user's conversation"""
                 user_results = []
 
@@ -272,44 +261,32 @@ async def test_concurrent_conversation_processing():
 
             # Analyze results
             processed_messages = sum(len(results) for results in all_results)
-            throughput = processed_messages / total_time
+            processed_messages / total_time
 
-            print(f"  ⚡ Total time: {total_time*1000:.1f}ms")
-            print(f"  📈 Throughput: {throughput:.1f} messages/sec")
-            print(f"  👤 Avg per-user time: {total_time/config['users']*1000:.1f}ms")
 
             # Get performance statistics
-            stats = manager.get_performance_stats()
+            manager.get_performance_stats()
 
-            print(f"  📊 Active sessions: {stats['sessions']['active_sessions']}")
-            print(f"  💾 Session utilization: {stats['sessions']['utilization']:.1%}")
-            print(f"  ⚡ Avg response time: {stats['performance']['avg_response_time_ms']:.1f}ms")
-            print(f"  🔄 Queue length: {stats['performance']['queue_length']}")
-            print(f"  🧵 Thread utilization: {stats['performance']['thread_pool_utilization']:.1%}")
 
             # Analyze priority distribution
-            immediate_processed = sum(
+            sum(
                 1
                 for results in all_results
                 for result in results
                 if result.get("status") == "processed"
             )
-            queued_processed = sum(
+            sum(
                 1
                 for results in all_results
                 for result in results
                 if result.get("status") == "queued"
             )
 
-            print(f"  🚀 Immediate processing: {immediate_processed} messages")
-            print(f"  📋 Queued processing: {queued_processed} messages")
 
             await manager.stop()
 
-        print(f"\n✅ Concurrent conversation tests completed!")
 
-    except Exception as e:
-        print(f"❌ Error in concurrent conversation tests: {e}")
+    except Exception:
         import traceback
 
         traceback.print_exc()
@@ -321,8 +298,6 @@ async def test_priority_queue_performance():
     if not LIBRARIES_AVAILABLE:
         return
 
-    print("\n🚦 Testing Priority Queue Performance")
-    print("=" * 50)
 
     try:
         from src.conversation.concurrent_conversation_manager import ConversationQueue
@@ -337,9 +312,8 @@ async def test_priority_queue_performance():
             "low": 250,  # Background processing
         }
 
-        print(f"  📊 Testing priority distribution:")
         for priority, count in priority_distribution.items():
-            print(f"    {priority}: {count} messages")
+            pass
 
         # Add messages to queue
         start_time = time.time()
@@ -354,11 +328,9 @@ async def test_priority_queue_performance():
                 }
                 await queue.put(message_data, priority)
 
-        queue_time = time.time() - start_time
+        time.time() - start_time
         total_messages = sum(priority_distribution.values())
 
-        print(f"  ⚡ Queue insertion time: {queue_time*1000:.1f}ms")
-        print(f"  📈 Insertion rate: {total_messages/queue_time:.1f} msgs/sec")
 
         # Test queue retrieval with priority ordering
         start_time = time.time()
@@ -375,28 +347,20 @@ async def test_priority_queue_performance():
                 priority_counts[msg_priority] += 1
                 retrieved_messages.append(message)
 
-        retrieval_time = time.time() - start_time
+        time.time() - start_time
 
-        print(f"  ⚡ Retrieval time (100 msgs): {retrieval_time*1000:.1f}ms")
-        print(f"  📈 Retrieval rate: {len(retrieved_messages)/retrieval_time:.1f} msgs/sec")
 
-        print(f"  🎯 Priority distribution in first 100 retrieved:")
         for priority, count in priority_counts.items():
-            percentage = (count / len(retrieved_messages)) * 100 if retrieved_messages else 0
-            print(f"    {priority}: {count} ({percentage:.1f}%)")
+            (count / len(retrieved_messages)) * 100 if retrieved_messages else 0
 
         # Verify high-priority messages are processed first
-        high_priority_first = priority_counts["critical"] + priority_counts["high"]
-        print(
-            f"  🚀 High-priority messages first: {high_priority_first}/100 ({high_priority_first}%)"
-        )
+        priority_counts["critical"] + priority_counts["high"]
 
         # Queue statistics
-        stats = queue.get_stats()
-        print(f"  📊 Remaining queue stats: {stats}")
+        queue.get_stats()
 
-    except Exception as e:
-        print(f"❌ Error in priority queue tests: {e}")
+    except Exception:
+        pass
 
 
 async def test_session_management():
@@ -405,8 +369,6 @@ async def test_session_management():
     if not LIBRARIES_AVAILABLE:
         return
 
-    print("\n🎭 Testing Session Management")
-    print("=" * 40)
 
     try:
         from src.conversation.concurrent_conversation_manager import ConcurrentConversationManager
@@ -427,13 +389,11 @@ async def test_session_management():
             {"users": 8, "active": True, "messages": 8},  # Very active users
         ]
 
-        print(f"  👥 Creating sessions:")
 
         total_users = 0
         for scenario in session_scenarios:
             total_users += scenario["users"]
-            activity = "active" if scenario["active"] else "inactive"
-            print(f"    {scenario['users']} {activity} users ({scenario['messages']} msgs each)")
+            "active" if scenario["active"] else "inactive"
 
         # Simulate session creation and activity
         all_tasks = []
@@ -462,19 +422,15 @@ async def test_session_management():
 
         start_time = time.time()
         await asyncio.gather(*all_tasks)
-        session_time = time.time() - start_time
+        time.time() - start_time
 
-        print(f"  ⚡ Session simulation time: {session_time:.1f}s")
 
         # Get initial session stats
         stats = manager.get_performance_stats()
         initial_sessions = stats["sessions"]["active_sessions"]
 
-        print(f"  📊 Active sessions created: {initial_sessions}")
-        print(f"  📈 Session creation rate: {initial_sessions/session_time:.1f} sessions/sec")
 
         # Wait for session cleanup (timeout is 1 minute, but cleanup runs every 30s)
-        print(f"  ⏳ Waiting for session cleanup...")
         await asyncio.sleep(65)  # Wait longer than timeout
 
         # Trigger manual cleanup
@@ -484,24 +440,20 @@ async def test_session_management():
         final_stats = manager.get_performance_stats()
         final_sessions = final_stats["sessions"]["active_sessions"]
 
-        print(f"  🧹 Sessions after cleanup: {final_sessions}")
-        print(f"  🗑️ Sessions cleaned up: {initial_sessions - final_sessions}")
 
         # Expected: only active users should remain
-        expected_active = sum(
+        sum(
             scenario["users"] for scenario in session_scenarios if scenario["active"]
         )
-        cleanup_efficiency = (
+        (
             (initial_sessions - final_sessions) / initial_sessions if initial_sessions > 0 else 0
         )
 
-        print(f"  🎯 Expected active sessions: ~{expected_active}")
-        print(f"  📊 Cleanup efficiency: {cleanup_efficiency:.1%}")
 
         await manager.stop()
 
-    except Exception as e:
-        print(f"❌ Error in session management tests: {e}")
+    except Exception:
+        pass
 
 
 async def test_load_balancing():
@@ -510,8 +462,6 @@ async def test_load_balancing():
     if not LIBRARIES_AVAILABLE:
         return
 
-    print("\n⚖️ Testing Load Balancing")
-    print("=" * 35)
 
     try:
         from src.conversation.concurrent_conversation_manager import ConcurrentConversationManager
@@ -531,7 +481,6 @@ async def test_load_balancing():
         ]
 
         for pattern in load_patterns:
-            print(f"\n  📊 Testing {pattern['name']} ({pattern['users']} users)")
 
             # Generate burst of messages
             async def burst_user(user_id: str, message_count: int):
@@ -559,39 +508,27 @@ async def test_load_balancing():
             # Execute burst
             await asyncio.gather(*burst_tasks)
 
-            burst_time = time.time() - start_time
-            total_messages = pattern["users"] * messages_per_user
+            time.time() - start_time
+            pattern["users"] * messages_per_user
 
             # Get performance stats during load
-            stats = manager.get_performance_stats()
+            manager.get_performance_stats()
 
-            print(f"    ⚡ Burst time: {burst_time*1000:.1f}ms")
-            print(f"    📈 Messages processed: {total_messages}")
-            print(f"    🚀 Throughput: {total_messages/burst_time:.1f} msgs/sec")
-            print(f"    📊 Queue length: {stats['performance']['queue_length']}")
-            print(
-                f"    🧵 Thread utilization: {stats['performance']['thread_pool_utilization']:.1%}"
-            )
-            print(f"    💾 Cache utilization: {stats['cache']['utilization']:.1%}")
 
             # Wait for queue to process
             await asyncio.sleep(1.0)
 
         await manager.stop()
 
-    except Exception as e:
-        print(f"❌ Error in load balancing tests: {e}")
+    except Exception:
+        pass
 
 
 async def main():
     """Run all concurrent conversation manager tests"""
 
-    print("👥 WhisperEngine Concurrent Conversation Manager Performance Demo")
-    print("=" * 70)
 
     if not LIBRARIES_AVAILABLE:
-        print("❌ Required libraries not available. Please install:")
-        print("   pip install pandas numpy")
         return
 
     # Run all tests
@@ -600,13 +537,6 @@ async def main():
     await test_session_management()
     await test_load_balancing()
 
-    print("\n🎉 All concurrent conversation tests completed!")
-    print("📊 Performance Summary:")
-    print("   • High-performance priority queue with weighted selection")
-    print("   • Automatic session management with timeout-based cleanup")
-    print("   • Dynamic load balancing for varying conversation loads")
-    print("   • Concurrent processing with thread and process pools")
-    print("   • Intelligent caching for conversation context optimization")
 
 
 if __name__ == "__main__":

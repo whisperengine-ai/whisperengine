@@ -3,9 +3,9 @@ Input Validation and Sanitization Module
 Security enhancement to prevent injection attacks and malicious content processing.
 """
 
-import re
 import logging
-from typing import Optional, Dict, Any
+import re
+from typing import Any
 from urllib.parse import urlparse
 
 logger = logging.getLogger(__name__)
@@ -99,7 +99,7 @@ class InputValidator:
 
     def validate_and_sanitize(
         self, message_content: str, user_id: str, channel_type: str = "unknown"
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Validate and sanitize user input message.
 
@@ -151,7 +151,7 @@ class InputValidator:
                 )
                 logger.error(f"SECURITY: Original matches: {matches}")
 
-                warnings.append(f"Potentially malicious content detected and filtered")
+                warnings.append("Potentially malicious content detected and filtered")
 
         # 3. Suspicious keyword detection (logging only, don't filter)
         for keyword in self.SUSPICIOUS_KEYWORDS:
@@ -159,7 +159,7 @@ class InputValidator:
                 logger.warning(
                     f"SECURITY: Suspicious keyword '{keyword}' detected from user {user_id} in {channel_type}"
                 )
-                warnings.append(f"Suspicious content detected - monitoring increased")
+                warnings.append("Suspicious content detected - monitoring increased")
 
         # 4. Additional sanitization
         sanitized_content = self._additional_sanitization(message_content)
@@ -321,7 +321,7 @@ input_validator = InputValidator()
 
 def validate_user_input(
     message_content: str, user_id: str, channel_type: str = "unknown"
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Convenience function for validating user input.
 

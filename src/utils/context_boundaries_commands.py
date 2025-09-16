@@ -14,10 +14,10 @@ SECURITY FEATURE: User consent and control for Insufficient Context Boundaries f
 """
 
 import logging
+
 import discord
+from context_boundaries_security import get_context_boundaries_manager
 from discord.ext import commands
-from typing import Optional, Dict, Any
-from context_boundaries_security import get_context_boundaries_manager, PrivacyLevel, ConsentStatus
 
 logger = logging.getLogger(__name__)
 
@@ -125,7 +125,7 @@ class ContextBoundariesCommands(commands.Cog):
             await ctx.send("❌ Error retrieving privacy settings. Please try again.")
 
     @commands.command(name="privacy_level")
-    async def set_privacy_level(self, ctx, level: Optional[str] = None):
+    async def set_privacy_level(self, ctx, level: str | None = None):
         """Set privacy level: strict, moderate, permissive, or custom"""
         user_id = str(ctx.author.id)
 
@@ -221,7 +221,7 @@ class ContextBoundariesCommands(commands.Cog):
                 await ctx.send("📝 No privacy decisions recorded yet.")
                 return
 
-            with open(audit_file, "r") as f:
+            with open(audit_file) as f:
                 audit_log = json.load(f)
 
             # Filter for this user and get recent entries
@@ -308,10 +308,10 @@ class ContextBoundariesCommands(commands.Cog):
 
     @commands.command(name="privacy_consent")
     async def handle_consent_response(
-        self, ctx, response: Optional[str] = None, *, context: Optional[str] = None
+        self, ctx, response: str | None = None, *, context: str | None = None
     ):
         """Respond to privacy consent requests"""
-        user_id = str(ctx.author.id)
+        str(ctx.author.id)
 
         if not response:
             embed = discord.Embed(

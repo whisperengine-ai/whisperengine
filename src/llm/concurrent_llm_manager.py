@@ -5,10 +5,9 @@ Addresses: Blocking operations, connection management, timeout issues
 
 import asyncio
 import logging
-import time
-from typing import Dict, Optional, Any
-from concurrent.futures import ThreadPoolExecutor
 import threading
+import time
+from concurrent.futures import ThreadPoolExecutor
 
 logger = logging.getLogger(__name__)
 
@@ -80,7 +79,7 @@ class ConcurrentLLMManager:
             logger.debug(f"LLM call completed for operation {operation_id}")
             return result
 
-        except asyncio.TimeoutError:
+        except TimeoutError:
             logger.error(f"LLM call timed out after {timeout}s for operation {operation_id}")
             raise
         except Exception as e:
@@ -131,7 +130,7 @@ class ConcurrentLLMManager:
 
             return status
 
-        except asyncio.TimeoutError:
+        except TimeoutError:
             logger.warning("Connection check timed out")
             with self._connection_lock:
                 self._connection_status = False

@@ -4,16 +4,16 @@ Test the complete settings workflow in the enhanced universal app
 """
 
 import sys
-import os
 from pathlib import Path
 
 # Add the project root to the Python path
 project_root = Path(__file__).parent
 sys.path.insert(0, str(project_root))
 
-from PySide6.QtWidgets import QApplication
-from PySide6.QtCore import QTimer
 import logging
+
+from PySide6.QtCore import QTimer
+from PySide6.QtWidgets import QApplication
 
 
 def test_settings_workflow():

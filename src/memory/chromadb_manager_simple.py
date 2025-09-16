@@ -34,14 +34,15 @@ Usage:
 
 import argparse
 import json
-import sys
+import logging
 import os
 import shutil
+import sys
 from datetime import datetime
-from typing import Dict, List, Any, Optional
+from typing import Any
+
 import chromadb
 from chromadb.config import Settings
-import logging
 
 # Set up logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
@@ -51,7 +52,7 @@ logger = logging.getLogger(__name__)
 class ChromaDBManagerSimple:
     """Simple ChromaDB manager with robust error handling"""
 
-    def __init__(self, persist_directory: Optional[str] = None):
+    def __init__(self, persist_directory: str | None = None):
         """Initialize ChromaDB client"""
         if persist_directory is None:
             persist_directory = os.getenv("CHROMADB_PATH", "./chromadb_data")
@@ -106,7 +107,7 @@ class ChromaDBManagerSimple:
             return text[:length] + "..."
         return text
 
-    def create_backup(self, suffix: Optional[str] = None) -> str:
+    def create_backup(self, suffix: str | None = None) -> str:
         """Create a backup of the ChromaDB directory before operations"""
         if suffix is None:
             suffix = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -116,14 +117,12 @@ class ChromaDBManagerSimple:
         try:
             # Copy the entire ChromaDB directory
             shutil.copytree(self.persist_directory, backup_path)
-            print(f"✅ Created backup: {backup_path}")
             return backup_path
         except Exception as e:
             logger.error(f"Failed to create backup: {e}")
-            print(f"❌ Failed to create backup: {e}")
             raise
 
-    def preview_user_deletion(self, user_id: str) -> Dict[str, Any]:
+    def preview_user_deletion(self, user_id: str) -> dict[str, Any]:
         """Preview what would be deleted for a user (safe, no changes)"""
         if not self.user_collection:
             return {"exists": False, "error": "User collection not found"}
@@ -180,7 +179,7 @@ class ChromaDBManagerSimple:
             logger.error(f"Error previewing user deletion: {e}")
             return {"exists": False, "error": str(e)}
 
-    def preview_conversation_deletion(self, doc_id: str) -> Dict[str, Any]:
+    def preview_conversation_deletion(self, doc_id: str) -> dict[str, Any]:
         """Preview what conversation would be deleted (safe, no changes)"""
         if not self.user_collection:
             return {"exists": False, "error": "User collection not found"}
@@ -219,7 +218,7 @@ class ChromaDBManagerSimple:
             logger.error(f"Error previewing conversation deletion: {e}")
             return {"exists": False, "error": str(e)}
 
-    def preview_global_fact_deletion(self, fact_id: str) -> Dict[str, Any]:
+    def preview_global_fact_deletion(self, fact_id: str) -> dict[str, Any]:
         """Preview what global fact would be deleted (safe, no changes)"""
         if not self.global_collection:
             return {"exists": False, "error": "Global collection not found"}
@@ -259,10 +258,9 @@ class ChromaDBManagerSimple:
             logger.error(f"Error previewing global fact deletion: {e}")
             return {"exists": False, "error": str(e)}
 
-    def query_conversations(self, user_id: Optional[str] = None, limit: int = 50) -> List[Dict]:
+    def query_conversations(self, user_id: str | None = None, limit: int = 50) -> list[dict]:
         """Query conversation history"""
         if not self.user_collection:
-            print("❌ User collection not found")
             return []
 
         try:
@@ -317,10 +315,9 @@ class ChromaDBManagerSimple:
             logger.error(f"Error querying conversations: {e}")
             return []
 
-    def query_user_facts(self, user_id: str, limit: int = 100) -> List[Dict]:
+    def query_user_facts(self, user_id: str, limit: int = 100) -> list[dict]:
         """Query user-specific facts"""
         if not self.user_collection:
-            print("❌ User collection not found")
             return []
 
         try:
@@ -366,10 +363,9 @@ class ChromaDBManagerSimple:
             logger.error(f"Error querying user facts: {e}")
             return []
 
-    def query_global_facts(self, limit: int = 100, search_text: Optional[str] = None) -> List[Dict]:
+    def query_global_facts(self, limit: int = 100, search_text: str | None = None) -> list[dict]:
         """Query global facts with optional text search"""
         if not self.global_collection:
-            print("❌ Global collection not found")
             return []
 
         try:
@@ -469,7 +465,7 @@ class ChromaDBManagerSimple:
             logger.error(f"Error querying global facts: {e}")
             return []
 
-    def search_all_data(self, search_text: str, limit: int = 20) -> Dict[str, List[Dict]]:
+    def search_all_data(self, search_text: str, limit: int = 20) -> dict[str, list[dict]]:
         """Search across all collections for text"""
         results = {"conversations": [], "user_facts": [], "global_facts": []}
 
@@ -569,7 +565,7 @@ class ChromaDBManagerSimple:
 
         return results
 
-    def get_users_list(self) -> List[Dict[str, Any]]:
+    def get_users_list(self) -> list[dict[str, Any]]:
         """Get list of all users with basic statistics"""
         if not self.user_collection:
             return []
@@ -634,7 +630,7 @@ class ChromaDBManagerSimple:
             logger.error(f"Error getting users list: {e}")
             return []
 
-    def get_database_stats(self) -> Dict[str, Any]:
+    def get_database_stats(self) -> dict[str, Any]:
         """Get comprehensive database statistics"""
         stats = {"collections": {}, "user_data": {}, "global_data": {}}
 
@@ -724,31 +720,26 @@ class ChromaDBManagerSimple:
     def export_user_data(
         self,
         user_id: str,
-        output_file: Optional[str] = None,
+        output_file: str | None = None,
         format_type: str = "json",
         facts_only: bool = False,
         stats_only: bool = False,
-    ) -> Optional[str]:
+    ) -> str | None:
         """Export all data for a specific user"""
         conversations = [] if facts_only else self.query_conversations(user_id=user_id, limit=10000)
         facts = self.query_user_facts(user_id=user_id, limit=10000)
 
         if not conversations and not facts:
-            print(f"❌ No data found for user {user_id}")
             return None
 
         # Stats-only mode
         if stats_only:
-            stats = {
+            {
                 "user_id": user_id,
                 "total_conversations": len(conversations),
                 "total_facts": len(facts),
                 "total_entries": len(conversations) + len(facts),
             }
-            print(f"📊 User Statistics for {user_id}:")
-            print(f"   Conversations: {stats['total_conversations']}")
-            print(f"   Facts: {stats['total_facts']}")
-            print(f"   Total Entries: {stats['total_entries']}")
             return None
 
         # Generate output filename if not provided
@@ -762,8 +753,8 @@ class ChromaDBManagerSimple:
             if format_type == "text":
                 # Generate text format
                 lines = []
-                lines.append(f"ChromaDB User Data Export")
-                lines.append(f"=" * 50)
+                lines.append("ChromaDB User Data Export")
+                lines.append("=" * 50)
                 lines.append(f"User ID: {user_id}")
                 lines.append(f"Export Date: {datetime.now().isoformat()}")
                 lines.append(f"Total Conversations: {len(conversations)}")
@@ -812,21 +803,18 @@ class ChromaDBManagerSimple:
                 with open(output_file, "w", encoding="utf-8") as f:
                     json.dump(export_data, f, indent=2, ensure_ascii=False)
 
-            conv_msg = f"{len(conversations)} conversations and " if not facts_only else ""
-            print(f"✅ Exported {conv_msg}{len(facts)} facts to {output_file}")
+            f"{len(conversations)} conversations and " if not facts_only else ""
             return output_file
 
         except Exception as e:
             logger.error(f"Error exporting user data: {e}")
-            print(f"❌ Error exporting user data: {e}")
             return None
 
-    def export_global_facts(self, output_file: Optional[str] = None) -> Optional[str]:
+    def export_global_facts(self, output_file: str | None = None) -> str | None:
         """Export global facts to JSON file"""
         facts = self.query_global_facts(limit=10000)
 
         if not facts:
-            print("❌ No global facts found to export")
             return None
 
         # Generate output filename if not provided
@@ -845,12 +833,10 @@ class ChromaDBManagerSimple:
             with open(output_file, "w", encoding="utf-8") as f:
                 json.dump(export_data, f, indent=2, ensure_ascii=False)
 
-            print(f"✅ Exported {len(facts)} global facts to {output_file}")
             return output_file
 
         except Exception as e:
             logger.error(f"Error exporting global facts: {e}")
-            print(f"❌ Error exporting global facts: {e}")
             return None
 
     def delete_user_data(
@@ -858,11 +844,9 @@ class ChromaDBManagerSimple:
     ) -> bool:
         """Delete all data for a specific user"""
         if not confirm:
-            print("❌ This operation requires --confirm flag")
             return False
 
         if not self.user_collection:
-            print("❌ User collection not found")
             return False
 
         try:
@@ -872,11 +856,9 @@ class ChromaDBManagerSimple:
             )
 
             if not user_data or not user_data.get("ids"):
-                print(f"❌ No data found for user {user_id}")
                 return False
 
-            total_items = len(user_data["ids"])
-            print(f"🔍 Found {total_items} items for user {user_id}")
+            len(user_data["ids"])
 
             # Count by type
             conversations = 0
@@ -889,25 +871,20 @@ class ChromaDBManagerSimple:
                     else:
                         conversations += 1
 
-            print(f"   - {conversations} conversations")
-            print(f"   - {facts} user facts")
 
             # Create backup if requested
             if create_backup:
                 try:
                     self.create_backup(f"before_user_delete_{user_id}")
-                except Exception as e:
-                    print(f"❌ Failed to create backup: {e}")
+                except Exception:
                     return False
 
             # Delete all user data
             self.user_collection.delete(where={"user_id": user_id})
-            print(f"✅ Successfully deleted all data for user {user_id}")
             return True
 
         except Exception as e:
             logger.error(f"Error deleting user data: {e}")
-            print(f"❌ Error deleting user data: {e}")
             return False
 
     def delete_global_fact(
@@ -915,11 +892,9 @@ class ChromaDBManagerSimple:
     ) -> bool:
         """Delete a specific global fact"""
         if not confirm:
-            print("❌ This operation requires --confirm flag")
             return False
 
         if not self.global_collection:
-            print("❌ Global collection not found")
             return False
 
         try:
@@ -929,7 +904,6 @@ class ChromaDBManagerSimple:
             )
 
             if not fact_data or not fact_data.get("ids"):
-                print(f"❌ Global fact {fact_id} not found")
                 return False
 
             metadata = (
@@ -943,27 +917,21 @@ class ChromaDBManagerSimple:
                 else ""
             )
 
-            fact_text = self.safe_get_string(metadata.get("fact", document))
-            print(f"🔍 Found global fact: {self.safe_truncate(fact_text, 100)}")
-            print(f"   Added by: {self.safe_get_string(metadata.get('added_by', 'unknown'))}")
-            print(f"   Timestamp: {self.safe_get_string(metadata.get('timestamp', 'unknown'))}")
+            self.safe_get_string(metadata.get("fact", document))
 
             # Create backup if requested
             if create_backup:
                 try:
                     self.create_backup(f"before_global_fact_delete_{fact_id[:8]}")
-                except Exception as e:
-                    print(f"❌ Failed to create backup: {e}")
+                except Exception:
                     return False
 
             # Delete the fact
             self.global_collection.delete(ids=[fact_id])
-            print(f"✅ Successfully deleted global fact {fact_id}")
             return True
 
         except Exception as e:
             logger.error(f"Error deleting global fact: {e}")
-            print(f"❌ Error deleting global fact: {e}")
             return False
 
     def delete_user_facts(
@@ -971,11 +939,9 @@ class ChromaDBManagerSimple:
     ) -> bool:
         """Delete only facts for a specific user (keep conversations)"""
         if not confirm:
-            print("❌ This operation requires --confirm flag")
             return False
 
         if not self.user_collection:
-            print("❌ User collection not found")
             return False
 
         try:
@@ -985,27 +951,22 @@ class ChromaDBManagerSimple:
             )
 
             if not user_facts or not user_facts.get("ids"):
-                print(f"❌ No facts found for user {user_id}")
                 return False
 
-            print(f"🔍 Will delete {len(user_facts['ids'])} facts for user {user_id}")
 
             # Create backup if requested
             if create_backup:
                 try:
                     self.create_backup(f"before_user_facts_delete_{user_id}")
-                except Exception as e:
-                    print(f"❌ Failed to create backup: {e}")
+                except Exception:
                     return False
 
             # Delete all user facts
             self.user_collection.delete(where={"user_id": user_id, "type": "user_fact"})
-            print(f"✅ Successfully deleted {len(user_facts['ids'])} facts for user {user_id}")
             return True
 
         except Exception as e:
             logger.error(f"Error deleting user facts: {e}")
-            print(f"❌ Error deleting user facts: {e}")
             return False
 
     def delete_conversation(
@@ -1013,84 +974,61 @@ class ChromaDBManagerSimple:
     ) -> bool:
         """Delete a specific conversation"""
         if not confirm:
-            print("❌ This operation requires --confirm flag")
             return False
 
         if not self.user_collection:
-            print("❌ User collection not found")
             return False
 
         # Preview what will be deleted
         preview = self.preview_conversation_deletion(doc_id)
         if not preview["exists"]:
-            print(f"❌ Conversation {doc_id} not found")
             return False
 
-        print(f"🔍 Will delete conversation:")
-        print(f"   - ID: {doc_id}")
-        print(f"   - User: {preview['user_id']}")
-        print(f"   - Timestamp: {preview['timestamp']}")
-        print(f"   - Channel: {preview['channel_id']}")
-        print(f"   - Type: {preview['type']}")
-        print(f"   - User message: {preview['user_message']}")
 
         # Create backup if requested
         if create_backup:
             try:
                 self.create_backup(f"before_conversation_delete_{doc_id[:8]}")
-            except Exception as e:
-                print(f"❌ Failed to create backup: {e}")
+            except Exception:
                 return False
 
         try:
             # Delete the conversation
             self.user_collection.delete(ids=[doc_id])
-            print(f"✅ Successfully deleted conversation {doc_id}")
             return True
 
         except Exception as e:
             logger.error(f"Error deleting conversation: {e}")
-            print(f"❌ Error deleting conversation: {e}")
             return False
 
     def import_user_data(
-        self, filename: str, user_id: Optional[str] = None, dry_run: bool = False
+        self, filename: str, user_id: str | None = None, dry_run: bool = False
     ) -> bool:
         """Import user data from JSON export file"""
         if not os.path.exists(filename):
-            print(f"❌ File not found: {filename}")
             return False
 
         if not self.user_collection:
-            print("❌ User collection not found")
             return False
 
         try:
-            with open(filename, "r", encoding="utf-8") as f:
+            with open(filename, encoding="utf-8") as f:
                 data = json.load(f)
 
             # Validate JSON structure
             if not isinstance(data, dict) or "conversations" not in data or "facts" not in data:
-                print("❌ Invalid export file format")
                 return False
 
             # Get user ID from file or parameter
             import_user_id = user_id or data.get("user_id")
             if not import_user_id:
-                print("❌ No user ID specified and none found in file")
                 return False
 
             conversations = data.get("conversations", {}).get("data", [])
             facts = data.get("facts", {}).get("data", [])
 
-            print(
-                f"📁 Found {len(conversations)} conversations and {len(facts)} facts for user {import_user_id}"
-            )
 
             if dry_run:
-                print("🔍 DRY RUN - No data will be imported")
-                print(f"   Would import {len(conversations)} conversations")
-                print(f"   Would import {len(facts)} facts")
                 return True
 
             # Check if user already has data
@@ -1103,11 +1041,9 @@ class ChromaDBManagerSimple:
                     .lower()
                 )
                 if response != "y":
-                    print("❌ Import cancelled")
                     return False
 
                 # Delete existing data
-                print(f"🗑️  Deleting existing data for user {import_user_id}")
                 self.user_collection.delete(where={"user_id": import_user_id})
 
             # Import conversations
@@ -1179,44 +1115,33 @@ class ChromaDBManagerSimple:
                     logger.warning(f"Failed to import fact {fact.get('id', 'unknown')}: {e}")
                     continue
 
-            print(
-                f"✅ Successfully imported {conversation_count} conversations and {fact_count} facts for user {import_user_id}"
-            )
             return True
 
         except json.JSONDecodeError:
-            print("❌ Invalid JSON file format")
             return False
         except Exception as e:
             logger.error(f"Error importing user data: {e}")
-            print(f"❌ Error importing user data: {e}")
             return False
 
     def import_global_facts(self, filename: str, dry_run: bool = False) -> bool:
         """Import global facts from JSON export file"""
         if not os.path.exists(filename):
-            print(f"❌ File not found: {filename}")
             return False
 
         if not self.global_collection:
-            print("❌ Global collection not found")
             return False
 
         try:
-            with open(filename, "r", encoding="utf-8") as f:
+            with open(filename, encoding="utf-8") as f:
                 data = json.load(f)
 
             # Validate JSON structure
             if not isinstance(data, dict) or "facts" not in data:
-                print("❌ Invalid global facts export file format")
                 return False
 
             facts = data.get("facts", [])
-            print(f"📁 Found {len(facts)} global facts to import")
 
             if dry_run:
-                print("🔍 DRY RUN - No data will be imported")
-                print(f"   Would import {len(facts)} global facts")
                 return True
 
             # Import facts
@@ -1248,130 +1173,89 @@ class ChromaDBManagerSimple:
                     logger.warning(f"Failed to import global fact {fact.get('id', 'unknown')}: {e}")
                     continue
 
-            print(f"✅ Successfully imported {fact_count} global facts")
             return True
 
         except json.JSONDecodeError:
-            print("❌ Invalid JSON file format")
             return False
         except Exception as e:
             logger.error(f"Error importing global facts: {e}")
-            print(f"❌ Error importing global facts: {e}")
             return False
 
 
-def print_formatted_results(data: List[Dict], result_type: str, limit: Optional[int] = None):
+def print_formatted_results(data: list[dict], result_type: str, limit: int | None = None):
     """Print query results in a formatted way"""
     if not data:
-        print(f"❌ No {result_type} found")
         return
 
     # Apply limit if specified
     if limit and len(data) > limit:
         display_data = data[:limit]
-        print(f"🔍 Showing first {limit} of {len(data)} {result_type}")
     else:
         display_data = data
-        print(f"🔍 Found {len(data)} {result_type}")
 
-    print("=" * 80)
 
-    for i, item in enumerate(display_data, 1):
+    for _i, item in enumerate(display_data, 1):
         if result_type == "conversations":
-            print(f"\n[{i}] Conversation ID: {item['id']}")
-            print(f"    User ID: {item.get('user_id', item['metadata'].get('user_id', 'unknown'))}")
-            print(f"    Timestamp: {item['timestamp']}")
-            print(
-                f"    Channel: {item.get('channel_id', item['metadata'].get('channel_id', 'unknown'))}"
-            )
 
             # Handle different data structures
             if "user_message" in item:
-                user_msg = (
+                (
                     item["user_message"][:100] + "..."
                     if len(item["user_message"]) > 100
                     else item["user_message"]
                 )
-                bot_msg = (
+                (
                     item["bot_response"][:100] + "..."
                     if len(item["bot_response"]) > 100
                     else item["bot_response"]
                 )
             else:
                 # Search results format
-                user_msg = (
+                (
                     item["metadata"].get("user_message", item.get("document", ""))[:100] + "..."
                 )
-                bot_msg = (
+                (
                     item["metadata"].get("bot_response", "")[:100] + "..."
                     if item["metadata"].get("bot_response")
                     else "N/A"
                 )
 
-            print(f"    User: {user_msg}")
-            print(f"    Bot: {bot_msg}")
             if item.get("similarity_score"):
-                print(f"    Similarity: {item['similarity_score']:.3f}")
+                pass
 
         elif result_type == "user_facts":
-            print(f"\n[{i}] Fact ID: {item['id']}")
 
             # Handle different data structures
             if "fact" in item:
-                fact_text = item["fact"]
+                item["fact"]
             else:
                 # Search results format
-                fact_text = item["metadata"].get("fact", item.get("document", ""))
+                item["metadata"].get("fact", item.get("document", ""))
 
-            print(f"    Fact: {fact_text}")
-            print(
-                f"    Category: {item.get('category', item['metadata'].get('category', 'unknown'))}"
-            )
-            print(
-                f"    Confidence: {item.get('confidence', item['metadata'].get('confidence', 'unknown'))}"
-            )
-            print(
-                f"    Method: {item.get('extraction_method', item['metadata'].get('extraction_method', 'unknown'))}"
-            )
-            print(f"    Timestamp: {item['timestamp']}")
 
             context = item.get("context", item["metadata"].get("context", ""))
             if context:
-                context_display = context[:100] + "..." if len(context) > 100 else context
-                print(f"    Context: {context_display}")
+                context[:100] + "..." if len(context) > 100 else context
 
             if item.get("similarity_score"):
-                print(f"    Similarity: {item['similarity_score']:.3f}")
+                pass
 
         elif result_type == "global_facts":
-            print(f"\n[{i}] Fact ID: {item['id']}")
 
             # Handle different data structures
             if "fact" in item:
-                fact_text = item["fact"]
+                item["fact"]
             else:
                 # Search results format
-                fact_text = item["metadata"].get("fact", item.get("document", ""))
+                item["metadata"].get("fact", item.get("document", ""))
 
-            print(f"    Fact: {fact_text}")
-            print(
-                f"    Category: {item.get('category', item['metadata'].get('category', 'unknown'))}"
-            )
-            print(
-                f"    Added by: {item.get('added_by', item['metadata'].get('added_by', 'unknown'))}"
-            )
-            print(
-                f"    Method: {item.get('extraction_method', item['metadata'].get('extraction_method', 'unknown'))}"
-            )
-            print(f"    Timestamp: {item['timestamp']}")
 
             context = item.get("context", item["metadata"].get("context", ""))
             if context:
-                context_display = context[:100] + "..." if len(context) > 100 else context
-                print(f"    Context: {context_display}")
+                context[:100] + "..." if len(context) > 100 else context
 
             if item.get("similarity_score"):
-                print(f"    Similarity: {item['similarity_score']:.3f}")
+                pass
 
 
 def main():
@@ -1558,41 +1442,26 @@ def main():
 
             elif args.query_type == "search":
                 results = manager.search_all_data(args.text, args.limit)
-                print(f"🔍 Search results for: '{args.text}'")
-                print("=" * 80)
 
                 if results["conversations"]:
-                    print(f"\n📄 CONVERSATIONS ({len(results['conversations'])})")
                     print_formatted_results(results["conversations"], "conversations", 10)
 
                 if results["user_facts"]:
-                    print(f"\n👤 USER FACTS ({len(results['user_facts'])})")
                     print_formatted_results(results["user_facts"], "user_facts", 10)
 
                 if results["global_facts"]:
-                    print(f"\n🌍 GLOBAL FACTS ({len(results['global_facts'])})")
                     print_formatted_results(results["global_facts"], "global_facts", 10)
 
         # Handle info commands
         elif args.command == "info":
             if args.info_type == "users":
                 users = manager.get_users_list()
-                print(f"👥 Found {len(users)} users")
-                print("=" * 80)
 
-                for user in users:
-                    print(f"\nUser ID: {user['user_id']}")
-                    print(f"  Conversations: {user['conversations']}")
-                    print(f"  Facts: {user['facts']}")
-                    print(f"  Channels: {', '.join(user['channels'])}")
-                    print(f"  First seen: {user['first_seen'] or 'unknown'}")
-                    print(f"  Last seen: {user['last_seen'] or 'unknown'}")
+                for _user in users:
+                    pass
 
             elif args.info_type == "stats":
-                stats = manager.get_database_stats()
-                print("📊 ChromaDB Statistics")
-                print("=" * 50)
-                print(json.dumps(stats, indent=2))
+                manager.get_database_stats()
 
         # Handle export commands
         elif args.command == "export":
@@ -1637,64 +1506,30 @@ def main():
             if args.preview_type == "user":
                 preview = manager.preview_user_deletion(args.user_id)
                 if preview["exists"]:
-                    print(f"👤 User {args.user_id} data preview:")
-                    print(f"   - Total items: {preview['total_items']}")
-                    print(f"   - Conversations: {preview['conversations']}")
-                    print(f"   - Facts: {preview['facts']}")
-                    print(f"   - Channels: {', '.join(preview['channels'])}")
-                    print(f"   - First seen: {preview['first_seen']}")
-                    print(f"   - Last seen: {preview['last_seen']}")
-                    print(f"\nTo delete this data, run:")
-                    print(
-                        f"python chromadb_manager_simple.py delete user --user-id {args.user_id} --confirm"
-                    )
+                    pass
                 else:
-                    print(f"❌ User {args.user_id} not found or no data")
                     if "error" in preview:
-                        print(f"Error: {preview['error']}")
+                        pass
 
             elif args.preview_type == "conversation":
                 preview = manager.preview_conversation_deletion(args.doc_id)
                 if preview["exists"]:
-                    print(f"💬 Conversation {args.doc_id} preview:")
-                    print(f"   - User: {preview['user_id']}")
-                    print(f"   - Timestamp: {preview['timestamp']}")
-                    print(f"   - Channel: {preview['channel_id']}")
-                    print(f"   - Type: {preview['type']}")
-                    print(f"   - User message: {preview['user_message']}")
-                    print(f"   - Bot response: {preview['bot_response']}")
-                    print(f"\nTo delete this conversation, run:")
-                    print(
-                        f"python chromadb_manager_simple.py delete conversation --doc-id {args.doc_id} --confirm"
-                    )
+                    pass
                 else:
-                    print(f"❌ Conversation {args.doc_id} not found")
                     if "error" in preview:
-                        print(f"Error: {preview['error']}")
+                        pass
 
             elif args.preview_type == "global-fact":
                 preview = manager.preview_global_fact_deletion(args.fact_id)
                 if preview["exists"]:
-                    print(f"🌍 Global fact {args.fact_id} preview:")
-                    print(f"   - Fact: {preview['fact']}")
-                    print(f"   - Category: {preview['category']}")
-                    print(f"   - Added by: {preview['added_by']}")
-                    print(f"   - Method: {preview['extraction_method']}")
-                    print(f"   - Timestamp: {preview['timestamp']}")
                     if preview["context"]:
-                        print(f"   - Context: {preview['context']}")
-                    print(f"\nTo delete this fact, run:")
-                    print(
-                        f"python chromadb_manager_simple.py delete global-fact --fact-id {args.fact_id} --confirm"
-                    )
+                        pass
                 else:
-                    print(f"❌ Global fact {args.fact_id} not found")
                     if "error" in preview:
-                        print(f"Error: {preview['error']}")
+                        pass
 
     except Exception as e:
         logger.error(f"Command failed: {e}")
-        print(f"❌ Error: {e}")
         sys.exit(1)
 
 

@@ -5,10 +5,8 @@ This module contains the initialization logic extracted from the main() function
 For now, it's a simple organization - dependency injection will be added later.
 """
 
-import asyncio
 import logging
 import os
-import time
 from functools import wraps
 
 import discord

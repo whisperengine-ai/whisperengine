@@ -7,7 +7,6 @@ Tests the full desktop app LLM initialization and auto-configuration flow.
 import asyncio
 import logging
 import os
-import tempfile
 
 # Set up logging
 logging.basicConfig(level=logging.INFO, format="%(levelname)s - %(message)s")
@@ -26,7 +25,7 @@ async def test_desktop_llm_initialization():
         # Test initialization
         result = await manager.initialize_llm_for_desktop()
 
-        logger.info(f"📊 Initialization Result:")
+        logger.info("📊 Initialization Result:")
         logger.info(f"   Status: {result.get('status', 'unknown')}")
         logger.info(f"   Next Steps: {', '.join(result.get('next_steps', []))}")
 
@@ -39,7 +38,7 @@ async def test_desktop_llm_initialization():
 
         if result.get("configuration"):
             config = result["configuration"]
-            logger.info(f"   🔧 Configuration Applied:")
+            logger.info("   🔧 Configuration Applied:")
             for key, value in config.items():
                 if "API_KEY" in key:
                     logger.info(f"      {key}: {'[SET]' if value else '[NOT SET]'}")
@@ -67,7 +66,7 @@ async def test_llm_validation():
 
         validation_result = await validate_desktop_llm()
 
-        logger.info(f"📊 Validation Result:")
+        logger.info("📊 Validation Result:")
         logger.info(f"   Valid: {validation_result.get('is_valid', False)}")
         logger.info(f"   Service: {validation_result.get('service_name', 'Unknown')}")
         logger.info(f"   URL: {validation_result.get('api_url', 'Not set')}")
@@ -109,18 +108,18 @@ async def test_ui_guidance_formatting():
         manager = DesktopLLMManager()
         ui_guidance = manager.get_setup_guidance_for_ui(recommendation)
 
-        logger.info(f"📱 UI Guidance Format:")
+        logger.info("📱 UI Guidance Format:")
         logger.info(f"   Title: {ui_guidance.get('title', 'No title')}")
         logger.info(f"   Description: {ui_guidance.get('description', 'No description')}")
         logger.info(f"   Setup URL: {ui_guidance.get('setup_url', 'No URL')}")
 
         if ui_guidance.get("benefits"):
-            logger.info(f"   💎 Benefits:")
+            logger.info("   💎 Benefits:")
             for benefit in ui_guidance["benefits"]:
                 logger.info(f"      {benefit}")
 
         if ui_guidance.get("steps"):
-            logger.info(f"   📋 Steps:")
+            logger.info("   📋 Steps:")
             for step in ui_guidance["steps"][:3]:  # Show first 3 steps
                 logger.info(f"      {step}")
             if len(ui_guidance["steps"]) > 3:

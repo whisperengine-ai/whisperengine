@@ -6,14 +6,11 @@ enhancing the existing ChromaDB/PostgreSQL system with graph-based connections.
 """
 
 import logging
-import asyncio
-from typing import Dict, List, Optional, Any, Tuple
-from datetime import datetime, timedelta
 from dataclasses import dataclass
-import json
+from datetime import datetime
 
 try:
-    from neo4j import GraphDatabase, AsyncGraphDatabase
+    from neo4j import AsyncGraphDatabase, GraphDatabase
 
     NEO4J_AVAILABLE = True
 except ImportError:
@@ -99,9 +96,9 @@ class GraphMemoryManager:
         self,
         user_id: str,
         discord_id: str,
-        name: Optional[str] = None,
-        personality_traits: Optional[List[str]] = None,
-        communication_style: Optional[str] = None,
+        name: str | None = None,
+        personality_traits: list[str] | None = None,
+        communication_style: str | None = None,
     ) -> bool:
         """Create or update user node"""
         if not self.enabled:
@@ -140,8 +137,8 @@ class GraphMemoryManager:
         user_id: str,
         chromadb_id: str,
         summary: str,
-        topics: List[str],
-        emotion_data: Optional[Dict] = None,
+        topics: list[str],
+        emotion_data: dict | None = None,
         importance: float = 0.5,
     ) -> bool:
         """Create memory node and establish relationships"""
@@ -206,12 +203,12 @@ class GraphMemoryManager:
                      t.first_mentioned = datetime(),
                      t.created_at = datetime()
         SET t.last_mentioned = datetime()
-        
+
         WITH t
         MATCH (m:Memory {id: $memory_id})
         MERGE (m)-[r:ABOUT]->(t)
         SET r.relevance = 0.8
-        
+
         WITH t
         MATCH (u:User {id: $user_id})
         MERGE (u)-[i:INTERESTED_IN]->(t)
@@ -222,7 +219,7 @@ class GraphMemoryManager:
         await session.run(topic_query, topic=topic, memory_id=memory_id, user_id=user_id)
 
     async def _create_emotion_relationship(
-        self, session, memory_id: str, emotion_data: Dict, user_id: str
+        self, session, memory_id: str, emotion_data: dict, user_id: str
     ):
         """Create emotion context and relationships"""
         emotion_id = f"emotion_{memory_id}_{emotion_data.get('detected_emotion', 'neutral')}"
@@ -236,11 +233,11 @@ class GraphMemoryManager:
             timestamp: datetime(),
             resolved: false
         })
-        
+
         WITH e
         MATCH (m:Memory {id: $memory_id})
         CREATE (m)-[:EVOKED_EMOTION {strength: $intensity}]->(e)
-        
+
         WITH e
         MATCH (u:User {id: $user_id})
         CREATE (u)-[:EXPERIENCED {
@@ -260,7 +257,7 @@ class GraphMemoryManager:
             user_id=user_id,
         )
 
-    async def get_relationship_context(self, user_id: str) -> Dict:
+    async def get_relationship_context(self, user_id: str) -> dict:
         """Get comprehensive relationship context for personalized responses"""
         if not self.enabled:
             return {}
@@ -270,13 +267,13 @@ class GraphMemoryManager:
         OPTIONAL MATCH (u)-[r:REMEMBERS]->(m:Memory)
         OPTIONAL MATCH (u)-[i:INTERESTED_IN]->(t:Topic)
         OPTIONAL MATCH (u)-[e:EXPERIENCED]->(ec:EmotionContext)
-        
-        WITH u, 
+
+        WITH u,
              count(DISTINCT m) as memory_count,
              count(DISTINCT t) as topic_count,
              collect(DISTINCT t.name) as topics,
              collect(DISTINCT {emotion: ec.emotion, intensity: e.intensity}) as emotions
-        
+
         RETURN {
             name: u.name,
             memory_count: memory_count,
@@ -285,7 +282,7 @@ class GraphMemoryManager:
             recent_emotions: emotions[-5..],
             communication_style: u.communication_style,
             personality_traits: u.personality_traits,
-            intimacy_level: CASE 
+            intimacy_level: CASE
                 WHEN memory_count > 50 THEN 0.9
                 WHEN memory_count > 20 THEN 0.7
                 WHEN memory_count > 10 THEN 0.5
@@ -304,7 +301,7 @@ class GraphMemoryManager:
             logger.error(f"Failed to get relationship context for {user_id}: {e}")
             return {}
 
-    async def get_emotional_patterns(self, user_id: str) -> Dict:
+    async def get_emotional_patterns(self, user_id: str) -> dict:
         """Analyze emotional patterns and triggers"""
         if not self.enabled:
             return {}
@@ -313,21 +310,21 @@ class GraphMemoryManager:
         MATCH (u:User {id: $user_id})-[:EXPERIENCED]->(e:EmotionContext)
         WITH u, e.emotion as emotion, count(e) as frequency, avg(e.intensity) as avg_intensity
         ORDER BY frequency DESC, avg_intensity DESC
-        
+
         WITH u, collect({
-            emotion: emotion, 
-            frequency: frequency, 
+            emotion: emotion,
+            frequency: frequency,
             avg_intensity: avg_intensity
         }) as emotion_patterns
-        
+
         MATCH (u)-[:INTERESTED_IN]->(t:Topic)-[:TRIGGERS]->(trigger_e:EmotionContext)
-        WITH u, emotion_patterns, 
+        WITH u, emotion_patterns,
              collect({
-                topic: t.name, 
+                topic: t.name,
                 triggered_emotion: trigger_e.emotion,
                 frequency: count(trigger_e)
              }) as triggers
-             
+
         RETURN {
             patterns: emotion_patterns,
             triggers: triggers,
@@ -346,8 +343,8 @@ class GraphMemoryManager:
             return {}
 
     async def find_related_memories(
-        self, user_id: str, current_topics: List[str], limit: int = 5
-    ) -> List[Dict]:
+        self, user_id: str, current_topics: list[str], limit: int = 5
+    ) -> list[dict]:
         """Find memories related to current topics with emotional context"""
         if not self.enabled:
             return []
@@ -356,14 +353,14 @@ class GraphMemoryManager:
         MATCH (u:User {id: $user_id})-[:REMEMBERS]->(m:Memory)-[:ABOUT]->(t:Topic)
         WHERE t.name IN $topics
         OPTIONAL MATCH (m)-[:EVOKED_EMOTION]->(e:EmotionContext)
-        
-        WITH m, t, e, 
-             m.importance + 
+
+        WITH m, t, e,
+             m.importance +
              CASE WHEN e IS NOT NULL THEN e.intensity * 0.3 ELSE 0 END as relevance_score
-             
+
         ORDER BY relevance_score DESC, m.timestamp DESC
         LIMIT $limit
-        
+
         RETURN {
             memory_id: m.id,
             chromadb_id: m.chromadb_id,
@@ -393,7 +390,7 @@ class GraphMemoryManager:
             return []
 
     async def update_relationship_milestone(
-        self, user_id: str, milestone_type: str, context: Optional[str] = None
+        self, user_id: str, milestone_type: str, context: str | None = None
     ):
         """Track relationship progression milestones"""
         if not self.enabled:

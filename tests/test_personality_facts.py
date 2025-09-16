@@ -6,9 +6,9 @@ This validates that the personality fact classification and storage works correc
 replacing the old global/user fact distinction with AI companion-focused categorization.
 """
 
-import sys
-import os
 import logging
+import os
+import sys
 from datetime import datetime
 
 # Add the src directory to the path so we can import our modules
@@ -16,15 +16,13 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
 
 try:
     from src.memory.personality_facts import (
+        MemoryTier,
         PersonalityFactClassifier,
         PersonalityFactType,
         PersonalityRelevance,
-        MemoryTier,
     )
     from src.security.pii_detector import PIIDetector
-except ImportError as e:
-    print(f"❌ Import error: {e}")
-    print("Make sure you're running this from the whisperengine root directory")
+except ImportError:
     sys.exit(1)
 
 # Set up logging
@@ -34,8 +32,6 @@ logger = logging.getLogger(__name__)
 
 def test_personality_fact_classification():
     """Test the personality fact classification system"""
-    print("\n🧪 Testing Personality Fact Classification System")
-    print("=" * 60)
 
     # Initialize classifier
     pii_detector = PIIDetector()
@@ -83,7 +79,6 @@ def test_personality_fact_classification():
     results = []
 
     for i, test_case in enumerate(test_cases, 1):
-        print(f"\n📝 Test Case {i}: '{test_case['fact']}'")
 
         context_metadata = {"extraction_source": "test", "timestamp": datetime.now().isoformat()}
 
@@ -94,33 +89,21 @@ def test_personality_fact_classification():
 
         # Check results
         type_correct = personality_fact.fact_type == test_case["expected_type"]
-        relevance_matches = personality_fact.relevance == test_case["expected_relevance"]
+        personality_fact.relevance == test_case["expected_relevance"]
 
-        print(f"   🔍 Classified as: {personality_fact.fact_type.value}")
-        print(
-            f"   📊 Relevance: {personality_fact.relevance.value} (score: {personality_fact.relevance_score:.2f})"
-        )
-        print(f"   💾 Memory tier: {personality_fact.memory_tier.value}")
-        print(f"   🎭 Emotional weight: {personality_fact.emotional_weight:.2f}")
-        print(f"   🔒 Privacy level: {personality_fact.privacy_level}")
 
         if type_correct:
-            print(f"   ✅ Fact type classification: CORRECT")
+            pass
         else:
-            print(
-                f"   ❌ Fact type classification: Expected {test_case['expected_type'].value}, got {personality_fact.fact_type.value}"
-            )
+            pass
 
         # We'll be more lenient on relevance since it's calculated dynamically
         if personality_fact.relevance_score >= 0.7:
             relevance_ok = True
-            print(f"   ✅ Relevance score: HIGH ({personality_fact.relevance_score:.2f})")
         elif personality_fact.relevance_score >= 0.5:
             relevance_ok = True
-            print(f"   ✅ Relevance score: MODERATE ({personality_fact.relevance_score:.2f})")
         else:
             relevance_ok = personality_fact.relevance == PersonalityRelevance.MINIMAL
-            print(f"   ⚠️ Relevance score: LOW ({personality_fact.relevance_score:.2f})")
 
         results.append(
             {
@@ -133,19 +116,11 @@ def test_personality_fact_classification():
         )
 
     # Summary
-    print(f"\n📈 Test Results Summary")
-    print("-" * 30)
 
     type_successes = sum(1 for r in results if r["type_correct"])
     relevance_successes = sum(1 for r in results if r["relevance_ok"])
     total_tests = len(results)
 
-    print(
-        f"Fact Type Classification: {type_successes}/{total_tests} correct ({type_successes/total_tests*100:.1f}%)"
-    )
-    print(
-        f"Relevance Assessment: {relevance_successes}/{total_tests} appropriate ({relevance_successes/total_tests*100:.1f}%)"
-    )
 
     # Show memory tier distribution
     tier_distribution = {}
@@ -153,9 +128,8 @@ def test_personality_fact_classification():
         tier = result["personality_fact"].memory_tier.value
         tier_distribution[tier] = tier_distribution.get(tier, 0) + 1
 
-    print(f"\nMemory Tier Distribution:")
-    for tier, count in tier_distribution.items():
-        print(f"  {tier.upper()}: {count} facts")
+    for tier, _count in tier_distribution.items():
+        pass
 
     # Show fact type distribution
     type_distribution = {}
@@ -163,33 +137,21 @@ def test_personality_fact_classification():
         fact_type = result["personality_fact"].fact_type.value
         type_distribution[fact_type] = type_distribution.get(fact_type, 0) + 1
 
-    print(f"\nFact Type Distribution:")
-    for fact_type, count in type_distribution.items():
-        print(f"  {fact_type}: {count} facts")
+    for fact_type, _count in type_distribution.items():
+        pass
 
     success_rate = (type_successes + relevance_successes) / (total_tests * 2)
 
     if success_rate >= 0.8:
-        print(
-            f"\n🎉 SUCCESS: Personality fact classification working well ({success_rate*100:.1f}% accuracy)"
-        )
         return True
     elif success_rate >= 0.6:
-        print(
-            f"\n⚠️ PARTIAL SUCCESS: Classification needs refinement ({success_rate*100:.1f}% accuracy)"
-        )
         return True
     else:
-        print(
-            f"\n❌ FAILURE: Classification system needs significant improvement ({success_rate*100:.1f}% accuracy)"
-        )
         return False
 
 
 def test_pii_detection_integration():
     """Test PII detection integration with personality facts"""
-    print("\n🔒 Testing PII Detection Integration")
-    print("=" * 40)
 
     pii_detector = PIIDetector()
     classifier = PersonalityFactClassifier(pii_detector)
@@ -224,9 +186,7 @@ def test_pii_detection_integration():
 
     pii_results = []
 
-    for i, test_case in enumerate(pii_test_cases, 1):
-        print(f"\n📝 PII Test {i}: {test_case['description']}")
-        print(f"   Fact: '{test_case['fact']}'")
+    for _i, test_case in enumerate(pii_test_cases, 1):
 
         context_metadata = {"test": True}
         personality_fact = classifier.classify_fact(
@@ -238,36 +198,27 @@ def test_pii_detection_integration():
 
         if test_case["should_be_safe"]:
             success = is_safe
-            expected = "safe for sharing"
         else:
             success = is_private
-            expected = "private/restricted"
 
-        print(f"   🔒 Privacy level: {personality_fact.privacy_level}")
-        print(f"   🎯 Expected: {expected}")
 
         if success:
-            print(f"   ✅ PII detection: CORRECT")
+            pass
         else:
-            print(f"   ❌ PII detection: INCORRECT")
+            pass
 
         pii_results.append(success)
 
     pii_success_rate = sum(pii_results) / len(pii_results)
-    print(f"\n📊 PII Detection Accuracy: {pii_success_rate*100:.1f}%")
 
     if pii_success_rate >= 0.8:
-        print("🎉 PII detection working well!")
         return True
     else:
-        print("⚠️ PII detection needs improvement")
         return False
 
 
 def main():
     """Run all personality fact system tests"""
-    print("🤖 WhisperEngine Personality Fact System Test")
-    print("=" * 70)
 
     try:
         # Test 1: Personality fact classification
@@ -277,22 +228,15 @@ def main():
         pii_success = test_pii_detection_integration()
 
         # Overall results
-        print(f"\n🏁 Final Results")
-        print("=" * 20)
 
         if classification_success and pii_success:
-            print("🎉 ALL TESTS PASSED - Personality fact system is working correctly!")
-            print("\n✨ Ready for Phase 1.2: Memory Tier Architecture")
             return True
         elif classification_success or pii_success:
-            print("⚠️ PARTIAL SUCCESS - Some components need refinement")
             return True
         else:
-            print("❌ TESTS FAILED - System needs debugging before proceeding")
             return False
 
-    except Exception as e:
-        print(f"💥 Test execution failed: {e}")
+    except Exception:
         import traceback
 
         traceback.print_exc()

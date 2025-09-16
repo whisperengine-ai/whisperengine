@@ -4,17 +4,16 @@ Enhanced macOS System Tray Integration for WhisperEngine
 Provides advanced dock integration, badge notifications, and real-time status updates.
 """
 
-import os
-import sys
+import json
 import logging
 import subprocess
+import sys
 import threading
 import time
-import json
-from pathlib import Path
-from typing import Optional, Dict, Any, List
-from datetime import datetime
 from dataclasses import dataclass
+from datetime import datetime
+from pathlib import Path
+from typing import Any
 
 try:
     import pystray
@@ -59,7 +58,7 @@ class SystemStatus:
     total_conversations: int = 0
     memory_usage_mb: float = 0.0
     uptime_seconds: int = 0
-    last_activity: Optional[datetime] = None
+    last_activity: datetime | None = None
 
 
 class EnhancedMacOSTray:
@@ -82,8 +81,8 @@ class EnhancedMacOSTray:
 
         # Status tracking
         self.status = SystemStatus()
-        self.active_conversations: Dict[str, ConversationActivity] = {}
-        self.recent_activities: List[str] = []
+        self.active_conversations: dict[str, ConversationActivity] = {}
+        self.recent_activities: list[str] = []
         self.tray_icon = None
         self.running = False
 
@@ -99,12 +98,12 @@ class EnhancedMacOSTray:
             self._create_enhanced_tray()
             self._start_monitoring()
 
-    def _load_preferences(self) -> Dict[str, Any]:
+    def _load_preferences(self) -> dict[str, Any]:
         """Load preferences from file"""
         prefs_file = Path.home() / ".whisperengine" / "tray_preferences.json"
         try:
             if prefs_file.exists():
-                with open(prefs_file, "r") as f:
+                with open(prefs_file) as f:
                     return json.load(f)
         except Exception as e:
             self.logger.warning(f"Could not load tray preferences: {e}")
@@ -238,7 +237,7 @@ class EnhancedMacOSTray:
             self.logger.error(f"Failed to create dynamic menu: {e}")
             return None
 
-    def _create_status_icon(self, badge_count: Optional[int] = None):
+    def _create_status_icon(self, badge_count: int | None = None):
         """Create status icon with optional badge"""
         if not TRAY_AVAILABLE:
             return None
@@ -351,8 +350,8 @@ class EnhancedMacOSTray:
     def _update_status(self):
         """Update system status"""
         try:
-            import requests
             import psutil
+            import requests
 
             # Check server health
             try:
@@ -505,7 +504,7 @@ class EnhancedMacOSTray:
     def _show_statistics(self, icon=None, item=None):
         """Show system statistics"""
         stats = f"""WhisperEngine Statistics
-        
+
 Server Status: {self._get_server_status()}
 Active Connections: {self.status.active_connections}
 Conversations Today: {self.status.conversations_today}
@@ -533,11 +532,11 @@ Last Activity: {self.status.last_activity.strftime('%H:%M:%S') if self.status.la
             memory_info = psutil.virtual_memory()
 
             perf_info = f"""Performance Monitor
-            
+
 CPU Usage: {cpu_percent:.1f}%
 Memory Usage: {self.status.memory_usage_mb:.1f} MB
 System Memory: {memory_info.percent:.1f}% used
-            
+
 Server Response: {'Good' if self.status.server_running else 'Down'}
 Update Interval: {self.preferences.get('update_interval', 3)}s
 """
@@ -691,7 +690,7 @@ Features:
 
 def create_enhanced_macos_tray(
     app_instance, host: str = "127.0.0.1", port: int = 8080
-) -> Optional[EnhancedMacOSTray]:
+) -> EnhancedMacOSTray | None:
     """
     Create enhanced macOS tray integration
 

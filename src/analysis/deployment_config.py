@@ -9,11 +9,11 @@ This module automatically configures NLP components based on the deployment envi
 Follows your existing pattern of external embeddings for GPU-intensive tasks.
 """
 
-import os
 import logging
-from typing import Dict, Any, Optional
+import os
 from dataclasses import dataclass
 from enum import Enum
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -137,7 +137,7 @@ def get_optimal_nlp_config() -> NLPConfiguration:
     return NLPConfiguration(environment=environment, **config)
 
 
-def get_deployment_recommendations() -> Dict[str, Any]:
+def get_deployment_recommendations() -> dict[str, Any]:
     """Get deployment recommendations based on current environment."""
 
     config = get_optimal_nlp_config()
@@ -186,7 +186,7 @@ def get_deployment_recommendations() -> Dict[str, Any]:
     return recommendations
 
 
-def create_docker_optimized_config() -> Dict[str, str]:
+def create_docker_optimized_config() -> dict[str, str]:
     """Create environment variables for Docker deployment."""
     return {
         "NLP_SPACY_MODEL": "en_core_web_sm",
@@ -197,7 +197,7 @@ def create_docker_optimized_config() -> Dict[str, str]:
     }
 
 
-def create_native_optimized_config() -> Dict[str, str]:
+def create_native_optimized_config() -> dict[str, str]:
     """Create environment variables for native deployment."""
     return {
         "NLP_SPACY_MODEL": "en_core_web_lg",
@@ -213,25 +213,12 @@ def print_deployment_status():
     """Print current deployment status and recommendations."""
     recommendations = get_deployment_recommendations()
 
-    print("🔧 NLP Deployment Configuration")
-    print("=" * 50)
 
-    config = recommendations["current_config"]
-    print(f"Environment: {config['environment']}")
-    print(f"spaCy Model: {config['spacy_model']}")
-    print(f"External Embeddings: {config['external_embeddings']}")
-    print(f"GPU Acceleration: {config['gpu_acceleration']}")
-    print(f"Performance Mode: {config['performance_mode']}")
+    recommendations["current_config"]
 
-    print(f"\n📋 Recommendations:")
-    for rec in recommendations["recommendations"]:
-        print(f"  {rec}")
+    for _rec in recommendations["recommendations"]:
+        pass
 
-    print(f"\n💡 Your Current Approach (External Embeddings) is PERFECT for:")
-    print(f"  • Avoiding Docker GPU limitations on macOS")
-    print(f"  • Consistent performance across environments")
-    print(f"  • Leveraging powerful external GPU resources")
-    print(f"  • Keeping containers lightweight and portable")
 
 
 if __name__ == "__main__":

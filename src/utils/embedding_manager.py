@@ -7,10 +7,9 @@ Optimized for WhisperEngine with FAISS compatibility and ultra-fast processing.
 import asyncio
 import logging
 import os
-import numpy as np
-from typing import List, Optional, Dict, Any, Union
 import time
 from functools import lru_cache
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -108,7 +107,7 @@ class LocalEmbeddingManager:
         """Generate cache key for text"""
         return f"embed_{hash(text)}"
 
-    async def _encode_texts(self, texts: List[str]) -> List[List[float]]:
+    async def _encode_texts(self, texts: list[str]) -> list[list[float]]:
         """Encode texts using the model"""
         if not self._model:
             await self.initialize()
@@ -126,8 +125,8 @@ class LocalEmbeddingManager:
         return embeddings.tolist()
 
     async def get_embeddings(
-        self, texts: Union[str, List[str]], use_cache: bool = True
-    ) -> List[List[float]]:
+        self, texts: str | list[str], use_cache: bool = True
+    ) -> list[list[float]]:
         """
         Get embeddings for text(s) with local processing only
 
@@ -172,7 +171,7 @@ class LocalEmbeddingManager:
 
             # Cache new embeddings
             if use_cache:
-                for text, embedding in zip(uncached_texts, new_embeddings):
+                for text, embedding in zip(uncached_texts, new_embeddings, strict=False):
                     cache_key = self._get_cache_key(text)
 
                     # Manage cache size
@@ -211,7 +210,7 @@ class LocalEmbeddingManager:
             await self.initialize()
         return self.embedding_dimension
 
-    def get_performance_stats(self) -> Dict[str, Any]:
+    def get_performance_stats(self) -> dict[str, Any]:
         """Get performance statistics"""
         avg_time_per_embedding = self.total_time / max(self.total_embeddings, 1) * 1000
 
@@ -227,7 +226,7 @@ class LocalEmbeddingManager:
             "is_initialized": self._is_initialized,
         }
 
-    async def warmup(self, sample_texts: Optional[List[str]] = None):
+    async def warmup(self, sample_texts: list[str] | None = None):
         """Warm up the model with sample texts"""
         if not sample_texts:
             sample_texts = [
@@ -268,7 +267,7 @@ async def get_default_embedding_manager() -> LocalEmbeddingManager:
     return _default_manager
 
 
-async def get_embeddings(texts: Union[str, List[str]]) -> List[List[float]]:
+async def get_embeddings(texts: str | list[str]) -> list[list[float]]:
     """Convenience function for getting embeddings"""
     manager = await get_default_embedding_manager()
     return await manager.get_embeddings(texts)
@@ -277,37 +276,30 @@ async def get_embeddings(texts: Union[str, List[str]]) -> List[List[float]]:
 # Test function
 async def test_local_embeddings():
     """Test the local embedding system"""
-    print("🧪 Testing Local Embedding System")
-    print("=" * 40)
 
     manager = LocalEmbeddingManager()
     await manager.warmup()
 
     # Test single embedding
-    result = await manager.get_embeddings("Hello world!")
-    print(f"✅ Single embedding: {len(result[0])} dimensions")
+    await manager.get_embeddings("Hello world!")
 
     # Test batch embedding
     batch_texts = ["Hello", "World", "AI", "Embeddings"] * 5
     start_time = time.time()
-    batch_result = await manager.get_embeddings(batch_texts)
-    batch_time = time.time() - start_time
+    await manager.get_embeddings(batch_texts)
+    time.time() - start_time
 
-    print(f"✅ Batch embedding: {len(batch_result)} embeddings in {batch_time*1000:.2f}ms")
-    print(f"   Speed: {len(batch_result)/batch_time:.1f} embeddings/second")
 
     # Test caching
     start_time = time.time()
-    cached_result = await manager.get_embeddings(batch_texts)  # Should be cached
-    cache_time = time.time() - start_time
+    await manager.get_embeddings(batch_texts)  # Should be cached
+    time.time() - start_time
 
-    print(f"✅ Cached retrieval: {cache_time*1000:.2f}ms")
 
     # Show stats
     stats = manager.get_performance_stats()
-    print(f"✅ Performance stats:")
-    for key, value in stats.items():
-        print(f"   {key}: {value}")
+    for _key, _value in stats.items():
+        pass
 
     await manager.shutdown()
 

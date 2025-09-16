@@ -32,23 +32,20 @@ Integration Points:
 - Universal chat platform for multi-platform support
 """
 
+import hashlib
 import logging
+import re
+from collections import defaultdict
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from enum import Enum
-from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Any
-from collections import defaultdict
-import re
-import statistics
-import hashlib
-import asyncio
-from concurrent.futures import ThreadPoolExecutor
+from typing import Any
 
 # Import existing systems for integration
 try:
     from src.intelligence.emotional_context_engine import (
-        EmotionalContextEngine,
         EmotionalContext,
+        EmotionalContextEngine,
         EmotionalState,
     )
 
@@ -64,7 +61,7 @@ except ImportError:
     PERSONALITY_PROFILER_AVAILABLE = False
 
 try:
-    from src.personality.memory_moments import MemoryTriggeredMoments, ConversationContext
+    from src.personality.memory_moments import ConversationContext, MemoryTriggeredMoments
 
     MEMORY_MOMENTS_AVAILABLE = True
 except ImportError:
@@ -118,24 +115,24 @@ class ConversationThreadAdvanced:
     user_id: str
 
     # Thread identification
-    topic_seeds: List[str] = field(default_factory=list)  # Initial topic keywords
-    topic_keywords: List[str] = field(default_factory=list)  # All related keywords
-    theme_tags: List[str] = field(default_factory=list)  # Semantic themes
+    topic_seeds: list[str] = field(default_factory=list)  # Initial topic keywords
+    topic_keywords: list[str] = field(default_factory=list)  # All related keywords
+    theme_tags: list[str] = field(default_factory=list)  # Semantic themes
 
     # Thread state
     state: ConversationThreadState = ConversationThreadState.ACTIVE
     priority_level: ThreadPriorityLevel = ThreadPriorityLevel.MEDIUM
 
     # Content tracking
-    messages: List[Dict[str, Any]] = field(default_factory=list)
+    messages: list[dict[str, Any]] = field(default_factory=list)
     last_message_time: datetime = field(default_factory=datetime.now)
     total_messages: int = 0
 
     # Context preservation
-    emotional_context: Optional[Any] = None  # Current emotional state
+    emotional_context: Any | None = None  # Current emotional state
     conversation_phase: str = "opening"  # opening, developing, deepening, resolving
-    unresolved_questions: List[str] = field(default_factory=list)
-    pending_actions: List[str] = field(default_factory=list)
+    unresolved_questions: list[str] = field(default_factory=list)
+    pending_actions: list[str] = field(default_factory=list)
 
     # Relationship tracking
     relationship_depth_at_start: float = 0.0
@@ -145,13 +142,13 @@ class ConversationThreadAdvanced:
     # Thread management
     created_at: datetime = field(default_factory=datetime.now)
     last_active: datetime = field(default_factory=datetime.now)
-    pause_reason: Optional[str] = None
-    resumption_cues: List[str] = field(default_factory=list)
+    pause_reason: str | None = None
+    resumption_cues: list[str] = field(default_factory=list)
 
     # Connection tracking
-    related_threads: List[str] = field(default_factory=list)
-    parent_thread: Optional[str] = None
-    child_threads: List[str] = field(default_factory=list)
+    related_threads: list[str] = field(default_factory=list)
+    parent_thread: str | None = None
+    child_threads: list[str] = field(default_factory=list)
 
     # Priority factors
     emotional_urgency: float = 0.0
@@ -168,14 +165,14 @@ class ThreadTransition:
     user_id: str
 
     # Transition details
-    from_thread: Optional[str]
+    from_thread: str | None
     to_thread: str
     transition_type: ThreadTransitionType
     trigger_message: str
 
     # Transition context
     bridge_message: str = ""  # AI's transition message
-    context_preserved: Dict[str, Any] = field(default_factory=dict)
+    context_preserved: dict[str, Any] = field(default_factory=dict)
     transition_quality: float = 0.0  # 0.0-1.0 smoothness rating
 
     # Timing
@@ -183,8 +180,8 @@ class ThreadTransition:
     preparation_time: float = 0.0  # Seconds to prepare transition
 
     # User response
-    user_accepted_transition: Optional[bool] = None
-    user_feedback: Optional[str] = None
+    user_accepted_transition: bool | None = None
+    user_feedback: str | None = None
 
 
 class AdvancedConversationThreadManager:
@@ -198,10 +195,10 @@ class AdvancedConversationThreadManager:
 
     def __init__(
         self,
-        emotional_context_engine: Optional[EmotionalContextEngine] = None,
-        personality_profiler: Optional[DynamicPersonalityProfiler] = None,
-        memory_moments: Optional[MemoryTriggeredMoments] = None,
-        memory_manager: Optional[Any] = None,
+        emotional_context_engine: EmotionalContextEngine | None = None,
+        personality_profiler: DynamicPersonalityProfiler | None = None,
+        memory_moments: MemoryTriggeredMoments | None = None,
+        memory_manager: Any | None = None,
         max_active_threads: int = 5,
         max_background_threads: int = 20,
         thread_timeout_hours: int = 48,
@@ -228,9 +225,9 @@ class AdvancedConversationThreadManager:
         self.thread_timeout = timedelta(hours=thread_timeout_hours)
 
         # Thread storage
-        self.user_threads: Dict[str, List[ConversationThreadAdvanced]] = defaultdict(list)
-        self.thread_transitions: Dict[str, List[ThreadTransition]] = defaultdict(list)
-        self.active_threads: Dict[str, str] = {}  # user_id -> current thread_id
+        self.user_threads: dict[str, list[ConversationThreadAdvanced]] = defaultdict(list)
+        self.thread_transitions: dict[str, list[ThreadTransition]] = defaultdict(list)
+        self.active_threads: dict[str, str] = {}  # user_id -> current thread_id
 
         # Analysis engines
         self.topic_analyzer = TopicSimilarityAnalyzer()
@@ -238,9 +235,9 @@ class AdvancedConversationThreadManager:
         self.priority_calculator = ThreadPriorityCalculator()
 
         # Performance tracking
-        self.thread_success_rates: Dict[str, float] = {}
-        self.transition_quality_scores: List[float] = []
-        self.user_satisfaction_scores: Dict[str, List[float]] = defaultdict(list)
+        self.thread_success_rates: dict[str, float] = {}
+        self.transition_quality_scores: list[float] = []
+        self.user_satisfaction_scores: dict[str, list[float]] = defaultdict(list)
 
         logger.info(
             "AdvancedConversationThreadManager initialized with max %d active threads",
@@ -248,8 +245,8 @@ class AdvancedConversationThreadManager:
         )
 
     async def process_user_message(
-        self, user_id: str, message: str, context: Optional[Dict[str, Any]] = None
-    ) -> Dict[str, Any]:
+        self, user_id: str, message: str, context: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
         """
         Process a user message and manage conversation threads intelligently.
 
@@ -292,8 +289,8 @@ class AdvancedConversationThreadManager:
         }
 
     async def _analyze_message_for_thread(
-        self, user_id: str, message: str, context: Optional[Dict[str, Any]]
-    ) -> Dict[str, Any]:
+        self, user_id: str, message: str, context: dict[str, Any] | None
+    ) -> dict[str, Any]:
         """Analyze message to understand thread context and intent"""
 
         # Extract topics and keywords
@@ -324,7 +321,7 @@ class AdvancedConversationThreadManager:
         }
 
     async def _determine_target_thread(
-        self, user_id: str, message: str, analysis: Dict[str, Any]
+        self, user_id: str, message: str, analysis: dict[str, Any]
     ) -> str:
         """Determine which thread this message belongs to"""
 
@@ -375,7 +372,7 @@ class AdvancedConversationThreadManager:
         return current_thread_id or await self._create_new_thread(user_id, message, analysis)
 
     async def _create_new_thread(
-        self, user_id: str, initial_message: str, analysis: Dict[str, Any]
+        self, user_id: str, initial_message: str, analysis: dict[str, Any]
     ) -> str:
         """Create a new conversation thread"""
 
@@ -432,7 +429,7 @@ class AdvancedConversationThreadManager:
 
     async def _handle_thread_transition(
         self, user_id: str, target_thread_id: str, message: str
-    ) -> Optional[ThreadTransition]:
+    ) -> ThreadTransition | None:
         """Handle transition between conversation threads"""
 
         current_thread_id = self.active_threads.get(user_id)
@@ -487,7 +484,7 @@ class AdvancedConversationThreadManager:
         return transition
 
     async def _update_thread_state(
-        self, user_id: str, thread_id: str, message: str, context: Optional[Dict[str, Any]]
+        self, user_id: str, thread_id: str, message: str, context: dict[str, Any] | None
     ):
         """Update the state of a conversation thread"""
 
@@ -535,7 +532,7 @@ class AdvancedConversationThreadManager:
 
     # Utility methods for thread analysis and management
 
-    def _extract_keywords(self, text: str) -> List[str]:
+    def _extract_keywords(self, text: str) -> list[str]:
         """Extract meaningful keywords from text"""
         words = re.findall(r"\b\w+\b", text.lower())
 
@@ -630,7 +627,7 @@ class AdvancedConversationThreadManager:
 
         return unique_keywords[:20]  # Limit to top 20 keywords
 
-    def _identify_themes(self, text: str) -> List[str]:
+    def _identify_themes(self, text: str) -> list[str]:
         """Identify thematic content in text"""
         text_lower = text.lower()
         themes = []
@@ -790,7 +787,7 @@ class AdvancedConversationThreadManager:
 
         return themes
 
-    def _detect_transition_indicators(self, message: str) -> Dict[str, Any]:
+    def _detect_transition_indicators(self, message: str) -> dict[str, Any]:
         """Detect linguistic indicators of topic transitions"""
         text_lower = message.lower()
 
@@ -867,8 +864,8 @@ class AdvancedConversationThreadManager:
     # Additional analysis and management methods
 
     async def _analyze_emotional_context(
-        self, message: str, context: Optional[Dict[str, Any]]
-    ) -> Dict[str, Any]:
+        self, message: str, context: dict[str, Any] | None
+    ) -> dict[str, Any]:
         """Analyze emotional context of a message"""
         if self.emotional_context_engine and context:
             try:
@@ -900,7 +897,7 @@ class AdvancedConversationThreadManager:
 
         return {"primary_emotion": "neutral", "urgency": urgency, "emotional_intensity": 0.5}
 
-    async def _detect_thread_references(self, user_id: str, message: str) -> List[str]:
+    async def _detect_thread_references(self, user_id: str, message: str) -> list[str]:
         """Detect references to existing threads using memory moments and keyword analysis"""
         thread_references = []
         user_threads = self.user_threads[user_id]
@@ -945,8 +942,8 @@ class AdvancedConversationThreadManager:
         return thread_references
 
     async def _analyze_conversation_intent(
-        self, message: str, context: Optional[Dict[str, Any]]
-    ) -> Dict[str, Any]:
+        self, message: str, context: dict[str, Any] | None
+    ) -> dict[str, Any]:
         """Analyze the intent behind a conversation message"""
         text_lower = message.lower()
 
@@ -1017,7 +1014,7 @@ class AdvancedConversationThreadManager:
         return max(0.0, min(1.0, score))
 
     async def _calculate_thread_similarity(
-        self, thread: ConversationThreadAdvanced, analysis: Dict[str, Any]
+        self, thread: ConversationThreadAdvanced, analysis: dict[str, Any]
     ) -> float:
         """Calculate similarity between thread and message analysis"""
         message_keywords = set(analysis.get("keywords", []))
@@ -1045,7 +1042,7 @@ class AdvancedConversationThreadManager:
         # Weighted combination
         return (keyword_similarity * 0.7) + (theme_similarity * 0.3)
 
-    async def _assess_initial_priority(self, analysis: Dict[str, Any]) -> ThreadPriorityLevel:
+    async def _assess_initial_priority(self, analysis: dict[str, Any]) -> ThreadPriorityLevel:
         """Assess initial priority level for a new thread"""
         emotional_urgency = analysis.get("emotional_analysis", {}).get("urgency", 0.0)
         time_sensitivity = analysis.get("intent_analysis", {}).get("time_sensitivity", 0.0)
@@ -1123,7 +1120,7 @@ class AdvancedConversationThreadManager:
         else:
             return f"This naturally connects to {', '.join(to_thread.topic_keywords[:2])}."
 
-    async def _preserve_thread_context(self, user_id: str, thread_id: str) -> Dict[str, Any]:
+    async def _preserve_thread_context(self, user_id: str, thread_id: str) -> dict[str, Any]:
         """Preserve important context from a thread being paused"""
         thread = await self._get_thread(user_id, thread_id)
         if not thread:
@@ -1166,7 +1163,7 @@ class AdvancedConversationThreadManager:
             return "established"
 
     async def _update_thread_priority_factors(
-        self, thread: ConversationThreadAdvanced, message: str, context: Optional[Dict[str, Any]]
+        self, thread: ConversationThreadAdvanced, message: str, context: dict[str, Any] | None
     ):
         """Update thread priority factors based on new message"""
         # Update emotional urgency
@@ -1185,7 +1182,7 @@ class AdvancedConversationThreadManager:
         phase_completion = {"opening": 0.1, "developing": 0.3, "deepening": 0.6, "established": 0.8}
         thread.completion_status = phase_completion.get(thread.conversation_phase, 0.5)
 
-    async def _calculate_thread_priorities(self, user_id: str) -> Dict[str, Any]:
+    async def _calculate_thread_priorities(self, user_id: str) -> dict[str, Any]:
         """Calculate priorities for all user threads"""
         user_threads = self.user_threads[user_id]
         priorities = {}
@@ -1210,9 +1207,9 @@ class AdvancedConversationThreadManager:
         self,
         user_id: str,
         current_thread_id: str,
-        transition_info: Optional[ThreadTransition],
-        priorities: Dict[str, Any],
-    ) -> Dict[str, Any]:
+        transition_info: ThreadTransition | None,
+        priorities: dict[str, Any],
+    ) -> dict[str, Any]:
         """Generate guidance for response generation"""
         current_thread = await self._get_thread(user_id, current_thread_id)
         if not current_thread:
@@ -1259,7 +1256,7 @@ class AdvancedConversationThreadManager:
 
         return guidance
 
-    async def _get_recent_context_switches(self, user_id: str) -> List[Dict[str, Any]]:
+    async def _get_recent_context_switches(self, user_id: str) -> list[dict[str, Any]]:
         """Get recent context switches for a user"""
         recent_transitions = []
         transitions = self.thread_transitions[user_id]
@@ -1301,12 +1298,12 @@ class AdvancedConversationThreadManager:
 
     async def _get_thread(
         self, user_id: str, thread_id: str
-    ) -> Optional[ConversationThreadAdvanced]:
+    ) -> ConversationThreadAdvanced | None:
         """Get a specific thread for a user"""
         user_threads = self.user_threads[user_id]
         return next((thread for thread in user_threads if thread.thread_id == thread_id), None)
 
-    async def _get_active_threads(self, user_id: str) -> List[Dict[str, Any]]:
+    async def _get_active_threads(self, user_id: str) -> list[dict[str, Any]]:
         """Get all active threads for a user"""
         user_threads = self.user_threads[user_id]
         active_threads = []
@@ -1401,7 +1398,7 @@ class TopicSimilarityAnalyzer:
         self.similarity_cache[cache_key] = similarity
         return similarity
 
-    def _extract_keywords(self, text: str) -> List[str]:
+    def _extract_keywords(self, text: str) -> list[str]:
         """Extract keywords from text"""
         words = re.findall(r"\b\w+\b", text.lower())
         stop_words = {
@@ -1429,7 +1426,7 @@ class TransitionDetector:
     def __init__(self):
         self.transition_patterns = self._load_transition_patterns()
 
-    def _load_transition_patterns(self) -> Dict[str, List[str]]:
+    def _load_transition_patterns(self) -> dict[str, list[str]]:
         """Load patterns for different transition types"""
         return {
             "explicit": ["anyway", "by the way", "speaking of", "changing topics"],
@@ -1439,7 +1436,7 @@ class TransitionDetector:
             "contrastive": ["however", "but", "although", "on the other hand"],
         }
 
-    async def detect_transition(self, message: str) -> Dict[str, Any]:
+    async def detect_transition(self, message: str) -> dict[str, Any]:
         """Detect if message contains transition indicators"""
         text_lower = message.lower()
 

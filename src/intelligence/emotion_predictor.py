@@ -9,16 +9,15 @@ Phase 2: Predictive Emotional Intelligence
 """
 
 import logging
-import asyncio
-from datetime import datetime, timezone, timedelta
-from typing import Dict, List, Optional, Any, Tuple
-from dataclasses import dataclass, asdict
-from enum import Enum
-import statistics
 import re
+import statistics
+from collections import Counter, defaultdict
+from dataclasses import dataclass
+from datetime import datetime
+from enum import Enum
+from typing import Any
+
 import spacy
-from collections import defaultdict, Counter
-import numpy as np
 
 logger = logging.getLogger(__name__)
 
@@ -47,8 +46,8 @@ class EmotionalPrediction:
     predicted_emotion: str
     confidence: float
     time_horizon: str  # "immediate", "short_term", "medium_term"
-    triggering_factors: List[str]
-    recommended_actions: List[str]
+    triggering_factors: list[str]
+    recommended_actions: list[str]
     risk_level: str  # "low", "medium", "high"
 
 
@@ -58,8 +57,8 @@ class EmotionalCycle:
 
     pattern_type: EmotionalPattern
     cycle_length: str  # "hourly", "daily", "weekly"
-    peak_times: List[str]
-    low_times: List[str]
+    peak_times: list[str]
+    low_times: list[str]
     confidence: float
     sample_size: int
 
@@ -180,8 +179,8 @@ class EmotionPredictor:
         }
 
     async def analyze_emotional_patterns(
-        self, user_id: str, conversation_history: List[Dict]
-    ) -> Dict[str, Any]:
+        self, user_id: str, conversation_history: list[dict]
+    ) -> dict[str, Any]:
         """
         Analyze historical emotional patterns for prediction
 
@@ -224,7 +223,7 @@ class EmotionPredictor:
         )
         return analysis
 
-    async def _detect_emotional_cycles(self, history: List[Dict]) -> List[EmotionalCycle]:
+    async def _detect_emotional_cycles(self, history: list[dict]) -> list[EmotionalCycle]:
         """Detect daily/weekly emotional patterns"""
         cycles = []
 
@@ -314,7 +313,7 @@ class EmotionPredictor:
 
         return cycles
 
-    async def _analyze_trigger_patterns(self, history: List[Dict]) -> List[EmotionalTrigger]:
+    async def _analyze_trigger_patterns(self, history: list[dict]) -> list[EmotionalTrigger]:
         """Identify what triggers specific emotions"""
         triggers = []
 
@@ -392,7 +391,7 @@ class EmotionPredictor:
 
         return triggers
 
-    async def _analyze_recovery_patterns(self, history: List[Dict]) -> Dict[str, Any]:
+    async def _analyze_recovery_patterns(self, history: list[dict]) -> dict[str, Any]:
         """Analyze how users recover from negative emotions"""
         recovery_patterns = {
             "average_recovery_time": None,
@@ -480,7 +479,7 @@ class EmotionPredictor:
 
         return recovery_patterns
 
-    async def _detect_stress_patterns(self, history: List[Dict]) -> Dict[str, Any]:
+    async def _detect_stress_patterns(self, history: list[dict]) -> dict[str, Any]:
         """Detect patterns that indicate stress buildup"""
         stress_patterns = {
             "stress_indicators_found": [],
@@ -534,7 +533,7 @@ class EmotionPredictor:
 
         return stress_patterns
 
-    async def _predict_emotional_trajectory(self, history: List[Dict]) -> Dict[str, Any]:
+    async def _predict_emotional_trajectory(self, history: list[dict]) -> dict[str, Any]:
         """Predict likely emotional trajectory based on recent patterns"""
         if len(history) < 3:
             return {"prediction": "insufficient_data"}
@@ -588,7 +587,7 @@ class EmotionPredictor:
 
         return {"prediction": "insufficient_trend_data"}
 
-    async def _analyze_conversation_timing(self, history: List[Dict]) -> Dict[str, Any]:
+    async def _analyze_conversation_timing(self, history: list[dict]) -> dict[str, Any]:
         """Analyze when emotional conversations typically occur"""
         timing_patterns = {
             "peak_conversation_hours": [],
@@ -628,7 +627,7 @@ class EmotionPredictor:
 
         return timing_patterns
 
-    async def _calculate_emotional_volatility(self, history: List[Dict]) -> float:
+    async def _calculate_emotional_volatility(self, history: list[dict]) -> float:
         """Calculate how much user's emotions fluctuate"""
         emotions = [conv.get("emotion") for conv in history if conv.get("emotion")]
 
@@ -657,7 +656,7 @@ class EmotionPredictor:
         return 0.0
 
     async def predict_emotional_state(
-        self, user_id: str, context: Dict, historical_patterns: Dict
+        self, user_id: str, context: dict, historical_patterns: dict
     ) -> EmotionalPrediction:
         """
         Predict likely emotional response to given context
@@ -678,7 +677,7 @@ class EmotionPredictor:
         current_topic = context.get("topic", "general")
         current_time_hour = datetime.now().hour
         recent_messages = context.get("recent_messages", [])
-        conversation_style = context.get("communication_style", "neutral")
+        context.get("communication_style", "neutral")
 
         predicted_emotion = "neutral"
         confidence = 0.5
@@ -833,7 +832,7 @@ class EmotionPredictor:
         )
         return prediction
 
-    def get_prediction_summary(self, prediction: EmotionalPrediction) -> Dict[str, Any]:
+    def get_prediction_summary(self, prediction: EmotionalPrediction) -> dict[str, Any]:
         """Generate human-readable prediction summary"""
         return {
             "prediction": {

@@ -14,7 +14,6 @@ import asyncio
 import logging
 import os
 import sys
-from typing import Optional
 
 # Add project root to path and load environment (like main.py does)
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -24,23 +23,15 @@ sys.path.insert(0, project_root)
 from env_manager import load_environment
 
 if not load_environment():
-    print("❌ Failed to load environment configuration")
-    print("💡 Run: python setup_env.py --template minimal")
     sys.exit(1)
 
 # Import the integrated components
-from src.utils.graph_integrated_emotion_manager import GraphIntegratedEmotionManager
-from src.memory.memory_manager import UserMemoryManager
-from src.memory.integrated_memory_manager import IntegratedMemoryManager
-
-import asyncio
-import logging
 import os
-from typing import Optional
+
+from src.memory.memory_manager import UserMemoryManager
+from src.utils.graph_integrated_emotion_manager import GraphIntegratedEmotionManager
 
 # Import the integrated components
-from src.utils.graph_integrated_emotion_manager import GraphIntegratedEmotionManager
-from src.memory.memory_manager import UserMemoryManager
 
 logger = logging.getLogger(__name__)
 
@@ -64,7 +55,7 @@ class EnhancedBot:
         logger.info("Enhanced bot initialized with integrated systems")
 
     async def process_message(
-        self, user_id: str, message: str, display_name: Optional[str] = None
+        self, user_id: str, message: str, display_name: str | None = None
     ) -> dict:
         """Process a message using all integrated systems"""
 
@@ -186,7 +177,7 @@ class EnhancedBot:
             system_prompt_parts.append("\n=== CONTEXTUAL INSIGHTS ===")
             system_prompt_parts.append(context["graph_insights"])
 
-        system_prompt = "\n".join(system_prompt_parts)
+        "\n".join(system_prompt_parts)
 
         # This is where you'd call your actual LLM
         # For demo purposes, return a context-aware response
@@ -272,7 +263,7 @@ class EnhancedBot:
 
         # Check memory manager
         try:
-            test_memories = self.memory_manager.retrieve_relevant_memories(
+            self.memory_manager.retrieve_relevant_memories(
                 "health_check", "test", limit=1
             )
             health["components"]["memory_manager"] = {"status": "healthy"}
@@ -291,17 +282,14 @@ class EnhancedBot:
 async def example_conversation():
     """Example of using the enhanced bot"""
 
-    print("🤖 Enhanced Bot with Integrated Graph-Emotion System")
-    print("=" * 60)
 
     # Initialize bot
     bot = EnhancedBot()
 
     # Health check
     health = await bot.health_check()
-    print(f"System Health: {health['overall_status']}")
-    for component, status in health["components"].items():
-        print(f"  {component}: {status.get('status', 'unknown')}")
+    for _component, _status in health["components"].items():
+        pass
 
     # Example conversation flow
     user_id = "example_user_456"
@@ -314,39 +302,22 @@ async def example_conversation():
         ("How do you remember all this stuff about me?", "Meta question about memory"),
     ]
 
-    print(f"\n💬 Example Conversation with User: {user_id}")
-    print("-" * 60)
 
-    for i, (message, description) in enumerate(conversations, 1):
-        print(f"\n[{i}] {description}")
-        print(f"User: {message}")
+    for i, (message, _description) in enumerate(conversations, 1):
 
         # Process message through integrated system
-        result = await bot.process_message(user_id, message, "Sarah")
+        await bot.process_message(user_id, message, "Sarah")
 
-        print(f"Bot: {result['response']}")
-        print(f"Context: {result['user_profile']}")
-        print(
-            f"Emotion: {result['emotion_analysis']['detected_emotion']} "
-            f"({result['emotion_analysis']['confidence']:.2f} confidence)"
-        )
-        print(f"Systems: {', '.join(result['context_sources'])}")
 
         # Show relationship progression
         if i % 2 == 0:  # Every other message
-            summary = await bot.get_user_summary(user_id)
-            print(
-                f"Relationship: {summary['relationship_level']} "
-                f"({summary['interaction_count']} interactions)"
-            )
+            await bot.get_user_summary(user_id)
 
     # Final summary
-    print(f"\n📊 Final User Summary")
-    print("-" * 60)
     final_summary = await bot.get_user_summary(user_id)
-    for key, value in final_summary.items():
+    for key, _value in final_summary.items():
         if key != "user_id":
-            print(f"{key}: {value}")
+            pass
 
 
 # Integration with existing Discord bot

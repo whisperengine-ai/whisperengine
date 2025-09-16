@@ -19,19 +19,20 @@ SECURITY FEATURES:
 """
 
 import asyncio
-import time
-import random
-import logging
 import hashlib
-from typing import Dict, List, Optional, Any, Callable, Awaitable
-from dataclasses import dataclass
-from enum import Enum
-from datetime import datetime, timedelta
+import logging
+import random
 import statistics
+import time
+from collections.abc import Awaitable, Callable
+from dataclasses import dataclass
+from datetime import datetime, timedelta
+from enum import Enum
+from typing import Any
 
 # Import secure logging for timing security events
 try:
-    from secure_logging import get_secure_logger, DataSensitivity, LogLevel
+    from secure_logging import DataSensitivity, LogLevel, get_secure_logger
 
     secure_logger = get_secure_logger("timing_attack_prevention")
     HAS_SECURE_LOGGING = True
@@ -96,7 +97,7 @@ class TimingAttackPrevention:
     to prevent attackers from inferring information based on response times.
     """
 
-    def __init__(self, config: Optional[TimingNormalizationConfig] = None):
+    def __init__(self, config: TimingNormalizationConfig | None = None):
         self.config = config or TimingNormalizationConfig()
         self.measurements = {}  # operation_type -> List[TimingMeasurement]
         self.baseline_times = {}  # operation_type -> baseline timing stats
@@ -139,7 +140,7 @@ class TimingAttackPrevention:
         operation: Callable[..., Awaitable],
         profile: TimingProfile,
         sensitivity: TimingSensitivity,
-        user_id: Optional[str] = None,
+        user_id: str | None = None,
         **kwargs,
     ) -> Any:
         """
@@ -217,11 +218,11 @@ class TimingAttackPrevention:
 
         # Get target timing for this operation type
         baseline = self.baseline_times.get(profile, {})
-        target_time = baseline.get("target_time", self.config.min_response_time)
+        baseline.get("target_time", self.config.min_response_time)
 
         # Calculate how much additional delay is needed
         elapsed = measurement.duration
-        current_time = time.time()
+        time.time()
 
         # Determine minimum required time based on sensitivity
         min_time = self._calculate_minimum_time(profile, sensitivity)
@@ -357,7 +358,7 @@ class TimingAttackPrevention:
         self._check_timing_probing(user_hash, user_data)
         self._check_consistent_timing(user_hash, user_data)
 
-    def _check_rapid_requests(self, user_hash: str, user_data: Dict):
+    def _check_rapid_requests(self, user_hash: str, user_data: dict):
         """Check for rapid sequential requests (potential automated probing)"""
 
         recent_measurements = user_data["measurements"]
@@ -381,7 +382,7 @@ class TimingAttackPrevention:
                     user_hash, "rapid_requests", f"Average request interval: {avg_interval:.3f}s"
                 )
 
-    def _check_timing_probing(self, user_hash: str, user_data: Dict):
+    def _check_timing_probing(self, user_hash: str, user_data: dict):
         """Check for timing-based probing attempts"""
 
         measurements = user_data["measurements"]
@@ -408,7 +409,7 @@ class TimingAttackPrevention:
                     f"Data present avg: {with_avg:.3f}s, Data absent avg: {without_avg:.3f}s",
                 )
 
-    def _check_consistent_timing(self, user_hash: str, user_data: Dict):
+    def _check_consistent_timing(self, user_hash: str, user_data: dict):
         """Check for unusually consistent timing (potential automation)"""
 
         measurements = user_data["measurements"]
@@ -543,7 +544,7 @@ class TimingAttackPrevention:
             **kwargs,
         )
 
-    def get_timing_statistics(self, operation_type: Optional[str] = None) -> Dict[str, Any]:
+    def get_timing_statistics(self, operation_type: str | None = None) -> dict[str, Any]:
         """Get timing statistics for monitoring and analysis"""
 
         if operation_type:

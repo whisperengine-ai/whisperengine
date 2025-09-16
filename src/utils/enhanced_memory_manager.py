@@ -6,7 +6,8 @@ for better semantic search and memory retrieval.
 """
 
 import logging
-from typing import List, Dict, Optional, Any, Tuple
+from typing import Any
+
 from .enhanced_query_processor import EnhancedQueryProcessor, QueryResult
 
 logger = logging.getLogger(__name__)
@@ -36,8 +37,8 @@ class EnhancedMemoryManager:
         logger.info("Enhanced memory manager initialized with optimized query processing")
 
     def retrieve_relevant_memories_enhanced(
-        self, user_id: str, message: str, limit: int = 10, context: Optional[Any] = None
-    ) -> List[Dict]:
+        self, user_id: str, message: str, limit: int = 10, context: Any | None = None
+    ) -> list[dict]:
         """
         Retrieve relevant memories using enhanced query processing
 
@@ -80,11 +81,11 @@ class EnhancedMemoryManager:
     def _retrieve_with_combined_queries(
         self,
         user_id: str,
-        search_strategies: List[Tuple[str, float]],
+        search_strategies: list[tuple[str, float]],
         limit: int,
-        context: Optional[Any],
+        context: Any | None,
         query_result: QueryResult,
-    ) -> List[Dict]:
+    ) -> list[dict]:
         """
         Retrieve memories using multiple queries and combine results with weighted scoring
         """
@@ -164,11 +165,11 @@ class EnhancedMemoryManager:
     def _retrieve_with_sequential_queries(
         self,
         user_id: str,
-        search_strategies: List[Tuple[str, float]],
+        search_strategies: list[tuple[str, float]],
         limit: int,
-        context: Optional[Any],
+        context: Any | None,
         query_result: QueryResult,
-    ) -> List[Dict]:
+    ) -> list[dict]:
         """
         Retrieve memories using queries sequentially until limit is reached
         """
@@ -218,7 +219,7 @@ class EnhancedMemoryManager:
 
         return all_memories[:limit]
 
-    def _apply_relevance_boosting(self, memories: List[Dict], query_result: QueryResult):
+    def _apply_relevance_boosting(self, memories: list[dict], query_result: QueryResult):
         """
         Apply additional relevance boosting based on query analysis
         """
@@ -267,7 +268,6 @@ class EnhancedMemoryManager:
             timestamp = metadata.get("timestamp", "")
             if timestamp:
                 try:
-                    from datetime import datetime, timedelta
 
                     # Simple recency boost (this could be more sophisticated)
                     memory["enhanced_score"] = memory.get("enhanced_score", 0) + 0.05
@@ -275,8 +275,8 @@ class EnhancedMemoryManager:
                     pass
 
     def _fallback_retrieve(
-        self, user_id: str, message: str, limit: int, context: Optional[Any]
-    ) -> List[Dict]:
+        self, user_id: str, message: str, limit: int, context: Any | None
+    ) -> list[dict]:
         """
         Fallback to original memory retrieval method
         """
@@ -351,7 +351,7 @@ class EnhancedMemoryManager:
 
     def retrieve_context_aware_memories(
         self, user_id: str, message: str, context: Any, limit: int = 10
-    ) -> List[Dict]:
+    ) -> list[dict]:
         """
         Enhanced version of context-aware memory retrieval
 
@@ -359,7 +359,7 @@ class EnhancedMemoryManager:
         """
         return self.retrieve_relevant_memories_enhanced(user_id, message, limit, context)
 
-    def retrieve_relevant_memories(self, user_id: str, message: str, limit: int = 10) -> List[Dict]:
+    def retrieve_relevant_memories(self, user_id: str, message: str, limit: int = 10) -> list[dict]:
         """
         Enhanced version of relevant memory retrieval
 

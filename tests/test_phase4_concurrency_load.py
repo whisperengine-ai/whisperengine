@@ -21,17 +21,11 @@ Testing Strategy:
 
 import asyncio
 import logging
-import time
-import threading
-import uuid
 import random
-import statistics
-from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import List, Dict, Any, Optional
+import time
+import uuid
+
 import pytest
-from unittest.mock import Mock, patch
-import gc
-import os
 
 # Import actual Phase 4 components
 try:
@@ -56,7 +50,7 @@ except ImportError:
     ENGAGEMENT_ENGINE_AVAILABLE = False
 
 try:
-    from src.intelligence.emotional_context_engine import EmotionalContextEngine, EmotionalContext
+    from src.intelligence.emotional_context_engine import EmotionalContext, EmotionalContextEngine
 
     EMOTIONAL_CONTEXT_AVAILABLE = True
 except ImportError:
@@ -100,7 +94,7 @@ class Phase4ConcurrencyTester:
             logger.error(f"❌ Component initialization failed: {e}")
             return False
 
-    def generate_realistic_messages(self, count: int) -> List[str]:
+    def generate_realistic_messages(self, count: int) -> list[str]:
         """Generate realistic conversation messages for testing"""
         conversation_starters = [
             "I've been thinking about my career lately",
@@ -173,7 +167,7 @@ class Phase4ConcurrencyTester:
                         if i > 0:
                             await asyncio.sleep(random.uniform(0.01, 0.05))
 
-                        result = await self.thread_manager.process_user_message(
+                        await self.thread_manager.process_user_message(
                             user_id, message, {"message_index": i}
                         )
 
@@ -244,7 +238,7 @@ class Phase4ConcurrencyTester:
                 for i, message in enumerate(messages):
                     try:
                         # Test memory analysis - use the actual method signature
-                        connections = await self.memory_moments.analyze_conversation_for_memories(
+                        await self.memory_moments.analyze_conversation_for_memories(
                             user_id,
                             f"context_{i}",
                             message,
@@ -337,7 +331,7 @@ class Phase4ConcurrencyTester:
                         message = messages[i]
 
                         # Test engagement analysis - check actual method signature
-                        analysis = await self.engagement_engine.analyze_conversation_engagement(
+                        await self.engagement_engine.analyze_conversation_engagement(
                             user_id, message, []  # Empty list for recent_messages
                         )
 
@@ -393,7 +387,6 @@ class Phase4ConcurrencyTester:
         )
 
         start_time = time.time()
-        component_results = {}
 
         async def integrated_user_session(user_id: str):
             """Simulate a complete user conversation session"""

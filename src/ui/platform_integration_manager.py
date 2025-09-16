@@ -6,14 +6,13 @@ Handles platform-specific integrations for macOS, Windows, and Linux.
 
 import logging
 import platform
-import sys
-from typing import Optional, Dict, Any, List
 from pathlib import Path
+from typing import Any
 
 try:
-    from PySide6.QtWidgets import QApplication, QSystemTrayIcon, QMenu
-    from PySide6.QtCore import QObject, Signal, QTimer
-    from PySide6.QtGui import QIcon, QPixmap, QColor, QAction
+    from PySide6.QtCore import QObject, QTimer, Signal
+    from PySide6.QtGui import QAction, QColor, QIcon, QPixmap
+    from PySide6.QtWidgets import QApplication, QMenu, QSystemTrayIcon
 
     PYSIDE6_AVAILABLE = True
 except ImportError:
@@ -41,12 +40,12 @@ class PlatformIntegrationManager(QObject):
         self.is_linux = self.platform_name == "linux"
 
         # Platform-specific managers
-        self.macos_manager: Optional["MacOSIntegration"] = None
-        self.windows_manager: Optional["WindowsIntegration"] = None
-        self.linux_manager: Optional["LinuxIntegration"] = None
+        self.macos_manager: MacOSIntegration | None = None
+        self.windows_manager: WindowsIntegration | None = None
+        self.linux_manager: LinuxIntegration | None = None
 
         # System tray
-        self.system_tray: Optional[QSystemTrayIcon] = None
+        self.system_tray: QSystemTrayIcon | None = None
 
         self.logger.info(f"Platform integration manager initialized for {platform.system()}")
 
@@ -284,7 +283,7 @@ class PlatformIntegrationManager(QObject):
         if self.system_tray:
             self.system_tray.setToolTip(tooltip)
 
-    def update_tray_icon(self, icon_path: Optional[str] = None):
+    def update_tray_icon(self, icon_path: str | None = None):
         """Update system tray icon"""
         if self.system_tray:
             if icon_path and Path(icon_path).exists():
@@ -309,7 +308,7 @@ class PlatformIntegrationManager(QObject):
             self.logger.error(f"Failed to set auto-start: {e}")
             return False
 
-    def get_platform_info(self) -> Dict[str, Any]:
+    def get_platform_info(self) -> dict[str, Any]:
         """Get comprehensive platform information"""
         info = {
             "platform": platform.system(),

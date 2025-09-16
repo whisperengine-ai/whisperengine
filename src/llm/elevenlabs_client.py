@@ -3,20 +3,20 @@ ElevenLabs Client for Text-to-Speech and Speech-to-Text functionality
 SECURITY ENHANCED: Now includes API key validation and secure credential handling
 """
 
-import os
-import aiohttp
-import asyncio
 import logging
-from typing import Optional, Dict, Any, List, BinaryIO
+import os
 from io import BytesIO
-import json
-from src.utils.exceptions import LLMError, LLMConnectionError, LLMTimeoutError, LLMRateLimitError
+from typing import Any
+
+import aiohttp
+
+from src.utils.exceptions import LLMConnectionError, LLMError, LLMRateLimitError, LLMTimeoutError
 
 
 class ElevenLabsClient:
     """Client for ElevenLabs TTS and STT services"""
 
-    def __init__(self, api_key: Optional[str] = None, require_api_key: bool = True):
+    def __init__(self, api_key: str | None = None, require_api_key: bool = True):
         """
         Initialize the ElevenLabs client with secure API key validation
 
@@ -26,7 +26,7 @@ class ElevenLabsClient:
         """
         # SECURITY ENHANCEMENT: Import API key security manager
         try:
-            from src.security.api_key_security import get_api_key_manager, APIKeyType
+            from src.security.api_key_security import APIKeyType, get_api_key_manager
 
             self.api_key_manager = get_api_key_manager()
         except ImportError:
@@ -104,7 +104,7 @@ class ElevenLabsClient:
             f"Audio format: {self.output_format}, Streaming: {self.use_streaming}, Optimization: {self.optimize_streaming_latency}"
         )
 
-    def _get_secure_headers(self) -> Dict[str, str]:
+    def _get_secure_headers(self) -> dict[str, str]:
         """
         SECURITY ENHANCEMENT: Create secure headers with API key validation
 
@@ -120,7 +120,7 @@ class ElevenLabsClient:
             # Fallback to basic header creation
             return {"xi-api-key": self.api_key}
 
-    async def get_available_voices(self) -> List[Dict[str, Any]]:
+    async def get_available_voices(self) -> list[dict[str, Any]]:
         """
         Get list of available voices from ElevenLabs
 
@@ -152,7 +152,7 @@ class ElevenLabsClient:
                         error_text = await response.text()
                         raise LLMError(f"ElevenLabs API error {response.status}: {error_text}")
 
-        except asyncio.TimeoutError:
+        except TimeoutError:
             raise LLMTimeoutError("ElevenLabs voices request timed out")
         except aiohttp.ClientError as e:
             raise LLMConnectionError(f"Connection error to ElevenLabs: {e}")
@@ -162,10 +162,10 @@ class ElevenLabsClient:
     async def text_to_speech(
         self,
         text: str,
-        voice_id: Optional[str] = None,
-        model_id: Optional[str] = None,
-        voice_settings: Optional[Dict[str, Any]] = None,
-        stream: Optional[bool] = None,
+        voice_id: str | None = None,
+        model_id: str | None = None,
+        voice_settings: dict[str, Any] | None = None,
+        stream: bool | None = None,
     ) -> bytes:
         """
         Convert text to speech using ElevenLabs TTS
@@ -260,7 +260,7 @@ class ElevenLabsClient:
                         error_text = await response.text()
                         raise LLMError(f"ElevenLabs TTS API error {response.status}: {error_text}")
 
-        except asyncio.TimeoutError:
+        except TimeoutError:
             raise LLMTimeoutError("ElevenLabs TTS request timed out")
         except aiohttp.ClientError as e:
             raise LLMConnectionError(f"Connection error to ElevenLabs TTS: {e}")
@@ -270,7 +270,7 @@ class ElevenLabsClient:
             raise LLMError(f"Unexpected error in TTS: {e}")
 
     async def speech_to_text(
-        self, audio_data: bytes, model_id: Optional[str] = None, language: Optional[str] = None
+        self, audio_data: bytes, model_id: str | None = None, language: str | None = None
     ) -> str:
         """
         Convert speech to text using ElevenLabs STT
@@ -330,7 +330,7 @@ class ElevenLabsClient:
                         error_text = await response.text()
                         raise LLMError(f"ElevenLabs STT API error {response.status}: {error_text}")
 
-        except asyncio.TimeoutError:
+        except TimeoutError:
             raise LLMTimeoutError("ElevenLabs STT request timed out")
         except aiohttp.ClientError as e:
             raise LLMConnectionError(f"Connection error to ElevenLabs STT: {e}")
@@ -342,9 +342,9 @@ class ElevenLabsClient:
     async def text_to_speech_stream(
         self,
         text: str,
-        voice_id: Optional[str] = None,
-        model_id: Optional[str] = None,
-        voice_settings: Optional[Dict[str, Any]] = None,
+        voice_id: str | None = None,
+        model_id: str | None = None,
+        voice_settings: dict[str, Any] | None = None,
     ):
         """
         Convert text to speech using ElevenLabs streaming API, yielding audio chunks as they arrive
@@ -427,7 +427,7 @@ class ElevenLabsClient:
                             f"ElevenLabs TTS streaming API error {response.status}: {error_text}"
                         )
 
-        except asyncio.TimeoutError:
+        except TimeoutError:
             raise LLMTimeoutError("ElevenLabs TTS streaming request timed out")
         except aiohttp.ClientError as e:
             raise LLMConnectionError(f"Connection error to ElevenLabs TTS streaming: {e}")
@@ -450,7 +450,7 @@ class ElevenLabsClient:
             self.logger.debug(f"ElevenLabs connection check failed: {e}")
             return False
 
-    def get_voice_settings(self) -> Dict[str, Any]:
+    def get_voice_settings(self) -> dict[str, Any]:
         """
         Get current voice settings configuration
 

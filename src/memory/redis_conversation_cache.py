@@ -4,15 +4,15 @@ Replaces in-memory cache with persistent Redis storage.
 Provides better scalability, persistence, and simplified locking.
 """
 
-import json
-import time
-import logging
 import asyncio
-import pickle
-import redis.asyncio as redis
-from typing import Dict, List, Optional, Any
-import discord
+import logging
 import os
+import pickle
+import time
+from typing import Any
+
+import discord
+import redis.asyncio as redis
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +40,7 @@ class RedisConversationCache:
         self.redis_db = int(os.getenv("REDIS_DB", "0"))
 
         # Redis client (will be initialized async)
-        self.redis: Optional[redis.Redis] = None
+        self.redis: redis.Redis | None = None
 
         # Key prefixes for organization
         self.key_prefix = "discord_cache"
@@ -129,13 +129,13 @@ class RedisConversationCache:
         }
         return pickle.dumps(message_data)
 
-    def _deserialize_message(self, data: bytes) -> Dict[str, Any]:
+    def _deserialize_message(self, data: bytes) -> dict[str, Any]:
         """Deserialize message data from Redis"""
         return pickle.loads(data)
 
     async def get_conversation_context(
         self, channel, limit=5, exclude_message_id=None
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """
         Get recent conversation context with minimal API calls.
 
@@ -203,7 +203,7 @@ class RedisConversationCache:
 
     async def get_user_conversation_context(
         self, channel, user_id: int, limit=5, exclude_message_id=None
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """
         Get conversation context filtered by specific user ID.
 
@@ -310,7 +310,7 @@ class RedisConversationCache:
             await self.remove_message(channel_id, message.id)
             logger.warning(f"Removed message from Redis cache due to storage failure: {channel_id}")
 
-    async def get_cache_stats(self) -> Dict[str, Any]:
+    async def get_cache_stats(self) -> dict[str, Any]:
         """Get cache statistics"""
         if not self.redis:
             return {"error": "Redis not initialized"}
@@ -472,8 +472,8 @@ class RedisConversationCache:
             logger.error(f"Error clearing channel cache: {e}")
 
     async def _get_cached_messages(
-        self, channel_id: str, limit: int, exclude_message_id: Optional[int]
-    ) -> List[Dict[str, Any]]:
+        self, channel_id: str, limit: int, exclude_message_id: int | None
+    ) -> list[dict[str, Any]]:
         """Get cached messages from Redis"""
         if not self.redis:
             return []

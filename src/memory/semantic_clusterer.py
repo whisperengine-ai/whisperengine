@@ -8,21 +8,18 @@ for improved contextual understanding and retrieval.
 Phase 3: Multi-Dimensional Memory Networks
 """
 
-import logging
 import asyncio
-from datetime import datetime, timezone, timedelta
-from typing import Dict, List, Optional, Any, Tuple
-from dataclasses import dataclass, asdict
+import logging
+import os
+from collections import Counter, defaultdict
+from dataclasses import dataclass
+from datetime import UTC, datetime
 from enum import Enum
+from typing import Any
+
 import numpy as np
-from collections import defaultdict, Counter
-import json
 from sklearn.cluster import DBSCAN, AgglomerativeClustering
 from sklearn.metrics.pairwise import cosine_similarity
-import pickle
-import concurrent.futures
-import multiprocessing
-import os
 
 # Import external embedding manager instead of SentenceTransformer
 from src.utils.embedding_manager import ExternalEmbeddingManager
@@ -44,11 +41,11 @@ class MemoryCluster:
 
     cluster_id: str
     cluster_type: ClusterType
-    memories: List[str]  # memory IDs
-    centroid_embedding: Optional[List[float]]
-    topic_keywords: List[str]
-    emotional_signature: Dict[str, float]
-    temporal_span: Dict[str, str]  # start_date, end_date
+    memories: list[str]  # memory IDs
+    centroid_embedding: list[float] | None
+    topic_keywords: list[str]
+    emotional_signature: dict[str, float]
+    temporal_span: dict[str, str]  # start_date, end_date
     importance_score: float
     cluster_summary: str
     last_updated: datetime
@@ -101,7 +98,7 @@ class SemanticMemoryClusterer:
         logger.warning("embedding_model property accessed - should use embedding_manager instead")
         return None
 
-    async def create_memory_clusters(self, user_id: str, memory_manager) -> Dict[str, Any]:
+    async def create_memory_clusters(self, user_id: str, memory_manager) -> dict[str, Any]:
         """
         Create comprehensive semantic clusters of user memories
 
@@ -138,7 +135,7 @@ class SemanticMemoryClusterer:
                 "complexity_clusters": await self._cluster_by_complexity(user_id, memories),
                 "clustering_metadata": {
                     "total_memories": len(memories),
-                    "clustering_timestamp": datetime.now(timezone.utc),
+                    "clustering_timestamp": datetime.now(UTC),
                     "algorithm_used": self.clustering_algorithm,
                     "similarity_threshold": self.similarity_threshold,
                 },
@@ -154,7 +151,7 @@ class SemanticMemoryClusterer:
             logger.error(f"Error creating memory clusters for user {user_id}: {e}")
             return self._create_empty_cluster_result()
 
-    async def _fetch_user_memories(self, user_id: str, memory_manager) -> List[Dict]:
+    async def _fetch_user_memories(self, user_id: str, memory_manager) -> list[dict]:
         """Fetch all memories for a user"""
         try:
             # Get memories from the memory manager
@@ -169,7 +166,7 @@ class SemanticMemoryClusterer:
                         "content": memory.get("content", ""),
                         "topic": memory.get("topic", ""),
                         "emotional_context": memory.get("emotional_context", {}),
-                        "timestamp": memory.get("timestamp", datetime.now(timezone.utc)),
+                        "timestamp": memory.get("timestamp", datetime.now(UTC)),
                         "importance_score": memory.get("importance_score", 0.5),
                         "metadata": memory.get("metadata", {}),
                     }
@@ -182,13 +179,13 @@ class SemanticMemoryClusterer:
             logger.error(f"Error fetching memories for user {user_id}: {e}")
             return []
 
-    def _is_valid_memory(self, memory: Dict) -> bool:
+    def _is_valid_memory(self, memory: dict) -> bool:
         """Check if memory is valid for clustering"""
         content = memory.get("content", "")
         memory_id = memory.get("id", "")
         return bool(content) and len(content.strip()) > 10 and bool(memory_id)
 
-    async def _generate_memory_embeddings(self, memories: List[Dict]) -> Dict[str, np.ndarray]:
+    async def _generate_memory_embeddings(self, memories: list[dict]) -> dict[str, np.ndarray]:
         """Generate embeddings for memory contents using external API"""
         total_memories = len(memories)
         logger.debug(f"Generating embeddings for {total_memories} memories using external API")
@@ -240,7 +237,7 @@ class SemanticMemoryClusterer:
             )
             return embeddings
 
-        except asyncio.TimeoutError:
+        except TimeoutError:
             logger.error(f"Embedding generation timed out after {self.embedding_timeout} seconds")
             return {}
         except Exception as e:
@@ -248,8 +245,8 @@ class SemanticMemoryClusterer:
             return {}
 
     async def _cluster_by_topics(
-        self, user_id: str, memories: List[Dict], embeddings: Dict[str, np.ndarray]
-    ) -> List[MemoryCluster]:
+        self, user_id: str, memories: list[dict], embeddings: dict[str, np.ndarray]
+    ) -> list[MemoryCluster]:
         """Group memories by semantic topic similarity"""
         logger.debug(f"Clustering {len(memories)} memories by topics")
 
@@ -294,9 +291,9 @@ class SemanticMemoryClusterer:
     async def _create_topic_cluster(
         self,
         cluster_id: str,
-        memory_ids: List[str],
-        memories: List[Dict],
-        embeddings: Dict[str, np.ndarray],
+        memory_ids: list[str],
+        memories: list[dict],
+        embeddings: dict[str, np.ndarray],
     ) -> MemoryCluster:
         """Create a topic-based memory cluster"""
 
@@ -332,12 +329,12 @@ class SemanticMemoryClusterer:
             temporal_span=temporal_span,
             importance_score=importance_score,
             cluster_summary=cluster_summary,
-            last_updated=datetime.now(timezone.utc),
+            last_updated=datetime.now(UTC),
         )
 
-    async def _cluster_by_emotions(self, user_id: str, memories: List[Dict]) -> List[MemoryCluster]:
+    async def _cluster_by_emotions(self, user_id: str, memories: list[dict]) -> list[MemoryCluster]:
         """Group memories by emotional context similarity"""
-        logger.debug(f"Clustering memories by emotional context")
+        logger.debug("Clustering memories by emotional context")
 
         # Group memories by emotional categories
         emotional_groups = defaultdict(list)
@@ -376,7 +373,7 @@ class SemanticMemoryClusterer:
         return emotional_clusters
 
     async def _create_emotional_cluster(
-        self, cluster_id: str, memory_ids: List[str], memories: List[Dict], primary_emotion: str
+        self, cluster_id: str, memory_ids: list[str], memories: list[dict], primary_emotion: str
     ) -> MemoryCluster:
         """Create an emotion-based memory cluster"""
 
@@ -409,25 +406,25 @@ class SemanticMemoryClusterer:
             temporal_span=temporal_span,
             importance_score=importance_score,
             cluster_summary=cluster_summary,
-            last_updated=datetime.now(timezone.utc),
+            last_updated=datetime.now(UTC),
         )
 
     async def _cluster_by_time_periods(
-        self, user_id: str, memories: List[Dict]
-    ) -> List[MemoryCluster]:
+        self, user_id: str, memories: list[dict]
+    ) -> list[MemoryCluster]:
         """Group memories by temporal periods"""
-        logger.debug(f"Clustering memories by time periods")
+        logger.debug("Clustering memories by time periods")
 
         # Convert timestamps to datetime objects for proper sorting
         for memory in memories:
-            timestamp = memory.get("timestamp", datetime.now(timezone.utc))
+            timestamp = memory.get("timestamp", datetime.now(UTC))
             if isinstance(timestamp, str):
                 try:
                     memory["timestamp"] = datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
                 except (ValueError, TypeError):
-                    memory["timestamp"] = datetime.now(timezone.utc)
+                    memory["timestamp"] = datetime.now(UTC)
             elif not isinstance(timestamp, datetime):
-                memory["timestamp"] = datetime.now(timezone.utc)
+                memory["timestamp"] = datetime.now(UTC)
 
         # Sort memories by timestamp
         sorted_memories = sorted(memories, key=lambda m: m["timestamp"])
@@ -448,7 +445,7 @@ class SemanticMemoryClusterer:
         logger.debug(f"Created {len(temporal_clusters)} temporal clusters")
         return temporal_clusters
 
-    def _group_by_temporal_periods(self, sorted_memories: List[Dict]) -> Dict[str, List[Dict]]:
+    def _group_by_temporal_periods(self, sorted_memories: list[dict]) -> dict[str, list[dict]]:
         """Group memories by temporal periods"""
         groups = defaultdict(list)
 
@@ -459,9 +456,9 @@ class SemanticMemoryClusterer:
                 try:
                     timestamp = datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
                 except (ValueError, TypeError):
-                    timestamp = datetime.now(timezone.utc)
+                    timestamp = datetime.now(UTC)
             elif not isinstance(timestamp, datetime):
-                timestamp = datetime.now(timezone.utc)
+                timestamp = datetime.now(UTC)
 
             # Group by week (could be adjusted to different periods)
             year_week = f"{timestamp.year}_W{timestamp.isocalendar()[1]}"
@@ -470,7 +467,7 @@ class SemanticMemoryClusterer:
         return dict(groups)
 
     async def _create_temporal_cluster(
-        self, cluster_id: str, memory_ids: List[str], memories: List[Dict], period: str
+        self, cluster_id: str, memory_ids: list[str], memories: list[dict], period: str
     ) -> MemoryCluster:
         """Create a temporal-based memory cluster"""
 
@@ -499,14 +496,14 @@ class SemanticMemoryClusterer:
             temporal_span=temporal_span,
             importance_score=importance_score,
             cluster_summary=cluster_summary,
-            last_updated=datetime.now(timezone.utc),
+            last_updated=datetime.now(UTC),
         )
 
     async def _cluster_by_interaction_patterns(
-        self, user_id: str, memories: List[Dict]
-    ) -> List[MemoryCluster]:
+        self, user_id: str, memories: list[dict]
+    ) -> list[MemoryCluster]:
         """Group memories by interaction patterns"""
-        logger.debug(f"Clustering memories by interaction patterns")
+        logger.debug("Clustering memories by interaction patterns")
 
         # This is a placeholder for more sophisticated interaction pattern analysis
         # Could analyze conversation length, response times, question types, etc.
@@ -540,7 +537,7 @@ class SemanticMemoryClusterer:
         return interaction_clusters
 
     async def _create_interaction_cluster(
-        self, cluster_id: str, memory_ids: List[str], memories: List[Dict], pattern: str
+        self, cluster_id: str, memory_ids: list[str], memories: list[dict], pattern: str
     ) -> MemoryCluster:
         """Create an interaction pattern-based memory cluster"""
 
@@ -571,14 +568,14 @@ class SemanticMemoryClusterer:
             temporal_span=temporal_span,
             importance_score=importance_score,
             cluster_summary=cluster_summary,
-            last_updated=datetime.now(timezone.utc),
+            last_updated=datetime.now(UTC),
         )
 
     async def _cluster_by_complexity(
-        self, user_id: str, memories: List[Dict]
-    ) -> List[MemoryCluster]:
+        self, user_id: str, memories: list[dict]
+    ) -> list[MemoryCluster]:
         """Group memories by complexity levels"""
-        logger.debug(f"Clustering memories by complexity")
+        logger.debug("Clustering memories by complexity")
 
         complexity_groups = defaultdict(list)
 
@@ -607,7 +604,7 @@ class SemanticMemoryClusterer:
         logger.debug(f"Created {len(complexity_clusters)} complexity clusters")
         return complexity_clusters
 
-    def _calculate_complexity_score(self, memory: Dict) -> float:
+    def _calculate_complexity_score(self, memory: dict) -> float:
         """Calculate complexity score for a memory"""
         content = memory["content"]
 
@@ -624,7 +621,7 @@ class SemanticMemoryClusterer:
         return (word_score + sentence_score + length_score) / 3
 
     async def _create_complexity_cluster(
-        self, cluster_id: str, memory_ids: List[str], memories: List[Dict], complexity_level: str
+        self, cluster_id: str, memory_ids: list[str], memories: list[dict], complexity_level: str
     ) -> MemoryCluster:
         """Create a complexity-based memory cluster"""
 
@@ -655,10 +652,10 @@ class SemanticMemoryClusterer:
             temporal_span=temporal_span,
             importance_score=importance_score,
             cluster_summary=cluster_summary,
-            last_updated=datetime.now(timezone.utc),
+            last_updated=datetime.now(UTC),
         )
 
-    def _extract_cluster_keywords(self, memories: List[Dict]) -> List[str]:
+    def _extract_cluster_keywords(self, memories: list[dict]) -> list[str]:
         """Extract topic keywords from cluster memories"""
         # Combine all topics and content
         all_text = " ".join(
@@ -726,7 +723,7 @@ class SemanticMemoryClusterer:
 
         return keywords[:10]  # Return top 10 keywords
 
-    def _calculate_emotional_signature(self, memories: List[Dict]) -> Dict[str, float]:
+    def _calculate_emotional_signature(self, memories: list[dict]) -> dict[str, float]:
         """Calculate emotional signature for cluster"""
         emotion_counts = Counter()
 
@@ -756,7 +753,7 @@ class SemanticMemoryClusterer:
 
         return {emotion: count / total for emotion, count in emotion_counts.items()}
 
-    def _calculate_temporal_span(self, memories: List[Dict]) -> Dict[str, str]:
+    def _calculate_temporal_span(self, memories: list[dict]) -> dict[str, str]:
         """Calculate temporal span of cluster"""
         timestamps = []
 
@@ -766,18 +763,18 @@ class SemanticMemoryClusterer:
                 try:
                     timestamp = datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
                 except (ValueError, TypeError):
-                    timestamp = datetime.now(timezone.utc)
+                    timestamp = datetime.now(UTC)
             elif not isinstance(timestamp, datetime):
-                timestamp = datetime.now(timezone.utc)
+                timestamp = datetime.now(UTC)
             timestamps.append(timestamp)
 
         if not timestamps:
-            now = datetime.now(timezone.utc)
+            now = datetime.now(UTC)
             return {"start_date": now.isoformat(), "end_date": now.isoformat()}
 
         return {"start_date": min(timestamps).isoformat(), "end_date": max(timestamps).isoformat()}
 
-    def _calculate_cluster_importance(self, memories: List[Dict]) -> float:
+    def _calculate_cluster_importance(self, memories: list[dict]) -> float:
         """Calculate importance score for cluster"""
         if not memories:
             return 0.0
@@ -791,7 +788,7 @@ class SemanticMemoryClusterer:
 
         return min(float(base_importance + size_boost), 1.0)
 
-    def _generate_cluster_summary(self, memories: List[Dict], keywords: List[str]) -> str:
+    def _generate_cluster_summary(self, memories: list[dict], keywords: list[str]) -> str:
         """Generate human-readable cluster summary"""
         memory_count = len(memories)
         top_keywords = ", ".join(keywords[:5])
@@ -800,7 +797,7 @@ class SemanticMemoryClusterer:
 
     async def find_related_memories(
         self, memory_id: str, user_id: str, similarity_threshold: float = 0.7, memory_manager=None
-    ) -> List[Dict]:
+    ) -> list[dict]:
         """
         Find memories related to a specific memory
 
@@ -896,7 +893,7 @@ class SemanticMemoryClusterer:
         except Exception as e:
             logger.error(f"Error updating cluster relationships: {e}")
 
-    def _create_empty_cluster_result(self) -> Dict[str, Any]:
+    def _create_empty_cluster_result(self) -> dict[str, Any]:
         """Create empty cluster result structure"""
         return {
             "topic_clusters": [],
@@ -906,13 +903,13 @@ class SemanticMemoryClusterer:
             "complexity_clusters": [],
             "clustering_metadata": {
                 "total_memories": 0,
-                "clustering_timestamp": datetime.now(timezone.utc),
+                "clustering_timestamp": datetime.now(UTC),
                 "algorithm_used": self.clustering_algorithm,
                 "similarity_threshold": self.similarity_threshold,
             },
         }
 
-    async def get_cluster_by_id(self, user_id: str, cluster_id: str) -> Optional[MemoryCluster]:
+    async def get_cluster_by_id(self, user_id: str, cluster_id: str) -> MemoryCluster | None:
         """Get specific cluster by ID"""
         if user_id not in self.clusters_cache:
             return None
@@ -928,7 +925,7 @@ class SemanticMemoryClusterer:
 
     async def get_clusters_by_type(
         self, user_id: str, cluster_type: ClusterType
-    ) -> List[MemoryCluster]:
+    ) -> list[MemoryCluster]:
         """Get all clusters of specific type for user"""
         if user_id not in self.clusters_cache:
             return []
@@ -945,7 +942,7 @@ class SemanticMemoryClusterer:
         cluster_key = type_mapping.get(cluster_type, "topic_clusters")
         return clusters.get(cluster_key, [])
 
-    def get_clustering_statistics(self, user_id: str) -> Dict[str, Any]:
+    def get_clustering_statistics(self, user_id: str) -> dict[str, Any]:
         """Get clustering statistics for user"""
         if user_id not in self.clusters_cache:
             return {}

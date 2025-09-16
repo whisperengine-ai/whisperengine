@@ -20,21 +20,21 @@ Integration Points:
 - Personality facts for meaningful connection identification
 """
 
+import hashlib
 import logging
-from datetime import datetime, timedelta
-from enum import Enum
-from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Any, Tuple
-from collections import defaultdict
 import re
 import statistics
-import hashlib
+from collections import defaultdict
+from dataclasses import dataclass, field
+from datetime import datetime, timedelta
+from enum import Enum
+from typing import Any
 
 # Import existing systems for integration
 try:
     from src.intelligence.emotional_context_engine import (
-        EmotionalContextEngine,
         EmotionalContext,
+        EmotionalContextEngine,
         EmotionalState,
     )
 
@@ -110,8 +110,8 @@ class MemoryConnection:
     connection_type: MemoryConnectionType
 
     # Connected memories
-    primary_memory: Dict[str, Any]  # Main memory being connected
-    related_memories: List[Dict[str, Any]]  # Connected memories
+    primary_memory: dict[str, Any]  # Main memory being connected
+    related_memories: list[dict[str, Any]]  # Connected memories
 
     # Connection characteristics
     connection_strength: float  # 0.0-1.0 how strong the connection is
@@ -125,16 +125,16 @@ class MemoryConnection:
 
     # Pattern information
     pattern_frequency: int  # How often this pattern occurs
-    pattern_keywords: List[str]  # Key terms that identify the pattern
+    pattern_keywords: list[str]  # Key terms that identify the pattern
 
     # Creation metadata
     created_at: datetime
-    last_triggered: Optional[datetime] = None
+    last_triggered: datetime | None = None
     trigger_count: int = 0
 
     # Effectiveness tracking
-    user_response_positive: Optional[bool] = None
-    engagement_improvement: Optional[float] = None
+    user_response_positive: bool | None = None
+    engagement_improvement: float | None = None
 
 
 @dataclass
@@ -147,19 +147,19 @@ class MemoryMoment:
 
     # Memory connections driving this moment
     primary_connection: MemoryConnection
-    supporting_connections: List[MemoryConnection] = field(default_factory=list)
+    supporting_connections: list[MemoryConnection] = field(default_factory=list)
 
     # Trigger conditions
-    trigger_keywords: List[str] = field(
+    trigger_keywords: list[str] = field(
         default_factory=list
     )  # Keywords that can trigger this moment
-    trigger_emotions: List[EmotionalState] = field(
+    trigger_emotions: list[EmotionalState] = field(
         default_factory=list
     )  # Emotions that can trigger
-    trigger_contexts: List[str] = field(default_factory=list)  # Conversation contexts that fit
+    trigger_contexts: list[str] = field(default_factory=list)  # Conversation contexts that fit
 
     # Timing and appropriateness
-    optimal_timing: List[MemoryMomentTiming] = field(default_factory=list)
+    optimal_timing: list[MemoryMomentTiming] = field(default_factory=list)
     min_relationship_depth: float = 0.0
     min_trust_level: float = 0.0
     cooldown_hours: int = 24  # Hours to wait before retriggering
@@ -171,7 +171,7 @@ class MemoryMoment:
 
     # Effectiveness data
     created_at: datetime = field(default_factory=datetime.now)
-    last_used: Optional[datetime] = None
+    last_used: datetime | None = None
     usage_count: int = 0
     success_rate: float = 0.0
 
@@ -189,12 +189,12 @@ class ConversationContext:
     current_message: str
 
     # Conversation characteristics
-    topic_keywords: List[str]
+    topic_keywords: list[str]
     emotional_state: EmotionalState
     conversation_phase: str  # "opening", "middle", "deepening", "closing"
 
     # Recent history
-    recent_messages: List[str]
+    recent_messages: list[str]
     conversation_length: int
 
     # User state
@@ -203,11 +203,11 @@ class ConversationContext:
     current_engagement_level: float
 
     # Timing context
-    time_since_last_conversation: Optional[timedelta]
+    time_since_last_conversation: timedelta | None
     conversation_frequency: float  # Conversations per day
 
     # Memory context
-    recently_triggered_moments: List[str]  # Recent moment IDs to avoid repetition
+    recently_triggered_moments: list[str]  # Recent moment IDs to avoid repetition
 
 
 class MemoryTriggeredMoments:
@@ -218,10 +218,10 @@ class MemoryTriggeredMoments:
 
     def __init__(
         self,
-        emotional_context_engine: Optional[EmotionalContextEngine] = None,
-        personality_profiler: Optional[DynamicPersonalityProfiler] = None,
-        memory_manager: Optional[Any] = None,
-        personality_fact_classifier: Optional[PersonalityFactClassifier] = None,
+        emotional_context_engine: EmotionalContextEngine | None = None,
+        personality_profiler: DynamicPersonalityProfiler | None = None,
+        memory_manager: Any | None = None,
+        personality_fact_classifier: PersonalityFactClassifier | None = None,
         connection_retention_days: int = 365,
         max_connections_per_user: int = 1000,
         moment_cooldown_hours: int = 24,
@@ -248,18 +248,18 @@ class MemoryTriggeredMoments:
         self.default_cooldown = moment_cooldown_hours
 
         # Memory storage
-        self.memory_connections: Dict[str, List[MemoryConnection]] = defaultdict(list)
-        self.memory_moments: Dict[str, List[MemoryMoment]] = defaultdict(list)
-        self.conversation_history: Dict[str, List[Dict]] = defaultdict(list)
+        self.memory_connections: dict[str, list[MemoryConnection]] = defaultdict(list)
+        self.memory_moments: dict[str, list[MemoryMoment]] = defaultdict(list)
+        self.conversation_history: dict[str, list[dict]] = defaultdict(list)
 
         # Pattern tracking
-        self.recurring_patterns: Dict[str, Dict[str, int]] = defaultdict(lambda: defaultdict(int))
-        self.user_interests: Dict[str, Dict[str, float]] = defaultdict(lambda: defaultdict(float))
-        self.emotional_themes: Dict[str, List[Tuple[datetime, EmotionalState]]] = defaultdict(list)
+        self.recurring_patterns: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
+        self.user_interests: dict[str, dict[str, float]] = defaultdict(lambda: defaultdict(float))
+        self.emotional_themes: dict[str, list[tuple[datetime, EmotionalState]]] = defaultdict(list)
 
         # Performance tracking
-        self.moment_effectiveness: Dict[str, List[float]] = defaultdict(list)
-        self.connection_success_rates: Dict[MemoryConnectionType, float] = {}
+        self.moment_effectiveness: dict[str, list[float]] = defaultdict(list)
+        self.connection_success_rates: dict[MemoryConnectionType, float] = {}
 
         logger.info(
             "MemoryTriggeredMoments initialized with %d day retention", connection_retention_days
@@ -270,8 +270,8 @@ class MemoryTriggeredMoments:
         user_id: str,
         context_id: str,
         message: str,
-        emotional_context: Optional[EmotionalContext] = None,
-    ) -> List[MemoryConnection]:
+        emotional_context: EmotionalContext | None = None,
+    ) -> list[MemoryConnection]:
         """
         Analyze a conversation to identify potential memory connections.
 
@@ -312,7 +312,7 @@ class MemoryTriggeredMoments:
 
     async def generate_memory_moments(
         self, user_id: str, conversation_context: ConversationContext
-    ) -> List[MemoryMoment]:
+    ) -> list[MemoryMoment]:
         """
         Generate memory moments that could be triggered in the current conversation.
 
@@ -387,7 +387,7 @@ class MemoryTriggeredMoments:
         return callback_text
 
     async def get_memory_moment_prompt(
-        self, moments: List[MemoryMoment], conversation_context: ConversationContext
+        self, moments: list[MemoryMoment], conversation_context: ConversationContext
     ) -> str:
         """
         Generate a prompt for the AI companion that incorporates memory moments.
@@ -436,7 +436,7 @@ class MemoryTriggeredMoments:
 
         return "\n".join(prompt_parts)
 
-    def _extract_keywords(self, text: str) -> List[str]:
+    def _extract_keywords(self, text: str) -> list[str]:
         """Extract meaningful keywords from text"""
         # Simple keyword extraction - could be enhanced with NLP
         words = re.findall(r"\b\w+\b", text.lower())
@@ -497,7 +497,7 @@ class MemoryTriggeredMoments:
         # Return unique keywords
         return list(set(keywords))
 
-    def _identify_themes(self, text: str) -> List[str]:
+    def _identify_themes(self, text: str) -> list[str]:
         """Identify thematic content in text"""
         text_lower = text.lower()
         themes = []
@@ -594,7 +594,7 @@ class MemoryTriggeredMoments:
 
         return themes
 
-    async def _update_user_interests(self, user_id: str, conversation_entry: Dict):
+    async def _update_user_interests(self, user_id: str, conversation_entry: dict):
         """Update user interest tracking based on conversation"""
         keywords = conversation_entry["keywords"]
         themes = conversation_entry["themes"]
@@ -611,8 +611,8 @@ class MemoryTriggeredMoments:
             self.user_interests[user_id][interest] *= 0.99
 
     async def _discover_memory_connections(
-        self, user_id: str, current_entry: Dict
-    ) -> List[MemoryConnection]:
+        self, user_id: str, current_entry: dict
+    ) -> list[MemoryConnection]:
         """Discover potential connections between current conversation and past memories"""
         connections = []
         user_history = self.conversation_history[user_id]
@@ -696,7 +696,7 @@ class MemoryTriggeredMoments:
 
         return connections
 
-    def _generate_connection_id(self, user_id: str, entry1: Dict, entry2: Dict) -> str:
+    def _generate_connection_id(self, user_id: str, entry1: dict, entry2: dict) -> str:
         """Generate a unique ID for a memory connection"""
         # Create hash from user ID and timestamps to ensure uniqueness
         content = f"{user_id}_{entry1['timestamp']}_{entry2['timestamp']}"
@@ -704,7 +704,7 @@ class MemoryTriggeredMoments:
 
     async def _find_relevant_connections(
         self, user_id: str, conversation_context: ConversationContext
-    ) -> List[MemoryConnection]:
+    ) -> list[MemoryConnection]:
         """Find memory connections relevant to the current conversation"""
         user_connections = self.memory_connections[user_id]
         relevant = []
@@ -751,7 +751,7 @@ class MemoryTriggeredMoments:
 
     async def _create_memory_moment(
         self, user_id: str, connection: MemoryConnection, conversation_context: ConversationContext
-    ) -> Optional[MemoryMoment]:
+    ) -> MemoryMoment | None:
         """Create a memory moment from a connection"""
         # Determine moment type based on connection
         moment_type = self._determine_moment_type(connection, conversation_context)
@@ -946,8 +946,8 @@ class MemoryTriggeredMoments:
         return True
 
     async def _select_best_moment(
-        self, moments: List[MemoryMoment], conversation_context: ConversationContext
-    ) -> Optional[MemoryMoment]:
+        self, moments: list[MemoryMoment], conversation_context: ConversationContext
+    ) -> MemoryMoment | None:
         """Select the best memory moment for the current context"""
         if not moments:
             return None
@@ -1017,7 +1017,7 @@ class MemoryTriggeredMoments:
                 : self.max_connections
             ]
 
-    async def get_user_memory_summary(self, user_id: str) -> Dict[str, Any]:
+    async def get_user_memory_summary(self, user_id: str) -> dict[str, Any]:
         """Get a summary of user's memory connections and moments"""
         connections = self.memory_connections[user_id]
         moments = self.memory_moments[user_id]

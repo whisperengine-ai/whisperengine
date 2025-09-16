@@ -8,9 +8,9 @@ import asyncio
 import logging
 import os
 import time
-from typing import Dict, List, Optional, Any, Union
 from dataclasses import dataclass
 from functools import lru_cache
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +22,7 @@ class EmotionResult:
     primary_emotion: str
     confidence: float
     sentiment_score: float  # -1 to 1
-    emotions: Dict[str, float]
+    emotions: dict[str, float]
     analysis_time_ms: float
     method: str  # "vader", "roberta", "hybrid"
 
@@ -291,8 +291,8 @@ class LocalEmotionEngine:
         return result
 
     async def analyze_emotions_batch(
-        self, texts: List[str], method: str = "auto"
-    ) -> List[EmotionResult]:
+        self, texts: list[str], method: str = "auto"
+    ) -> list[EmotionResult]:
         """Analyze emotions for multiple texts efficiently"""
         if not texts:
             return []
@@ -302,7 +302,7 @@ class LocalEmotionEngine:
 
         return await asyncio.gather(*tasks)
 
-    def get_performance_stats(self) -> Dict[str, Any]:
+    def get_performance_stats(self) -> dict[str, Any]:
         """Get performance statistics"""
         avg_time_per_analysis = self.total_time / max(self.total_analyses, 1) * 1000
 
@@ -379,8 +379,6 @@ async def analyze_emotion(text: str, method: str = "auto") -> EmotionResult:
 # Test function
 async def test_local_emotion_engine():
     """Test the local emotion engine"""
-    print("🎭 Testing Local Emotion Engine")
-    print("=" * 40)
 
     engine = LocalEmotionEngine()
     await engine.warmup()
@@ -403,26 +401,19 @@ async def test_local_emotion_engine():
         ):
             continue
 
-        print(f"\n{method.upper()} Analysis:")
 
         start_time = time.time()
         results = await engine.analyze_emotions_batch(test_texts[:2], method=method)
-        batch_time = time.time() - start_time
+        time.time() - start_time
 
-        print(f"Batch time: {batch_time*1000:.2f}ms")
 
-        for text, result in zip(test_texts[:2], results):
-            print(f'  Text: "{text}"')
-            print(f"  Emotion: {result.primary_emotion} ({result.confidence:.3f})")
-            print(f"  Sentiment: {result.sentiment_score:.3f}")
-            print(f"  Time: {result.analysis_time_ms:.2f}ms")
-            print()
+        for _text, _result in zip(test_texts[:2], results, strict=False):
+            pass
 
     # Show performance stats
     stats = engine.get_performance_stats()
-    print("Performance Stats:")
-    for key, value in stats.items():
-        print(f"  {key}: {value}")
+    for _key, _value in stats.items():
+        pass
 
     await engine.shutdown()
 

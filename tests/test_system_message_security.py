@@ -3,23 +3,21 @@ Test script for system message security enhancements.
 Validates that system message leakage is properly detected and prevented.
 """
 
-import sys
 import os
+import sys
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from system_message_security import (
+    create_secure_system_message,
     sanitize_system_messages,
     scan_response_for_system_leakage,
-    create_secure_system_message,
 )
 
 
 def test_system_message_sanitization():
     """Test the system message sanitization functionality."""
 
-    print("🛡️ Testing System Message Sanitization")
-    print("=" * 50)
 
     # Test cases with various system message content
     test_cases = [
@@ -92,7 +90,7 @@ def test_system_message_sanitization():
 
     for test_case in test_cases:
         original_messages = test_case["input"]
-        description = test_case["description"]
+        test_case["description"]
         should_be_filtered = test_case["should_be_filtered"]
 
         # Apply sanitization
@@ -107,7 +105,7 @@ def test_system_message_sanitization():
         if len(system_messages_before) != len(system_messages_after):
             content_changed = True
         else:
-            for before, after in zip(system_messages_before, system_messages_after):
+            for before, after in zip(system_messages_before, system_messages_after, strict=False):
                 if before.get("content", "") != after.get("content", ""):
                     content_changed = True
                     break
@@ -115,29 +113,18 @@ def test_system_message_sanitization():
         # Determine if test passed
         test_passed = content_changed == should_be_filtered
 
-        status = "✅ PASS" if test_passed else "❌ FAIL"
 
         if test_passed:
             passed += 1
         else:
             failed += 1
 
-        print(f"{status} | {description}")
-        print(f"      Expected filtering: {should_be_filtered}, Content changed: {content_changed}")
 
         if content_changed:
-            print(f"      Original system messages: {len(system_messages_before)}")
-            print(f"      Sanitized system messages: {len(system_messages_after)}")
             if system_messages_after:
-                print(
-                    f"      Sample sanitized content: {system_messages_after[0]['content'][:100]}..."
-                )
+                pass
 
-        print()
 
-    print("=" * 50)
-    print(f"📊 Sanitization Test Results: {passed} passed, {failed} failed")
-    print(f"Success Rate: {(passed / (passed + failed)) * 100:.1f}%")
 
     return failed == 0
 
@@ -145,8 +132,6 @@ def test_system_message_sanitization():
 def test_response_leakage_detection():
     """Test the response leakage detection functionality."""
 
-    print("\n🔍 Testing Response Leakage Detection")
-    print("=" * 50)
 
     test_responses = [
         # Safe responses (no leakage)
@@ -198,7 +183,7 @@ def test_response_leakage_detection():
 
     for test_case in test_responses:
         response = test_case["response"]
-        description = test_case["description"]
+        test_case["description"]
         should_have_leakage = test_case["should_have_leakage"]
 
         # Scan for leakage
@@ -208,27 +193,17 @@ def test_response_leakage_detection():
         # Check if test passed
         test_passed = actual_has_leakage == should_have_leakage
 
-        status = "✅ PASS" if test_passed else "❌ FAIL"
 
         if test_passed:
             passed += 1
         else:
             failed += 1
 
-        print(f"{status} | {description}")
-        print(
-            f"      Expected leakage: {should_have_leakage}, Detected leakage: {actual_has_leakage}"
-        )
 
         if actual_has_leakage:
-            print(f"      Leaked patterns: {leakage_scan['leaked_patterns']}")
-            print(f"      Sanitized response: {leakage_scan['sanitized_response'][:100]}...")
+            pass
 
-        print()
 
-    print("=" * 50)
-    print(f"📊 Leakage Detection Test Results: {passed} passed, {failed} failed")
-    print(f"Success Rate: {(passed / (passed + failed)) * 100:.1f}%")
 
     return failed == 0
 
@@ -236,8 +211,6 @@ def test_response_leakage_detection():
 def test_secure_system_message_creation():
     """Test the secure system message creation functionality."""
 
-    print("\n🔐 Testing Secure System Message Creation")
-    print("=" * 50)
 
     test_cases = [
         {
@@ -268,7 +241,7 @@ def test_secure_system_message_creation():
     for test_case in test_cases:
         content = test_case["content"]
         message_type = test_case["message_type"]
-        description = test_case["description"]
+        test_case["description"]
 
         # Create secure system message
         secure_message = create_secure_system_message(content, message_type)
@@ -285,44 +258,26 @@ def test_secure_system_message_creation():
             is_system_message and has_content and (content_is_different == should_be_different)
         )
 
-        status = "✅ PASS" if test_passed else "❌ FAIL"
 
         if test_passed:
             passed += 1
         else:
             failed += 1
 
-        print(f"{status} | {description}")
-        print(f"      Original: {content[:50]}...")
-        print(f"      Secure: {secure_message.get('content', '')[:50]}...")
-        print(f"      Content changed: {content_is_different} (expected: {should_be_different})")
-        print()
 
-    print("=" * 50)
-    print(f"📊 Secure Message Creation Test Results: {passed} passed, {failed} failed")
-    print(f"Success Rate: {(passed / (passed + failed)) * 100:.1f}%")
 
     return failed == 0
 
 
 if __name__ == "__main__":
-    print("🛡️ SYSTEM MESSAGE SECURITY FIX VALIDATION")
-    print("Testing System Message Leakage Prevention System")
-    print("=" * 60)
 
     # Run all tests
     test1_passed = test_system_message_sanitization()
     test2_passed = test_response_leakage_detection()
     test3_passed = test_secure_system_message_creation()
 
-    print("\n" + "=" * 60)
-    print("🎯 OVERALL TEST RESULTS")
 
     if test1_passed and test2_passed and test3_passed:
-        print("✅ ALL TESTS PASSED - System message security is working correctly!")
-        print("✅ SECURITY FIX VALIDATED - System message leakage prevention active")
         exit(0)
     else:
-        print("❌ SOME TESTS FAILED - System message security needs improvement")
-        print("⚠️  REVIEW RESULTS before deploying")
         exit(1)

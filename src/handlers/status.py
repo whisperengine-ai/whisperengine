@@ -3,12 +3,12 @@ Status command handlers for Discord bot
 Includes ping, bot status, LLM status, voice status, vision status, and cache stats
 """
 
-import logging
-import discord
-from discord.ext import commands
 import asyncio
-import time
+import logging
 import os
+import time
+
+import discord
 
 logger = logging.getLogger(__name__)
 
@@ -513,8 +513,8 @@ class StatusCommandHandlers:
         logger.debug(f"Health status command called by {ctx.author.name}")
 
         # Import here to avoid circular imports
+
         import aiohttp
-        import json
 
         embed = discord.Embed(
             title="🏥 System Health Status",
@@ -588,7 +588,7 @@ class StatusCommandHandlers:
                 voice_status = "✅ **Available**"
                 if self.voice_manager:
                     # Check if voice manager is functioning
-                    voice_status += f"\n• Manager: Active"
+                    voice_status += "\n• Manager: Active"
                 else:
                     voice_status = "⚠️ **Partial** - Manager not initialized"
             except Exception as e:

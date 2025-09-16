@@ -4,8 +4,6 @@ Simple SQLite browser for user_profiles.db
 """
 
 import sqlite3
-import json
-from typing import List
 
 
 def connect_db(db_path: str = "user_profiles.db"):
@@ -18,16 +16,14 @@ def show_schema():
     with connect_db() as conn:
         cursor = conn.execute(
             """
-            SELECT sql FROM sqlite_master 
-            WHERE type='table' 
+            SELECT sql FROM sqlite_master
+            WHERE type='table'
             ORDER BY name
         """
         )
 
-        print("🗄️  Database Schema")
-        print("=" * 50)
-        for (sql,) in cursor.fetchall():
-            print(sql + ";\n")
+        for (_sql,) in cursor.fetchall():
+            pass
 
 
 def show_tables():
@@ -35,46 +31,43 @@ def show_tables():
     with connect_db() as conn:
         cursor = conn.execute(
             """
-            SELECT name FROM sqlite_master 
-            WHERE type='table' 
+            SELECT name FROM sqlite_master
+            WHERE type='table'
             ORDER BY name
         """
         )
 
         tables = cursor.fetchall()
-        print("📊 Tables and Row Counts")
-        print("=" * 30)
 
         for (table_name,) in tables:
             cursor = conn.execute(f"SELECT COUNT(*) FROM {table_name}")
-            count = cursor.fetchone()[0]
-            print(f"{table_name}: {count} rows")
+            cursor.fetchone()[0]
 
 
 def quick_queries():
     """Run some useful quick queries"""
     queries = {
         "Recent Users": """
-            SELECT user_id, interaction_count, last_interaction 
-            FROM users 
-            ORDER BY last_interaction DESC 
+            SELECT user_id, interaction_count, last_interaction
+            FROM users
+            ORDER BY last_interaction DESC
             LIMIT 5
         """,
         "Emotion Summary": """
             SELECT detected_emotion, COUNT(*) as count
-            FROM emotion_history 
-            GROUP BY detected_emotion 
+            FROM emotion_history
+            GROUP BY detected_emotion
             ORDER BY count DESC
         """,
         "Most Active Users": """
             SELECT user_id, interaction_count, relationship_level
-            FROM users 
+            FROM users
             ORDER BY interaction_count DESC
             LIMIT 5
         """,
         "Users by Relationship": """
             SELECT relationship_level, COUNT(*) as count
-            FROM users 
+            FROM users
             GROUP BY relationship_level
         """,
     }
@@ -82,18 +75,14 @@ def quick_queries():
     with connect_db() as conn:
         conn.row_factory = sqlite3.Row
 
-        for title, query in queries.items():
-            print(f"\n📋 {title}")
-            print("-" * 40)
+        for _title, query in queries.items():
 
             cursor = conn.execute(query)
             rows = cursor.fetchall()
 
             if rows:
                 # Print column headers
-                headers = rows[0].keys()
-                print(" | ".join(headers))
-                print("-" * (len(" | ".join(headers))))
+                rows[0].keys()
 
                 # Print data rows
                 for row in rows:
@@ -103,23 +92,18 @@ def quick_queries():
                             values.append(value[:30] + "...")
                         else:
                             values.append(str(value))
-                    print(" | ".join(values))
             else:
-                print("No data found")
+                pass
 
 
 if __name__ == "__main__":
-    print("🤖 User Profile Database Browser")
-    print("=" * 50)
 
     try:
         show_schema()
-        print("\n")
         show_tables()
-        print("\n")
         quick_queries()
 
     except FileNotFoundError:
-        print("❌ Database file 'user_profiles.db' not found")
-    except Exception as e:
-        print(f"❌ Error: {e}")
+        pass
+    except Exception:
+        pass

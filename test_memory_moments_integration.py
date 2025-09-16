@@ -7,25 +7,22 @@ into the WhisperEngine bot system.
 """
 
 import asyncio
-import sys
-import os
-import tempfile
 import logging
+import os
+import sys
 
 # Add project root to path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from src.personality.memory_moments import MemoryTriggeredMoments
 from src.core.bot import DiscordBotCore
+from src.personality.memory_moments import MemoryTriggeredMoments
 
 
 async def test_memory_moments_integration():
     """Test memory moments integration with bot core"""
-    print("🧪 Testing Memory Moments Integration...")
 
     try:
         # Test 1: MemoryTriggeredMoments can be imported and initialized
-        print("Test 1: MemoryTriggeredMoments initialization...")
 
         # Create a minimal memory manager mock
         class MockMemoryManager:
@@ -40,10 +37,8 @@ async def test_memory_moments_integration():
             personality_profiler=None,  # Can be None for basic testing
         )
 
-        print("✅ MemoryTriggeredMoments initialized successfully")
 
         # Test 2: Bot core can initialize memory moments
-        print("Test 2: Bot core memory moments integration...")
 
         # We can't fully test bot core without Discord bot setup,
         # but we can test the integration path exists
@@ -54,39 +49,34 @@ async def test_memory_moments_integration():
             components = bot_core.get_components()
 
             if "memory_moments" in components:
-                print("✅ memory_moments component found in bot core")
+                pass
             else:
-                print("⚠️ memory_moments component not found (may need full initialization)")
+                pass
 
-        except Exception as e:
-            print(f"⚠️ Bot core test skipped (requires full Discord setup): {e}")
+        except Exception:
+            pass
 
         # Test 3: Memory moments can analyze conversations
-        print("Test 3: Memory moments conversation analysis...")
 
         try:
             # Test basic conversation analysis
-            memory_connections = await memory_moments.analyze_conversation_for_memories(
+            await memory_moments.analyze_conversation_for_memories(
                 user_id="test_user_123",
                 context_id="test_context",
                 message="I've been thinking about our conversation yesterday about goals.",
             )
 
-            print(
-                f"✅ Conversation analysis completed: {len(memory_connections)} connections found"
-            )
 
-        except Exception as e:
-            print(f"⚠️ Conversation analysis test failed: {e}")
+        except Exception:
+            pass
 
         # Test 4: Memory moments can generate moments
-        print("Test 4: Memory moments generation...")
 
         try:
-            from src.personality.memory_moments import ConversationContext
-
             # Create minimal conversation context
             from datetime import timedelta
+
+            from src.personality.memory_moments import ConversationContext
 
             conversation_context = ConversationContext(
                 user_id="test_user_123",
@@ -105,27 +95,18 @@ async def test_memory_moments_integration():
                 recently_triggered_moments=[],
             )
 
-            memory_moments_result = await memory_moments.generate_memory_moments(
+            await memory_moments.generate_memory_moments(
                 user_id="test_user_123", conversation_context=conversation_context
             )
 
-            print(
-                f"✅ Memory moments generation completed: {len(memory_moments_result)} moments generated"
-            )
 
-        except Exception as e:
-            print(f"⚠️ Memory moments generation test failed: {e}")
+        except Exception:
+            pass
 
-        print("\n🎉 Memory Moments Integration Test Summary:")
-        print("✅ Phase 4.1 Memory-Triggered Personality Moments are properly integrated")
-        print("✅ Core components can be imported and initialized")
-        print("✅ Basic conversation analysis functionality works")
-        print("✅ Integration architecture is properly connected")
 
         return True
 
-    except Exception as e:
-        print(f"\n❌ Memory Moments Integration Test Failed: {e}")
+    except Exception:
         import traceback
 
         traceback.print_exc()
@@ -134,7 +115,6 @@ async def test_memory_moments_integration():
 
 def test_integration_completeness():
     """Test that all integration points are properly connected"""
-    print("\n🔍 Testing Integration Completeness...")
 
     integration_points = {
         "Bot Core Initialization": "src/core/bot.py contains memory_moments initialization",
@@ -150,7 +130,7 @@ def test_integration_completeness():
     for name, description in integration_points.items():
         try:
             if "src/core/bot.py" in description:
-                with open("src/core/bot.py", "r") as f:
+                with open("src/core/bot.py") as f:
                     content = f.read()
                     if "memory_moments" in content and "Phase 4.1" in content:
                         results[name] = "✅ Found"
@@ -158,7 +138,7 @@ def test_integration_completeness():
                         results[name] = "❌ Missing"
 
             elif "src/platforms/universal_chat.py" in description:
-                with open("src/platforms/universal_chat.py", "r") as f:
+                with open("src/platforms/universal_chat.py") as f:
                     content = f.read()
                     if "memory_moments_context" in content:
                         results[name] = "✅ Found"
@@ -166,7 +146,7 @@ def test_integration_completeness():
                         results[name] = "❌ Missing"
 
             elif "src/utils/helpers.py" in description:
-                with open("src/utils/helpers.py", "r") as f:
+                with open("src/utils/helpers.py") as f:
                     content = f.read()
                     if "MEMORY_MOMENTS_CONTEXT" in content:
                         results[name] = "✅ Found"
@@ -174,7 +154,7 @@ def test_integration_completeness():
                         results[name] = "❌ Missing"
 
             elif "dream_ai_enhanced.md" in description:
-                with open("config/system_prompts/dream_ai_enhanced.md", "r") as f:
+                with open("config/system_prompts/dream_ai_enhanced.md") as f:
                     content = f.read()
                     if "{MEMORY_MOMENTS_CONTEXT}" in content:
                         results[name] = "✅ Found"
@@ -182,7 +162,7 @@ def test_integration_completeness():
                         results[name] = "❌ Missing"
 
             elif "advanced_thread_manager.py" in description:
-                with open("src/conversation/advanced_thread_manager.py", "r") as f:
+                with open("src/conversation/advanced_thread_manager.py") as f:
                     content = f.read()
                     if "self.memory_moments" in content and "MEMORY_MOMENTS_AVAILABLE" in content:
                         results[name] = "✅ Found"
@@ -190,7 +170,7 @@ def test_integration_completeness():
                         results[name] = "❌ Missing"
 
             elif "proactive_engagement_engine.py" in description:
-                with open("src/conversation/proactive_engagement_engine.py", "r") as f:
+                with open("src/conversation/proactive_engagement_engine.py") as f:
                     content = f.read()
                     if (
                         "self.memory_moments" in content
@@ -203,14 +183,12 @@ def test_integration_completeness():
         except Exception as e:
             results[name] = f"❌ Error: {e}"
 
-    print("\nIntegration Points Status:")
-    for name, status in results.items():
-        print(f"  {status} {name}")
+    for name, _status in results.items():
+        pass
 
     success_count = sum(1 for status in results.values() if status.startswith("✅"))
     total_count = len(results)
 
-    print(f"\nIntegration Completeness: {success_count}/{total_count} points implemented")
 
     return success_count == total_count
 
@@ -219,8 +197,6 @@ if __name__ == "__main__":
     # Set up logging
     logging.basicConfig(level=logging.ERROR)  # Reduce noise during testing
 
-    print("🚀 WhisperEngine Phase 4.1 Memory Moments Integration Test")
-    print("=" * 60)
 
     # Test integration completeness
     completeness_passed = test_integration_completeness()
@@ -228,10 +204,7 @@ if __name__ == "__main__":
     # Test runtime integration
     runtime_passed = asyncio.run(test_memory_moments_integration())
 
-    print("\n" + "=" * 60)
     if completeness_passed and runtime_passed:
-        print("🎉 ALL TESTS PASSED: Phase 4.1 Memory Moments Successfully Integrated!")
         sys.exit(0)
     else:
-        print("❌ TESTS FAILED: Integration issues detected")
         sys.exit(1)

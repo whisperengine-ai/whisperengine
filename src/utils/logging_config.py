@@ -3,14 +3,14 @@ Enhanced logging configuration with rotation, structured logging, and environmen
 DevOps best practices implementation for the Discord bot.
 """
 
+import json
 import logging
 import logging.handlers
 import os
 import sys
-from pathlib import Path
 from datetime import datetime
-import json
-from typing import Dict, Any, Optional
+from pathlib import Path
+from typing import Any
 
 
 class StructuredFormatter(logging.Formatter):
@@ -36,13 +36,13 @@ class StructuredFormatter(logging.Formatter):
 
         # Add extra fields if present
         if hasattr(record, "user_id"):
-            log_entry["user_id"] = getattr(record, "user_id")
+            log_entry["user_id"] = record.user_id
         if hasattr(record, "guild_id"):
-            log_entry["guild_id"] = getattr(record, "guild_id")
+            log_entry["guild_id"] = record.guild_id
         if hasattr(record, "channel_id"):
-            log_entry["channel_id"] = getattr(record, "channel_id")
+            log_entry["channel_id"] = record.channel_id
         if hasattr(record, "request_id"):
-            log_entry["request_id"] = getattr(record, "request_id")
+            log_entry["request_id"] = record.request_id
 
         return json.dumps(log_entry, ensure_ascii=False)
 
@@ -112,7 +112,7 @@ def setup_logging(
     environment: str = "development",
     log_dir: str = "logs",
     app_name: str = "discord_bot",
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Configure comprehensive logging with rotation, structured output, and environment-specific settings.
 
@@ -261,10 +261,10 @@ def log_with_context(
     logger: logging.Logger,
     level: int,
     message: str,
-    user_id: Optional[int] = None,
-    guild_id: Optional[int] = None,
-    channel_id: Optional[int] = None,
-    request_id: Optional[str] = None,
+    user_id: int | None = None,
+    guild_id: int | None = None,
+    channel_id: int | None = None,
+    request_id: str | None = None,
     **kwargs,
 ):
     """
@@ -296,7 +296,7 @@ def log_with_context(
 
 # Convenience functions
 def log_user_action(
-    message: str, user_id: int, guild_id: Optional[int] = None, channel_id: Optional[int] = None
+    message: str, user_id: int, guild_id: int | None = None, channel_id: int | None = None
 ):
     """Log user actions with context."""
     logger = get_logger("discord_bot.user_actions")
@@ -308,12 +308,12 @@ def log_user_action(
 def log_bot_response(
     message: str,
     user_id: int,
-    response_time: Optional[float] = None,
-    guild_id: Optional[int] = None,
+    response_time: float | None = None,
+    guild_id: int | None = None,
 ):
     """Log bot responses with performance metrics."""
     logger = get_logger("discord_bot.responses")
-    extra = {"response_time_ms": response_time * 1000 if response_time else None}
+    {"response_time_ms": response_time * 1000 if response_time else None}
     log_with_context(logger, logging.INFO, message, user_id=user_id, guild_id=guild_id)
 
 

@@ -2,8 +2,8 @@
 """
 Test script to verify the JSON comment removal fix is working correctly
 """
-import re
 import json
+import re
 
 # Test JSON with comments that was causing the issue
 test_json_with_comments = """
@@ -11,19 +11,19 @@ test_json_with_comments = """
   "user_facts": [
     {
       "fact": "I'm a fan of pizza",
-      "category": "preference", 
+      "category": "preference",
       "confidence": 0.95, // Assuming this is a clear and persistent fact
       "reasoning": "It's a common interest that many people share"
     },
     {
       "fact": "I'm a teacher by profession",
-      "category": "personal_info", 
+      "category": "personal_info",
       "confidence": 0.95, // Assuming this is a clear and persistent fact
       "reasoning": "It's a profession that many people aspire to"
     },
     {
       "fact": "I enjoy playing guitar",
-      "category": "hobby", 
+      "category": "hobby",
       "confidence": 0.95, // Assuming this is a clear and persistent fact
       "reasoning": "It's a hobby that many people enjoy"
     }
@@ -47,39 +47,24 @@ def clean_json_comments(response_text):
 
 def test_json_comment_removal():
     """Test that the comment removal fix works correctly"""
-    print("Testing JSON comment removal fix...")
-    print("=" * 50)
 
     # Test the original problematic JSON
-    print("Original JSON with comments:")
-    print(test_json_with_comments)
-    print("\n" + "=" * 50)
 
     # Clean the JSON
     cleaned_json = clean_json_comments(test_json_with_comments)
-    print("JSON after comment removal:")
-    print(cleaned_json)
-    print("\n" + "=" * 50)
 
     # Try to parse it
     try:
         parsed_data = json.loads(cleaned_json)
-        print("✅ SUCCESS: JSON parsed successfully!")
-        print(f"Found {len(parsed_data['user_facts'])} user facts:")
-        for i, fact in enumerate(parsed_data["user_facts"], 1):
-            print(
-                f"  {i}. {fact['fact']} (category: {fact['category']}, confidence: {fact['confidence']})"
-            )
+        for _i, _fact in enumerate(parsed_data["user_facts"], 1):
+            pass
         return True
-    except json.JSONDecodeError as e:
-        print(f"❌ FAILED: JSON parsing error: {e}")
+    except json.JSONDecodeError:
         return False
 
 
 def test_edge_cases():
     """Test various edge cases for comment removal"""
-    print("\n" + "=" * 50)
-    print("Testing edge cases...")
 
     test_cases = [
         # Single line comment at end
@@ -101,17 +86,12 @@ def test_edge_cases():
     ]
 
     all_passed = True
-    for i, test_case in enumerate(test_cases, 1):
-        print(f"\nTest case {i}:")
-        print(f"Input:  {repr(test_case)}")
+    for _i, test_case in enumerate(test_cases, 1):
         cleaned = clean_json_comments(test_case)
-        print(f"Output: {repr(cleaned)}")
 
         try:
             json.loads(cleaned)
-            print("✅ Valid JSON after cleaning")
-        except json.JSONDecodeError as e:
-            print(f"❌ Invalid JSON: {e}")
+        except json.JSONDecodeError:
             all_passed = False
 
     return all_passed
@@ -121,8 +101,7 @@ if __name__ == "__main__":
     success1 = test_json_comment_removal()
     success2 = test_edge_cases()
 
-    print("\n" + "=" * 50)
     if success1 and success2:
-        print("🎉 ALL TESTS PASSED! The JSON comment removal fix is working correctly.")
+        pass
     else:
-        print("⚠️  Some tests failed. Please review the implementation.")
+        pass

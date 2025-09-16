@@ -4,17 +4,15 @@ Enhanced macOS System Tray Integration for WhisperEngine
 Provides advanced dock integration, badge notifications, and real-time status updates.
 """
 
-import os
-import sys
+import json
 import logging
 import subprocess
+import sys
 import threading
 import time
-import json
-from pathlib import Path
-from typing import Optional, Dict, Any, List
-from datetime import datetime
 from dataclasses import dataclass
+from datetime import datetime
+from pathlib import Path
 
 
 @dataclass
@@ -37,7 +35,7 @@ class SystemStatus:
     total_conversations: int = 0
     memory_usage_mb: float = 0.0
     uptime_seconds: int = 0
-    last_activity: Optional[datetime] = None
+    last_activity: datetime | None = None
 
 
 class MacOSDockBadgeManager:
@@ -80,7 +78,7 @@ class MacOSDockBadgeManager:
         prefs_file = Path.home() / ".whisperengine" / "dock_preferences.json"
         try:
             if prefs_file.exists():
-                with open(prefs_file, "r") as f:
+                with open(prefs_file) as f:
                     return json.load(f)
         except Exception as e:
             self.logger.warning(f"Could not load dock preferences: {e}")
@@ -126,8 +124,8 @@ class MacOSDockBadgeManager:
     def _update_status(self):
         """Update system status"""
         try:
-            import requests
             import psutil
+            import requests
 
             # Check server health
             try:

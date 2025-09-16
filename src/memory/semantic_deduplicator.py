@@ -3,12 +3,13 @@ Semantic Deduplication System for Memory Optimization
 Prevents storage of redundant memories and improves retrieval quality
 """
 
-import logging
-import numpy as np
 import hashlib
-from typing import Dict, List, Optional, Tuple, Any
-from datetime import datetime, timedelta
+import logging
 from dataclasses import dataclass
+from datetime import datetime, timedelta
+from typing import Any
+
+import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
 
 logger = logging.getLogger(__name__)
@@ -20,9 +21,9 @@ class MemoryFingerprint:
 
     content_hash: str
     semantic_hash: str
-    embedding_preview: List[float]  # First 10 dimensions for quick comparison
+    embedding_preview: list[float]  # First 10 dimensions for quick comparison
     content_length: int
-    key_phrases: List[str]
+    key_phrases: list[str]
     timestamp: str
     memory_type: str
 
@@ -39,9 +40,9 @@ class SemanticDeduplicator:
         self.logger = logging.getLogger(__name__)
 
         # Deduplication cache and fingerprint storage
-        self.memory_fingerprints: Dict[str, MemoryFingerprint] = {}
-        self.content_clusters: Dict[str, List[str]] = {}  # cluster_id -> memory_ids
-        self.similarity_cache: Dict[str, float] = {}  # (id1, id2) -> similarity
+        self.memory_fingerprints: dict[str, MemoryFingerprint] = {}
+        self.content_clusters: dict[str, list[str]] = {}  # cluster_id -> memory_ids
+        self.similarity_cache: dict[str, float] = {}  # (id1, id2) -> similarity
 
         # Configuration
         self.max_fingerprints = 10000
@@ -58,8 +59,8 @@ class SemanticDeduplicator:
         }
 
     def should_store_memory(
-        self, content: str, memory_type: str = "conversation", user_id: Optional[str] = None
-    ) -> Tuple[bool, Optional[str], float]:
+        self, content: str, memory_type: str = "conversation", user_id: str | None = None
+    ) -> tuple[bool, str | None, float]:
         """
         Determine if a memory should be stored based on semantic similarity to existing memories
 
@@ -110,7 +111,7 @@ class SemanticDeduplicator:
 
     def find_similar_memories(
         self, content: str, limit: int = 5, min_similarity: float = 0.7
-    ) -> List[Tuple[str, float]]:
+    ) -> list[tuple[str, float]]:
         """
         Find memories that are semantically similar to the given content
 
@@ -164,14 +165,14 @@ class SemanticDeduplicator:
             self.logger.error("Error finding similar memories: %s", str(e))
             return []
 
-    def get_cluster_memories(self, memory_id: str) -> List[str]:
+    def get_cluster_memories(self, memory_id: str) -> list[str]:
         """Get all memories in the same cluster as the given memory"""
         for memory_ids in self.content_clusters.values():
             if memory_id in memory_ids:
                 return memory_ids.copy()
         return [memory_id]
 
-    def optimize_memory_storage(self, memory_ids: List[str]) -> Dict[str, Any]:
+    def optimize_memory_storage(self, memory_ids: list[str]) -> dict[str, Any]:
         """
         Analyze a set of memories and suggest optimizations
         """
@@ -238,7 +239,7 @@ class SemanticDeduplicator:
         return optimization_report
 
     def _generate_fingerprint(
-        self, content: str, memory_type: str, memory_id: Optional[str] = None
+        self, content: str, memory_type: str, memory_id: str | None = None
     ) -> MemoryFingerprint:
         """Generate a compact fingerprint for memory content"""
         _ = memory_id  # Reserved for future memory-specific fingerprinting
@@ -271,7 +272,7 @@ class SemanticDeduplicator:
             memory_type=memory_type,
         )
 
-    def _extract_key_phrases(self, content: str) -> List[str]:
+    def _extract_key_phrases(self, content: str) -> list[str]:
         """Extract key phrases for semantic hashing"""
         import re
 
@@ -357,7 +358,7 @@ class SemanticDeduplicator:
         phrase_counts = Counter(phrases)
         return [phrase for phrase, count in phrase_counts.most_common(10)]
 
-    def _find_exact_duplicate(self, fingerprint: MemoryFingerprint) -> Optional[str]:
+    def _find_exact_duplicate(self, fingerprint: MemoryFingerprint) -> str | None:
         """Find exact content duplicates using content hash"""
         for memory_id, stored_fingerprint in self.memory_fingerprints.items():
             if stored_fingerprint.content_hash == fingerprint.content_hash:
@@ -366,7 +367,7 @@ class SemanticDeduplicator:
 
     def _find_semantic_duplicate(
         self, fingerprint: MemoryFingerprint
-    ) -> Tuple[Optional[str], float]:
+    ) -> tuple[str | None, float]:
         """Find semantic duplicates using embedding similarity"""
         if not self.embedding_manager or not fingerprint.embedding_preview:
             return None, 0.0
@@ -405,7 +406,7 @@ class SemanticDeduplicator:
         )
 
     def _quick_similarity_check_previews(
-        self, preview1: List[float], preview2: List[float]
+        self, preview1: list[float], preview2: list[float]
     ) -> float:
         """Compute cosine similarity between two embedding previews"""
         if not preview1 or not preview2:
@@ -535,7 +536,7 @@ class SemanticDeduplicator:
         # This is a simplified reconstruction - in practice, you might store more content
         return " ".join(fingerprint.key_phrases)
 
-    def _estimate_group_similarity(self, memory_ids: List[str]) -> float:
+    def _estimate_group_similarity(self, memory_ids: list[str]) -> float:
         """Estimate average similarity within a group of memories"""
         if len(memory_ids) < 2:
             return 1.0
@@ -552,7 +553,7 @@ class SemanticDeduplicator:
 
         return sum(similarities) / len(similarities) if similarities else 0.0
 
-    def get_deduplication_stats(self) -> Dict[str, Any]:
+    def get_deduplication_stats(self) -> dict[str, Any]:
         """Get statistics about deduplication performance"""
         return {
             "total_fingerprints": len(self.memory_fingerprints),

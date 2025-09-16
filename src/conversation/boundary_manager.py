@@ -17,15 +17,12 @@ Key improvements over the existing system:
 - Separate conversation threads in multi-user channels
 """
 
-import asyncio
 import hashlib
 import logging
-import time
-from datetime import datetime, timedelta
 from dataclasses import dataclass, field
+from datetime import datetime, timedelta
 from enum import Enum
-from typing import Dict, List, Optional, Any, Tuple
-import json
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -56,12 +53,12 @@ class ConversationTopic:
     """Represents a conversation topic segment"""
 
     topic_id: str
-    keywords: List[str]
+    keywords: list[str]
     start_time: datetime
-    end_time: Optional[datetime] = None
+    end_time: datetime | None = None
     message_count: int = 0
-    emotional_tone: Optional[str] = None
-    resolution_status: Optional[str] = None  # resolved, pending, ongoing
+    emotional_tone: str | None = None
+    resolution_status: str | None = None  # resolved, pending, ongoing
 
     def is_active(self) -> bool:
         """Check if topic is currently active"""
@@ -83,12 +80,12 @@ class ConversationSession:
     start_time: datetime
     last_activity: datetime
     state: ConversationState = ConversationState.ACTIVE
-    current_topic: Optional[ConversationTopic] = None
-    topic_history: List[ConversationTopic] = field(default_factory=list)
+    current_topic: ConversationTopic | None = None
+    topic_history: list[ConversationTopic] = field(default_factory=list)
     message_count: int = 0
     context_summary: str = ""
-    conversation_goal: Optional[str] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    conversation_goal: str | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     def update_activity(self):
         """Update last activity timestamp"""
@@ -102,7 +99,7 @@ class ConversationSession:
         """Check if this is a long conversation requiring special handling"""
         return self.message_count >= message_threshold
 
-    def get_active_topics(self) -> List[ConversationTopic]:
+    def get_active_topics(self) -> list[ConversationTopic]:
         """Get currently active topics"""
         return [topic for topic in self.topic_history if topic.is_active()]
 
@@ -113,10 +110,10 @@ class ConversationSegment:
 
     segment_id: str
     session_id: str
-    start_message_id: Optional[str]
-    end_message_id: Optional[str]
+    start_message_id: str | None
+    end_message_id: str | None
     topic: ConversationTopic
-    message_ids: List[str] = field(default_factory=list)
+    message_ids: list[str] = field(default_factory=list)
     context_summary: str = ""
     importance_score: float = 0.0
 
@@ -158,8 +155,8 @@ class ConversationBoundaryManager:
         self.summarization_threshold = summarization_threshold
 
         # Active session storage
-        self.active_sessions: Dict[str, ConversationSession] = {}
-        self.session_segments: Dict[str, List[ConversationSegment]] = {}
+        self.active_sessions: dict[str, ConversationSession] = {}
+        self.session_segments: dict[str, list[ConversationSegment]] = {}
 
         # Topic transition keywords for detection
         self.transition_indicators = {
@@ -204,7 +201,7 @@ class ConversationBoundaryManager:
         channel_id: str,
         message_id: str,
         message_content: str,
-        timestamp: Optional[datetime] = None,
+        timestamp: datetime | None = None,
     ) -> ConversationSession:
         """
         Process a new message and update conversation boundaries
@@ -256,7 +253,7 @@ class ConversationBoundaryManager:
 
     async def get_conversation_context(
         self, user_id: str, channel_id: str, limit: int = 15, include_summary: bool = True
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Get enhanced conversation context with boundary awareness
 
@@ -357,7 +354,7 @@ class ConversationBoundaryManager:
 
     async def resume_conversation(
         self, user_id: str, channel_id: str, resume_message: str
-    ) -> Optional[str]:
+    ) -> str | None:
         """
         Resume an interrupted or paused conversation
 
@@ -393,7 +390,7 @@ class ConversationBoundaryManager:
 
     async def end_conversation_session(
         self, user_id: str, channel_id: str, completion_reason: str = "natural_end"
-    ) -> Optional[str]:
+    ) -> str | None:
         """
         End a conversation session gracefully
 
@@ -426,14 +423,14 @@ class ConversationBoundaryManager:
         session.context_summary = final_summary
 
         # Archive session (remove from active sessions)
-        archived_session = self.active_sessions.pop(session_key, None)
+        self.active_sessions.pop(session_key, None)
 
         logger.info(f"Conversation session ended for user {user_id}: {completion_reason}")
         return final_summary
 
     async def get_multi_user_context(
-        self, channel_id: str, active_user_ids: List[str], limit_per_user: int = 10
-    ) -> Dict[str, Any]:
+        self, channel_id: str, active_user_ids: list[str], limit_per_user: int = 10
+    ) -> dict[str, Any]:
         """
         Get conversation context for multi-user channels
 
@@ -581,7 +578,7 @@ class ConversationBoundaryManager:
 
         logger.debug(f"Started new topic {topic_id} with keywords: {keywords[:3]}")
 
-    async def _extract_topic_keywords(self, message_content: str) -> List[str]:
+    async def _extract_topic_keywords(self, message_content: str) -> list[str]:
         """Extract topic keywords from message content"""
         # Simple keyword extraction (can be enhanced with NLP)
         words = message_content.lower().split()
@@ -633,7 +630,6 @@ class ConversationBoundaryManager:
             "my",
             "your",
             "his",
-            "her",
             "its",
             "our",
             "their",
@@ -667,7 +663,7 @@ class ConversationBoundaryManager:
 
     async def _identify_conversation_boundaries(
         self, session: ConversationSession, limit: int
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Identify conversation boundaries for context pruning"""
         boundaries = []
 
@@ -766,8 +762,8 @@ class ConversationBoundaryManager:
         return summary
 
     async def _identify_conversation_threads(
-        self, channel_id: str, user_ids: List[str]
-    ) -> List[Dict[str, Any]]:
+        self, channel_id: str, user_ids: list[str]
+    ) -> list[dict[str, Any]]:
         """Identify active conversation threads in multi-user channel"""
         threads = []
 
@@ -793,7 +789,7 @@ class ConversationBoundaryManager:
             [s for s in self.active_sessions.values() if s.state == ConversationState.ACTIVE]
         )
 
-    def get_session_statistics(self) -> Dict[str, Any]:
+    def get_session_statistics(self) -> dict[str, Any]:
         """Get conversation session statistics"""
         sessions = list(self.active_sessions.values())
 

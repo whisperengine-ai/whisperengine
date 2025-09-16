@@ -8,20 +8,17 @@ ensuring perfect API consistency with server deployments while maintaining
 local data control and privacy.
 """
 
-import os
-import asyncio
 import logging
-from typing import Dict, Any, Optional, List
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
+from typing import Any
 
 from src.config.adaptive_config import AdaptiveConfigManager
 from src.database.database_integration import (
-    WhisperEngineDatabaseConfig,
     DatabaseIntegrationManager,
 )
-from src.memory.chromadb_manager_simple import ChromaDBManagerSimple
 from src.graph_database.local_graph_storage import LocalGraphStorage
+from src.memory.chromadb_manager_simple import ChromaDBManagerSimple
 from src.memory.desktop_conversation_cache import DesktopConversationCache
 
 logger = logging.getLogger(__name__)
@@ -43,9 +40,9 @@ class ChromaDBLocalDatabaseManager(DatabaseIntegrationManager):
         super().__init__(config_manager)
 
         # ChromaDB local storage
-        self.chromadb_manager: Optional[ChromaDBManagerSimple] = None
-        self.graph_storage: Optional[LocalGraphStorage] = None
-        self.local_cache: Optional[DesktopConversationCache] = None
+        self.chromadb_manager: ChromaDBManagerSimple | None = None
+        self.graph_storage: LocalGraphStorage | None = None
+        self.local_cache: DesktopConversationCache | None = None
 
         # Storage paths
         self.data_dir = Path.home() / ".whisperengine"
@@ -139,7 +136,7 @@ class ChromaDBLocalDatabaseManager(DatabaseIntegrationManager):
         return self.chromadb_manager
 
     async def store_conversation(
-        self, user_id: str, message: str, response: str, metadata: Optional[Dict[str, Any]] = None
+        self, user_id: str, message: str, response: str, metadata: dict[str, Any] | None = None
     ) -> str:
         """Store conversation using ChromaDB (same API as server deployments)"""
         try:
@@ -188,7 +185,7 @@ class ChromaDBLocalDatabaseManager(DatabaseIntegrationManager):
 
     async def search_conversations(
         self, user_id: str, query: str, limit: int = 10
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Search conversations using ChromaDB semantic search"""
         try:
             if not self.chromadb_manager or not self.chromadb_manager.user_collection:
@@ -244,7 +241,7 @@ class ChromaDBLocalDatabaseManager(DatabaseIntegrationManager):
 
     # ========== Health and Statistics ==========
 
-    async def get_health_status(self) -> Dict[str, Any]:
+    async def get_health_status(self) -> dict[str, Any]:
         """Get health status of all local database components"""
         status = {
             "timestamp": datetime.now().isoformat(),
@@ -296,7 +293,7 @@ class ChromaDBLocalDatabaseManager(DatabaseIntegrationManager):
 
         return status
 
-    async def get_storage_stats(self) -> Dict[str, Any]:
+    async def get_storage_stats(self) -> dict[str, Any]:
         """Get detailed storage statistics"""
         stats = {"timestamp": datetime.now().isoformat(), "chromadb": {}, "graph": {}, "cache": {}}
 

@@ -1,15 +1,15 @@
 """Neo4j connector for Docker containerized Neo4j database."""
 
+import asyncio
+import logging
 import os
-from typing import Dict, List, Optional, Any, Tuple
+from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from datetime import datetime
-import asyncio
-from contextlib import asynccontextmanager
-import logging
+from typing import Any
 
-from neo4j import GraphDatabase, Driver
-from neo4j.exceptions import ServiceUnavailable, TransactionError
+from neo4j import Driver, GraphDatabase
+from neo4j.exceptions import ServiceUnavailable
 
 logger = logging.getLogger(__name__)
 
@@ -44,9 +44,9 @@ class Neo4jConfig:
 class Neo4jConnector:
     """Async Neo4j database connector for Docker containerized setup."""
 
-    def __init__(self, config: Optional[Neo4jConfig] = None):
+    def __init__(self, config: Neo4jConfig | None = None):
         self.config = config or Neo4jConfig.from_env()
-        self._driver: Optional[Driver] = None
+        self._driver: Driver | None = None
         self._connected = False
 
     async def connect(self) -> None:
@@ -168,8 +168,8 @@ class Neo4jConnector:
             await asyncio.get_event_loop().run_in_executor(None, session.close)
 
     async def execute_query(
-        self, query: str, parameters: Optional[Dict[str, Any]] = None
-    ) -> List[Dict[str, Any]]:
+        self, query: str, parameters: dict[str, Any] | None = None
+    ) -> list[dict[str, Any]]:
         """Execute a Cypher query and return results."""
         if not self._connected:
             await self.connect()
@@ -184,8 +184,8 @@ class Neo4jConnector:
             return await asyncio.get_event_loop().run_in_executor(None, run_query, session)
 
     async def execute_write_query(
-        self, query: str, parameters: Optional[Dict[str, Any]] = None
-    ) -> List[Dict[str, Any]]:
+        self, query: str, parameters: dict[str, Any] | None = None
+    ) -> list[dict[str, Any]]:
         """Execute a write query in a transaction."""
         if not self._connected:
             await self.connect()
@@ -205,7 +205,7 @@ class Neo4jConnector:
     # User Management
     async def create_or_update_user(
         self, user_id: str, discord_id: str, name: str, **properties
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Create or update a user node."""
         query = """
         MERGE (u:User {id: $user_id})
@@ -227,7 +227,7 @@ class Neo4jConnector:
     # Topic Management
     async def create_or_update_topic(
         self, topic_id: str, name: str, category: str = "general", **properties
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Create or update a topic node."""
         query = """
         MERGE (t:Topic {id: $topic_id})
@@ -255,10 +255,10 @@ class Neo4jConnector:
         user_id: str,
         chromadb_id: str,
         summary: str,
-        topics: List[str],
-        emotion_data: Optional[Dict] = None,
+        topics: list[str],
+        emotion_data: dict | None = None,
         importance: float = 0.5,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Create a memory node with topic and emotion relationships."""
 
         # Create memory node
@@ -306,7 +306,7 @@ class Neo4jConnector:
                          t.created_at = datetime(),
                          t.first_mentioned = datetime()
             ON MATCH SET t.last_mentioned = datetime()
-            
+
             WITH t
             MATCH (m:Memory {id: $memory_id})
             MERGE (m)-[r:ABOUT]->(t)
@@ -335,11 +335,11 @@ class Neo4jConnector:
                 timestamp: datetime(),
                 resolved: false
             })
-            
+
             WITH ec
             MATCH (m:Memory {id: $memory_id})
             CREATE (m)-[:EVOKED_EMOTION {strength: $intensity}]->(ec)
-            
+
             WITH ec
             MATCH (u:User {id: $user_id})
             CREATE (u)-[:EXPERIENCED {
@@ -347,7 +347,7 @@ class Neo4jConnector:
                 intensity: $intensity,
                 timestamp: datetime()
             }]->(ec)
-            
+
             RETURN ec
             """
 
@@ -367,31 +367,31 @@ class Neo4jConnector:
         return memory_result[0]["m"] if memory_result else {}
 
     # Relationship Analysis
-    async def get_user_relationship_context(self, user_id: str) -> Dict[str, Any]:
+    async def get_user_relationship_context(self, user_id: str) -> dict[str, Any]:
         """Get comprehensive relationship context for a user."""
         query = """
         MATCH (u:User {id: $user_id})
-        
+
         // Get interaction history
         OPTIONAL MATCH (u)-[r:REMEMBERS]->(m:Memory)
         WITH u, count(m) as memory_count, avg(m.importance) as avg_importance
-        
+
         // Get emotional patterns
         OPTIONAL MATCH (u)-[:EXPERIENCED]->(ec:EmotionContext)
         WITH u, memory_count, avg_importance,
              collect(DISTINCT ec.emotion) as experienced_emotions,
              avg(ec.intensity) as avg_emotional_intensity
-        
+
         // Get topic interests
         OPTIONAL MATCH (u)-[:REMEMBERS]->(m:Memory)-[:ABOUT]->(t:Topic)
         WITH u, memory_count, avg_importance, experienced_emotions, avg_emotional_intensity,
              collect(DISTINCT {name: t.name, category: t.category}) as topics
-        
+
         // Get relationship milestones
         OPTIONAL MATCH (u)-[rm:RELATIONSHIP_MILESTONE]->(bot:User {id: 'bot'})
         WITH u, memory_count, avg_importance, experienced_emotions, avg_emotional_intensity, topics,
              collect(DISTINCT {level: rm.level, achieved_at: rm.achieved_at}) as milestones
-        
+
         RETURN {
             user_id: u.id,
             name: u.name,
@@ -401,7 +401,7 @@ class Neo4jConnector:
             avg_emotional_intensity: avg_emotional_intensity,
             topics: topics,
             milestones: milestones,
-            intimacy_level: CASE 
+            intimacy_level: CASE
                 WHEN memory_count > 100 AND avg_emotional_intensity > 0.7 THEN 0.9
                 WHEN memory_count > 50 AND avg_emotional_intensity > 0.5 THEN 0.7
                 WHEN memory_count > 20 THEN 0.5
@@ -413,16 +413,16 @@ class Neo4jConnector:
         result = await self.execute_query(query, {"user_id": user_id})
         return result[0]["relationship_context"] if result else {}
 
-    async def get_emotional_patterns(self, user_id: str) -> Dict[str, Any]:
+    async def get_emotional_patterns(self, user_id: str) -> dict[str, Any]:
         """Get emotional response patterns for a user."""
         query = """
         MATCH (u:User {id: $user_id})-[:EXPERIENCED]->(ec:EmotionContext)
         <-[:TRIGGERS]-(t:Topic)
-        
-        WITH t.name as topic, ec.emotion as emotion, 
+
+        WITH t.name as topic, ec.emotion as emotion,
              avg(ec.intensity) as avg_intensity,
              count(ec) as frequency
-        
+
         RETURN {
             triggers: collect({
                 topic: topic,
@@ -438,14 +438,14 @@ class Neo4jConnector:
 
     async def get_contextual_memories(
         self, user_id: str, topic: str, limit: int = 10
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Get memories related to a specific topic with emotional context."""
         query = """
         MATCH (u:User {id: $user_id})-[:REMEMBERS]->(m:Memory)-[:ABOUT]->(t:Topic)
         WHERE t.name CONTAINS $topic OR t.category = $topic
-        
+
         OPTIONAL MATCH (m)-[:EVOKED_EMOTION]->(ec:EmotionContext)
-        
+
         RETURN {
             memory_id: m.id,
             chromadb_id: m.chromadb_id,
@@ -457,7 +457,7 @@ class Neo4jConnector:
             emotion: ec.emotion,
             emotion_intensity: ec.intensity
         } as memory_context
-        
+
         ORDER BY m.importance DESC, m.timestamp DESC
         LIMIT $limit
         """
@@ -470,8 +470,8 @@ class Neo4jConnector:
 
     # Global Facts Management
     async def create_or_update_knowledge_domain(
-        self, domain_name: str, description: str = "", parent_domain: Optional[str] = None
-    ) -> Dict[str, Any]:
+        self, domain_name: str, description: str = "", parent_domain: str | None = None
+    ) -> dict[str, Any]:
         """Create or update a knowledge domain node."""
         # Calculate depth based on parent
         depth = 0
@@ -528,8 +528,8 @@ class Neo4jConnector:
         confidence_score: float = 0.8,
         source: str = "learned",
         fact_type: str = "declarative",
-        tags: Optional[List[str]] = None,
-    ) -> Dict[str, Any]:
+        tags: list[str] | None = None,
+    ) -> dict[str, Any]:
         """Store a global fact in the graph database."""
         tags = tags or []
 
@@ -548,12 +548,12 @@ class Neo4jConnector:
             gf.verification_status = 'unverified',
             gf.tags = $tags,
             gf.updated_at = datetime()
-        
+
         WITH gf
         MATCH (kd:KnowledgeDomain {name: $knowledge_domain})
         MERGE (gf)-[:BELONGS_TO_DOMAIN]->(kd)
         SET kd.fact_count = kd.fact_count + 1
-        
+
         RETURN gf
         """
 
@@ -579,7 +579,7 @@ class Neo4jConnector:
         to_fact_id: str,
         relationship_type: str,
         strength: float = 1.0,
-        properties: Optional[Dict[str, Any]] = None,
+        properties: dict[str, Any] | None = None,
     ) -> bool:
         """Create a relationship between two global facts."""
         properties = properties or {}
@@ -615,8 +615,8 @@ class Neo4jConnector:
         return len(result) > 0
 
     async def get_related_facts(
-        self, fact_id: str, relationship_types: Optional[List[str]] = None, max_depth: int = 2
-    ) -> List[Dict[str, Any]]:
+        self, fact_id: str, relationship_types: list[str] | None = None, max_depth: int = 2
+    ) -> list[dict[str, Any]]:
         """Get facts related to a given fact through graph relationships."""
         relationship_filter = ""
         if relationship_types:
@@ -632,10 +632,10 @@ class Neo4jConnector:
         }})
         YIELD node
         WHERE node <> source AND labels(node)[0] = 'GlobalFact'
-        
+
         MATCH path = (source)-[r{relationship_filter}*1..{max_depth}]-(node)
         WITH node, relationships(path) as rels, length(path) as distance
-        
+
         RETURN {{
             fact: node,
             distance: distance,
@@ -666,14 +666,14 @@ class Neo4jConnector:
 
     async def search_facts_by_domain(
         self, knowledge_domain: str, include_subdomain: bool = True, limit: int = 50
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Search for facts within a knowledge domain."""
         if include_subdomain:
             query = """
             MATCH (kd:KnowledgeDomain)
             WHERE kd.name = $knowledge_domain OR kd.parent_domain = $knowledge_domain
             WITH collect(kd.name) as domain_names
-            
+
             MATCH (gf:GlobalFact)
             WHERE gf.knowledge_domain IN domain_names
             RETURN gf
@@ -694,7 +694,7 @@ class Neo4jConnector:
 
         return [record["gf"] for record in result]
 
-    async def get_fact_by_chromadb_id(self, chromadb_id: str) -> Optional[Dict[str, Any]]:
+    async def get_fact_by_chromadb_id(self, chromadb_id: str) -> dict[str, Any] | None:
         """Get a global fact by its ChromaDB ID."""
         query = """
         MATCH (gf:GlobalFact {chromadb_id: $chromadb_id})
@@ -705,11 +705,11 @@ class Neo4jConnector:
         return result[0]["gf"] if result else None
 
     async def update_fact_verification(
-        self, fact_id: str, verification_status: str, confidence_score: Optional[float] = None
+        self, fact_id: str, verification_status: str, confidence_score: float | None = None
     ) -> bool:
         """Update the verification status and confidence of a fact."""
         set_clause = "gf.verification_status = $verification_status, gf.updated_at = datetime()"
-        params: Dict[str, Any] = {"fact_id": fact_id, "verification_status": verification_status}
+        params: dict[str, Any] = {"fact_id": fact_id, "verification_status": verification_status}
 
         if confidence_score is not None:
             set_clause += ", gf.confidence_score = $confidence_score"
@@ -725,7 +725,7 @@ class Neo4jConnector:
         return len(result) > 0
 
     # Health Check
-    async def health_check(self) -> Dict[str, Any]:
+    async def health_check(self) -> dict[str, Any]:
         """Check database health and connection status."""
         try:
             result = await self.execute_query("RETURN 'healthy' as status, datetime() as timestamp")
@@ -762,7 +762,7 @@ class Neo4jConnector:
 
 
 # Global instance
-_neo4j_connector: Optional[Neo4jConnector] = None
+_neo4j_connector: Neo4jConnector | None = None
 
 
 async def get_neo4j_connector() -> Neo4jConnector:

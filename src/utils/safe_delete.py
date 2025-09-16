@@ -5,11 +5,11 @@ Provides controlled ways to remove data with confirmations and backups
 """
 
 import os
-import sys
-import sqlite3
 import shutil
+import sqlite3
+import sys
 from datetime import datetime
-from typing import List, Dict, Optional
+
 from user_profile_db import UserProfileDatabase
 
 
@@ -20,17 +20,16 @@ class SafeUserDeletion:
         self.db_path = db_path
         self.db = UserProfileDatabase(db_path)
 
-    def create_backup(self, suffix: Optional[str] = None) -> str:
+    def create_backup(self, suffix: str | None = None) -> str:
         """Create a backup before any deletion operation"""
         if suffix is None:
             suffix = datetime.now().strftime("%Y%m%d_%H%M%S")
 
         backup_path = f"user_profiles_backup_{suffix}.db"
         shutil.copy2(self.db_path, backup_path)
-        print(f"✅ Created backup: {backup_path}")
         return backup_path
 
-    def preview_user_deletion(self, user_id: str) -> Dict:
+    def preview_user_deletion(self, user_id: str) -> dict:
         """Preview what would be deleted for a user"""
         with sqlite3.connect(self.db_path) as conn:
             conn.row_factory = sqlite3.Row
@@ -50,34 +49,30 @@ class SafeUserDeletion:
 
             return {"exists": True, "user_data": dict(user), "emotion_count": emotion_count}
 
-    def preview_cleanup(self, days: int) -> Dict:
+    def preview_cleanup(self, days: int) -> dict:
         """Preview what would be deleted in cleanup operation"""
         with sqlite3.connect(self.db_path) as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.execute(
-                """
-                SELECT COUNT(*) as count, 
+                f"""
+                SELECT COUNT(*) as count,
                        COUNT(DISTINCT user_id) as affected_users
-                FROM emotion_history 
-                WHERE timestamp < date('now', '-{} days')
-            """.format(
-                    days
-                )
+                FROM emotion_history
+                WHERE timestamp < date('now', '-{days} days')
+            """
             )
 
             result = dict(cursor.fetchone())
 
             # Get sample of what would be deleted
             cursor = conn.execute(
-                """
+                f"""
                 SELECT user_id, detected_emotion, timestamp
-                FROM emotion_history 
-                WHERE timestamp < date('now', '-{} days')
+                FROM emotion_history
+                WHERE timestamp < date('now', '-{days} days')
                 ORDER BY timestamp ASC
                 LIMIT 10
-            """.format(
-                    days
-                )
+            """
             )
 
             result["sample_records"] = [dict(row) for row in cursor.fetchall()]
@@ -89,47 +84,33 @@ class SafeUserDeletion:
         preview = self.preview_user_deletion(user_id)
 
         if not preview["exists"]:
-            print(f"❌ User {user_id} does not exist")
             return False
 
-        user_data = preview["user_data"]
-        emotion_count = preview["emotion_count"]
+        preview["user_data"]
+        preview["emotion_count"]
 
-        print(f"\n🔍 User Deletion Preview:")
-        print(f"   User ID: {user_id}")
-        print(f"   Name: {user_data.get('name', 'No name')}")
-        print(f"   Relationship: {user_data.get('relationship_level', 'Unknown')}")
-        print(f"   Interactions: {user_data.get('interaction_count', 0)}")
-        print(f"   Emotion records: {emotion_count}")
-        print(f"   First seen: {user_data.get('first_interaction', 'Unknown')}")
-        print(f"   Last seen: {user_data.get('last_interaction', 'Unknown')}")
 
         # Confirmation
         confirm = input(
             f"\n⚠️  Delete ALL data for user {user_id}? (type 'DELETE {user_id}' to confirm): "
         )
         if confirm != f"DELETE {user_id}":
-            print("❌ Deletion cancelled")
             return False
 
         # Create backup
         if auto_backup:
-            backup_path = self.create_backup(f"before_delete_{user_id}")
+            self.create_backup(f"before_delete_{user_id}")
 
         # Perform deletion
         try:
             self.db.delete_user_profile(user_id)
-            print(f"✅ Successfully deleted user {user_id}")
-            print(f"   - Deleted 1 user record")
-            print(f"   - Deleted {emotion_count} emotion records")
 
             if auto_backup:
-                print(f"   - Backup saved: {os.path.basename(backup_path)}")
+                pass
 
             return True
 
-        except Exception as e:
-            print(f"❌ Error during deletion: {e}")
+        except Exception:
             return False
 
     def safe_cleanup_emotions(self, days: int, auto_backup: bool = True) -> bool:
@@ -138,48 +119,37 @@ class SafeUserDeletion:
         preview = self.preview_cleanup(days)
 
         if preview["count"] == 0:
-            print(f"ℹ️  No emotion records older than {days} days found")
             return True
 
-        print(f"\n🔍 Cleanup Preview:")
-        print(f"   Records to delete: {preview['count']}")
-        print(f"   Users affected: {preview['affected_users']}")
-        print(f"   Age threshold: {days} days")
 
         if preview["sample_records"]:
-            print(f"\n📋 Sample records to be deleted:")
-            for record in preview["sample_records"][:5]:
-                print(
-                    f"   • {record['user_id']}: {record['detected_emotion']} at {record['timestamp']}"
-                )
+            for _record in preview["sample_records"][:5]:
+                pass
 
             if len(preview["sample_records"]) > 5:
-                print(f"   ... and {len(preview['sample_records']) - 5} more")
+                pass
 
         # Confirmation
         confirm = input(
             f"\n⚠️  Delete {preview['count']} emotion records older than {days} days? (type 'YES' to confirm): "
         )
         if confirm != "YES":
-            print("❌ Cleanup cancelled")
             return False
 
         # Create backup
         if auto_backup:
-            backup_path = self.create_backup(f"before_cleanup_{days}days")
+            self.create_backup(f"before_cleanup_{days}days")
 
         # Perform cleanup
         try:
-            deleted = self.db.cleanup_old_emotions(days)
-            print(f"✅ Successfully cleaned up {deleted} emotion records")
+            self.db.cleanup_old_emotions(days)
 
             if auto_backup:
-                print(f"   - Backup saved: {os.path.basename(backup_path)}")
+                pass
 
             return True
 
-        except Exception as e:
-            print(f"❌ Error during cleanup: {e}")
+        except Exception:
             return False
 
     def safe_reset_user(
@@ -190,55 +160,43 @@ class SafeUserDeletion:
         preview = self.preview_user_deletion(user_id)
 
         if not preview["exists"]:
-            print(f"❌ User {user_id} does not exist")
             return False
 
-        user_data = preview["user_data"]
-        emotion_count = preview["emotion_count"]
+        preview["user_data"]
+        preview["emotion_count"]
 
         reset_type = "complete" if full_reset else "partial (keep basic info)"
 
-        print(f"\n🔍 User Reset Preview ({reset_type}):")
-        print(f"   User ID: {user_id}")
-        print(f"   Current interactions: {user_data.get('interaction_count', 0)}")
-        print(f"   Current emotion: {user_data.get('current_emotion', 'unknown')}")
-        print(f"   Emotion records to delete: {emotion_count}")
 
         if full_reset:
-            print(f"   ⚠️  FULL RESET: All user data will be deleted")
+            pass
         else:
-            print(f"   ℹ️  PARTIAL RESET: Will keep user_id, name, first_interaction")
+            pass
 
         # Confirmation
         confirm = input(f"\n⚠️  Reset user {user_id} ({reset_type})? (y/n): ")
         if confirm.lower() != "y":
-            print("❌ Reset cancelled")
             return False
 
         # Create backup
         if auto_backup:
-            backup_path = self.create_backup(f"before_reset_{user_id}")
+            self.create_backup(f"before_reset_{user_id}")
 
         # Perform reset
         try:
-            deleted = self.db.reset_user_profile(user_id, not full_reset)
-            print(f"✅ Successfully reset user {user_id}")
-            print(f"   - Deleted {deleted} emotion records")
+            self.db.reset_user_profile(user_id, not full_reset)
 
             if full_reset:
-                print(f"   - Deleted user record")
+                pass
             else:
-                print(f"   - Reset interaction/escalation counters")
-                print(f"   - Reset current emotion to neutral")
-                print(f"   - Cleared trust indicators")
+                pass
 
             if auto_backup:
-                print(f"   - Backup saved: {os.path.basename(backup_path)}")
+                pass
 
             return True
 
-        except Exception as e:
-            print(f"❌ Error during reset: {e}")
+        except Exception:
             return False
 
     def list_backups(self):
@@ -256,12 +214,11 @@ class SafeUserDeletion:
                 )
 
         if backups:
-            print("\n📁 Available Backups:")
             backups.sort(key=lambda x: x["modified"], reverse=True)
-            for backup in backups:
-                print(f"   • {backup['filename']} ({backup['size']:,} bytes, {backup['modified']})")
+            for _backup in backups:
+                pass
         else:
-            print("📁 No backup files found")
+            pass
 
 
 def main():
@@ -293,16 +250,13 @@ def main():
                 user_id = sys.argv[3]
                 preview = deleter.preview_user_deletion(user_id)
                 if preview["exists"]:
-                    print(f"User {user_id} exists with {preview['emotion_count']} emotion records")
+                    pass
                 else:
-                    print(f"User {user_id} does not exist")
+                    pass
 
             elif subcommand == "cleanup":
                 days = int(sys.argv[3])
                 preview = deleter.preview_cleanup(days)
-                print(
-                    f"Would delete {preview['count']} records affecting {preview['affected_users']} users"
-                )
 
         elif command == "backups":
             deleter.list_backups()
@@ -310,42 +264,12 @@ def main():
         else:
             print_help()
 
-    except Exception as e:
-        print(f"❌ Error: {e}")
+    except Exception:
+        pass
 
 
 def print_help():
-    print(
-        """
-🗑️  Safe User Profile Deletion Tool
-
-Usage:
-  python safe_delete.py <command> [args]
-
-Commands:
-  delete <user_id>           - Safely delete all data for a user
-  cleanup <days>             - Delete emotion records older than N days
-  reset <user_id> [full]     - Reset user profile (partial or full)
-  preview user <user_id>     - Preview what would be deleted for user
-  preview cleanup <days>     - Preview what would be cleaned up
-  backups                    - List available backup files
-
-Features:
-  ✅ Automatic backups before any deletion
-  ✅ Preview operations before execution
-  ✅ Confirmation prompts for safety
-  ✅ Detailed logging of what was deleted
-
-Examples:
-  python safe_delete.py delete 123456789
-  python safe_delete.py cleanup 60
-  python safe_delete.py reset 672814231002939413
-  python safe_delete.py reset 672814231002939413 full
-  python safe_delete.py preview user 123456789
-  python safe_delete.py preview cleanup 30
-  python safe_delete.py backups
-    """
-    )
+    pass
 
 
 if __name__ == "__main__":

@@ -17,19 +17,18 @@ SECURITY FEATURES:
 - Security event logging for suspicious errors
 """
 
+import hashlib
 import logging
 import re
-import hashlib
-import traceback
-from typing import Dict, List, Optional, Any, Tuple, Union
 from dataclasses import dataclass
-from enum import Enum
 from datetime import datetime
+from enum import Enum
+
 import discord
 
 # Import secure logging for error audit trail
 try:
-    from secure_logging import get_secure_logger, LogLevel, DataSensitivity
+    from secure_logging import DataSensitivity, LogLevel, get_secure_logger
 
     secure_logger = get_secure_logger("error_message_security")
     HAS_SECURE_LOGGING = True
@@ -68,7 +67,7 @@ class SecureErrorResponse:
     error_code: str  # Generic error identifier
     severity: ErrorSeverity
     context: ErrorContext
-    sanitized_details: Optional[str] = None
+    sanitized_details: str | None = None
     requires_admin_notification: bool = False
 
 
@@ -89,7 +88,7 @@ class ErrorMessageSecurity:
         self.generic_messages = self._load_generic_messages()
         self.error_counts = {}  # Track error patterns for security monitoring
 
-    def _load_sensitive_patterns(self) -> List[Tuple[str, str]]:
+    def _load_sensitive_patterns(self) -> list[tuple[str, str]]:
         """Load patterns that should be filtered from error messages"""
         return [
             # File paths and directory structures
@@ -129,7 +128,7 @@ class ErrorMessageSecurity:
             (r'os\.environ\[[\'"]([^\'"]+)[\'"]\]', "os.environ[[ENV_VAR_REDACTED]]"),
         ]
 
-    def _load_generic_messages(self) -> Dict[str, str]:
+    def _load_generic_messages(self) -> dict[str, str]:
         """Load generic error messages for different error types"""
         return {
             "connection_error": "I'm having trouble connecting to external services. Please try again later.",
@@ -400,7 +399,7 @@ class ErrorMessageSecurity:
 
             log_level(f"[{response.error_code}] {response.log_message}")
 
-    def _alert_error_frequency(self, pattern_hash: str, error_data: Dict):
+    def _alert_error_frequency(self, pattern_hash: str, error_data: dict):
         """Alert on suspicious error frequency patterns"""
 
         if HAS_SECURE_LOGGING:
@@ -419,7 +418,7 @@ class ErrorMessageSecurity:
             )
 
     def handle_discord_error(
-        self, error: Exception, context: Optional[discord.Message] = None
+        self, error: Exception, context: discord.Message | None = None
     ) -> str:
         """
         Handle Discord-specific errors with appropriate context awareness.
@@ -491,7 +490,7 @@ class ErrorMessageSecurity:
         return error_type_mapping.get(error_name, "unknown_error")
 
     def _notify_admin_async(
-        self, response: SecureErrorResponse, context: Optional[discord.Message]
+        self, response: SecureErrorResponse, context: discord.Message | None
     ):
         """Notify administrators of critical errors (async-safe)"""
 
@@ -516,7 +515,7 @@ class ErrorMessageSecurity:
 error_security = ErrorMessageSecurity()
 
 
-def secure_error_handler(error: Exception, context: Optional[discord.Message] = None) -> str:
+def secure_error_handler(error: Exception, context: discord.Message | None = None) -> str:
     """
     Convenient function to handle errors securely.
 

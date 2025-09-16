@@ -24,47 +24,34 @@ Test Categories:
 - Edge Case Tests: Error conditions and boundary cases
 """
 
-import pytest
 import asyncio
 import logging
-import threading
+import random
 import time
 import uuid
-from datetime import datetime, timedelta
-from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import List, Dict, Any, Optional
-import random
-import statistics
-from unittest.mock import Mock, patch, MagicMock
-import gc
-import psutil
-import os
+
+import pytest
+
+from src.conversation.advanced_thread_manager import (
+    AdvancedConversationThreadManager,
+    ConversationThreadState,
+)
+from src.conversation.proactive_engagement_engine import (
+    ConversationFlowState,
+    ProactiveConversationEngagementEngine,
+)
 
 # Import Phase 4 components
 from src.personality.memory_moments import (
-    MemoryTriggeredMoments,
-    MemoryConnectionType,
-    MemoryMomentType,
     ConversationContext,
-)
-from src.conversation.advanced_thread_manager import (
-    AdvancedConversationThreadManager,
-    ConversationThreadAdvanced,
-    ConversationThreadState,
-    ThreadTransitionType,
-    ThreadPriorityLevel,
-)
-from src.conversation.proactive_engagement_engine import (
-    ProactiveConversationEngagementEngine,
-    ConversationFlowState,
-    EngagementStrategy,
+    MemoryTriggeredMoments,
 )
 
 # Import supporting systems
 try:
     from src.intelligence.emotional_context_engine import (
-        EmotionalContextEngine,
         EmotionalContext,
+        EmotionalContextEngine,
         EmotionalState,
     )
 
@@ -123,11 +110,11 @@ class Phase4TestFramework:
             logger.error(f"❌ Failed to initialize test environment: {e}")
             return False
 
-    def generate_test_users(self, count: int) -> List[str]:
+    def generate_test_users(self, count: int) -> list[str]:
         """Generate test user IDs for concurrent testing"""
         return [f"test_user_{uuid.uuid4().hex[:8]}" for _ in range(count)]
 
-    def generate_test_messages(self, count: int) -> List[str]:
+    def generate_test_messages(self, count: int) -> list[str]:
         """Generate realistic test messages for conversation testing"""
         message_templates = [
             "I've been thinking about {topic} lately and {feeling}",
@@ -252,7 +239,7 @@ class CriticalPathTester:
                 invalid_context = ConversationContext(
                     user_id="", context_id="", current_message="", emotional_state=None
                 )
-                error_connections = (
+                (
                     await self.framework.memory_moments.analyze_conversation_for_memories(
                         "", "", "", invalid_context
                     )
@@ -349,7 +336,7 @@ class CriticalPathTester:
             # Simulate declining conversation
             messages = ["Yeah...", "I guess...", "Hmm...", "Sure..."]
             for message in messages:
-                analysis = await self.framework.engagement_engine.analyze_conversation_engagement(
+                await self.framework.engagement_engine.analyze_conversation_engagement(
                     test_user, message, {}
                 )
 

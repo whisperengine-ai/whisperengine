@@ -5,14 +5,15 @@ High-performance emotion processing using pandas vectorization and parallel sent
 
 import asyncio
 import logging
-import time
-from typing import Dict, List, Optional, Any, Tuple, AsyncIterator
-from dataclasses import dataclass, asdict
-from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
 import threading
+import time
+from collections.abc import AsyncIterator
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
+from dataclasses import dataclass
+from typing import Any
 
-import pandas as pd
 import numpy as np
+import pandas as pd
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 
 logger = logging.getLogger(__name__)
@@ -29,19 +30,19 @@ class EmotionVector:
     arousal: float  # Energy/activation level
     dominance: float  # Control/power feeling
     sentiment_compound: float
-    triggers: List[str]
-    metadata: Dict[str, Any]
+    triggers: list[str]
+    metadata: dict[str, Any]
 
 
 @dataclass
 class BatchEmotionResult:
     """Results from batch emotion processing"""
 
-    emotions: List[EmotionVector]
+    emotions: list[EmotionVector]
     processing_time: float
     batch_size: int
     avg_confidence: float
-    emotion_distribution: Dict[str, int]
+    emotion_distribution: dict[str, int]
 
 
 class VectorizedEmotionProcessor:
@@ -77,7 +78,7 @@ class VectorizedEmotionProcessor:
 
         logger.info(f"🧠 Initialized VectorizedEmotionProcessor with {max_workers} workers")
 
-    def _load_emotion_keywords(self) -> Dict[str, List[str]]:
+    def _load_emotion_keywords(self) -> dict[str, list[str]]:
         """Load emotion keyword mappings for vectorized detection"""
         return {
             "joy": [
@@ -120,7 +121,7 @@ class VectorizedEmotionProcessor:
             "calm": ["calm", "peaceful", "serene", "tranquil", "relaxed", "composed"],
         }
 
-    def _load_emotion_intensifiers(self) -> Dict[str, float]:
+    def _load_emotion_intensifiers(self) -> dict[str, float]:
         """Load emotion intensifier mappings for confidence scoring"""
         return {
             "extremely": 1.5,
@@ -143,9 +144,9 @@ class VectorizedEmotionProcessor:
 
     def process_batch(
         self,
-        texts: List[str],
-        user_ids: Optional[List[str]] = None,
-        metadata_list: Optional[List[Dict[str, Any]]] = None,
+        texts: list[str],
+        user_ids: list[str] | None = None,
+        metadata_list: list[dict[str, Any]] | None = None,
     ) -> BatchEmotionResult:
         """
         Process multiple texts using vectorized operations for maximum performance
@@ -313,7 +314,7 @@ class VectorizedEmotionProcessor:
         neutral_mask = df["primary_emotion"] == "neutral"
         if neutral_mask.any():
             # Map VADER compound to basic emotions
-            compound_scores = df.loc[neutral_mask, "compound"]
+            df.loc[neutral_mask, "compound"]
 
             # Positive compound -> joy, negative -> sadness
             positive_mask = neutral_mask & (df["compound"] > 0.2)
@@ -331,9 +332,9 @@ class VectorizedEmotionProcessor:
 
     async def process_batch_async(
         self,
-        texts: List[str],
-        user_ids: Optional[List[str]] = None,
-        metadata_list: Optional[List[Dict[str, Any]]] = None,
+        texts: list[str],
+        user_ids: list[str] | None = None,
+        metadata_list: list[dict[str, Any]] | None = None,
     ) -> BatchEmotionResult:
         """Async wrapper for batch processing"""
 
@@ -359,7 +360,7 @@ class VectorizedEmotionProcessor:
                 try:
                     text_data = await asyncio.wait_for(text_stream.get(), timeout=timeout)
                     batch.append(text_data)
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     pass
 
                 # Process batch when ready
@@ -386,7 +387,7 @@ class VectorizedEmotionProcessor:
                 logger.error(f"Streaming emotion processing error: {e}")
                 await asyncio.sleep(0.1)
 
-    def get_performance_stats(self) -> Dict[str, Any]:
+    def get_performance_stats(self) -> dict[str, Any]:
         """Get performance statistics for the emotion processor"""
 
         with self._lock:
@@ -439,7 +440,7 @@ class ProductionEmotionEngine:
         logger.info(f"🚀 Initialized ProductionEmotionEngine with caching={enable_caching}")
 
     async def analyze_emotion(
-        self, text: str, user_id: Optional[str] = None, metadata: Optional[Dict[str, Any]] = None
+        self, text: str, user_id: str | None = None, metadata: dict[str, Any] | None = None
     ) -> EmotionVector:
         """Analyze single text with caching optimization"""
 
@@ -480,10 +481,10 @@ class ProductionEmotionEngine:
 
     async def analyze_emotions_batch(
         self,
-        texts: List[str],
-        user_ids: Optional[List[str]] = None,
-        metadata_list: Optional[List[Dict[str, Any]]] = None,
-    ) -> List[EmotionVector]:
+        texts: list[str],
+        user_ids: list[str] | None = None,
+        metadata_list: list[dict[str, Any]] | None = None,
+    ) -> list[EmotionVector]:
         """Analyze multiple texts with batch optimization"""
 
         if not texts:
@@ -584,7 +585,7 @@ class ProductionEmotionEngine:
         self.emotion_cache[cache_key] = emotion
         self.cache_access_times[cache_key] = time.time()
 
-    def get_comprehensive_stats(self) -> Dict[str, Any]:
+    def get_comprehensive_stats(self) -> dict[str, Any]:
         """Get comprehensive performance statistics"""
 
         processor_stats = self.processor.get_performance_stats()
@@ -617,8 +618,8 @@ class EmotionEngineAdapter:
         self.engine = ProductionEmotionEngine(max_workers)
 
     async def process_interaction_enhanced(
-        self, user_id: str, message: str, display_name: Optional[str] = None
-    ) -> Tuple[Any, EmotionVector]:
+        self, user_id: str, message: str, display_name: str | None = None
+    ) -> tuple[Any, EmotionVector]:
         """Compatible with existing emotion manager interface"""
 
         metadata = {"display_name": display_name} if display_name else {}
@@ -628,7 +629,7 @@ class EmotionEngineAdapter:
         # Profile would be handled by existing user profile system
         return None, emotion
 
-    async def get_enhanced_emotion_context(self, user_id: str, query: str) -> Dict[str, Any]:
+    async def get_enhanced_emotion_context(self, user_id: str, query: str) -> dict[str, Any]:
         """Get emotion context for query"""
 
         emotion = await self.engine.analyze_emotion(query, user_id)

@@ -15,18 +15,18 @@ Integration with existing systems maintained for backward compatibility.
 """
 
 import logging
+from dataclasses import dataclass
+from datetime import datetime, timedelta
+from typing import Any
+
 import numpy as np
 import pandas as pd
-from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Any, Tuple
-from dataclasses import dataclass
-from enum import Enum
 
 # Enhanced libraries for better performance
 try:
     from sklearn.cluster import DBSCAN, KMeans
-    from sklearn.preprocessing import StandardScaler
     from sklearn.metrics import silhouette_score
+    from sklearn.preprocessing import StandardScaler
 
     SKLEARN_AVAILABLE = True
 except ImportError:
@@ -54,10 +54,10 @@ except ImportError:
 # Import existing systems for integration
 try:
     from src.intelligence.emotional_context_engine import (
-        EmotionalContextEngine,
         EmotionalContext,
-        EmotionalState,
+        EmotionalContextEngine,
         EmotionalPattern,
+        EmotionalState,
         EmotionalTrigger,
     )
 
@@ -80,8 +80,8 @@ class EnhancedEmotionalAnalysis:
     """Enhanced emotional analysis results with confidence metrics"""
 
     primary_emotion: str
-    emotion_scores: Dict[str, float]  # All emotion probabilities
-    sentiment_scores: Dict[str, float]  # VADER sentiment breakdown
+    emotion_scores: dict[str, float]  # All emotion probabilities
+    sentiment_scores: dict[str, float]  # VADER sentiment breakdown
     confidence: float  # Overall confidence in analysis
     emotional_intensity: float  # How intense the emotion is
     emotional_stability: float  # How stable emotions are over time
@@ -153,7 +153,7 @@ class EnhancedEmotionalIntelligence:
             self.logger.error(f"❌ Enhanced component initialization failed: {e}")
 
     async def analyze_emotion_enhanced(
-        self, message: str, context: Optional[Dict[str, Any]] = None
+        self, message: str, context: dict[str, Any] | None = None
     ) -> EnhancedEmotionalAnalysis:
         """
         Perform enhanced emotional analysis using multiple AI libraries
@@ -243,7 +243,7 @@ class EnhancedEmotionalIntelligence:
             )
 
     def _calculate_emotional_intensity(
-        self, message: str, sentiment_scores: Dict[str, float], emotion_scores: Dict[str, float]
+        self, message: str, sentiment_scores: dict[str, float], emotion_scores: dict[str, float]
     ) -> float:
         """Calculate emotional intensity using multiple signals"""
         try:
@@ -296,8 +296,8 @@ class EnhancedEmotionalIntelligence:
 
     def _calculate_enhanced_confidence(
         self,
-        sentiment_scores: Dict[str, float],
-        emotion_scores: Dict[str, float],
+        sentiment_scores: dict[str, float],
+        emotion_scores: dict[str, float],
         base_confidence: float,
     ) -> float:
         """Calculate confidence using multiple signals"""
@@ -323,7 +323,7 @@ class EnhancedEmotionalIntelligence:
             return base_confidence
 
     async def _store_emotion_data(
-        self, message: str, analysis: EnhancedEmotionalAnalysis, context: Optional[Dict[str, Any]]
+        self, message: str, analysis: EnhancedEmotionalAnalysis, context: dict[str, Any] | None
     ):
         """Store emotion data efficiently using pandas"""
         try:
@@ -358,7 +358,7 @@ class EnhancedEmotionalIntelligence:
         except Exception as e:
             self.logger.warning(f"Emotion data storage failed: {e}")
 
-    async def get_emotional_patterns_enhanced(self) -> Dict[str, Any]:
+    async def get_emotional_patterns_enhanced(self) -> dict[str, Any]:
         """
         Analyze emotional patterns using advanced ML clustering
         and statistical analysis.
@@ -387,7 +387,7 @@ class EnhancedEmotionalIntelligence:
             self.logger.error(f"❌ Enhanced pattern analysis failed: {e}")
             return {"error": str(e)}
 
-    async def _analyze_emotional_clusters(self) -> Dict[str, Any]:
+    async def _analyze_emotional_clusters(self) -> dict[str, Any]:
         """Use scikit-learn to identify emotional patterns"""
         try:
             # Prepare feature vectors for clustering
@@ -439,12 +439,12 @@ class EnhancedEmotionalIntelligence:
             self.logger.warning(f"Clustering analysis failed: {e}")
             return {"clusters": "Clustering analysis unavailable"}
 
-    async def _analyze_emotional_trends(self) -> Dict[str, Any]:
+    async def _analyze_emotional_trends(self) -> dict[str, Any]:
         """Use SciPy for trend analysis"""
         try:
             # Analyze intensity trends over time
             intensities = self.emotion_history["intensity"].values
-            timestamps = pd.to_datetime(self.emotion_history["timestamp"]).values
+            pd.to_datetime(self.emotion_history["timestamp"]).values
 
             # Calculate trend using linear regression
             time_numeric = np.arange(len(intensities))
@@ -476,7 +476,7 @@ class EnhancedEmotionalIntelligence:
             self.logger.warning(f"Trend analysis failed: {e}")
             return {"trends": "Trend analysis unavailable"}
 
-    async def _analyze_emotional_statistics(self) -> Dict[str, Any]:
+    async def _analyze_emotional_statistics(self) -> dict[str, Any]:
         """Use pandas for efficient statistical analysis"""
         try:
             stats_analysis = {

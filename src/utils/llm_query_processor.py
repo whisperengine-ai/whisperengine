@@ -7,8 +7,8 @@ into optimized search queries for better memory retrieval.
 
 import json
 import logging
-from typing import List, Dict, Optional, Any
 from dataclasses import dataclass
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -28,12 +28,12 @@ class LLMSearchQuery:
 class LLMQueryBreakdown:
     """Result of LLM query breakdown"""
 
-    primary_queries: List[LLMSearchQuery]
+    primary_queries: list[LLMSearchQuery]
     fallback_query: str
-    extracted_entities: List[str]
-    main_topics: List[str]
+    extracted_entities: list[str]
+    main_topics: list[str]
     intent_classification: str
-    emotional_context: Optional[str] = None
+    emotional_context: str | None = None
     search_strategy: str = "standard"  # "broad", "specific", "contextual"
 
 
@@ -46,7 +46,7 @@ class LLMQueryProcessor:
         self.llm_client = llm_client
 
     async def analyze_message_for_search(
-        self, message: str, conversation_context: Optional[str] = None
+        self, message: str, conversation_context: str | None = None
     ) -> LLMQueryBreakdown:
         """
         Use LLM to break down a user message into optimized search queries
@@ -79,7 +79,7 @@ class LLMQueryProcessor:
 
     async def _call_llm_for_query_breakdown(
         self, message: str, context_prompt: str
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Call LLM to analyze message and generate search queries"""
 
         system_prompt = """You are an expert at analyzing user messages to create optimal memory search queries. Your goal is to break down user messages into focused search terms that will find relevant past conversations and memories.
@@ -96,7 +96,7 @@ GUIDELINES:
 
 QUERY TYPES:
 - "entity": Specific people, places, things mentioned
-- "topic": Main subject areas or themes  
+- "topic": Main subject areas or themes
 - "context": Situational or emotional context
 - "intent": What the user is trying to accomplish
 - "emotion": Emotional state or feeling-related terms
@@ -128,7 +128,7 @@ Return ONLY valid JSON in this exact format:
     "search_strategy": "specific|broad|contextual"
 }}
 
-IMPORTANT: 
+IMPORTANT:
 - Create 2-4 focused queries maximum
 - Avoid repeating the entire message as a query
 - Focus on searchable terms that would match past conversations
@@ -161,7 +161,7 @@ IMPORTANT:
             raise
 
     def _parse_llm_response(
-        self, response: Dict[str, Any], original_message: str
+        self, response: dict[str, Any], original_message: str
     ) -> LLMQueryBreakdown:
         """Parse LLM response into structured breakdown"""
 
@@ -280,7 +280,7 @@ class HybridQueryProcessor:
         self.enable_llm = enable_llm
 
     async def process_message(
-        self, message: str, conversation_context: Optional[str] = None
+        self, message: str, conversation_context: str | None = None
     ) -> LLMQueryBreakdown:
         """
         Process message using LLM analysis with rule-based fallback
@@ -341,7 +341,7 @@ class HybridQueryProcessor:
             search_strategy="broad",
         )
 
-    def _extract_simple_entities(self, message: str) -> List[str]:
+    def _extract_simple_entities(self, message: str) -> list[str]:
         """Simple rule-based entity extraction"""
         import re
 
@@ -387,10 +387,7 @@ class HybridQueryProcessor:
             "one",
             "our",
             "had",
-            "but",
-            "not",
             "what",
-            "all",
             "were",
             "they",
             "said",

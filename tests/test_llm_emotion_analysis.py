@@ -5,16 +5,15 @@ Test script for LLM-based emotion analysis
 This script tests the new LLM-based sentiment analysis system compared to the old pattern-based system.
 """
 
+import logging
 import os
 import sys
-import logging
-from datetime import datetime
 
 # Add the current directory to the path so we can import our modules
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
+from emotion_manager import SentimentAnalyzer
 from lmstudio_client import LMStudioClient
-from emotion_manager import SentimentAnalyzer, EmotionalState
 
 # Set up logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
@@ -27,10 +26,7 @@ def test_emotion_analysis():
     # Initialize LLM client
     try:
         llm_client = LMStudioClient()
-        print("✅ LLM Client initialized successfully")
-    except Exception as e:
-        print(f"❌ Failed to initialize LLM client: {e}")
-        print("Make sure LM Studio is running on localhost:1234")
+    except Exception:
         return False
 
     # Test messages with expected emotions
@@ -55,28 +51,16 @@ def test_emotion_analysis():
     # Initialize LLM analyzer
     llm_analyzer = SentimentAnalyzer(llm_client=llm_client)
 
-    print("\n" + "=" * 80)
-    print("LLM EMOTION ANALYSIS TEST")
-    print("=" * 80)
 
-    for message, expected in test_messages:
-        print(f'\n📝 Message: "{message}"')
-        print(f"🎯 Expected: {expected}")
+    for message, _expected in test_messages:
 
         # Test LLM-based analysis
         try:
-            llm_result = llm_analyzer.analyze_emotion(message)
-            print(f"🤖 LLM Analysis:")
-            print(f"   Emotion: {llm_result.detected_emotion.value}")
-            print(f"   Confidence: {llm_result.confidence:.2f}")
-            print(f"   Intensity: {llm_result.intensity:.2f}")
-            print(f"   Triggers: {llm_result.triggers[:2]}")  # Show first 2 triggers
-        except Exception as e:
-            print(f"❌ LLM Analysis failed: {e}")
+            llm_analyzer.analyze_emotion(message)
+        except Exception:
+            pass
 
-        print("-" * 60)
 
-    print("\n✅ Emotion analysis test completed!")
     return True
 
 
@@ -88,35 +72,21 @@ def test_direct_llm_emotion():
 
         test_message = "I'm absolutely thrilled about this new project, but also a bit nervous about the deadlines"
 
-        print(f"\n🧪 Direct LLM Emotion Test:")
-        print(f'Message: "{test_message}"')
 
-        result = llm_client.analyze_emotion(test_message)
+        llm_client.analyze_emotion(test_message)
 
-        print(f"\nResult: {result}")
-        print(f"Primary Emotion: {result['primary_emotion']}")
-        print(f"Confidence: {result['confidence']}")
-        print(f"Intensity: {result['intensity']}")
-        print(f"Secondary Emotions: {result['secondary_emotions']}")
-        print(f"Reasoning: {result['reasoning']}")
 
         return True
 
-    except Exception as e:
-        print(f"❌ Direct LLM test failed: {e}")
+    except Exception:
         return False
 
 
 if __name__ == "__main__":
-    print("🚀 Starting LLM-based Emotion Analysis Test")
 
     # Test direct LLM emotion analysis
-    print("\n" + "=" * 50)
-    print("DIRECT LLM EMOTION ANALYSIS TEST")
-    print("=" * 50)
     test_direct_llm_emotion()
 
     # Test full emotion analysis system
     test_emotion_analysis()
 
-    print("\n🎉 All tests completed!")

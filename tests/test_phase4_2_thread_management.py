@@ -16,11 +16,10 @@ Usage:
     python test_phase4_2_thread_management.py  # For direct execution
 """
 
-import pytest
 import asyncio
 import logging
-from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Any
+
+import pytest
 
 # Configure test logging
 logging.basicConfig(level=logging.INFO)
@@ -32,11 +31,11 @@ try:
         AdvancedConversationThreadManager,
         ConversationThreadAdvanced,
         ConversationThreadState,
+        ThreadPriorityCalculator,
         ThreadPriorityLevel,
         ThreadTransitionType,
         TopicSimilarityAnalyzer,
         TransitionDetector,
-        ThreadPriorityCalculator,
         create_advanced_conversation_thread_manager,
     )
 
@@ -144,7 +143,7 @@ class TestAdvancedThreadManager:
 
         # Create normal priority thread
         normal_message = "I'm planning my weekend activities and hobbies."
-        result1 = await thread_manager.process_user_message(user_id, normal_message, context)
+        await thread_manager.process_user_message(user_id, normal_message, context)
 
         # Create high priority thread with emotional urgency
         urgent_message = "I'm feeling really stressed and need help urgently!"
@@ -259,7 +258,7 @@ class TestAdvancedThreadManager:
 
         # Create thread with some context
         message1 = "I'm worried about my upcoming job interview and need advice."
-        result1 = await thread_manager.process_user_message(user_id, message1, context)
+        await thread_manager.process_user_message(user_id, message1, context)
 
         # Transition to different topic
         message2 = "Actually, let me ask about something else - cooking recipes for dinner."

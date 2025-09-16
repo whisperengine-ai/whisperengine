@@ -13,14 +13,13 @@ Key Optimizations:
 """
 
 import asyncio
+import hashlib
 import logging
 import time
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Any, Tuple
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-import json
-import hashlib
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -47,11 +46,11 @@ class PhaseResult:
 
     phase_name: str
     success: bool
-    data: Dict[str, Any]
+    data: dict[str, Any]
     processing_time: float
-    error_message: Optional[str] = None
+    error_message: str | None = None
     cache_hit: bool = False
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -60,10 +59,10 @@ class IntegratedPhaseContext:
 
     user_id: str
     message: str
-    conversation_context: List[Dict[str, Any]] = field(default_factory=list)
-    phase_results: Dict[str, PhaseResult] = field(default_factory=dict)
-    processing_metadata: Dict[str, Any] = field(default_factory=dict)
-    optimization_stats: Dict[str, Any] = field(default_factory=dict)
+    conversation_context: list[dict[str, Any]] = field(default_factory=list)
+    phase_results: dict[str, PhaseResult] = field(default_factory=dict)
+    processing_metadata: dict[str, Any] = field(default_factory=dict)
+    optimization_stats: dict[str, Any] = field(default_factory=dict)
 
 
 class PhaseIntegrationOptimizer:
@@ -131,7 +130,7 @@ class PhaseIntegrationOptimizer:
         )
 
     async def process_integrated_phases(
-        self, user_id: str, message: str, conversation_context: Optional[List[Dict]] = None
+        self, user_id: str, message: str, conversation_context: list[dict] | None = None
     ) -> IntegratedPhaseContext:
         """
         Process all phases with optimization strategies applied
@@ -153,7 +152,7 @@ class PhaseIntegrationOptimizer:
             message=message,
             conversation_context=conversation_context or [],
             processing_metadata={
-                "start_time": datetime.now(timezone.utc),
+                "start_time": datetime.now(UTC),
                 "optimization_level": self.optimization_level.value,
                 "execution_strategy": self.execution_strategy.value,
             },
@@ -209,7 +208,7 @@ class PhaseIntegrationOptimizer:
 
     async def _determine_phases_to_execute(
         self, message: str, context: IntegratedPhaseContext
-    ) -> List[str]:
+    ) -> list[str]:
         """Determine which phases to execute based on optimization level"""
 
         base_phases = []
@@ -236,7 +235,7 @@ class PhaseIntegrationOptimizer:
         logger.debug(f"Selected phases for execution: {base_phases}")
         return base_phases
 
-    async def _execute_phases_parallel(self, phases: List[str], context: IntegratedPhaseContext):
+    async def _execute_phases_parallel(self, phases: list[str], context: IntegratedPhaseContext):
         """Execute phases in parallel where dependencies allow"""
 
         # Group phases by dependency level
@@ -279,7 +278,7 @@ class PhaseIntegrationOptimizer:
 
         self.performance_stats["parallel_executions"] += 1
 
-    async def _execute_phases_sequential(self, phases: List[str], context: IntegratedPhaseContext):
+    async def _execute_phases_sequential(self, phases: list[str], context: IntegratedPhaseContext):
         """Execute phases sequentially in dependency order"""
 
         # Sort phases by dependencies
@@ -293,7 +292,7 @@ class PhaseIntegrationOptimizer:
             # Allow subsequent phases to use results from previous phases
             context.processing_metadata[f"{phase}_completed"] = True
 
-    async def _execute_phases_adaptive(self, phases: List[str], context: IntegratedPhaseContext):
+    async def _execute_phases_adaptive(self, phases: list[str], context: IntegratedPhaseContext):
         """Adaptively choose execution strategy based on system load and context"""
 
         # Simple heuristic: use parallel for short messages, sequential for complex ones
@@ -448,8 +447,8 @@ class PhaseIntegrationOptimizer:
         )
 
     async def _execute_phase3_optimized(
-        self, context: IntegratedPhaseContext, enhanced_context: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        self, context: IntegratedPhaseContext, enhanced_context: dict[str, Any]
+    ) -> dict[str, Any]:
         """Execute Phase 3 with optimization strategies"""
 
         if not self.memory_manager:
@@ -477,7 +476,7 @@ class PhaseIntegrationOptimizer:
             else:
                 raise ValueError("Phase 3 memory networks not available for fallback")
 
-    def _group_phases_by_dependencies(self, phases: List[str]) -> List[List[str]]:
+    def _group_phases_by_dependencies(self, phases: list[str]) -> list[list[str]]:
         """Group phases by dependency levels for parallel execution"""
 
         # Level 0: No dependencies
@@ -493,7 +492,7 @@ class PhaseIntegrationOptimizer:
 
         return [level_0, level_1]
 
-    def _sort_phases_by_dependencies(self, phases: List[str]) -> List[str]:
+    def _sort_phases_by_dependencies(self, phases: list[str]) -> list[str]:
         """Sort phases by their dependencies for sequential execution"""
 
         sorted_phases = []
@@ -549,7 +548,7 @@ class PhaseIntegrationOptimizer:
 
     async def _check_result_cache(
         self, user_id: str, message: str
-    ) -> Optional[Dict[str, PhaseResult]]:
+    ) -> dict[str, PhaseResult] | None:
         """Check if we have cached results for this user/message combination"""
 
         if not self.enable_caching:
@@ -571,7 +570,7 @@ class PhaseIntegrationOptimizer:
 
         return None
 
-    async def _cache_results(self, user_id: str, message: str, results: Dict[str, PhaseResult]):
+    async def _cache_results(self, user_id: str, message: str, results: dict[str, PhaseResult]):
         """Cache successful phase results"""
 
         if not self.enable_caching:
@@ -607,7 +606,7 @@ class PhaseIntegrationOptimizer:
                     "phase_timings"
                 ][phase_name][-100:]
 
-    def get_performance_report(self) -> Dict[str, Any]:
+    def get_performance_report(self) -> dict[str, Any]:
         """Get comprehensive performance report"""
 
         report = {

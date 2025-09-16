@@ -5,16 +5,14 @@ Test script for ChatGPT History Import functionality
 This script tests the import_chatgpt_history.py script with sample data.
 """
 
-import unittest
 import json
-import tempfile
 import os
-from datetime import datetime
-from unittest.mock import patch, MagicMock
+import tempfile
+import unittest
+from unittest.mock import MagicMock, patch
 
 # Import the modules we're testing
 from import_chatgpt_history import ChatGPTImporter
-from memory_manager import UserMemoryManager
 
 
 class TestChatGPTImporter(unittest.TestCase):
@@ -387,13 +385,6 @@ def create_sample_export_files():
     with open("sample_chatgpt_simple.json", "w") as f:
         json.dump(simple_format, f, indent=2)
 
-    print("Created sample files:")
-    print("- sample_chatgpt_standard.json (standard ChatGPT export format)")
-    print("- sample_chatgpt_simple.json (simplified format)")
-    print("\nExample usage:")
-    print(
-        "python import_chatgpt_history.py 123456789012345678 sample_chatgpt_standard.json --dry-run"
-    )
 
 
 if __name__ == "__main__":

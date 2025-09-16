@@ -6,13 +6,10 @@ This script tests the data migration path from SQLite (desktop) to PostgreSQL (D
 by creating test data and verifying schema compatibility.
 """
 
-import asyncio
-import os
-import sys
 import sqlite3
-import json
-from pathlib import Path
+import sys
 from datetime import datetime
+from pathlib import Path
 
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
@@ -28,16 +25,14 @@ def create_test_sqlite_data():
     # Clean up existing database
     if db_path.exists():
         db_path.unlink()
-        print(f"🧹 Cleaned up existing test database")
 
-    print(f"📝 Creating test data in {db_path}")
 
     conn = sqlite3.connect(str(db_path))
     cursor = conn.cursor()
 
     # Create schema
     schema = WhisperEngineSchema.get_core_schema()
-    for table_name, table_sql in schema.items():
+    for _table_name, table_sql in schema.items():
         cursor.execute(table_sql)
 
     # Insert test data
@@ -121,25 +116,21 @@ def create_test_sqlite_data():
 
     # Verify data
     cursor.execute("SELECT COUNT(*) FROM users")
-    user_count = cursor.fetchone()[0]
+    cursor.fetchone()[0]
 
     cursor.execute("SELECT COUNT(*) FROM conversations")
-    conv_count = cursor.fetchone()[0]
+    cursor.fetchone()[0]
 
     cursor.execute("SELECT COUNT(*) FROM memory_entries")
-    memory_count = cursor.fetchone()[0]
+    cursor.fetchone()[0]
 
     conn.close()
 
-    print(
-        f"✅ Created test data: {user_count} users, {conv_count} conversations, {memory_count} memories"
-    )
     return db_path
 
 
 def analyze_sqlite_data(db_path):
     """Analyze SQLite data structure"""
-    print(f"🔍 Analyzing SQLite data structure in {db_path}")
 
     conn = sqlite3.connect(str(db_path))
     cursor = conn.cursor()
@@ -148,33 +139,29 @@ def analyze_sqlite_data(db_path):
     cursor.execute("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
     tables = [row[0] for row in cursor.fetchall()]
 
-    print(f"📊 Tables found: {', '.join(tables)}")
 
     # Get row counts
     for table in tables:
         if table != "sqlite_sequence":
             cursor.execute(f"SELECT COUNT(*) FROM {table}")
-            count = cursor.fetchone()[0]
-            print(f"  - {table}: {count} rows")
+            cursor.fetchone()[0]
 
     # Sample some data
-    print(f"\\n📋 Sample data:")
     cursor.execute("SELECT user_id, username, display_name FROM users LIMIT 2")
     users = cursor.fetchall()
-    for user in users:
-        print(f"  User: {user[1]} ({user[0]}) - {user[2]}")
+    for _user in users:
+        pass
 
     cursor.execute("SELECT user_id, channel_id, message_content FROM conversations LIMIT 2")
     conversations = cursor.fetchall()
-    for conv in conversations:
-        print(f"  Message: {conv[2][:50]}... in {conv[1]} by {conv[0]}")
+    for _conv in conversations:
+        pass
 
     conn.close()
 
 
 def generate_postgresql_migration_sql(db_path):
     """Generate PostgreSQL migration SQL"""
-    print(f"🔄 Generating PostgreSQL migration SQL")
 
     conn = sqlite3.connect(str(db_path))
     cursor = conn.cursor()
@@ -235,7 +222,7 @@ def generate_postgresql_migration_sql(db_path):
                 columns = [col for col in columns if col in postgres_columns]
 
             column_list = ", ".join(columns)
-            placeholder_list = ", ".join(["%s"] * len(columns))
+            ", ".join(["%s"] * len(columns))
 
             cursor.execute(f"SELECT {column_list} FROM {table}")
             rows = cursor.fetchall()
@@ -262,13 +249,11 @@ def generate_postgresql_migration_sql(db_path):
     with open(migration_file, "w") as f:
         f.write("\n".join(migration_sql))
 
-    print(f"✅ Migration SQL saved to {migration_file}")
     return migration_file
 
 
 def test_schema_compatibility():
     """Test schema compatibility between SQLite and PostgreSQL"""
-    print(f"🔧 Testing schema compatibility")
 
     sqlite_schema = WhisperEngineSchema.get_core_schema()
     postgres_schema = WhisperEngineSchema.get_postgresql_schema()
@@ -278,11 +263,9 @@ def test_schema_compatibility():
     postgres_tables = set(postgres_schema.keys()) - {"indexes"}  # Exclude indexes
 
     if sqlite_tables == postgres_tables:
-        print(f"✅ Table names match: {', '.join(sorted(sqlite_tables))}")
+        pass
     else:
-        print(f"❌ Table mismatch!")
-        print(f"  SQLite only: {sqlite_tables - postgres_tables}")
-        print(f"  PostgreSQL only: {postgres_tables - sqlite_tables}")
+        pass
 
     # Check for key transformations
     for table in sqlite_tables:
@@ -295,15 +278,13 @@ def test_schema_compatibility():
                 "INTEGER PRIMARY KEY AUTOINCREMENT" in sqlite_sql
                 and "SERIAL PRIMARY KEY" in postgres_sql
             ):
-                print(f"✅ {table}: AUTO_INCREMENT -> SERIAL conversion detected")
+                pass
             elif "PRIMARY KEY AUTOINCREMENT" in sqlite_sql or "SERIAL PRIMARY KEY" in postgres_sql:
-                print(f"⚠️  {table}: Check primary key conversion")
+                pass
 
 
 def main():
     """Main migration test function"""
-    print("🚀 Starting Desktop to Docker Migration Test")
-    print("=" * 60)
 
     try:
         # 1. Create test SQLite data
@@ -316,26 +297,12 @@ def main():
         test_schema_compatibility()
 
         # 4. Generate migration SQL
-        migration_file = generate_postgresql_migration_sql(db_path)
+        generate_postgresql_migration_sql(db_path)
 
-        print(f"\n" + "=" * 60)
-        print(f"🎉 Migration test completed successfully!")
-        print(f"\n📋 Next steps for real migration:")
-        print(f"  1. Start Docker services: docker compose up -d postgres")
-        print(
-            f"  2. Run migration: docker compose exec postgres psql -U bot_user -d whisper_engine -f /path/to/{migration_file.name}"
-        )
-        print(
-            f"  3. Verify data: docker compose exec postgres psql -U bot_user -d whisper_engine -c 'SELECT COUNT(*) FROM users;'"
-        )
-        print(f"\n📁 Files created:")
-        print(f"  - Test database: {db_path}")
-        print(f"  - Migration SQL: {migration_file}")
 
         return True
 
-    except Exception as e:
-        print(f"❌ Migration test failed: {e}")
+    except Exception:
         return False
 
 

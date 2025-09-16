@@ -7,12 +7,11 @@ to prevent indefinite blocking in concurrent user scenarios.
 """
 
 import asyncio
+import logging
 import threading
 import time
-import logging
-from typing import Dict, Optional, Any, Callable, Awaitable
-from functools import wraps
 from concurrent.futures import ThreadPoolExecutor
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +26,7 @@ class TimeoutLock:
         self._acquired_by = None
         self._acquired_at = None
 
-    def acquire(self, timeout: Optional[float] = None) -> bool:
+    def acquire(self, timeout: float | None = None) -> bool:
         """Acquire lock with timeout"""
         effective_timeout = timeout if timeout is not None else self.timeout
         start_time = time.time()
@@ -74,14 +73,14 @@ class EnhancedAsyncMemoryManager:
         self.lock_timeout = lock_timeout
 
         # Per-user locks with timeouts
-        self._user_locks: Dict[str, TimeoutLock] = {}
+        self._user_locks: dict[str, TimeoutLock] = {}
         self._user_locks_manager = TimeoutLock(timeout=5.0, name="user_locks_manager")
 
         # Global operation locks
         self._global_lock = TimeoutLock(timeout=lock_timeout, name="global_operations")
 
         # Emotion processing locks
-        self._emotion_locks: Dict[str, TimeoutLock] = {}
+        self._emotion_locks: dict[str, TimeoutLock] = {}
         self._emotion_locks_manager = TimeoutLock(timeout=5.0, name="emotion_locks_manager")
 
         # Thread pool for CPU-intensive operations
@@ -125,9 +124,9 @@ class EnhancedAsyncMemoryManager:
         user_id: str,
         user_message: str,
         bot_response: str,
-        channel_id: Optional[str] = None,
-        pre_analyzed_emotion_data: Optional[dict] = None,
-        timeout: Optional[float] = None,
+        channel_id: str | None = None,
+        pre_analyzed_emotion_data: dict | None = None,
+        timeout: float | None = None,
     ):
         """Async wrapper for thread-safe conversation storage with timeout"""
 
@@ -155,12 +154,12 @@ class EnhancedAsyncMemoryManager:
                 asyncio.get_event_loop().run_in_executor(self._executor, _store_with_timeout),
                 timeout=operation_timeout,
             )
-        except asyncio.TimeoutError:
+        except TimeoutError:
             logger.error(f"Overall timeout for user {user_id} conversation storage")
             raise TimeoutError(f"Conversation storage timed out for user {user_id}")
 
     async def retrieve_memories_async(
-        self, user_id: str, query: str, limit: int = 10, timeout: Optional[float] = None
+        self, user_id: str, query: str, limit: int = 10, timeout: float | None = None
     ):
         """Async wrapper for thread-safe memory retrieval with timeout"""
 
@@ -186,12 +185,12 @@ class EnhancedAsyncMemoryManager:
                 asyncio.get_event_loop().run_in_executor(self._executor, _retrieve_with_timeout),
                 timeout=operation_timeout,
             )
-        except asyncio.TimeoutError:
+        except TimeoutError:
             logger.error(f"Overall timeout for user {user_id} memory retrieval")
             raise TimeoutError(f"Memory retrieval timed out for user {user_id}")
 
     async def process_emotion_async(
-        self, user_id: str, message: str, timeout: Optional[float] = None
+        self, user_id: str, message: str, timeout: float | None = None
     ):
         """Async wrapper for thread-safe emotion processing with timeout"""
 
@@ -226,7 +225,7 @@ class EnhancedAsyncMemoryManager:
                 ),
                 timeout=operation_timeout,
             )
-        except asyncio.TimeoutError:
+        except TimeoutError:
             logger.error(f"Overall timeout for user {user_id} emotion processing")
             # Return neutral emotion rather than failing completely
             return None, None
@@ -236,7 +235,7 @@ class EnhancedAsyncMemoryManager:
         fact: str,
         context: str = "",
         added_by: str = "system",
-        timeout: Optional[float] = None,
+        timeout: float | None = None,
     ):
         """Async wrapper for thread-safe global fact storage with timeout"""
 
@@ -263,11 +262,11 @@ class EnhancedAsyncMemoryManager:
                 ),
                 timeout=operation_timeout,
             )
-        except asyncio.TimeoutError:
+        except TimeoutError:
             logger.error("Overall timeout for global fact storage")
             raise TimeoutError("Global fact storage timed out")
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get operation statistics"""
         return {
             **self._operation_stats,
@@ -307,7 +306,7 @@ class EnhancedConversationCache:
 
         # Thread-safe locks with timeouts
         self._cache_lock = TimeoutLock(timeout=lock_timeout_seconds, name="main_cache")
-        self._bootstrap_locks: Dict[str, TimeoutLock] = {}
+        self._bootstrap_locks: dict[str, TimeoutLock] = {}
         self._bootstrap_lock_manager = TimeoutLock(timeout=5.0, name="bootstrap_manager")
 
         # Statistics
@@ -335,7 +334,7 @@ class EnhancedConversationCache:
             logger.error(f"Timeout getting bootstrap lock for channel {channel_id}")
             raise TimeoutError(f"Unable to get bootstrap lock for channel {channel_id}")
 
-    def add_message(self, channel_id: str, message: dict, timeout: Optional[float] = None):
+    def add_message(self, channel_id: str, message: dict, timeout: float | None = None):
         """Add message to cache with timeout protection"""
         try:
             with self._cache_lock:
@@ -377,7 +376,7 @@ class EnhancedConversationCache:
             logger.warning(f"Cache lock timeout getting context for channel {channel_id}")
             return []  # Return empty rather than blocking
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get cache statistics"""
         try:
             with self._cache_lock:
@@ -405,7 +404,7 @@ async_memory_manager = AsyncMemoryManager(memory_manager)
 
 # NEW:
 async_memory_manager = EnhancedAsyncMemoryManager(
-    memory_manager, 
+    memory_manager,
     lock_timeout=30.0,  # 30 second timeout for locks
     max_workers=4
 )
