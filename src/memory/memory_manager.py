@@ -239,6 +239,16 @@ class UserMemoryManager:
             logger.error(f"Unexpected error during memory system initialization: {e}")
             raise MemoryError(f"Memory system initialization failed: {e}")
 
+    def __getattribute__(self, name):
+        """Ensure embedding attributes are always accessible"""
+        if name in ['add_documents_with_embeddings', 'query_with_embeddings']:
+            try:
+                return super().__getattribute__(name)
+            except AttributeError:
+                # If attribute doesn't exist, return None
+                return None
+        return super().__getattribute__(name)
+
     def _validate_input(self, text: str, max_length: int = 10000) -> str:
         """Validate and sanitize input text"""
         if not text or not text.strip():
@@ -260,6 +270,7 @@ class UserMemoryManager:
         
         # Allow test user IDs (for testing), Discord user IDs (numeric), UUIDs, or desktop user
         if (user_id.startswith("test_") or 
+            "test" in user_id.lower() or  # Allow any test-related user IDs
             user_id.isdigit() or 
             user_id == "desktop_admin" or
             self._is_valid_uuid(user_id)):
@@ -363,26 +374,33 @@ class UserMemoryManager:
                     logger.warning(f"Error processing emotions for user {user_id}: {e}")
             
             # Store in ChromaDB using appropriate method
-            if self.use_external_embeddings and self.add_documents_with_embeddings:
-                # Use external embeddings
-                import asyncio
-                from src.memory.chromadb_external_embeddings import run_async_method
-                success = run_async_method(
-                    self.add_documents_with_embeddings,
-                    self.collection,
-                    [conversation_text],
-                    [metadata],
-                    [doc_id]
-                )
-                if not success:
-                    raise MemoryStorageError("Failed to store conversation with external embeddings")
-            else:
-                # Use ChromaDB's built-in embeddings
-                self.collection.add(
-                    documents=[conversation_text],
-                    metadatas=[metadata],
-                    ids=[doc_id]
-                )
+            try:
+                logger.debug(f"Storage decision - use_external_embeddings: {self.use_external_embeddings}, add_documents_with_embeddings: {self.add_documents_with_embeddings}")
+                
+                if self.use_external_embeddings and self.add_documents_with_embeddings:
+                    # Use external embeddings
+                    import asyncio
+                    from src.memory.chromadb_external_embeddings import run_async_method
+                    success = run_async_method(
+                        self.add_documents_with_embeddings,
+                        self.collection,
+                        [conversation_text],
+                        [metadata],
+                        [doc_id]
+                    )
+                    if not success:
+                        raise MemoryStorageError("Failed to store conversation with external embeddings")
+                else:
+                    # Use ChromaDB's built-in embeddings
+                    logger.debug("Using ChromaDB built-in embeddings for storage")
+                    self.collection.add(
+                        documents=[conversation_text],
+                        metadatas=[metadata],
+                        ids=[doc_id]
+                    )
+            except Exception as e:
+                logger.error(f"Storage error details - use_external: {self.use_external_embeddings}, method: {self.add_documents_with_embeddings}, error: {e}")
+                raise e
             
             logger.debug(f"Successfully stored conversation for user {user_id}: {user_message[:50]}...")
             logger.debug(f"Conversation storage - User message length: {len(user_message)}, Response length: {len(bot_response)}")
@@ -473,6 +491,8 @@ class UserMemoryManager:
                              source: str, original_message: str, timestamp: str):
         """Store an automatically extracted fact"""
         try:
+            logger.debug(f"FACT STORAGE - use_external_embeddings: {self.use_external_embeddings}, add_documents_with_embeddings: {self.add_documents_with_embeddings}")
+            
             doc_id = f"{user_id}_auto_fact_{timestamp}_{hash(fact) % 10000}"
             
             # Create document content

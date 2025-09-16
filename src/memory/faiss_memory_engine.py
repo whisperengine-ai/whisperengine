@@ -41,13 +41,13 @@ class FaissMemoryIndex:
     def __init__(self, dimension: int = 384, index_type: str = "IVF", 
                  nlist: int = 100, use_gpu: bool = False):
         """
-        Initialize Faiss index with optimized configuration
+        Initialize Faiss index with optimized configuration for WhisperEngine
         
         Args:
-            dimension: Vector dimension (384 for sentence-transformers)
+            dimension: Vector dimension (384 for all-MiniLM-L6-v2 local embeddings)
             index_type: Index type (IVF, HNSW, Flat)
             nlist: Number of clusters for IVF index
-            use_gpu: Whether to use GPU acceleration (if available)
+            use_gpu: Whether to use GPU acceleration (disabled for local processing)
         """
         if not FAISS_AVAILABLE:
             raise ImportError("Faiss not available. Install with: pip install faiss-cpu")
@@ -98,14 +98,11 @@ class FaissMemoryIndex:
         else:
             raise ValueError(f"Unsupported index type: {self.index_type}")
         
-        # GPU acceleration if requested and available
+        # GPU acceleration disabled for local processing (CPU-only is optimal)
         if self.use_gpu and hasattr(faiss, 'StandardGpuResources'):
-            try:
-                res = faiss.StandardGpuResources()
-                index = faiss.index_cpu_to_gpu(res, 0, index)
-                logger.info("✅ GPU acceleration enabled")
-            except Exception as e:
-                logger.warning(f"GPU acceleration failed, using CPU: {e}")
+            logger.warning("GPU acceleration disabled - local processing uses CPU-only for optimal compatibility")
+            # Force disable GPU for local processing
+            self.use_gpu = False
         
         return index
     
@@ -267,10 +264,10 @@ class FaissMemoryEngine:
     def __init__(self, embedding_dimension: int = 384, max_workers: int = 4,
                  enable_batch_processing: bool = True):
         """
-        Initialize Faiss memory engine with production optimizations
+        Initialize Faiss memory engine optimized for local processing
         
         Args:
-            embedding_dimension: Dimension of embedding vectors
+            embedding_dimension: Dimension of embedding vectors (384 for all-MiniLM-L6-v2)
             max_workers: Number of worker threads for parallel processing
             enable_batch_processing: Enable batch processing for memory operations
         """

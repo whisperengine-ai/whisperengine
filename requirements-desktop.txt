@@ -16,3 +16,6 @@ pywin32>=306; sys_platform == "win32"
 
 # Linux-specific dependencies (only on Linux)
 python3-xlib>=0.15; sys_platform == "linux"
+
+# Local AI processing for desktop app
+vaderSentiment>=3.3.2  # Fast local emotion analysis
