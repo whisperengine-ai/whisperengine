@@ -213,20 +213,16 @@ class CriticalPathTester:
                 context_id="critical_path_test",
                 current_message="I'm thinking about my career goals again",
                 topic_keywords=["career", "goals"],
-                emotional_state=(
-                    EmotionalState.JOY if EMOTIONAL_CONTEXT_AVAILABLE else None
-                ),
+                emotional_state=(EmotionalState.JOY if EMOTIONAL_CONTEXT_AVAILABLE else None),
                 conversation_phase="middle",
-                recent_messages=[
-                    "I'm thinking about my career goals again"
-                ],
+                recent_messages=["I'm thinking about my career goals again"],
                 conversation_length=1,
                 current_relationship_depth=0.5,
                 current_trust_level=0.5,
                 current_engagement_level=0.7,
                 time_since_last_conversation=None,
                 conversation_frequency=1.0,
-                recently_triggered_moments=[]
+                recently_triggered_moments=[],
             )
 
             # Test 2: Memory moment generation
@@ -272,7 +268,7 @@ class CriticalPathTester:
                     current_engagement_level=0.0,
                     time_since_last_conversation=None,
                     conversation_frequency=0.0,
-                    recently_triggered_moments=[]
+                    recently_triggered_moments=[],
                 )
                 (
                     await self.framework.memory_moments.analyze_conversation_for_memories(
