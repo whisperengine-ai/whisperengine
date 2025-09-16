@@ -2,7 +2,7 @@
 
 ## 🎭 Project Overview
 
-WhisperEngine is a privacy-first AI conversation platform that can run as both a Discord bot and a standalone desktop application. The system features sophisticated AI memory, emotional intelligence, and personality adaptation, designed around "Dream of the Endless" from Neil Gaiman's Sandman series.
+WhisperEngine is a privacy-first AI conversation platform that can run as both a Discord bot and a standalone desktop application. The system features sophisticated AI memory, emotional intelligence, and personality adaptation with configurable AI personalities.
 
 **Core Deployment Modes:**
 - **Discord Bot** (`python run.py`) - Full AI-powered Discord bot with advanced memory
