@@ -43,11 +43,7 @@ try:
 except ImportError:
     PERSONALITY_PROFILER_AVAILABLE = False
 
-try:
-    from src.memory.memory_tiers import MemoryTierManager
-    MEMORY_TIERS_AVAILABLE = True
-except ImportError:
-    MEMORY_TIERS_AVAILABLE = False
+# Memory tier system removed for performance optimization
 
 try:
     from src.memory.personality_facts import PersonalityFactClassifier
@@ -206,7 +202,7 @@ class MemoryTriggeredMoments:
     def __init__(self,
                  emotional_context_engine: Optional[EmotionalContextEngine] = None,
                  personality_profiler: Optional[DynamicPersonalityProfiler] = None,
-                 memory_tier_manager: Optional[MemoryTierManager] = None,
+                 memory_manager: Optional[Any] = None,
                  personality_fact_classifier: Optional[PersonalityFactClassifier] = None,
                  connection_retention_days: int = 365,
                  max_connections_per_user: int = 1000,
@@ -225,7 +221,7 @@ class MemoryTriggeredMoments:
         """
         self.emotional_context_engine = emotional_context_engine
         self.personality_profiler = personality_profiler
-        self.memory_tier_manager = memory_tier_manager
+        self.memory_manager = memory_manager
         self.personality_fact_classifier = personality_fact_classifier
         
         self.retention_period = timedelta(days=connection_retention_days)
@@ -906,7 +902,7 @@ class MemoryTriggeredMoments:
 async def create_memory_triggered_moments(
     emotional_context_engine=None,
     personality_profiler=None,
-    memory_tier_manager=None,
+    memory_manager=None,
     personality_fact_classifier=None
 ) -> MemoryTriggeredMoments:
     """
@@ -924,7 +920,7 @@ async def create_memory_triggered_moments(
     system = MemoryTriggeredMoments(
         emotional_context_engine=emotional_context_engine,
         personality_profiler=personality_profiler,
-        memory_tier_manager=memory_tier_manager,
+        memory_manager=memory_manager,
         personality_fact_classifier=personality_fact_classifier
     )
     

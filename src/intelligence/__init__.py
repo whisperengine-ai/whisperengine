@@ -14,6 +14,15 @@ import json
 
 from .emotional_intelligence import PredictiveEmotionalIntelligence, EmotionalIntelligenceAssessment
 
+# Phase 3.1 Integration: Import Emotional Context Engine
+try:
+    from .emotional_context_engine import create_emotional_context_engine, EmotionalContextEngine
+    EMOTIONAL_CONTEXT_ENGINE_AVAILABLE = True
+except ImportError:
+    EMOTIONAL_CONTEXT_ENGINE_AVAILABLE = False
+    create_emotional_context_engine = None
+    EmotionalContextEngine = None
+
 logger = logging.getLogger(__name__)
 
 class Phase2Integration:
@@ -29,12 +38,53 @@ class Phase2Integration:
             conversation_cache=conversation_cache
         )
         
+        # Phase 3.1 Integration: Initialize Emotional Context Engine
+        self.emotional_context_engine = None
+        self.graph_personality_manager = graph_personality_manager
+        self.conversation_cache = conversation_cache
+        
         # Integration settings
         self.auto_intervention_enabled = True
         self.intervention_cooldown = timedelta(hours=2)
         self.last_interventions = {}  # Track last intervention time per user
         
+        # Initialize emotional context engine asynchronously
+        asyncio.create_task(self._initialize_emotional_context_engine())
+        
         logger.info("Phase 2 Integration initialized successfully")
+    
+    async def _initialize_emotional_context_engine(self):
+        """Initialize the emotional context engine with proper dependencies"""
+        if not EMOTIONAL_CONTEXT_ENGINE_AVAILABLE or create_emotional_context_engine is None:
+            logger.warning("EmotionalContextEngine not available - Phase 3.1 features disabled")
+            return
+        
+        try:
+            # Get dependencies from the bot instance if available
+            emotional_ai = None
+            personality_profiler = None
+            personality_fact_classifier = None
+            
+            if self.bot and hasattr(self.bot, 'external_emotion_ai'):
+                emotional_ai = self.bot.external_emotion_ai
+            
+            if self.graph_personality_manager:
+                # Try to get personality profiler from graph manager
+                if hasattr(self.graph_personality_manager, 'personality_profiler'):
+                    personality_profiler = self.graph_personality_manager.personality_profiler
+            
+            # Create emotional context engine
+            self.emotional_context_engine = await create_emotional_context_engine(
+                emotional_ai=emotional_ai,
+                personality_profiler=personality_profiler,
+                personality_fact_classifier=personality_fact_classifier
+            )
+            
+            logger.info("✅ Phase 3.1 Emotional Context Engine integrated successfully")
+            
+        except Exception as e:
+            logger.error("Failed to initialize emotional context engine: %s", str(e))
+            self.emotional_context_engine = None
 
     async def process_message_with_emotional_intelligence(self, user_id: str, 
                                                         message: str,

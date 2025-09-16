@@ -51,13 +51,32 @@ class GracefulShutdownManager:
         if self.shutdown_requested:
             return
             
+        # Use asyncio's thread-safe call_soon_threadsafe to schedule shutdown
         try:
-            # Try to schedule the shutdown in the current event loop
             loop = asyncio.get_running_loop()
-            loop.create_task(self.graceful_shutdown())
-        except RuntimeError:
-            # If no event loop is running, use asyncio.run
-            asyncio.run(self.graceful_shutdown())
+            # Schedule the shutdown coroutine from the signal handler context
+            future = asyncio.run_coroutine_threadsafe(self.graceful_shutdown(), loop)
+            logger.debug("Graceful shutdown scheduled in event loop")
+        except RuntimeError as e:
+            logger.error(f"Could not schedule graceful shutdown: {e}")
+            # Fallback: set shutdown flag and let the bot's main loop handle it
+            self.shutdown_requested = True
+            # Force bot close from signal context
+            if self.bot and hasattr(self.bot, 'close'):
+                try:
+                    # Schedule bot close in the event loop
+                    loop = asyncio.get_running_loop()
+                    def close_bot():
+                        if self.bot and not self.bot.is_closed():
+                            asyncio.create_task(self.bot.close())
+                    loop.call_soon_threadsafe(close_bot)
+                except (RuntimeError, AttributeError):
+                    logger.warning("Could not schedule bot close from signal handler")
+        except (RuntimeError, AttributeError) as e:
+            logger.error(f"Error in signal handler: {e}")
+            # Emergency fallback
+            import os
+            os._exit(1)
         
     def register_cleanup(self, cleanup_func, priority=0):
         """Register cleanup function with priority (higher = earlier)"""

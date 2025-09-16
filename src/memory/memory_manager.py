@@ -17,13 +17,7 @@ from src.memory.chromadb_manager_simple import ChromaDBManagerSimple as ChromaDB
 from src.utils.emotion_manager import EmotionManager, UserProfile, EmotionProfile
 from src.utils.embedding_manager import ExternalEmbeddingManager
 
-# Import memory tier system for optimization
-try:
-    from src.memory.memory_tiers import MemoryTierManager, memory_tier_manager
-    MEMORY_TIERS_AVAILABLE = True
-except ImportError:
-    MEMORY_TIERS_AVAILABLE = False
-    logger.warning("Memory tiers system not available - using basic storage")
+# Memory tier system removed for performance optimization
 
 # Import graph memory manager for hybrid storage
 try:
@@ -44,7 +38,9 @@ class UserMemoryManager:
         if enable_auto_facts is None:
             enable_auto_facts = True  # Always enabled in unified AI system
         if enable_global_facts is None:
-            enable_global_facts = True  # Always enabled for better memory
+            # Global facts are always enabled since the collection exists anyway
+            # This flag mainly controls graph database integration
+            enable_global_facts = True
         if enable_emotions is None:
             enable_emotions = True  # Always enabled for emotional intelligence
         
@@ -179,8 +175,9 @@ class UserMemoryManager:
             
             # Automatic fact extraction has been replaced by personality-driven fact classification
             self.enable_auto_facts = False  # Legacy feature disabled
-            self.enable_global_facts = False  # Legacy feature disabled
-            logger.info("Legacy automatic fact extraction disabled - using personality-driven classification instead")
+            # Fix: Use the parameter value instead of hardcoding False
+            self.enable_global_facts = enable_global_facts  # Use parameter value for consistency
+            logger.info(f"Global facts {'enabled' if self.enable_global_facts else 'disabled'}")
             
             # Initialize emotion manager if enabled
             self.enable_emotions = enable_emotions
@@ -247,6 +244,12 @@ class UserMemoryManager:
             text = text[:max_length]
         
         return text
+
+    def update_phase2_integration(self, phase2_integration):
+        """Update emotion manager with phase2_integration after initialization"""
+        if self.emotion_manager:
+            self.emotion_manager.phase2_integration = phase2_integration
+            logger.info("✅ Updated emotion manager with Phase 2 integration")
 
     def _validate_user_id(self, user_id: str) -> str:
         """Validate user ID format"""
@@ -818,45 +821,7 @@ class UserMemoryManager:
             classifier = get_personality_fact_classifier()
             personality_fact = classifier.classify_fact(fact_content, context_metadata, user_id)
             
-            # Use memory tier manager for optimization if available
-            if MEMORY_TIERS_AVAILABLE:
-                start_time = time.time()
-                
-                # Get memory tier assignment from tier manager
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
-                try:
-                    memory_tier, tier_reason = loop.run_until_complete(
-                        memory_tier_manager.classify_memory_tier(
-                            personality_relevance=personality_fact.relevance_score,
-                            emotional_weight=personality_fact.emotional_weight,
-                            user_id=user_id,
-                            context_id=context_id
-                        )
-                    )
-                    
-                    # Update personality fact with optimized tier assignment
-                    personality_fact.memory_tier = memory_tier
-                    
-                    retrieval_time_ms = (time.time() - start_time) * 1000
-                    
-                    # Record the storage operation as an access pattern
-                    loop.run_until_complete(
-                        memory_tier_manager.record_access(
-                            fact_id=f"{user_id}_{hash(fact_content) % 10000}",
-                            user_id=user_id,
-                            context_id=context_id,
-                            retrieval_time_ms=retrieval_time_ms,
-                            was_cache_hit=False  # New storage, not a cache hit
-                        )
-                    )
-                    
-                    logger.debug("Memory tier assignment: %s - %s", memory_tier.value, tier_reason)
-                    
-                finally:
-                    loop.close()
-            
-            # Store based on memory tier assignment
+            # Store based on personality classification
             storage_metadata = personality_fact.to_storage_dict()
             
             # Create document content with personality context
@@ -864,33 +829,15 @@ class UserMemoryManager:
             if personality_fact.relevance.value != "minimal":
                 fact_text += f"\nPersonality relevance: {personality_fact.relevance.value} ({personality_fact.relevance_score:.2f})"
             
-            # Add memory tier information
-            fact_text += f"\nMemory tier: {personality_fact.memory_tier.value}"
-            
-            # Use appropriate collection based on memory tier
-            if personality_fact.memory_tier.value == "hot":
-                # Store in main collection for fast access
-                target_collection = self.collection
-                doc_id = f"{user_id}_personality_hot_{datetime.now().isoformat()}_{hash(fact_content) % 10000}"
-            elif personality_fact.memory_tier.value == "warm":
-                # Store in main collection but mark for caching
-                target_collection = self.collection
-                doc_id = f"{user_id}_personality_warm_{datetime.now().isoformat()}_{hash(fact_content) % 10000}"
-            else:
-                # Store in main collection but mark for cold storage
-                target_collection = self.collection
-                doc_id = f"{user_id}_personality_cold_{datetime.now().isoformat()}_{hash(fact_content) % 10000}"
-            
-            # Add memory tier metadata
-            storage_metadata["memory_tier"] = personality_fact.memory_tier.value
-            storage_metadata["tier_assignment_time"] = datetime.now().isoformat()
+            # Generate consistent document ID
+            doc_id = f"{user_id}_personality_{datetime.now().isoformat()}_{hash(fact_content) % 10000}"
             
             # Store using appropriate embedding method
             if self.use_external_embeddings and self.add_documents_with_embeddings:
                 from src.memory.chromadb_external_embeddings import run_async_method
                 success = run_async_method(
                     self.add_documents_with_embeddings,
-                    target_collection,
+                    self.collection,
                     [fact_text],
                     [storage_metadata],
                     [doc_id]
@@ -898,15 +845,15 @@ class UserMemoryManager:
                 if not success:
                     raise MemoryStorageError("Failed to store personality fact with external embeddings")
             else:
-                target_collection.add(
+                self.collection.add(
                     documents=[fact_text],
                     metadatas=[storage_metadata],
                     ids=[doc_id]
                 )
             
-            logger.debug("Stored personality fact for %s: %s (relevance: %.2f, tier: %s)", 
+            logger.debug("Stored personality fact for %s: %s (relevance: %.2f)", 
                         user_id, personality_fact.fact_type.value, 
-                        personality_fact.relevance_score, personality_fact.memory_tier.value)
+                        personality_fact.relevance_score)
             
             return personality_fact
             
@@ -919,7 +866,6 @@ class UserMemoryManager:
     def retrieve_personality_facts(self, user_id: str, query: str = "", 
                                  fact_types: List = None, 
                                  min_relevance: float = 0.0,
-                                 memory_tiers: List = None,
                                  limit: int = 10) -> List[Dict]:
         """
         Retrieve personality facts with advanced filtering for AI companion enhancement
@@ -929,7 +875,6 @@ class UserMemoryManager:
             query: Optional semantic search query
             fact_types: Optional list of PersonalityFactType values to filter by
             min_relevance: Minimum relevance score (0.0-1.0)
-            memory_tiers: Optional list of MemoryTier values to filter by  
             limit: Maximum number of facts to return
             
         Returns:

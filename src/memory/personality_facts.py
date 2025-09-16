@@ -58,13 +58,6 @@ class PersonalityRelevance(Enum):
     MINIMAL = "minimal"       # Little personality value (score: 0.0-0.29)
 
 
-class MemoryTier(Enum):
-    """Memory storage tier based on personality importance and access frequency"""
-    HOT = "hot"               # Always in RAM for instant access
-    WARM = "warm"             # Cached on SSD, loaded on demand  
-    COLD = "cold"             # Compressed on disk, archived
-
-
 @dataclass
 class PersonalityFact:
     """A fact that enhances AI companion personality and relationships"""
@@ -72,7 +65,6 @@ class PersonalityFact:
     fact_type: PersonalityFactType
     relevance: PersonalityRelevance
     relevance_score: float
-    memory_tier: MemoryTier
     emotional_weight: float
     privacy_level: str
     context_metadata: Dict
@@ -88,7 +80,6 @@ class PersonalityFact:
             "fact_type": self.fact_type.value,
             "relevance": self.relevance.value,
             "relevance_score": self.relevance_score,
-            "memory_tier": self.memory_tier.value,
             "emotional_weight": self.emotional_weight,
             "privacy_level": self.privacy_level,
             "extraction_confidence": self.extraction_confidence,
@@ -280,10 +271,7 @@ class PersonalityFactClassifier:
             # Step 4: Determine relevance category
             relevance = self._score_to_relevance_category(relevance_score)
             
-            # Step 5: Assign memory tier based on importance
-            memory_tier = self._determine_memory_tier(relevance_score, emotional_weight)
-            
-            # Step 6: Set privacy level from PII analysis
+            # Step 5: Set privacy level from PII analysis
             privacy_level = pii_analysis.recommended_security_level
             
             personality_fact = PersonalityFact(
@@ -291,7 +279,6 @@ class PersonalityFactClassifier:
                 fact_type=fact_type,
                 relevance=relevance,
                 relevance_score=relevance_score,
-                memory_tier=memory_tier,
                 emotional_weight=emotional_weight,
                 privacy_level=privacy_level,
                 context_metadata=context_metadata,
@@ -301,8 +288,8 @@ class PersonalityFactClassifier:
                 user_id=user_id
             )
             
-            logger.debug(f"Classified personality fact: {fact_type.value} "
-                        f"(relevance: {relevance_score:.2f}, tier: {memory_tier.value})")
+            logger.debug("Classified personality fact: %s (relevance: %.2f)", 
+                        fact_type.value, relevance_score)
             
             return personality_fact
             
@@ -416,21 +403,6 @@ class PersonalityFactClassifier:
         else:
             return PersonalityRelevance.MINIMAL
     
-    def _determine_memory_tier(self, relevance_score: float, emotional_weight: float) -> MemoryTier:
-        """Determine appropriate memory tier for storage optimization"""
-        
-        # Critical facts always go to hot memory
-        if relevance_score >= 0.9 or emotional_weight >= 0.8:
-            return MemoryTier.HOT
-        
-        # High relevance or emotional facts go to warm memory
-        elif relevance_score >= 0.7 or emotional_weight >= 0.5:
-            return MemoryTier.WARM
-        
-        # Everything else goes to cold storage
-        else:
-            return MemoryTier.COLD
-    
     def _create_safe_fallback_fact(self, fact_content: str, context_metadata: Dict, 
                                  user_id: str) -> PersonalityFact:
         """Create a safe fallback fact when classification fails"""
@@ -439,7 +411,6 @@ class PersonalityFactClassifier:
             fact_type=PersonalityFactType.INTEREST_DISCOVERY,
             relevance=PersonalityRelevance.LOW,
             relevance_score=0.3,
-            memory_tier=MemoryTier.COLD,
             emotional_weight=0.1,
             privacy_level="private_dm",  # Conservative privacy
             context_metadata=context_metadata,

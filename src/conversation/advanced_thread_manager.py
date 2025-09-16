@@ -63,11 +63,7 @@ try:
 except ImportError:
     MEMORY_MOMENTS_AVAILABLE = False
 
-try:
-    from src.memory.memory_tiers import MemoryTierManager
-    MEMORY_TIERS_AVAILABLE = True
-except ImportError:
-    MEMORY_TIERS_AVAILABLE = False
+# Memory tier system removed for performance optimization
 
 logger = logging.getLogger(__name__)
 
@@ -192,7 +188,7 @@ class AdvancedConversationThreadManager:
                  emotional_context_engine: Optional[EmotionalContextEngine] = None,
                  personality_profiler: Optional[DynamicPersonalityProfiler] = None,
                  memory_moments: Optional[MemoryTriggeredMoments] = None,
-                 memory_tier_manager: Optional[MemoryTierManager] = None,
+                 memory_manager: Optional[Any] = None,
                  max_active_threads: int = 5,
                  max_background_threads: int = 20,
                  thread_timeout_hours: int = 48):
@@ -211,7 +207,7 @@ class AdvancedConversationThreadManager:
         self.emotional_context_engine = emotional_context_engine
         self.personality_profiler = personality_profiler
         self.memory_moments = memory_moments
-        self.memory_tier_manager = memory_tier_manager
+        self.memory_manager = memory_manager
         
         self.max_active_threads = max_active_threads
         self.max_background_threads = max_background_threads
@@ -1158,7 +1154,7 @@ async def create_advanced_conversation_thread_manager(
     emotional_context_engine=None,
     personality_profiler=None,
     memory_moments=None,
-    memory_tier_manager=None
+    memory_manager=None
 ) -> AdvancedConversationThreadManager:
     """
     Create and initialize an advanced conversation thread manager.
@@ -1179,7 +1175,7 @@ async def create_advanced_conversation_thread_manager(
         emotional_context_engine=emotional_context_engine,
         personality_profiler=personality_profiler,
         memory_moments=memory_moments,
-        memory_tier_manager=memory_tier_manager
+        memory_manager=memory_manager
     )
     
     logger.info("AdvancedConversationThreadManager created successfully")
