@@ -16,7 +16,12 @@ Key Features:
 Integration Points:
 - ExternalAPIEmotionAI (src/emotion/external_api_emotion_ai.py) for emotion detection
 - DynamicPersonalityProfiler (src/intelligence/dynamic_personality_profiler.py) for personality context
-- Memory tier system for emotional pattern storage
+- Memory clustering for emotional pattern storage
+
+Key Integration Points:
+- ExternalAPIEmotionAI: Primary emotion analysis from user messages
+- DynamicPersonalityProfiler: Personality-aware emotional adaptations
+- PersonalityFactClassifier: Classification of personality-relevant emotional data
 - Privacy-aware emotional data handling
 """
 
@@ -40,12 +45,6 @@ try:
     PERSONALITY_PROFILER_AVAILABLE = True
 except ImportError:
     PERSONALITY_PROFILER_AVAILABLE = False
-
-try:
-    from src.memory.memory_tiers import MemoryTierManager
-    MEMORY_TIERS_AVAILABLE = True
-except ImportError:
-    MEMORY_TIERS_AVAILABLE = False
 
 try:
     from src.memory.personality_facts import PersonalityFactClassifier
@@ -193,7 +192,6 @@ class EmotionalContextEngine:
     def __init__(self,
                  emotional_ai: Optional[ExternalAPIEmotionAI] = None,
                  personality_profiler: Optional[DynamicPersonalityProfiler] = None,
-                 memory_tier_manager: Optional[MemoryTierManager] = None,
                  personality_fact_classifier: Optional[PersonalityFactClassifier] = None,
                  emotional_memory_retention_days: int = 90,
                  pattern_detection_threshold: int = 3):
@@ -203,14 +201,12 @@ class EmotionalContextEngine:
         Args:
             emotional_ai: External API emotion analysis system
             personality_profiler: Dynamic personality profiling system
-            memory_tier_manager: Memory tier management system
             personality_fact_classifier: Personality fact classification system
             emotional_memory_retention_days: Days to retain emotional memory clusters
             pattern_detection_threshold: Minimum occurrences to recognize a pattern
         """
         self.emotional_ai = emotional_ai
         self.personality_profiler = personality_profiler
-        self.memory_tier_manager = memory_tier_manager
         self.personality_fact_classifier = personality_fact_classifier
         
         self.retention_period = timedelta(days=emotional_memory_retention_days)
@@ -486,6 +482,80 @@ Respond in a way that demonstrates emotional intelligence and builds the relatio
 Respond naturally while being mindful of their emotional state."""
         
         return prompt
+
+    async def get_conversation_emotional_context(self, user_id: str, current_message: Optional[str] = None) -> Dict[str, Any]:
+        """
+        Get comprehensive emotional context for conversation enhancement.
+        
+        Args:
+            user_id: User identifier
+            current_message: Current user message
+            
+        Returns:
+            Dictionary with emotional context data for conversation
+        """
+        context_data = {
+            'adaptation_strategy': None,
+            'emotional_patterns': [],
+            'recent_emotions': [],
+            'cluster_insights': [],
+            'adaptation_prompt': ""
+        }
+        
+        try:
+            # TODO: Use current_message for real-time emotional analysis if provided
+            # For now, using most recent stored emotional context
+            
+            # Get recent emotional patterns
+            user_contexts = self.emotional_contexts.get(user_id, [])
+            if user_contexts:
+                # Get recent emotions (last 5)
+                recent_contexts = user_contexts[-5:]
+                context_data['recent_emotions'] = [
+                    {
+                        'emotion': ctx.primary_emotion.value,
+                        'intensity': ctx.emotion_intensity,
+                        'timestamp': ctx.timestamp.isoformat() if ctx.timestamp else None
+                    }
+                    for ctx in recent_contexts
+                ]
+                
+                # Get emotional clusters
+                clusters = await self.cluster_emotional_memories(user_id)
+                if clusters:
+                    context_data['cluster_insights'] = [
+                        {
+                            'pattern': cluster.emotional_pattern.value,
+                            'frequency': cluster.frequency,
+                            'intensity': cluster.emotion_intensity_range[1] if cluster.emotion_intensity_range else 0,
+                            'triggers': cluster.common_triggers[:3]  # Top 3 triggers
+                        }
+                        for cluster in clusters[:3]  # Top 3 clusters
+                    ]
+                
+                # Create adaptation strategy for current message
+                latest_context = recent_contexts[-1]
+                strategy = await self.create_adaptation_strategy(
+                    emotional_context=latest_context
+                )
+                
+                if strategy:
+                    context_data['adaptation_strategy'] = {
+                        'acknowledge_emotion': strategy.acknowledge_emotion,
+                        'tone_adjustments': strategy.tone_adjustments,
+                        'offer_support': strategy.offer_support,
+                        'provide_validation': strategy.provide_validation,
+                        'empathy_emphasis': strategy.empathy_emphasis
+                    }
+                    
+                    # Generate adaptation prompt
+                    context_data['adaptation_prompt'] = self.get_emotional_adaptation_prompt(strategy)
+            
+            return context_data
+            
+        except (AttributeError, TypeError, KeyError) as e:
+            logger.warning("Failed to get conversation emotional context: %s", str(e))
+            return context_data
     
     def _fallback_emotional_analysis(self, text: str) -> Dict[str, Any]:
         """Provide basic emotional analysis when external AI is unavailable"""
@@ -1000,7 +1070,6 @@ Respond naturally while being mindful of their emotional state."""
 async def create_emotional_context_engine(
     emotional_ai=None,
     personality_profiler=None,
-    memory_tier_manager=None,
     personality_fact_classifier=None
 ) -> EmotionalContextEngine:
     """
@@ -1018,7 +1087,6 @@ async def create_emotional_context_engine(
     engine = EmotionalContextEngine(
         emotional_ai=emotional_ai,
         personality_profiler=personality_profiler,
-        memory_tier_manager=memory_tier_manager,
         personality_fact_classifier=personality_fact_classifier
     )
     

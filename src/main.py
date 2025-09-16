@@ -260,11 +260,9 @@ async def main():
         bot_manager = ModularBotManager(debug_mode=False)
         await bot_manager.initialize()
         
-        # Start the bot
+        # Start the bot (signal handlers will handle graceful shutdown)
         await bot_manager.run()
         
-    except KeyboardInterrupt:
-        logger.info("Bot stopped by user")
     except Exception as e:
         error_msg = str(e)
         if "Failed to initialize memory system" in error_msg or "ChromaDB" in error_msg:
@@ -286,9 +284,6 @@ def sync_main():
     """Synchronous wrapper for the main async function."""
     try:
         return asyncio.run(main())
-    except KeyboardInterrupt:
-        logger.info("Bot stopped by user")
-        return 0
     except Exception as e:
         logger.error(f"Fatal error in sync_main: {e}")
         return 1

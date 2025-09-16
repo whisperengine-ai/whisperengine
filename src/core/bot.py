@@ -8,6 +8,7 @@ import discord
 from discord.ext import commands
 import os
 import logging
+import asyncio
 from typing import Optional
 
 # Core imports
@@ -254,9 +255,39 @@ class DiscordBotCore:
             self.logger.info("Memory and backup managers initialized successfully")
             
         except Exception as e:
-            self.logger.critical(f"Failed to initialize memory system: {e}")
-            raise
+            self.logger.error("Memory system initialization failed: %s", str(e))
+            # Fallback to basic memory manager
+            self.memory_manager = UserMemoryManager(llm_client=self.llm_client)
+            self.backup_manager = BackupManager()
+            self.logger.warning("Using fallback memory manager")
+    
+    async def _update_emotional_context_dependencies(self):
+        """Update emotional context engine with dependencies after they're initialized"""
+        try:
+            # Wait a bit for the emotional context engine to finish initializing
+            await asyncio.sleep(1)
             
+            if (hasattr(self, 'phase2_integration') and self.phase2_integration and
+                hasattr(self.phase2_integration, 'emotional_context_engine') and
+                self.phase2_integration.emotional_context_engine):
+                
+                engine = self.phase2_integration.emotional_context_engine
+                
+                # Update emotional AI if available
+                if hasattr(self, 'external_emotion_ai') and self.external_emotion_ai:
+                    engine.emotional_ai = self.external_emotion_ai
+                    self.logger.info("✅ Updated emotional context engine with External API Emotion AI")
+                
+                # Update personality profiler if available  
+                if hasattr(self, 'dynamic_personality_profiler') and self.dynamic_personality_profiler:
+                    engine.personality_profiler = self.dynamic_personality_profiler
+                    self.logger.info("✅ Updated emotional context engine with Dynamic Personality Profiler")
+                
+                self.logger.info("🎉 Phase 3.1 Emotional Context Engine fully integrated and operational")
+            
+        except Exception as e:
+            self.logger.warning("Failed to update emotional context engine dependencies: %s", str(e))
+
     def initialize_ai_enhancements(self):
         """Initialize advanced AI enhancement systems."""
         # Initialize Personality Profiler
@@ -314,8 +345,16 @@ class DiscordBotCore:
             
             self.logger.info("🧠 Emotional Intelligence Mode: Full Capabilities Always Active")
             
-            self.phase2_integration = Phase2Integration()
-            self.logger.info("✅ Predictive Emotional Intelligence initialized")
+            # Phase 3.1 Integration: Provide dependencies for EmotionalContextEngine
+            graph_personality_manager = getattr(self, 'graph_personality_manager', None)
+            conversation_cache = getattr(self, 'conversation_cache', None)
+            
+            self.phase2_integration = Phase2Integration(
+                bot_instance=self,
+                graph_personality_manager=graph_personality_manager,
+                conversation_cache=conversation_cache
+            )
+            self.logger.info("✅ Predictive Emotional Intelligence initialized with Phase 3.1 support")
             
             # Update emotion manager with phase2_integration if it exists
             if hasattr(self, 'graph_emotion_manager') and self.graph_emotion_manager:
@@ -327,6 +366,10 @@ class DiscordBotCore:
                 hasattr(self.memory_manager, 'emotion_manager') and self.memory_manager.emotion_manager):
                 self.memory_manager.emotion_manager.phase2_integration = self.phase2_integration
                 self.logger.info("✅ Updated memory manager's emotion manager with Phase 2 integration")
+                
+            # Use the new update method for consistency
+            if hasattr(self, 'memory_manager') and self.memory_manager and hasattr(self.memory_manager, 'update_phase2_integration'):
+                self.memory_manager.update_phase2_integration(self.phase2_integration)
                 
         except Exception as e:
             self.logger.error(f"Failed to initialize emotional intelligence: {e}")
@@ -350,6 +393,12 @@ class DiscordBotCore:
                 )
                 
                 self.logger.info("✅ External API Emotion AI initialized (full capabilities)")
+                
+                # Phase 3.1 Integration: Update emotional context engine with emotion AI
+                if hasattr(self, 'phase2_integration') and self.phase2_integration:
+                    # Give the emotional context engine time to initialize, then update dependencies
+                    asyncio.create_task(self._update_emotional_context_dependencies())
+                
             else:
                 self.logger.info("🌐 External API Emotion AI disabled or not available")
                 

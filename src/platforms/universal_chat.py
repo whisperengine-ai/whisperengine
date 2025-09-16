@@ -787,6 +787,23 @@ class UniversalChatOrchestrator:
                         message.content,
                         limit=5
                     )
+                    
+                    # Enhanced: Add knowledge domain classification
+                    if hasattr(memory_manager, '_determine_knowledge_domain'):
+                        try:
+                            domain = memory_manager._determine_knowledge_domain(message.content, "")
+                            if domain and domain != "general":
+                                # Get domain-specific facts if graph database is available
+                                if (hasattr(memory_manager, 'get_knowledge_domain_facts') and 
+                                    hasattr(memory_manager, 'enable_global_facts') and 
+                                    memory_manager.enable_global_facts):
+                                    domain_facts = memory_manager.get_knowledge_domain_facts(domain, limit=3)
+                                    if domain_facts:
+                                        chromadb_memories.extend(domain_facts)
+                                        logging.debug(f"Added {len(domain_facts)} domain-specific facts for {domain}")
+                        except Exception as e:
+                            logging.debug(f"Knowledge domain enhancement failed: {e}")
+                            
                 except Exception as e:
                     logging.warning(f"ChromaDB memory retrieval failed: {e}")
             
@@ -814,11 +831,89 @@ class UniversalChatOrchestrator:
                 
                 if emotion_context:
                     context_parts.append(f"💭 **Emotional Context:** {str(emotion_context)}")
+                    
+                    # Enhanced: Add emotional adaptation guidance if available
+                    if hasattr(memory_manager, 'emotion_manager') and memory_manager.emotion_manager:
+                        try:
+                            # Get comprehensive emotional context from actual emotion manager
+                            if (hasattr(memory_manager.emotion_manager, 'phase2_integration') and 
+                                memory_manager.emotion_manager.phase2_integration and
+                                hasattr(memory_manager.emotion_manager.phase2_integration, 'emotional_context_engine')):
+                                
+                                # Use the actual emotional context engine with real data
+                                emotional_context_engine = memory_manager.emotion_manager.phase2_integration.emotional_context_engine
+                                if emotional_context_engine:
+                                    emotional_context_data = await emotional_context_engine.get_conversation_emotional_context(
+                                        user_id=message.user_id,
+                                        current_message=message.content
+                                    )
+                                    
+                                    if emotional_context_data.get('recent_emotions'):
+                                        recent_emotions = [e['emotion'] for e in emotional_context_data['recent_emotions'][-3:]]
+                                        context_parts.append(f"🎭 **Emotional Patterns:** Recent emotions: {', '.join(recent_emotions)}")
+                                    
+                                    if emotional_context_data.get('cluster_insights'):
+                                        patterns = [c['pattern'] for c in emotional_context_data['cluster_insights'][:2]]
+                                        context_parts.append(f"🔍 **Emotional Clusters:** Patterns: {', '.join(patterns)}")
+                                    
+                                    if emotional_context_data.get('adaptation_prompt'):
+                                        # Add adaptation guidance to system context
+                                        context_parts.append(f"📋 **Adaptation Strategy:** {emotional_context_data['adaptation_prompt'][:200]}...")
+                                else:
+                                    # Fallback to simple pattern detection
+                                    user_profile = memory_manager.emotion_manager.get_profile(message.user_id)
+                                    if user_profile and user_profile.emotion_history:
+                                        recent_emotions = [e.detected_emotion.value for e in user_profile.emotion_history[-3:]]
+                                        if recent_emotions:
+                                            context_parts.append(f"🎭 **Emotional Patterns:** Recent emotions: {', '.join(recent_emotions)}")
+                                            
+                                            # Add adaptation guidance based on patterns
+                                            if any(emotion in ['frustrated', 'angry', 'disappointed'] for emotion in recent_emotions):
+                                                context_parts.append("📋 **Adaptation Strategy:** Use supportive, calming tone. Acknowledge frustration and offer help.")
+                                            elif any(emotion in ['excited', 'happy', 'grateful'] for emotion in recent_emotions):
+                                                context_parts.append("📋 **Adaptation Strategy:** Match positive energy while maintaining helpful focus.")
+                                            elif any(emotion in ['worried', 'sad'] for emotion in recent_emotions):
+                                                context_parts.append("📋 **Adaptation Strategy:** Provide gentle encouragement and emotional support.")
+                            else:
+                                # Fallback to simple pattern detection
+                                user_profile = memory_manager.emotion_manager.get_profile(message.user_id)
+                                if user_profile and user_profile.emotion_history:
+                                    recent_emotions = [e.detected_emotion.value for e in user_profile.emotion_history[-3:]]
+                                    if recent_emotions:
+                                        context_parts.append(f"🎭 **Emotional Patterns:** Recent emotions: {', '.join(recent_emotions)}")
+                                        
+                                        # Add adaptation guidance based on patterns
+                                        if any(emotion in ['frustrated', 'angry', 'disappointed'] for emotion in recent_emotions):
+                                            context_parts.append("📋 **Adaptation Strategy:** Use supportive, calming tone. Acknowledge frustration and offer help.")
+                                        elif any(emotion in ['excited', 'happy', 'grateful'] for emotion in recent_emotions):
+                                            context_parts.append("📋 **Adaptation Strategy:** Match positive energy while maintaining helpful focus.")
+                                        elif any(emotion in ['worried', 'sad'] for emotion in recent_emotions):
+                                            context_parts.append("📋 **Adaptation Strategy:** Provide gentle encouragement and emotional support.")
+                        except Exception as e:
+                            logging.debug(f"Emotional adaptation enhancement failed: {e}")
                 
                 if chromadb_memories:
                     context_parts.append("🧠 **Memory Networks:**")
-                    for memory in chromadb_memories[:2]:
-                        context_parts.append(f"- {str(memory)}")
+                    regular_memories = []
+                    domain_facts = []
+                    
+                    # Separate regular memories from domain-specific facts
+                    for memory in chromadb_memories[:5]:  # Show more memories
+                        memory_str = str(memory)
+                        if 'knowledge_domain' in str(memory).lower() or 'domain_specific' in str(memory).lower():
+                            domain_facts.append(memory_str)
+                        else:
+                            regular_memories.append(memory_str)
+                    
+                    # Show regular memories
+                    for memory in regular_memories[:2]:
+                        context_parts.append(f"- {memory}")
+                    
+                    # Show domain-specific knowledge if available
+                    if domain_facts:
+                        context_parts.append("🏷️ **Domain Knowledge:**")
+                        for fact in domain_facts[:2]:
+                            context_parts.append(f"- {fact}")
                 
                 if context_parts:
                     context_message = "\n".join(context_parts)

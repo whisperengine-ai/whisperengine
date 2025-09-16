@@ -58,11 +58,7 @@ try:
 except ImportError:
     EXISTING_MEMORY_SYSTEM_AVAILABLE = False
 
-try:
-    from src.memory.memory_tiers import MemoryTierManager
-    MEMORY_TIERS_AVAILABLE = True
-except ImportError:
-    MEMORY_TIERS_AVAILABLE = False
+# Memory tier system removed for performance optimization
 
 try:
     from src.utils.local_embedding_manager import LocalEmbeddingManager
