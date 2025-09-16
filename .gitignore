@@ -40,12 +40,15 @@ coverage.xml
 # Environment & Package Management
 .env
 .env.local
-.env.native
+.env.*.local
 .venv/
 venv/
 env/
 ENV/
 __pypackages__/
+
+# Keep example files
+!.env.example
 
 # IDE & Editors
 .vscode/

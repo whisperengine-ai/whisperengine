@@ -13,7 +13,7 @@ ARCH=$(uname -m)
 
 # Check if Python is available
 if ! command -v python3 &> /dev/null; then
-    echo "❌ Python 3 is required. Please install Python 3.9 or later."
+    echo "❌ Python 3 is required. Please install Python 3.13 or later."
     exit 1
 fi
 
@@ -88,15 +88,6 @@ if [ "$INSTALL_TYPE" = "discord" ] || [ "$INSTALL_TYPE" = "both" ]; then
     pip install -r requirements-discord.txt
 fi
 
-echo "🤖 Downloading AI models (this may take 5-10 minutes)..."
-echo "   - Phi-3-Mini conversational AI (~2GB)"
-echo "   - Embedding models for memory (~500MB)"  
-echo "   - Emotion analysis models (~600MB)"
-echo "   Total size: ~3.1GB (full functionality)"
-echo ""
-
-python download_models.py
-
 echo ""
 echo "🎉 Setup completed successfully!"
 echo ""
@@ -129,11 +120,3 @@ elif [ "$INSTALL_TYPE" = "both" ]; then
     echo ""
 fi
 
-echo "� For detailed documentation, see:"
-echo "   - QUICK_START.md (getting started)"
-echo "   - DEPENDENCY_MANAGEMENT.md (dependency system)"
-echo "   - BUILD_AND_USER_GUIDE.md (advanced setup)"
-echo ""
-echo "💡 Use automated installers for future setups:"
-echo "   ./scripts/install-desktop.sh (desktop app)"
-echo "   ./scripts/install-discord.sh (discord bot)"
