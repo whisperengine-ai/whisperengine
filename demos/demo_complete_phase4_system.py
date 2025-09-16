@@ -67,7 +67,7 @@ except ImportError as e:
 
 # Supporting systems
 try:
-    from src.emotion.external_api_emotion_ai import EmotionalContextEngine
+    from src.intelligence.emotional_context_engine import EmotionalContextEngine
     EMOTION_ENGINE_AVAILABLE = True
 except ImportError:
     logger.warning("Emotional Context Engine not available")
@@ -323,12 +323,12 @@ class CompletePhase4SystemDemo:
                     try:
                         thread_result = await self.thread_manager.process_user_message(
                             user_id=scenario['user_id'],
-                            message_content=message_content,
+                            message=message_content,
                             context={'thread_topic': conversation['thread_topic']}
                         )
                         
-                        if thread_result and thread_result.get('thread_id'):
-                            thread_id = thread_result['thread_id']
+                        if thread_result and thread_result.get('current_thread'):
+                            thread_id = thread_result['current_thread']
                             if thread_id not in scenario_results['threads_created']:
                                 scenario_results['threads_created'].append(thread_id)
                                 logger.info("   🧵 Thread created/identified: %s", thread_id)
@@ -480,7 +480,7 @@ class CompletePhase4SystemDemo:
                 if test_result:
                     capabilities['thread_management'] = True
                     logger.info("   ✅ Multi-thread conversation management operational")
-                    logger.info("   📊 Thread ID: %s", test_result.get('thread_id', 'unknown'))
+                    logger.info("   📊 Thread ID: %s", test_result.get('current_thread', 'unknown'))
             except Exception as e:
                 logger.warning("   ❌ Thread management test failed: %s", e)
         

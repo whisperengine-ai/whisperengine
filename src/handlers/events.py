@@ -206,6 +206,19 @@ class BotEventHandlers:
             except Exception as e:
                 logger.error(f"Failed to initialize Universal Chat Orchestrator: {e}")
         
+        # Initialize Production Optimization System if available
+        if hasattr(self.bot_core, 'production_adapter') and self.bot_core.production_adapter:
+            try:
+                logger.info("🚀 Initializing Production Optimization System...")
+                success = await self.bot_core.production_adapter.initialize_production_mode()
+                if success:
+                    logger.info("✅ Production optimization system activated - performance boost enabled!")
+                else:
+                    logger.info("📋 Production optimization system in fallback mode")
+            except Exception as e:
+                logger.error(f"Failed to initialize production optimization system: {e}")
+                logger.warning("Bot will continue with standard performance")
+        
         # Start heartbeat monitor
         if self.heartbeat_monitor:
             try:
