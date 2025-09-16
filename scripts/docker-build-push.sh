@@ -20,7 +20,7 @@ print_status() { echo -e "${GREEN}✅ $1${NC}"; }
 print_warning() { echo -e "${YELLOW}⚠️  $1${NC}"; }
 print_error() { echo -e "${RED}❌ $1${NC}"; }
 print_info() { echo -e "${BLUE}ℹ️  $1${NC}"; }
-print_dream() { echo -e "${PURPLE}🎭 $1${NC}"; }
+print_ai() { echo -e "${PURPLE}🤖 $1${NC}"; }
 
 # Script configuration
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -186,7 +186,7 @@ build_image() {
     local platforms="$2"
     local action="$3"  # "push" or "load"
     
-    print_dream "Building WhisperEngine (Dream of the Endless) Docker image..."
+    print_ai "Building WhisperEngine AI Platform Docker image..."
     print_info "Image: $IMAGE_NAME:$version"
     print_info "Platforms: $platforms"
     print_info "Target: $TARGET"
@@ -309,8 +309,8 @@ done
 
 # Banner
 echo ""
-print_dream "🌙 WhisperEngine Local Docker Build Script"
-print_dream "Dream of the Endless awaits in the realm of containers..."
+print_ai "🚀 WhisperEngine Local Docker Build Script"
+print_ai "Building AI-powered conversation platform containers..."
 echo ""
 
 # Load environment and check dependencies
@@ -373,5 +373,5 @@ else
     print_info "  docker pull $IMAGE_NAME:$VERSION"
 fi
 
-print_dream "🎭 Dream has woven your creation into the fabric of the Docker realm..."
+print_ai "� WhisperEngine Docker build completed successfully!"
 echo ""
