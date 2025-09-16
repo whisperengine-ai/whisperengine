@@ -1020,11 +1020,11 @@ class UniversalChatOrchestrator:
             return await self._generate_basic_ai_response(message, conversation_context)
     
     
-    async def _load_system_prompt(self) -> str:
-        """Load the system prompt using the proper config system"""
+    async def _load_system_prompt(self, user_id: Optional[str] = None, template_context: Optional[dict] = None) -> str:
+        """Load the system prompt using the proper config system with template contextualization"""
         try:
             from src.core.config import load_system_prompt
-            return load_system_prompt()
+            content = load_system_prompt()
         except Exception as e:
             logging.warning(f"Could not load system prompt via config: {e}")
             # Try fallback to direct file loading
@@ -1037,12 +1037,15 @@ class UniversalChatOrchestrator:
                         # Replace {BOT_NAME} placeholder if present
                         bot_name = os.getenv('DISCORD_BOT_NAME', 'AI Assistant')
                         content = content.replace('{BOT_NAME}', bot_name)
-                        return content
+                else:
+                    content = None
             except Exception as e2:
                 logging.warning(f"Could not load system prompt file: {e2}")
-            
-            # Final fallback to generic AI assistant prompt
-            return """You are an AI assistant and companion with advanced conversational abilities, emotional intelligence, and memory. You have a thoughtful, helpful personality and can adapt your communication style to match user preferences.
+                content = None
+        
+        # If we still don't have content, use fallback
+        if content is None:
+            content = """You are an AI assistant and companion with advanced conversational abilities, emotional intelligence, and memory. You have a thoughtful, helpful personality and can adapt your communication style to match user preferences.
 
 Your core qualities:
 - You are knowledgeable, articulate, and genuinely interested in helping users
@@ -1058,6 +1061,14 @@ Your communication style:
 - Show genuine interest in the user's thoughts, questions, and experiences
 
 You are here to be a helpful, reliable, and engaging AI companion."""
+        
+        # Apply template context if provided
+        if template_context:
+            for key, value in template_context.items():
+                if isinstance(value, str):
+                    content = content.replace(f'{{{key.upper()}}}', value)
+        
+        return content
     
     async def _generate_basic_ai_response(self, message: Message, conversation_context: List[Dict[str, str]]) -> AIResponse:
         """Generate AI response using existing WhisperEngine logic"""
