@@ -24,8 +24,8 @@ class EnvironmentManager:
         Loading order:
         1. DOTENV_PATH environment variable (highest priority - for deployment subdirectories)
         2. Docker Compose provides base configuration via environment variables
-        3. Mode-specific .env.{mode} file (e.g., .env.desktop, .env.development)
-        4. Generic .env file provides local overrides and secrets
+        3. Generic .env file provides local overrides and secrets
+        4. Auto-detection handles mode-specific behavior
         
         Args:
             mode: Environment mode (used for logging only)
@@ -52,16 +52,7 @@ class EnvironmentManager:
             
         success = False
         
-        # First, try to load mode-specific environment file
-        if mode:
-            mode_env = self.project_root / f'.env.{mode}'
-            if mode_env.exists():
-                load_dotenv(mode_env, override=True)
-                self.loaded_files.append(str(mode_env))
-                success = True
-                logging.info(f"✅ Mode-specific .env.{mode} loaded")
-        
-        # Then load local .env file (overrides mode-specific and Docker environment)
+        # Load local .env file if it exists
         local_env = self.project_root / '.env'
         if local_env.exists():
             load_dotenv(local_env, override=True)  # Override everything else
@@ -69,8 +60,6 @@ class EnvironmentManager:
             success = True
             logging.info(f"✅ Local .env loaded for {mode} mode")
             logging.debug(f"Loaded files: {', '.join(self.loaded_files)}")
-        elif success:
-            logging.info(f"✅ Using mode-specific .env.{mode} for {mode} mode")
         else:
             logging.info(f"✅ Using Docker Compose environment for {mode} mode (no local .env)")
             success = True  # Docker provides the base config
@@ -94,21 +83,6 @@ class EnvironmentManager:
         if (os.getenv('DEV_MODE') or
             os.path.exists(self.project_root / 'bot.sh')):
             return 'development'
-            
-        # Check for any available .env.{mode} files (excluding templates)
-        import glob
-        env_pattern = str(self.project_root / '.env.*')
-        env_files = glob.glob(env_pattern)
-        
-        # Filter out template files
-        env_files = [f for f in env_files if not f.endswith('.example')]
-        
-        if env_files:
-            # Extract mode from first available file (e.g., .env.production -> production)
-            first_file = Path(env_files[0])
-            mode = first_file.name.split('.env.')[1]
-            logging.info(f"Auto-detected mode '{mode}' from available .env files: {[Path(f).name for f in env_files]}")
-            return mode
             
         # Default to development for safety
         return 'development'

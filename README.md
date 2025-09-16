@@ -112,19 +112,23 @@ All scripts will:
 git clone https://github.com/whisperengine-ai/whisperengine
 cd whisperengine
 
-# 2. Configure (get Discord token from discord.com/developers)
-cp .env.minimal .env
-nano .env  # Set DISCORD_BOT_TOKEN
+# 2. Quick setup with automated configuration
+./setup.sh  # Interactive setup for all dependencies and environment
 
-# 3. Start your local LLM (LM Studio, Ollama, etc.)
-#    OR use optimized llama-cpp-python: python setup_llamacpp.py
+# 3. Start Discord bot OR desktop app
+source .venv/bin/activate && python run.py            # Discord bot
+source .venv/bin/activate && python universal_native_app.py  # Desktop app
 
-# 4. Launch bot
-./bot.sh start
+# Optional: Validate your installation
+python validate_build_system.py  # Comprehensive validation
 ```
 **Perfect for:** Customization, development, advanced features
 
-**Your character bot is now running!** Edit files in the `prompts/` directory to customize your AI's personality.
+**Your AI is now running!** The setup script automatically:
+- Creates virtual environment
+- Installs all dependencies  
+- Configures environment from `.env.example`
+- Sets up your choice of Discord bot or desktop app
 
 ## 📚 **Documentation**
 
@@ -136,7 +140,8 @@ nano .env  # Set DISCORD_BOT_TOKEN
 | **[👥 End User Guide](docs/getting-started/END_USER_GUIDE.md)** | End Users | 15 min | Complete setup and usage |
 | **[💻 Development Guide](docs/development/DEVELOPMENT_GUIDE.md)** | Developers | 30 min | Customize and extend the bot |
 | **[🔑 API Configuration](docs/configuration/API_KEY_CONFIGURATION.md)** | All Users | 10 min | LLM provider setup |
-| **[🐳 Docker Hub Publishing](docs/deployment/DOCKER_HUB_SETUP.md)** | Maintainers | 15 min | Automated Docker publishing setup |
+| **[� Build Validation](validate_build_system.py)** | Developers | 2 min | Validate all build methods and deployment options |
+| **[�🐳 Docker Hub Publishing](docs/deployment/DOCKER_HUB_SETUP.md)** | Maintainers | 15 min | Automated Docker publishing setup |
 | **[🍎 MLX Integration Guide](MLX_INTEGRATION_GUIDE.md)** | Apple Users | 20 min | Native Apple Silicon optimization |
 | **[🧪 MLX Testing Guide](MLX_TESTING_GUIDE.md)** | Developers | 15 min | Comprehensive MLX validation |
 | **[🧠 Memory System](docs/ai-systems/MEMORY_SYSTEM_README.md)** | Advanced | 20 min | Understanding AI memory |

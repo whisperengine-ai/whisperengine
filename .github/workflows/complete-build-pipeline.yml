@@ -1,0 +1,308 @@
+name: 🚀 Complete Build and Release Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      build_type:
+        description: 'Build type'
+        required: true
+        default: 'test'
+        type: choice
+        options:
+          - test
+          - release
+          - docker-only
+
+# Prevent multiple concurrent builds
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  REGISTRY: docker.io
+  IMAGE_NAME: whisperengine/whisperengine
+  DOCKER_BUILDKIT: 1
+  BUILDX_NO_DEFAULT_ATTESTATIONS: 1
+
+jobs:
+  # ===================================================================
+  # Pre-flight Checks
+  # ===================================================================
+  validation:
+    name: 🔍 Validation & Linting
+    runs-on: ubuntu-latest
+    outputs:
+      should_build: ${{ steps.changes.outputs.should_build }}
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install validation dependencies
+        run: |
+          pip install -r requirements-core.txt
+          pip install ruff black pytest
+
+      - name: Validate environment configuration
+        run: |
+          python -c "from env_manager import load_environment; assert load_environment()"
+          
+      - name: Check code formatting
+        run: |
+          black --check --diff .
+          ruff check .
+
+      - name: Validate requirements consistency
+        run: |
+          python -m pip check
+
+      - name: Determine version
+        id: version
+        run: |
+          if [[ "${{ github.ref }}" =~ ^refs/tags/v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            VERSION="${{ github.ref_name }}"
+          else
+            VERSION="dev-$(git rev-parse --short HEAD)"
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Version: $VERSION"
+
+      - name: Check if build needed
+        id: changes
+        run: |
+          # Always build on tags, main, or workflow_dispatch
+          if [[ "${{ github.ref }}" =~ ^refs/tags/ ]] || [[ "${{ github.ref }}" == "refs/heads/main" ]] || [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "should_build=true" >> $GITHUB_OUTPUT
+          else
+            # For PRs, check if relevant files changed
+            git diff --name-only ${{ github.event.before }}..${{ github.sha }} > changed_files.txt
+            if grep -E "\.(py|yml|yaml|txt|toml|spec)$|Dockerfile|requirements" changed_files.txt; then
+              echo "should_build=true" >> $GITHUB_OUTPUT
+            else
+              echo "should_build=false" >> $GITHUB_OUTPUT
+            fi
+          fi
+
+  # ===================================================================
+  # Docker Builds (Multi-architecture)
+  # ===================================================================
+  docker-build:
+    name: 🐳 Docker Build
+    runs-on: ubuntu-latest
+    needs: validation
+    if: needs.validation.outputs.should_build == 'true'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=${{ needs.validation.outputs.version }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./docker/Dockerfile.multi-stage
+          platforms: linux/amd64,linux/arm64
+          target: production
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            VERSION=${{ needs.validation.outputs.version }}
+            BUILD_DATE=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.created'] }}
+
+  # ===================================================================
+  # Cross-Platform Native Builds
+  # ===================================================================
+  build-matrix:
+    name: 📦 Build ${{ matrix.os }}
+    runs-on: ${{ matrix.runner }}
+    needs: validation
+    if: needs.validation.outputs.should_build == 'true' && (github.ref_type == 'tag' || github.event.inputs.build_type == 'release')
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos
+            runner: macos-latest
+            arch: universal
+            extension: .app
+          - os: windows
+            runner: windows-latest
+            arch: x64
+            extension: .exe
+          - os: linux
+            runner: ubuntu-latest
+            arch: x64
+            extension: ""
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install system dependencies (Ubuntu)
+        if: matrix.os == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential
+
+      - name: Set up virtual environment
+        run: |
+          python -m venv .venv
+          
+      - name: Activate virtual environment and install dependencies
+        shell: bash
+        run: |
+          source .venv/bin/activate || .venv/Scripts/activate
+          pip install --upgrade pip
+          pip install -r requirements-core.txt
+          pip install -r requirements-desktop.txt
+          pip install pyinstaller
+
+      - name: Build executable
+        shell: bash
+        run: |
+          source .venv/bin/activate || .venv/Scripts/activate
+          python build_cross_platform.py build --platform ${{ matrix.os }}
+
+      - name: Package build artifacts
+        shell: bash
+        run: |
+          cd dist
+          if [ "${{ matrix.os }}" = "macos" ]; then
+            tar -czf WhisperEngine-${{ needs.validation.outputs.version }}-macos.tar.gz WhisperEngine.app
+          elif [ "${{ matrix.os }}" = "windows" ]; then
+            7z a WhisperEngine-${{ needs.validation.outputs.version }}-windows.zip WhisperEngine.exe
+          else
+            tar -czf WhisperEngine-${{ needs.validation.outputs.version }}-linux.tar.gz WhisperEngine
+          fi
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: WhisperEngine-${{ matrix.os }}-${{ needs.validation.outputs.version }}
+          path: dist/WhisperEngine-${{ needs.validation.outputs.version }}-*
+          retention-days: 30
+
+  # ===================================================================
+  # Release Creation
+  # ===================================================================
+  release:
+    name: 🚀 Create Release
+    runs-on: ubuntu-latest
+    needs: [validation, docker-build, build-matrix]
+    if: github.ref_type == 'tag' && startsWith(github.ref, 'refs/tags/v')
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ./artifacts
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: WhisperEngine ${{ github.ref_name }}
+          draft: false
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          generate_release_notes: true
+          files: |
+            ./artifacts/*/WhisperEngine-*
+          body: |
+            ## 🎉 WhisperEngine ${{ github.ref_name }}
+            
+            ### 📦 Downloads
+            - **Desktop App (macOS)**: WhisperEngine-${{ github.ref_name }}-macos.tar.gz
+            - **Desktop App (Windows)**: WhisperEngine-${{ github.ref_name }}-windows.zip  
+            - **Desktop App (Linux)**: WhisperEngine-${{ github.ref_name }}-linux.tar.gz
+            - **Docker Image**: `docker pull whisperengine/whisperengine:${{ github.ref_name }}`
+            
+            ### 🚀 Quick Start
+            ```bash
+            # Docker (Recommended)
+            docker run -d --name whisperengine whisperengine/whisperengine:${{ github.ref_name }}
+            
+            # Native Installation
+            ./setup.sh
+            ```
+            
+            ### 📋 What's Changed
+            See the release notes below for detailed changes.
+
+  # ===================================================================
+  # Post-Build Validation  
+  # ===================================================================
+  validate-builds:
+    name: ✅ Validate Builds
+    runs-on: ubuntu-latest
+    needs: [docker-build]
+    if: always() && needs.validation.outputs.should_build == 'true'
+    
+    steps:
+      - name: Test Docker image
+        if: needs.docker-build.result == 'success'
+        run: |
+          docker run --rm \
+            -e DISCORD_BOT_TOKEN=test_token \
+            -e DEBUG_MODE=true \
+            --entrypoint python \
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.validation.outputs.version }} \
+            -c "import src.main; print('✅ Import test passed')"
+
+      - name: Report status
+        run: |
+          echo "## 📊 Build Results" >> $GITHUB_STEP_SUMMARY
+          echo "| Component | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Docker Build | ${{ needs.docker-build.result == 'success' && '✅ Success' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ github.ref_type }}" = "tag" ]; then
+            echo "| Native Builds | ${{ needs.build-matrix.result == 'success' && '✅ Success' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+          fi

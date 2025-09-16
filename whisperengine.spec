@@ -14,9 +14,11 @@ ui_path = src_path / "ui"
 
 block_cipher = None
 
-# Collect data files (including bundled models for offline use)
+# Collect data files (configuration and system prompts)
 data_files = [
-    ('models', 'models'),  # Bundle all downloaded models
+    ('config', 'config'),
+    ('prompts', 'prompts'),
+    ('system_prompt.md', '.'),
 ]
 
 # Hidden imports (modules not automatically detected)

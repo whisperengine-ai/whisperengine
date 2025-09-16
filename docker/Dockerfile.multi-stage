@@ -30,7 +30,7 @@ COPY requirements-dev.txt* ./
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip install -r requirements-core.txt && \
     pip install -r requirements-platform.txt && \
-    pip install -r discord-bot/requirements-discord.txt && \
+    pip install -r requirements-discord.txt && \
     if [ -f requirements-dev.txt ]; then pip install -r requirements-dev.txt; fi && \
     python -m spacy download en_core_web_sm
 
@@ -52,14 +52,13 @@ CMD ["sh", "-c", "python validate_config.py && python run.py"]
 FROM base as production
 
 # Copy dependency files for better layer caching
-COPY requirements-core.txt requirements-platform.txt ./
-COPY discord-bot/requirements-discord.txt ./discord-bot/
+COPY requirements-core.txt requirements-platform.txt requirements-discord.txt ./
 
 # Install Python dependencies with cache mount for faster builds
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip install --no-cache-dir -r requirements-core.txt && \
     pip install --no-cache-dir -r requirements-platform.txt && \
-    pip install --no-cache-dir -r discord-bot/requirements-discord.txt && \
+    pip install --no-cache-dir -r requirements-discord.txt && \
     python -m spacy download en_core_web_sm
 
 # Copy only necessary application files

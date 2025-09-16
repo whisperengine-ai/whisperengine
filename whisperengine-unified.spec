@@ -20,11 +20,11 @@ is_linux = sys.platform.startswith('linux')
 
 block_cipher = None
 
-# Collect data files (including bundled models for offline use)
+# Collect data files (configuration and system prompts)
 data_files = [
-    ('models', 'models'),  # Bundle all downloaded models (~8GB with Phi-3-Mini)
+    ('config', 'config'),
+    ('prompts', 'prompts'),
     ('system_prompt.md', '.'),
-    # UI files would go here if using web UI - currently using Qt native UI
 ]
 
 # Hidden imports - comprehensive list for all platforms

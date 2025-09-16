@@ -3,7 +3,9 @@ services:
     build: .
     working_dir: /app
     environment:
-      - DOTENV_PATH=/app/.env.discord
+      - ENV_MODE=discord
+    env_file:
+      - .env
     volumes:
       - .:/app
       - /app/.venv  # Exclude virtual environment
