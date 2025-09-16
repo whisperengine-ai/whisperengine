@@ -15,9 +15,6 @@ sys.path.insert(0, str(Path(__file__).parent / "src"))
 async def demo_settings_features():
     """Demonstrate the new settings features"""
 
-
-
-
     from src.config.desktop_settings import DesktopSettingsManager
 
     manager = DesktopSettingsManager()
@@ -42,7 +39,6 @@ Be helpful, accurate, and provide practical examples."""
     # Set as active
     manager.set_active_prompt("custom", "developer_assistant")
 
-
     # Demonstrate LLM configuration
 
     # Example OpenAI setup
@@ -61,7 +57,6 @@ Be helpful, accurate, and provide practical examples."""
 
     manager.get_llm_config()
 
-
     # Demonstrate Discord setup
 
     # Example Discord token (fake)
@@ -70,16 +65,10 @@ Be helpful, accurate, and provide practical examples."""
     discord_config = manager.get_discord_config()
     len(discord_config["bot_token"])
 
-
     # Show settings file location
 
     # Demonstrate export
     manager.export_settings()
-
-
-
-
-
 
 
 if __name__ == "__main__":

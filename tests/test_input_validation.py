@@ -14,7 +14,6 @@ from input_validator import is_safe_admin_command, validate_user_input
 def test_input_validation():
     """Test the input validation system with various attack vectors."""
 
-
     # Test cases with expected results
     test_cases = [
         # Safe inputs
@@ -61,26 +60,21 @@ def test_input_validation():
         result = validate_user_input(test_input, "test_user_123", "test_channel")
         actual_safe = result["is_safe"]
 
-
         if actual_safe == expected_safe:
             passed += 1
         else:
             failed += 1
-
 
         if not actual_safe:
             pass
         if result["warnings"]:
             pass
 
-
-
     return failed == 0
 
 
 def test_admin_command_validation():
     """Test admin command specific validation."""
-
 
     admin_test_cases = [
         # Safe admin commands
@@ -104,20 +98,16 @@ def test_admin_command_validation():
     for test_command, expected_safe, _description in admin_test_cases:
         actual_safe = is_safe_admin_command(test_command, "admin_user_456")
 
-
         if actual_safe == expected_safe:
             passed += 1
         else:
             failed += 1
-
-
 
     return failed == 0
 
 
 def test_sanitization():
     """Test the sanitization functionality."""
-
 
     sanitization_cases = [
         # Whitespace normalization
@@ -149,13 +139,10 @@ def test_sanitization():
         else:
             matches = actual_output == expected_output
 
-
         if matches:
             passed += 1
         else:
             failed += 1
-
-
 
     return failed == 0
 
@@ -166,7 +153,6 @@ if __name__ == "__main__":
     test1_passed = test_input_validation()
     test2_passed = test_admin_command_validation()
     test3_passed = test_sanitization()
-
 
     if test1_passed and test2_passed and test3_passed:
         exit(0)

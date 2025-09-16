@@ -16,7 +16,6 @@ from basic_discord_bot import generate_conversation_summary
 def test_real_conversation_scenario():
     """Test with a realistic multi-turn conversation"""
 
-
     # Simulate a conversation about AI and programming
     messages = []
 
@@ -57,7 +56,6 @@ def test_real_conversation_scenario():
     # Generate summary
     summary = generate_conversation_summary(messages, "123456789")
 
-
     # Verify the summary captures key elements
     assert len(summary) > 0, "Summary should not be empty"
     assert (
@@ -74,7 +72,6 @@ def test_real_conversation_scenario():
 
 def test_mixed_users_scenario():
     """Test that summary properly filters for specific user in multi-user channel"""
-
 
     messages = []
 
@@ -113,7 +110,6 @@ def test_mixed_users_scenario():
     # Generate summary for User A only
     summary_a = generate_conversation_summary(messages, "111111111")
 
-
     # Should only contain User A's content
     assert "Python" in summary_a, "Should contain User A's Python content"
     assert (
@@ -128,7 +124,6 @@ def test_mixed_users_scenario():
 
 def test_command_filtering_scenario():
     """Test that commands and their responses are properly filtered"""
-
 
     messages = []
 
@@ -169,7 +164,6 @@ def test_command_filtering_scenario():
     # Generate summary
     summary = generate_conversation_summary(messages, "444444444")
 
-
     # Should contain real content but not commands
     assert "quantum computing" in summary.lower(), "Should contain real conversation content"
     assert "help" not in summary.lower(), "Should not contain command content"
@@ -190,10 +184,6 @@ if __name__ == "__main__":
 
         # Test command filtering
         command_summary = test_command_filtering_scenario()
-
-
-
-
 
     except Exception:
         import traceback

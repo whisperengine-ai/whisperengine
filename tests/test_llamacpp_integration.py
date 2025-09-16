@@ -74,7 +74,6 @@ def test_llamacpp_without_model():
         is_connected = client.check_connection()
         assert not is_connected, "Connection check should return False when no model is loaded"
 
-
     finally:
         # Restore moved models
         for original_path, temp_path in moved_models:
@@ -117,7 +116,6 @@ def test_llamacpp_chat_completion_error():
     ), f"Error message should mention model not loaded, got: {choice['message']['content']}"
 
 
-
 def show_environment_config():
     """Show the environment variables used for llamacpp configuration"""
 
@@ -132,7 +130,6 @@ if __name__ == "__main__":
         test_llamacpp_detection()
         test_llamacpp_without_model()
         test_llamacpp_chat_completion_error()
-
 
         show_environment_config()
         show_usage_instructions()

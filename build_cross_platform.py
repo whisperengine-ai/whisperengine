@@ -244,7 +244,6 @@ app = BUNDLE(
         if is_cross_compile:
             pass
 
-
         try:
             # Generate spec file
             spec_file = self.generate_spec_file(target_platform)
@@ -327,7 +326,6 @@ app = BUNDLE(
         """Build for all supported platforms (if possible)"""
         results = {}
 
-
         for platform_key in self.platforms:
             if platform_key == self.current_platform:
                 results[platform_key] = self.build_platform(platform_key, clean)
@@ -351,7 +349,6 @@ app = BUNDLE(
             spec_path = self.project_root / platform_config["spec_file"]
             if spec_path.exists():
                 spec_path.unlink()
-
 
     def get_build_info(self) -> dict:
         """Get build environment information"""
@@ -384,7 +381,6 @@ def main():
     args = parser.parse_args()
 
     builder = CrossPlatformBuilder()
-
 
     if args.command == "info":
         info = builder.get_build_info()

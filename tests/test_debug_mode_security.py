@@ -23,7 +23,6 @@ from debug_mode_security import (
 def test_sensitive_data_sanitization():
     """Test that sensitive data is properly sanitized"""
 
-
     debug_logger = SecureDebugLogger(enable_debug_mode=True)
 
     # Test various sensitive data patterns
@@ -43,10 +42,8 @@ def test_sensitive_data_sanitization():
         ), f"Failed to sanitize: {original} -> {sanitized}, expected: {expected}"
 
 
-
 def test_user_id_hashing():
     """Test that user IDs are consistently hashed"""
-
 
     debug_logger = SecureDebugLogger(enable_debug_mode=True)
 
@@ -60,7 +57,6 @@ def test_user_id_hashing():
     assert len(hash1) == 13, f"Hash should be 13 chars (user_ + 8), got: {len(hash1)}"
     assert user_id not in hash1, "Original user ID should not appear in hash"
 
-
     # Test different user IDs produce different hashes
     user_id2 = "987654321"
     hash2 = debug_logger.hash_user_id(user_id2)
@@ -68,10 +64,8 @@ def test_user_id_hashing():
     assert hash1 != hash2, "Different user IDs should produce different hashes"
 
 
-
 def test_username_sanitization():
     """Test username sanitization"""
-
 
     debug_logger = SecureDebugLogger(enable_debug_mode=True)
 
@@ -96,10 +90,8 @@ def test_username_sanitization():
         ), f"Username sanitization failed: {original} -> {sanitized}, expected: {expected}"
 
 
-
 def test_production_mode_security():
     """Test that production mode (debug disabled) hides sensitive information"""
-
 
     # Test with debug mode disabled
     debug_logger = SecureDebugLogger(enable_debug_mode=False)
@@ -110,7 +102,6 @@ def test_production_mode_security():
     assert (
         sanitized == "[username_hidden]"
     ), f"Production mode should hide usernames, got: {sanitized}"
-
 
     # Test logging in production mode
     # Capture log output
@@ -132,15 +123,12 @@ def test_production_mode_security():
     assert "123456789" not in log_output, "User ID should not appear in production logs"
     assert "TestUser" not in log_output, "Real names should not appear in production logs"
 
-
     # Clean up
     logger.removeHandler(handler)
 
 
-
 def test_debug_function_integration():
     """Test integration with the actual bot debug functions"""
-
 
     # Mock memory manager with emotion profile
     mock_memory_manager = Mock()
@@ -186,10 +174,8 @@ def test_debug_function_integration():
     ), "Duplicate processing should still return clean response"
 
 
-
 def test_log_level_security():
     """Test that sensitive information doesn't leak through different log levels"""
-
 
     # Capture all log output
     log_capture = io.StringIO()
@@ -239,15 +225,12 @@ def test_log_level_security():
     # Hashed user ID should appear (for debugging)
     assert "user_" in all_output, "Hashed user ID should be present for debugging"
 
-
     # Clean up
     logger.removeHandler(handler)
 
 
-
 def test_edge_cases():
     """Test edge cases and error conditions"""
-
 
     debug_logger = SecureDebugLogger(enable_debug_mode=True)
 
@@ -269,14 +252,12 @@ def test_edge_cases():
     long_hash = debug_logger.hash_user_id(very_long_id)
     assert len(long_hash) == 13, "Very long user ID should still produce standard hash length"
 
-
     # Test error conditions
     try:
         # Test with invalid data types (should handle gracefully)
         debug_logger.log_user_debug_info("test_user", {"invalid": object()})
     except Exception:
         pass
-
 
 
 if __name__ == "__main__":
@@ -293,11 +274,6 @@ if __name__ == "__main__":
         test_debug_function_integration()
         test_log_level_security()
         test_edge_cases()
-
-
-
-
-
 
     except Exception:
         import traceback

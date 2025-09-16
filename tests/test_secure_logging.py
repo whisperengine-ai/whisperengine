@@ -71,7 +71,6 @@ class TestSecureLogging(unittest.TestCase):
 
         # None case is handled by the method parameter default
 
-
     def test_pii_sanitization(self):
         """Test that PII is properly detected and sanitized"""
 
@@ -124,7 +123,6 @@ class TestSecureLogging(unittest.TestCase):
         self.assertTrue(len(sanitized) < len(long_message))
         self.assertIn("TRUNCATED", sanitized)
 
-
     def test_discord_context_classification(self):
         """Test proper classification of Discord channel contexts"""
 
@@ -135,7 +133,6 @@ class TestSecureLogging(unittest.TestCase):
         # Test guild channel classification
         guild_context = self.logger._classify_discord_context(self.mock_guild_message)
         self.assertEqual(guild_context, "guild_text")
-
 
     def test_data_sensitivity_levels(self):
         """Test different data sensitivity levels"""
@@ -159,7 +156,6 @@ class TestSecureLogging(unittest.TestCase):
         self.assertTrue(
             "DETECTED" in confidential_sanitized or "REDACTED" in confidential_sanitized
         )
-
 
     @patch("secure_logging.logging.getLogger")
     def test_user_action_logging(self, mock_get_logger):
@@ -192,7 +188,6 @@ class TestSecureLogging(unittest.TestCase):
         self.assertIn("REDACTED", logged_message)  # Sensitive data redacted
         self.assertIn("dm", logged_message)  # Context classified
         self.assertIn("SANITIZED", logged_message)  # Sanitization flag
-
 
     @patch("secure_logging.logging.getLogger")
     def test_security_event_logging(self, mock_get_logger):
@@ -228,7 +223,6 @@ class TestSecureLogging(unittest.TestCase):
         self.assertIn("user_", logged_message)  # User hash
         self.assertIn("threat_level_high", logged_message)  # Threat level context
 
-
     def test_message_processing_logging(self):
         """Test message processing event logging"""
 
@@ -253,7 +247,6 @@ class TestSecureLogging(unittest.TestCase):
             self.assertIn("success", logged_message)
             self.assertIn("user_", logged_message)  # User hash
             self.assertIn("dm", logged_message)  # Channel context
-
 
     def test_api_interaction_logging(self):
         """Test API interaction logging with error sanitization"""
@@ -284,7 +277,6 @@ class TestSecureLogging(unittest.TestCase):
             self.assertIn("REDACTED", logged_message)  # API key should be redacted
             self.assertNotIn("sk-1234567890abcdef", logged_message)  # Actual key should not appear
 
-
     def test_database_operation_logging(self):
         """Test database operation logging"""
 
@@ -314,7 +306,6 @@ class TestSecureLogging(unittest.TestCase):
             self.assertIn("Records: 5", logged_message)
             self.assertIn("user_", logged_message)  # User hash
 
-
     def test_global_logger_instances(self):
         """Test that global logger instances are properly configured"""
 
@@ -330,7 +321,6 @@ class TestSecureLogging(unittest.TestCase):
         component_logger = get_secure_logger("test_component")
         self.assertIsInstance(component_logger, SecureLogger)
         self.assertEqual(component_logger.name, "discord_bot.test_component")
-
 
     def test_log_entry_structure(self):
         """Test log entry structure and formatting"""
@@ -360,7 +350,6 @@ class TestSecureLogging(unittest.TestCase):
         self.assertIn("Test message", formatted)
         self.assertIn("[SANITIZED]", formatted)
 
-
     def test_confidential_data_handling(self):
         """Test that confidential data is completely removed"""
 
@@ -375,9 +364,7 @@ class TestSecureLogging(unittest.TestCase):
         self.assertIn("DETECTED", sanitized)
 
 
-
 if __name__ == "__main__":
 
     # Run the tests
     unittest.main(verbosity=0, exit=False)
-

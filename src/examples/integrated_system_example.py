@@ -263,9 +263,7 @@ class EnhancedBot:
 
         # Check memory manager
         try:
-            self.memory_manager.retrieve_relevant_memories(
-                "health_check", "test", limit=1
-            )
+            self.memory_manager.retrieve_relevant_memories("health_check", "test", limit=1)
             health["components"]["memory_manager"] = {"status": "healthy"}
         except Exception as e:
             health["components"]["memory_manager"] = {"status": "error", "error": str(e)}
@@ -281,7 +279,6 @@ class EnhancedBot:
 # Example usage
 async def example_conversation():
     """Example of using the enhanced bot"""
-
 
     # Initialize bot
     bot = EnhancedBot()
@@ -302,12 +299,10 @@ async def example_conversation():
         ("How do you remember all this stuff about me?", "Meta question about memory"),
     ]
 
-
     for i, (message, _description) in enumerate(conversations, 1):
 
         # Process message through integrated system
         await bot.process_message(user_id, message, "Sarah")
-
 
         # Show relationship progression
         if i % 2 == 0:  # Every other message

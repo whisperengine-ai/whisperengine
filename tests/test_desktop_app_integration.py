@@ -41,10 +41,8 @@ async def test_desktop_app_initialization():
         # Setup logging like the app does
         app.setup_logging()
 
-
         # Initialize components (this will include LLM auto-detection)
         await app.initialize_components()
-
 
         # Clean up
         if hasattr(app, "web_ui") and app.web_ui:

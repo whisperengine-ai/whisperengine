@@ -531,6 +531,5 @@ async def test_topic_extraction():
         await extractor.extract_topics_enhanced(message)
 
 
-
 if __name__ == "__main__":
     asyncio.run(test_topic_extraction())

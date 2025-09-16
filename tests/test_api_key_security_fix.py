@@ -14,7 +14,6 @@ from api_key_security import APIKeyType, get_api_key_manager
 def test_api_key_validation():
     """Test API key validation functionality"""
 
-
     manager = get_api_key_manager()
 
     # Test Case 1: Valid API key formats
@@ -63,13 +62,11 @@ def test_api_key_validation():
         if not is_sanitized:
             all_sanitized = False
 
-
     return all_sanitized
 
 
 def test_secure_header_creation():
     """Test secure header creation"""
-
 
     manager = get_api_key_manager()
 
@@ -107,7 +104,6 @@ def test_secure_header_creation():
 def test_environment_validation():
     """Test environment variable validation"""
 
-
     manager = get_api_key_manager()
 
     # Get current environment validation
@@ -123,7 +119,6 @@ def test_environment_validation():
 
 def test_client_integration():
     """Test integration with LMStudioClient and ElevenLabsClient"""
-
 
     try:
         # Test LMStudioClient integration
@@ -156,7 +151,6 @@ def test_client_integration():
 
 def test_security_report():
     """Test security report generation"""
-
 
     manager = get_api_key_manager()
     report = manager.get_security_report()
@@ -209,7 +203,6 @@ def run_comprehensive_test():
         pass
     else:
         pass
-
 
     return all(test_results)
 

@@ -33,7 +33,6 @@ def test_personality_fact_integration():
             enable_emotions=False,
         )
 
-
         # Test 2: Personality fact storage
 
         test_user_id = "test_user_123"
@@ -46,15 +45,11 @@ def test_personality_fact_integration():
             "is_dm": True,
         }
 
-        memory_manager.store_personality_fact(
-            test_user_id, test_fact, context_metadata
-        )
-
+        memory_manager.store_personality_fact(test_user_id, test_fact, context_metadata)
 
         # Test 3: Fact retrieval
 
         retrieved_facts = memory_manager.retrieve_personality_facts(user_id=test_user_id, limit=10)
-
 
         if retrieved_facts:
             retrieved_facts[0]
@@ -73,10 +68,8 @@ def test_personality_fact_integration():
             metadata={"is_dm": True},
         )
 
-
         # Check if facts were auto-extracted
         new_facts = memory_manager.retrieve_personality_facts(user_id=test_user_id, limit=20)
-
 
         # Show any new facts that were extracted
         for _fact in new_facts[1:]:  # Skip the first one we manually added

@@ -697,7 +697,6 @@ if __name__ == "__main__":
             emotional_context=EmotionalContext(EmotionalState.JOY),
         )
 
-
         # Test moment generation
         context = ConversationContext(
             user_id=user_id,
@@ -727,7 +726,6 @@ if __name__ == "__main__":
 
         # Test summary
         await system.get_user_memory_summary(user_id)
-
 
     # Run the test
     asyncio.run(main())

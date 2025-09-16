@@ -158,4 +158,3 @@ if __name__ == "__main__":
         test_dock_badge()
         demo_badge_lifecycle()
         show_capabilities()
-

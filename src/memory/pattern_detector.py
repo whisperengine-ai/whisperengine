@@ -305,14 +305,10 @@ class CrossReferencePatternDetector:
 
         temporal_span = {
             "start_date": (
-                min(all_timestamps).isoformat()
-                if all_timestamps
-                else datetime.now(UTC).isoformat()
+                min(all_timestamps).isoformat() if all_timestamps else datetime.now(UTC).isoformat()
             ),
             "end_date": (
-                max(all_timestamps).isoformat()
-                if all_timestamps
-                else datetime.now(UTC).isoformat()
+                max(all_timestamps).isoformat() if all_timestamps else datetime.now(UTC).isoformat()
             ),
         }
 
@@ -504,20 +500,14 @@ class CrossReferencePatternDetector:
                 related_memories.append(memory_id)
 
         # Calculate temporal span
-        timestamps = [
-            interaction.get("timestamp", datetime.now(UTC)) for interaction in sequence
-        ]
+        timestamps = [interaction.get("timestamp", datetime.now(UTC)) for interaction in sequence]
 
         temporal_span = {
             "start_date": (
-                min(timestamps).isoformat()
-                if timestamps
-                else datetime.now(UTC).isoformat()
+                min(timestamps).isoformat() if timestamps else datetime.now(UTC).isoformat()
             ),
             "end_date": (
-                max(timestamps).isoformat()
-                if timestamps
-                else datetime.now(UTC).isoformat()
+                max(timestamps).isoformat() if timestamps else datetime.now(UTC).isoformat()
             ),
         }
 
@@ -774,9 +764,7 @@ class CrossReferencePatternDetector:
             return []
 
         # Sort memories by timestamp
-        sorted_memories = sorted(
-            memories, key=lambda m: m.get("timestamp", datetime.now(UTC))
-        )
+        sorted_memories = sorted(memories, key=lambda m: m.get("timestamp", datetime.now(UTC)))
 
         # Split into time periods
         early_memories = sorted_memories[: len(sorted_memories) // 2]

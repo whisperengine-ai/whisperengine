@@ -69,14 +69,12 @@ async def test_embedding_manager():
         embeddings = await embedding_manager.get_embeddings(test_texts)
         time.time()
 
-
         # Show first few values of first embedding
         if embeddings and embeddings[0]:
             embeddings[0][:5]  # First 5 values
 
     except Exception:
         pass
-
 
 
 async def test_chromadb_integration():
@@ -94,13 +92,11 @@ async def test_chromadb_integration():
     else:
         pass
 
-
     # Test with actual ChromaDB (if available)
     try:
         import chromadb
         from chromadb.config import Settings
         from chromadb.utils import embedding_functions
-
 
         # Create temporary ChromaDB instance
         settings = Settings(anonymized_telemetry=False)
@@ -175,7 +171,6 @@ async def test_chromadb_integration():
         pass
 
 
-
 def test_sync_wrappers():
     """Test the sync wrapper functions"""
 
@@ -191,7 +186,6 @@ def test_sync_wrappers():
         pass
 
 
-
 async def main():
     """Run all tests"""
 
@@ -204,7 +198,6 @@ async def main():
     # Test sync wrappers
     test_sync_wrappers()
 
-
     # Provide usage recommendations
     use_external = os.getenv("USE_EXTERNAL_EMBEDDINGS", "false").lower() == "true"
 
@@ -212,7 +205,6 @@ async def main():
         pass
     else:
         pass
-
 
 
 if __name__ == "__main__":

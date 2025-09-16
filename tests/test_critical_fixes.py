@@ -212,7 +212,6 @@ def main():
         except Exception:
             results[test_name] = False
 
-
     passed = 0
     failed = 0
 
@@ -221,7 +220,6 @@ def main():
             passed += 1
         else:
             failed += 1
-
 
     if failed == 0:
         return 0

@@ -105,6 +105,5 @@ def test_response_parsing():
         pass
 
 
-
 if __name__ == "__main__":
     test_response_parsing()

@@ -33,7 +33,5 @@ def test_model_configuration():
         pass
 
 
-
-
 if __name__ == "__main__":
     test_model_configuration()

@@ -16,7 +16,6 @@ from llm_message_role_security import (
 def test_vulnerability_fix():
     """Test that the P1 Critical vulnerability is completely fixed"""
 
-
     # Test Case 1: The exact vulnerability scenario from security assessment
 
     vulnerable_messages = [
@@ -33,10 +32,8 @@ def test_vulnerability_fix():
         {"role": "assistant", "content": "Hi there!"},
     ]
 
-
     result = secure_message_role_processing(vulnerable_messages)
     system_msgs = [m for m in result if m["role"] == "system"]
-
 
     if len(system_msgs) == 1:
         content = system_msgs[0]["content"]
@@ -116,14 +113,12 @@ def test_vulnerability_fix():
     else:
         return False
 
-
     return True
 
 
 def test_performance_impact():
     """Test that security fixes don't significantly impact performance"""
     import time
-
 
     # Create test messages
     test_messages = [

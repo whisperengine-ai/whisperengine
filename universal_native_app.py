@@ -2116,7 +2116,6 @@ def main():
     ):
         pass
 
-
     # Check PySide6 availability
     if not PYSIDE6_AVAILABLE:
         return 1
@@ -2145,7 +2144,6 @@ def main():
     # Create and show main window
     window = WhisperEngineUniversalApp()
     window.show()
-
 
     # Run application
     return app.exec()

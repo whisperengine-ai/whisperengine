@@ -13,7 +13,6 @@ from pathlib import Path
 def run_model_download():
     """Run the model download script as part of build process"""
 
-
     # Ensure we're in the right directory
     if not Path("download_models.py").exists():
         sys.exit(1)
@@ -36,7 +35,6 @@ def run_model_download():
 
         if result.returncode != 0:
             sys.exit(1)
-
 
         # Now run the actual build
         build_command = sys.argv[1:] if len(sys.argv) > 1 else ["pyinstaller", "whisperengine.spec"]

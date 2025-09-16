@@ -66,7 +66,6 @@ class UserNameUpdater:
                     # TODO: Parse and extract user ID and name mappings
                     # This would require more complex parsing
 
-
         except Exception:
             return False
 
@@ -76,7 +75,6 @@ class UserNameUpdater:
 
         if not unnamed_users:
             return
-
 
         for user in unnamed_users:
             user_id = user["user_id"]

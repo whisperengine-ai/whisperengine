@@ -527,7 +527,6 @@ if __name__ == "__main__":
         ("", APIKeyType.UNKNOWN),
     ]
 
-
     for key, key_type in test_keys:
         result = manager.validate_api_key(key, key_type)
 

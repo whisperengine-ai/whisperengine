@@ -65,6 +65,5 @@ def generate_app_logs():
     loggers["main"].info("WhisperEngine session simulation completed")
 
 
-
 if __name__ == "__main__":
     generate_app_logs()

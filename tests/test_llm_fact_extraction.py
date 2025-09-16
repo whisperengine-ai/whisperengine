@@ -32,7 +32,6 @@ def test_llm_fact_extraction():
         "Just had a great day at the beach!",  # Should extract no facts
     ]
 
-
     # Initialize LLM client
     try:
         llm_client = LMStudioClient()
@@ -40,7 +39,6 @@ def test_llm_fact_extraction():
         # Check if LM Studio is running
         if not llm_client.check_connection():
             return False
-
 
         # Initialize fact extractor with LLM client
         fact_extractor = GlobalFactExtractor(llm_client=llm_client)
@@ -62,7 +60,6 @@ def test_llm_fact_extraction():
 
             except Exception as e:
                 logger.error(f"Fact extraction error: {e}", exc_info=True)
-
 
         return True
 

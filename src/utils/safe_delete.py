@@ -89,7 +89,6 @@ class SafeUserDeletion:
         preview["user_data"]
         preview["emotion_count"]
 
-
         # Confirmation
         confirm = input(
             f"\n⚠️  Delete ALL data for user {user_id}? (type 'DELETE {user_id}' to confirm): "
@@ -120,7 +119,6 @@ class SafeUserDeletion:
 
         if preview["count"] == 0:
             return True
-
 
         if preview["sample_records"]:
             for _record in preview["sample_records"][:5]:
@@ -166,7 +164,6 @@ class SafeUserDeletion:
         preview["emotion_count"]
 
         reset_type = "complete" if full_reset else "partial (keep basic info)"
-
 
         if full_reset:
             pass

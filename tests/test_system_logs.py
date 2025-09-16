@@ -16,7 +16,6 @@ def test_logging():
 
     logger = logging.getLogger("TestLogger")
 
-
     # Generate various log levels
     logger.debug("This is a DEBUG message - used for detailed diagnostic info")
     logger.info("This is an INFO message - general application flow")
@@ -42,7 +41,6 @@ def test_logging():
 
     thread_logger = logging.getLogger("ThreadTest")
     thread_logger.info(f"Running on thread: {threading.current_thread().name}")
-
 
 
 if __name__ == "__main__":

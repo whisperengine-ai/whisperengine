@@ -222,7 +222,6 @@ class EnhancedBotFixed:
 async def example_conversation_fixed():
     """Example of using the enhanced bot without ChromaDB conflicts"""
 
-
     # Initialize bot (avoids ChromaDB memory manager)
     bot = EnhancedBotFixed()
 
@@ -242,12 +241,10 @@ async def example_conversation_fixed():
         ("How do you remember my emotional patterns?", "Meta question about memory"),
     ]
 
-
     for _i, (message, _description) in enumerate(conversations, 1):
 
         # Process message through integrated system
         result = await bot.process_message(user_id, message, "Sarah")
-
 
         # Show escalation tracking
         if result["user_profile"]["escalation_count"] > 0:
@@ -276,7 +273,6 @@ async def example_conversation_fixed():
 async def demonstrate_emotion_system_only():
     """Demonstrate just the enhanced emotion system without ChromaDB conflicts"""
 
-
     # Initialize just the emotion manager
     emotion_manager = GraphIntegratedEmotionManager()
 
@@ -289,7 +285,6 @@ async def demonstrate_emotion_system_only():
         "You really help me feel better",
     ]
 
-
     for _i, message in enumerate(messages, 1):
 
         # Process through emotion system
@@ -297,16 +292,13 @@ async def demonstrate_emotion_system_only():
             user_id, message, "John"
         )
 
-
         if profile.trust_indicators:
             pass
-
 
 
 if __name__ == "__main__":
     # Configure logging
     logging.basicConfig(level=logging.INFO, format="%(levelname)s - %(message)s")
-
 
     # Run the fixed examples
     asyncio.run(example_conversation_fixed())

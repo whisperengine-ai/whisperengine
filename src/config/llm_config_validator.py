@@ -155,7 +155,6 @@ class LLMConfigValidator:
         """Print a detailed configuration report"""
         config = self.validate_configuration()
 
-
         # Status
 
         # Configuration details
@@ -168,7 +167,6 @@ class LLMConfigValidator:
             pass
         else:
             pass
-
 
         # Issues
         if config.issues:

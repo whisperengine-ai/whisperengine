@@ -289,12 +289,10 @@ async def test_local_embeddings():
     await manager.get_embeddings(batch_texts)
     time.time() - start_time
 
-
     # Test caching
     start_time = time.time()
     await manager.get_embeddings(batch_texts)  # Should be cached
     time.time() - start_time
-
 
     # Show stats
     stats = manager.get_performance_stats()

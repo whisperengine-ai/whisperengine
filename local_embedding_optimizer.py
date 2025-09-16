@@ -170,7 +170,6 @@ FAISS_USE_GPU=false
 if __name__ == "__main__":
     optimizer = LocalEmbeddingOptimizer()
 
-
     # Show all available configurations
     for use_case in ["fast", "balanced", "quality"]:
         config = optimizer.get_optimal_config(use_case)

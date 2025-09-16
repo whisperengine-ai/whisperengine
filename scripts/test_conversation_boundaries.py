@@ -22,7 +22,6 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 def test_conversation_boundary_system():
     """Test the conversation boundary management system"""
 
-
     try:
         from src.conversation.boundary_manager import (
             ConversationBoundaryManager,
@@ -31,7 +30,6 @@ def test_conversation_boundary_system():
             ConversationTopic,
             TopicTransitionType,
         )
-
 
         # Test 1: Initialize boundary manager
         boundary_manager = ConversationBoundaryManager(
@@ -54,7 +52,6 @@ def test_conversation_boundary_system():
             last_activity=datetime.now(),
         )
 
-
         # Test 3: Test topic management
         topic1 = ConversationTopic(
             topic_id="topic_1",
@@ -66,7 +63,6 @@ def test_conversation_boundary_system():
 
         session1.current_topic = topic1
         session1.topic_history.append(topic1)
-
 
         # Test 4: Test conversation states
 
@@ -99,12 +95,10 @@ def test_conversation_boundary_system():
 async def test_async_boundary_management():
     """Test async boundary management functionality"""
 
-
     try:
         from src.conversation.boundary_manager import ConversationBoundaryManager
 
         boundary_manager = ConversationBoundaryManager()
-
 
         # Simulate a conversation sequence
         user_id = "async_test_user"
@@ -118,7 +112,6 @@ async def test_async_boundary_management():
             message_content="Hello, I need help with Python programming",
         )
 
-
         # Message 2: Continue topic
         await asyncio.sleep(0.1)  # Small delay
         await boundary_manager.process_message(
@@ -127,7 +120,6 @@ async def test_async_boundary_management():
             message_id="msg_2",
             message_content="Specifically, I'm having trouble with for loops",
         )
-
 
         # Message 3: Topic transition
         await asyncio.sleep(0.1)
@@ -138,13 +130,10 @@ async def test_async_boundary_management():
             message_content="Actually, let me ask about something different - databases",
         )
 
-
         # Test conversation context retrieval
         await boundary_manager.get_conversation_context(
             user_id=user_id, channel_id=channel_id, limit=15
         )
-
-
 
         return True
 
@@ -157,7 +146,6 @@ async def test_async_boundary_management():
 
 def test_enhanced_context_manager():
     """Test the enhanced conversation context manager"""
-
 
     try:
         from src.conversation.boundary_manager import ConversationBoundaryManager
@@ -181,18 +169,14 @@ def test_enhanced_context_manager():
             enable_boundary_management=True,
         )
 
-
         # Test without boundary management
         context_manager_disabled = EnhancedConversationContextManager(
             conversation_cache=mock_cache, enable_boundary_management=False
         )
 
-
         # Test statistics
         context_manager_enabled.get_manager_statistics()
         context_manager_disabled.get_manager_statistics()
-
-
 
         return True
 
@@ -205,7 +189,6 @@ def test_enhanced_context_manager():
 
 def demonstrate_conversation_scenarios():
     """Demonstrate different conversation management scenarios"""
-
 
     scenarios = [
         {
@@ -255,18 +238,12 @@ def demonstrate_conversation_scenarios():
             pass
 
 
-
 def demonstrate_integration_benefits():
     """Demonstrate benefits of integrating with existing system"""
 
 
-
-
-
-
 async def main():
     """Main test function"""
-
 
     # Run basic tests
     sync_success = test_conversation_boundary_system()
@@ -283,9 +260,6 @@ async def main():
                 # Demonstrate capabilities
                 demonstrate_conversation_scenarios()
                 demonstrate_integration_benefits()
-
-
-
 
                 return True
 

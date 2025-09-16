@@ -39,7 +39,6 @@ class CompleteIntegratedBot:
     def __init__(self):
         """Initialize bot with full system integration"""
 
-
         # Initialize LLM client (like main.py does)
         try:
             base_llm_client = LLMClient()
@@ -68,7 +67,6 @@ class CompleteIntegratedBot:
             )
         except Exception:
             raise
-
 
     async def process_message(
         self, user_id: str, message: str, display_name: str | None = None
@@ -272,9 +270,7 @@ class CompleteIntegratedBot:
         # Check memory manager
         try:
             # Test memory system
-            self.memory_manager.retrieve_relevant_memories(
-                "test_user", "test", limit=1
-            )
+            self.memory_manager.retrieve_relevant_memories("test_user", "test", limit=1)
             status["components"]["memory_manager"] = {
                 "status": "healthy",
                 "external_embeddings": os.getenv("USE_EXTERNAL_EMBEDDINGS", "false"),
@@ -303,7 +299,6 @@ class CompleteIntegratedBot:
 
 async def demonstrate_complete_integration():
     """Demonstrate the complete integrated system"""
-
 
     # Initialize complete bot
     bot = CompleteIntegratedBot()
@@ -342,7 +337,6 @@ async def demonstrate_complete_integration():
         # Process through complete system
         result = await bot.process_message(user_id, message, "Alex")
 
-
         # Show detailed analysis
         if "error" in result:
             pass
@@ -380,7 +374,6 @@ async def demonstrate_complete_integration():
 if __name__ == "__main__":
     # Configure logging
     logging.basicConfig(level=logging.INFO, format="%(levelname)s - %(message)s")
-
 
     # Run the complete demonstration
     asyncio.run(demonstrate_complete_integration())

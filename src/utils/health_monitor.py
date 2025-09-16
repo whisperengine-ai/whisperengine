@@ -59,9 +59,7 @@ class HealthMonitor:
         # Check memory manager
         try:
             # Test memory operations
-            await self.memory_manager.retrieve_memories_safe(
-                "health_check", "test", limit=1
-            )
+            await self.memory_manager.retrieve_memories_safe("health_check", "test", limit=1)
             health_status["components"]["memory"] = {
                 "status": "healthy",
                 "thread_safe": True,

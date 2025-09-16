@@ -103,7 +103,6 @@ class TestContextBoundariesSecurity(unittest.TestCase):
         self.assertFalse(prefs.allow_cross_server)
         self.assertFalse(prefs.allow_dm_to_server)
 
-
     def test_privacy_level_updates(self):
         """Test updating user privacy levels"""
 
@@ -121,7 +120,6 @@ class TestContextBoundariesSecurity(unittest.TestCase):
         self.assertEqual(prefs.privacy_level, PrivacyLevel.STRICT)
         self.assertFalse(prefs.allow_cross_server)
 
-
     def test_context_boundary_permission_strict(self):
         """Test context boundary permissions with strict privacy"""
 
@@ -138,7 +136,6 @@ class TestContextBoundariesSecurity(unittest.TestCase):
         self.assertFalse(permission["allowed"])
         self.assertEqual(permission["reason"], "privacy_level_strict")
         self.assertFalse(permission["requires_consent"])
-
 
     def test_context_boundary_permission_moderate(self):
         """Test context boundary permissions with moderate privacy"""
@@ -166,7 +163,6 @@ class TestContextBoundariesSecurity(unittest.TestCase):
 
         self.assertFalse(permission_dm["allowed"])
 
-
     def test_consent_request_generation(self):
         """Test consent request generation"""
 
@@ -180,7 +176,6 @@ class TestContextBoundariesSecurity(unittest.TestCase):
         self.assertIn("message", consent_request)
         self.assertIn("options", consent_request)
         self.assertEqual(len(consent_request["options"]), 5)
-
 
     def test_consent_response_processing(self):
         """Test processing of user consent responses"""
@@ -202,7 +197,6 @@ class TestContextBoundariesSecurity(unittest.TestCase):
         if prefs.custom_rules:
             self.assertIn("dm_to_public_channel", prefs.custom_rules)
             self.assertTrue(prefs.custom_rules["dm_to_public_channel"])
-
 
     def test_enhanced_memory_retrieval_with_privacy(self):
         """Test enhanced memory retrieval with privacy filtering"""
@@ -234,7 +228,6 @@ class TestContextBoundariesSecurity(unittest.TestCase):
         # With strict privacy, should only allow same context or cross-server safe
         self.assertNotIn("public_channel", allowed_contexts)
 
-
     def test_memory_sensitivity_analysis(self):
         """Test memory content sensitivity analysis"""
 
@@ -256,7 +249,6 @@ class TestContextBoundariesSecurity(unittest.TestCase):
         sensitivity_low = self.enhanced_memory._analyze_memory_sensitivity(low_sens_memory)
         self.assertEqual(sensitivity_low, "low")
 
-
     def test_privacy_settings_ui_generation(self):
         """Test privacy settings UI generation"""
 
@@ -275,16 +267,13 @@ class TestContextBoundariesSecurity(unittest.TestCase):
         self.assertTrue(ui_data["current_settings"]["allow_cross_server"])
         self.assertEqual(len(ui_data["privacy_levels"]), 4)
 
-
     def test_audit_trail_logging(self):
         """Test audit trail logging for privacy decisions"""
 
         user_id = "test_user_audit"
 
         # Make a privacy decision
-        self.boundaries_manager.check_context_boundary_permission(
-            user_id, "dm", "public_channel"
-        )
+        self.boundaries_manager.check_context_boundary_permission(user_id, "dm", "public_channel")
 
         # Check audit file exists and contains entry
         audit_file = os.path.join(self.temp_dir, "context_boundary_audit.json")
@@ -301,7 +290,6 @@ class TestContextBoundariesSecurity(unittest.TestCase):
         last_entry = user_entries[-1]
         self.assertEqual(last_entry["source_context"], "dm")
         self.assertEqual(last_entry["target_context"], "public_channel")
-
 
     def test_privacy_leak_prevention_scenario(self):
         """Test comprehensive privacy leak prevention scenario"""
@@ -341,16 +329,12 @@ class TestContextBoundariesSecurity(unittest.TestCase):
         self.assertEqual(len(health_memories), 0)
 
         # Should have consent request instead
-        [
-            mem for mem in memories if mem.get("metadata", {}).get("is_consent_request", False)
-        ]
+        [mem for mem in memories if mem.get("metadata", {}).get("is_consent_request", False)]
 
         # May or may not have consent request depending on context compatibility
-
 
 
 if __name__ == "__main__":
 
     # Run tests
     unittest.main(verbosity=2, exit=False)
-

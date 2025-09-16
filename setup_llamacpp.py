@@ -142,7 +142,6 @@ def main():
     if not test_integration():
         return 1
 
-
     return 0
 
 

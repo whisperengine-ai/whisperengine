@@ -897,9 +897,7 @@ class EmotionManager:
 
         logger.info("EmotionManager cleanup complete")
 
-    def get_or_create_profile(
-        self, user_id: str, display_name: str | None = None
-    ) -> UserProfile:
+    def get_or_create_profile(self, user_id: str, display_name: str | None = None) -> UserProfile:
         """Get existing user profile or create a new one"""
         if user_id not in self.user_profiles:
             self.user_profiles[user_id] = UserProfile(
@@ -1267,4 +1265,3 @@ if __name__ == "__main__":
     for message in test_messages:
         profile, emotion = emotion_manager.process_interaction(user_id, message)
         context = emotion_manager.get_emotion_context(user_id)
-

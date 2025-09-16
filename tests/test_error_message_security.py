@@ -333,9 +333,7 @@ class TestErrorSecurityIntegration(unittest.TestCase):
 
                 # Test critical error logging
                 critical_msg = "Authentication bypass detected"
-                error_security.sanitize_error_message(
-                    critical_msg, error_type="security_error"
-                )
+                error_security.sanitize_error_message(critical_msg, error_type="security_error")
 
                 # Should have called secure logging
                 mock_logger.log_security_event.assert_called()

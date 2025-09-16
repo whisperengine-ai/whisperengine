@@ -38,7 +38,6 @@ def create_mock_channel(channel_id: int):
 async def test_cache_user_filtering():
     """Test the core security fix: user-specific filtering in conversation cache"""
 
-
     cache = HybridConversationCache()
     mock_channel = create_mock_channel(12345)
 
@@ -61,7 +60,6 @@ async def test_cache_user_filtering():
     # Add all messages to cache (this simulates the cache being populated)
     for msg in messages:
         cache.add_message(str(mock_channel.id), msg)
-
 
     # Key test: Check that Alice only sees her own messages + bot responses
     alice_context = await cache.get_user_conversation_context(mock_channel, user_alice, limit=10)
@@ -87,7 +85,6 @@ async def test_cache_user_filtering():
         "Hey bot, I'm Bob" not in alice_content
     ), "🚨 SECURITY BREACH: Alice should NOT see Bob's messages!"
 
-
     # Test Bob's context as well
     bob_context = await cache.get_user_conversation_context(mock_channel, user_bob, limit=10)
 
@@ -109,11 +106,8 @@ async def test_cache_user_filtering():
     ), "🚨 SECURITY BREACH: Bob should NOT see Alice's messages!"
 
 
-
-
 async def test_dm_isolation():
     """Test that DM conversations are properly isolated"""
-
 
     cache = HybridConversationCache()
 
@@ -152,7 +146,6 @@ async def test_dm_isolation():
     for msg in bob_messages:
         cache.add_message(str(bob_dm.id), msg)
 
-
     # Test Alice's DM context
     alice_dm_context = await cache.get_user_conversation_context(alice_dm, user_alice, limit=10)
     alice_dm_content = " ".join([msg.content for msg in alice_dm_context])
@@ -164,7 +157,6 @@ async def test_dm_isolation():
     # Alice should NOT see Bob's private information
     assert "fired" not in alice_dm_content, "🚨 Alice should NOT see Bob's job loss!"
     assert "job today" not in alice_dm_content, "🚨 Alice should NOT see Bob's private DM!"
-
 
     # Test Bob's DM context
     bob_dm_context = await cache.get_user_conversation_context(bob_dm, user_bob, limit=10)
@@ -181,11 +173,8 @@ async def test_dm_isolation():
     assert "anxiety" not in bob_dm_content, "🚨 Bob should NOT see Alice's private DM!"
 
 
-
-
 async def test_bot_integration():
     """Test that the bot integration fix works correctly"""
-
 
     # This test verifies that the bot code changes work
     # We can't directly test the bot here, but we can verify the cache behavior
@@ -217,13 +206,11 @@ async def test_bot_integration():
     for msg in busy_channel_messages:
         cache.add_message(str(mock_channel.id), msg)
 
-
     # When Alice sends a message, the bot should only see Alice's conversation context
     alice_safe_context = await cache.get_user_conversation_context(
         mock_channel, user_alice, limit=10
     )
     alice_safe_content = " ".join([msg.content for msg in alice_safe_context])
-
 
     # Alice should see her legitimate conversation
     assert "homework" in alice_safe_content, "Alice should see her homework discussion"
@@ -234,7 +221,6 @@ async def test_bot_integration():
         "malicious-site.com" not in alice_safe_content
     ), "🚨 Alice should NOT see Bob's malicious link!"
     assert "hacking" not in alice_safe_content, "🚨 Alice should NOT see Bob's hacking request!"
-
 
     # When Bob sends a message, his problematic history should be contained to him
     bob_context = await cache.get_user_conversation_context(mock_channel, user_bob, limit=10)
@@ -249,8 +235,6 @@ async def test_bot_integration():
     assert "math homework" not in bob_content, "Bob should NOT see Alice's study session"
 
 
-
-
 if __name__ == "__main__":
 
     async def run_tests():
@@ -258,11 +242,6 @@ if __name__ == "__main__":
             await test_cache_user_filtering()
             await test_dm_isolation()
             await test_bot_integration()
-
-
-
-
-
 
         except Exception:
             import traceback

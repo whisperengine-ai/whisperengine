@@ -128,9 +128,7 @@ async def test_conversation_summarizer():
 
     # Test summarization
     try:
-        await summarizer.should_summarize_conversation(
-            "test_user", test_messages
-        )
+        await summarizer.should_summarize_conversation("test_user", test_messages)
 
         if len(test_messages) >= 3:  # Force summarization for testing
             await summarizer.create_conversation_summary("test_user", test_messages)
@@ -172,10 +170,7 @@ async def test_semantic_deduplicator():
     ]
 
     try:
-        await deduplicator.optimize_memory_collection(
-            memories=test_memories, user_id="test_user"
-        )
-
+        await deduplicator.optimize_memory_collection(memories=test_memories, user_id="test_user")
 
     except Exception:
         return False
@@ -220,11 +215,9 @@ async def test_topic_clusterer():
             memories=test_memories, user_id="test_user"
         )
 
-
         if clustering_result["clusters"]:
             for _i, _cluster in enumerate(clustering_result["clusters"][:3]):
                 pass
-
 
     except Exception:
         return False
@@ -273,7 +266,6 @@ async def test_context_prioritizer():
             query=query, user_id="test_user", available_context=test_context, context_limit=10
         )
 
-
         for _i, _item in enumerate(prioritized_context):
             pass
 
@@ -281,7 +273,6 @@ async def test_context_prioritizer():
         await prioritizer.get_context_recommendations(
             user_id="test_user", recent_topics=["Python", "programming"], limit=5
         )
-
 
     except Exception:
         return False
@@ -373,9 +364,7 @@ async def test_integration():
             }
         ]
 
-        await prioritizer.prioritize_context(
-            "Python web development", "test_user", context_items
-        )
+        await prioritizer.prioritize_context("Python web development", "test_user", context_items)
 
         return True
 
@@ -410,7 +399,6 @@ async def main():
 
     for test_name, result in results.items():
         pass
-
 
     if passed == total:
         return True

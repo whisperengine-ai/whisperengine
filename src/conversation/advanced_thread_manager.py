@@ -1296,9 +1296,7 @@ class AdvancedConversationThreadManager:
         hash_suffix = hashlib.md5(content.encode()).hexdigest()[:8]
         return f"trans_{timestamp}_{hash_suffix}"
 
-    async def _get_thread(
-        self, user_id: str, thread_id: str
-    ) -> ConversationThreadAdvanced | None:
+    async def _get_thread(self, user_id: str, thread_id: str) -> ConversationThreadAdvanced | None:
         """Get a specific thread for a user"""
         user_threads = self.user_threads[user_id]
         return next((thread for thread in user_threads if thread.thread_id == thread_id), None)

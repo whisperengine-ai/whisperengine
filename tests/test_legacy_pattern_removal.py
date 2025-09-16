@@ -15,7 +15,6 @@ import re
 def test_no_legacy_context_patterns():
     """Test that we no longer create user messages with embedded context"""
 
-
     # Read the bot file to check for problematic patterns
     with open("basic_discord_bot.py") as f:
         bot_code = f.read()
@@ -62,7 +61,6 @@ def test_no_legacy_context_patterns():
 def test_conversation_context_structure():
     """Test that conversation context only contains proper system and user/assistant messages"""
 
-
     # This test would require mocking the entire message processing,
     # but we can check the structure by looking at the code patterns
 
@@ -92,7 +90,6 @@ def test_conversation_context_structure():
 def test_no_context_message_updates():
     """Test that we no longer try to update context messages in user messages"""
 
-
     with open("basic_discord_bot.py") as f:
         bot_code = f.read()
 
@@ -117,7 +114,6 @@ def test_no_context_message_updates():
 
 def test_memory_storage_safety():
     """Test that memory storage comments indicate proper filtering"""
-
 
     with open("basic_discord_bot.py") as f:
         bot_code = f.read()
@@ -154,10 +150,7 @@ if __name__ == "__main__":
         # Test memory storage safety
         test4_passed = test_memory_storage_safety()
 
-
         if test1_passed and test2_passed and test3_passed:
-
-
 
             pass
 

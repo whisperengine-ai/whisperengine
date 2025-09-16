@@ -189,9 +189,7 @@ class EnhancedAsyncMemoryManager:
             logger.error(f"Overall timeout for user {user_id} memory retrieval")
             raise TimeoutError(f"Memory retrieval timed out for user {user_id}")
 
-    async def process_emotion_async(
-        self, user_id: str, message: str, timeout: float | None = None
-    ):
+    async def process_emotion_async(self, user_id: str, message: str, timeout: float | None = None):
         """Async wrapper for thread-safe emotion processing with timeout"""
 
         def _process_emotion_with_timeout():

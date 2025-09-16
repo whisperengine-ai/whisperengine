@@ -23,7 +23,6 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 def test_advanced_cache_system():
     """Test the advanced caching system"""
 
-
     try:
         from src.memory.performance_optimizer import AdvancedCache, CacheStrategy
 
@@ -33,7 +32,6 @@ def test_advanced_cache_system():
         # Add items
         for i in range(7):  # Exceed max_size
             lru_cache.put(f"key_{i}", f"value_{i}")
-
 
         # Test 2: TTL Cache
         ttl_cache = AdvancedCache(
@@ -63,7 +61,6 @@ def test_advanced_cache_system():
 def test_performance_metrics():
     """Test performance metrics collection"""
 
-
     try:
         from src.memory.performance_optimizer import PerformanceMetrics
 
@@ -77,7 +74,6 @@ def test_performance_metrics():
             network_latency_ms=15.5,
         )
 
-
         # Test serialization
         metrics.to_dict()
 
@@ -89,7 +85,6 @@ def test_performance_metrics():
 
 async def test_optimized_adapter():
     """Test the optimized memory adapter"""
-
 
     try:
         from src.memory.optimized_adapter import (
@@ -131,7 +126,6 @@ async def test_optimized_adapter():
             monitoring_enabled=True,
         )
 
-
         # Test optimized operations
 
         # Test search
@@ -143,13 +137,11 @@ async def test_optimized_adapter():
         # Test user conversations
         await adapter.get_user_conversations("test_user", limit=5)
 
-
         # Test performance statistics
         adapter.get_performance_statistics()
 
         if adapter.optimizer:
             adapter.get_cache_summary()
-
 
         return True
 
@@ -162,7 +154,6 @@ async def test_optimized_adapter():
 
 async def test_query_optimization():
     """Test query optimization features"""
-
 
     try:
         from src.memory.performance_optimizer import (
@@ -202,7 +193,6 @@ async def test_query_optimization():
                 query_text=original_query, user_id="test_user", limit=5, doc_types=None
             )
 
-
         return True
 
     except Exception:
@@ -214,7 +204,6 @@ async def test_query_optimization():
 
 def demonstrate_performance_improvements():
     """Demonstrate performance improvement scenarios"""
-
 
     scenarios = [
         {
@@ -269,19 +258,12 @@ def demonstrate_performance_improvements():
             pass
 
 
-
 def demonstrate_integration_benefits():
     """Demonstrate benefits of integrating with existing WhisperEngine"""
 
 
-
-
-
-
-
 async def main():
     """Main test function"""
-
 
     # Run basic tests
     cache_success = test_advanced_cache_system()
@@ -299,10 +281,6 @@ async def main():
                     # Demonstrate benefits
                     demonstrate_performance_improvements()
                     demonstrate_integration_benefits()
-
-
-
-
 
                     return True
 

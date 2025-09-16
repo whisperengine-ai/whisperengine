@@ -22,7 +22,6 @@ def test_discord_integration():
             persist_directory="./test_discord_chromadb", enable_emotions=True
         )
 
-
         # Simulate a Discord interaction
         user_id = "123456789"  # Discord user ID format
         user_message = (
@@ -38,7 +37,6 @@ def test_discord_integration():
 
         # Simulate the CLEAN system prompt (no temporary context)
         time_context = "Current time: 2025-09-06"
-
 
         # Simulate the context user message (where temporal context now goes)
         context_parts = [f"Current context: {time_context}"]
@@ -64,7 +62,6 @@ def test_discord_integration():
 
         # Get final stats
         memory_manager.get_collection_stats()
-
 
         return True
 

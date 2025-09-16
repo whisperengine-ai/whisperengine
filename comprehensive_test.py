@@ -58,9 +58,7 @@ async def test_all_functionality():
     emotion_ai = components.get("external_emotion_ai")
     if emotion_ai:
         try:
-            emotion_ai.analyze_emotion_cloud(
-                "I'm really excited about my new project!"
-            )
+            emotion_ai.analyze_emotion_cloud("I'm really excited about my new project!")
         except Exception:
             pass
 

@@ -36,13 +36,11 @@ def clean_json_for_parsing(response_text):
 def test_trailing_comma_fix():
     """Test that the specific trailing comma issue is fixed"""
 
-
     # Try to parse without fix (should fail)
     try:
         json.loads(problematic_json)
     except json.JSONDecodeError:
         pass
-
 
     # Apply the fix
     cleaned_json = clean_json_for_parsing(problematic_json)

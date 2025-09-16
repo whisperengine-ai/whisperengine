@@ -52,7 +52,6 @@ async def test_production_optimization():
             except Exception:
                 pass
 
-
         # Test 3: Test production adapter initialization
         if bot_core.production_adapter:
             try:
@@ -64,12 +63,10 @@ async def test_production_optimization():
             except Exception:
                 pass
 
-
         # Test 4: Show component availability
         components = bot_core.get_components()
         for _name, _component in components.items():
             pass
-
 
         # Test 5: Environment configuration guide
 

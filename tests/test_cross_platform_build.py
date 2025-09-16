@@ -176,7 +176,6 @@ def test_cleanup():
         Path(__file__).parent / "build"
         Path(__file__).parent / "dist"
 
-
         # Cleanup test file
         if test_spec.exists():
             test_spec.unlink()
@@ -212,7 +211,6 @@ def main():
                 pass
         except Exception:
             pass
-
 
     if passed == total:
 

@@ -63,7 +63,6 @@ async def test_conversation_analysis():
             emotional_data={"primary_emotion": "neutral", "intensity": 0.5},
         )
 
-
         # Validate expectations
         if "expected_formality" in case:
             if case["expected_formality"] == "formal" and analysis.formality_score >= 0:
@@ -85,7 +84,6 @@ async def test_conversation_analysis():
             and case["expected_knowledge_sharing"] != analysis.knowledge_sharing
         ):
             pass
-
 
     return profiler
 
@@ -139,7 +137,6 @@ async def test_personality_profile_building(profiler):
 
         await profiler.update_personality_profile(analysis)
 
-
     # Get final profile summary
     final_profile = await profiler.get_personality_profile(user_id)
 
@@ -157,7 +154,6 @@ async def test_adaptation_recommendations(profiler, user_id):
 
     if "error" in recommendations:
         return False
-
 
     if recommendations["communication_style"]:
         for _key, _value in recommendations["communication_style"].items():
@@ -185,7 +181,6 @@ async def test_personality_summary(profiler, user_id):
 
     if "error" in summary:
         return False
-
 
     if summary["personality_traits"]:
         for _trait_name, _trait_data in summary["personality_traits"].items():
@@ -218,7 +213,6 @@ async def test_real_time_adaptation():
     await profiler.update_personality_profile(analysis1)
     await profiler.get_adaptation_recommendations(user_id)
 
-
     # Scenario 2: User seeks emotional support
     analysis2 = await profiler.analyze_conversation(
         user_id=user_id,
@@ -231,7 +225,6 @@ async def test_real_time_adaptation():
     await profiler.update_personality_profile(analysis2)
     await profiler.get_adaptation_recommendations(user_id)
 
-
     # Scenario 3: Building deeper relationship
     analysis3 = await profiler.analyze_conversation(
         user_id=user_id,
@@ -243,7 +236,6 @@ async def test_real_time_adaptation():
 
     await profiler.update_personality_profile(analysis3)
     await profiler.get_adaptation_recommendations(user_id)
-
 
     return True
 
@@ -260,7 +252,6 @@ async def main():
         await test_adaptation_recommendations(profiler, user_id)
         await test_personality_summary(profiler, user_id)
         await test_real_time_adaptation()
-
 
     except Exception:
         import traceback

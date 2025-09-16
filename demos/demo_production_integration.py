@@ -16,7 +16,6 @@ logger = logging.getLogger(__name__)
 async def test_production_system_integration():
     """Test production system integration with all components"""
 
-
     try:
         from src.integration.production_system_integration import ProductionSystemIntegrator
 
@@ -82,7 +81,6 @@ async def test_production_system_integration():
             )
             time.time() - start_time
 
-
             # Show specific component results
             if "emotion_analysis" in result:
                 result["emotion_analysis"].get("primary_emotion", "unknown")
@@ -117,7 +115,6 @@ async def test_production_system_integration():
 
             return results
 
-
         start_time = time.time()
 
         # Create concurrent user tasks
@@ -132,7 +129,6 @@ async def test_production_system_integration():
         total_time = time.time() - start_time
         total_messages = concurrent_users * messages_per_user
         total_messages / total_time
-
 
         # Analyze results
         successful_messages = sum(
@@ -167,7 +163,6 @@ async def test_production_system_integration():
         await integrator.shutdown_production_system()
         time.time() - shutdown_start
 
-
     except Exception:
         import traceback
 
@@ -176,7 +171,6 @@ async def test_production_system_integration():
 
 async def test_production_adapter():
     """Test the WhisperEngine production adapter"""
-
 
     try:
         from src.integration.production_system_integration import WhisperEngineProductionAdapter
@@ -219,7 +213,6 @@ async def test_production_adapter():
             )
             time.time() - start_time
 
-
         # Test shutdown
         await adapter.shutdown()
 
@@ -232,13 +225,11 @@ async def test_production_adapter():
 async def test_component_compatibility():
     """Test compatibility and fallback behavior"""
 
-
     try:
         from src.integration.production_system_integration import ProductionSystemIntegrator
 
         # Test with limited components available
         integrator = ProductionSystemIntegrator()
-
 
         # Override config to simulate different scenarios
         test_configs = [
@@ -288,14 +279,10 @@ async def test_component_compatibility():
             success = await integrator.initialize_production_components()
             time.time() - start_time
 
-
             # Get metrics
             metrics = integrator.get_production_metrics()
-            sum(
-                1 for available in metrics["components_available"].values() if available
-            )
+            sum(1 for available in metrics["components_available"].values() if available)
             len(metrics["components_available"])
-
 
             # Test basic functionality
             if success:
@@ -310,7 +297,6 @@ async def test_component_compatibility():
 
             await integrator.shutdown_production_system()
 
-
     except Exception:
         import traceback
 
@@ -320,12 +306,10 @@ async def test_component_compatibility():
 async def main():
     """Run all production integration tests"""
 
-
     # Run all integration tests
     await test_production_system_integration()
     await test_production_adapter()
     await test_component_compatibility()
-
 
 
 if __name__ == "__main__":

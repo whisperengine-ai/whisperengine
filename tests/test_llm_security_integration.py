@@ -18,7 +18,6 @@ from lmstudio_client import LMStudioClient
 def test_lmstudio_message_security_integration():
     """Test that LMStudioClient properly uses the new security system"""
 
-
     # Create a mock LMStudioClient (we don't need actual LLM connection for this test)
     client = LMStudioClient("http://localhost:1234")
 
@@ -34,7 +33,6 @@ def test_lmstudio_message_security_integration():
 
     # Test the _fix_message_alternation method (which now includes security)
     fixed_messages = client._fix_message_alternation(test_messages)
-
 
     # Verify security processing occurred
     assert len(fixed_messages) > 0, "Should have some messages"
@@ -55,10 +53,8 @@ def test_lmstudio_message_security_integration():
             assert "[security_filtered]" in system_content, "Override content should be filtered"
 
 
-
 def test_fallback_processing():
     """Test that fallback processing works if security module fails"""
-
 
     # Create client
     client = LMStudioClient("http://localhost:1234")
@@ -81,10 +77,8 @@ def test_fallback_processing():
         assert len(fixed_messages) > 0, "Fallback should still process messages"
 
 
-
 def test_empty_message_handling():
     """Test handling of edge cases like empty messages"""
-
 
     client = LMStudioClient("http://localhost:1234")
 
@@ -108,10 +102,8 @@ def test_empty_message_handling():
     assert len(malformed_result) > 0, "Should process valid messages despite malformed ones"
 
 
-
 async def test_async_compatibility():
     """Test that the security system works with async operations"""
-
 
     # This tests that our security processing doesn't interfere with async operations
     client = LMStudioClient("http://localhost:1234")
@@ -140,10 +132,6 @@ if __name__ == "__main__":
 
         # Test async compatibility
         asyncio.run(test_async_compatibility())
-
-
-
-
 
     except Exception:
         import traceback

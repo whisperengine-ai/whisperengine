@@ -185,7 +185,6 @@ async def test_concurrent_conversation_processing():
     if not LIBRARIES_AVAILABLE:
         return
 
-
     try:
         from src.conversation.concurrent_conversation_manager import ConcurrentConversationManager
 
@@ -217,7 +216,6 @@ async def test_concurrent_conversation_processing():
             # Generate concurrent users
             users = generate_concurrent_users(config["users"], config["messages"])
             sum(len(user["messages"]) for user in users)
-
 
             # Execute concurrent conversations
             start_time = time.time()
@@ -263,10 +261,8 @@ async def test_concurrent_conversation_processing():
             processed_messages = sum(len(results) for results in all_results)
             processed_messages / total_time
 
-
             # Get performance statistics
             manager.get_performance_stats()
-
 
             # Analyze priority distribution
             sum(
@@ -282,9 +278,7 @@ async def test_concurrent_conversation_processing():
                 if result.get("status") == "queued"
             )
 
-
             await manager.stop()
-
 
     except Exception:
         import traceback
@@ -297,7 +291,6 @@ async def test_priority_queue_performance():
 
     if not LIBRARIES_AVAILABLE:
         return
-
 
     try:
         from src.conversation.concurrent_conversation_manager import ConversationQueue
@@ -331,7 +324,6 @@ async def test_priority_queue_performance():
         time.time() - start_time
         total_messages = sum(priority_distribution.values())
 
-
         # Test queue retrieval with priority ordering
         start_time = time.time()
 
@@ -348,7 +340,6 @@ async def test_priority_queue_performance():
                 retrieved_messages.append(message)
 
         time.time() - start_time
-
 
         for priority, count in priority_counts.items():
             (count / len(retrieved_messages)) * 100 if retrieved_messages else 0
@@ -369,7 +360,6 @@ async def test_session_management():
     if not LIBRARIES_AVAILABLE:
         return
 
-
     try:
         from src.conversation.concurrent_conversation_manager import ConcurrentConversationManager
 
@@ -388,7 +378,6 @@ async def test_session_management():
             {"users": 15, "active": False, "messages": 2},  # Inactive users
             {"users": 8, "active": True, "messages": 8},  # Very active users
         ]
-
 
         total_users = 0
         for scenario in session_scenarios:
@@ -424,11 +413,9 @@ async def test_session_management():
         await asyncio.gather(*all_tasks)
         time.time() - start_time
 
-
         # Get initial session stats
         stats = manager.get_performance_stats()
         initial_sessions = stats["sessions"]["active_sessions"]
-
 
         # Wait for session cleanup (timeout is 1 minute, but cleanup runs every 30s)
         await asyncio.sleep(65)  # Wait longer than timeout
@@ -440,15 +427,9 @@ async def test_session_management():
         final_stats = manager.get_performance_stats()
         final_sessions = final_stats["sessions"]["active_sessions"]
 
-
         # Expected: only active users should remain
-        sum(
-            scenario["users"] for scenario in session_scenarios if scenario["active"]
-        )
-        (
-            (initial_sessions - final_sessions) / initial_sessions if initial_sessions > 0 else 0
-        )
-
+        sum(scenario["users"] for scenario in session_scenarios if scenario["active"])
+        ((initial_sessions - final_sessions) / initial_sessions if initial_sessions > 0 else 0)
 
         await manager.stop()
 
@@ -461,7 +442,6 @@ async def test_load_balancing():
 
     if not LIBRARIES_AVAILABLE:
         return
-
 
     try:
         from src.conversation.concurrent_conversation_manager import ConcurrentConversationManager
@@ -514,7 +494,6 @@ async def test_load_balancing():
             # Get performance stats during load
             manager.get_performance_stats()
 
-
             # Wait for queue to process
             await asyncio.sleep(1.0)
 
@@ -527,7 +506,6 @@ async def test_load_balancing():
 async def main():
     """Run all concurrent conversation manager tests"""
 
-
     if not LIBRARIES_AVAILABLE:
         return
 
@@ -536,7 +514,6 @@ async def main():
     await test_priority_queue_performance()
     await test_session_management()
     await test_load_balancing()
-
 
 
 if __name__ == "__main__":

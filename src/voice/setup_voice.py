@@ -190,9 +190,6 @@ def show_configuration_guide():
     print_step(4, "Configuration Guide")
 
 
-
-
-
 def main():
     """Main setup function"""
     print_header("Discord Bot Voice Setup")
@@ -219,8 +216,6 @@ def main():
     show_configuration_guide()
 
     print_header("Setup Complete!")
-
-
 
 
 if __name__ == "__main__":

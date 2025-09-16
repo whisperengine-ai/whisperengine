@@ -17,7 +17,6 @@ from lmstudio_client import LMStudioClient
 async def test_vision_message_processing():
     """Test complete vision message processing pipeline"""
 
-
     # Set up vision support
     os.environ["LLM_SUPPORTS_VISION"] = "true"
     os.environ["LLM_VISION_MAX_IMAGES"] = "2"
@@ -59,7 +58,6 @@ async def test_vision_message_processing():
             msg.get("role")
             content = msg.get("content")
             type(content).__name__
-
 
     except Exception:
         import traceback
@@ -118,8 +116,6 @@ async def test_vision_message_processing():
                 "\n".join(text_parts).strip()
             else:
                 str(response_content).strip()
-
-
 
     except Exception:
         return False

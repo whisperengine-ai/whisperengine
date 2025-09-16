@@ -75,7 +75,6 @@ def test_global_fact_extraction():
         except Exception:
             pass
 
-
     return passed_tests == total_tests
 
 
@@ -109,13 +108,8 @@ def test_global_fact_storage():
         memory_manager.store_user_fact(user_id, "I like visiting towers", "Test user fact")
 
         combined_memories = memory_manager.retrieve_relevant_memories(user_id, query, limit=10)
-        len(
-            [m for m in combined_memories if m["metadata"].get("is_global", False)]
-        )
-        len(
-            [m for m in combined_memories if not m["metadata"].get("is_global", False)]
-        )
-
+        len([m for m in combined_memories if m["metadata"].get("is_global", False)])
+        len([m for m in combined_memories if not m["metadata"].get("is_global", False)])
 
         # Verify global facts have higher scores (priority)
         if combined_memories:

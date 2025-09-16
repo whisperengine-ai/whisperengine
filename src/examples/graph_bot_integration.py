@@ -244,7 +244,6 @@ class GraphEnhancedBot:
 async def example_usage():
     """Example of how to use the graph-enhanced bot."""
 
-
     # Initialize bot
     bot = GraphEnhancedBot()
 
@@ -264,11 +263,9 @@ async def example_usage():
         "Can you help me with some coding advice?",
     ]
 
-
     for i, message in enumerate(messages, 1):
 
         await bot.process_message(user_id, message)
-
 
         # Show relationship development
         if i % 2 == 0:  # Every other message

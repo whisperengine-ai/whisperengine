@@ -21,7 +21,6 @@ def test_llm_client():
     # Create LLM client
     client = LLMClient()
 
-
     # Test simple chat completion
     try:
         messages = [{"role": "user", "content": "Say hello briefly"}]

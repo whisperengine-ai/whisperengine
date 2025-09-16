@@ -20,7 +20,6 @@ def show_user_facts(user_id: str):
         if not results["documents"]:
             return
 
-
         fact_count = 0
         for i, doc in enumerate(results["documents"]):
             metadata = results["metadatas"][i]

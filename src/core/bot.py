@@ -497,9 +497,7 @@ class DiscordBotCore:
                 memory_optimization = os.getenv("AI_MEMORY_OPTIMIZATION", "true").lower() == "true"
                 emotional_resonance = os.getenv("AI_EMOTIONAL_RESONANCE", "true").lower() == "true"
                 adaptive_mode = os.getenv("AI_ADAPTIVE_MODE", "true").lower() == "true"
-                (
-                    os.getenv("AI_PERSONALITY_ANALYSIS", "true").lower() == "true"
-                )
+                (os.getenv("AI_PERSONALITY_ANALYSIS", "true").lower() == "true")
 
                 # Use full configuration for Phase 4
                 phase4_config = {

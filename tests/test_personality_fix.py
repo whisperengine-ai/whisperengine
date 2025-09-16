@@ -90,7 +90,6 @@ def test_personality_cross_context_retrieval():
         graph_personality_manager=None,
     )
 
-
     # Test DM context - should get ALL user messages regardless of original context
     MockDiscordContext(is_dm=True)
 
@@ -121,7 +120,6 @@ def test_personality_cross_context_retrieval():
         metrics = personality_profiler.analyze_personality(recent_messages, user_id)
         personality_profiler.get_personality_summary(metrics)
 
-
         # Verify we got messages from multiple contexts
         dm_messages = [
             msg
@@ -142,7 +140,6 @@ def test_personality_cross_context_retrieval():
             )
         ]
 
-
         if len(dm_messages) > 0 and len(channel_messages) > 0:
             return True
         else:
@@ -159,4 +156,3 @@ if __name__ == "__main__":
         pass
     else:
         pass
-

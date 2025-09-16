@@ -132,7 +132,6 @@ class DependencyChecker:
         """Print a comprehensive dependency report using new multi-tier structure"""
         missing = self.check_all_dependencies(deployment_type)
 
-
         # Core dependencies
         if missing["core"]:
             for _package, _description in missing["core"]:
@@ -177,7 +176,6 @@ class DependencyChecker:
                 pass
             if deployment_type in ["desktop", "all"]:
                 pass
-
 
             # Platform-specific guidance
 

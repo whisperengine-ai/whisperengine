@@ -467,4 +467,3 @@ if __name__ == "__main__":
     else:
         for _rec in selector.get_setup_recommendations():
             pass
-

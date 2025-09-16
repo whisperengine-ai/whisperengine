@@ -39,7 +39,6 @@ def test_name_capture():
         except Exception:
             pass
 
-
     # List all users to verify
     users = db.list_all_users()
 

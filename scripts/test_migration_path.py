@@ -26,7 +26,6 @@ def create_test_sqlite_data():
     if db_path.exists():
         db_path.unlink()
 
-
     conn = sqlite3.connect(str(db_path))
     cursor = conn.cursor()
 
@@ -138,7 +137,6 @@ def analyze_sqlite_data(db_path):
     # Get table info
     cursor.execute("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
     tables = [row[0] for row in cursor.fetchall()]
-
 
     # Get row counts
     for table in tables:
@@ -298,7 +296,6 @@ def main():
 
         # 4. Generate migration SQL
         generate_postgresql_migration_sql(db_path)
-
 
         return True
 

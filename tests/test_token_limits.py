@@ -39,7 +39,6 @@ Please respond as Dream would - with empathy, wisdom, and perhaps a touch of the
         total_chars = sum(len(msg["content"]) for msg in test_messages)
         estimated_tokens = total_chars // 4
 
-
         if estimated_tokens > 1024:
 
             # Try with shorter prompt

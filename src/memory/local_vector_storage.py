@@ -253,7 +253,9 @@ class LocalVectorStorage:
             collection_docs = self.documents[collection_name]
             doc_ids = []
 
-            for i, (doc, embedding, meta) in enumerate(zip(documents, embeddings, metadata, strict=False)):
+            for i, (doc, embedding, meta) in enumerate(
+                zip(documents, embeddings, metadata, strict=False)
+            ):
                 # Generate or use provided ID
                 doc_id = (
                     ids[i]

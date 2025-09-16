@@ -25,7 +25,6 @@ def test_phi3_with_full_prompt():
     os.getenv("LLM_CHAT_API_URL")
     os.getenv("LOCAL_LLM_MODEL")
 
-
     try:
         llm_client = LLMClient()
 
@@ -68,7 +67,6 @@ def test_phi3_with_full_prompt():
         # Estimate total tokens
         total_chars = len(system_prompt) + len(user_message)
         total_chars // 4
-
 
         response = llm_client.generate_chat_completion(full_messages, max_tokens=200)
 

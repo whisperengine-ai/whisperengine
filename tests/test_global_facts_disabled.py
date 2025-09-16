@@ -31,12 +31,10 @@ def test_global_facts_disabled():
         # Import the functions we modified
         from basic_discord_bot import store_discord_server_info, store_discord_user_info
 
-
         # Test that these functions don't store global facts anymore
 
     except Exception:
         return False
-
 
     # Mock user object
     class MockUser:

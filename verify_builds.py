@@ -37,7 +37,6 @@ def verify_builds():
     if not dist_dir.exists():
         return
 
-
     # Check what we built
     builds_found = []
 
@@ -61,7 +60,6 @@ def verify_builds():
     if not builds_found:
         return
 
-
     for _platform_name, _bundle_path, exe_path in builds_found:
 
         if exe_path.exists():
@@ -78,7 +76,6 @@ def verify_builds():
                 pass
         else:
             pass
-
 
 
 if __name__ == "__main__":

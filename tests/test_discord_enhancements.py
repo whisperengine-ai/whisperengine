@@ -113,7 +113,6 @@ def test_memory_storage():
         pass
 
 
-
 class MockDiscordUser:
     """Mock Discord user for testing"""
 
@@ -156,12 +155,10 @@ def test_discord_user_info_storage():
         pass
 
 
-
 def main():
     """Run all tests"""
     # Set up logging
     logging.basicConfig(level=logging.INFO)
-
 
     # Run tests
     test_time_awareness()
@@ -169,7 +166,6 @@ def main():
     test_global_fact_extraction()
     test_memory_storage()
     test_discord_user_info_storage()
-
 
 
 if __name__ == "__main__":

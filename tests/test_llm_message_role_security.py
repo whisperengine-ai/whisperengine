@@ -18,7 +18,6 @@ from llm_message_role_security import (
 def test_basic_message_validation():
     """Test basic message structure validation"""
 
-
     processor = LLMMessageRoleSecurityProcessor()
 
     # Valid message
@@ -42,10 +41,8 @@ def test_basic_message_validation():
         assert threat is not None
 
 
-
 def test_injection_detection():
     """Test detection of system prompt injection attempts"""
-
 
     processor = LLMMessageRoleSecurityProcessor()
 
@@ -76,7 +73,6 @@ def test_injection_detection():
 def test_system_message_sanitization():
     """Test system message content sanitization"""
 
-
     processor = LLMMessageRoleSecurityProcessor(max_system_length=100)
 
     # Test basic sanitization
@@ -93,10 +89,8 @@ def test_system_message_sanitization():
     assert "[TRUNCATED_FOR_SECURITY]" in truncated
 
 
-
 def test_user_message_validation():
     """Test user message content validation"""
-
 
     processor = LLMMessageRoleSecurityProcessor()
 
@@ -113,10 +107,8 @@ def test_user_message_validation():
     # Note: User messages are generally not modified, just flagged
 
 
-
 def test_system_message_combination():
     """Test secure combination of multiple system messages"""
-
 
     processor = LLMMessageRoleSecurityProcessor(max_system_length=200)
 
@@ -147,10 +139,8 @@ def test_system_message_combination():
         assert "[SECURITY_FILTERED]" in combined_mal["content"]
 
 
-
 def test_message_sequence_validation():
     """Test validation of message sequences"""
-
 
     processor = LLMMessageRoleSecurityProcessor()
 
@@ -178,10 +168,8 @@ def test_message_sequence_validation():
     assert len(validated_mixed) == 2  # Only user "Hello" and assistant "Hi!" should remain
 
 
-
 def test_complete_secure_processing():
     """Test the complete secure message processing pipeline"""
-
 
     # Realistic message set with various issues
     test_messages = [
@@ -223,10 +211,8 @@ def test_complete_secure_processing():
         ), f"Override content not properly filtered: {system_content}"
 
 
-
 def test_security_reporting():
     """Test security event reporting"""
-
 
     processor = LLMMessageRoleSecurityProcessor()
 
@@ -247,10 +233,8 @@ def test_security_reporting():
     assert "configuration" in report
 
 
-
 def test_performance_limits():
     """Test that processing respects performance limits"""
-
 
     processor = LLMMessageRoleSecurityProcessor(max_messages=5, max_system_length=100)
 
@@ -273,7 +257,6 @@ def test_performance_limits():
         assert len(result["content"]) <= 150  # Should be truncated
 
 
-
 if __name__ == "__main__":
 
     try:
@@ -287,11 +270,6 @@ if __name__ == "__main__":
         test_complete_secure_processing()
         test_security_reporting()
         test_performance_limits()
-
-
-
-
-
 
     except Exception:
         import traceback

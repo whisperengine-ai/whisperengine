@@ -40,7 +40,6 @@ async def test_desktop_ai_with_local_storage():
         # Test initialization
         success = await ai_service.initialize()
 
-
         if ai_service.universal_chat:
             pass
 
@@ -53,7 +52,6 @@ async def test_desktop_ai_with_local_storage():
                 "Remember that I like cats. Can you tell me about cat behavior?",
                 "What did I just tell you about my preferences?",
             ]
-
 
             for _i, message in enumerate(test_messages, 1):
                 try:
@@ -106,7 +104,6 @@ async def main():
 
     check_environment_config()
     await test_desktop_ai_with_local_storage()
-
 
 
 if __name__ == "__main__":

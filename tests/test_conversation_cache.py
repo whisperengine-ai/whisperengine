@@ -58,7 +58,6 @@ async def test_cache_basic_functionality():
         msg = MockMessage(f"Test message {i+1}", author_id=111)
         channel.add_mock_message(msg)
 
-
     # Test 1: First call should bootstrap from Discord
     messages = await cache.get_conversation_context(channel, limit=3)
     assert len(messages) == 3, f"Expected 3 messages, got {len(messages)}"
@@ -86,7 +85,6 @@ async def test_cache_basic_functionality():
     # Test 5: Statistics
     stats = cache.get_cache_stats()
     assert stats["cached_channels"] == 1, "Should have 1 cached channel"
-
 
 
 if __name__ == "__main__":

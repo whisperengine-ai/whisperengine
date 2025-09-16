@@ -16,13 +16,11 @@ def test_environment_config():
     if not load_environment():
         return False
 
-
     # Check critical LLM settings
     api_url = os.getenv("LLM_CHAT_API_URL")
     os.getenv("USE_LOCAL_LLM", "false").lower() == "true"
     local_model = os.getenv("LOCAL_LLM_MODEL")
     models_dir = os.getenv("LOCAL_MODELS_DIR", "./models")
-
 
     # Check if models directory exists
     if os.path.exists(models_dir):

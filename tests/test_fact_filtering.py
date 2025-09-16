@@ -46,7 +46,6 @@ def test_fact_filtering():
 
         fact_extractor = FactExtractor(llm_client)
 
-
         all_passed = True
 
         for message, expected_keywords in test_messages:

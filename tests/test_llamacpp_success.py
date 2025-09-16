@@ -85,7 +85,6 @@ def test_chat_completion():
     assert len(content.strip()) > 0, "Response content should not be empty"
 
 
-
 def test_performance():
     """Test basic performance characteristics"""
 
@@ -104,7 +103,6 @@ def test_performance():
 
     response_time = end_time - start_time
     response["choices"][0]["message"]["content"]
-
 
     if response_time < 30:  # Reasonable threshold
         pass
@@ -125,7 +123,6 @@ def show_model_info():
             pass
     else:
         pass
-
 
 
 if __name__ == "__main__":

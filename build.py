@@ -115,13 +115,11 @@ def print_build_matrix():
         pass
 
 
-
 async def interactive_build():
     """Interactive build configuration"""
 
     # Get recommendations
     recommendations = get_recommended_config()
-
 
     # Ask for build target
     targets = list(DeploymentTarget)
@@ -245,7 +243,6 @@ async def show_next_steps(config: BuildConfig, result):
 
     elif config.target == DeploymentTarget.KUBERNETES:
         pass
-
 
 
 async def main():

@@ -86,7 +86,6 @@ def test_tray_background_start():
         else:
             return False
 
-
         # Don't actually start in background for automated testing
         # since it requires GUI environment
         return True
@@ -115,12 +114,10 @@ def main():
         except Exception:
             pass
 
-
     if passed == total:
         pass
     else:
         pass
-
 
 
 if __name__ == "__main__":

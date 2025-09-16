@@ -39,6 +39,7 @@ class MemoryCommandHandlers:
 
         # Default to no-op filter if none provided
         if bot_name_filter is None:
+
             def bot_name_filter():
                 return lambda func: func
 
@@ -129,7 +130,9 @@ class MemoryCommandHandlers:
                 )
 
                 if results["documents"]:
-                    facts_with_meta = list(zip(results["documents"], results["metadatas"], strict=False))
+                    facts_with_meta = list(
+                        zip(results["documents"], results["metadatas"], strict=False)
+                    )
                     facts_with_meta.sort(key=lambda x: x[1].get("timestamp", ""), reverse=True)
 
                     for doc, metadata in facts_with_meta:

@@ -91,7 +91,6 @@ def test_personality_fact_classification():
         type_correct = personality_fact.fact_type == test_case["expected_type"]
         personality_fact.relevance == test_case["expected_relevance"]
 
-
         if type_correct:
             pass
         else:
@@ -120,7 +119,6 @@ def test_personality_fact_classification():
     type_successes = sum(1 for r in results if r["type_correct"])
     relevance_successes = sum(1 for r in results if r["relevance_ok"])
     total_tests = len(results)
-
 
     # Show memory tier distribution
     tier_distribution = {}
@@ -200,7 +198,6 @@ def test_pii_detection_integration():
             success = is_safe
         else:
             success = is_private
-
 
         if success:
             pass

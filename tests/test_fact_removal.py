@@ -80,7 +80,6 @@ def test_fact_removal():
         for _i, fact in enumerate(remaining_facts, 1):
             pass
 
-
     except Exception:
         import traceback
 
