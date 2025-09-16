@@ -6,9 +6,8 @@ based on performance requirements and infrastructure constraints.
 """
 
 import os
-from enum import Enum
-from typing import Dict, Any, Optional
 from dataclasses import dataclass
+from enum import Enum
 
 
 class DeploymentMode(Enum):
@@ -26,7 +25,7 @@ class NLPConfig:
 
     deployment_mode: DeploymentMode
     use_gpu: bool
-    model_cache_dir: Optional[str] = None
+    model_cache_dir: str | None = None
     service_host: str = "localhost"
     service_port: int = 8080
     timeout_seconds: int = 30
@@ -162,32 +161,17 @@ ARCHITECTURE_COMPARISON = {
 
 def print_architecture_comparison():
     """Print comparison of architecture options."""
-    print("🏗️  NLP Architecture Comparison")
-    print("=" * 80)
 
-    for mode, details in ARCHITECTURE_COMPARISON.items():
-        print(f"\n📋 {mode.upper()}")
-        print(f"Description: {details['description']}")
-        print(f"Performance: {details['performance']}")
-        print(f"Complexity: {details['complexity']}")
-        print(f"Best for: {details['best_for']}")
+    for _mode, details in ARCHITECTURE_COMPARISON.items():
 
-        print("✅ Pros:")
-        for pro in details["pros"]:
-            print(f"   • {pro}")
+        for _pro in details["pros"]:
+            pass
 
-        print("❌ Cons:")
-        for con in details["cons"]:
-            print(f"   • {con}")
-        print("-" * 80)
+        for _con in details["cons"]:
+            pass
 
 
 if __name__ == "__main__":
     print_architecture_comparison()
 
-    print(f"\n🔧 Current Configuration:")
     config = get_nlp_config()
-    print(f"Deployment Mode: {config.deployment_mode.value}")
-    print(f"GPU Available: {config.use_gpu}")
-    print(f"spaCy Model: {config.spacy_model}")
-    print(f"Sentence Transformer: {config.sentence_transformer_model}")

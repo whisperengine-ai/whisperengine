@@ -23,12 +23,11 @@ This script tests all the pattern-based code that was converted to use LLM:
 """
 
 import logging
-import os
-from dotenv import load_dotenv
 
-from lmstudio_client import LMStudioClient
-from fact_extractor import FactExtractor
+from dotenv import load_dotenv
 from emotion_manager import EmotionManager, RelationshipManager
+from fact_extractor import FactExtractor
+from lmstudio_client import LMStudioClient
 from memory_manager import UserMemoryManager
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s - %(name)s - %(message)s")
@@ -63,68 +62,53 @@ def test_llm_conversions():
         "You make me feel comfortable sharing my thoughts with you.",
     ]
 
-    print("🔍 Testing LLM-based conversions...\n")
 
     # Test 1: User Fact Extraction
-    print("1️⃣ Testing User Fact Extraction (FactExtractor)")
-    print("=" * 50)
 
     fact_extractor = FactExtractor(llm_client=llm_client)
 
-    for i, message in enumerate(test_messages[:3], 1):
-        print(f'\nTest {i}: "{message[:50]}..."')
+    for _i, message in enumerate(test_messages[:3], 1):
         try:
             facts = fact_extractor.extract_facts_from_message(message)
             if facts:
-                for fact in facts:
-                    print(f"  ✅ Fact: {fact['fact']}")
-                    print(
-                        f"     Category: {fact['category']}, Confidence: {fact['confidence']:.2f}"
-                    )
+                for _fact in facts:
+                    pass
             else:
-                print("  📝 No facts extracted")
-        except Exception as e:
-            print(f"  ❌ Error: {e}")
+                pass
+        except Exception:
+            pass
 
     # Test 2: Personal Information Detection
-    print("\n\n2️⃣ Testing Personal Information Detection (RelationshipManager)")
-    print("=" * 60)
 
     relationship_manager = RelationshipManager(llm_client=llm_client)
 
-    for i, message in enumerate(test_messages[:3], 1):
-        print(f'\nTest {i}: "{message[:50]}..."')
+    for _i, message in enumerate(test_messages[:3], 1):
         try:
             personal_info = relationship_manager.detect_personal_info(message)
             if personal_info:
-                for info_type, items in personal_info.items():
-                    print(f"  ✅ {info_type}: {items}")
+                for _info_type, _items in personal_info.items():
+                    pass
             else:
-                print("  📝 No personal info detected")
-        except Exception as e:
-            print(f"  ❌ Error: {e}")
+                pass
+        except Exception:
+            pass
 
     # Test 3: Trust Indicator Detection
-    print("\n\n3️⃣ Testing Trust Indicator Detection (RelationshipManager)")
-    print("=" * 55)
 
     trust_test_messages = test_messages[2:6]  # Focus on trust-related messages
 
-    for i, message in enumerate(trust_test_messages, 1):
-        print(f'\nTest {i}: "{message[:50]}..."')
+    for _i, message in enumerate(trust_test_messages, 1):
         try:
             trust_indicators = relationship_manager.detect_trust_indicators(message)
             if trust_indicators:
-                for indicator in trust_indicators:
-                    print(f"  ✅ Trust indicator: {indicator}")
+                for _indicator in trust_indicators:
+                    pass
             else:
-                print("  📝 No trust indicators detected")
-        except Exception as e:
-            print(f"  ❌ Error: {e}")
+                pass
+        except Exception:
+            pass
 
     # Test 4: Synthetic Message Detection
-    print("\n\n4️⃣ Testing Synthetic Message Detection (UserMemoryManager)")
-    print("=" * 55)
 
     memory_manager = UserMemoryManager(enable_auto_facts=False, llm_client=llm_client)
 
@@ -136,19 +120,13 @@ def test_llm_conversions():
         "I'm having a great day, thanks for asking!",  # Natural message
     ]
 
-    for i, message in enumerate(synthetic_test_messages, 1):
-        print(f'\nTest {i}: "{message[:50]}..."')
+    for _i, message in enumerate(synthetic_test_messages, 1):
         try:
-            is_synthetic = memory_manager._is_synthetic_message(message)
-            result_icon = "🤖" if is_synthetic else "👤"
-            result_text = "SYNTHETIC" if is_synthetic else "NATURAL"
-            print(f"  {result_icon} Result: {result_text}")
-        except Exception as e:
-            print(f"  ❌ Error: {e}")
+            memory_manager._is_synthetic_message(message)
+        except Exception:
+            pass
 
     # Test 5: Full Emotion Manager Integration
-    print("\n\n5️⃣ Testing Full Emotion Manager Integration")
-    print("=" * 45)
 
     emotion_manager = EmotionManager(llm_client=llm_client)
 
@@ -161,12 +139,6 @@ def test_llm_conversions():
             test_user_id, test_message
         )
 
-        print(f"User: {test_user_id}")
-        print(f'Message: "{test_message[:60]}..."')
-        print(f"✅ Emotional State: {profile.current_emotion.value}")
-        print(f"✅ Relationship Level: {profile.relationship_level.value}")
-        print(f"✅ Total Interactions: {profile.interaction_count}")
-        print(f"✅ Emotion Confidence: {emotion_profile.confidence:.2f}")
 
         # Test personal info and trust detection through relationship manager
         personal_info = emotion_manager.relationship_manager.detect_personal_info(test_message)
@@ -175,28 +147,14 @@ def test_llm_conversions():
         )
 
         if personal_info:
-            print(f"✅ Personal Info Detected: {list(personal_info.keys())}")
+            pass
         if trust_indicators:
-            print(f"✅ Trust Indicators: {len(trust_indicators)} found")
+            pass
 
-    except Exception as e:
-        print(f"❌ Error in emotion manager integration: {e}")
+    except Exception:
+        pass
 
     # Summary
-    print("\n\n📊 SUMMARY")
-    print("=" * 40)
-    print("✅ User Fact Extraction - Pure LLM-based")
-    print("✅ Personal Information Detection - Pure LLM-based")
-    print("✅ Trust Indicator Detection - Pure LLM-based")
-    print("✅ Synthetic Message Detection - Pure LLM-based")
-    print("✅ Full Integration - EmotionManager using LLM throughout")
-    print("\n🎉 All pattern-based code successfully converted to pure LLM-based analysis!")
-    print("\n💡 Benefits of pure LLM conversion:")
-    print("   • Maximum accuracy and context awareness")
-    print("   • No maintenance of complex regex patterns")
-    print("   • Consistent LLM-based analysis throughout")
-    print("   • Cleaner, more maintainable codebase")
-    print("   • Requires LLM client for full functionality")
 
 
 if __name__ == "__main__":

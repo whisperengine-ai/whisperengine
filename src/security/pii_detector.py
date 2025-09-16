@@ -5,9 +5,8 @@ This module provides automatic detection of personally identifiable information 
 and sensitive content in facts to ensure appropriate privacy classification.
 """
 
-import re
 import logging
-from typing import Dict, List, Optional, Set
+import re
 from dataclasses import dataclass
 from enum import Enum, IntEnum
 
@@ -58,7 +57,7 @@ class PIIAnalysis:
 
     contains_pii: bool
     highest_sensitivity: SensitivityLevel
-    detections: List[PIIDetection]
+    detections: list[PIIDetection]
     recommended_security_level: str
     analysis_confidence: float
 
@@ -255,7 +254,7 @@ class PIIDetector:
                 analysis_confidence=0.5,
             )
 
-    def _check_patterns(self, fact_text: str) -> List[PIIDetection]:
+    def _check_patterns(self, fact_text: str) -> list[PIIDetection]:
         """Check regex patterns for PII"""
         detections = []
 
@@ -274,7 +273,7 @@ class PIIDetector:
 
         return detections
 
-    def _check_keywords(self, fact_lower: str) -> List[PIIDetection]:
+    def _check_keywords(self, fact_lower: str) -> list[PIIDetection]:
         """Check keyword categories for sensitive content"""
         detections = []
 
@@ -294,7 +293,7 @@ class PIIDetector:
 
         return detections
 
-    def _check_personal_indicators(self, fact_lower: str) -> List[PIIDetection]:
+    def _check_personal_indicators(self, fact_lower: str) -> list[PIIDetection]:
         """Check for personal indicators that suggest user-specific content"""
         detections = []
 
@@ -312,7 +311,7 @@ class PIIDetector:
 
         return detections
 
-    def _check_temporal_indicators(self, fact_lower: str) -> List[PIIDetection]:
+    def _check_temporal_indicators(self, fact_lower: str) -> list[PIIDetection]:
         """Check for temporal personal indicators"""
         detections = []
 
@@ -341,7 +340,7 @@ class PIIDetector:
         }
         return sensitivity_map.get(pii_type, SensitivityLevel.PERSONAL)
 
-    def _analyze_detections(self, detections: List[PIIDetection], fact_text: str) -> PIIAnalysis:
+    def _analyze_detections(self, detections: list[PIIDetection], fact_text: str) -> PIIAnalysis:
         """Analyze all detections to create final assessment"""
         if not detections:
             # No PII detected - check if it's general knowledge

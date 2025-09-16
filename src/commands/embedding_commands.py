@@ -3,12 +3,9 @@ Embedding Test Commands for Discord Bot
 Commands to test and manage the external embedding system.
 """
 
-import asyncio
-import json
 import os
-from typing import Dict, Any
+
 from src.utils.embedding_manager import embedding_manager, get_embedding_config
-from src.memory.chromadb_external_embeddings import test_embedding_setup
 
 
 async def handle_embedding_test_command(message) -> str:
@@ -30,8 +27,8 @@ async def handle_embedding_test_command(message) -> str:
         embeddings = await embedding_manager.get_embeddings(test_texts)
 
         # Format response
-        response = f"🔧 **Embedding System Status**\n\n"
-        response += f"**Configuration:**\n"
+        response = "🔧 **Embedding System Status**\n\n"
+        response += "**Configuration:**\n"
         response += (
             f"• External Embeddings: {'✅ Enabled' if config['use_external'] else '❌ Disabled'}\n"
         )
@@ -40,24 +37,24 @@ async def handle_embedding_test_command(message) -> str:
         response += f"• Has API Key: {'✅ Yes' if config['has_api_key'] else '❌ No'}\n"
         response += f"• Batch Size: {config['max_batch_size']}\n\n"
 
-        response += f"**Connection Test:**\n"
+        response += "**Connection Test:**\n"
         if connection_test["success"]:
-            response += f"✅ **Connected Successfully**\n"
+            response += "✅ **Connected Successfully**\n"
             response += f"• Service: {connection_test.get('service', 'unknown')}\n"
             response += f"• Model: {connection_test.get('model', 'unknown')}\n"
             response += f"• Dimension: {connection_test.get('dimension', 'unknown')}\n"
             response += f"• Response Time: {connection_test.get('response_time', 0):.3f}s\n"
         else:
-            response += f"❌ **Connection Failed**\n"
+            response += "❌ **Connection Failed**\n"
             response += f"• Error: {connection_test.get('error', 'Unknown error')}\n"
 
-        response += f"\n**Embedding Test:**\n"
+        response += "\n**Embedding Test:**\n"
         if embeddings and len(embeddings) > 0:
             response += f"✅ **Generated {len(embeddings)} embeddings**\n"
             response += f"• Dimension: {len(embeddings[0])}\n"
             response += f"• Sample values: {[f'{x:.4f}' for x in embeddings[0][:5]]}\n"
         else:
-            response += f"❌ **Failed to generate embeddings**\n"
+            response += "❌ **Failed to generate embeddings**\n"
 
         return response
 
@@ -75,7 +72,7 @@ async def handle_embedding_config_command(message) -> str:
     try:
         config = get_embedding_config()
 
-        response = f"⚙️ **Embedding Configuration**\n\n"
+        response = "⚙️ **Embedding Configuration**\n\n"
 
         for key, value in config.items():
             if key == "has_api_key":
@@ -91,10 +88,10 @@ async def handle_embedding_config_command(message) -> str:
             display_key = key.replace("_", " ").title()
             response += f"• **{display_key}:** `{display_value}`\n"
 
-        response += f"\n**To change configuration:**\n"
-        response += f"1. Update your `.env` file\n"
-        response += f"2. Set `USE_EXTERNAL_EMBEDDINGS=true/false`\n"
-        response += f"3. Restart the bot\n"
+        response += "\n**To change configuration:**\n"
+        response += "1. Update your `.env` file\n"
+        response += "2. Set `USE_EXTERNAL_EMBEDDINGS=true/false`\n"
+        response += "3. Restart the bot\n"
 
         return response
 
@@ -114,11 +111,11 @@ async def handle_embedding_performance_command(message) -> str:
 
         perf_info = await check_chromadb_performance()
 
-        response = f"🔍 **ChromaDB Embedding Performance Analysis**\n\n"
+        response = "🔍 **ChromaDB Embedding Performance Analysis**\n\n"
 
         # System information
         system_info = perf_info.get("system_info", {})
-        response += f"**System Information:**\n"
+        response += "**System Information:**\n"
         response += f"• Platform: {system_info.get('platform', 'unknown')}\n"
         response += f"• Architecture: {system_info.get('machine', 'unknown')}\n"
 
@@ -134,29 +131,29 @@ async def handle_embedding_performance_command(message) -> str:
         if tokens_per_sec > 0:
             response += f"• Estimated Speed: ~{tokens_per_sec:,.0f} tokens/sec\n"
 
-        response += f"\n"
+        response += "\n"
 
         # Warnings
         warnings = perf_info.get("warnings", [])
         if warnings:
-            response += f"**⚠️ Performance Warnings:**\n"
+            response += "**⚠️ Performance Warnings:**\n"
             for warning in warnings:
                 response += f"• {warning}\n"
-            response += f"\n"
+            response += "\n"
 
         # Recommendations
         recommendations = perf_info.get("recommendations", [])
         if recommendations:
-            response += f"**💡 Recommendations:**\n"
+            response += "**💡 Recommendations:**\n"
             for rec in recommendations:
                 response += f"• {rec}\n"
-            response += f"\n"
+            response += "\n"
 
         # Current configuration
         from src.utils.embedding_manager import is_external_embedding_configured
 
         external_configured = is_external_embedding_configured()
-        response += f"**Current Configuration:**\n"
+        response += "**Current Configuration:**\n"
         response += f"• External Embeddings: {'✅ Configured' if external_configured else '❌ Not configured'}\n"
 
         if external_configured:
@@ -171,21 +168,21 @@ async def handle_embedding_performance_command(message) -> str:
                 os.getenv("LLM_EMBEDDING_API_URL") is None
                 and os.getenv("LLM_CHAT_API_URL") is not None
             ):
-                response += f"  (using LLM_CHAT_API_URL as fallback)\n"
+                response += "  (using LLM_CHAT_API_URL as fallback)\n"
             response += f"• Model: `{os.getenv('LLM_EMBEDDING_MODEL', 'not set')}`\n"
         else:
-            response += f"• Using: ChromaDB default embeddings (CPU-based)\n"
+            response += "• Using: ChromaDB default embeddings (CPU-based)\n"
 
         # Configuration suggestions
         external_recommended = perf_info.get("external_embedding_recommended", False)
         if external_recommended and not external_configured:
-            response += f"\n**🚀 Recommended Configuration:**\n"
-            response += f"Add to your `.env` file:\n"
-            response += f"```\n"
-            response += f"LLM_EMBEDDING_API_URL=http://localhost:1234/v1\n"
-            response += f"LLM_EMBEDDING_MODEL=text-embedding-nomic-embed-text-v1.5\n"
-            response += f"```\n"
-            response += f"Then restart the bot for better performance.\n"
+            response += "\n**🚀 Recommended Configuration:**\n"
+            response += "Add to your `.env` file:\n"
+            response += "```\n"
+            response += "LLM_EMBEDDING_API_URL=http://localhost:1234/v1\n"
+            response += "LLM_EMBEDDING_MODEL=text-embedding-nomic-embed-text-v1.5\n"
+            response += "```\n"
+            response += "Then restart the bot for better performance.\n"
 
         return response
 
@@ -205,32 +202,32 @@ async def handle_embedding_switch_command(message, args) -> str:
 
     mode = args[0].lower()
 
-    response = f"⚠️ **Embedding Mode Switch Request**\n\n"
+    response = "⚠️ **Embedding Mode Switch Request**\n\n"
     response += f"You requested to switch to **{mode}** embeddings.\n\n"
-    response += f"**To switch modes:**\n"
+    response += "**To switch modes:**\n"
 
     if mode == "external":
-        response += f"1. Add to your `.env` file:\n"
-        response += f"```\n"
-        response += f"LLM_EMBEDDING_API_URL=http://localhost:1234/v1\n"
-        response += f"LLM_EMBEDDING_MODEL=text-embedding-nomic-embed-text-v1.5\n"
-        response += f"# Optional: LLM_EMBEDDING_API_KEY=your_key\n"
-        response += f"```\n"
-        response += f"2. Restart the bot\n\n"
-        response += f"**Alternative APIs:**\n"
-        response += f"• OpenAI: `https://api.openai.com/v1` + `text-embedding-3-small`\n"
-        response += f"• Ollama: `http://localhost:11434/v1` + `nomic-embed-text`\n"
+        response += "1. Add to your `.env` file:\n"
+        response += "```\n"
+        response += "LLM_EMBEDDING_API_URL=http://localhost:1234/v1\n"
+        response += "LLM_EMBEDDING_MODEL=text-embedding-nomic-embed-text-v1.5\n"
+        response += "# Optional: LLM_EMBEDDING_API_KEY=your_key\n"
+        response += "```\n"
+        response += "2. Restart the bot\n\n"
+        response += "**Alternative APIs:**\n"
+        response += "• OpenAI: `https://api.openai.com/v1` + `text-embedding-3-small`\n"
+        response += "• Ollama: `http://localhost:11434/v1` + `nomic-embed-text`\n"
     else:
-        response += f"1. Remove or comment out these lines in `.env`:\n"
-        response += f"```\n"
-        response += f"# LLM_EMBEDDING_API_URL=...\n"
-        response += f"# LLM_EMBEDDING_MODEL=...\n"
-        response += f"```\n"
-        response += f"2. Restart the bot\n\n"
-        response += f"Local embeddings will use ChromaDB's built-in models.\n"
-        response += f"**Note:** May be slower, especially on macOS.\n"
+        response += "1. Remove or comment out these lines in `.env`:\n"
+        response += "```\n"
+        response += "# LLM_EMBEDDING_API_URL=...\n"
+        response += "# LLM_EMBEDDING_MODEL=...\n"
+        response += "```\n"
+        response += "2. Restart the bot\n\n"
+        response += "Local embeddings will use ChromaDB's built-in models.\n"
+        response += "**Note:** May be slower, especially on macOS.\n"
 
-    response += f"\n⚡ **Note:** Configuration changes require a bot restart to take effect."
+    response += "\n⚡ **Note:** Configuration changes require a bot restart to take effect."
 
     return response
 
@@ -334,12 +331,12 @@ if content.startswith('!'):
     parts = content[1:].split()
     command = parts[0].lower()
     args = parts[1:] if len(parts) > 1 else []
-    
+
     # Handle embedding commands
     embedding_response = await handle_embedding_commands(message, command, args)
     if embedding_response:
         await message.channel.send(embedding_response)
         return
-    
+
     # Handle other commands...
 """

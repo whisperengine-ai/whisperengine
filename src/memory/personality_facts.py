@@ -7,12 +7,11 @@ classification system that maximizes AI companion engagement and relationship bu
 
 import logging
 import re
-from typing import Dict, List, Optional, Tuple
 from dataclasses import dataclass
-from enum import Enum
 from datetime import datetime
+from enum import Enum
 
-from src.security.pii_detector import PIIDetector, PIIAnalysis, SensitivityLevel
+from src.security.pii_detector import PIIDetector
 
 logger = logging.getLogger(__name__)
 
@@ -69,13 +68,13 @@ class PersonalityFact:
     relevance_score: float
     emotional_weight: float
     privacy_level: str
-    context_metadata: Dict
+    context_metadata: dict
     extraction_confidence: float
     last_accessed: datetime
     access_frequency: int
     user_id: str
 
-    def to_storage_dict(self) -> Dict:
+    def to_storage_dict(self) -> dict:
         """Convert to dictionary for database storage with flattened metadata"""
         storage_dict = {
             "content": self.content,
@@ -113,7 +112,7 @@ class PersonalityFactClassifier:
     relationship building rather than global vs user categorization
     """
 
-    def __init__(self, pii_detector: Optional[PIIDetector] = None):
+    def __init__(self, pii_detector: PIIDetector | None = None):
         self.pii_detector = pii_detector or PIIDetector()
         self.setup_classification_patterns()
         self.setup_relevance_scoring()
@@ -317,7 +316,7 @@ class PersonalityFactClassifier:
         }
 
     def classify_fact(
-        self, fact_content: str, context_metadata: Dict, user_id: str
+        self, fact_content: str, context_metadata: dict, user_id: str
     ) -> PersonalityFact:
         """
         Classify a fact for personality enhancement potential
@@ -405,8 +404,8 @@ class PersonalityFactClassifier:
         return PersonalityFactType.INTEREST_DISCOVERY
 
     def _calculate_relevance_score(
-        self, fact_content: str, fact_type: PersonalityFactType, context_metadata: Dict
-    ) -> Tuple[float, float]:
+        self, fact_content: str, fact_type: PersonalityFactType, context_metadata: dict
+    ) -> tuple[float, float]:
         """Calculate personality relevance score and emotional weight"""
 
         base_score = self.base_relevance_scores.get(fact_type, 0.5)
@@ -482,7 +481,7 @@ class PersonalityFactClassifier:
             return PersonalityRelevance.MINIMAL
 
     def _create_safe_fallback_fact(
-        self, fact_content: str, context_metadata: Dict, user_id: str
+        self, fact_content: str, context_metadata: dict, user_id: str
     ) -> PersonalityFact:
         """Create a safe fallback fact when classification fails"""
         return PersonalityFact(

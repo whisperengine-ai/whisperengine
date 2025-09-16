@@ -2,14 +2,14 @@
 Backup and recovery system for ChromaDB HTTP service data
 """
 
-import os
 import json
 import logging
+import os
 from datetime import datetime
-from typing import Dict, List, Optional
 from pathlib import Path
-from src.memory.memory_manager import UserMemoryManager
+
 from src.memory.chromadb_http_manager import ChromaDBHTTPManager
+from src.memory.memory_manager import UserMemoryManager
 from src.utils.exceptions import MemoryError
 
 logger = logging.getLogger(__name__)
@@ -20,9 +20,9 @@ class BackupManager:
 
     def __init__(
         self,
-        backup_path: Optional[str] = None,
-        chromadb_host: Optional[str] = None,
-        chromadb_port: Optional[int] = None,
+        backup_path: str | None = None,
+        chromadb_host: str | None = None,
+        chromadb_port: int | None = None,
     ):
         # Load backup path from environment variables
         if backup_path is None:
@@ -120,7 +120,7 @@ class BackupManager:
                 raise MemoryError("Invalid backup: missing backup_info.json")
 
             # Load backup info
-            with open(backup_info_file, "r") as f:
+            with open(backup_info_file) as f:
                 backup_info = json.load(f)
 
             logger.info(f"Restoring backup from {backup_info['timestamp']}")
@@ -139,7 +139,7 @@ class BackupManager:
             backup_chromadb = backup_dir / "chromadb_data"
             if backup_chromadb.exists():
                 shutil.copytree(backup_chromadb, self.chromadb_path)
-                logger.info(f"Restored ChromaDB data from backup")
+                logger.info("Restored ChromaDB data from backup")
             else:
                 raise MemoryError("Backup does not contain ChromaDB data")
 
@@ -150,7 +150,7 @@ class BackupManager:
             logger.error(f"Failed to restore backup: {e}")
             raise MemoryError(f"Backup restoration failed: {e}")
 
-    def list_backups(self) -> List[Dict]:
+    def list_backups(self) -> list[dict]:
         """List all available backups with their metadata"""
         backups = []
 
@@ -161,7 +161,7 @@ class BackupManager:
 
                     if backup_info_file.exists():
                         try:
-                            with open(backup_info_file, "r") as f:
+                            with open(backup_info_file) as f:
                                 backup_info = json.load(f)
 
                             backup_info["path"] = str(backup_dir)
@@ -243,7 +243,7 @@ class BackupManager:
         """Get the total size of a directory in bytes"""
         total_size = 0
         try:
-            for dirpath, dirnames, filenames in os.walk(path):
+            for dirpath, _dirnames, filenames in os.walk(path):
                 for filename in filenames:
                     filepath = os.path.join(dirpath, filename)
                     if os.path.exists(filepath):
@@ -265,7 +265,7 @@ class BackupManager:
 
         return self.create_backup(include_metadata=True)
 
-    def verify_backup(self, backup_path: str) -> Dict:
+    def verify_backup(self, backup_path: str) -> dict:
         """
         Verify the integrity of a backup
 
@@ -291,7 +291,7 @@ class BackupManager:
                 verification_result["errors"].append("Missing backup_info.json")
             else:
                 try:
-                    with open(backup_info_file, "r") as f:
+                    with open(backup_info_file) as f:
                         backup_info = json.load(f)
                     verification_result["info"]["backup_info"] = backup_info
                 except Exception as e:
@@ -312,7 +312,7 @@ class BackupManager:
             metadata_file = backup_dir / "metadata_export.json"
             if metadata_file.exists():
                 try:
-                    with open(metadata_file, "r") as f:
+                    with open(metadata_file) as f:
                         metadata = json.load(f)
                     verification_result["info"]["metadata_count"] = metadata.get(
                         "total_documents", 0

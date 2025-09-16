@@ -4,15 +4,16 @@ Test for Conversation Cache Mixing Security Fix
 Tests the fix for CVSS 7.2 vulnerability - Conversation Cache Mixing
 """
 
-import sys
 import os
+import sys
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-from conversation_cache import HybridConversationCache
-from unittest.mock import Mock, AsyncMock
 import asyncio
 import time
+from unittest.mock import Mock
+
+from conversation_cache import HybridConversationCache
 
 
 def create_mock_message(user_id: int, content: str, is_bot: bool = False, message_id=None):
@@ -56,7 +57,6 @@ def create_mock_channel(channel_id: int):
 async def test_user_specific_filtering():
     """Test that user-specific filtering works correctly"""
 
-    print("🧪 Testing user-specific conversation filtering...")
 
     cache = HybridConversationCache()
     mock_channel = create_mock_channel(12345)
@@ -87,15 +87,12 @@ async def test_user_specific_filtering():
     for msg in messages:
         cache.add_message(str(mock_channel.id), msg)
 
-    print(f"  Added {len(messages)} messages from 3 users + bot to cache")
 
     # Test Alice's conversation context - should only see Alice + bot messages
     alice_context = await cache.get_user_conversation_context(mock_channel, user_alice, limit=10)
 
-    print(f"  Alice's context contains {len(alice_context)} messages:")
     for msg in alice_context:
-        user_type = "Bot" if msg.author.bot else f"User {msg.author.id}"
-        print(f"    - {user_type}: {msg.content}")
+        pass
 
     # Validate Alice's context
     alice_user_messages = [msg for msg in alice_context if msg.author.id == user_alice]
@@ -128,15 +125,12 @@ async def test_user_specific_filtering():
     ), "Alice should NOT see Charlie's secret"
     assert "Hey bot, I'm Bob" not in all_alice_content, "Alice should NOT see Bob's messages"
 
-    print("  ✅ Alice's context is properly filtered")
 
     # Test Bob's conversation context
     bob_context = await cache.get_user_conversation_context(mock_channel, user_bob, limit=10)
 
-    print(f"  Bob's context contains {len(bob_context)} messages:")
     for msg in bob_context:
-        user_type = "Bot" if msg.author.bot else f"User {msg.author.id}"
-        print(f"    - {user_type}: {msg.content}")
+        pass
 
     # Validate Bob's context
     bob_user_messages = [msg for msg in bob_context if msg.author.id == user_bob]
@@ -159,17 +153,14 @@ async def test_user_specific_filtering():
     ), "Bob should NOT see Charlie's secret"
     assert "weather" not in all_bob_content, "Bob should NOT see Alice's weather question"
 
-    print("  ✅ Bob's context is properly filtered")
 
     # Test Charlie's conversation context (should only see his own message)
     charlie_context = await cache.get_user_conversation_context(
         mock_channel, user_charlie, limit=10
     )
 
-    print(f"  Charlie's context contains {len(charlie_context)} messages:")
     for msg in charlie_context:
-        user_type = "Bot" if msg.author.bot else f"User {msg.author.id}"
-        print(f"    - {user_type}: {msg.content}")
+        pass
 
     # Validate Charlie's context
     charlie_user_messages = [msg for msg in charlie_context if msg.author.id == user_charlie]
@@ -194,15 +185,12 @@ async def test_user_specific_filtering():
     assert "Alice" not in all_charlie_content, "Charlie should NOT see Alice's name or messages"
     assert "Bob" not in all_charlie_content, "Charlie should NOT see Bob's name or messages"
 
-    print("  ✅ Charlie's context is properly filtered")
 
-    print("✅ User-specific filtering test passed")
 
 
 async def test_dm_security():
     """Test security in DM context where cache mixing is still possible"""
 
-    print("\n🧪 Testing DM conversation security...")
 
     cache = HybridConversationCache()
 
@@ -247,18 +235,14 @@ async def test_dm_security():
     for msg in bob_messages:
         cache.add_message(str(bob_dm_channel.id), msg)
 
-    print(f"  Added {len(alice_messages)} messages to Alice's DM")
-    print(f"  Added {len(bob_messages)} messages to Bob's DM")
 
     # Test Alice's DM context - should only see Alice + bot from her DM
     alice_dm_context = await cache.get_user_conversation_context(
         alice_dm_channel, user_alice, limit=10
     )
 
-    print(f"  Alice's DM context contains {len(alice_dm_context)} messages:")
     for msg in alice_dm_context:
-        user_type = "Bot" if msg.author.bot else f"User {msg.author.id}"
-        print(f"    - {user_type}: {msg.content}")
+        pass
 
     # Validate Alice's DM context
     alice_dm_content = " ".join([msg.content for msg in alice_dm_context])
@@ -270,10 +254,8 @@ async def test_dm_security():
     # Test Bob's DM context - should only see Bob + bot from his DM
     bob_dm_context = await cache.get_user_conversation_context(bob_dm_channel, user_bob, limit=10)
 
-    print(f"  Bob's DM context contains {len(bob_dm_context)} messages:")
     for msg in bob_dm_context:
-        user_type = "Bot" if msg.author.bot else f"User {msg.author.id}"
-        print(f"    - {user_type}: {msg.content}")
+        pass
 
     # Validate Bob's DM context
     bob_dm_content = " ".join([msg.content for msg in bob_dm_context])
@@ -282,14 +264,11 @@ async def test_dm_security():
     assert "secret plan" not in bob_dm_content, "Bob should NOT see Alice's secret plan"
     assert "surprise" not in bob_dm_content, "Bob should NOT see Alice's party planning"
 
-    print("  ✅ DM conversations are properly isolated")
-    print("✅ DM security test passed")
 
 
 async def test_bot_response_filtering():
     """Test that bot responses are correctly included and attributed"""
 
-    print("\n🧪 Testing bot response filtering...")
 
     cache = HybridConversationCache()
     mock_channel = create_mock_channel(30001)
@@ -316,15 +295,12 @@ async def test_bot_response_filtering():
     for msg in messages:
         cache.add_message(str(mock_channel.id), msg)
 
-    print(f"  Added {len(messages)} messages with interleaved bot responses")
 
     # Test Alice's context - should see her messages + all bot responses
     alice_context = await cache.get_user_conversation_context(mock_channel, user_alice, limit=10)
 
-    print(f"  Alice's context contains {len(alice_context)} messages:")
     for msg in alice_context:
-        user_type = "Bot" if msg.author.bot else f"User {msg.author.id}"
-        print(f"    - {user_type}: {msg.content}")
+        pass
 
     # Validate Alice sees her conversation with the bot
     alice_content = " ".join([msg.content for msg in alice_context])
@@ -340,10 +316,8 @@ async def test_bot_response_filtering():
     # Test Bob's context - should see his messages + all bot responses
     bob_context = await cache.get_user_conversation_context(mock_channel, user_bob, limit=10)
 
-    print(f"  Bob's context contains {len(bob_context)} messages:")
     for msg in bob_context:
-        user_type = "Bot" if msg.author.bot else f"User {msg.author.id}"
-        print(f"    - {user_type}: {msg.content}")
+        pass
 
     # Validate Bob sees his conversation with the bot
     bob_content = " ".join([msg.content for msg in bob_context])
@@ -358,14 +332,11 @@ async def test_bot_response_filtering():
     # This is a design decision - we could further filter bot responses to only include
     # those that are contextually relevant to the current user
 
-    print("  ✅ Bot responses are included but user messages are properly filtered")
-    print("✅ Bot response filtering test passed")
 
 
 async def test_performance_and_limits():
     """Test that the security filtering doesn't cause performance issues"""
 
-    print("\n🧪 Testing performance and limits...")
 
     cache = HybridConversationCache()
     mock_channel = create_mock_channel(40001)
@@ -389,17 +360,14 @@ async def test_performance_and_limits():
     start_time = time.time()
     for msg in messages:
         cache.add_message(str(mock_channel.id), msg)
-    add_time = time.time() - start_time
+    time.time() - start_time
 
-    print(f"  Added {len(messages)} messages in {add_time:.3f} seconds")
 
     # Test retrieval performance
     start_time = time.time()
     alice_context = await cache.get_user_conversation_context(mock_channel, user_alice, limit=10)
     retrieval_time = time.time() - start_time
 
-    print(f"  Retrieved user context in {retrieval_time:.3f} seconds")
-    print(f"  Context contains {len(alice_context)} messages (limit was 10)")
 
     # Validate we get the expected limit
     assert len(alice_context) == 10, f"Should get exactly 10 messages, got {len(alice_context)}"
@@ -407,14 +375,11 @@ async def test_performance_and_limits():
     # Validate performance is reasonable (should be very fast for this test)
     assert retrieval_time < 1.0, f"Context retrieval took too long: {retrieval_time:.3f}s"
 
-    print("  ✅ Performance is acceptable")
-    print("✅ Performance and limits test passed")
 
 
 async def test_edge_cases():
     """Test edge cases like empty channels, no bot messages, etc."""
 
-    print("\n🧪 Testing edge cases...")
 
     cache = HybridConversationCache()
 
@@ -424,7 +389,6 @@ async def test_edge_cases():
 
     empty_context = await cache.get_user_conversation_context(empty_channel, user_alice, limit=5)
     assert len(empty_context) == 0, "Empty channel should return empty context"
-    print("  ✅ Empty channel handled correctly")
 
     # Test 2: Channel with only other users' messages
     other_users_channel = create_mock_channel(50002)
@@ -444,7 +408,6 @@ async def test_edge_cases():
         other_users_channel, user_alice, limit=5
     )
     assert len(alice_context_empty) == 0, "Alice should see no messages from other users"
-    print("  ✅ Other users only channel handled correctly")
 
     # Test 3: Channel with only bot messages (no user messages)
     bot_only_channel = create_mock_channel(50003)
@@ -465,14 +428,10 @@ async def test_edge_cases():
     assert (
         len(alice_bot_context) == 2
     ), f"Alice should see bot messages, got {len(alice_bot_context)}"
-    print("  ✅ Bot-only channel handled correctly")
 
-    print("✅ Edge cases test passed")
 
 
 if __name__ == "__main__":
-    print("🔒 Conversation Cache Mixing Security Fix - Test Suite")
-    print("=" * 65)
 
     async def run_all_tests():
         try:
@@ -482,26 +441,11 @@ if __name__ == "__main__":
             await test_performance_and_limits()
             await test_edge_cases()
 
-            print("\n" + "=" * 65)
-            print("🎉 All conversation cache security tests passed!")
 
-            print("\n🔒 Security Test Summary:")
-            print("  ✅ User-specific message filtering")
-            print("  ✅ DM conversation isolation")
-            print("  ✅ Bot response filtering")
-            print("  ✅ Performance and limits")
-            print("  ✅ Edge case handling")
 
-            print("\n🛡️  Security Vulnerabilities Addressed:")
-            print("  ✅ Cross-user message contamination prevented")
-            print("  ✅ Private information leakage blocked")
-            print("  ✅ Channel-based cache segmentation fixed")
-            print("  ✅ User-level conversation isolation enforced")
 
-            print("\n✅ Conversation Cache Mixing (CVSS 7.2) - SECURITY FIX VALIDATED")
 
-        except Exception as e:
-            print(f"❌ Test failed: {e}")
+        except Exception:
             import traceback
 
             traceback.print_exc()

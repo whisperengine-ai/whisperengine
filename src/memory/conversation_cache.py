@@ -4,12 +4,12 @@ Reduces Discord API calls by caching recent messages locally with smart refresh 
 Thread-safe implementation for concurrent user operations.
 """
 
-import time
-import logging
 import asyncio
+import logging
 import threading
+import time
 from collections import deque
-from typing import Dict, List, Optional
+
 import discord
 
 logger = logging.getLogger(__name__)
@@ -44,7 +44,7 @@ class HybridConversationCache:
 
     async def get_conversation_context(
         self, channel, limit=5, exclude_message_id=None
-    ) -> List[discord.Message]:
+    ) -> list[discord.Message]:
         """
         Get recent conversation context with minimal API calls.
         Thread-safe for concurrent users.
@@ -111,7 +111,7 @@ class HybridConversationCache:
 
     async def get_user_conversation_context(
         self, channel, user_id: int, limit=5, exclude_message_id=None
-    ) -> List[discord.Message]:
+    ) -> list[discord.Message]:
         """
         SECURITY ENHANCEMENT: Get conversation context filtered by specific user ID to prevent cross-user contamination.
 
@@ -203,7 +203,7 @@ class HybridConversationCache:
                 if channel_id in self._bootstrap_locks:
                     del self._bootstrap_locks[channel_id]
 
-    def get_cache_stats(self) -> Dict:
+    def get_cache_stats(self) -> dict:
         """Get statistics about cache usage. Thread-safe."""
         with self._cache_lock:
             total_messages = sum(len(conv["messages"]) for conv in self.conversations.values())

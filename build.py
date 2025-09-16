@@ -4,24 +4,24 @@ WhisperEngine Universal Build Script
 Builds WhisperEngine for multiple deployment targets with smart configuration.
 """
 
+import argparse
+import asyncio
+import logging
 import os
 import sys
-import asyncio
-import argparse
-import logging
 from pathlib import Path
-from typing import Dict, List, Optional, Any
+from typing import Any
 
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
+from src.config.adaptive_config import AdaptiveConfigManager
 from src.packaging.unified_builder import (
-    UnifiedPackagingSystem,
     BuildConfig,
     DeploymentTarget,
     Platform,
+    UnifiedPackagingSystem,
 )
-from src.config.adaptive_config import AdaptiveConfigManager
 
 
 def setup_logging(debug: bool = False):
@@ -52,11 +52,11 @@ def detect_platform() -> Platform:
         return Platform.UNIVERSAL
 
 
-def get_recommended_config() -> Dict[str, Any]:
+def get_recommended_config() -> dict[str, Any]:
     """Get recommended configuration based on environment"""
     # Try to detect environment info, fallback to defaults
     try:
-        config_manager = AdaptiveConfigManager()
+        AdaptiveConfigManager()
         env_info = {"scale_tier": "tier_1"}  # Default fallback
     except:
         env_info = {"scale_tier": "tier_1"}
@@ -92,10 +92,7 @@ def get_recommended_config() -> Dict[str, Any]:
 
 def print_build_matrix():
     """Print available build targets and platforms"""
-    print("🏗️  WhisperEngine Build Matrix")
-    print("=" * 50)
 
-    print("\n📱 Deployment Targets:")
     targets = [
         ("native_desktop", "Native desktop app with embedded SQLite"),
         ("docker_single", "Single Docker container (all-in-one)"),
@@ -104,10 +101,9 @@ def print_build_matrix():
         ("web_only", "Web-only deployment (no Discord)"),
     ]
 
-    for target, description in targets:
-        print(f"  • {target:<16} - {description}")
+    for _target, _description in targets:
+        pass
 
-    print("\n💻 Platforms:")
     platforms = [
         ("windows", "Windows 10/11 (x64)"),
         ("macos", "macOS 10.15+ (Intel/Apple Silicon)"),
@@ -115,36 +111,22 @@ def print_build_matrix():
         ("universal", "Cross-platform compatible"),
     ]
 
-    for platform, description in platforms:
-        print(f"  • {platform:<12} - {description}")
+    for _platform, _description in platforms:
+        pass
 
-    print("\n🎯 Recommended Combinations:")
-    print("  • Desktop Users:    native_desktop + your_platform")
-    print("  • Developers:       docker_single + universal")
-    print("  • Self-Hosting:     docker_compose + linux")
-    print("  • Enterprise:       kubernetes + universal")
-    print("  • Web-Only Demo:    web_only + universal")
 
 
 async def interactive_build():
     """Interactive build configuration"""
-    print("🤖 WhisperEngine Interactive Build Setup")
-    print("=" * 45)
 
     # Get recommendations
     recommendations = get_recommended_config()
 
-    print(f"\n🔍 Detected Environment:")
-    print(f"  Platform: {recommendations['platform'].value}")
-    print(
-        f"  Discord Token: {'✅ Found' if recommendations['include_discord'] else '❌ Not found'}"
-    )
 
     # Ask for build target
-    print(f"\n🎯 Select Deployment Target:")
     targets = list(DeploymentTarget)
-    for i, target in enumerate(targets, 1):
-        print(f"  {i}. {target.value}")
+    for _i, _target in enumerate(targets, 1):
+        pass
 
     while True:
         try:
@@ -153,9 +135,9 @@ async def interactive_build():
                 selected_target = targets[choice]
                 break
             else:
-                print("Invalid choice, please try again.")
+                pass
         except ValueError:
-            print("Please enter a number.")
+            pass
 
     # Configure based on target
     if selected_target == DeploymentTarget.NATIVE_DESKTOP:
@@ -170,20 +152,20 @@ async def interactive_build():
 
     # Ask about Discord integration if not auto-detected
     if not os.environ.get("DISCORD_BOT_TOKEN"):
-        discord_choice = input(f"\n🤖 Include Discord integration? (y/N): ").lower()
+        discord_choice = input("\n🤖 Include Discord integration? (y/N): ").lower()
         include_discord = discord_choice in ["y", "yes"]
 
     # Ask about optimization
-    optimize_choice = input(f"\n🗜️  Optimize for smaller size? (Y/n): ").lower()
+    optimize_choice = input("\n🗜️  Optimize for smaller size? (Y/n): ").lower()
     optimize = optimize_choice not in ["n", "no"]
 
     # Ask for custom name
-    app_name = input(f"\n📛 Application name (WhisperEngine): ").strip()
+    app_name = input("\n📛 Application name (WhisperEngine): ").strip()
     if not app_name:
         app_name = "WhisperEngine"
 
     # Ask for output directory
-    output_dir = input(f"\n📁 Output directory (./dist): ").strip()
+    output_dir = input("\n📁 Output directory (./dist): ").strip()
     if not output_dir:
         output_dir = "./dist"
 
@@ -205,20 +187,10 @@ async def interactive_build():
     )
 
     # Show summary
-    print(f"\n📋 Build Configuration:")
-    print(f"  Target:       {config.target.value}")
-    print(f"  Platform:     {config.platform.value}")
-    print(f"  App Name:     {config.app_name}")
-    print(f"  Output:       {config.output_dir}")
-    print(f"  Database:     {config.database_type}")
-    print(f"  Discord:      {'✅ Enabled' if config.include_discord else '❌ Disabled'}")
-    print(f"  Web UI:       {'✅ Enabled' if config.include_web_ui else '❌ Disabled'}")
-    print(f"  Optimized:    {'✅ Yes' if config.optimize_size else '❌ No'}")
 
     # Confirm and build
-    confirm = input(f"\n🚀 Proceed with build? (Y/n): ").lower()
+    confirm = input("\n🚀 Proceed with build? (Y/n): ").lower()
     if confirm in ["n", "no"]:
-        print("Build cancelled.")
         return 1
 
     return await execute_build(config)
@@ -226,7 +198,6 @@ async def interactive_build():
 
 async def execute_build(config: BuildConfig) -> int:
     """Execute build with given configuration"""
-    print(f"\n🏗️  Starting build for {config.target.value}...")
 
     try:
         # Create packaging system
@@ -236,21 +207,15 @@ async def execute_build(config: BuildConfig) -> int:
         result = await packaging_system.build(config)
 
         if result.success:
-            print(f"\n✅ Build completed successfully!")
-            print(f"📁 Output:     {result.output_path}")
-            print(f"📦 Size:       {result.size_mb}MB")
-            print(f"⏱️  Time:       {result.build_time_seconds}s")
-            print(f"📄 Artifacts:  {', '.join(result.artifacts)}")
 
             # Show next steps based on target
             await show_next_steps(config, result)
 
             return 0
         else:
-            print(f"\n❌ Build failed!")
             if result.errors:
-                for error in result.errors:
-                    print(f"   • {error}")
+                for _error in result.errors:
+                    pass
             return 1
 
     except Exception as e:
@@ -260,45 +225,27 @@ async def execute_build(config: BuildConfig) -> int:
 
 async def show_next_steps(config: BuildConfig, result):
     """Show next steps after successful build"""
-    print(f"\n🎯 Next Steps:")
 
     if config.target == DeploymentTarget.NATIVE_DESKTOP:
         if config.platform == Platform.MACOS:
-            print(f"  1. Double-click {config.app_name}.app to launch")
+            pass
         else:
-            exe_suffix = ".exe" if config.platform == Platform.WINDOWS else ""
-            print(f"  1. Run ./{config.app_name}{exe_suffix} to launch")
-        print(f"  2. Open http://localhost:8080 in your browser")
-        print(f"  3. Start chatting with your AI assistant!")
+            pass
 
         if config.include_discord and not os.environ.get("DISCORD_BOT_TOKEN"):
-            print(f"\n⚠️  Discord Integration:")
-            print(f"  • Set DISCORD_BOT_TOKEN environment variable")
-            print(f"  • Or configure in the web UI settings")
+            pass
 
     elif config.target == DeploymentTarget.DOCKER_SINGLE:
-        print(f"  1. Load Docker image: docker load < {result.artifacts[0]}")
-        print(f"  2. Run container: ./run.sh")
-        print(f"  3. Open http://localhost:8080 in your browser")
 
         if not os.environ.get("OPENROUTER_API_KEY"):
-            print(f"\n⚠️  API Configuration:")
-            print(f"  • Set OPENROUTER_API_KEY environment variable")
-            print(f"  • Update run.sh script with your API key")
+            pass
 
     elif config.target == DeploymentTarget.DOCKER_COMPOSE:
-        print(f"  1. Copy .env.template to .env")
-        print(f"  2. Edit .env with your API keys and passwords")
-        print(f"  3. Run: ./setup.sh")
-        print(f"  4. Open http://localhost:8080 in your browser")
+        pass
 
     elif config.target == DeploymentTarget.KUBERNETES:
-        print(f"  1. Configure kubectl for your cluster")
-        print(f"  2. Update ConfigMaps with your API keys")
-        print(f"  3. Apply manifests: kubectl apply -f ./")
-        print(f"  4. Access via ingress or port-forward")
+        pass
 
-    print(f"\n📚 Documentation: Check the generated README files for details")
 
 
 async def main():
@@ -393,21 +340,14 @@ Examples:
 
     if args.all:
         # Build all targets
-        print("🏗️  Building all targets...")
         packaging_system = UnifiedPackagingSystem()
         results = await packaging_system.build_all_targets(config)
 
-        print("\n📊 Build Summary:")
         success_count = 0
-        for target, result in results.items():
-            status = "✅" if result.success else "❌"
-            print(
-                f"  {status} {target.value:<20} {result.size_mb:>6.1f}MB  {result.build_time_seconds:>5.1f}s"
-            )
+        for _target, result in results.items():
             if result.success:
                 success_count += 1
 
-        print(f"\n🎯 {success_count}/{len(results)} builds successful")
         return 0 if success_count == len(results) else 1
 
     else:
@@ -419,5 +359,4 @@ if __name__ == "__main__":
     try:
         sys.exit(asyncio.run(main()))
     except KeyboardInterrupt:
-        print("\n👋 Build cancelled by user")
         sys.exit(1)

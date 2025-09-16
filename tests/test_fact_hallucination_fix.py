@@ -3,30 +3,24 @@
 Test script to verify that the fact extraction fixes prevent hallucinated facts
 """
 
-import sys
 import os
+import sys
 
 # Add the current directory to Python path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from fact_extractor import FactExtractor
 from lmstudio_client import LMStudioClient
-from memory_manager import UserMemoryManager
 
 
 def test_fact_extraction_fix():
     """Test that the problematic messages no longer generate hallucinated facts"""
 
-    print("Testing fact extraction fixes...")
-    print("=" * 50)
 
     # Create the LLM client (this will connect to LM Studio if running)
     try:
         llm_client = LMStudioClient()
-        print("✓ LLM client created successfully")
-    except Exception as e:
-        print(f"✗ Could not create LLM client: {e}")
-        print("Note: This test requires LM Studio to be running with the sentiment model")
+    except Exception:
         return
 
     # Create fact extractor
@@ -42,26 +36,20 @@ def test_fact_extraction_fix():
         "what?",
     ]
 
-    print("\nTesting problematic messages that previously generated hallucinated facts:")
-    print("-" * 70)
 
     for message in test_messages:
         try:
             facts = fact_extractor.extract_facts_from_message(message)
-            print(f"Message: '{message}' -> {len(facts)} facts extracted")
 
             if facts:
-                print("  WARNING: Facts were extracted from this message!")
-                for fact in facts:
-                    print(f"    - {fact['fact']} (confidence: {fact['confidence']})")
+                for _fact in facts:
+                    pass
             else:
-                print("  ✓ No facts extracted (correct behavior)")
+                pass
 
-        except Exception as e:
-            print(f"  ✗ Error extracting facts: {e}")
+        except Exception:
+            pass
 
-    print("\nTesting legitimate messages that should generate facts:")
-    print("-" * 70)
 
     legitimate_messages = [
         "I play guitar every weekend",
@@ -73,13 +61,12 @@ def test_fact_extraction_fix():
     for message in legitimate_messages:
         try:
             facts = fact_extractor.extract_facts_from_message(message)
-            print(f"Message: '{message}' -> {len(facts)} facts extracted")
 
-            for fact in facts:
-                print(f"    - {fact['fact']} (confidence: {fact['confidence']})")
+            for _fact in facts:
+                pass
 
-        except Exception as e:
-            print(f"  ✗ Error extracting facts: {e}")
+        except Exception:
+            pass
 
 
 if __name__ == "__main__":

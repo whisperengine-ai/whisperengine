@@ -4,16 +4,15 @@ Replaces JSON file storage with proper database backend for better security and 
 """
 
 import asyncio
-import asyncpg
 import json
 import logging
 import os
-from datetime import datetime, timezone
-from typing import Dict, List, Optional, Any
-from dataclasses import asdict
 from contextlib import asynccontextmanager
+from typing import Any
 
-from src.security.context_boundaries_security import PrivacyLevel, ConsentStatus, PrivacyPreferences
+import asyncpg
+
+from src.security.context_boundaries_security import ConsentStatus, PrivacyLevel, PrivacyPreferences
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +38,7 @@ class PostgreSQLPrivacyManager:
         self.password = password
         self.min_size = min_size
         self.max_size = max_size
-        self.pool: Optional[asyncpg.Pool] = None
+        self.pool: asyncpg.Pool | None = None
         self._initialized = False
         self._lock = asyncio.Lock()
 
@@ -92,7 +91,7 @@ class PostgreSQLPrivacyManager:
             created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
         );
-        
+
         -- Context Boundary Audit Log Table
         CREATE TABLE IF NOT EXISTS context_boundary_audit (
             id SERIAL PRIMARY KEY,
@@ -104,17 +103,17 @@ class PostgreSQLPrivacyManager:
             reason TEXT,
             privacy_level TEXT
         );
-        
+
         -- Indexes for performance
         CREATE INDEX IF NOT EXISTS idx_privacy_preferences_user_id ON user_privacy_preferences(user_id);
         CREATE INDEX IF NOT EXISTS idx_privacy_preferences_privacy_level ON user_privacy_preferences(privacy_level);
         CREATE INDEX IF NOT EXISTS idx_privacy_preferences_updated_at ON user_privacy_preferences(updated_at);
-        
+
         CREATE INDEX IF NOT EXISTS idx_audit_user_id ON context_boundary_audit(user_id);
         CREATE INDEX IF NOT EXISTS idx_audit_timestamp ON context_boundary_audit(request_timestamp);
         CREATE INDEX IF NOT EXISTS idx_audit_decision ON context_boundary_audit(decision);
         CREATE INDEX IF NOT EXISTS idx_audit_source_target ON context_boundary_audit(source_context, target_context);
-        
+
         -- Auto-update timestamp function and trigger
         CREATE OR REPLACE FUNCTION update_updated_at_column()
         RETURNS TRIGGER AS $$
@@ -123,7 +122,7 @@ class PostgreSQLPrivacyManager:
             RETURN NEW;
         END;
         $$ language 'plpgsql';
-        
+
         DROP TRIGGER IF EXISTS update_privacy_preferences_updated_at ON user_privacy_preferences;
         CREATE TRIGGER update_privacy_preferences_updated_at
             BEFORE UPDATE ON user_privacy_preferences
@@ -153,7 +152,7 @@ class PostgreSQLPrivacyManager:
         async with self.pool.acquire() as conn:
             yield conn
 
-    async def get_user_preferences(self, user_id: str) -> Optional[PrivacyPreferences]:
+    async def get_user_preferences(self, user_id: str) -> PrivacyPreferences | None:
         """Get user privacy preferences"""
         async with self.get_connection() as conn:
             row = await conn.fetchrow(
@@ -161,7 +160,7 @@ class PostgreSQLPrivacyManager:
                 SELECT user_id, privacy_level, allow_cross_server, allow_dm_to_server,
                        allow_server_to_dm, allow_private_to_public, custom_rules,
                        consent_status, consent_timestamp, updated_at
-                FROM user_privacy_preferences 
+                FROM user_privacy_preferences
                 WHERE user_id = $1
             """,
                 user_id,
@@ -187,7 +186,7 @@ class PostgreSQLPrivacyManager:
         async with self.get_connection() as conn:
             await conn.execute(
                 """
-                INSERT INTO user_privacy_preferences 
+                INSERT INTO user_privacy_preferences
                 (user_id, privacy_level, allow_cross_server, allow_dm_to_server,
                  allow_server_to_dm, allow_private_to_public, custom_rules,
                  consent_status, consent_timestamp)
@@ -229,7 +228,7 @@ class PostgreSQLPrivacyManager:
         async with self.get_connection() as conn:
             await conn.execute(
                 """
-                INSERT INTO context_boundary_audit 
+                INSERT INTO context_boundary_audit
                 (user_id, source_context, target_context, decision, reason, privacy_level)
                 VALUES ($1, $2, $3, $4, $5, $6)
             """,
@@ -242,8 +241,8 @@ class PostgreSQLPrivacyManager:
             )
 
     async def get_audit_history(
-        self, user_id: Optional[str] = None, limit: int = 100
-    ) -> List[Dict[str, Any]]:
+        self, user_id: str | None = None, limit: int = 100
+    ) -> list[dict[str, Any]]:
         """Get audit history, optionally filtered by user"""
         async with self.get_connection() as conn:
             if user_id:
@@ -251,9 +250,9 @@ class PostgreSQLPrivacyManager:
                     """
                     SELECT user_id, request_timestamp, source_context, target_context,
                            decision, reason, privacy_level
-                    FROM context_boundary_audit 
+                    FROM context_boundary_audit
                     WHERE user_id = $1
-                    ORDER BY request_timestamp DESC 
+                    ORDER BY request_timestamp DESC
                     LIMIT $2
                 """,
                     user_id,
@@ -264,8 +263,8 @@ class PostgreSQLPrivacyManager:
                     """
                     SELECT user_id, request_timestamp, source_context, target_context,
                            decision, reason, privacy_level
-                    FROM context_boundary_audit 
-                    ORDER BY request_timestamp DESC 
+                    FROM context_boundary_audit
+                    ORDER BY request_timestamp DESC
                     LIMIT $1
                 """,
                     limit,
@@ -273,7 +272,7 @@ class PostgreSQLPrivacyManager:
 
             return [dict(row) for row in rows]
 
-    async def get_all_user_preferences(self) -> Dict[str, PrivacyPreferences]:
+    async def get_all_user_preferences(self) -> dict[str, PrivacyPreferences]:
         """Get all user privacy preferences"""
         async with self.get_connection() as conn:
             rows = await conn.fetch(
@@ -306,11 +305,10 @@ class PostgreSQLPrivacyManager:
         """Clean up old audit entries for privacy compliance"""
         async with self.get_connection() as conn:
             result = await conn.execute(
-                """
-                DELETE FROM context_boundary_audit 
-                WHERE request_timestamp < CURRENT_TIMESTAMP - INTERVAL '%s days'
+                f"""
+                DELETE FROM context_boundary_audit
+                WHERE request_timestamp < CURRENT_TIMESTAMP - INTERVAL '{days_to_keep} days'
             """
-                % days_to_keep
             )
 
             count = int(result.split()[-1])

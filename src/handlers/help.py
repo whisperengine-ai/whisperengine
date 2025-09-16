@@ -4,8 +4,8 @@ Provides comprehensive help and command listings
 """
 
 import logging
+
 import discord
-from discord.ext import commands
 
 logger = logging.getLogger(__name__)
 
@@ -110,9 +110,9 @@ class HelpCommandHandlers:
         else:  # In a DM
             embed.add_field(
                 name="🚀 Getting Started",
-                value=f"• **Chat:** Just type messages - no commands needed!\n"
-                f"• **Quick test:** `!ping` (bot name optional in DMs)\n"
-                f"• **Voice chat:** `!join` to connect to voice",
+                value="• **Chat:** Just type messages - no commands needed!\n"
+                "• **Quick test:** `!ping` (bot name optional in DMs)\n"
+                "• **Voice chat:** `!join` to connect to voice",
                 inline=False,
             )
 
@@ -399,9 +399,9 @@ class HelpCommandHandlers:
         else:
             embed.add_field(
                 name="🎯 Bot Discovery",
-                value=f"**This bot responds to:** `whisperengine`\n"
-                f"**Standard help:** `!help` (works without bot name)\n"
-                f"**Quick start:** Try `!ping whisperengine` or mention the bot",
+                value="**This bot responds to:** `whisperengine`\n"
+                "**Standard help:** `!help` (works without bot name)\n"
+                "**Quick start:** Try `!ping whisperengine` or mention the bot",
                 inline=False,
             )
 
@@ -420,7 +420,7 @@ class HelpCommandHandlers:
         if ctx.guild:
             quick_start = f"1. Try: `!help` (standard Discord help)\n2. Test bot: `!ping {self.bot_name or 'whisperengine'}`\n3. Chat by mentioning the bot\n4. Use voice with `!join {self.bot_name or 'whisperengine'}`"
         else:
-            quick_start = f"1. Try: `!help` (works everywhere)\n2. Test bot: `!ping` (bot name optional in DMs)\n3. Just type messages to chat\n4. Use `!join` for voice features"
+            quick_start = "1. Try: `!help` (works everywhere)\n2. Test bot: `!ping` (bot name optional in DMs)\n3. Just type messages to chat\n4. Use `!join` for voice features"
 
         embed.add_field(name="⚡ Quick Start", value=quick_start, inline=False)
 

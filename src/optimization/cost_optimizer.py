@@ -4,12 +4,11 @@ Intelligent model selection and token usage optimization based on real usage pat
 """
 
 import asyncio
-import json
-from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Tuple, Any
-from dataclasses import dataclass
-from enum import Enum
 import logging
+from dataclasses import dataclass
+from datetime import datetime, timedelta
+from enum import Enum
+from typing import Any
 
 from src.database.database_integration import DatabaseIntegrationManager
 
@@ -32,8 +31,8 @@ class ModelProfile:
     cost_per_1k_input: float
     cost_per_1k_output: float
     max_tokens: int
-    strengths: List[str]
-    use_cases: List[str]
+    strengths: list[str]
+    use_cases: list[str]
     avg_response_time_ms: int = 1000
 
 
@@ -46,8 +45,8 @@ class RequestContext:
     prompt_tokens: int
     expected_output_tokens: int
     conversation_type: str  # casual, technical, creative, etc.
-    user_preference: Optional[str] = None
-    max_cost_cents: Optional[int] = None
+    user_preference: str | None = None
+    max_cost_cents: int | None = None
     priority: str = "normal"  # low, normal, high, urgent
 
 
@@ -72,7 +71,7 @@ class CostOptimizationEngine:
         self.usage_history = {}
         # Note: Usage patterns will be loaded when first needed
 
-    def _initialize_model_profiles(self) -> Dict[str, ModelProfile]:
+    def _initialize_model_profiles(self) -> dict[str, ModelProfile]:
         """Initialize model profiles based on current OpenRouter pricing"""
         return {
             "openai/gpt-4o-mini": ModelProfile(
@@ -133,14 +132,14 @@ class CostOptimizationEngine:
             # Load user preferences and usage patterns
             result = await self.db_manager.get_database_manager().query(
                 """
-                SELECT 
+                SELECT
                     user_id,
                     model_name,
                     AVG(cost_usd) as avg_cost,
                     AVG(input_tokens) as avg_input,
                     AVG(output_tokens) as avg_output,
                     COUNT(*) as usage_count
-                FROM token_usage_log 
+                FROM token_usage_log
                 WHERE timestamp >= :since
                 GROUP BY user_id, model_name
             """,
@@ -174,7 +173,7 @@ class CostOptimizationEngine:
 
         return selected_model
 
-    async def _get_cost_predictions(self, context: RequestContext) -> List[CostPrediction]:
+    async def _get_cost_predictions(self, context: RequestContext) -> list[CostPrediction]:
         """Get cost predictions for all suitable models"""
         predictions = []
 
@@ -238,7 +237,7 @@ class CostOptimizationEngine:
         return min(base_confidence, 1.0)
 
     def _apply_selection_logic(
-        self, context: RequestContext, predictions: List[CostPrediction]
+        self, context: RequestContext, predictions: list[CostPrediction]
     ) -> str:
         """Apply selection logic to choose the best model"""
 
@@ -276,19 +275,19 @@ class CostOptimizationEngine:
         # Return model with highest composite score
         return max(scored_predictions, key=lambda x: x[1])[0]
 
-    async def estimate_monthly_cost(self, user_id: str) -> Dict[str, Any]:
+    async def estimate_monthly_cost(self, user_id: str) -> dict[str, Any]:
         """Estimate monthly cost for a user based on usage patterns"""
         try:
             # Get last 30 days of usage
             result = await self.db_manager.get_database_manager().query(
                 """
-                SELECT 
+                SELECT
                     COUNT(*) as request_count,
                     AVG(cost_usd) as avg_cost_per_request,
                     SUM(cost_usd) as total_cost,
                     AVG(total_tokens) as avg_tokens_per_request
-                FROM token_usage_log 
-                WHERE user_id = :user_id 
+                FROM token_usage_log
+                WHERE user_id = :user_id
                 AND timestamp >= :since
             """,
                 {"user_id": user_id, "since": (datetime.now() - timedelta(days=30)).isoformat()},
@@ -320,7 +319,7 @@ class CostOptimizationEngine:
             logging.error(f"Failed to estimate monthly cost: {e}")
             return {"error": str(e)}
 
-    async def get_cost_optimization_suggestions(self, user_id: str) -> List[str]:
+    async def get_cost_optimization_suggestions(self, user_id: str) -> list[str]:
         """Get personalized cost optimization suggestions"""
         suggestions = []
 
@@ -328,14 +327,14 @@ class CostOptimizationEngine:
             # Analyze user's model usage
             result = await self.db_manager.get_database_manager().query(
                 """
-                SELECT 
+                SELECT
                     model_name,
                     COUNT(*) as usage_count,
                     SUM(cost_usd) as total_cost,
                     AVG(cost_usd) as avg_cost,
                     AVG(input_tokens) as avg_input_tokens
-                FROM token_usage_log 
-                WHERE user_id = :user_id 
+                FROM token_usage_log
+                WHERE user_id = :user_id
                 AND timestamp >= :since
                 GROUP BY model_name
                 ORDER BY total_cost DESC
@@ -401,7 +400,7 @@ class CostOptimizationEngine:
             logging.error(f"Failed to set user budget: {e}")
             return False
 
-    async def check_budget_status(self, user_id: str) -> Dict[str, Any]:
+    async def check_budget_status(self, user_id: str) -> dict[str, Any]:
         """Check current budget status for a user"""
         try:
             # Get budget
@@ -425,8 +424,8 @@ class CostOptimizationEngine:
             spending_result = await self.db_manager.get_database_manager().query(
                 """
                 SELECT SUM(cost_usd) as current_spending
-                FROM token_usage_log 
-                WHERE user_id = :user_id 
+                FROM token_usage_log
+                WHERE user_id = :user_id
                 AND timestamp >= :since
             """,
                 {"user_id": user_id, "since": first_of_month.isoformat()},
@@ -486,16 +485,13 @@ async def main():
     )
 
     # Select optimal model
-    selected_model = await cost_optimizer.select_optimal_model(context)
-    print(f"Selected model: {selected_model}")
+    await cost_optimizer.select_optimal_model(context)
 
     # Get cost estimate
-    monthly_estimate = await cost_optimizer.estimate_monthly_cost("test_user")
-    print(f"Monthly cost estimate: {monthly_estimate}")
+    await cost_optimizer.estimate_monthly_cost("test_user")
 
     # Get optimization suggestions
-    suggestions = await cost_optimizer.get_cost_optimization_suggestions("test_user")
-    print(f"Optimization suggestions: {suggestions}")
+    await cost_optimizer.get_cost_optimization_suggestions("test_user")
 
     await db_manager.cleanup()
 

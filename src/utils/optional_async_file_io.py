@@ -8,12 +8,13 @@ and memory manager. These are optional optimizations for better concurrent perfo
 Install aiofiles first: pip install aiofiles
 """
 
-import json
 import asyncio
-import aiofiles
+import json
 import logging
 from datetime import datetime
-from typing import Dict, Any, Optional
+from typing import Any
+
+import aiofiles
 
 logger = logging.getLogger(__name__)
 
@@ -22,10 +23,10 @@ class AsyncFileManager:
     """Async file operations for profile management"""
 
     @staticmethod
-    async def load_json_file(file_path: str) -> Dict[str, Any]:
+    async def load_json_file(file_path: str) -> dict[str, Any]:
         """Async JSON file loading"""
         try:
-            async with aiofiles.open(file_path, "r", encoding="utf-8") as f:
+            async with aiofiles.open(file_path, encoding="utf-8") as f:
                 content = await f.read()
                 return json.loads(content)
         except FileNotFoundError:
@@ -39,7 +40,7 @@ class AsyncFileManager:
             return {}
 
     @staticmethod
-    async def save_json_file(file_path: str, data: Dict[str, Any], indent: int = 2) -> bool:
+    async def save_json_file(file_path: str, data: dict[str, Any], indent: int = 2) -> bool:
         """Async JSON file saving"""
         try:
             json_content = json.dumps(data, indent=indent, ensure_ascii=False)
@@ -66,7 +67,7 @@ class AsyncEmotionProfileManager:
         self.file_manager = AsyncFileManager()
         self._save_lock = asyncio.Lock()  # Prevent concurrent saves
 
-    async def load_profiles(self) -> Dict[str, Any]:
+    async def load_profiles(self) -> dict[str, Any]:
         """Async version of profile loading"""
         logger.debug(f"Loading profiles from {self.persist_file}")
 
@@ -101,7 +102,7 @@ class AsyncEmotionProfileManager:
         logger.debug(f"Loaded {len(processed_profiles)} user profiles")
         return processed_profiles
 
-    async def save_profiles(self, profiles_data: Dict[str, Any]) -> bool:
+    async def save_profiles(self, profiles_data: dict[str, Any]) -> bool:
         """Async version of profile saving with write lock"""
         async with self._save_lock:  # Prevent concurrent saves
             logger.debug(f"Saving {len(profiles_data)} profiles to {self.persist_file}")
@@ -150,7 +151,7 @@ class AsyncSystemPromptLoader:
     """Async system prompt loading (optional optimization)"""
 
     @staticmethod
-    async def load_system_prompt(prompt_file: Optional[str] = None) -> str:
+    async def load_system_prompt(prompt_file: str | None = None) -> str:
         """Async version of system prompt loading"""
         import os
 
@@ -158,7 +159,7 @@ class AsyncSystemPromptLoader:
             prompt_file = os.getenv("BOT_SYSTEM_PROMPT_FILE", "./prompts/default.md")
 
         try:
-            async with aiofiles.open(prompt_file, "r", encoding="utf-8") as f:
+            async with aiofiles.open(prompt_file, encoding="utf-8") as f:
                 content = await f.read()
                 return content.strip()
         except FileNotFoundError:
@@ -180,13 +181,13 @@ class EmotionManager:
     def __init__(self, persist_file: str = "./user_profiles.json", llm_client=None, memory_manager=None):
         # ... existing init code ...
         self.async_file_manager = AsyncEmotionProfileManager(persist_file)
-    
+
     async def async_load_profiles(self):
         \"\"\"Async version of load_profiles\"\"\"
         profiles_data = await self.async_file_manager.load_profiles()
         # Process into UserProfile objects...
         return profiles_data
-    
+
     async def async_save_profiles(self):
         \"\"\"Async version of save_profiles\"\"\"
         # Prepare profiles data...

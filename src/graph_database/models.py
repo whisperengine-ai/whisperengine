@@ -1,9 +1,9 @@
 """Data models for graph database entities."""
 
+import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Dict, List, Optional, Any
-import uuid
+from typing import Any
 
 
 @dataclass
@@ -11,10 +11,10 @@ class BaseNode:
     """Base class for all graph nodes."""
 
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
-    created_at: Optional[datetime] = None
-    updated_at: Optional[datetime] = None
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for Neo4j storage."""
         return {"id": self.id, "created_at": self.created_at, "updated_at": self.updated_at}
 
@@ -25,10 +25,10 @@ class UserNode(BaseNode):
 
     discord_id: str = ""
     name: str = ""
-    personality_traits: List[str] = field(default_factory=list)
+    personality_traits: list[str] = field(default_factory=list)
     communication_style: str = "neutral"
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         data = super().to_dict()
         data.update(
             {
@@ -48,10 +48,10 @@ class TopicNode(BaseNode):
     name: str = ""
     category: str = "general"
     importance_score: float = 0.5
-    first_mentioned: Optional[datetime] = None
-    last_mentioned: Optional[datetime] = None
+    first_mentioned: datetime | None = None
+    last_mentioned: datetime | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         data = super().to_dict()
         data.update(
             {
@@ -72,10 +72,10 @@ class MemoryNode(BaseNode):
     chromadb_id: str = ""
     summary: str = ""
     importance: float = 0.5
-    timestamp: Optional[datetime] = None
+    timestamp: datetime | None = None
     context_type: str = "conversation"
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         data = super().to_dict()
         data.update(
             {
@@ -96,10 +96,10 @@ class EmotionContextNode(BaseNode):
     emotion: str = "neutral"
     intensity: float = 0.5
     trigger_event: str = ""
-    timestamp: Optional[datetime] = None
+    timestamp: datetime | None = None
     resolved: bool = False
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         data = super().to_dict()
         data.update(
             {
@@ -120,10 +120,10 @@ class ExperienceNode(BaseNode):
     title: str = ""
     description: str = ""
     emotional_impact: float = 0.5
-    timestamp: Optional[datetime] = None
+    timestamp: datetime | None = None
     outcome: str = ""
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         data = super().to_dict()
         data.update(
             {
@@ -143,11 +143,11 @@ class KnowledgeDomainNode(BaseNode):
 
     name: str = ""
     description: str = ""
-    parent_domain: Optional[str] = None  # For hierarchical domains
+    parent_domain: str | None = None  # For hierarchical domains
     depth: int = 0  # Domain hierarchy depth
     fact_count: int = 0  # Number of facts in this domain
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         data = super().to_dict()
         data.update(
             {
@@ -172,9 +172,9 @@ class GlobalFactNode(BaseNode):
     source: str = "learned"  # learned, user_provided, external_api, etc.
     fact_type: str = "declarative"  # declarative, procedural, episodic
     verification_status: str = "unverified"  # verified, unverified, disputed
-    tags: List[str] = field(default_factory=list)
+    tags: list[str] = field(default_factory=list)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         data = super().to_dict()
         data.update(
             {
@@ -198,11 +198,11 @@ class RelationshipData:
     from_node: str
     to_node: str
     relationship_type: str
-    properties: Dict[str, Any] = field(default_factory=dict)
+    properties: dict[str, Any] = field(default_factory=dict)
     strength: float = 1.0
-    created_at: Optional[datetime] = None
+    created_at: datetime | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "from_node": self.from_node,
             "to_node": self.to_node,

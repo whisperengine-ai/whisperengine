@@ -4,11 +4,11 @@ Simple Datastore Factory for WhisperEngine Desktop Mode
 Provides lightweight alternatives to complex datastore dependencies
 """
 
-import os
 import logging
+import os
 from enum import Enum
 from pathlib import Path
-from typing import Dict, Any, Optional, Union, List
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +27,7 @@ class SimpleDatastoreFactory:
     Focuses on providing working implementations with minimal dependencies
     """
 
-    def __init__(self, data_dir: Optional[Path] = None):
+    def __init__(self, data_dir: Path | None = None):
         """Initialize simple datastore factory"""
         self.data_dir = data_dir or Path("data")
         self.data_dir.mkdir(parents=True, exist_ok=True)
@@ -193,7 +193,7 @@ class SimpleDatastoreFactory:
                 if metadatas is None:
                     metadatas = [{}] * len(documents)
 
-                for i, (doc, meta, doc_id) in enumerate(zip(documents, metadatas, ids)):
+                for _i, (doc, meta, doc_id) in enumerate(zip(documents, metadatas, ids, strict=False)):
                     # Store document text and metadata
                     self.vectors[doc_id] = doc
                     self.metadata[doc_id] = meta
@@ -231,8 +231,8 @@ class SimpleDatastoreFactory:
         """Create database manager for desktop mode"""
         try:
             # Try to use existing database integration
-            from src.database.database_integration import DatabaseIntegrationManager
             from src.config.adaptive_config import AdaptiveConfigManager
+            from src.database.database_integration import DatabaseIntegrationManager
 
             config = AdaptiveConfigManager()
             return DatabaseIntegrationManager(config)
@@ -288,7 +288,7 @@ class SimpleDatastoreFactory:
                 logger.info("✅ Simple graph storage initialized")
                 return True
 
-            def add_node(self, node_id: str, properties: Dict[str, Any]):
+            def add_node(self, node_id: str, properties: dict[str, Any]):
                 self.nodes[node_id] = properties
 
             def add_edge(
@@ -296,7 +296,7 @@ class SimpleDatastoreFactory:
                 from_node: str,
                 to_node: str,
                 relationship: str,
-                properties: Optional[Dict[str, Any]] = None,
+                properties: dict[str, Any] | None = None,
             ):
                 self.edges.append(
                     {
@@ -307,7 +307,7 @@ class SimpleDatastoreFactory:
                     }
                 )
 
-            def query_relationships(self, node_id: str) -> List[Dict[str, Any]]:
+            def query_relationships(self, node_id: str) -> list[dict[str, Any]]:
                 relationships = []
                 for edge in self.edges:
                     if edge["from"] == node_id or edge["to"] == node_id:
@@ -319,7 +319,7 @@ class SimpleDatastoreFactory:
 
         return SimpleGraphStorage()
 
-    def get_availability_info(self) -> Dict[str, Any]:
+    def get_availability_info(self) -> dict[str, Any]:
         """Get information about available datastores"""
         info = {
             "deployment_mode": self.deployment_mode.value,
@@ -336,7 +336,7 @@ class SimpleDatastoreFactory:
 
         return info
 
-    async def initialize_all(self) -> Dict[str, Any]:
+    async def initialize_all(self) -> dict[str, Any]:
         """Initialize all datastore components"""
         logger.info("🚀 Initializing all datastore components...")
 
@@ -375,7 +375,7 @@ class SimpleDatastoreFactory:
         return components
 
 
-def create_simple_datastore_factory(data_dir: Optional[Path] = None) -> SimpleDatastoreFactory:
+def create_simple_datastore_factory(data_dir: Path | None = None) -> SimpleDatastoreFactory:
     """Create a simple datastore factory instance"""
     return SimpleDatastoreFactory(data_dir=data_dir)
 

@@ -4,7 +4,6 @@ Simple test to verify settings system integration
 """
 
 import sys
-import os
 from pathlib import Path
 
 # Add the project root to the Python path
@@ -50,19 +49,16 @@ def test_settings_components():
 
         # Test 4: Import settings dialog (without showing it)
         logger.info("🧪 Test 4: Settings Dialog Import")
-        from src.ui.native_settings_dialog import NativeSettingsDialog
 
         logger.info("✅ Settings dialog imported successfully")
 
         # Test 5: Import platform integration manager
         logger.info("🧪 Test 5: Platform Integration Manager Import")
-        from src.ui.platform_integration_manager import PlatformIntegrationManager
 
         logger.info("✅ Platform integration manager imported successfully")
 
         # Test 6: Import universal app
         logger.info("🧪 Test 6: Universal App Import")
-        from universal_native_app import WhisperEngineUniversalApp
 
         logger.info("✅ Universal app imported successfully")
 

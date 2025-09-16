@@ -5,20 +5,19 @@ This shows exactly where the new memory optimization components integrate
 
 import asyncio
 import logging
-from typing import Dict, List, Optional, Any
 from datetime import datetime
+from typing import Any
 
-# Import existing WhisperEngine memory components
-from src.memory.memory_manager import UserMemoryManager
-from src.memory.integrated_memory_manager import IntegratedMemoryManager
-from src.utils.embedding_manager import ExternalEmbeddingManager
-from src.llm.llm_client import LLMClient
+from src.memory.context_prioritizer import IntelligentContextPrioritizer
 
 # Import our new memory optimization components
 from src.memory.conversation_summarizer import AdvancedConversationSummarizer
+from src.memory.integrated_memory_manager import IntegratedMemoryManager
+
+# Import existing WhisperEngine memory components
+from src.memory.memory_manager import UserMemoryManager
 from src.memory.semantic_deduplicator import SemanticDeduplicator
 from src.memory.topic_clusterer import AdvancedTopicClusterer
-from src.memory.context_prioritizer import IntelligentContextPrioritizer
 
 logger = logging.getLogger(__name__)
 
@@ -124,9 +123,9 @@ class OptimizedMemoryManager(IntegratedMemoryManager):
         user_id: str,
         user_message: str,
         bot_response: str,
-        channel_id: Optional[str] = None,
-        pre_analyzed_emotion_data: Optional[dict] = None,
-        metadata: Optional[dict] = None,
+        channel_id: str | None = None,
+        pre_analyzed_emotion_data: dict | None = None,
+        metadata: dict | None = None,
     ):
         """
         Enhanced conversation storage with optimization integration
@@ -251,7 +250,7 @@ class OptimizedMemoryManager(IntegratedMemoryManager):
     # INTEGRATION POINT 3: Background Analytics & Optimization
     # ================================================================
 
-    async def run_memory_optimization_cycle(self, user_id: Optional[str] = None):
+    async def run_memory_optimization_cycle(self, user_id: str | None = None):
         """
         Run a complete memory optimization cycle
 
@@ -311,7 +310,7 @@ class OptimizedMemoryManager(IntegratedMemoryManager):
     # HELPER METHODS
     # ================================================================
 
-    async def _get_recent_conversation_history(self, user_id: str, limit: int = 20) -> List[Dict]:
+    async def _get_recent_conversation_history(self, user_id: str, limit: int = 20) -> list[dict]:
         """Get recent conversation history for summarization"""
         try:
             # Get recent memories and format as conversation
@@ -373,7 +372,7 @@ class OptimizedMemoryManager(IntegratedMemoryManager):
         except Exception as e:
             logger.error(f"Failed to store conversation summary: {e}")
 
-    def _convert_memories_to_context(self, memories: List[Dict]) -> List[Dict]:
+    def _convert_memories_to_context(self, memories: list[dict]) -> list[dict]:
         """Convert memory objects to context format for prioritization"""
         context_items = []
 
@@ -394,7 +393,7 @@ class OptimizedMemoryManager(IntegratedMemoryManager):
 
         return context_items
 
-    def _convert_context_to_memories(self, context_items) -> List[Dict]:
+    def _convert_context_to_memories(self, context_items) -> list[dict]:
         """Convert prioritized context items back to memory format"""
         memories = []
 
@@ -420,7 +419,7 @@ class OptimizedMemoryManager(IntegratedMemoryManager):
         logger.info("System-wide memory optimization not implemented yet")
         pass
 
-    def get_optimization_stats(self) -> Dict[str, Any]:
+    def get_optimization_stats(self) -> dict[str, Any]:
         """Get comprehensive optimization statistics"""
         stats = {
             "summarizer_available": self.conversation_summarizer is not None,

@@ -6,11 +6,12 @@ This script demonstrates the emotion detection, relationship progression,
 and contextual response system for the Discord bot.
 """
 
-import sys
-import os
 import logging
+import os
+import sys
+
 import pytest
-from datetime import datetime
+
 from env_manager import load_environment
 
 # Load environment variables using centralized manager
@@ -19,9 +20,8 @@ load_environment()
 # Add the current directory to the path
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-from emotion_manager import EmotionManager, EmotionalState, RelationshipLevel
+from emotion_manager import EmotionManager
 from memory_manager import UserMemoryManager
-from lmstudio_client import LMStudioClient
 
 
 def setup_test_logging():
@@ -34,9 +34,6 @@ def setup_test_logging():
 @pytest.mark.unit
 def test_emotion_detection_mock(mock_llm_client, temp_profiles_file):
     """Test emotion detection with mock LLM client"""
-    print("=" * 80)
-    print("TESTING EMOTION DETECTION (MOCK)")
-    print("=" * 80)
 
     emotion_manager = EmotionManager(temp_profiles_file, llm_client=mock_llm_client)
     _run_emotion_detection_test(emotion_manager)
@@ -45,9 +42,6 @@ def test_emotion_detection_mock(mock_llm_client, temp_profiles_file):
 @pytest.mark.integration
 def test_emotion_detection_real(real_llm_client, temp_profiles_file):
     """Test emotion detection with real LLM client (integration test)"""
-    print("=" * 80)
-    print("TESTING EMOTION DETECTION (REAL LLM)")
-    print("=" * 80)
 
     emotion_manager = EmotionManager(temp_profiles_file, llm_client=real_llm_client)
     _run_emotion_detection_test(emotion_manager)
@@ -73,29 +67,16 @@ def _run_emotion_detection_test(emotion_manager):
 
     user_id = "test_user_emotion"
 
-    for i, (message, description) in enumerate(test_messages, 1):
-        print(f"\n--- Test {i}: {description} ---")
-        print(f"Message: '{message}'")
+    for _i, (message, _description) in enumerate(test_messages, 1):
 
         profile, emotion = emotion_manager.process_interaction(user_id, message)
-        context = emotion_manager.get_emotion_context(user_id)
+        emotion_manager.get_emotion_context(user_id)
 
-        print(f"Detected Emotion: {emotion.detected_emotion.value}")
-        print(f"Confidence: {emotion.confidence:.2f}")
-        print(f"Intensity: {emotion.intensity:.2f}")
-        print(f"Triggers: {emotion.triggers}")
-        print(f"Relationship Level: {profile.relationship_level.value}")
-        print(f"Interaction Count: {profile.interaction_count}")
-        print(f"Trust Indicators: {profile.trust_indicators}")
-        print(f"Context for LLM: {context}")
 
 
 @pytest.mark.unit
 def test_relationship_progression_mock(mock_llm_client, temp_profiles_file):
     """Test relationship progression with mock LLM client"""
-    print("\n" + "=" * 80)
-    print("TESTING RELATIONSHIP PROGRESSION (MOCK)")
-    print("=" * 80)
 
     emotion_manager = EmotionManager(temp_profiles_file, llm_client=mock_llm_client)
     _run_relationship_progression_test(emotion_manager)
@@ -104,9 +85,6 @@ def test_relationship_progression_mock(mock_llm_client, temp_profiles_file):
 @pytest.mark.integration
 def test_relationship_progression_real(real_llm_client, temp_profiles_file):
     """Test relationship progression with real LLM client"""
-    print("\n" + "=" * 80)
-    print("TESTING RELATIONSHIP PROGRESSION (REAL LLM)")
-    print("=" * 80)
 
     emotion_manager = EmotionManager(temp_profiles_file, llm_client=real_llm_client)
     _run_relationship_progression_test(emotion_manager)
@@ -140,28 +118,17 @@ def _run_relationship_progression_test(emotion_manager):
     user_id = "test_user_progression"
 
     for i, message in enumerate(progression_messages, 1):
-        print(f"\n--- Interaction {i} ---")
-        print(f"Message: '{message}'")
 
         profile, emotion = emotion_manager.process_interaction(user_id, message)
 
-        print(f"Relationship Level: {profile.relationship_level.value}")
-        print(f"Detected Emotion: {emotion.detected_emotion.value}")
-        print(f"Interaction Count: {profile.interaction_count}")
-        print(f"Name: {profile.name}")
-        print(f"Trust Indicators: {len(profile.trust_indicators or [])}")
 
         if i in [3, 6, 10, 16]:  # Show full context at key milestones
-            context = emotion_manager.get_emotion_context(user_id)
-            print(f"Full Context: {context}")
+            emotion_manager.get_emotion_context(user_id)
 
 
 @pytest.mark.unit
 def test_escalation_handling_mock(mock_llm_client, temp_profiles_file):
     """Test emotional escalation and de-escalation with mock LLM client"""
-    print("\n" + "=" * 80)
-    print("TESTING EMOTIONAL ESCALATION (MOCK)")
-    print("=" * 80)
 
     emotion_manager = EmotionManager(temp_profiles_file, llm_client=mock_llm_client)
     _run_escalation_handling_test(emotion_manager)
@@ -170,9 +137,6 @@ def test_escalation_handling_mock(mock_llm_client, temp_profiles_file):
 @pytest.mark.integration
 def test_escalation_handling_real(real_llm_client, temp_profiles_file):
     """Test emotional escalation and de-escalation with real LLM client"""
-    print("\n" + "=" * 80)
-    print("TESTING EMOTIONAL ESCALATION (REAL LLM)")
-    print("=" * 80)
 
     emotion_manager = EmotionManager(temp_profiles_file, llm_client=real_llm_client)
     _run_escalation_handling_test(emotion_manager)
@@ -192,26 +156,18 @@ def _run_escalation_handling_test(emotion_manager):
 
     user_id = "test_user_escalation"
 
-    for i, message in enumerate(escalation_sequence, 1):
-        print(f"\n--- Step {i} ---")
-        print(f"Message: '{message}'")
+    for _i, message in enumerate(escalation_sequence, 1):
 
         profile, emotion = emotion_manager.process_interaction(user_id, message)
 
-        print(f"Emotion: {emotion.detected_emotion.value} (intensity: {emotion.intensity:.2f})")
-        print(f"Escalation Count: {profile.escalation_count}")
-        print(f"Context: {emotion_manager.get_emotion_context(user_id)}")
 
         if profile.escalation_count >= 3:
-            print("⚠️  ESCALATION WARNING: User showing repeated negative emotions")
+            pass
 
 
 @pytest.mark.unit
 def test_memory_integration_mock(mock_llm_client):
     """Test integration with the memory manager using mock LLM client"""
-    print("\n" + "=" * 80)
-    print("TESTING MEMORY MANAGER INTEGRATION (MOCK)")
-    print("=" * 80)
 
     _run_memory_integration_test(mock_llm_client)
 
@@ -219,9 +175,6 @@ def test_memory_integration_mock(mock_llm_client):
 @pytest.mark.integration
 def test_memory_integration_real(real_llm_client):
     """Test integration with the memory manager using real LLM client"""
-    print("\n" + "=" * 80)
-    print("TESTING MEMORY MANAGER INTEGRATION (REAL LLM)")
-    print("=" * 80)
 
     _run_memory_integration_test(real_llm_client)
 
@@ -246,37 +199,28 @@ def _run_memory_integration_test(llm_client):
             ("I'm frustrated with this bug I can't fix", "Let's work through it step by step."),
         ]
 
-        for i, (user_msg, bot_response) in enumerate(test_conversations, 1):
-            print(f"\n--- Conversation {i} ---")
-            print(f"User: {user_msg}")
-            print(f"Bot: {bot_response}")
+        for _i, (user_msg, bot_response) in enumerate(test_conversations, 1):
 
             # Store conversation (this will process emotions automatically)
             memory_manager.store_conversation(user_id, user_msg, bot_response)
 
             # Get emotion context
-            emotion_context = memory_manager.get_emotion_context(user_id)
-            print(f"Emotion Context: {emotion_context}")
+            memory_manager.get_emotion_context(user_id)
 
             # Get user profile
             profile = memory_manager.get_user_emotion_profile(user_id)
             if profile:
-                print(f"Relationship: {profile.relationship_level.value}")
-                print(f"Current Emotion: {profile.current_emotion.value}")
+                pass
 
         # Test emotion-aware context retrieval
-        print(f"\n--- Testing Emotion-Aware Context Retrieval ---")
-        context = memory_manager.get_emotion_aware_context(
+        memory_manager.get_emotion_aware_context(
             user_id, "help with programming", limit=3
         )
-        print(f"Context for 'help with programming': {context[:200]}...")
 
         # Get stats
-        stats = memory_manager.get_collection_stats()
-        print(f"\nMemory Stats: {stats}")
+        memory_manager.get_collection_stats()
 
-    except Exception as e:
-        print(f"Error testing memory integration: {e}")
+    except Exception:
         import traceback
 
         traceback.print_exc()
@@ -286,13 +230,6 @@ def main():
     """Run all tests using pytest"""
     setup_test_logging()
 
-    print("🧠 EMOTION AND RELATIONSHIP MANAGEMENT SYSTEM TESTS")
-    print("=" * 80)
-    print("Use pytest to run these tests:")
-    print("  pytest tests/test_emotion_system.py -v          # Run all tests")
-    print("  pytest tests/test_emotion_system.py -m unit     # Run unit tests only")
-    print("  pytest tests/test_emotion_system.py -m integration  # Run integration tests only")
-    print("=" * 80)
 
 
 if __name__ == "__main__":

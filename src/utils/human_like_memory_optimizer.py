@@ -6,12 +6,9 @@ feel human-like in their memory recall and conversational continuity.
 Focus on natural conversation flow, emotional intelligence, and relationship building.
 """
 
-import json
 import logging
-from typing import List, Dict, Optional, Any, Tuple
 from dataclasses import dataclass
-from datetime import datetime, timedelta
-import re
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -20,7 +17,7 @@ logger = logging.getLogger(__name__)
 class ConversationalContext:
     """Context that mimics how humans remember conversations"""
 
-    emotional_state: Optional[str]  # How the user seemed to feel
+    emotional_state: str | None  # How the user seemed to feel
     relationship_tone: str  # "friendly", "professional", "intimate", "casual"
     conversation_purpose: str  # "seeking_support", "sharing_news", "asking_advice", "casual_chat"
     time_sensitivity: str  # "immediate", "ongoing", "past_event", "future_planning"
@@ -31,11 +28,11 @@ class ConversationalContext:
 class HumanMemoryPattern:
     """Patterns that mimic human memory recall"""
 
-    emotional_triggers: List[str]  # Words/phrases that trigger emotional memories
-    relationship_markers: List[str]  # Indicators of relationship depth/type
-    personal_anchors: List[str]  # Things that make memories personally significant
-    temporal_cues: List[str]  # Time-related context clues
-    topic_associations: List[str]  # How topics connect in human memory
+    emotional_triggers: list[str]  # Words/phrases that trigger emotional memories
+    relationship_markers: list[str]  # Indicators of relationship depth/type
+    personal_anchors: list[str]  # Things that make memories personally significant
+    temporal_cues: list[str]  # Time-related context clues
+    topic_associations: list[str]  # How topics connect in human memory
 
 
 class HumanLikeChatbotOptimizer:
@@ -52,9 +49,9 @@ class HumanLikeChatbotOptimizer:
         self,
         message: str,
         user_id: str,
-        conversation_history: Optional[List[str]] = None,
-        relationship_context: Optional[Dict] = None,
-    ) -> Tuple[str, str]:
+        conversation_history: list[str] | None = None,
+        relationship_context: dict | None = None,
+    ) -> tuple[str, str]:
         """
         Create prompts optimized for human-like conversational memory recall
 
@@ -74,7 +71,7 @@ class HumanLikeChatbotOptimizer:
         return system_prompt, user_prompt
 
     def _analyze_conversational_context(
-        self, message: str, conversation_history: Optional[List[str]] = None
+        self, message: str, conversation_history: list[str] | None = None
     ) -> ConversationalContext:
         """Analyze message like a human would understand conversational context"""
 
@@ -166,7 +163,7 @@ class HumanLikeChatbotOptimizer:
         )
 
     def _build_human_like_system_prompt(
-        self, conv_context: ConversationalContext, relationship_context: Optional[Dict]
+        self, conv_context: ConversationalContext, relationship_context: dict | None
     ) -> str:
         """Build system prompt that mimics human conversational memory"""
 
@@ -174,7 +171,7 @@ class HumanLikeChatbotOptimizer:
 
 HUMAN-LIKE MEMORY PRINCIPLES:
 • Humans remember emotional moments more vividly
-• Personal and meaningful topics stick better in memory  
+• Personal and meaningful topics stick better in memory
 • We associate current feelings with similar past feelings
 • Relationships deepen through shared experiences and understanding
 • Context and tone matter as much as specific words"""
@@ -224,11 +221,11 @@ HUMAN-LIKE MEMORY PRINCIPLES:
             base_prompt += f"\n\nRELATIONSHIP TONE: {tone_guidance[conv_context.relationship_tone]}"
 
         # Add memory search strategy
-        base_prompt += f"""
+        base_prompt += """
 
 HUMAN MEMORY SEARCH STRATEGY:
 1. **Emotional Resonance**: Prioritize memories with similar emotional tone
-2. **Personal Connection**: Weight personally significant topics higher  
+2. **Personal Connection**: Weight personally significant topics higher
 3. **Conversational Flow**: Find memories that naturally connect to current topic
 4. **Relationship Building**: Look for memories that show growing understanding
 5. **Contextual Relevance**: Consider time, situation, and relationship depth
@@ -246,7 +243,7 @@ QUERY GENERATION (like human memory association):
         self,
         message: str,
         conv_context: ConversationalContext,
-        conversation_history: Optional[List[str]] = None,
+        conversation_history: list[str] | None = None,
     ) -> str:
         """Build user prompt that feels natural for conversational memory search"""
 
@@ -327,7 +324,7 @@ FOCUS ON:
 
         return prompt
 
-    def _build_human_memory_patterns(self) -> Dict[str, HumanMemoryPattern]:
+    def _build_human_memory_patterns(self) -> dict[str, HumanMemoryPattern]:
         """Build patterns that mimic how humans naturally recall memories"""
 
         return {
@@ -354,7 +351,7 @@ FOCUS ON:
             ),
         }
 
-    def _build_emotional_prompts(self) -> Dict[str, str]:
+    def _build_emotional_prompts(self) -> dict[str, str]:
         """Build emotionally intelligent prompt variations"""
 
         return {
@@ -365,7 +362,7 @@ FOCUS ON:
             "companionable": "Look for casual, friendly interactions that show ongoing friendship.",
         }
 
-    def _build_relationship_templates(self) -> Dict[str, str]:
+    def _build_relationship_templates(self) -> dict[str, str]:
         """Build templates based on relationship depth and type"""
 
         return {
@@ -388,9 +385,9 @@ class ConversationalMemoryOptimizer:
     def optimize_for_conversation_flow(
         self,
         current_message: str,
-        conversation_history: List[str],
-        user_patterns: Optional[Dict] = None,
-    ) -> Dict[str, Any]:
+        conversation_history: list[str],
+        user_patterns: dict | None = None,
+    ) -> dict[str, Any]:
         """
         Optimize memory search to maintain natural conversation flow
         """
@@ -414,8 +411,8 @@ class ConversationalMemoryOptimizer:
         }
 
     def _analyze_conversation_flow(
-        self, current_message: str, conversation_history: List[str]
-    ) -> Dict[str, Any]:
+        self, current_message: str, conversation_history: list[str]
+    ) -> dict[str, Any]:
         """Analyze how current message fits in conversation flow"""
 
         message_lower = current_message.lower()
@@ -468,7 +465,7 @@ class ConversationalMemoryOptimizer:
             ),
         }
 
-    def _calculate_continuity_score(self, current_message: str, history: List[str]) -> float:
+    def _calculate_continuity_score(self, current_message: str, history: list[str]) -> float:
         """Calculate how well current message continues the conversation"""
 
         if not history:
@@ -491,7 +488,7 @@ class ConversationalMemoryOptimizer:
 
         return overlap / max(1, total_unique)
 
-    def _detect_emotional_momentum(self, current_message: str, history: List[str]) -> str:
+    def _detect_emotional_momentum(self, current_message: str, history: list[str]) -> str:
         """Detect emotional momentum in conversation"""
 
         # This is a simplified version - could be much more sophisticated
@@ -509,7 +506,7 @@ class ConversationalMemoryOptimizer:
         else:
             return current_emotion or recent_emotion or "neutral"
 
-    def _detect_simple_emotion(self, message: str) -> Optional[str]:
+    def _detect_simple_emotion(self, message: str) -> str | None:
         """Simple emotion detection for momentum analysis"""
 
         message_lower = message.lower()
@@ -527,7 +524,7 @@ class ConversationalMemoryOptimizer:
 
         return None
 
-    def _determine_search_strategy(self, flow_analysis: Dict[str, Any]) -> str:
+    def _determine_search_strategy(self, flow_analysis: dict[str, Any]) -> str:
         """Determine optimal search strategy based on conversation flow"""
 
         flow_type = flow_analysis.get("flow_type", "neutral")
@@ -545,8 +542,8 @@ class ConversationalMemoryOptimizer:
             return "balanced_search"
 
     def _generate_flow_aware_queries(
-        self, message: str, flow_analysis: Dict[str, Any], strategy: str
-    ) -> List[Dict[str, Any]]:
+        self, message: str, flow_analysis: dict[str, Any], strategy: str
+    ) -> list[dict[str, Any]]:
         """Generate queries optimized for conversation flow"""
 
         # This would integrate with the main query generation
@@ -562,7 +559,7 @@ class ConversationalMemoryOptimizer:
 
         return [base_query]
 
-    def _build_conversation_patterns(self) -> Dict[str, Any]:
+    def _build_conversation_patterns(self) -> dict[str, Any]:
         """Build patterns for natural conversation flow"""
 
         return {

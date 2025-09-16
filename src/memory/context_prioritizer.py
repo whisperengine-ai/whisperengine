@@ -5,12 +5,13 @@ Prioritizes memory retrieval based on relevance, recency, and importance scores
 
 import logging
 import math
-import numpy as np
-from typing import Dict, List, Optional, Tuple, Any, Set
-from datetime import datetime, timedelta
-from dataclasses import dataclass, asdict
 from collections import defaultdict
+from dataclasses import asdict, dataclass
+from datetime import datetime, timedelta
 from enum import Enum
+from typing import Any
+
+import numpy as np
 
 logger = logging.getLogger(__name__)
 
@@ -62,11 +63,11 @@ class ContextItem:
 
     # Metadata
     access_count: int = 0
-    last_accessed: Optional[str] = None
-    keywords: Optional[List[str]] = None
-    embedding_vector: Optional[List[float]] = None
+    last_accessed: str | None = None
+    keywords: list[str] | None = None
+    embedding_vector: list[float] | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
 
@@ -103,15 +104,15 @@ class IntelligentContextPrioritizer:
     the most relevant context for memory retrieval and conversation generation
     """
 
-    def __init__(self, embedding_manager=None, config: Optional[PrioritizationConfig] = None):
+    def __init__(self, embedding_manager=None, config: PrioritizationConfig | None = None):
         self.embedding_manager = embedding_manager
         self.config = config or PrioritizationConfig()
         self.logger = logging.getLogger(__name__)
 
         # Storage for context items and metadata
-        self.context_items: Dict[str, ContextItem] = {}
-        self.user_interaction_history: Dict[str, Dict[str, Any]] = defaultdict(dict)
-        self.topic_frequency_cache: Dict[str, Dict[str, int]] = defaultdict(dict)
+        self.context_items: dict[str, ContextItem] = {}
+        self.user_interaction_history: dict[str, dict[str, Any]] = defaultdict(dict)
+        self.topic_frequency_cache: dict[str, dict[str, int]] = defaultdict(dict)
 
         # Performance tracking
         self.stats = {
@@ -122,16 +123,16 @@ class IntelligentContextPrioritizer:
         }
 
         # Caching for performance
-        self.score_cache: Dict[str, Tuple[float, datetime]] = {}
+        self.score_cache: dict[str, tuple[float, datetime]] = {}
         self.cache_ttl = timedelta(minutes=30)
 
     async def prioritize_context(
         self,
         query: str,
         user_id: str,
-        available_context: List[Dict[str, Any]],
-        context_limit: Optional[int] = None,
-    ) -> List[ContextItem]:
+        available_context: list[dict[str, Any]],
+        context_limit: int | None = None,
+    ) -> list[ContextItem]:
         """
         Prioritize and select the most relevant context items for a given query
 
@@ -203,8 +204,8 @@ class IntelligentContextPrioritizer:
         return selected_items
 
     async def get_context_recommendations(
-        self, user_id: str, recent_topics: List[str], limit: int = 10
-    ) -> List[ContextItem]:
+        self, user_id: str, recent_topics: list[str], limit: int = 10
+    ) -> list[ContextItem]:
         """
         Get proactive context recommendations based on user's recent activity
         """
@@ -227,7 +228,7 @@ class IntelligentContextPrioritizer:
         recommendations.sort(key=lambda x: x.final_score, reverse=True)
         return recommendations[:limit]
 
-    async def analyze_context_gaps(self, user_id: str, query: str) -> Dict[str, Any]:
+    async def analyze_context_gaps(self, user_id: str, query: str) -> dict[str, Any]:
         """
         Analyze what types of context are missing or underrepresented
         """
@@ -274,8 +275,8 @@ class IntelligentContextPrioritizer:
         return analysis
 
     async def optimize_context_retrieval(
-        self, user_id: str, performance_metrics: Dict[str, float]
-    ) -> Dict[str, Any]:
+        self, user_id: str, performance_metrics: dict[str, float]
+    ) -> dict[str, Any]:
         """
         Optimize context retrieval based on performance feedback
         """
@@ -318,8 +319,8 @@ class IntelligentContextPrioritizer:
     # Private methods
 
     async def _convert_to_context_items(
-        self, available_context: List[Dict[str, Any]], user_id: str
-    ) -> List[ContextItem]:
+        self, available_context: list[dict[str, Any]], user_id: str
+    ) -> list[ContextItem]:
         """Convert raw context data to ContextItem objects"""
         context_items = []
 
@@ -357,7 +358,7 @@ class IntelligentContextPrioritizer:
 
         return context_items
 
-    def _infer_context_type(self, ctx_data: Dict[str, Any]) -> ContextType:
+    def _infer_context_type(self, ctx_data: dict[str, Any]) -> ContextType:
         """Infer the context type from context data"""
         if "type" in ctx_data:
             type_str = ctx_data["type"].lower()
@@ -383,7 +384,7 @@ class IntelligentContextPrioritizer:
         else:
             return ContextType.CONVERSATION
 
-    def _extract_content(self, ctx_data: Dict[str, Any]) -> str:
+    def _extract_content(self, ctx_data: dict[str, Any]) -> str:
         """Extract text content from context data"""
         if "content" in ctx_data:
             return str(ctx_data["content"])
@@ -396,7 +397,7 @@ class IntelligentContextPrioritizer:
         else:
             return str(ctx_data)
 
-    async def _get_query_embedding(self, query: str) -> Optional[np.ndarray]:
+    async def _get_query_embedding(self, query: str) -> np.ndarray | None:
         """Get embedding for the query"""
         if not self.embedding_manager:
             return None
@@ -409,8 +410,8 @@ class IntelligentContextPrioritizer:
             return None
 
     async def _calculate_comprehensive_score(
-        self, item: ContextItem, query: str, query_embedding: Optional[np.ndarray], user_id: str
-    ) -> Dict[str, float]:
+        self, item: ContextItem, query: str, query_embedding: np.ndarray | None, user_id: str
+    ) -> dict[str, float]:
         """Calculate comprehensive relevance score for a context item"""
 
         # Check cache first
@@ -468,7 +469,7 @@ class IntelligentContextPrioritizer:
         return scores
 
     async def _calculate_semantic_score(
-        self, item: ContextItem, query: str, query_embedding: Optional[np.ndarray]
+        self, item: ContextItem, query: str, query_embedding: np.ndarray | None
     ) -> float:
         """Calculate semantic similarity score"""
         if not query_embedding or not item.embedding_vector:
@@ -605,7 +606,7 @@ class IntelligentContextPrioritizer:
         return min(1.0, base_score)
 
     def _apply_boost_factors(
-        self, base_score: float, item: ContextItem, scores: Dict[str, float]
+        self, base_score: float, item: ContextItem, scores: dict[str, float]
     ) -> float:
         """Apply various boost factors to the base score"""
         boosted_score = base_score
@@ -624,7 +625,7 @@ class IntelligentContextPrioritizer:
 
         return min(1.0, boosted_score)
 
-    def _calculate_score_confidence(self, scores: Dict[str, float]) -> float:
+    def _calculate_score_confidence(self, scores: dict[str, float]) -> float:
         """Calculate confidence in the scoring based on signal strength"""
         # Count strong signals (> 0.5)
         strong_signals = sum(1 for score in scores.values() if score > 0.5)
@@ -641,8 +642,8 @@ class IntelligentContextPrioritizer:
         return base_confidence
 
     async def _apply_diversity_filtering(
-        self, scored_items: List[ContextItem], query_embedding: Optional[np.ndarray]
-    ) -> List[ContextItem]:
+        self, scored_items: list[ContextItem], query_embedding: np.ndarray | None
+    ) -> list[ContextItem]:
         """Apply diversity filtering to avoid redundant context"""
         if len(scored_items) <= 5:  # No need to diversify small lists
             return scored_items
@@ -689,7 +690,7 @@ class IntelligentContextPrioritizer:
 
         return diversified
 
-    async def _update_access_tracking(self, selected_items: List[ContextItem], user_id: str):
+    async def _update_access_tracking(self, selected_items: list[ContextItem], user_id: str):
         """Update access tracking for selected items"""
         current_time = datetime.now().isoformat()
 
@@ -716,7 +717,7 @@ class IntelligentContextPrioritizer:
                     topic_freq[keyword] = topic_freq.get(keyword, 0) + 1
 
     async def _calculate_proactive_relevance(
-        self, item: ContextItem, recent_topics: List[str], user_id: str
+        self, item: ContextItem, recent_topics: list[str], user_id: str
     ) -> float:
         """Calculate relevance for proactive recommendations"""
         scores = []
@@ -771,7 +772,7 @@ class IntelligentContextPrioritizer:
 
         return intersection / union if union > 0 else 0.0
 
-    def _extract_simple_topics(self, text: str) -> List[str]:
+    def _extract_simple_topics(self, text: str) -> list[str]:
         """Extract simple topics from text"""
         import re
 
@@ -788,7 +789,7 @@ class IntelligentContextPrioritizer:
         word_counts = Counter(topic_words)
         return [word for word, count in word_counts.most_common(5)]
 
-    def get_prioritization_stats(self) -> Dict[str, Any]:
+    def get_prioritization_stats(self) -> dict[str, Any]:
         """Get comprehensive prioritization statistics"""
         return {
             "total_context_items": len(self.context_items),

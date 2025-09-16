@@ -4,10 +4,11 @@ Tool to update user names in the profile database
 This helps fix missing names from existing user profiles
 """
 
-import sys
 import logging
-from user_profile_db import UserProfileDatabase
+import sys
+
 from query_profiles import UserProfileQuery
+from user_profile_db import UserProfileDatabase
 
 logger = logging.getLogger(__name__)
 
@@ -23,9 +24,9 @@ class UserNameUpdater:
         """Update name for a specific user"""
         success = self.db.update_user_name(user_id, name)
         if success:
-            print(f"✅ Updated name for {user_id}: '{name}'")
+            pass
         else:
-            print(f"ℹ️  No update needed for {user_id}")
+            pass
         return success
 
     def list_users_without_names(self):
@@ -34,11 +35,10 @@ class UserNameUpdater:
         unnamed_users = [user for user in users if not user.get("name")]
 
         if unnamed_users:
-            print(f"\n👤 Users without names ({len(unnamed_users)}):")
-            for user in unnamed_users:
-                print(f"   • {user['user_id']} - {user['interaction_count']} interactions")
+            for _user in unnamed_users:
+                pass
         else:
-            print("\n✅ All users have names set!")
+            pass
 
         return unnamed_users
 
@@ -53,24 +53,21 @@ class UserNameUpdater:
             with sqlite3.connect(chromadb_path) as conn:
                 cursor = conn.execute(
                     """
-                    SELECT document, metadata 
-                    FROM embeddings 
-                    WHERE document LIKE '%Discord user%' 
+                    SELECT document, metadata
+                    FROM embeddings
+                    WHERE document LIKE '%Discord user%'
                     OR document LIKE '%display name%'
                     OR metadata LIKE '%user_id%'
                 """
                 )
 
-                updates = 0
-                for document, metadata in cursor.fetchall():
-                    print(f"Found: {document}")
+                for _document, _metadata in cursor.fetchall():
+                    pass
                     # TODO: Parse and extract user ID and name mappings
                     # This would require more complex parsing
 
-                print(f"Found {updates} potential name updates from ChromaDB")
 
-        except Exception as e:
-            print(f"❌ Could not access ChromaDB: {e}")
+        except Exception:
             return False
 
     def interactive_name_update(self):
@@ -80,30 +77,24 @@ class UserNameUpdater:
         if not unnamed_users:
             return
 
-        print(f"\n🔧 Interactive Name Update Mode")
-        print("Enter names for users (press Enter to skip):")
 
         for user in unnamed_users:
             user_id = user["user_id"]
-            interactions = user["interaction_count"]
+            user["interaction_count"]
 
             # Show some context about the user
             user_details = self.query.get_user_details(user_id)
             if user_details and user_details.get("recent_emotions"):
-                recent_emotion = user_details["recent_emotions"][0]["detected_emotion"]
-                print(f"\n👤 User: {user_id}")
-                print(f"   Interactions: {interactions}")
-                print(f"   Recent emotion: {recent_emotion}")
-                print(f"   Last seen: {user.get('last_interaction', 'Unknown')}")
+                user_details["recent_emotions"][0]["detected_emotion"]
             else:
-                print(f"\n👤 User: {user_id} ({interactions} interactions)")
+                pass
 
-            name = input(f"   Enter name (or press Enter to skip): ").strip()
+            name = input("   Enter name (or press Enter to skip): ").strip()
 
             if name:
                 self.update_user_name(user_id, name)
             else:
-                print(f"   ⏭️  Skipped {user_id}")
+                pass
 
 
 def main():
@@ -132,31 +123,12 @@ def main():
         else:
             print_help()
 
-    except Exception as e:
-        print(f"❌ Error: {e}")
+    except Exception:
+        pass
 
 
 def print_help():
-    print(
-        """
-👤 User Name Updater Tool
-
-Usage:
-  python update_names.py <command> [args]
-
-Commands:
-  list                           - List users without names
-  update <user_id> <name>        - Set name for specific user
-  interactive                    - Interactive mode to set names
-  auto                           - Try to extract names from Discord facts
-
-Examples:
-  python update_names.py list
-  python update_names.py update 672814231002939413 "MarkAnthony"
-  python update_names.py interactive
-  python update_names.py auto
-    """
-    )
+    pass
 
 
 if __name__ == "__main__":

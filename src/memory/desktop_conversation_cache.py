@@ -5,15 +5,15 @@ Lightweight, file-based conversation caching for desktop mode
 Replaces Redis with SQLite + in-memory caching for optimal performance
 """
 
-import sqlite3
-import json
 import asyncio
+import json
 import logging
-from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Any
-from pathlib import Path
+import sqlite3
 import threading
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass
+from datetime import datetime, timedelta
+from pathlib import Path
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -27,8 +27,8 @@ class CachedMessage:
     author_name: str
     timestamp: str
     bot: bool = False
-    message_id: Optional[str] = None
-    metadata: Optional[Dict[str, Any]] = None
+    message_id: str | None = None
+    metadata: dict[str, Any] | None = None
 
     def __post_init__(self):
         if self.metadata is None:
@@ -68,8 +68,8 @@ class DesktopConversationCache:
         self.cache_ttl = timedelta(hours=cache_ttl_hours)
 
         # In-memory cache for active conversations
-        self.memory_cache: Dict[str, List[CachedMessage]] = {}
-        self.cache_access_times: Dict[str, datetime] = {}
+        self.memory_cache: dict[str, list[CachedMessage]] = {}
+        self.cache_access_times: dict[str, datetime] = {}
         self.lock = threading.RLock()
 
         # SQLite connection (thread-local)
@@ -145,14 +145,14 @@ class DesktopConversationCache:
         # Create indexes for performance
         conn.execute(
             """
-            CREATE INDEX IF NOT EXISTS idx_messages_conversation 
+            CREATE INDEX IF NOT EXISTS idx_messages_conversation
             ON messages (conversation_id, timestamp DESC)
         """
         )
 
         conn.execute(
             """
-            CREATE INDEX IF NOT EXISTS idx_conversations_user 
+            CREATE INDEX IF NOT EXISTS idx_conversations_user
             ON conversations (user_id, last_activity DESC)
         """
         )
@@ -168,10 +168,10 @@ class DesktopConversationCache:
             cutoff_time = datetime.now() - self.cache_ttl
             cursor = conn.execute(
                 """
-                SELECT conversation_id 
-                FROM conversations 
-                WHERE last_activity > ? 
-                ORDER BY last_activity DESC 
+                SELECT conversation_id
+                FROM conversations
+                WHERE last_activity > ?
+                ORDER BY last_activity DESC
                 LIMIT ?
             """,
                 (cutoff_time, self.max_memory_conversations),
@@ -192,15 +192,15 @@ class DesktopConversationCache:
         except Exception as e:
             logger.warning(f"Failed to load conversations to memory: {e}")
 
-    async def _load_conversation_from_db(self, conversation_id: str) -> List[CachedMessage]:
+    async def _load_conversation_from_db(self, conversation_id: str) -> list[CachedMessage]:
         """Load conversation messages from SQLite"""
         try:
             conn = self.db_connection
             cursor = conn.execute(
                 """
                 SELECT content, author_id, author_name, timestamp, is_bot, message_id, metadata
-                FROM messages 
-                WHERE conversation_id = ? 
+                FROM messages
+                WHERE conversation_id = ?
                 ORDER BY timestamp ASC
                 LIMIT ?
             """,
@@ -299,9 +299,9 @@ class DesktopConversationCache:
             # Insert or update conversation record
             conn.execute(
                 """
-                INSERT OR REPLACE INTO conversations 
-                (conversation_id, user_id, last_activity, message_count) 
-                VALUES (?, ?, ?, 
+                INSERT OR REPLACE INTO conversations
+                (conversation_id, user_id, last_activity, message_count)
+                VALUES (?, ?, ?,
                     COALESCE((SELECT message_count FROM conversations WHERE conversation_id = ?), 0) + 1)
             """,
                 (conversation_id, message.author_id, datetime.now(), conversation_id),
@@ -310,7 +310,7 @@ class DesktopConversationCache:
             # Insert message
             conn.execute(
                 """
-                INSERT INTO messages 
+                INSERT INTO messages
                 (conversation_id, content, author_id, author_name, timestamp, is_bot, message_id, metadata)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """,
@@ -332,8 +332,8 @@ class DesktopConversationCache:
             logger.error(f"Failed to persist message to DB: {e}")
 
     async def get_user_conversation_context(
-        self, channel, user_id: int, limit: int = 15, exclude_message_id: Optional[int] = None
-    ) -> List[Dict[str, Any]]:
+        self, channel, user_id: int, limit: int = 15, exclude_message_id: int | None = None
+    ) -> list[dict[str, Any]]:
         """Get conversation context for user (compatible with existing interface)"""
         try:
             conversation_id = self._get_conversation_id(channel, user_id)
@@ -383,7 +383,7 @@ class DesktopConversationCache:
         else:
             return f"conv_web_{user_id}"
 
-    async def get_cache_stats(self) -> Dict[str, Any]:
+    async def get_cache_stats(self) -> dict[str, Any]:
         """Get cache statistics"""
         try:
             conn = self.db_connection
@@ -508,7 +508,7 @@ class DesktopConversationCache:
             # Delete conversations with no messages
             cursor = conn.execute(
                 """
-                DELETE FROM conversations 
+                DELETE FROM conversations
                 WHERE conversation_id NOT IN (SELECT DISTINCT conversation_id FROM messages)
             """
             )

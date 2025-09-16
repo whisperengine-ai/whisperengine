@@ -2,9 +2,9 @@
 """
 Integration test for LLM-based fact extraction in the memory manager
 """
-import sys
-import os
 import logging
+import os
+import sys
 
 # Add the current directory to the Python path
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
@@ -20,8 +20,6 @@ logger = logging.getLogger(__name__)
 def test_memory_manager_llm_facts():
     """Test LLM-based fact extraction through the memory manager"""
 
-    print("Testing Memory Manager with LLM-based Fact Extraction")
-    print("=" * 60)
 
     try:
         # Initialize LLM client
@@ -32,11 +30,8 @@ def test_memory_manager_llm_facts():
 
         # Check if LM Studio is running
         if not llm_client.check_connection():
-            print("❌ LM Studio is not running or not accessible")
-            print("Please start LM Studio and load a model, then try again.")
             return False
 
-        print("✅ LM Studio connection established")
 
         # Initialize memory manager with LLM support
         memory_manager = UserMemoryManager(enable_auto_facts=True, llm_client=llm_client)
@@ -60,13 +55,8 @@ def test_memory_manager_llm_facts():
             },
         ]
 
-        print(f"\nStoring conversations and extracting facts for user: {test_user_id}")
 
-        total_facts_extracted = 0
-        for i, conversation in enumerate(test_conversations, 1):
-            print(f"\n--- Conversation {i} ---")
-            print(f"User: {conversation['user']}")
-            print(f"Bot: {conversation['bot']}")
+        for _i, conversation in enumerate(test_conversations, 1):
 
             # Store the conversation (this should trigger fact extraction)
             try:
@@ -75,44 +65,35 @@ def test_memory_manager_llm_facts():
                     user_message=conversation["user"],
                     bot_response=conversation["bot"],
                 )
-                print("✅ Conversation stored successfully")
 
                 # Check if any global facts were extracted (if global extraction is enabled)
                 if (
                     hasattr(memory_manager, "global_fact_extractor")
                     and memory_manager.global_fact_extractor
                 ):
-                    print("🔍 Global fact extraction is enabled")
+                    pass
                 else:
-                    print("ℹ️  Global fact extraction is disabled (this is expected)")
+                    pass
 
             except Exception as e:
-                print(f"❌ Error storing conversation: {e}")
                 logger.error(f"Conversation storage error: {e}", exc_info=True)
 
         # Try to retrieve some user memories to verify storage worked
-        print(f"\n--- Retrieving Memories ---")
         try:
             memories = memory_manager.get_relevant_memories(
                 test_user_id, "Tell me about Alice", limit=5
             )
             if memories:
-                print(f"✅ Retrieved {len(memories)} relevant memories:")
-                for memory in memories:
-                    print(f"  • {memory[:100]}..." if len(memory) > 100 else f"  • {memory}")
+                for _memory in memories:
+                    pass
             else:
-                print("ℹ️  No relevant memories found")
+                pass
         except Exception as e:
-            print(f"❌ Error retrieving memories: {e}")
             logger.error(f"Memory retrieval error: {e}", exc_info=True)
 
-        print(f"\n" + "=" * 60)
-        print("✅ Memory manager integration test completed successfully!")
-        print("🤖 LLM-based fact extraction is now integrated into the Discord bot")
         return True
 
     except Exception as e:
-        print(f"❌ Error in memory manager test: {e}")
         logger.error(f"Memory manager test error: {e}", exc_info=True)
         return False
 

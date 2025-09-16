@@ -2,13 +2,13 @@
 """
 Test script to verify that global fact extraction no longer processes bot responses
 """
-import sys
 import os
+import sys
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
+
 from fact_extractor import GlobalFactExtractor
-import json
 
 
 def test_no_bot_response_extraction():
@@ -24,24 +24,19 @@ def test_no_bot_response_extraction():
     # Extract facts
     facts = extractor.extract_global_facts_from_message(user_message, bot_response)
 
-    print("Extracted facts:")
-    for fact in facts:
-        print(f"- {fact['fact']} (source: {fact['source']})")
+    for _fact in facts:
+        pass
 
     # Check that facts only come from user messages
     bot_facts = [f for f in facts if "bot" in f["source"]]
-    user_facts = [f for f in facts if "user" in f["source"]]
+    [f for f in facts if "user" in f["source"]]
 
-    print(f"\nFacts from bot responses: {len(bot_facts)}")
-    print(f"Facts from user messages: {len(user_facts)}")
 
     if bot_facts:
-        print("ERROR: Found facts extracted from bot responses!")
-        for fact in bot_facts:
-            print(f"  - {fact['fact']}")
+        for _fact in bot_facts:
+            pass
         return False
     else:
-        print("SUCCESS: No facts extracted from bot responses")
         return True
 
 
@@ -55,21 +50,18 @@ def test_user_message_only():
     # Extract facts (no bot response)
     facts = extractor.extract_global_facts_from_message(user_message)
 
-    print("\nFacts from user message only:")
-    for fact in facts:
-        print(f"- {fact['fact']} (confidence: {fact['confidence']})")
+    for _fact in facts:
+        pass
 
     return len(facts) > 0
 
 
 if __name__ == "__main__":
-    print("Testing global fact extraction fix...")
 
     success1 = test_no_bot_response_extraction()
     success2 = test_user_message_only()
 
     if success1 and success2:
-        print("\n✅ All tests passed! Global fact extraction is working correctly.")
+        pass
     else:
-        print("\n❌ Some tests failed!")
         sys.exit(1)

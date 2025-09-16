@@ -2,10 +2,10 @@
 
 import asyncio
 import logging
-from typing import Optional, Dict, Any, List
+from typing import Any
 
-from src.memory.graph_enhanced_memory_manager import GraphEnhancedMemoryManager
 from src.graph_database.neo4j_connector import get_neo4j_connector
+from src.memory.graph_enhanced_memory_manager import GraphEnhancedMemoryManager
 
 logger = logging.getLogger(__name__)
 
@@ -20,12 +20,12 @@ class GraphEnhancedBot:
     def _load_base_system_prompt(self) -> str:
         """Load the base system prompt from file."""
         try:
-            with open("prompts/default.md", "r") as f:
+            with open("prompts/default.md") as f:
                 return f.read()
         except FileNotFoundError:
             return "You are a helpful AI assistant."
 
-    async def process_message(self, user_id: str, message: str) -> Dict[str, Any]:
+    async def process_message(self, user_id: str, message: str) -> dict[str, Any]:
         """Process a user message with graph-enhanced context."""
 
         try:
@@ -82,7 +82,7 @@ class GraphEnhancedBot:
             }
 
     def _build_system_prompt(
-        self, base_prompt: str, personalized_prompt: str, context: Dict[str, Any]
+        self, base_prompt: str, personalized_prompt: str, context: dict[str, Any]
     ) -> str:
         """Build complete system prompt with context."""
 
@@ -112,7 +112,7 @@ class GraphEnhancedBot:
         return "\n".join(prompt_parts)
 
     async def _generate_response(
-        self, message: str, system_prompt: str, context: Dict[str, Any]
+        self, message: str, system_prompt: str, context: dict[str, Any]
     ) -> str:
         """Generate response using LLM (replace with actual implementation)."""
 
@@ -132,7 +132,7 @@ class GraphEnhancedBot:
 
         return f"[{tone} response] I understand your message about: {message[:50]}..."
 
-    def _detect_emotion(self, message: str) -> Optional[Dict[str, Any]]:
+    def _detect_emotion(self, message: str) -> dict[str, Any] | None:
         """Simple emotion detection (replace with actual emotion manager)."""
 
         message_lower = message.lower()
@@ -147,12 +147,12 @@ class GraphEnhancedBot:
 
         return {"emotion": "neutral", "intensity": 0.3, "context": "default"}
 
-    async def _extract_topics(self, message: str) -> List[str]:
+    async def _extract_topics(self, message: str) -> list[str]:
         """Extract topics from message."""
         # Reuse the topic extraction from the memory manager
         return await self.memory_manager._extract_topics_from_message(message)
 
-    async def get_user_relationship_summary(self, user_id: str) -> Dict[str, Any]:
+    async def get_user_relationship_summary(self, user_id: str) -> dict[str, Any]:
         """Get a comprehensive relationship summary for a user."""
 
         try:
@@ -185,7 +185,7 @@ class GraphEnhancedBot:
             return {"status": "error", "error": str(e)}
 
     def _generate_relationship_summary(
-        self, relationship_context: Dict, emotional_patterns: Dict
+        self, relationship_context: dict, emotional_patterns: dict
     ) -> str:
         """Generate human-readable relationship summary."""
 
@@ -211,7 +211,7 @@ class GraphEnhancedBot:
 
         return summary
 
-    async def health_check(self) -> Dict[str, Any]:
+    async def health_check(self) -> dict[str, Any]:
         """Check health of all components."""
 
         health_status = {"timestamp": asyncio.get_event_loop().time(), "components": {}}
@@ -219,7 +219,7 @@ class GraphEnhancedBot:
         # Check ChromaDB (through memory manager)
         try:
             # Test ChromaDB connection
-            test_memories = await asyncio.get_event_loop().run_in_executor(
+            await asyncio.get_event_loop().run_in_executor(
                 None, self.memory_manager.retrieve_relevant_memories, "test_user", "test message", 1
             )
             health_status["components"]["chromadb"] = {"status": "healthy"}
@@ -244,17 +244,14 @@ class GraphEnhancedBot:
 async def example_usage():
     """Example of how to use the graph-enhanced bot."""
 
-    print("🤖 Graph-Enhanced Bot Example")
-    print("=" * 40)
 
     # Initialize bot
     bot = GraphEnhancedBot()
 
     # Health check
     health = await bot.health_check()
-    print(f"Health Status: {health['overall_status']}")
-    for component, status in health["components"].items():
-        print(f"  {component}: {status['status']}")
+    for _component, _status in health["components"].items():
+        pass
 
     # Example conversation
     user_id = "example_user_123"
@@ -267,32 +264,21 @@ async def example_usage():
         "Can you help me with some coding advice?",
     ]
 
-    print(f"\n💬 Example Conversation with User: {user_id}")
-    print("-" * 40)
 
     for i, message in enumerate(messages, 1):
-        print(f"\nMessage {i}: {message}")
 
-        result = await bot.process_message(user_id, message)
+        await bot.process_message(user_id, message)
 
-        print(f"Response: {result['response']}")
-        print(f"Context: {result['context_used']}")
 
         # Show relationship development
         if i % 2 == 0:  # Every other message
             summary = await bot.get_user_relationship_summary(user_id)
             if summary.get("status") == "success":
-                print(f"Relationship: {summary['summary']}")
+                pass
 
-    print(f"\n📊 Final Relationship Summary")
-    print("-" * 40)
     final_summary = await bot.get_user_relationship_summary(user_id)
     if final_summary.get("status") == "success":
-        ctx = final_summary["relationship_context"]
-        print(f"Intimacy Level: {ctx.get('intimacy_level', 0):.2f}")
-        print(f"Total Memories: {ctx.get('memory_count', 0)}")
-        print(f"Topics Discussed: {len(ctx.get('topics', []))}")
-        print(f"Summary: {final_summary['summary']}")
+        final_summary["relationship_context"]
 
 
 if __name__ == "__main__":

@@ -3,16 +3,15 @@
 Test script to verify the improved JSON parsing error handling in user fact extraction
 """
 
-import sys
-import os
 import json
 import logging
+import os
+import sys
 
 # Add the project directory to the path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from lmstudio_client import LMStudioClient
-from exceptions import LLMError
 
 # Set up logging
 logging.basicConfig(level=logging.DEBUG)
@@ -23,7 +22,7 @@ def test_malformed_json_handling():
     """Test handling of malformed JSON responses"""
 
     # Create a mock LLM client to test JSON parsing
-    client = LMStudioClient()
+    LMStudioClient()
 
     # Test cases of malformed JSON that we've seen
     test_cases = [
@@ -59,9 +58,7 @@ def test_malformed_json_handling():
         '{"user_facts": [{"fact": "incomplete',
     ]
 
-    for i, test_json in enumerate(test_cases):
-        print(f"\n--- Test Case {i+1} ---")
-        print(f"Input JSON: {test_json[:100]}{'...' if len(test_json) > 100 else ''}")
+    for _i, test_json in enumerate(test_cases):
 
         try:
             # Simulate the JSON parsing logic from extract_user_facts
@@ -76,11 +73,9 @@ def test_malformed_json_handling():
 
             # Try to parse
             try:
-                fact_data = json.loads(response_text)
-                print(f"✓ Successfully parsed JSON: {len(fact_data.get('user_facts', []))} facts")
+                json.loads(response_text)
 
-            except json.JSONDecodeError as e:
-                print(f"✗ JSON parsing failed: {e}")
+            except json.JSONDecodeError:
 
                 # Apply the same fix logic
                 import re
@@ -90,13 +85,11 @@ def test_malformed_json_handling():
                 # Look for malformed patterns
                 malformed_pattern = r'}\s*,\s*"(category|confidence|reasoning)":'
                 if re.search(malformed_pattern, fixed_text):
-                    print("  → Detected malformed array element - returning empty facts")
-                    result = {"user_facts": []}
+                    pass
                 else:
                     # Look for missing fact field
                     pattern_no_fact = r'\{\s*"(?:category|confidence|reasoning)":'
                     if re.search(pattern_no_fact, fixed_text):
-                        print("  → Detected object missing 'fact' field - extracting valid facts")
 
                         complete_facts = []
                         fact_pattern = r'\{\s*"fact"\s*:\s*"[^"]*"[^}]*\}'
@@ -108,21 +101,16 @@ def test_malformed_json_handling():
                                 fact_obj = json.loads(fact_json)
                                 if "fact" in fact_obj and "category" in fact_obj:
                                     complete_facts.append(fact_obj)
-                                    print(f"    → Extracted valid fact: {fact_obj['fact']}")
                             except json.JSONDecodeError:
                                 continue
 
-                        result = {"user_facts": complete_facts}
                     else:
-                        print("  → No specific fix pattern matched - returning empty facts")
-                        result = {"user_facts": []}
+                        pass
 
-                print(f"  → Final result: {len(result.get('user_facts', []))} facts")
 
-        except Exception as e:
-            print(f"✗ Unexpected error: {e}")
+        except Exception:
+            pass
 
 
 if __name__ == "__main__":
-    print("Testing improved JSON parsing error handling for user fact extraction")
     test_malformed_json_handling()

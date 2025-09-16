@@ -13,20 +13,20 @@ Test Categories:
 6. Integration Testing - Working with emotional context and personality systems
 """
 
-import pytest
 import asyncio
 from datetime import datetime, timedelta
-from unittest.mock import Mock, patch, AsyncMock
+from unittest.mock import Mock
+
+import pytest
 
 # Import the system under test
 from src.personality.memory_moments import (
-    MemoryTriggeredMoments,
-    MemoryConnection,
-    MemoryMoment,
     ConversationContext,
+    MemoryConnection,
     MemoryConnectionType,
+    MemoryMoment,
     MemoryMomentType,
-    MemoryMomentTiming,
+    MemoryTriggeredMoments,
     create_memory_triggered_moments,
 )
 
@@ -675,11 +675,9 @@ class TestMemoryMomentDataStructures:
 if __name__ == "__main__":
     # Run basic functionality test
     async def main():
-        print("🧠 Testing Memory-Triggered Moments System...")
 
         # Create system
         system = await create_memory_triggered_moments()
-        print("✅ Memory system created successfully")
 
         # Test basic functionality
         user_id = "test_user"
@@ -699,7 +697,6 @@ if __name__ == "__main__":
             emotional_context=EmotionalContext(EmotionalState.JOY),
         )
 
-        print("✅ Conversation analysis completed")
 
         # Test moment generation
         context = ConversationContext(
@@ -720,22 +717,17 @@ if __name__ == "__main__":
         )
 
         moments = await system.generate_memory_moments(user_id, context)
-        print(f"✅ Generated {len(moments)} memory moments")
 
         if moments:
             # Test prompt generation
-            prompt = await system.get_memory_moment_prompt(moments, context)
-            print(f"✅ Generated memory prompt: {len(prompt)} characters")
+            await system.get_memory_moment_prompt(moments, context)
 
             # Test triggering
-            callback = await system.trigger_memory_moment(moments[0], context)
-            print(f"✅ Triggered memory moment: {callback[:50]}...")
+            await system.trigger_memory_moment(moments[0], context)
 
         # Test summary
-        summary = await system.get_user_memory_summary(user_id)
-        print(f"✅ User memory summary: {summary['total_connections']} connections")
+        await system.get_user_memory_summary(user_id)
 
-        print("🎉 Memory-Triggered Moments system test completed successfully!")
 
     # Run the test
     asyncio.run(main())

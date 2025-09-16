@@ -8,12 +8,10 @@ and identify any performance bottlenecks or race conditions.
 import asyncio
 import logging
 import time
-import uuid
-import random
 
-from src.personality.memory_moments import MemoryTriggeredMoments
 from src.conversation.advanced_thread_manager import AdvancedConversationThreadManager
 from src.conversation.proactive_engagement_engine import ProactiveConversationEngagementEngine
+from src.personality.memory_moments import MemoryTriggeredMoments
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -41,7 +39,7 @@ async def test_thread_manager_concurrency():
 
         for message in messages:
             try:
-                result = await thread_manager.process_user_message(user_id, message, {})
+                await thread_manager.process_user_message(user_id, message, {})
                 successful_ops += 1
                 await asyncio.sleep(0.01)  # Small delay
             except Exception as e:
@@ -92,7 +90,7 @@ async def test_memory_moments_concurrency():
 
         for i, message in enumerate(messages):
             try:
-                connections = await memory_moments.analyze_conversation_for_memories(
+                await memory_moments.analyze_conversation_for_memories(
                     user_id, f"context_{i}", message, None
                 )
                 successful_ops += 1
@@ -145,7 +143,7 @@ async def test_engagement_engine_concurrency():
 
         for message in messages:
             try:
-                analysis = await engagement_engine.analyze_conversation_engagement(
+                await engagement_engine.analyze_conversation_engagement(
                     user_id, message, []
                 )
                 successful_ops += 1

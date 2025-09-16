@@ -8,27 +8,24 @@ including user privacy controls, consent management, and enhanced filtering.
 SECURITY VULNERABILITY ADDRESSED: Insufficient Context Boundaries (CVSS 6.8)
 """
 
-import os
-import sys
-import asyncio
-import unittest
-import tempfile
-import shutil
-from unittest.mock import Mock, AsyncMock, MagicMock, patch
 import logging
+import os
+import shutil
+import sys
+import tempfile
+import unittest
+from unittest.mock import Mock
 
 # Add the project root to the path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+from context_aware_memory_security import ContextSecurity, MemoryContext, MemoryContextType
 from context_boundaries_security import (
-    ContextBoundariesManager,
-    PrivacyPreferences,
-    PrivacyLevel,
     ConsentStatus,
-    ContextBoundaryDecision,
+    ContextBoundariesManager,
+    PrivacyLevel,
 )
 from enhanced_context_security import EnhancedContextAwareMemoryManager
-from context_aware_memory_security import MemoryContext, MemoryContextType, ContextSecurity
 
 # Set up logging
 logging.basicConfig(level=logging.DEBUG)
@@ -94,7 +91,6 @@ class TestContextBoundariesSecurity(unittest.TestCase):
 
     def test_privacy_preferences_creation(self):
         """Test creation and management of user privacy preferences"""
-        print("\n🧪 Testing privacy preferences creation...")
 
         user_id = "test_user_001"
 
@@ -107,11 +103,9 @@ class TestContextBoundariesSecurity(unittest.TestCase):
         self.assertFalse(prefs.allow_cross_server)
         self.assertFalse(prefs.allow_dm_to_server)
 
-        print("  ✅ Default privacy preferences created correctly")
 
     def test_privacy_level_updates(self):
         """Test updating user privacy levels"""
-        print("\n🧪 Testing privacy level updates...")
 
         user_id = "test_user_002"
 
@@ -127,11 +121,9 @@ class TestContextBoundariesSecurity(unittest.TestCase):
         self.assertEqual(prefs.privacy_level, PrivacyLevel.STRICT)
         self.assertFalse(prefs.allow_cross_server)
 
-        print("  ✅ Privacy level updated successfully")
 
     def test_context_boundary_permission_strict(self):
         """Test context boundary permissions with strict privacy"""
-        print("\n🧪 Testing context boundary permissions - strict privacy...")
 
         user_id = "test_user_strict"
 
@@ -147,11 +139,9 @@ class TestContextBoundariesSecurity(unittest.TestCase):
         self.assertEqual(permission["reason"], "privacy_level_strict")
         self.assertFalse(permission["requires_consent"])
 
-        print("  ✅ Strict privacy correctly blocks cross-context sharing")
 
     def test_context_boundary_permission_moderate(self):
         """Test context boundary permissions with moderate privacy"""
-        print("\n🧪 Testing context boundary permissions - moderate privacy...")
 
         user_id = "test_user_moderate"
 
@@ -176,11 +166,9 @@ class TestContextBoundariesSecurity(unittest.TestCase):
 
         self.assertFalse(permission_dm["allowed"])
 
-        print("  ✅ Moderate privacy allows safe sharing, blocks private sharing")
 
     def test_consent_request_generation(self):
         """Test consent request generation"""
-        print("\n🧪 Testing consent request generation...")
 
         user_id = "test_user_consent"
 
@@ -193,11 +181,9 @@ class TestContextBoundariesSecurity(unittest.TestCase):
         self.assertIn("options", consent_request)
         self.assertEqual(len(consent_request["options"]), 5)
 
-        print("  ✅ Consent request generated with proper options")
 
     def test_consent_response_processing(self):
         """Test processing of user consent responses"""
-        print("\n🧪 Testing consent response processing...")
 
         user_id = "test_user_response"
 
@@ -217,11 +203,9 @@ class TestContextBoundariesSecurity(unittest.TestCase):
             self.assertIn("dm_to_public_channel", prefs.custom_rules)
             self.assertTrue(prefs.custom_rules["dm_to_public_channel"])
 
-        print("  ✅ Consent response processed and preferences updated")
 
     def test_enhanced_memory_retrieval_with_privacy(self):
         """Test enhanced memory retrieval with privacy filtering"""
-        print("\n🧪 Testing enhanced memory retrieval with privacy filtering...")
 
         user_id = "test_user_memory"
 
@@ -250,11 +234,9 @@ class TestContextBoundariesSecurity(unittest.TestCase):
         # With strict privacy, should only allow same context or cross-server safe
         self.assertNotIn("public_channel", allowed_contexts)
 
-        print(f"  ✅ Privacy filtering applied: {len(memories)} memories returned")
 
     def test_memory_sensitivity_analysis(self):
         """Test memory content sensitivity analysis"""
-        print("\n🧪 Testing memory sensitivity analysis...")
 
         # High sensitivity memory
         high_sens_memory = {
@@ -274,11 +256,9 @@ class TestContextBoundariesSecurity(unittest.TestCase):
         sensitivity_low = self.enhanced_memory._analyze_memory_sensitivity(low_sens_memory)
         self.assertEqual(sensitivity_low, "low")
 
-        print("  ✅ Memory sensitivity analysis working correctly")
 
     def test_privacy_settings_ui_generation(self):
         """Test privacy settings UI generation"""
-        print("\n🧪 Testing privacy settings UI generation...")
 
         user_id = "test_user_ui"
 
@@ -295,16 +275,14 @@ class TestContextBoundariesSecurity(unittest.TestCase):
         self.assertTrue(ui_data["current_settings"]["allow_cross_server"])
         self.assertEqual(len(ui_data["privacy_levels"]), 4)
 
-        print("  ✅ Privacy settings UI generated correctly")
 
     def test_audit_trail_logging(self):
         """Test audit trail logging for privacy decisions"""
-        print("\n🧪 Testing audit trail logging...")
 
         user_id = "test_user_audit"
 
         # Make a privacy decision
-        permission = self.boundaries_manager.check_context_boundary_permission(
+        self.boundaries_manager.check_context_boundary_permission(
             user_id, "dm", "public_channel"
         )
 
@@ -314,7 +292,7 @@ class TestContextBoundariesSecurity(unittest.TestCase):
 
         import json
 
-        with open(audit_file, "r") as f:
+        with open(audit_file) as f:
             audit_log = json.load(f)
 
         user_entries = [entry for entry in audit_log if entry["user_id"] == user_id]
@@ -324,11 +302,9 @@ class TestContextBoundariesSecurity(unittest.TestCase):
         self.assertEqual(last_entry["source_context"], "dm")
         self.assertEqual(last_entry["target_context"], "public_channel")
 
-        print("  ✅ Audit trail logging working correctly")
 
     def test_privacy_leak_prevention_scenario(self):
         """Test comprehensive privacy leak prevention scenario"""
-        print("\n🧪 Testing comprehensive privacy leak prevention scenario...")
 
         user_id = "test_user_leak_prevention"
 
@@ -365,42 +341,16 @@ class TestContextBoundariesSecurity(unittest.TestCase):
         self.assertEqual(len(health_memories), 0)
 
         # Should have consent request instead
-        consent_requests = [
+        [
             mem for mem in memories if mem.get("metadata", {}).get("is_consent_request", False)
         ]
 
         # May or may not have consent request depending on context compatibility
-        print(f"  🛡️  Privacy protection: Health info blocked in public context")
-        print(f"  📋 Memories returned: {len(memories)}, Health memories: {len(health_memories)}")
 
-        print("  ✅ Privacy leak prevention working correctly")
 
 
 if __name__ == "__main__":
-    print("🔒 Enhanced Context Boundaries Security - Test Suite")
-    print("=" * 70)
 
     # Run tests
     unittest.main(verbosity=2, exit=False)
 
-    print("\n" + "=" * 70)
-    print("🎉 Context Boundaries Security Testing Complete!")
-    print("\n🔒 Security Features Validated:")
-    print("  ✅ User privacy preference management")
-    print("  ✅ Context boundary permission checking")
-    print("  ✅ Consent request generation and processing")
-    print("  ✅ Enhanced memory retrieval with privacy filtering")
-    print("  ✅ Memory sensitivity analysis")
-    print("  ✅ Privacy settings UI generation")
-    print("  ✅ Audit trail logging")
-    print("  ✅ Comprehensive privacy leak prevention")
-    print("\n🛡️  CVSS 6.8 Vulnerability - ADDRESSED:")
-    print("  ❌ Insufficient context boundaries")
-    print("  ❌ No user consent for cross-context sharing")
-    print("  ❌ Missing privacy preference controls")
-    print("  ❌ Lack of context-aware response filtering")
-    print("  ✅ Comprehensive privacy controls implemented")
-    print("  ✅ User consent system operational")
-    print("  ✅ Granular privacy settings available")
-    print("  ✅ Context-aware filtering with user preferences")
-    print("\n✅ Enhanced Context Boundaries Security - IMPLEMENTATION COMPLETE ✅")

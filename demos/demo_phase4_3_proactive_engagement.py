@@ -19,10 +19,10 @@ Usage:
 """
 
 import asyncio
+import json
 import logging
 from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Any
-import json
+from typing import Any
 
 # Configure logging
 logging.basicConfig(
@@ -33,9 +33,9 @@ logger = logging.getLogger(__name__)
 # Import Phase 4.3 implementation
 try:
     from src.conversation.proactive_engagement_engine import (
-        ProactiveConversationEngagementEngine,
         ConversationFlowState,
         EngagementStrategy,
+        ProactiveConversationEngagementEngine,
         TopicRelevanceLevel,
         create_proactive_engagement_engine,
     )
@@ -74,9 +74,9 @@ class Phase43ProactiveEngagementDemo:
     """
 
     def __init__(self):
-        self.engagement_engine: Optional[ProactiveConversationEngagementEngine] = None
-        self.thread_manager: Optional[AdvancedConversationThreadManager] = None
-        self.memory_moments: Optional[MemoryTriggeredMoments] = None
+        self.engagement_engine: ProactiveConversationEngagementEngine | None = None
+        self.thread_manager: AdvancedConversationThreadManager | None = None
+        self.memory_moments: MemoryTriggeredMoments | None = None
 
         # Demo conversation scenarios showcasing proactive engagement
         self.conversation_scenarios = self._create_engagement_scenarios()
@@ -109,7 +109,7 @@ class Phase43ProactiveEngagementDemo:
 
         return True
 
-    def _create_engagement_scenarios(self) -> List[Dict[str, Any]]:
+    def _create_engagement_scenarios(self) -> list[dict[str, Any]]:
         """Create conversation scenarios that demonstrate proactive engagement"""
         return [
             {
@@ -214,7 +214,7 @@ class Phase43ProactiveEngagementDemo:
             },
         ]
 
-    async def run_scenario_demo(self, scenario: Dict[str, Any]) -> Dict[str, Any]:
+    async def run_scenario_demo(self, scenario: dict[str, Any]) -> dict[str, Any]:
         """Run a single conversation scenario and analyze proactive engagement"""
         logger.info("=" * 70)
         logger.info("🎭 SCENARIO: %s", scenario["scenario_name"])
@@ -262,9 +262,9 @@ class Phase43ProactiveEngagementDemo:
 
     def _record_engagement_analysis(
         self,
-        engagement_result: Dict[str, Any],
-        scenario_results: Dict[str, Any],
-        message_data: Dict[str, Any],
+        engagement_result: dict[str, Any],
+        scenario_results: dict[str, Any],
+        message_data: dict[str, Any],
     ):
         """Record engagement analysis results"""
 
@@ -304,7 +304,7 @@ class Phase43ProactiveEngagementDemo:
             if strategy not in scenario_results["proactive_strategies_used"]:
                 scenario_results["proactive_strategies_used"].append(strategy)
 
-    def _display_engagement_state(self, engagement_result: Dict[str, Any], message_num: int):
+    def _display_engagement_state(self, engagement_result: dict[str, Any], message_num: int):
         """Display current engagement state information"""
 
         flow_state = engagement_result.get("flow_state", "unknown")
@@ -347,7 +347,7 @@ class Phase43ProactiveEngagementDemo:
             logger.info("   ✅ Conversation flowing naturally - no intervention needed")
 
     def _analyze_scenario_performance(
-        self, scenario_results: Dict[str, Any], scenario: Dict[str, Any]
+        self, scenario_results: dict[str, Any], scenario: dict[str, Any]
     ):
         """Analyze overall scenario performance"""
 
@@ -398,7 +398,7 @@ class Phase43ProactiveEngagementDemo:
                 logger.info("      Expected: %s", expected_strategies)
                 logger.info("      Used: %s", strategies_used)
 
-    async def run_integration_demo(self) -> Dict[str, Any]:
+    async def run_integration_demo(self) -> dict[str, Any]:
         """Demonstrate integration with Phase 4.1 and 4.2 systems"""
 
         logger.info("")
@@ -472,7 +472,7 @@ class Phase43ProactiveEngagementDemo:
 
         return integration_results
 
-    async def run_full_demo(self) -> Dict[str, Any]:
+    async def run_full_demo(self) -> dict[str, Any]:
         """Run the complete Phase 4.3 demonstration"""
         logger.info("🚀 STARTING PHASE 4.3 PROACTIVE CONVERSATION ENGAGEMENT DEMO")
 
@@ -526,7 +526,7 @@ class Phase43ProactiveEngagementDemo:
 
         return demo_results
 
-    def _display_demo_summary(self, results: Dict[str, Any]):
+    def _display_demo_summary(self, results: dict[str, Any]):
         """Display a comprehensive demo summary"""
         logger.info("")
         logger.info("=" * 80)

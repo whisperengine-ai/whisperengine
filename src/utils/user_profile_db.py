@@ -3,13 +3,12 @@ Database-backed user profile management
 This replaces the JSON file approach with SQLite for better data integrity
 """
 
-import sqlite3
 import json
 import logging
+import sqlite3
 from datetime import datetime
-from typing import Dict, List, Optional, Tuple
-from dataclasses import asdict
-from src.utils.emotion_manager import UserProfile, EmotionProfile, RelationshipLevel, EmotionalState
+
+from src.utils.emotion_manager import EmotionalState, EmotionProfile, RelationshipLevel, UserProfile
 
 logger = logging.getLogger(__name__)
 
@@ -69,8 +68,8 @@ class UserProfileDatabase:
             # Insert or update user record
             conn.execute(
                 """
-                INSERT OR REPLACE INTO users 
-                (user_id, name, relationship_level, current_emotion, interaction_count, 
+                INSERT OR REPLACE INTO users
+                (user_id, name, relationship_level, current_emotion, interaction_count,
                  first_interaction, last_interaction, escalation_count, trust_indicators)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
@@ -94,7 +93,7 @@ class UserProfileDatabase:
             for emotion in profile.emotion_history or []:
                 conn.execute(
                     """
-                    INSERT INTO emotion_history 
+                    INSERT INTO emotion_history
                     (user_id, detected_emotion, confidence, triggers, intensity, timestamp)
                     VALUES (?, ?, ?, ?, ?, ?)
                 """,
@@ -108,7 +107,7 @@ class UserProfileDatabase:
                     ),
                 )
 
-    def load_user_profile(self, user_id: str) -> Optional[UserProfile]:
+    def load_user_profile(self, user_id: str) -> UserProfile | None:
         """Load a user profile from database"""
         with sqlite3.connect(self.db_path) as conn:
             # Get user data
@@ -129,8 +128,8 @@ class UserProfileDatabase:
             emotion_cursor = conn.execute(
                 """
                 SELECT detected_emotion, confidence, triggers, intensity, timestamp
-                FROM emotion_history 
-                WHERE user_id = ? 
+                FROM emotion_history
+                WHERE user_id = ?
                 ORDER BY timestamp ASC
             """,
                 (user_id,),
@@ -173,7 +172,7 @@ class UserProfileDatabase:
                 emotion_history=emotion_history,
             )
 
-    def load_all_profiles(self) -> Dict[str, UserProfile]:
+    def load_all_profiles(self) -> dict[str, UserProfile]:
         """Load all user profiles"""
         profiles = {}
         with sqlite3.connect(self.db_path) as conn:
@@ -190,7 +189,7 @@ class UserProfileDatabase:
             conn.execute("DELETE FROM emotion_history WHERE user_id = ?", (user_id,))
             conn.execute("DELETE FROM users WHERE user_id = ?", (user_id,))
 
-    def update_user_name(self, user_id: str, name: Optional[str]) -> bool:
+    def update_user_name(self, user_id: str, name: str | None) -> bool:
         """Update the name for an existing user"""
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.execute("SELECT name FROM users WHERE user_id = ?", (user_id,))
@@ -207,7 +206,7 @@ class UserProfileDatabase:
 
             return False  # No change needed
 
-    def get_user_stats(self) -> Dict:
+    def get_user_stats(self) -> dict:
         """Get database statistics"""
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.execute("SELECT COUNT(*) FROM users")
@@ -218,19 +217,17 @@ class UserProfileDatabase:
 
             return {"total_users": user_count, "total_emotions": emotion_count}
 
-    def delete_user_emotions(self, user_id: str, older_than_days: Optional[int] = None):
+    def delete_user_emotions(self, user_id: str, older_than_days: int | None = None):
         """Delete emotion history for a user, optionally only older records"""
         with sqlite3.connect(self.db_path) as conn:
             if older_than_days:
                 # Delete emotions older than specified days
                 deleted = conn.execute(
-                    """
-                    DELETE FROM emotion_history 
-                    WHERE user_id = ? 
-                    AND timestamp < date('now', '-{} days')
-                """.format(
-                        older_than_days
-                    ),
+                    f"""
+                    DELETE FROM emotion_history
+                    WHERE user_id = ?
+                    AND timestamp < date('now', '-{older_than_days} days')
+                """,
                     (user_id,),
                 )
                 logger.info(
@@ -254,12 +251,10 @@ class UserProfileDatabase:
         """Clean up emotion records older than specified days across all users"""
         with sqlite3.connect(self.db_path) as conn:
             deleted = conn.execute(
-                """
-                DELETE FROM emotion_history 
-                WHERE timestamp < date('now', '-{} days')
-            """.format(
-                    days_to_keep
-                )
+                f"""
+                DELETE FROM emotion_history
+                WHERE timestamp < date('now', '-{days_to_keep} days')
+            """
             )
             logger.info(
                 f"Cleaned up {deleted.rowcount} emotion records older than {days_to_keep} days"
@@ -278,7 +273,7 @@ class UserProfileDatabase:
                 # Reset counters and emotions but keep identity
                 conn.execute(
                     """
-                    UPDATE users 
+                    UPDATE users
                     SET current_emotion = 'neutral',
                         interaction_count = 0,
                         escalation_count = 0,
@@ -305,14 +300,12 @@ class UserProfileDatabase:
         with sqlite3.connect(self.db_path) as conn:
             # First, let's see who would be affected
             cursor = conn.execute(
-                """
+                f"""
                 SELECT user_id, last_interaction, interaction_count
-                FROM users 
-                WHERE last_interaction < date('now', '-{} days')
+                FROM users
+                WHERE last_interaction < date('now', '-{days_inactive} days')
                 OR last_interaction IS NULL
-            """.format(
-                    days_inactive
-                )
+            """
             )
 
             inactive_users = cursor.fetchall()
@@ -329,14 +322,12 @@ class UserProfileDatabase:
 
             # Mark users as archived
             archived = conn.execute(
-                """
-                UPDATE users 
-                SET archived = 1 
-                WHERE last_interaction < date('now', '-{} days')
+                f"""
+                UPDATE users
+                SET archived = 1
+                WHERE last_interaction < date('now', '-{days_inactive} days')
                 OR last_interaction IS NULL
-            """.format(
-                    days_inactive
-                )
+            """
             )
 
             logger.info(
@@ -349,15 +340,13 @@ class UserProfileDatabase:
         with sqlite3.connect(self.db_path) as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.execute(
-                """
+                f"""
                 SELECT user_id, last_interaction, interaction_count, relationship_level
-                FROM users 
-                WHERE (last_interaction < date('now', '-{} days') OR last_interaction IS NULL)
+                FROM users
+                WHERE (last_interaction < date('now', '-{days_inactive} days') OR last_interaction IS NULL)
                 AND (archived IS NULL OR archived = 0)
                 ORDER BY last_interaction ASC
-            """.format(
-                    days_inactive
-                )
+            """
             )
 
             return [dict(row) for row in cursor.fetchall()]
@@ -365,7 +354,7 @@ class UserProfileDatabase:
     def migrate_from_json(self, json_file_path: str):
         """Migrate existing JSON data to database"""
         try:
-            with open(json_file_path, "r") as f:
+            with open(json_file_path) as f:
                 data = json.load(f)
 
             migrated_count = 0

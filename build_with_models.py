@@ -5,19 +5,17 @@ Downloads all required models during the build process for offline bundling
 """
 
 import os
-import sys
 import subprocess
+import sys
 from pathlib import Path
 
 
 def run_model_download():
     """Run the model download script as part of build process"""
 
-    print("🔄 Building WhisperEngine with bundled models...")
 
     # Ensure we're in the right directory
     if not Path("download_models.py").exists():
-        print("❌ download_models.py not found. Please run from WhisperEngine root directory")
         sys.exit(1)
 
     # Set environment variables for offline mode
@@ -32,31 +30,25 @@ def run_model_download():
 
     try:
         # Download models first
-        print("📦 Downloading models for bundling...")
         result = subprocess.run(
             [sys.executable, "download_models.py"], capture_output=True, text=True, env=env
         )
 
         if result.returncode != 0:
-            print(f"❌ Model download failed: {result.stderr}")
             sys.exit(1)
 
-        print("✅ Models downloaded successfully")
 
         # Now run the actual build
         build_command = sys.argv[1:] if len(sys.argv) > 1 else ["pyinstaller", "whisperengine.spec"]
 
-        print(f"🔨 Running build command: {' '.join(build_command)}")
         result = subprocess.run(build_command, env=env)
 
         if result.returncode == 0:
-            print("🎉 Build completed successfully with bundled models!")
+            pass
         else:
-            print("❌ Build failed")
             sys.exit(1)
 
-    except Exception as e:
-        print(f"❌ Build process failed: {e}")
+    except Exception:
         sys.exit(1)
 
 

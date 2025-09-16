@@ -2,14 +2,15 @@
 Image processing module for Discord message attachments
 """
 
-import os
-import io
 import base64
-import aiohttp
-import aiofiles
+import io
 import logging
-from typing import Optional, Dict, List, Any, Tuple
+import os
+from typing import Any
+
+import aiohttp
 from PIL import Image
+
 from src.utils.exceptions import ValidationError
 
 
@@ -26,7 +27,7 @@ class ImageProcessor:
     MAX_WIDTH = 2048
     MAX_HEIGHT = 2048
 
-    def __init__(self, temp_dir: Optional[str] = None):
+    def __init__(self, temp_dir: str | None = None):
         """
         Initialize the image processor
 
@@ -62,7 +63,7 @@ class ImageProcessor:
         )
         return is_supported
 
-    async def download_image(self, url: str, max_size: Optional[int] = None) -> Optional[bytes]:
+    async def download_image(self, url: str, max_size: int | None = None) -> bytes | None:
         """
         Download an image from a URL
 
@@ -183,7 +184,7 @@ class ImageProcessor:
             self.logger.error(f"Error encoding image for LLM: {e}")
             raise ValidationError(f"Failed to encode image: {str(e)}")
 
-    async def process_discord_attachment(self, attachment) -> Optional[Dict[str, Any]]:
+    async def process_discord_attachment(self, attachment) -> dict[str, Any] | None:
         """
         Process a Discord attachment for LLM input
 
@@ -234,7 +235,7 @@ class ImageProcessor:
             self.logger.error(f"Error processing image attachment {attachment.filename}: {e}")
             return None
 
-    async def process_multiple_attachments(self, attachments) -> List[Dict[str, Any]]:
+    async def process_multiple_attachments(self, attachments) -> list[dict[str, Any]]:
         """
         Process multiple Discord attachments
 
@@ -256,7 +257,7 @@ class ImageProcessor:
         )
         return processed_images
 
-    def get_image_description_prompt(self, images: List[Dict[str, Any]]) -> str:
+    def get_image_description_prompt(self, images: list[dict[str, Any]]) -> str:
         """
         Generate a prompt describing the attached images
 

@@ -11,19 +11,18 @@ This test suite validates that the secure logging system properly:
 """
 
 import unittest
-import re
-import json
 from unittest.mock import Mock, patch
+
+import discord
 from secure_logging import (
-    SecureLogger,
-    LogLevel,
     DataSensitivity,
     LogEntry,
+    LogLevel,
+    SecureLogger,
+    get_secure_logger,
     secure_logger,
     security_logger,
-    get_secure_logger,
 )
-import discord
 
 
 class TestSecureLogging(unittest.TestCase):
@@ -53,7 +52,6 @@ class TestSecureLogging(unittest.TestCase):
 
     def test_user_id_hashing(self):
         """Test that user IDs are properly hashed for privacy"""
-        print("\n🧪 Testing user ID hashing...")
 
         # Test with integer user ID
         user_id = 123456789012345678
@@ -72,15 +70,10 @@ class TestSecureLogging(unittest.TestCase):
         self.assertNotEqual(hashed_id, different_hashed_id)
 
         # None case is handled by the method parameter default
-        print("  ✅ None handling tested in other methods")
 
-        print(f"  ✅ User ID {user_id} hashed to: {hashed_id}")
-        print(f"  ✅ Hash consistency verified")
-        print(f"  ✅ Anonymous handling verified")
 
     def test_pii_sanitization(self):
         """Test that PII is properly detected and sanitized"""
-        print("\n🧪 Testing PII sanitization...")
 
         test_cases = [
             ("Email: user@example.com", "Email: [EMAIL_REDACTED]"),
@@ -91,18 +84,16 @@ class TestSecureLogging(unittest.TestCase):
             ("Discord ID: 123456789012345678", "Discord ID: [DISCORD_ID_REDACTED]"),
         ]
 
-        for original, expected_pattern in test_cases:
+        for original, _expected_pattern in test_cases:
             sanitized, was_modified = self.logger._sanitize_message_content(
                 original, DataSensitivity.SENSITIVE
             )
 
             self.assertTrue(was_modified, f"Content should be modified: {original}")
             self.assertIn("REDACTED", sanitized, f"Should contain redaction: {sanitized}")
-            print(f"  ✅ PII sanitized: '{original}' -> '{sanitized}'")
 
     def test_sensitive_content_detection(self):
         """Test detection of sensitive content indicators"""
-        print("\n🧪 Testing sensitive content detection...")
 
         sensitive_messages = [
             "Here is my password: secret123",
@@ -119,11 +110,9 @@ class TestSecureLogging(unittest.TestCase):
 
             self.assertTrue(was_modified, f"Sensitive content should be detected: {message}")
             self.assertIn("REDACTED", sanitized, f"Should contain redaction: {sanitized}")
-            print(f"  ✅ Sensitive content detected: '{message}' -> '{sanitized}'")
 
     def test_message_length_truncation(self):
         """Test that very long messages are truncated"""
-        print("\n🧪 Testing message length truncation...")
 
         long_message = "A" * 300  # Longer than 200 character limit
 
@@ -135,11 +124,9 @@ class TestSecureLogging(unittest.TestCase):
         self.assertTrue(len(sanitized) < len(long_message))
         self.assertIn("TRUNCATED", sanitized)
 
-        print(f"  ✅ Long message truncated: {len(long_message)} -> {len(sanitized)} chars")
 
     def test_discord_context_classification(self):
         """Test proper classification of Discord channel contexts"""
-        print("\n🧪 Testing Discord context classification...")
 
         # Test DM classification
         dm_context = self.logger._classify_discord_context(self.mock_dm_message)
@@ -149,12 +136,9 @@ class TestSecureLogging(unittest.TestCase):
         guild_context = self.logger._classify_discord_context(self.mock_guild_message)
         self.assertEqual(guild_context, "guild_text")
 
-        print(f"  ✅ DM context classified as: {dm_context}")
-        print(f"  ✅ Guild context classified as: {guild_context}")
 
     def test_data_sensitivity_levels(self):
         """Test different data sensitivity levels"""
-        print("\n🧪 Testing data sensitivity levels...")
 
         sensitive_content = "My email is user@example.com"
 
@@ -176,13 +160,10 @@ class TestSecureLogging(unittest.TestCase):
             "DETECTED" in confidential_sanitized or "REDACTED" in confidential_sanitized
         )
 
-        print(f"  ✅ Public level: '{sensitive_content}' -> '{public_sanitized}'")
-        print(f"  ✅ Confidential level: '{sensitive_content}' -> '{confidential_sanitized}'")
 
     @patch("secure_logging.logging.getLogger")
     def test_user_action_logging(self, mock_get_logger):
         """Test user action logging with proper sanitization"""
-        print("\n🧪 Testing user action logging...")
 
         mock_logger_instance = Mock()
         mock_get_logger.return_value = mock_logger_instance
@@ -212,12 +193,10 @@ class TestSecureLogging(unittest.TestCase):
         self.assertIn("dm", logged_message)  # Context classified
         self.assertIn("SANITIZED", logged_message)  # Sanitization flag
 
-        print(f"  ✅ User action logged with sanitization: {logged_message[:100]}...")
 
     @patch("secure_logging.logging.getLogger")
     def test_security_event_logging(self, mock_get_logger):
         """Test security event logging"""
-        print("\n🧪 Testing security event logging...")
 
         mock_logger_instance = Mock()
         mock_get_logger.return_value = mock_logger_instance
@@ -249,11 +228,9 @@ class TestSecureLogging(unittest.TestCase):
         self.assertIn("user_", logged_message)  # User hash
         self.assertIn("threat_level_high", logged_message)  # Threat level context
 
-        print(f"  ✅ Security event logged: {logged_message[:100]}...")
 
     def test_message_processing_logging(self):
         """Test message processing event logging"""
-        print("\n🧪 Testing message processing logging...")
 
         with patch("secure_logging.logging.getLogger") as mock_get_logger:
             mock_logger_instance = Mock()
@@ -277,11 +254,9 @@ class TestSecureLogging(unittest.TestCase):
             self.assertIn("user_", logged_message)  # User hash
             self.assertIn("dm", logged_message)  # Channel context
 
-            print(f"  ✅ Message processing logged: {logged_message[:100]}...")
 
     def test_api_interaction_logging(self):
         """Test API interaction logging with error sanitization"""
-        print("\n🧪 Testing API interaction logging...")
 
         with patch("secure_logging.logging.getLogger") as mock_get_logger:
             mock_logger_instance = Mock()
@@ -309,11 +284,9 @@ class TestSecureLogging(unittest.TestCase):
             self.assertIn("REDACTED", logged_message)  # API key should be redacted
             self.assertNotIn("sk-1234567890abcdef", logged_message)  # Actual key should not appear
 
-            print(f"  ✅ API interaction logged with error sanitization: {logged_message[:100]}...")
 
     def test_database_operation_logging(self):
         """Test database operation logging"""
-        print("\n🧪 Testing database operation logging...")
 
         with patch("secure_logging.logging.getLogger") as mock_get_logger:
             mock_logger_instance = Mock()
@@ -341,11 +314,9 @@ class TestSecureLogging(unittest.TestCase):
             self.assertIn("Records: 5", logged_message)
             self.assertIn("user_", logged_message)  # User hash
 
-            print(f"  ✅ Database operation logged: {logged_message[:100]}...")
 
     def test_global_logger_instances(self):
         """Test that global logger instances are properly configured"""
-        print("\n🧪 Testing global logger instances...")
 
         # Test secure_logger instance
         self.assertIsInstance(secure_logger, SecureLogger)
@@ -360,13 +331,9 @@ class TestSecureLogging(unittest.TestCase):
         self.assertIsInstance(component_logger, SecureLogger)
         self.assertEqual(component_logger.name, "discord_bot.test_component")
 
-        print("  ✅ Global secure_logger configured correctly")
-        print("  ✅ Global security_logger configured correctly")
-        print("  ✅ Component logger factory working correctly")
 
     def test_log_entry_structure(self):
         """Test log entry structure and formatting"""
-        print("\n🧪 Testing log entry structure...")
 
         # Create a log entry
         from datetime import datetime
@@ -393,11 +360,9 @@ class TestSecureLogging(unittest.TestCase):
         self.assertIn("Test message", formatted)
         self.assertIn("[SANITIZED]", formatted)
 
-        print(f"  ✅ Log entry formatted correctly: {formatted}")
 
     def test_confidential_data_handling(self):
         """Test that confidential data is completely removed"""
-        print("\n🧪 Testing confidential data handling...")
 
         confidential_content = "User password is secret123 and email is user@example.com"
 
@@ -409,46 +374,10 @@ class TestSecureLogging(unittest.TestCase):
         # In confidential mode, entire content should be replaced for PII detection
         self.assertIn("DETECTED", sanitized)
 
-        print(
-            f"  ✅ Confidential data completely sanitized: '{confidential_content}' -> '{sanitized}'"
-        )
 
 
 if __name__ == "__main__":
-    print("🔒 Secure Logging System - Test Suite")
-    print("=" * 70)
 
     # Run the tests
     unittest.main(verbosity=0, exit=False)
 
-    print("=" * 70)
-    print("🎉 Secure Logging Testing Complete!")
-    print("")
-    print("🔒 Security Features Validated:")
-    print("  ✅ PII detection and sanitization")
-    print("  ✅ User ID hashing for privacy")
-    print("  ✅ Message content sanitization")
-    print("  ✅ Sensitive content pattern detection")
-    print("  ✅ Data sensitivity level handling")
-    print("  ✅ Discord context classification")
-    print("  ✅ Security event logging")
-    print("  ✅ API interaction sanitization")
-    print("  ✅ Database operation logging")
-    print("  ✅ Log entry structure validation")
-    print("  ✅ Confidential data protection")
-    print("")
-    print("🛡️  CVSS 5.8 Vulnerability - ADDRESSED:")
-    print("  ❌ Sensitive user data logged in plain text")
-    print("  ❌ User IDs exposed in logs")
-    print("  ❌ Message content logged without sanitization")
-    print("  ❌ API responses with PII logged")
-    print("  ❌ Debug information contains sensitive data")
-    print("  ❌ No log rotation or secure storage")
-    print("  ✅ Comprehensive PII sanitization system")
-    print("  ✅ User ID hashing for privacy protection")
-    print("  ✅ Content-aware sanitization levels")
-    print("  ✅ Security event audit trail")
-    print("  ✅ API key and credential protection")
-    print("  ✅ Structured secure logging framework")
-    print("")
-    print("✅ Logging Security Issues - IMPLEMENTATION COMPLETE ✅")

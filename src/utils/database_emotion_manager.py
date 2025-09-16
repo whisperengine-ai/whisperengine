@@ -3,9 +3,11 @@ Enhanced EmotionManager that can work with either JSON files or database storage
 """
 
 import logging
-from typing import Dict, Optional
-from src.utils.emotion_manager import EmotionManager as BaseEmotionManager, UserProfile
+
 from user_profile_db import UserProfileDatabase
+
+from src.utils.emotion_manager import EmotionManager as BaseEmotionManager
+from src.utils.emotion_manager import UserProfile
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +32,7 @@ class DatabaseEmotionManager(BaseEmotionManager):
             # Don't call parent init to avoid JSON file setup
             self.llm_client = llm_client
             self.enable_llm_analysis = enable_llm_analysis
-            self.user_profiles: Dict[str, UserProfile] = {}
+            self.user_profiles: dict[str, UserProfile] = {}
             self.load_profiles()
         else:
             # Use traditional JSON file approach
@@ -62,7 +64,7 @@ class DatabaseEmotionManager(BaseEmotionManager):
         else:
             super().save_profiles()
 
-    def get_database_stats(self) -> Optional[Dict]:
+    def get_database_stats(self) -> dict | None:
         """Get database statistics (only available in database mode)"""
         if self.use_database:
             return self.db.get_user_stats()
@@ -81,7 +83,7 @@ class DatabaseEmotionManager(BaseEmotionManager):
             self.save_profiles()
             logger.info(f"Deleted user profile from JSON: {user_id}")
 
-    def migrate_to_database(self, json_file_path: Optional[str] = None):
+    def migrate_to_database(self, json_file_path: str | None = None):
         """Migrate from JSON file to database (if not already using database)"""
         if self.use_database:
             logger.info("Already using database backend")

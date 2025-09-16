@@ -10,15 +10,13 @@ Phase 3: Multi-Dimensional Memory Networks
 """
 
 import logging
-import asyncio
-from datetime import datetime, timezone, timedelta
-from typing import Dict, List, Optional, Any, Tuple
-from dataclasses import dataclass, asdict
-from enum import Enum
-import numpy as np
-from collections import defaultdict, Counter
 import statistics
-import math
+from dataclasses import asdict, dataclass
+from datetime import UTC, datetime, timedelta
+from enum import Enum
+from typing import Any
+
+import numpy as np
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +41,7 @@ class ImportanceFactors:
     uniqueness: float
     relationship_milestone: float
 
-    def to_dict(self) -> Dict[str, float]:
+    def to_dict(self) -> dict[str, float]:
         return asdict(self)
 
 
@@ -58,7 +56,7 @@ class MemoryImportanceScore:
     calculation_timestamp: datetime
     score_explanation: str
     decay_rate: float
-    boost_events: List[str]
+    boost_events: list[str]
 
 
 class MemoryImportanceEngine:
@@ -95,8 +93,8 @@ class MemoryImportanceEngine:
         self,
         memory_id: str,
         user_id: str,
-        memory_data: Dict,
-        user_history: List[Dict],
+        memory_data: dict,
+        user_history: list[dict],
         memory_manager=None,
     ) -> MemoryImportanceScore:
         """
@@ -152,7 +150,7 @@ class MemoryImportanceEngine:
                 user_id=user_id,
                 overall_score=overall_score,
                 factor_scores=factor_scores,
-                calculation_timestamp=datetime.now(timezone.utc),
+                calculation_timestamp=datetime.now(UTC),
                 score_explanation=explanation,
                 decay_rate=decay_rate,
                 boost_events=boost_events,
@@ -170,7 +168,7 @@ class MemoryImportanceEngine:
             # Return default score
             return self._create_default_importance_score(memory_id, user_id)
 
-    async def _assess_emotional_impact(self, memory_data: Dict, user_history: List[Dict]) -> float:
+    async def _assess_emotional_impact(self, memory_data: dict, user_history: list[dict]) -> float:
         """Assess emotional significance of memory"""
         logger.debug("Assessing emotional impact")
 
@@ -218,21 +216,21 @@ class MemoryImportanceEngine:
 
         # Check for subsequent emotional references
         content = memory_data.get("content", "").lower()
-        memory_timestamp = memory_data.get("timestamp", datetime.now(timezone.utc))
+        memory_timestamp = memory_data.get("timestamp", datetime.now(UTC))
 
         # Ensure memory_timestamp is a datetime object
         if isinstance(memory_timestamp, str):
             try:
                 memory_timestamp = datetime.fromisoformat(memory_timestamp.replace("Z", "+00:00"))
             except (ValueError, TypeError):
-                memory_timestamp = datetime.now(timezone.utc)
+                memory_timestamp = datetime.now(UTC)
 
         # Ensure timezone-aware
         memory_timestamp = self._ensure_timezone_aware(memory_timestamp)
 
         subsequent_references = 0
         for interaction in user_history:
-            interaction_time = interaction.get("timestamp", datetime.now(timezone.utc))
+            interaction_time = interaction.get("timestamp", datetime.now(UTC))
             if isinstance(interaction_time, str):
                 try:
                     interaction_time = datetime.fromisoformat(
@@ -258,7 +256,7 @@ class MemoryImportanceEngine:
         return min(emotional_intensity, 1.0)
 
     async def _assess_personal_relevance(
-        self, memory_data: Dict, user_id: str, user_history: List[Dict]
+        self, memory_data: dict, user_id: str, user_history: list[dict]
     ) -> float:
         """Assess how personally relevant the memory is to the user"""
         logger.debug("Assessing personal relevance")
@@ -347,24 +345,24 @@ class MemoryImportanceEngine:
     def _ensure_timezone_aware(self, dt: datetime) -> datetime:
         """Ensure datetime object is timezone-aware (UTC if naive)"""
         if dt.tzinfo is None:
-            return dt.replace(tzinfo=timezone.utc)
+            return dt.replace(tzinfo=UTC)
         return dt
 
-    async def _calculate_recency_score(self, memory_data: Dict) -> float:
+    async def _calculate_recency_score(self, memory_data: dict) -> float:
         """Calculate recency-based importance score"""
         logger.debug("Calculating recency score")
 
-        memory_timestamp = memory_data.get("timestamp", datetime.now(timezone.utc))
+        memory_timestamp = memory_data.get("timestamp", datetime.now(UTC))
         if isinstance(memory_timestamp, str):
             try:
                 memory_timestamp = datetime.fromisoformat(memory_timestamp.replace("Z", "+00:00"))
             except (ValueError, TypeError):
                 # If parsing fails, use current time (low recency score)
-                memory_timestamp = datetime.now(timezone.utc) - timedelta(days=365)
+                memory_timestamp = datetime.now(UTC) - timedelta(days=365)
 
         # Ensure both datetimes are timezone-aware
         memory_timestamp = self._ensure_timezone_aware(memory_timestamp)
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         days_old = (now - memory_timestamp).days
 
         # Ensure days_old is not negative
@@ -401,7 +399,7 @@ class MemoryImportanceEngine:
         return min(base_frequency + np.random.uniform(0, 0.4), 1.0)
 
     async def _assess_uniqueness(
-        self, memory_data: Dict, user_id: str, user_history: List[Dict]
+        self, memory_data: dict, user_id: str, user_history: list[dict]
     ) -> float:
         """Assess how unique this memory is compared to others"""
         logger.debug("Assessing memory uniqueness")
@@ -443,7 +441,7 @@ class MemoryImportanceEngine:
         return min(overall_uniqueness, 1.0)
 
     async def _check_milestone_significance(
-        self, memory_data: Dict, user_history: List[Dict]
+        self, memory_data: dict, user_history: list[dict]
     ) -> float:
         """Check if memory represents a relationship or personal milestone"""
         logger.debug("Checking milestone significance")
@@ -498,7 +496,7 @@ class MemoryImportanceEngine:
 
         return min(total_score, 1.0)
 
-    def _calculate_decay_rate(self, factor_scores: ImportanceFactors, memory_data: Dict) -> float:
+    def _calculate_decay_rate(self, factor_scores: ImportanceFactors, memory_data: dict) -> float:
         """Calculate how quickly this memory should decay in importance"""
         base_decay = self.base_decay_rate
 
@@ -550,7 +548,7 @@ class MemoryImportanceEngine:
         explanation = f"Score: {overall_score:.2f} - " + ", ".join(explanations)
         return explanation
 
-    def _identify_boost_events(self, factor_scores: ImportanceFactors) -> List[str]:
+    def _identify_boost_events(self, factor_scores: ImportanceFactors) -> list[str]:
         """Identify events that boosted the importance score"""
         boost_events = []
 
@@ -601,7 +599,7 @@ class MemoryImportanceEngine:
             logger.error(f"Error in auto-adjustment: {e}")
 
     async def _apply_time_decay(
-        self, memory_id: str, user_id: str, memory_data: Dict, memory_manager
+        self, memory_id: str, user_id: str, memory_data: dict, memory_manager
     ):
         """Apply time-based decay to memory importance"""
         cache_key = f"{user_id}_{memory_id}"
@@ -610,7 +608,7 @@ class MemoryImportanceEngine:
             cached_score = self.importance_cache[cache_key]
 
             # Calculate time elapsed since last calculation
-            now = datetime.now(timezone.utc)
+            now = datetime.now(UTC)
             time_elapsed = now - cached_score.calculation_timestamp
             days_elapsed = time_elapsed.days
 
@@ -627,7 +625,7 @@ class MemoryImportanceEngine:
                 await self._update_memory_importance(memory_id, new_score, memory_manager)
 
     async def _boost_recently_connected_memories(
-        self, user_id: str, user_memories: List[Dict], memory_manager
+        self, user_id: str, user_memories: list[dict], memory_manager
     ):
         """Boost importance of memories connected to recent conversations"""
         # This would analyze recent conversations and boost related memories
@@ -635,7 +633,7 @@ class MemoryImportanceEngine:
         pass
 
     async def _adjust_for_emotional_patterns(
-        self, user_id: str, user_memories: List[Dict], memory_manager
+        self, user_id: str, user_memories: list[dict], memory_manager
     ):
         """Adjust importance based on emotional pattern changes"""
         # This would analyze emotional patterns and adjust memory importance accordingly
@@ -650,8 +648,8 @@ class MemoryImportanceEngine:
             logger.error(f"Failed to update memory importance: {e}")
 
     async def identify_core_memories(
-        self, user_id: str, limit: Optional[int] = None, memory_manager=None
-    ) -> List[Dict]:
+        self, user_id: str, limit: int | None = None, memory_manager=None
+    ) -> list[dict]:
         """
         Identify most important memories for user
 
@@ -724,13 +722,13 @@ class MemoryImportanceEngine:
             user_id=user_id,
             overall_score=0.5,
             factor_scores=factor_scores,
-            calculation_timestamp=datetime.now(timezone.utc),
+            calculation_timestamp=datetime.now(UTC),
             score_explanation="Default score due to calculation error",
             decay_rate=self.base_decay_rate,
             boost_events=[],
         )
 
-    def get_importance_statistics(self, user_id: str) -> Dict[str, Any]:
+    def get_importance_statistics(self, user_id: str) -> dict[str, Any]:
         """Get importance calculation statistics for user"""
         user_scores = [
             score for key, score in self.importance_cache.items() if key.startswith(f"{user_id}_")
@@ -752,8 +750,8 @@ class MemoryImportanceEngine:
         }
 
     def _calculate_factor_averages(
-        self, user_scores: List[MemoryImportanceScore]
-    ) -> Dict[str, float]:
+        self, user_scores: list[MemoryImportanceScore]
+    ) -> dict[str, float]:
         """Calculate average scores for each importance factor"""
         factors = {
             "emotional_intensity": [],
@@ -772,7 +770,7 @@ class MemoryImportanceEngine:
             factor: statistics.mean(values) if values else 0.0 for factor, values in factors.items()
         }
 
-    def clear_cache(self, user_id: Optional[str] = None):
+    def clear_cache(self, user_id: str | None = None):
         """Clear importance cache for user or all users"""
         if user_id:
             # Clear cache for specific user

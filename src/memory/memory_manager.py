@@ -1,26 +1,23 @@
-import chromadb
-from chromadb.utils import embedding_functions
-from chromadb.config import Settings
-import json
+import asyncio
 import logging
 import os
-from typing import List, Dict, Optional, Tuple
 from datetime import datetime
-import asyncio
-import time
+
+import chromadb
+from chromadb.config import Settings
+from chromadb.utils import embedding_functions
 
 logger = logging.getLogger(__name__)
 
 # Environment variables are loaded by main.py using env_manager
+from src.utils.embedding_manager import ExternalEmbeddingManager
+from src.utils.emotion_manager import EmotionManager, UserProfile
 from src.utils.exceptions import (
     MemoryError,
-    MemoryStorageError,
     MemoryRetrievalError,
+    MemoryStorageError,
     ValidationError,
 )
-from src.memory.chromadb_manager_simple import ChromaDBManagerSimple as ChromaDBManager
-from src.utils.emotion_manager import EmotionManager, UserProfile, EmotionProfile
-from src.utils.embedding_manager import ExternalEmbeddingManager
 
 # Memory tier system removed for performance optimization
 
@@ -419,7 +416,6 @@ class UserMemoryManager:
 
                 if self.use_external_embeddings and self.add_documents_with_embeddings:
                     # Use external embeddings
-                    import asyncio
                     from src.memory.chromadb_external_embeddings import run_async_method
 
                     success = run_async_method(
@@ -510,7 +506,7 @@ class UserMemoryManager:
                     # Only store facts with meaningful personality relevance
                     if personality_fact.relevance_score >= 0.3:  # Minimum relevance threshold
                         # Store using the personality fact storage method
-                        stored_fact = self.store_personality_fact(user_id, fact, context_metadata)
+                        self.store_personality_fact(user_id, fact, context_metadata)
                         facts_stored += 1
 
                         logger.info(
@@ -540,7 +536,7 @@ class UserMemoryManager:
             # Don't fail the conversation storage if fact extraction fails
             logger.warning(f"Error during personality fact extraction: {e}")
 
-    def _extract_simple_personal_facts(self, message: str) -> List[str]:
+    def _extract_simple_personal_facts(self, message: str) -> list[str]:
         """Simple extraction of personal facts when legacy extractor is unavailable"""
         facts = []
         message_lower = message.lower()
@@ -698,7 +694,7 @@ class UserMemoryManager:
 
     def get_related_global_facts(
         self, query: str, limit: int = 5, include_graph_relationships: bool = True
-    ) -> List[Dict]:
+    ) -> list[dict]:
         """Retrieve related global facts using both semantic search and graph relationships"""
         try:
             # First get semantically similar facts from ChromaDB
@@ -796,7 +792,7 @@ class UserMemoryManager:
             logger.error(f"Error creating fact relationship: {e}")
             return False
 
-    def get_knowledge_domain_facts(self, domain: str, limit: int = 20) -> List[Dict]:
+    def get_knowledge_domain_facts(self, domain: str, limit: int = 20) -> list[dict]:
         """Get all facts from a specific knowledge domain"""
         if not (
             GRAPH_MEMORY_AVAILABLE and getattr(self, "_graph_memory_manager_initialized", False)
@@ -832,7 +828,7 @@ class UserMemoryManager:
             logger.error(f"Error retrieving domain facts: {e}")
             return []
 
-    def retrieve_relevant_global_facts(self, query: str, limit: int = 5) -> List[Dict]:
+    def retrieve_relevant_global_facts(self, query: str, limit: int = 5) -> list[dict]:
         """Retrieve relevant global facts based on the current query"""
         try:
             # Validate inputs
@@ -897,7 +893,7 @@ class UserMemoryManager:
             logger.error(f"Error retrieving global facts: {e}")
             raise MemoryRetrievalError(f"Failed to retrieve global facts: {e}")
 
-    def get_all_global_facts(self, limit: int = 50) -> List[Dict]:
+    def get_all_global_facts(self, limit: int = 50) -> list[dict]:
         """Get all global facts for admin management"""
         try:
             results = self.global_collection.get(where={"type": "global_fact"}, limit=limit)
@@ -959,7 +955,7 @@ class UserMemoryManager:
                 }
 
             # Get context_id for memory tier analysis
-            context_id = context_metadata.get("channel_id", "dm")
+            context_metadata.get("channel_id", "dm")
 
             # Classify the fact for personality enhancement
             classifier = get_personality_fact_classifier()
@@ -1017,10 +1013,10 @@ class UserMemoryManager:
         self,
         user_id: str,
         query: str = "",
-        fact_types: List = None,
+        fact_types: list = None,
         min_relevance: float = 0.0,
         limit: int = 10,
-    ) -> List[Dict]:
+    ) -> list[dict]:
         """
         Retrieve personality facts with advanced filtering for AI companion enhancement
 
@@ -1143,7 +1139,7 @@ class UserMemoryManager:
             logger.error(f"Error retrieving personality facts: {e}")
             return []
 
-    async def get_memories_by_user(self, user_id: str, limit: int = 100) -> List[Dict]:
+    async def get_memories_by_user(self, user_id: str, limit: int = 100) -> list[dict]:
         """Retrieve all memories for a specific user"""
         try:
             # Validate inputs
@@ -1187,7 +1183,7 @@ class UserMemoryManager:
             logger.error(f"Error retrieving memories for user {user_id}: {e}")
             raise MemoryRetrievalError(f"Failed to retrieve memories for user {user_id}: {e}")
 
-    def retrieve_relevant_memories(self, user_id: str, query: str, limit: int = 10) -> List[Dict]:
+    def retrieve_relevant_memories(self, user_id: str, query: str, limit: int = 10) -> list[dict]:
         """Retrieve relevant memories for a user based on the current query, including global facts with priority"""
         try:
             # Validate inputs
@@ -1355,7 +1351,7 @@ class UserMemoryManager:
             logger.error(f"Error getting emotion context for user {user_id}: {e}")
             return ""
 
-    def get_user_emotion_profile(self, user_id: str) -> Optional[UserProfile]:
+    def get_user_emotion_profile(self, user_id: str) -> UserProfile | None:
         """Get the complete emotion profile for a user"""
         if not self.enable_emotions or not self.emotion_manager:
             return None
@@ -1424,7 +1420,7 @@ class UserMemoryManager:
             except:
                 return "Error retrieving context"
 
-    def get_collection_stats(self) -> Dict:
+    def get_collection_stats(self) -> dict:
         """Get statistics about the memory collections"""
         try:
             user_count = self.collection.count()

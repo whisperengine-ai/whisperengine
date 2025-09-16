@@ -5,14 +5,16 @@ SECURITY ENHANCED: Includes API key validation and secure credential handling
 """
 
 import json
+import logging
 import os
 import re
+from typing import Any
+
 import requests
-import logging
-from typing import Dict, List, Optional, Any, Union
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
-from src.utils.exceptions import LLMError, LLMConnectionError, LLMTimeoutError, LLMRateLimitError
+
+from src.utils.exceptions import LLMConnectionError, LLMError, LLMRateLimitError, LLMTimeoutError
 
 
 class LLMClient:
@@ -25,7 +27,7 @@ class LLMClient:
     - Any OpenAI-compatible API endpoint
     """
 
-    def __init__(self, api_url: Optional[str] = None, api_key: Optional[str] = None):
+    def __init__(self, api_url: str | None = None, api_key: str | None = None):
         """
         Initialize the LLM client
 
@@ -35,7 +37,7 @@ class LLMClient:
         """
         # SECURITY ENHANCEMENT: Import API key security manager
         try:
-            from src.security.api_key_security import get_api_key_manager, APIKeyType
+            from src.security.api_key_security import APIKeyType, get_api_key_manager
 
             self.api_key_manager = get_api_key_manager()
         except ImportError:
@@ -303,7 +305,7 @@ class LLMClient:
             f"Vision support: {self.supports_vision}, Max images: {self.vision_max_images}"
         )
 
-    def get_client_config(self) -> Dict[str, Any]:
+    def get_client_config(self) -> dict[str, Any]:
         """Get client configuration for debugging/testing"""
         return {
             "service_name": self.service_name,
@@ -327,8 +329,8 @@ class LLMClient:
     def _initialize_local_llm(self):
         """Initialize local LLM model for offline inference"""
         try:
-            from transformers import AutoTokenizer, AutoModelForCausalLM
             import torch
+            from transformers import AutoModelForCausalLM, AutoTokenizer
 
             # Get model path from environment
             local_model_name = os.getenv("LOCAL_LLM_MODEL", "microsoft_Phi-3-mini-4k-instruct")
@@ -433,7 +435,7 @@ class LLMClient:
                 chat_format="chatml",  # Use ChatML format by default
             )
 
-            self.logger.info(f"✅ llama-cpp-python model loaded successfully")
+            self.logger.info("✅ llama-cpp-python model loaded successfully")
 
         except ImportError:
             self.logger.error(
@@ -444,10 +446,10 @@ class LLMClient:
 
     def _generate_local_chat_completion(
         self,
-        messages: List[Dict[str, str]],
+        messages: list[dict[str, str]],
         temperature: float = 0.7,
-        max_tokens: Optional[int] = None,
-    ) -> Dict[str, Any]:
+        max_tokens: int | None = None,
+    ) -> dict[str, Any]:
         """Generate chat completion using local LLM"""
         try:
             import torch
@@ -582,10 +584,10 @@ class LLMClient:
 
     def _generate_llamacpp_chat_completion(
         self,
-        messages: List[Dict[str, str]],
+        messages: list[dict[str, str]],
         temperature: float = 0.7,
-        max_tokens: Optional[int] = None,
-    ) -> Dict[str, Any]:
+        max_tokens: int | None = None,
+    ) -> dict[str, Any]:
         """Generate chat completion using llama-cpp-python"""
         try:
             # Check if model is loaded
@@ -676,7 +678,7 @@ class LLMClient:
                 loop.run_in_executor(None, self.check_connection),
                 timeout=5.0,  # 5 second timeout for connection check
             )
-        except asyncio.TimeoutError:
+        except TimeoutError:
             self.logger.debug("Async connection check timed out")
             return False
         except Exception as e:
@@ -685,12 +687,12 @@ class LLMClient:
 
     def generate_chat_completion(
         self,
-        messages: List[Dict[str, str]],
-        model: Optional[str] = None,
+        messages: list[dict[str, str]],
+        model: str | None = None,
         temperature: float = 0.7,
-        max_tokens: Optional[int] = None,
+        max_tokens: int | None = None,
         stream: bool = False,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Generate a chat completion response
 
@@ -833,7 +835,7 @@ class LLMClient:
             self.logger.error(f"Unexpected error generating chat completion: {e}")
             raise LLMError(f"Unexpected error: {str(e)}")
 
-    def create_vision_message(self, text: str, images: List[str]) -> Dict[str, Any]:
+    def create_vision_message(self, text: str, images: list[str]) -> dict[str, Any]:
         """
         Create a message with both text and images for vision models
 
@@ -884,7 +886,7 @@ class LLMClient:
         """
         return self.supports_vision
 
-    def get_vision_config(self) -> Dict[str, Any]:
+    def get_vision_config(self) -> dict[str, Any]:
         """
         Get current vision configuration
 
@@ -896,10 +898,10 @@ class LLMClient:
     def generate_completion(
         self,
         prompt: str,
-        model: Optional[str] = None,
+        model: str | None = None,
         temperature: float = 0.7,
-        max_tokens: Optional[int] = None,
-    ) -> Dict[str, Any]:
+        max_tokens: int | None = None,
+    ) -> dict[str, Any]:
         """
         Generate a text completion response
 
@@ -980,12 +982,12 @@ class LLMClient:
 
     def generate_emotion_chat_completion(
         self,
-        messages: List[Dict[str, str]],
-        model: Optional[str] = None,
+        messages: list[dict[str, str]],
+        model: str | None = None,
         temperature: float = 0.7,
-        max_tokens: Optional[int] = None,
+        max_tokens: int | None = None,
         stream: bool = False,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Generate a chat completion response using the emotion analysis endpoint
         This allows using a different service/model for emotion analysis tasks
@@ -1075,12 +1077,12 @@ class LLMClient:
 
     def generate_facts_chat_completion(
         self,
-        messages: List[Dict[str, str]],
-        model: Optional[str] = None,
+        messages: list[dict[str, str]],
+        model: str | None = None,
         temperature: float = 0.7,
-        max_tokens: Optional[int] = None,
+        max_tokens: int | None = None,
         stream: bool = False,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Generate a chat completion response using the facts analysis endpoint
         This allows using a different service/model for fact extraction tasks
@@ -1169,7 +1171,7 @@ class LLMClient:
             self.logger.error(f"Unexpected error generating sentiment completion: {e}")
             raise LLMError(f"Unexpected error: {str(e)}")
 
-    def get_chat_response(self, messages: List[Dict[str, str]]) -> str:
+    def get_chat_response(self, messages: list[dict[str, str]]) -> str:
         """
         Get a simple text response from a chat completion
 
@@ -1373,7 +1375,7 @@ class LLMClient:
                     for part in content
                 )
                 if not has_content:  # Skip messages with no text content
-                    self.logger.debug(f"Skipping multimodal message with no text content")
+                    self.logger.debug("Skipping multimodal message with no text content")
                     continue
             elif isinstance(content, str):
                 if not content.strip():  # Skip empty messages
@@ -1403,7 +1405,7 @@ class LLMClient:
                     filtered_messages.append(placeholder)
                     filtered_messages.append(msg)
                     expected_role = "user"
-                    self.logger.debug(f"Added placeholder user message before assistant message")
+                    self.logger.debug("Added placeholder user message before assistant message")
                 else:
                     # Other cases - just add the message
                     filtered_messages.append(msg)
@@ -1418,7 +1420,7 @@ class LLMClient:
 
         return final_result
 
-    def extract_facts(self, message: str) -> Dict[str, Any]:
+    def extract_facts(self, message: str) -> dict[str, Any]:
         """
         Use LLM to extract factual information from a message
 
@@ -1602,7 +1604,7 @@ JSON Response:""",
             self.logger.error(f"Error in LLM fact extraction: {e}")
             raise LLMError(f"LLM fact extraction failed: {e}")
 
-    def extract_personal_info(self, message: str) -> Dict[str, Any]:
+    def extract_personal_info(self, message: str) -> dict[str, Any]:
         """
         Use LLM to extract personal information from a message
 
@@ -1634,7 +1636,7 @@ Return only a JSON response with this exact structure:
   "personal_info": {{
     "name": ["extracted names"],
     "age": ["extracted ages"],
-    "location": ["extracted locations"], 
+    "location": ["extracted locations"],
     "work": ["extracted work info"],
     "hobbies": ["extracted hobbies/interests"],
     "preferences": ["extracted likes/dislikes"]
@@ -1747,7 +1749,7 @@ Respond only with valid JSON, no other text.""",
             self.logger.error(f"Error in LLM personal info extraction: {e}")
             raise LLMError(f"LLM personal info extraction failed: {e}")
 
-    def detect_trust_indicators(self, message: str) -> Dict[str, Any]:
+    def detect_trust_indicators(self, message: str) -> dict[str, Any]:
         """
         Use LLM to detect trust indicators in a message
 
@@ -1886,7 +1888,7 @@ Respond only with valid JSON, no other text.""",
             self.logger.error(f"Error in LLM trust detection: {e}")
             raise LLMError(f"LLM trust detection failed: {e}")
 
-    def extract_user_facts(self, message: str) -> Dict[str, Any]:
+    def extract_user_facts(self, message: str) -> dict[str, Any]:
         """
         Use LLM to extract user-specific facts from a message
 
@@ -1932,7 +1934,7 @@ IMPORTANT: Return ONLY valid JSON in the exact format below. Do not add any comm
   "user_facts": [
     {{
       "fact": "exact persistent fact about the user from the message",
-      "category": "category_name", 
+      "category": "category_name",
       "confidence": 0.85,
       "reasoning": "brief explanation of what in the message indicates this fact"
     }}

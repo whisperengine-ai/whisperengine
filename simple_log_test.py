@@ -45,9 +45,6 @@ def generate_logs():
     memory_logger.warning("Memory usage approaching threshold")
 
     logger.info("✅ Log generation test completed")
-    print("📋 Check the 'System Logs' tab in WhisperEngine to see these messages!")
-    print("🔍 Try filtering by different log levels")
-    print("📋 Test the Copy All and Copy Selected buttons")
 
 
 if __name__ == "__main__":

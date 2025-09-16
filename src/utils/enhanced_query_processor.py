@@ -5,9 +5,8 @@ This module provides optimized query processing for semantic search
 to improve memory retrieval relevance and reduce the "forgetting" issue.
 """
 
-import re
 import logging
-from typing import List, Dict, Tuple, Optional, Set
+import re
 from dataclasses import dataclass
 
 logger = logging.getLogger(__name__)
@@ -27,11 +26,11 @@ class SearchQuery:
 class QueryResult:
     """Result of query optimization"""
 
-    primary_queries: List[SearchQuery]
+    primary_queries: list[SearchQuery]
     fallback_query: str
-    extracted_entities: List[str]
+    extracted_entities: list[str]
     intent_classification: str
-    emotional_context: Optional[str] = None
+    emotional_context: str | None = None
 
 
 class EnhancedQueryProcessor:
@@ -168,8 +167,6 @@ class EnhancedQueryProcessor:
             "same",
             "so",
             "than",
-            "too",
-            "very",
             "well",
         }
 
@@ -297,7 +294,7 @@ class EnhancedQueryProcessor:
 
         return cleaned
 
-    def _extract_entities(self, message: str) -> List[str]:
+    def _extract_entities(self, message: str) -> list[str]:
         """Extract key entities and important terms"""
         words = message.split()
 
@@ -377,7 +374,7 @@ class EnhancedQueryProcessor:
 
         return "general"
 
-    def _extract_emotion(self, message: str) -> Optional[str]:
+    def _extract_emotion(self, message: str) -> str | None:
         """Extract emotional context from the message"""
         words = set(message.split())
 
@@ -388,8 +385,8 @@ class EnhancedQueryProcessor:
         return None
 
     def _generate_primary_queries(
-        self, entities: List[str], intent: str, emotion: Optional[str], message: str
-    ) -> List[SearchQuery]:
+        self, entities: list[str], intent: str, emotion: str | None, message: str
+    ) -> list[SearchQuery]:
         """Generate primary search queries based on extracted information"""
         queries = []
 
@@ -435,7 +432,7 @@ class EnhancedQueryProcessor:
 
         return queries[:5]  # Limit to top 5 queries
 
-    def _extract_topic_terms(self, entities: List[str], message: str) -> List[str]:
+    def _extract_topic_terms(self, entities: list[str], message: str) -> list[str]:
         """Extract topic-specific terms"""
         topic_terms = []
 
@@ -471,7 +468,7 @@ class EnhancedQueryProcessor:
         # Limit length to avoid noise
         return " ".join(filtered_words[:8])
 
-    def get_search_strategies(self, query_result: QueryResult) -> List[Tuple[str, float]]:
+    def get_search_strategies(self, query_result: QueryResult) -> list[tuple[str, float]]:
         """
         Get search strategies as (query, weight) tuples for use in memory retrieval
 
@@ -509,27 +506,18 @@ def test_query_processor():
         "I went to the park yesterday with my friends and had a great time",
     ]
 
-    print("🧪 ENHANCED QUERY PROCESSOR TEST")
-    print("=" * 50)
 
-    for i, message in enumerate(test_messages, 1):
-        print(f"\n{i}. Original Message: '{message}'")
+    for _i, message in enumerate(test_messages, 1):
 
         result = processor.process_message(message)
 
-        print(f"   Entities: {result.extracted_entities}")
-        print(f"   Intent: {result.intent_classification}")
-        print(f"   Emotion: {result.emotional_context}")
-        print(f"   Fallback Query: '{result.fallback_query}'")
-        print(f"   Primary Queries:")
 
-        for j, query in enumerate(result.primary_queries, 1):
-            print(f"     {j}. '{query.query}' (weight: {query.weight}, type: {query.query_type})")
+        for _j, _query in enumerate(result.primary_queries, 1):
+            pass
 
         strategies = processor.get_search_strategies(result)
-        print(f"   Search Strategies (ordered by priority):")
-        for j, (query, weight) in enumerate(strategies, 1):
-            print(f"     {j}. '{query}' (weight: {weight})")
+        for _j, (_query, _weight) in enumerate(strategies, 1):
+            pass
 
 
 if __name__ == "__main__":

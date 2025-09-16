@@ -5,24 +5,22 @@ Tests the optimized emotion engine with pandas vectorization and parallel proces
 """
 
 import asyncio
-import time
 import random
-from typing import List, Dict, Any
+import time
+from typing import Any
 
 try:
-    import pandas as pd
     import numpy as np
+    import pandas as pd
     from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 
-    print(f"✅ pandas {pd.__version__}, numpy {np.__version__}")
     LIBRARIES_AVAILABLE = True
-except ImportError as e:
-    print(f"❌ Missing libraries: {e}")
+except ImportError:
     LIBRARIES_AVAILABLE = False
 
 
 # Test data generator
-def generate_test_messages(count: int) -> List[Dict[str, Any]]:
+def generate_test_messages(count: int) -> list[dict[str, Any]]:
     """Generate realistic test messages with various emotions"""
 
     emotions_templates = [
@@ -94,17 +92,13 @@ async def test_vectorized_emotion_processing():
     """Test the vectorized emotion processing engine"""
 
     if not LIBRARIES_AVAILABLE:
-        print("❌ Cannot run tests - missing required libraries")
         return
 
-    print("\n🧠 Testing Vectorized Emotional Intelligence Engine")
-    print("=" * 60)
 
     try:
         from src.emotion.vectorized_emotion_engine import (
-            VectorizedEmotionProcessor,
             ProductionEmotionEngine,
-            EmotionEngineAdapter,
+            VectorizedEmotionProcessor,
         )
 
         # Test configurations
@@ -116,9 +110,6 @@ async def test_vectorized_emotion_processing():
         ]
 
         for config in test_configs:
-            print(
-                f"\n📊 Testing {config['name']} ({config['count']} messages, {config['workers']} workers)"
-            )
 
             # Generate test data
             test_messages = generate_test_messages(config["count"])
@@ -130,53 +121,38 @@ async def test_vectorized_emotion_processing():
             processor = VectorizedEmotionProcessor(max_workers=config["workers"])
 
             start_time = time.time()
-            result = processor.process_batch(texts, user_ids, metadata_list)
-            processing_time = time.time() - start_time
+            processor.process_batch(texts, user_ids, metadata_list)
+            time.time() - start_time
 
-            print(f"  ⚡ Batch Processing: {processing_time*1000:.1f}ms")
-            print(f"  📈 Throughput: {config['count']/processing_time:.1f} emotions/sec")
-            print(f"  🎯 Avg Confidence: {result.avg_confidence:.2f}")
-            print(
-                f"  🎭 Emotion Distribution: {dict(list(result.emotion_distribution.items())[:3])}"
-            )
 
             # Test async processing
             start_time = time.time()
-            async_result = await processor.process_batch_async(texts, user_ids, metadata_list)
-            async_time = time.time() - start_time
+            await processor.process_batch_async(texts, user_ids, metadata_list)
+            time.time() - start_time
 
-            print(f"  ⚡ Async Processing: {async_time*1000:.1f}ms")
-            print(f"  📈 Async Throughput: {config['count']/async_time:.1f} emotions/sec")
 
             # Test ProductionEmotionEngine (with caching)
             engine = ProductionEmotionEngine(max_workers=config["workers"])
 
             start_time = time.time()
-            batch_emotions = await engine.analyze_emotions_batch(texts, user_ids, metadata_list)
-            engine_time = time.time() - start_time
+            await engine.analyze_emotions_batch(texts, user_ids, metadata_list)
+            time.time() - start_time
 
-            print(f"  🚀 Production Engine: {engine_time*1000:.1f}ms")
-            print(f"  📈 Engine Throughput: {config['count']/engine_time:.1f} emotions/sec")
 
             # Test caching performance (process same batch again)
             start_time = time.time()
-            cached_emotions = await engine.analyze_emotions_batch(texts, user_ids, metadata_list)
-            cached_time = time.time() - start_time
+            await engine.analyze_emotions_batch(texts, user_ids, metadata_list)
+            time.time() - start_time
 
-            print(f"  💾 Cached Processing: {cached_time*1000:.1f}ms")
-            print(f"  🔥 Cache Speedup: {engine_time/cached_time:.1f}x faster")
 
             # Get performance stats
-            stats = engine.get_comprehensive_stats()
-            print(f"  📊 Cache Hit Rate: {stats['cache']['cache_hit_rate']:.1%}")
+            engine.get_comprehensive_stats()
 
             await engine.shutdown()
             processor.shutdown()
 
-        print(f"\n✅ Vectorized emotion processing tests completed!")
 
-    except Exception as e:
-        print(f"❌ Error in vectorized emotion tests: {e}")
+    except Exception:
         import traceback
 
         traceback.print_exc()
@@ -188,8 +164,6 @@ async def test_emotion_streaming():
     if not LIBRARIES_AVAILABLE:
         return
 
-    print("\n🌊 Testing Streaming Emotion Processing")
-    print("=" * 50)
 
     try:
         from src.emotion.vectorized_emotion_engine import VectorizedEmotionProcessor
@@ -217,17 +191,14 @@ async def test_emotion_streaming():
         # Collect results
         results = await stream_task
 
-        total_processed = sum(result.batch_size for result in results)
-        total_time = sum(result.processing_time for result in results)
+        sum(result.batch_size for result in results)
+        sum(result.processing_time for result in results)
 
-        print(f"  🌊 Processed {total_processed} emotions in {len(results)} batches")
-        print(f"  ⚡ Total time: {total_time*1000:.1f}ms")
-        print(f"  📈 Streaming throughput: {total_processed/total_time:.1f} emotions/sec")
 
         processor.shutdown()
 
-    except Exception as e:
-        print(f"❌ Error in streaming tests: {e}")
+    except Exception:
+        pass
 
 
 async def collect_streaming_results(processor, stream_queue):
@@ -236,10 +207,6 @@ async def collect_streaming_results(processor, stream_queue):
 
     async for batch_result in processor.process_streaming(stream_queue, batch_size=5, timeout=0.5):
         results.append(batch_result)
-        print(
-            f"    📦 Processed batch: {batch_result.batch_size} emotions, "
-            f"{batch_result.processing_time*1000:.1f}ms"
-        )
 
         # Stop when we get a None marker or enough results
         if len(results) >= 10:
@@ -254,8 +221,6 @@ async def test_emotion_accuracy():
     if not LIBRARIES_AVAILABLE:
         return
 
-    print("\n🎯 Testing Emotion Detection Accuracy")
-    print("=" * 45)
 
     try:
         from src.emotion.vectorized_emotion_engine import ProductionEmotionEngine
@@ -274,7 +239,6 @@ async def test_emotion_accuracy():
             {"text": "Surprised by the unexpected results!", "expected": "surprise"},
         ]
 
-        print(f"  🧪 Testing {len(test_cases)} emotion samples...")
 
         correct_predictions = 0
 
@@ -285,15 +249,8 @@ async def test_emotion_accuracy():
             if is_correct:
                 correct_predictions += 1
 
-            status = "✅" if is_correct else "❌"
-            print(f"    {status} '{case['text'][:40]}...'")
-            print(
-                f"        Expected: {case['expected']}, Got: {emotion.primary_emotion} "
-                f"(confidence: {emotion.confidence:.2f})"
-            )
 
-        accuracy = correct_predictions / len(test_cases)
-        print(f"\n  🎯 Accuracy: {accuracy:.1%} ({correct_predictions}/{len(test_cases)})")
+        correct_predictions / len(test_cases)
 
         # Test edge cases
         edge_cases = [
@@ -304,18 +261,13 @@ async def test_emotion_accuracy():
             "!!!",  # punctuation only
         ]
 
-        print(f"\n  🔍 Testing edge cases...")
         for case in edge_cases:
             emotion = await engine.analyze_emotion(case, "edge_user")
-            print(
-                f"    '{case}' -> {emotion.primary_emotion} "
-                f"(confidence: {emotion.confidence:.2f})"
-            )
 
         await engine.shutdown()
 
-    except Exception as e:
-        print(f"❌ Error in accuracy tests: {e}")
+    except Exception:
+        pass
 
 
 async def test_concurrent_emotion_processing():
@@ -324,8 +276,6 @@ async def test_concurrent_emotion_processing():
     if not LIBRARIES_AVAILABLE:
         return
 
-    print("\n⚡ Testing Concurrent Emotion Processing")
-    print("=" * 50)
 
     try:
         from src.emotion.vectorized_emotion_engine import ProductionEmotionEngine
@@ -336,9 +286,6 @@ async def test_concurrent_emotion_processing():
         num_users = 20
         messages_per_user = 5
 
-        print(
-            f"  👥 Simulating {num_users} concurrent users with {messages_per_user} messages each"
-        )
 
         async def process_user_emotions(user_id: str):
             """Process emotions for a single user"""
@@ -364,38 +311,27 @@ async def test_concurrent_emotion_processing():
         tasks = [process_user_emotions(f"user_{i}") for i in range(num_users)]
         results = await asyncio.gather(*tasks)
 
-        total_time = time.time() - start_time
+        time.time() - start_time
 
         # Analyze results
-        total_messages = sum(r["message_count"] for r in results)
-        avg_user_time = np.mean([r["processing_time"] for r in results])
+        sum(r["message_count"] for r in results)
+        np.mean([r["processing_time"] for r in results])
 
-        print(f"  ⚡ Total time: {total_time*1000:.1f}ms")
-        print(f"  📊 Processed {total_messages} emotions across {num_users} users")
-        print(f"  📈 Concurrent throughput: {total_messages/total_time:.1f} emotions/sec")
-        print(f"  👤 Avg per-user time: {avg_user_time*1000:.1f}ms")
-        print(f"  🚀 Concurrency speedup: ~{(num_users * avg_user_time)/total_time:.1f}x")
 
         # Check cache performance
-        stats = engine.get_comprehensive_stats()
-        print(f"  💾 Cache hit rate: {stats['cache']['cache_hit_rate']:.1%}")
-        print(f"  📊 Total requests: {stats['total_requests']}")
+        engine.get_comprehensive_stats()
 
         await engine.shutdown()
 
-    except Exception as e:
-        print(f"❌ Error in concurrent tests: {e}")
+    except Exception:
+        pass
 
 
 async def main():
     """Run all emotion processing performance tests"""
 
-    print("🧠 WhisperEngine Vectorized Emotional Intelligence Performance Demo")
-    print("=" * 70)
 
     if not LIBRARIES_AVAILABLE:
-        print("❌ Required libraries not available. Please install:")
-        print("   pip install pandas numpy vaderSentiment")
         return
 
     # Run all tests
@@ -404,13 +340,6 @@ async def main():
     await test_emotion_accuracy()
     await test_concurrent_emotion_processing()
 
-    print("\n🎉 All vectorized emotion intelligence tests completed!")
-    print("📊 Performance Summary:")
-    print("   • Vectorized batch processing with pandas")
-    print("   • Async processing with ThreadPoolExecutor")
-    print("   • Production-ready caching and optimization")
-    print("   • Real-time streaming emotion analysis")
-    print("   • High concurrency support for multiple users")
 
 
 if __name__ == "__main__":

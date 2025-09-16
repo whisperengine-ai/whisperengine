@@ -3,10 +3,10 @@ Local Model Loader for WhisperEngine Desktop App
 Loads pre-downloaded models from local directory
 """
 
-import os
-from pathlib import Path
-from sentence_transformers import SentenceTransformer
 import logging
+from pathlib import Path
+
+from sentence_transformers import SentenceTransformer
 
 logger = logging.getLogger(__name__)
 
@@ -47,7 +47,7 @@ class LocalModelManager:
         if model_path.exists():
             logger.info(f"Loading local emotion model: {model_path}")
             try:
-                from transformers import AutoTokenizer, AutoModelForSequenceClassification
+                from transformers import AutoModelForSequenceClassification, AutoTokenizer
 
                 tokenizer = AutoTokenizer.from_pretrained(str(model_path))
                 model = AutoModelForSequenceClassification.from_pretrained(str(model_path))

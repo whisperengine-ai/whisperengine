@@ -4,8 +4,8 @@ Test script to verify <|end|> token removal in MLX backend
 """
 
 import asyncio
-import sys
 import os
+import sys
 
 # Add the project root to the path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -13,20 +13,17 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 async def test_special_token_cleanup():
     """Test that special tokens are properly removed from MLX responses"""
-    print("🧪 Testing MLX special token cleanup...")
 
     try:
-        from src.llm.mlx_backend import MLXBackend, get_default_mlx_model_config
+        from src.llm.mlx_backend import MLXBackend
 
         # Check if MLX is available
         if not MLXBackend.is_available():
-            print("⚠️  MLX not available on this platform")
             return True
 
-        print("✅ MLX backend available")
 
         # Test the cleanup logic directly
-        backend = MLXBackend()
+        MLXBackend()
 
         # Simulate a response with the problematic token
         test_responses = [
@@ -37,8 +34,7 @@ async def test_special_token_cleanup():
             "Multiple tokens<|end|><|endoftext|></s>",
         ]
 
-        print("\n📝 Testing token cleanup:")
-        for i, test_response in enumerate(test_responses, 1):
+        for _i, test_response in enumerate(test_responses, 1):
             # Simulate the cleanup that happens in generate_response
             cleaned = test_response
             special_tokens_to_remove = [
@@ -55,15 +51,10 @@ async def test_special_token_cleanup():
                 cleaned = cleaned.replace(token, "")
             cleaned = cleaned.strip()
 
-            has_tokens = cleaned != test_response
-            status = "🧹 CLEANED" if has_tokens else "✅ CLEAN"
-            print(f"  {i}. {status}: '{test_response}' → '{cleaned}'")
 
-        print("\n✅ All token cleanup tests passed!")
         return True
 
-    except Exception as e:
-        print(f"❌ Test failed: {e}")
+    except Exception:
         import traceback
 
         traceback.print_exc()
@@ -72,16 +63,13 @@ async def test_special_token_cleanup():
 
 async def main():
     """Run the test"""
-    print("🚀 Starting Special Token Cleanup Tests\n")
 
     success = await test_special_token_cleanup()
 
     if success:
-        print("\n🎉 All tests passed!")
-        print("📱 The <|end|> tag should no longer appear in desktop app responses")
-        print("💡 Try sending a message in the desktop app to verify the fix")
+        pass
     else:
-        print("\n❌ Some tests failed")
+        pass
 
     return success
 
@@ -91,8 +79,6 @@ if __name__ == "__main__":
         result = asyncio.run(main())
         sys.exit(0 if result else 1)
     except KeyboardInterrupt:
-        print("\n⚠️  Test interrupted by user")
         sys.exit(1)
-    except Exception as e:
-        print(f"\n❌ Test failed with error: {e}")
+    except Exception:
         sys.exit(1)

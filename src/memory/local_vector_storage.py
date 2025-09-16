@@ -4,18 +4,16 @@ Provides ChromaDB-compatible interface using simple cosine similarity search.
 Replacement for ChromaDB in desktop/local deployment scenarios.
 """
 
-import json
-import pickle
-import numpy as np
-import time
-import logging
-import threading
-from typing import Dict, List, Optional, Any, Union, Tuple
-from pathlib import Path
-from dataclasses import dataclass
-from datetime import datetime
 import hashlib
-import os
+import logging
+import pickle
+import threading
+import time
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
+
+import numpy as np
 
 logger = logging.getLogger(__name__)
 
@@ -26,8 +24,8 @@ class VectorDocument:
 
     id: str
     content: str
-    embedding: List[float]
-    metadata: Dict[str, Any]
+    embedding: list[float]
+    metadata: dict[str, Any]
     timestamp: float
     doc_type: str
 
@@ -45,13 +43,13 @@ class LocalVectorStorage:
     - Similarity search with filtering
     """
 
-    def __init__(self, storage_dir: Optional[Path] = None, embedding_dim: int = 384):
+    def __init__(self, storage_dir: Path | None = None, embedding_dim: int = 384):
         self.embedding_dim = embedding_dim
         self.storage_dir = storage_dir or (Path.home() / ".whisperengine" / "vectors")
 
         # In-memory storage
-        self.collections: Dict[str, Dict[str, Any]] = {}
-        self.documents: Dict[str, Dict[str, VectorDocument]] = (
+        self.collections: dict[str, dict[str, Any]] = {}
+        self.documents: dict[str, dict[str, VectorDocument]] = (
             {}
         )  # collection_name -> doc_id -> document
 
@@ -138,14 +136,14 @@ class LocalVectorStorage:
         except Exception as e:
             logger.error(f"Failed to save collection '{collection_name}': {e}")
 
-    def _generate_doc_id(self, content: str, user_id: Optional[str] = None) -> str:
+    def _generate_doc_id(self, content: str, user_id: str | None = None) -> str:
         """Generate deterministic document ID"""
         content_hash = hashlib.md5(content.encode()).hexdigest()[:8]
         user_part = f"_{user_id}" if user_id else ""
         timestamp = int(time.time() * 1000) % 100000  # Last 5 digits of timestamp
         return f"doc_{content_hash}_{timestamp}{user_part}"
 
-    def _cosine_similarity(self, a: List[float], b: List[float]) -> float:
+    def _cosine_similarity(self, a: list[float], b: list[float]) -> float:
         """Calculate cosine similarity between two vectors"""
         try:
             a_np = np.array(a, dtype=np.float32)
@@ -160,7 +158,7 @@ class LocalVectorStorage:
         except:
             return 0.0
 
-    def _matches_filter(self, metadata: Dict[str, Any], where: Dict[str, Any]) -> bool:
+    def _matches_filter(self, metadata: dict[str, Any], where: dict[str, Any]) -> bool:
         """Check if metadata matches the where filter"""
         for key, value in where.items():
             if key not in metadata:
@@ -184,7 +182,7 @@ class LocalVectorStorage:
 
         return True
 
-    def create_collection(self, name: str, metadata: Optional[Dict[str, Any]] = None) -> bool:
+    def create_collection(self, name: str, metadata: dict[str, Any] | None = None) -> bool:
         """Create a new collection (ChromaDB-compatible)"""
         with self._lock:
             if name in self.collections:
@@ -198,7 +196,7 @@ class LocalVectorStorage:
         logger.info(f"Created collection '{name}'")
         return True
 
-    def get_collection(self, name: str) -> Optional[Dict[str, Any]]:
+    def get_collection(self, name: str) -> dict[str, Any] | None:
         """Get collection info (ChromaDB-compatible)"""
         with self._lock:
             if name not in self.collections:
@@ -212,7 +210,7 @@ class LocalVectorStorage:
                 "document_count": len(self.documents.get(name, {})),
             }
 
-    def list_collections(self) -> List[str]:
+    def list_collections(self) -> list[str]:
         """List all collections (ChromaDB-compatible)"""
         with self._lock:
             return list(self.collections.keys())
@@ -242,11 +240,11 @@ class LocalVectorStorage:
     def add_documents(
         self,
         collection_name: str,
-        documents: List[str],
-        embeddings: List[List[float]],
-        metadata: List[Dict[str, Any]],
-        ids: Optional[List[str]] = None,
-    ) -> List[str]:
+        documents: list[str],
+        embeddings: list[list[float]],
+        metadata: list[dict[str, Any]],
+        ids: list[str] | None = None,
+    ) -> list[str]:
         """Add documents to collection (ChromaDB-compatible)"""
         with self._lock:
             if collection_name not in self.collections:
@@ -255,7 +253,7 @@ class LocalVectorStorage:
             collection_docs = self.documents[collection_name]
             doc_ids = []
 
-            for i, (doc, embedding, meta) in enumerate(zip(documents, embeddings, metadata)):
+            for i, (doc, embedding, meta) in enumerate(zip(documents, embeddings, metadata, strict=False)):
                 # Generate or use provided ID
                 doc_id = (
                     ids[i]
@@ -285,11 +283,11 @@ class LocalVectorStorage:
     def query_documents(
         self,
         collection_name: str,
-        query_embeddings: List[List[float]],
+        query_embeddings: list[list[float]],
         n_results: int = 10,
-        where: Optional[Dict[str, Any]] = None,
-        include: Optional[List[str]] = None,
-    ) -> Dict[str, List[Any]]:
+        where: dict[str, Any] | None = None,
+        include: list[str] | None = None,
+    ) -> dict[str, list[Any]]:
         """Query documents from collection (ChromaDB-compatible)"""
         with self._lock:
             if collection_name not in self.collections:
@@ -337,11 +335,11 @@ class LocalVectorStorage:
     def get_documents(
         self,
         collection_name: str,
-        ids: Optional[List[str]] = None,
-        where: Optional[Dict[str, Any]] = None,
-        limit: Optional[int] = None,
-        offset: Optional[int] = None,
-    ) -> Dict[str, List[Any]]:
+        ids: list[str] | None = None,
+        where: dict[str, Any] | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
+    ) -> dict[str, list[Any]]:
         """Get documents from collection (ChromaDB-compatible)"""
         with self._lock:
             if collection_name not in self.collections:
@@ -376,7 +374,7 @@ class LocalVectorStorage:
                 "metadatas": [doc.metadata for doc in filtered_docs],
             }
 
-    def delete_documents(self, collection_name: str, ids: List[str]) -> int:
+    def delete_documents(self, collection_name: str, ids: list[str]) -> int:
         """Delete documents from collection (ChromaDB-compatible)"""
         with self._lock:
             if collection_name not in self.collections:
@@ -403,7 +401,7 @@ class LocalVectorStorage:
                 return 0
             return len(self.documents.get(collection_name, {}))
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get storage statistics"""
         with self._lock:
             total_docs = sum(len(docs) for docs in self.documents.values())
@@ -433,7 +431,7 @@ class LocalVectorStorage:
 class LocalVectorStorageAdapter:
     """Adapter to make LocalVectorStorage compatible with existing ChromaDB usage patterns"""
 
-    def __init__(self, storage_dir: Optional[Path] = None, embedding_dim: int = 384):
+    def __init__(self, storage_dir: Path | None = None, embedding_dim: int = 384):
         self.storage = LocalVectorStorage(storage_dir, embedding_dim)
 
         # Default collection names (matching ChromaDB usage)
@@ -459,8 +457,8 @@ class LocalVectorStorageAdapter:
         user_id: str,
         message: str,
         response: str,
-        embeddings: List[float],
-        metadata: Optional[Dict[str, Any]] = None,
+        embeddings: list[float],
+        metadata: dict[str, Any] | None = None,
     ) -> str:
         """Store conversation with embedding (compatible with existing interface)"""
         meta = metadata or {}
@@ -479,11 +477,11 @@ class LocalVectorStorageAdapter:
 
     async def search_memories(
         self,
-        query_embeddings: List[float],
-        user_id: Optional[str] = None,
+        query_embeddings: list[float],
+        user_id: str | None = None,
         limit: int = 10,
-        doc_types: Optional[List[str]] = None,
-    ) -> List[Dict[str, Any]]:
+        doc_types: list[str] | None = None,
+    ) -> list[dict[str, Any]]:
         """Search memories with optional filtering"""
         where_filter = {}
         if user_id:
@@ -512,7 +510,7 @@ class LocalVectorStorageAdapter:
 
         return memories
 
-    async def get_stats(self) -> Dict[str, Any]:
+    async def get_stats(self) -> dict[str, Any]:
         """Get storage statistics"""
         stats = self.storage.get_stats()
         stats.update(

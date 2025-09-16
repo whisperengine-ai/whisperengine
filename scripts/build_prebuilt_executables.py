@@ -14,15 +14,13 @@ Features:
 - Size optimization and validation
 """
 
+import argparse
 import os
-import sys
+import platform
 import shutil
 import subprocess
-import platform
-import json
+import sys
 from pathlib import Path
-from typing import Dict, List, Tuple, Optional, Union
-import argparse
 
 
 class PreBuiltExecutableBuilder:
@@ -51,8 +49,6 @@ class PreBuiltExecutableBuilder:
 
     def log(self, message: str, level: str = "INFO"):
         """Enhanced logging with platform context"""
-        prefix = f"[{level}] [{self.current_platform}]"
-        print(f"{prefix} {message}")
 
     def check_prerequisites(self) -> bool:
         """Verify all build prerequisites are available"""
@@ -126,7 +122,7 @@ class PreBuiltExecutableBuilder:
             self.log(f"ERROR: Model download exception: {e}", "ERROR")
             return False
 
-    def build_executable(self, platform_name: Optional[str] = None) -> Tuple[bool, Optional[Path]]:
+    def build_executable(self, platform_name: str | None = None) -> tuple[bool, Path | None]:
         """Build executable for specified platform (or current platform)"""
         target_platform = platform_name or self.current_platform
         self.log(f"Building executable for {target_platform}...")
@@ -155,13 +151,11 @@ class PreBuiltExecutableBuilder:
             # Validate build output
             if target_platform == "macos":
                 app_path = dist_dir / "WhisperEngine.app"
-                exe_path = dist_dir / "WhisperEngine"
+                dist_dir / "WhisperEngine"
             elif target_platform == "windows":
                 app_path = dist_dir / "WhisperEngine.exe"
-                exe_path = app_path
             else:  # linux
                 app_path = dist_dir / "WhisperEngine"
-                exe_path = app_path
 
             if not app_path.exists():
                 self.log(f"ERROR: Build output not found at {app_path}", "ERROR")
@@ -221,7 +215,7 @@ class PreBuiltExecutableBuilder:
             self.log(f"ERROR: Executable test failed: {e}", "ERROR")
             return False
 
-    def package_release(self, executable_path: Path) -> Optional[Path]:
+    def package_release(self, executable_path: Path) -> Path | None:
         """Package executable for distribution"""
         platform_name = self.current_platform
         arch = self.architecture

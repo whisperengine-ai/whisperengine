@@ -17,19 +17,16 @@ across Disc            # Test message creation
 
 import asyncio
 import sys
-import os
-from pathlib import Path
-from datetime import datetime
 from dataclasses import asdict
+from datetime import datetime
+from pathlib import Path
 
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from src.config.adaptive_config import AdaptiveConfigManager
 from src.database.database_integration import DatabaseIntegrationManager
-from src.llm.llm_client import LLMClient
-from src.memory.conversation_cache import HybridConversationCache
-from src.platforms.universal_chat import Message, ChatPlatform, MessageType, AbstractChatAdapter
+from src.platforms.universal_chat import AbstractChatAdapter, ChatPlatform, Message, MessageType
 
 
 class TestResult:
@@ -273,8 +270,6 @@ class UniversalPlatformTester:
 
     async def run_all_tests(self) -> bool:
         """Run all tests and return overall success"""
-        print("🧪 Testing Universal Platform Abstraction")
-        print("=" * 50)
 
         # Run tests in order
         tests = [
@@ -290,19 +285,14 @@ class UniversalPlatformTester:
         for test_coro in tests:
             result = await test_coro
             self.results.append(result)
-            print(result)
 
         # Summary
         passed_count = sum(1 for r in self.results if r.passed)
         total_count = len(self.results)
 
-        print("\n" + "=" * 50)
         if passed_count == total_count:
-            print(f"🎉 All {total_count} tests passed!")
-            print("✅ Universal platform abstraction is working correctly")
             return True
         else:
-            print(f"❌ {total_count - passed_count} of {total_count} tests failed")
             return False
 
     async def cleanup(self):
@@ -319,8 +309,7 @@ async def main():
     try:
         success = await tester.run_all_tests()
         return success
-    except Exception as e:
-        print(f"❌ Test suite failed with error: {e}")
+    except Exception:
         return False
     finally:
         await tester.cleanup()
@@ -331,5 +320,4 @@ if __name__ == "__main__":
         success = asyncio.run(main())
         sys.exit(0 if success else 1)
     except KeyboardInterrupt:
-        print("\n🛑 Tests interrupted by user")
         sys.exit(1)

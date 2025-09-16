@@ -4,11 +4,9 @@ Database query tool for user_profiles.db
 Provides easy ways to view and query user profile data
 """
 
-import sqlite3
 import json
+import sqlite3
 import sys
-from datetime import datetime
-from typing import List, Dict, Optional
 
 
 class UserProfileQuery:
@@ -17,13 +15,13 @@ class UserProfileQuery:
     def __init__(self, db_path: str = "user_profiles.db"):
         self.db_path = db_path
 
-    def get_all_users(self) -> List[Dict]:
+    def get_all_users(self) -> list[dict]:
         """Get all users with basic info"""
         with sqlite3.connect(self.db_path) as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.execute(
                 """
-                SELECT user_id, name, relationship_level, current_emotion, 
+                SELECT user_id, name, relationship_level, current_emotion,
                        interaction_count, escalation_count,
                        first_interaction, last_interaction
                 FROM users
@@ -32,7 +30,7 @@ class UserProfileQuery:
             )
             return [dict(row) for row in cursor.fetchall()]
 
-    def get_user_details(self, user_id: str) -> Optional[Dict]:
+    def get_user_details(self, user_id: str) -> dict | None:
         """Get detailed info for a specific user"""
         with sqlite3.connect(self.db_path) as conn:
             conn.row_factory = sqlite3.Row
@@ -53,7 +51,7 @@ class UserProfileQuery:
             cursor = conn.execute(
                 """
                 SELECT detected_emotion, confidence, triggers, intensity, timestamp
-                FROM emotion_history 
+                FROM emotion_history
                 WHERE user_id = ?
                 ORDER BY timestamp DESC
                 LIMIT 10
@@ -81,7 +79,7 @@ class UserProfileQuery:
 
             return result
 
-    def get_emotion_stats(self) -> Dict:
+    def get_emotion_stats(self) -> dict:
         """Get emotion statistics across all users"""
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.execute(
@@ -108,31 +106,29 @@ class UserProfileQuery:
 
             return {"emotion_breakdown": emotions}
 
-    def get_active_users(self, days: int = 7) -> List[Dict]:
+    def get_active_users(self, days: int = 7) -> list[dict]:
         """Get users active in the last N days"""
         with sqlite3.connect(self.db_path) as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.execute(
-                """
+                f"""
                 SELECT user_id, name, interaction_count, last_interaction,
                        current_emotion, relationship_level
                 FROM users
-                WHERE last_interaction > date('now', '-{} days')
+                WHERE last_interaction > date('now', '-{days} days')
                 ORDER BY last_interaction DESC
-            """.format(
-                    days
-                )
+            """
             )
 
             return [dict(row) for row in cursor.fetchall()]
 
-    def search_users_by_emotion(self, emotion: str) -> List[Dict]:
+    def search_users_by_emotion(self, emotion: str) -> list[dict]:
         """Find users who have experienced a specific emotion"""
         with sqlite3.connect(self.db_path) as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.execute(
                 """
-                SELECT DISTINCT u.user_id, u.name, u.current_emotion, 
+                SELECT DISTINCT u.user_id, u.name, u.current_emotion,
                        u.interaction_count, u.last_interaction,
                        COUNT(eh.id) as emotion_occurrences
                 FROM users u
@@ -146,7 +142,7 @@ class UserProfileQuery:
 
             return [dict(row) for row in cursor.fetchall()]
 
-    def get_database_stats(self) -> Dict:
+    def get_database_stats(self) -> dict:
         """Get overall database statistics"""
         with sqlite3.connect(self.db_path) as conn:
             # Total users
@@ -160,9 +156,9 @@ class UserProfileQuery:
             # Most active user
             cursor = conn.execute(
                 """
-                SELECT user_id, interaction_count 
-                FROM users 
-                ORDER BY interaction_count DESC 
+                SELECT user_id, interaction_count
+                FROM users
+                ORDER BY interaction_count DESC
                 LIMIT 1
             """
             )
@@ -171,10 +167,10 @@ class UserProfileQuery:
             # Most recent interaction
             cursor = conn.execute(
                 """
-                SELECT user_id, last_interaction 
-                FROM users 
+                SELECT user_id, last_interaction
+                FROM users
                 WHERE last_interaction IS NOT NULL
-                ORDER BY last_interaction DESC 
+                ORDER BY last_interaction DESC
                 LIMIT 1
             """
             )
@@ -194,14 +190,11 @@ class UserProfileQuery:
             }
 
 
-def print_table(data: List[Dict], title: str):
+def print_table(data: list[dict], title: str):
     """Print data in a nice table format"""
     if not data:
-        print(f"📋 {title}: No data found")
         return
 
-    print(f"\n📋 {title}")
-    print("=" * 60)
 
     # Get all unique keys
     all_keys = set()
@@ -209,21 +202,19 @@ def print_table(data: List[Dict], title: str):
         all_keys.update(item.keys())
 
     # Print each item
-    for i, item in enumerate(data, 1):
-        print(f"\n{i}. ", end="")
-        for key, value in item.items():
+    for _i, item in enumerate(data, 1):
+        for key, _value in item.items():
             if key == "user_id":
-                print(f"👤 {value}", end=" | ")
+                pass
             elif key == "name":
-                print(f"📛 {value or 'No name'}", end=" | ")
+                pass
             elif key == "current_emotion":
-                print(f"😊 {value}", end=" | ")
+                pass
             elif key == "relationship_level":
-                print(f"🤝 {value}", end=" | ")
+                pass
             elif key == "interaction_count":
-                print(f"💬 {value} interactions", end=" | ")
+                pass
             elif key == "last_interaction":
-                print(f"🕐 {value}")
                 break
 
 
@@ -244,42 +235,26 @@ def main():
             user_id = sys.argv[2]
             user = query.get_user_details(user_id)
             if user:
-                print(f"\n👤 User Details: {user_id}")
-                print("=" * 60)
                 for key, value in user.items():
                     if key == "recent_emotions":
-                        print(f"😊 Recent Emotions ({len(value)}):")
                         for emotion in value[:5]:  # Show last 5
-                            print(
-                                f"   • {emotion['detected_emotion']} "
-                                f"(confidence: {emotion['confidence']:.2f}, "
-                                f"intensity: {emotion['intensity']:.2f}) "
-                                f"at {emotion['timestamp']}"
-                            )
+                            pass
                     elif key == "trust_indicators":
-                        print(f"🔒 Trust Indicators: {', '.join(value) if value else 'None'}")
+                        pass
                     else:
-                        print(f"{key}: {value}")
+                        pass
             else:
-                print(f"❌ User {user_id} not found")
+                pass
 
         elif command == "stats":
             stats = query.get_database_stats()
-            print(f"\n📊 Database Statistics")
-            print("=" * 60)
             for key, value in stats.items():
-                print(f"{key}: {value}")
+                pass
 
             # Also show emotion stats
             emotion_stats = query.get_emotion_stats()
-            print(f"\n😊 Emotion Statistics")
-            print("=" * 60)
             for emotion in emotion_stats["emotion_breakdown"]:
-                print(
-                    f"{emotion['emotion']}: {emotion['count']} times "
-                    f"(avg confidence: {emotion['avg_confidence']}, "
-                    f"avg intensity: {emotion['avg_intensity']})"
-                )
+                pass
 
         elif command == "active":
             days = int(sys.argv[2]) if len(sys.argv) > 2 else 7
@@ -302,9 +277,8 @@ def main():
 
                     db = UserProfileDatabase()
                     db.delete_user_profile(user_id)
-                    print(f"✅ Deleted all data for user {user_id}")
                 else:
-                    print("❌ Deletion cancelled")
+                    pass
 
             elif subcommand == "emotions" and len(sys.argv) > 3:
                 user_id = sys.argv[3]
@@ -322,10 +296,9 @@ def main():
                     confirm = input(f"⚠️  Delete ALL emotions for user {user_id}? (y/n): ")
 
                 if confirm.lower() == "y":
-                    deleted = db.delete_user_emotions(user_id, days)
-                    print(f"✅ Deleted {deleted} emotion records")
+                    db.delete_user_emotions(user_id, days)
                 else:
-                    print("❌ Deletion cancelled")
+                    pass
 
             elif subcommand == "old" and len(sys.argv) > 3:
                 days = int(sys.argv[3])
@@ -336,12 +309,11 @@ def main():
                     from user_profile_db import UserProfileDatabase
 
                     db = UserProfileDatabase()
-                    deleted = db.cleanup_old_emotions(days)
-                    print(f"✅ Deleted {deleted} old emotion records")
+                    db.cleanup_old_emotions(days)
                 else:
-                    print("❌ Deletion cancelled")
+                    pass
             else:
-                print("❌ Invalid delete command. See help for usage.")
+                pass
 
         elif command == "reset" and len(sys.argv) > 2:
             user_id = sys.argv[2]
@@ -354,10 +326,9 @@ def main():
                 from user_profile_db import UserProfileDatabase
 
                 db = UserProfileDatabase()
-                deleted = db.reset_user_profile(user_id, keep_basic)
-                print(f"✅ Reset user {user_id}, deleted {deleted} emotion records")
+                db.reset_user_profile(user_id, keep_basic)
             else:
-                print("❌ Reset cancelled")
+                pass
 
         elif command == "archive":
             days = int(sys.argv[2]) if len(sys.argv) > 2 else 90
@@ -369,24 +340,19 @@ def main():
             # Show preview first
             archivable = db.get_archivable_users(days)
             if archivable:
-                print(f"📋 Users inactive for {days}+ days:")
                 for user in archivable:
-                    print(
-                        f"  • {user['user_id']} (last seen: {user['last_interaction'] or 'never'})"
-                    )
+                    pass
 
                 confirm = input(f"\n⚠️  Archive {len(archivable)} inactive users? (y/n): ")
                 if confirm.lower() == "y":
-                    archived = db.archive_inactive_users(days)
-                    print(f"✅ Archived {archived} users")
+                    db.archive_inactive_users(days)
                 else:
-                    print("❌ Archiving cancelled")
+                    pass
             else:
-                print(f"ℹ️  No users inactive for {days}+ days found")
+                pass
 
         elif command == "sql":
             # Interactive SQL mode
-            print("💾 Interactive SQL mode (type 'quit' to exit)")
             with sqlite3.connect(query.db_path) as conn:
                 conn.row_factory = sqlite3.Row
                 while True:
@@ -398,59 +364,21 @@ def main():
                             cursor = conn.execute(sql)
                             rows = cursor.fetchall()
                             if rows:
-                                for row in rows:
-                                    print(dict(row))
+                                for _row in rows:
+                                    pass
                             else:
-                                print("No results")
-                    except Exception as e:
-                        print(f"Error: {e}")
+                                pass
+                    except Exception:
+                        pass
         else:
             print_help()
 
-    except Exception as e:
-        print(f"❌ Error: {e}")
+    except Exception:
+        pass
 
 
 def print_help():
-    print(
-        """
-🤖 User Profile Database Query Tool
-
-Usage:
-  python query_profiles.py <command> [args]
-
-Query Commands:
-  list, all              - List all users
-  user <user_id>         - Show detailed info for specific user
-  stats                  - Show database statistics
-  active [days]          - Show users active in last N days (default: 7)
-  emotion <emotion_name> - Find users who experienced specific emotion
-  sql                    - Interactive SQL query mode
-
-Deletion Commands (⚠️  Use with caution!):
-  delete user <user_id>               - Delete ALL data for a user
-  delete emotions <user_id> [days]    - Delete emotions (optionally older than N days)
-  delete old <days>                   - Delete ALL emotion records older than N days
-  reset <user_id> [full]              - Reset user profile (keep basic info unless 'full')
-  archive [days]                      - Archive users inactive for N days (default: 90)
-
-Examples:
-  # Query examples
-  python query_profiles.py list
-  python query_profiles.py user 672814231002939413
-  python query_profiles.py active 30
-  python query_profiles.py emotion happy
-  python query_profiles.py stats
-  
-  # Deletion examples (careful!)
-  python query_profiles.py delete user 123456789
-  python query_profiles.py delete emotions 672814231002939413 30
-  python query_profiles.py delete old 60
-  python query_profiles.py reset 123456789
-  python query_profiles.py reset 123456789 full
-  python query_profiles.py archive 90
-    """
-    )
+    pass
 
 
 if __name__ == "__main__":

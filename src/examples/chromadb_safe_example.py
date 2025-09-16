@@ -9,7 +9,6 @@ import asyncio
 import logging
 import os
 import sys
-from typing import Optional
 
 # Add project root to path and load environment (like main.py does)
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -19,8 +18,6 @@ sys.path.insert(0, project_root)
 from env_manager import load_environment
 
 if not load_environment():
-    print("❌ Failed to load environment configuration")
-    print("💡 Run: python setup_env.py --template minimal")
     sys.exit(1)
 
 # Import the integrated components
@@ -44,7 +41,7 @@ class EnhancedBotFixed:
         logger.info("Enhanced bot initialized with integrated emotion system (ChromaDB-safe)")
 
     async def process_message(
-        self, user_id: str, message: str, display_name: Optional[str] = None
+        self, user_id: str, message: str, display_name: str | None = None
     ) -> dict:
         """Process a message using the enhanced emotion system only"""
 
@@ -139,7 +136,7 @@ class EnhancedBotFixed:
             system_prompt_parts.append("\n=== CONTEXTUAL INSIGHTS ===")
             system_prompt_parts.append(context["graph_insights"])
 
-        system_prompt = "\n".join(system_prompt_parts)
+        "\n".join(system_prompt_parts)
 
         # This is where you'd call your actual LLM
         # For demo purposes, return a context-aware response
@@ -225,17 +222,14 @@ class EnhancedBotFixed:
 async def example_conversation_fixed():
     """Example of using the enhanced bot without ChromaDB conflicts"""
 
-    print("🤖 Enhanced Bot with Graph-Emotion System (ChromaDB-Safe)")
-    print("=" * 60)
 
     # Initialize bot (avoids ChromaDB memory manager)
     bot = EnhancedBotFixed()
 
     # Health check
     health = await bot.health_check()
-    print(f"System Health: {health['overall_status']}")
-    for component, status in health["components"].items():
-        print(f"  {component}: {status.get('status', 'unknown')}")
+    for _component, _status in health["components"].items():
+        pass
 
     # Example conversation flow
     user_id = "example_user_fixed_789"
@@ -248,69 +242,40 @@ async def example_conversation_fixed():
         ("How do you remember my emotional patterns?", "Meta question about memory"),
     ]
 
-    print(f"\n💬 Example Conversation with User: {user_id}")
-    print("-" * 60)
 
-    for i, (message, description) in enumerate(conversations, 1):
-        print(f"\n[{i}] {description}")
-        print(f"User: {message}")
+    for _i, (message, _description) in enumerate(conversations, 1):
 
         # Process message through integrated system
         result = await bot.process_message(user_id, message, "Sarah")
 
-        print(f"Bot: {result['response']}")
-        print(
-            f"Relationship: {result['user_profile']['relationship_level']} "
-            f"({result['user_profile']['interaction_count']} interactions)"
-        )
-        print(
-            f"Emotion: {result['emotion_analysis']['detected_emotion']} "
-            f"(confidence: {result['emotion_analysis']['confidence']:.2f}, "
-            f"intensity: {result['emotion_analysis']['intensity']:.2f})"
-        )
-        print(f"Systems: {', '.join(result['context_sources'])}")
 
         # Show escalation tracking
         if result["user_profile"]["escalation_count"] > 0:
-            print(f"⚠️  Escalation count: {result['user_profile']['escalation_count']}")
+            pass
 
         # Show trust indicators
         trust_count = result["user_profile"]["trust_indicators"]
         if trust_count > 0:
-            print(f"🤝 Trust indicators: {trust_count}")
+            pass
 
     # Final summary
-    print(f"\n📊 Final User Summary")
-    print("-" * 60)
     final_summary = await bot.get_user_summary(user_id)
-    for key, value in final_summary.items():
+    for key, _value in final_summary.items():
         if key not in ["user_id", "timestamp"]:
-            print(f"{key}: {value}")
+            pass
 
     # Show what would be different with graph database enabled
-    print(f"\n🕸️ Graph Database Status")
-    print("-" * 60)
     graph_enabled = os.getenv("ENABLE_GRAPH_DATABASE", "false").lower() == "true"
-    print(f"Graph database enabled: {graph_enabled}")
 
     if graph_enabled:
-        print("✅ Enhanced features active:")
-        print("  • Relationship progression tracking in Neo4j")
-        print("  • Emotional pattern analysis across conversations")
-        print("  • Topic-emotion association mapping")
-        print("  • Contextual memory linking")
+        pass
     else:
-        print("ℹ️  To enable graph features:")
-        print("  1. Set ENABLE_GRAPH_DATABASE=true in .env")
-        print("  2. Start Neo4j: docker-compose up -d neo4j")
-        print("  3. Run setup: ./scripts/setup_neo4j.sh")
+        pass
 
 
 async def demonstrate_emotion_system_only():
     """Demonstrate just the enhanced emotion system without ChromaDB conflicts"""
 
-    print("\n🧠 Emotion System Enhancement Demo")
-    print("=" * 60)
 
     # Initialize just the emotion manager
     emotion_manager = GraphIntegratedEmotionManager()
@@ -324,44 +289,24 @@ async def demonstrate_emotion_system_only():
         "You really help me feel better",
     ]
 
-    print("Tracking relationship and emotion progression:")
-    print("-" * 40)
 
-    for i, message in enumerate(messages, 1):
-        print(f"\n{i}. User: {message}")
+    for _i, message in enumerate(messages, 1):
 
         # Process through emotion system
         profile, emotion_profile = emotion_manager.process_interaction_enhanced(
             user_id, message, "John"
         )
 
-        print(f"   Relationship: {profile.relationship_level.value}")
-        print(
-            f"   Emotion: {emotion_profile.detected_emotion.value} "
-            f"(confidence: {emotion_profile.confidence:.2f})"
-        )
-        print(
-            f"   Triggers: {', '.join(emotion_profile.triggers) if emotion_profile.triggers else 'none'}"
-        )
-        print(f"   Interactions: {profile.interaction_count}")
 
         if profile.trust_indicators:
-            print(f"   Trust indicators: {len(profile.trust_indicators)}")
+            pass
 
-    print(f"\n📈 Relationship Evolution Summary:")
-    print("-" * 40)
-    print(f"Final relationship level: {profile.relationship_level.value}")
-    print(f"Total interactions: {profile.interaction_count}")
-    print(f"Current emotion: {profile.current_emotion.value}")
-    print(f"Escalation count: {profile.escalation_count}")
 
 
 if __name__ == "__main__":
     # Configure logging
     logging.basicConfig(level=logging.INFO, format="%(levelname)s - %(message)s")
 
-    print("🔧 Graph Database Integration Test (ChromaDB-Safe)")
-    print("=" * 70)
 
     # Run the fixed examples
     asyncio.run(example_conversation_fixed())

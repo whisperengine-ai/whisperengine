@@ -6,12 +6,11 @@ Handles multiple conversation threads, persistence, and thread switching.
 import asyncio
 import json
 import logging
+import sqlite3
+from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Any, Optional
-from dataclasses import dataclass, asdict
-import sqlite3
-from contextlib import asynccontextmanager
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -24,8 +23,8 @@ class ConversationMessage:
     content: str
     sender: str  # 'user' or 'assistant'
     timestamp: str
-    metadata: Optional[Dict[str, Any]] = None
-    files: Optional[List[Dict[str, Any]]] = None
+    metadata: dict[str, Any] | None = None
+    files: list[dict[str, Any]] | None = None
 
     def __post_init__(self):
         if self.metadata is None:
@@ -33,7 +32,7 @@ class ConversationMessage:
         if self.files is None:
             self.files = []
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization"""
         return {
             "id": self.id,
@@ -54,10 +53,10 @@ class ConversationThread:
     user_id: str
     created_at: str
     updated_at: str
-    messages: Optional[List[ConversationMessage]] = None
-    metadata: Optional[Dict[str, Any]] = None
+    messages: list[ConversationMessage] | None = None
+    metadata: dict[str, Any] | None = None
     is_archived: bool = False
-    tags: Optional[List[str]] = None
+    tags: list[str] | None = None
 
     def __post_init__(self):
         if self.messages is None:
@@ -78,11 +77,11 @@ class ConversationThread:
         """Get the number of messages in this thread"""
         return len(self.messages) if self.messages else 0
 
-    def get_last_message(self) -> Optional[ConversationMessage]:
+    def get_last_message(self) -> ConversationMessage | None:
         """Get the most recent message"""
         return self.messages[-1] if self.messages else None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization"""
         return {
             "id": self.id,
@@ -97,7 +96,7 @@ class ConversationThread:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "ConversationThread":
+    def from_dict(cls, data: dict[str, Any]) -> "ConversationThread":
         """Create from dictionary"""
         messages = [ConversationMessage(**msg) for msg in data.get("messages", [])]
         return cls(
@@ -116,14 +115,14 @@ class ConversationThread:
 class ConversationThreadManager:
     """Manages conversation threads for the desktop app"""
 
-    def __init__(self, data_dir: Optional[Path] = None):
+    def __init__(self, data_dir: Path | None = None):
         self.data_dir = data_dir or Path.home() / ".whisperengine" / "conversations"
         self.data_dir.mkdir(parents=True, exist_ok=True)
 
         # SQLite database for persistent storage
         self.db_path = self.data_dir / "conversations.db"
-        self.threads_cache: Dict[str, ConversationThread] = {}
-        self.user_threads: Dict[str, List[str]] = {}  # user_id -> [thread_ids]
+        self.threads_cache: dict[str, ConversationThread] = {}
+        self.user_threads: dict[str, list[str]] = {}  # user_id -> [thread_ids]
 
         # Initialize database
         asyncio.create_task(self.initialize_database())
@@ -185,7 +184,7 @@ class ConversationThreadManager:
             logger.error(f"Failed to initialize conversation database: {e}")
 
     async def create_conversation(
-        self, user_id: str, title: Optional[str] = None, initial_message: Optional[str] = None
+        self, user_id: str, title: str | None = None, initial_message: str | None = None
     ) -> ConversationThread:
         """Create a new conversation thread"""
         try:
@@ -242,7 +241,7 @@ class ConversationThreadManager:
             logger.error(f"Failed to create conversation: {e}")
             raise
 
-    async def get_conversation(self, conversation_id: str) -> Optional[ConversationThread]:
+    async def get_conversation(self, conversation_id: str) -> ConversationThread | None:
         """Get a conversation by ID"""
         try:
             # Check cache first
@@ -302,7 +301,7 @@ class ConversationThreadManager:
 
     async def get_user_conversations(
         self, user_id: str, include_archived: bool = False
-    ) -> List[ConversationThread]:
+    ) -> list[ConversationThread]:
         """Get all conversations for a user"""
         try:
             conversations = []
@@ -366,7 +365,7 @@ class ConversationThreadManager:
                 # Insert or update conversation
                 conn.execute(
                     """
-                    INSERT OR REPLACE INTO conversations 
+                    INSERT OR REPLACE INTO conversations
                     (id, user_id, title, created_at, updated_at, is_archived, tags, metadata, message_count)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
@@ -400,7 +399,7 @@ class ConversationThreadManager:
                 with sqlite3.connect(self.db_path) as conn:
                     conn.execute(
                         """
-                        INSERT OR REPLACE INTO messages 
+                        INSERT OR REPLACE INTO messages
                         (id, conversation_id, content, sender, timestamp, metadata, files)
                         VALUES (?, ?, ?, ?, ?, ?, ?)
                     """,
@@ -418,7 +417,7 @@ class ConversationThreadManager:
             else:
                 conn.execute(
                     """
-                    INSERT OR REPLACE INTO messages 
+                    INSERT OR REPLACE INTO messages
                     (id, conversation_id, content, sender, timestamp, metadata, files)
                     VALUES (?, ?, ?, ?, ?, ?, ?)
                 """,
@@ -491,7 +490,7 @@ class ConversationThreadManager:
                 del self.threads_cache[conversation_id]
 
             # Remove from user threads index
-            for user_id, thread_ids in self.user_threads.items():
+            for _user_id, thread_ids in self.user_threads.items():
                 if conversation_id in thread_ids:
                     thread_ids.remove(conversation_id)
                     break
@@ -527,7 +526,7 @@ class ConversationThreadManager:
 
     async def search_conversations(
         self, user_id: str, query: str, limit: int = 20
-    ) -> List[ConversationThread]:
+    ) -> list[ConversationThread]:
         """Search conversations by content"""
         try:
             conversations = []
@@ -538,7 +537,7 @@ class ConversationThreadManager:
                 # Search in conversation titles and message content
                 rows = conn.execute(
                     """
-                    SELECT DISTINCT c.id 
+                    SELECT DISTINCT c.id
                     FROM conversations c
                     LEFT JOIN messages m ON c.id = m.conversation_id
                     WHERE c.user_id = ? AND c.is_archived = FALSE
@@ -560,7 +559,7 @@ class ConversationThreadManager:
             logger.error(f"Failed to search conversations for user {user_id}: {e}")
             return []
 
-    async def get_conversation_stats(self, user_id: str) -> Dict[str, Any]:
+    async def get_conversation_stats(self, user_id: str) -> dict[str, Any]:
         """Get conversation statistics for a user"""
         try:
             with sqlite3.connect(self.db_path) as conn:
@@ -568,12 +567,12 @@ class ConversationThreadManager:
 
                 stats = conn.execute(
                     """
-                    SELECT 
+                    SELECT
                         COUNT(*) as total_conversations,
                         COUNT(CASE WHEN is_archived = FALSE THEN 1 END) as active_conversations,
                         COUNT(CASE WHEN is_archived = TRUE THEN 1 END) as archived_conversations,
                         SUM(message_count) as total_messages
-                    FROM conversations 
+                    FROM conversations
                     WHERE user_id = ?
                 """,
                     (user_id,),
@@ -597,7 +596,7 @@ class ConversationThreadManager:
 
     async def export_conversation(
         self, conversation_id: str, format: str = "json"
-    ) -> Optional[Dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         """Export a conversation in the specified format"""
         try:
             thread = await self.get_conversation(conversation_id)
@@ -617,7 +616,7 @@ class ConversationThreadManager:
             logger.error(f"Failed to export conversation {conversation_id}: {e}")
             return None
 
-    def _export_as_markdown(self, thread: ConversationThread) -> Dict[str, Any]:
+    def _export_as_markdown(self, thread: ConversationThread) -> dict[str, Any]:
         """Export conversation as markdown format"""
         markdown_content = f"# {thread.title}\n\n"
         markdown_content += f"**Created:** {thread.created_at}  \n"
@@ -649,7 +648,7 @@ class ConversationThreadManager:
             "filename": f"{thread.title.replace(' ', '_')}.md",
         }
 
-    def _export_as_text(self, thread: ConversationThread) -> Dict[str, Any]:
+    def _export_as_text(self, thread: ConversationThread) -> dict[str, Any]:
         """Export conversation as plain text format"""
         text_content = f"Conversation: {thread.title}\n"
         text_content += f"Created: {thread.created_at}\n"
@@ -757,7 +756,7 @@ class ConversationThreadManager:
             logger.error(f"Failed to remove tag from conversation {conversation_id}: {e}")
             return False
 
-    async def get_conversations_by_tag(self, user_id: str, tag: str) -> List[ConversationThread]:
+    async def get_conversations_by_tag(self, user_id: str, tag: str) -> list[ConversationThread]:
         """Get all conversations with a specific tag"""
         try:
             conversations = []
@@ -768,8 +767,8 @@ class ConversationThreadManager:
 
                 rows = conn.execute(
                     """
-                    SELECT * FROM conversations 
-                    WHERE user_id = ? AND is_archived = FALSE 
+                    SELECT * FROM conversations
+                    WHERE user_id = ? AND is_archived = FALSE
                     AND tags LIKE ?
                     ORDER BY updated_at DESC
                 """,
@@ -788,7 +787,7 @@ class ConversationThreadManager:
             logger.error(f"Failed to get conversations by tag '{tag}' for user {user_id}: {e}")
             return []
 
-    async def get_all_tags(self, user_id: str) -> List[str]:
+    async def get_all_tags(self, user_id: str) -> list[str]:
         """Get all unique tags used by a user"""
         try:
             all_tags = set()
@@ -808,7 +807,7 @@ class ConversationThreadManager:
                     except (json.JSONDecodeError, TypeError):
                         continue
 
-            return sorted(list(all_tags))
+            return sorted(all_tags)
 
         except Exception as e:
             logger.error(f"Failed to get all tags for user {user_id}: {e}")

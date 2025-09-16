@@ -7,11 +7,11 @@ relationship tracking and personality evolution over time.
 """
 
 import logging
-import json
-from datetime import datetime, timezone
-from typing import Dict, List, Optional, Any
-from neo4j import AsyncGraphDatabase, AsyncSession
 from dataclasses import asdict
+from datetime import UTC, datetime
+from typing import Any
+
+from neo4j import AsyncGraphDatabase
 
 from .personality_profiler import PersonalityMetrics, PersonalityProfiler
 
@@ -32,7 +32,7 @@ class GraphPersonalityManager:
         await self.driver.close()
 
     async def store_personality_profile(
-        self, user_id: str, metrics: PersonalityMetrics, conversation_context: Optional[Dict] = None
+        self, user_id: str, metrics: PersonalityMetrics, conversation_context: dict | None = None
     ) -> bool:
         """
         Store or update personality profile in graph database
@@ -83,7 +83,7 @@ class GraphPersonalityManager:
 
     @staticmethod
     async def _create_personality_profile(
-        tx, user_id: str, personality_data: Dict, conversation_context: Optional[Dict]
+        tx, user_id: str, personality_data: dict, conversation_context: dict | None
     ):
         """Create or update personality profile node"""
 
@@ -134,7 +134,7 @@ class GraphPersonalityManager:
             total_messages_analyzed=personality_data.get("total_messages_analyzed", 0),
         )
 
-    async def get_personality_profile(self, user_id: str) -> Optional[Dict]:
+    async def get_personality_profile(self, user_id: str) -> dict | None:
         """
         Retrieve personality profile from graph database
 
@@ -154,7 +154,7 @@ class GraphPersonalityManager:
             return None
 
     @staticmethod
-    async def _get_personality_data(tx, user_id: str) -> Optional[Dict]:
+    async def _get_personality_data(tx, user_id: str) -> dict | None:
         """Retrieve personality data for user"""
         query = """
         MATCH (u:User {user_id: $user_id})
@@ -187,8 +187,8 @@ class GraphPersonalityManager:
         return None
 
     async def analyze_and_store_personality(
-        self, user_id: str, messages: List[str], conversation_context: Optional[Dict] = None
-    ) -> Optional[Dict]:
+        self, user_id: str, messages: list[str], conversation_context: dict | None = None
+    ) -> dict | None:
         """
         Analyze personality from messages and store in graph database
 
@@ -218,7 +218,7 @@ class GraphPersonalityManager:
             logger.error(f"Error analyzing and storing personality for user {user_id}: {e}")
             return None
 
-    async def get_personality_insights(self, user_id: str) -> Dict[str, Any]:
+    async def get_personality_insights(self, user_id: str) -> dict[str, Any]:
         """
         Get comprehensive personality insights including graph relationships
 
@@ -258,7 +258,7 @@ class GraphPersonalityManager:
             return {"error": str(e)}
 
     @staticmethod
-    async def _get_conversation_patterns(tx, user_id: str) -> Dict:
+    async def _get_conversation_patterns(tx, user_id: str) -> dict:
         """Get conversation patterns from graph"""
         query = """
         MATCH (u:User {user_id: $user_id})-[:PARTICIPATED_IN]->(c:Conversation)
@@ -280,7 +280,7 @@ class GraphPersonalityManager:
         return {}
 
     @staticmethod
-    async def _get_relationship_insights(tx, user_id: str) -> Dict:
+    async def _get_relationship_insights(tx, user_id: str) -> dict:
         """Get relationship insights from graph"""
         query = """
         MATCH (u:User {user_id: $user_id})-[r:COMMUNICATED_WITH]->(other:User)
@@ -300,7 +300,7 @@ class GraphPersonalityManager:
             return {"top_relationships": record["top_relationships"]}
         return {"top_relationships": []}
 
-    def _generate_recommendations(self, personality: Dict) -> List[str]:
+    def _generate_recommendations(self, personality: dict) -> list[str]:
         """Generate personalized recommendations based on personality"""
         recommendations = []
 
@@ -336,7 +336,7 @@ class GraphPersonalityManager:
         return recommendations
 
     async def update_personality_from_conversation(
-        self, user_id: str, new_messages: List[str]
+        self, user_id: str, new_messages: list[str]
     ) -> bool:
         """
         Update personality profile with new conversation data
@@ -369,7 +369,7 @@ class GraphPersonalityManager:
             return False
 
     def _merge_personality_metrics(
-        self, existing: Dict, new: PersonalityMetrics
+        self, existing: dict, new: PersonalityMetrics
     ) -> PersonalityMetrics:
         """Merge existing personality data with new analysis"""
         # Weight factor for new vs existing data
@@ -436,7 +436,7 @@ class GraphPersonalityManager:
         merged.total_messages_analyzed = (
             existing.get("total_messages_analyzed", 0) + new.total_messages_analyzed
         )
-        merged.last_updated = datetime.now(timezone.utc)
+        merged.last_updated = datetime.now(UTC)
         merged.confidence_interval = min(0.95, merged.total_messages_analyzed / 100.0)
 
         return merged

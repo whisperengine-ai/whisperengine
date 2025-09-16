@@ -34,16 +34,14 @@ Integration Points:
 """
 
 import logging
-from datetime import datetime, timedelta
-from enum import Enum
-from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Any, Tuple
-from collections import defaultdict, deque
+import random
 import re
 import statistics
-import random
-import asyncio
-import math
+from collections import defaultdict
+from dataclasses import dataclass, field
+from datetime import datetime, timedelta
+from enum import Enum
+from typing import Any
 
 # Import existing systems for integration
 try:
@@ -58,14 +56,14 @@ except ImportError:
     THREAD_MANAGER_AVAILABLE = False
 
 try:
-    from src.personality.memory_moments import MemoryTriggeredMoments, ConversationContext
+    from src.personality.memory_moments import ConversationContext, MemoryTriggeredMoments
 
     MEMORY_MOMENTS_AVAILABLE = True
 except ImportError:
     MEMORY_MOMENTS_AVAILABLE = False
 
 try:
-    from src.intelligence.emotional_context_engine import EmotionalContextEngine, EmotionalContext
+    from src.intelligence.emotional_context_engine import EmotionalContext, EmotionalContextEngine
 
     EMOTIONAL_CONTEXT_AVAILABLE = True
 except ImportError:
@@ -128,8 +126,8 @@ class ConversationStagnationSignal:
     timestamp: datetime = field(default_factory=datetime.now)
 
     # Context
-    recent_messages: List[str] = field(default_factory=list)
-    time_since_last_message: Optional[float] = None
+    recent_messages: list[str] = field(default_factory=list)
+    time_since_last_message: float | None = None
     engagement_decline_rate: float = 0.0
 
 
@@ -145,7 +143,7 @@ class TopicSuggestion:
     # Suggestion context
     connection_reason: str
     suggested_opening: str
-    follow_up_questions: List[str] = field(default_factory=list)
+    follow_up_questions: list[str] = field(default_factory=list)
 
     # Metadata
     personality_fit_score: float = 0.0
@@ -153,9 +151,9 @@ class TopicSuggestion:
     novelty_score: float = 0.0
 
     # Source information
-    source_memories: List[str] = field(default_factory=list)
-    source_threads: List[str] = field(default_factory=list)
-    source_interests: List[str] = field(default_factory=list)
+    source_memories: list[str] = field(default_factory=list)
+    source_threads: list[str] = field(default_factory=list)
+    source_interests: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -192,9 +190,9 @@ class ConversationRhythm:
     preferred_session_duration: float = 0.0  # minutes
 
     # Engagement patterns
-    peak_engagement_times: List[str] = field(default_factory=list)  # Hour ranges
-    engagement_fade_signals: List[str] = field(default_factory=list)
-    re_engagement_triggers: List[str] = field(default_factory=list)
+    peak_engagement_times: list[str] = field(default_factory=list)  # Hour ranges
+    engagement_fade_signals: list[str] = field(default_factory=list)
+    re_engagement_triggers: list[str] = field(default_factory=list)
 
     # Communication style
     message_length_preference: str = "medium"  # short, medium, long
@@ -218,10 +216,10 @@ class ProactiveConversationEngagementEngine:
 
     def __init__(
         self,
-        thread_manager: Optional[AdvancedConversationThreadManager] = None,
-        memory_moments: Optional[MemoryTriggeredMoments] = None,
-        emotional_engine: Optional[EmotionalContextEngine] = None,
-        personality_profiler: Optional[DynamicPersonalityProfiler] = None,
+        thread_manager: AdvancedConversationThreadManager | None = None,
+        memory_moments: MemoryTriggeredMoments | None = None,
+        emotional_engine: EmotionalContextEngine | None = None,
+        personality_profiler: DynamicPersonalityProfiler | None = None,
         stagnation_threshold_minutes: int = 5,
         engagement_check_interval_minutes: int = 3,
         max_proactive_suggestions_per_hour: int = 8,
@@ -248,14 +246,14 @@ class ProactiveConversationEngagementEngine:
         self.max_suggestions_per_hour = max_proactive_suggestions_per_hour
 
         # Conversation flow tracking
-        self.conversation_flows: Dict[str, List[ConversationFlowState]] = defaultdict(list)
-        self.stagnation_signals: Dict[str, List[ConversationStagnationSignal]] = defaultdict(list)
-        self.conversation_rhythms: Dict[str, ConversationRhythm] = {}
+        self.conversation_flows: dict[str, list[ConversationFlowState]] = defaultdict(list)
+        self.stagnation_signals: dict[str, list[ConversationStagnationSignal]] = defaultdict(list)
+        self.conversation_rhythms: dict[str, ConversationRhythm] = {}
 
         # Proactive engagement tracking
-        self.topic_suggestions: Dict[str, List[TopicSuggestion]] = defaultdict(list)
-        self.generated_prompts: Dict[str, List[ConversationPrompt]] = defaultdict(list)
-        self.engagement_interventions: Dict[str, List[datetime]] = defaultdict(list)
+        self.topic_suggestions: dict[str, list[TopicSuggestion]] = defaultdict(list)
+        self.generated_prompts: dict[str, list[ConversationPrompt]] = defaultdict(list)
+        self.engagement_interventions: dict[str, list[datetime]] = defaultdict(list)
 
         # Topic suggestion engines
         self.topic_generator = IntelligentTopicGenerator()
@@ -263,8 +261,8 @@ class ProactiveConversationEngagementEngine:
         self.rhythm_analyzer = ConversationRhythmAnalyzer()
 
         # Performance tracking
-        self.engagement_success_rates: Dict[str, float] = {}
-        self.intervention_effectiveness: Dict[EngagementStrategy, float] = defaultdict(float)
+        self.engagement_success_rates: dict[str, float] = {}
+        self.intervention_effectiveness: dict[EngagementStrategy, float] = defaultdict(float)
 
         logger.info(
             "ProactiveConversationEngagementEngine initialized with %d minute stagnation threshold",
@@ -275,9 +273,9 @@ class ProactiveConversationEngagementEngine:
         self,
         user_id: str,
         context_id: str,
-        recent_messages: List[Dict[str, Any]],
-        current_thread_info: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
+        recent_messages: list[dict[str, Any]],
+        current_thread_info: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         """
         Analyze current conversation engagement and provide proactive recommendations.
 
@@ -334,8 +332,8 @@ class ProactiveConversationEngagementEngine:
         return engagement_analysis
 
     async def _analyze_conversation_flow(
-        self, user_id: str, recent_messages: List[Dict[str, Any]]
-    ) -> Dict[str, Any]:
+        self, user_id: str, recent_messages: list[dict[str, Any]]
+    ) -> dict[str, Any]:
         """Analyze the current flow state of the conversation"""
 
         if not recent_messages:
@@ -445,8 +443,8 @@ class ProactiveConversationEngagementEngine:
         }
 
     async def _detect_stagnation_signals(
-        self, user_id: str, recent_messages: List[Dict[str, Any]]
-    ) -> Dict[str, Any]:
+        self, user_id: str, recent_messages: list[dict[str, Any]]
+    ) -> dict[str, Any]:
         """Detect signals indicating conversation stagnation"""
 
         stagnation_signals = []
@@ -531,7 +529,7 @@ class ProactiveConversationEngagementEngine:
         }
 
     async def _assess_intervention_need(
-        self, user_id: str, flow_analysis: Dict[str, Any], stagnation_analysis: Dict[str, Any]
+        self, user_id: str, flow_analysis: dict[str, Any], stagnation_analysis: dict[str, Any]
     ) -> bool:
         """Assess whether proactive intervention is needed"""
 
@@ -573,9 +571,9 @@ class ProactiveConversationEngagementEngine:
         self,
         user_id: str,
         context_id: str,
-        recent_messages: List[Dict[str, Any]],
-        current_thread_info: Optional[Dict[str, Any]],
-    ) -> List[Dict[str, Any]]:
+        recent_messages: list[dict[str, Any]],
+        current_thread_info: dict[str, Any] | None,
+    ) -> list[dict[str, Any]]:
         """Generate proactive engagement recommendations"""
 
         recommendations = []
@@ -662,7 +660,7 @@ class ProactiveConversationEngagementEngine:
 
         return recommendations[:3]  # Return top 3 recommendations
 
-    async def _analyze_topic_coherence(self, recent_content: List[str]) -> float:
+    async def _analyze_topic_coherence(self, recent_content: list[str]) -> float:
         """Analyze topic coherence in recent messages"""
         if len(recent_content) < 2:
             return 0.5
@@ -688,7 +686,7 @@ class ProactiveConversationEngagementEngine:
 
         return statistics.mean(overlaps) if overlaps else 0.3
 
-    def _extract_simple_keywords(self, text: str) -> List[str]:
+    def _extract_simple_keywords(self, text: str) -> list[str]:
         """Extract simple keywords from text"""
         words = re.findall(r"\b\w+\b", text.lower())
         stop_words = {
@@ -714,9 +712,9 @@ class ProactiveConversationEngagementEngine:
     async def _generate_topic_suggestions(
         self,
         user_id: str,
-        recent_messages: List[Dict[str, Any]],
-        personality_context: Optional[Dict[str, Any]],
-    ) -> List[TopicSuggestion]:
+        recent_messages: list[dict[str, Any]],
+        personality_context: dict[str, Any] | None,
+    ) -> list[TopicSuggestion]:
         """Generate intelligent topic suggestions"""
 
         suggestions = []
@@ -770,7 +768,7 @@ class ProactiveConversationEngagementEngine:
 
         return suggestions
 
-    def _identify_message_themes(self, content: str) -> List[str]:
+    def _identify_message_themes(self, content: str) -> list[str]:
         """Identify themes in a message"""
         content_lower = content.lower()
         themes = []
@@ -811,10 +809,10 @@ class ProactiveConversationEngagementEngine:
     async def _generate_conversation_prompts(
         self,
         user_id: str,
-        recent_messages: List[Dict[str, Any]],
-        current_thread_info: Optional[Dict[str, Any]],
-        personality_context: Optional[Dict[str, Any]],
-    ) -> List[ConversationPrompt]:
+        recent_messages: list[dict[str, Any]],
+        current_thread_info: dict[str, Any] | None,
+        personality_context: dict[str, Any] | None,
+    ) -> list[ConversationPrompt]:
         """Generate natural conversation prompts"""
 
         prompts = []
@@ -875,8 +873,8 @@ class ProactiveConversationEngagementEngine:
             return "what you mentioned"
 
     async def _generate_memory_connections(
-        self, user_id: str, recent_messages: List[Dict[str, Any]]
-    ) -> List[Dict[str, Any]]:
+        self, user_id: str, recent_messages: list[dict[str, Any]]
+    ) -> list[dict[str, Any]]:
         """Generate memory-based conversation connections using memory moments"""
 
         connections = []
@@ -957,7 +955,7 @@ class ProactiveConversationEngagementEngine:
         return connections
 
     async def _update_conversation_rhythm(
-        self, user_id: str, recent_messages: List[Dict[str, Any]]
+        self, user_id: str, recent_messages: list[dict[str, Any]]
     ):
         """Update conversation rhythm analysis for user"""
 
@@ -969,7 +967,7 @@ class ProactiveConversationEngagementEngine:
         # Analyze response times
         if len(recent_messages) >= 2:
             response_times = []
-            for i in range(1, len(recent_messages)):
+            for _i in range(1, len(recent_messages)):
                 # This would calculate actual response times
                 # For now, use a placeholder
                 response_times.append(60.0)  # 1 minute average
@@ -982,7 +980,7 @@ class ProactiveConversationEngagementEngine:
         rhythm.pattern_confidence = min(1.0, rhythm.data_points_analyzed / 100)
         rhythm.last_updated = datetime.now()
 
-    async def _get_conversation_rhythm_summary(self, user_id: str) -> Dict[str, Any]:
+    async def _get_conversation_rhythm_summary(self, user_id: str) -> dict[str, Any]:
         """Get conversation rhythm summary for user"""
 
         if user_id not in self.conversation_rhythms:
@@ -998,7 +996,7 @@ class ProactiveConversationEngagementEngine:
             "data_points": rhythm.data_points_analyzed,
         }
 
-    async def _get_recent_interventions(self, user_id: str) -> List[str]:
+    async def _get_recent_interventions(self, user_id: str) -> list[str]:
         """Get recent intervention timestamps"""
         interventions = self.engagement_interventions[user_id]
         return [intervention.isoformat() for intervention in interventions[-5:]]
@@ -1013,7 +1011,7 @@ class IntelligentTopicGenerator:
     def __init__(self):
         self.topic_templates = self._load_topic_templates()
 
-    def _load_topic_templates(self) -> Dict[str, List[str]]:
+    def _load_topic_templates(self) -> dict[str, list[str]]:
         """Load topic generation templates"""
         return {
             "personal_growth": [
@@ -1040,7 +1038,7 @@ class NaturalPromptGenerator:
     def __init__(self):
         self.prompt_templates = self._load_prompt_templates()
 
-    def _load_prompt_templates(self) -> Dict[EngagementStrategy, List[str]]:
+    def _load_prompt_templates(self) -> dict[EngagementStrategy, list[str]]:
         """Load conversation prompt templates"""
         return {
             EngagementStrategy.FOLLOW_UP_QUESTION: [
@@ -1068,7 +1066,7 @@ class ConversationRhythmAnalyzer:
         self.rhythm_patterns = {}
 
     async def analyze_rhythm(
-        self, user_id: str, message_history: List[Dict[str, Any]]
+        self, user_id: str, message_history: list[dict[str, Any]]
     ) -> ConversationRhythm:
         """Analyze conversation rhythm for a user"""
 

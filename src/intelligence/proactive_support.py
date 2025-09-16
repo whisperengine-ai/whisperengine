@@ -9,13 +9,12 @@ Phase 2: Predictive Emotional Intelligence
 """
 
 import logging
-import asyncio
-from datetime import datetime, timezone, timedelta
-from typing import Dict, List, Optional, Any, Tuple, Callable
-from dataclasses import dataclass, asdict
-from enum import Enum
 import random
-from collections import defaultdict, deque
+from collections import defaultdict
+from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
+from enum import Enum
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -53,8 +52,8 @@ class SupportIntervention:
     message_content: str
     rationale: str
     expected_outcome: str
-    success_metrics: List[str]
-    fallback_options: List[str]
+    success_metrics: list[str]
+    fallback_options: list[str]
     priority_level: int  # 1-5
     created_timestamp: datetime
 
@@ -64,12 +63,12 @@ class SupportStrategy:
     """Personalized support strategy"""
 
     strategy_id: str
-    user_preferences: Dict[str, Any]
-    effective_approaches: List[str]
-    approaches_to_avoid: List[str]
-    optimal_timing: Dict[str, str]
+    user_preferences: dict[str, Any]
+    effective_approaches: list[str]
+    approaches_to_avoid: list[str]
+    optimal_timing: dict[str, str]
     communication_style: str
-    support_history: List[Dict]
+    support_history: list[dict]
     last_updated: datetime
 
 
@@ -82,7 +81,7 @@ class SupportOutcome:
     user_response: str
     effectiveness_score: float  # 0.0 to 1.0
     follow_up_needed: bool
-    lessons_learned: List[str]
+    lessons_learned: list[str]
     timestamp: datetime
 
 
@@ -197,8 +196,8 @@ class ProactiveSupport:
         }
 
     async def analyze_support_needs(
-        self, user_id: str, emotional_context: Dict[str, Any], user_history: List[Dict]
-    ) -> Dict[str, Any]:
+        self, user_id: str, emotional_context: dict[str, Any], user_history: list[dict]
+    ) -> dict[str, Any]:
         """
         Analyze user's current support needs based on emotional context
 
@@ -300,8 +299,8 @@ class ProactiveSupport:
         return analysis
 
     def _identify_recurring_patterns(
-        self, interactions: List[Dict], pattern_type: str
-    ) -> List[str]:
+        self, interactions: list[dict], pattern_type: str
+    ) -> list[str]:
         """Identify recurring patterns in user interactions"""
         patterns = []
 
@@ -320,7 +319,7 @@ class ProactiveSupport:
 
         return patterns
 
-    def _identify_effective_strategies(self, user_history: List[Dict]) -> List[str]:
+    def _identify_effective_strategies(self, user_history: list[dict]) -> list[str]:
         """Identify strategies that have been effective for this user"""
         effective_strategies = []
 
@@ -347,8 +346,8 @@ class ProactiveSupport:
         return list(set(effective_strategies))
 
     async def _generate_intervention_recommendations(
-        self, needs_analysis: Dict, emotional_context: Dict, user_history: List[Dict]
-    ) -> List[Dict]:
+        self, needs_analysis: dict, emotional_context: dict, user_history: list[dict]
+    ) -> list[dict]:
         """Generate specific intervention recommendations"""
         recommendations = []
 
@@ -435,8 +434,8 @@ class ProactiveSupport:
     async def create_support_intervention(
         self,
         user_id: str,
-        support_needs: Dict[str, Any],
-        user_strategy: Optional[SupportStrategy] = None,
+        support_needs: dict[str, Any],
+        user_strategy: SupportStrategy | None = None,
     ) -> SupportIntervention:
         """
         Create a personalized support intervention
@@ -490,7 +489,7 @@ class ProactiveSupport:
             success_metrics=self._define_success_metrics(support_type),
             fallback_options=self._generate_fallback_options(intervention_style),
             priority_level=primary_recommendation["priority"],
-            created_timestamp=datetime.now(timezone.utc),
+            created_timestamp=datetime.now(UTC),
         )
 
         logger.debug(
@@ -498,7 +497,7 @@ class ProactiveSupport:
         )
         return intervention
 
-    def _map_recommendation_to_support_type(self, recommendation: Dict) -> SupportType:
+    def _map_recommendation_to_support_type(self, recommendation: dict) -> SupportType:
         """Map recommendation type to support type"""
         rec_type = recommendation["type"]
 
@@ -517,8 +516,8 @@ class ProactiveSupport:
         self,
         support_type: SupportType,
         intervention_style: InterventionStyle,
-        user_strategy: Optional[SupportStrategy],
-        support_needs: Dict,
+        user_strategy: SupportStrategy | None,
+        support_needs: dict,
     ) -> str:
         """Generate personalized intervention message"""
 
@@ -661,7 +660,7 @@ class ProactiveSupport:
             (support_type, intervention_style), "positive user engagement and emotional support"
         )
 
-    def _define_success_metrics(self, support_type: SupportType) -> List[str]:
+    def _define_success_metrics(self, support_type: SupportType) -> list[str]:
         """Define success metrics for intervention type"""
         metrics = {
             SupportType.CRISIS: [
@@ -692,7 +691,7 @@ class ProactiveSupport:
 
         return metrics.get(support_type, ["positive user response", "engagement maintained"])
 
-    def _generate_fallback_options(self, intervention_style: InterventionStyle) -> List[str]:
+    def _generate_fallback_options(self, intervention_style: InterventionStyle) -> list[str]:
         """Generate fallback options if primary intervention isn't effective"""
         fallbacks = {
             InterventionStyle.GENTLE_CHECK_IN: [
@@ -724,8 +723,8 @@ class ProactiveSupport:
         return fallbacks.get(intervention_style, ["Adjust approach based on user response"])
 
     async def deliver_intervention(
-        self, intervention: SupportIntervention, delivery_context: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        self, intervention: SupportIntervention, delivery_context: dict[str, Any]
+    ) -> dict[str, Any]:
         """
         Deliver the support intervention to the user
 
@@ -756,7 +755,7 @@ class ProactiveSupport:
             "intervention_id": intervention.intervention_id,
             "message_content": intervention.message_content,
             "delivery_method": delivery_method,
-            "delivery_timestamp": datetime.now(timezone.utc),
+            "delivery_timestamp": datetime.now(UTC),
             "expected_response_timeframe": self._calculate_response_timeframe(intervention.timing),
             "tracking_metrics": intervention.success_metrics,
             "fallback_plan": intervention.fallback_options,
@@ -766,8 +765,8 @@ class ProactiveSupport:
         return delivery_result
 
     async def _validate_delivery_timing(
-        self, intervention: SupportIntervention, delivery_context: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        self, intervention: SupportIntervention, delivery_context: dict[str, Any]
+    ) -> dict[str, Any]:
         """Validate if intervention should be delivered now"""
 
         # Check for recent interventions to avoid overwhelming
@@ -776,7 +775,7 @@ class ProactiveSupport:
             last_intervention_time = max(
                 recent_interventions, key=lambda x: x.get("timestamp", datetime.min)
             )
-            time_since_last = datetime.now(timezone.utc) - last_intervention_time.get(
+            time_since_last = datetime.now(UTC) - last_intervention_time.get(
                 "timestamp", datetime.min
             )
 
@@ -838,7 +837,7 @@ class ProactiveSupport:
         return timeframes.get(timing, "when appropriate")
 
     async def track_intervention_outcome(
-        self, intervention_id: str, user_response: str, outcome_context: Dict[str, Any]
+        self, intervention_id: str, user_response: str, outcome_context: dict[str, Any]
     ) -> SupportOutcome:
         """
         Track the outcome of a support intervention
@@ -909,7 +908,7 @@ class ProactiveSupport:
             effectiveness_score=effectiveness_score,
             follow_up_needed=follow_up_needed,
             lessons_learned=lessons_learned,
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
         )
 
         logger.debug(
@@ -918,8 +917,8 @@ class ProactiveSupport:
         return outcome
 
     def generate_support_summary(
-        self, intervention: SupportIntervention, outcome: Optional[SupportOutcome] = None
-    ) -> Dict[str, Any]:
+        self, intervention: SupportIntervention, outcome: SupportOutcome | None = None
+    ) -> dict[str, Any]:
         """Generate human-readable support summary"""
         summary = {
             "intervention": {

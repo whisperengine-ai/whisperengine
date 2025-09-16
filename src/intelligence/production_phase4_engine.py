@@ -23,18 +23,14 @@ Target Scenarios:
 import asyncio
 import logging
 import multiprocessing as mp
-from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor, as_completed
-from typing import Dict, List, Optional, Any, Tuple, Set
-import numpy as np
-import pandas as pd
-from datetime import datetime, timedelta
-from dataclasses import dataclass, field
-import queue
 import threading
-from collections import defaultdict, deque
 import time
-import uuid
-import weakref
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
+from dataclasses import dataclass, field
+from datetime import datetime, timedelta
+from typing import Any
+
+import numpy as np
 
 # High-performance libraries
 try:
@@ -61,11 +57,11 @@ except ImportError:
 
 # Import existing systems
 try:
-    from src.intelligence.emotional_context_engine import EmotionalContextEngine
-    from src.intelligence.dynamic_personality_profiler import DynamicPersonalityProfiler
-    from src.personality.memory_moments import MemoryTriggeredMoments
     from src.conversation.advanced_thread_manager import AdvancedConversationThreadManager
     from src.conversation.proactive_engagement_engine import ProactiveConversationEngagementEngine
+    from src.intelligence.dynamic_personality_profiler import DynamicPersonalityProfiler
+    from src.intelligence.emotional_context_engine import EmotionalContextEngine
+    from src.personality.memory_moments import MemoryTriggeredMoments
 
     PHASE4_COMPONENTS_AVAILABLE = True
 except ImportError:
@@ -80,9 +76,9 @@ class UserSessionState:
 
     user_id: str
     last_activity: datetime
-    active_threads: Set[str] = field(default_factory=set)
-    processing_queue: Optional[asyncio.Queue] = None
-    lock: Optional[asyncio.Lock] = None
+    active_threads: set[str] = field(default_factory=set)
+    processing_queue: asyncio.Queue | None = None
+    lock: asyncio.Lock | None = None
 
     def __post_init__(self):
         # Note: These will be set when the session is created in an async context
@@ -105,7 +101,7 @@ class OptimizedPhase4Engine:
 
     def __init__(
         self,
-        max_workers: Optional[int] = None,
+        max_workers: int | None = None,
         batch_size: int = 32,
         enable_multiprocessing: bool = True,
     ):
@@ -116,7 +112,7 @@ class OptimizedPhase4Engine:
         self.enable_multiprocessing = enable_multiprocessing
 
         # Session management for concurrent users
-        self.user_sessions: Dict[str, UserSessionState] = {}
+        self.user_sessions: dict[str, UserSessionState] = {}
         self.session_lock = asyncio.Lock()
 
         # Optimized resource pools
@@ -146,7 +142,7 @@ class OptimizedPhase4Engine:
         self.cache_lock = threading.RLock()
 
         # Background task management
-        self.background_tasks: Set[asyncio.Task] = set()
+        self.background_tasks: set[asyncio.Task] = set()
         self.is_running = False
 
         self.logger = logging.getLogger(f"{__name__}")
@@ -194,8 +190,8 @@ class OptimizedPhase4Engine:
         self.logger.info("✅ Optimized Phase 4 engine stopped gracefully")
 
     async def process_user_interaction_optimized(
-        self, user_id: str, message: str, context: Optional[Dict[str, Any]] = None
-    ) -> Dict[str, Any]:
+        self, user_id: str, message: str, context: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
         """
         Process user interaction with full optimization for concurrent users
         """
@@ -295,7 +291,7 @@ class OptimizedPhase4Engine:
                     self.user_sessions[user_id] = session
                     self.performance_stats["concurrent_users"] = len(self.user_sessions)
 
-    async def _queue_emotion_analysis(self, user_id: str, message: str) -> Optional[Dict[str, Any]]:
+    async def _queue_emotion_analysis(self, user_id: str, message: str) -> dict[str, Any] | None:
         """Queue emotion analysis for batch processing"""
         try:
             # Check cache first (thread-safe)
@@ -329,7 +325,7 @@ class OptimizedPhase4Engine:
 
                     return vader_result
 
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 self.logger.warning(f"Emotion analysis queue full for user {user_id}")
 
             return None
@@ -339,8 +335,8 @@ class OptimizedPhase4Engine:
             return None
 
     async def _queue_memory_search(
-        self, user_id: str, message: str, context: Optional[Dict[str, Any]]
-    ) -> Optional[List[Dict[str, Any]]]:
+        self, user_id: str, message: str, context: dict[str, Any] | None
+    ) -> list[dict[str, Any]] | None:
         """Queue memory search for optimized batch processing"""
         try:
             search_request = {
@@ -359,7 +355,7 @@ class OptimizedPhase4Engine:
                 # The batch processor will handle the full search
                 return await self._get_cached_memories(user_id, message)
 
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 self.logger.warning(f"Memory search queue full for user {user_id}")
                 return []
 
@@ -368,8 +364,8 @@ class OptimizedPhase4Engine:
             return []
 
     async def _process_conversation_thread(
-        self, user_id: str, message: str, context: Optional[Dict[str, Any]]
-    ) -> Optional[Dict[str, Any]]:
+        self, user_id: str, message: str, context: dict[str, Any] | None
+    ) -> dict[str, Any] | None:
         """Optimized conversation thread processing"""
         try:
             # Use thread pool for CPU-intensive thread analysis
@@ -386,8 +382,8 @@ class OptimizedPhase4Engine:
             return None
 
     def _analyze_conversation_thread_sync(
-        self, user_id: str, message: str, context: Optional[Dict[str, Any]]
-    ) -> Dict[str, Any]:
+        self, user_id: str, message: str, context: dict[str, Any] | None
+    ) -> dict[str, Any]:
         """Synchronous thread analysis for thread pool execution"""
         try:
             # Basic thread analysis using lightweight heuristics
@@ -428,7 +424,7 @@ class OptimizedPhase4Engine:
 
     async def _analyze_personality_optimized(
         self, user_id: str, message: str
-    ) -> Optional[Dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         """Optimized personality analysis using vectorized operations"""
         try:
             # Use multiprocessing for CPU-intensive personality analysis
@@ -454,8 +450,8 @@ class OptimizedPhase4Engine:
             return None
 
     async def _generate_proactive_response(
-        self, user_id: str, message: str, analysis_results: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        self, user_id: str, message: str, analysis_results: dict[str, Any]
+    ) -> dict[str, Any]:
         """Generate proactive engagement response based on analysis"""
         try:
             # Combine results from all analyses
@@ -503,7 +499,7 @@ class OptimizedPhase4Engine:
                             self.embedding_batch_queue.get(), timeout=0.05
                         )
                         batch_requests.append(request)
-                    except asyncio.TimeoutError:
+                    except TimeoutError:
                         break
 
                 if batch_requests:
@@ -537,7 +533,7 @@ class OptimizedPhase4Engine:
                             self.emotion_analysis_queue.get(), timeout=0.05
                         )
                         batch_requests.append(request)
-                    except asyncio.TimeoutError:
+                    except TimeoutError:
                         break
 
                 if batch_requests and SKLEARN_AVAILABLE:
@@ -563,7 +559,7 @@ class OptimizedPhase4Engine:
                             self.memory_search_queue.get(), timeout=0.05
                         )
                         batch_requests.append(request)
-                    except asyncio.TimeoutError:
+                    except TimeoutError:
                         break
 
                 if batch_requests and FAISS_AVAILABLE:
@@ -624,7 +620,7 @@ class OptimizedPhase4Engine:
 
     # Helper methods
 
-    async def _process_emotion_batch(self, batch_requests: List[Dict[str, Any]]):
+    async def _process_emotion_batch(self, batch_requests: list[dict[str, Any]]):
         """Process batch of emotion analysis requests"""
         try:
             if not batch_requests:
@@ -649,7 +645,7 @@ class OptimizedPhase4Engine:
         except Exception as e:
             self.logger.error(f"Emotion batch processing failed: {e}")
 
-    async def _process_memory_batch(self, batch_requests: List[Dict[str, Any]]):
+    async def _process_memory_batch(self, batch_requests: list[dict[str, Any]]):
         """Process batch of memory search requests"""
         try:
             if not batch_requests:
@@ -668,7 +664,7 @@ class OptimizedPhase4Engine:
         except Exception as e:
             self.logger.error(f"Memory batch processing failed: {e}")
 
-    async def _get_cached_memories(self, user_id: str, query: str) -> List[Dict[str, Any]]:
+    async def _get_cached_memories(self, user_id: str, query: str) -> list[dict[str, Any]]:
         """Get cached or quick memory results"""
         # Placeholder for cached memory retrieval
         return []
@@ -688,7 +684,7 @@ class OptimizedPhase4Engine:
 # Multiprocessing functions (must be at module level)
 
 
-def analyze_personality_multiprocess(user_id: str, message: str) -> Dict[str, Any]:
+def analyze_personality_multiprocess(user_id: str, message: str) -> dict[str, Any]:
     """CPU-intensive personality analysis for multiprocessing"""
     try:
         # Placeholder for comprehensive personality analysis
@@ -714,12 +710,12 @@ def analyze_personality_multiprocess(user_id: str, message: str) -> Dict[str, An
         return {"error": str(e)}
 
 
-def process_embedding_batch(batch_requests: List[Dict[str, Any]]) -> List[np.ndarray]:
+def process_embedding_batch(batch_requests: list[dict[str, Any]]) -> list[np.ndarray]:
     """Process batch of embedding requests with multiprocessing"""
     try:
         # Placeholder for batch embedding generation
         embeddings = []
-        for request in batch_requests:
+        for _request in batch_requests:
             # Generate embedding (placeholder)
             embedding = np.random.randn(768).astype(np.float32)
             embeddings.append(embedding)
@@ -731,7 +727,7 @@ def process_embedding_batch(batch_requests: List[Dict[str, Any]]) -> List[np.nda
         return []
 
 
-def process_emotion_batch_multiprocess(messages: List[str]) -> List[Dict[str, Any]]:
+def process_emotion_batch_multiprocess(messages: list[str]) -> list[dict[str, Any]]:
     """Process batch of emotion analysis with multiprocessing"""
     try:
         results = []
@@ -749,7 +745,7 @@ def process_emotion_batch_multiprocess(messages: List[str]) -> List[Dict[str, An
         return []
 
 
-def process_memory_batch_multiprocess(queries: List[str]) -> List[List[Dict[str, Any]]]:
+def process_memory_batch_multiprocess(queries: list[str]) -> list[list[dict[str, Any]]]:
     """Process batch of memory searches with multiprocessing"""
     try:
         # Placeholder for batch memory search
@@ -768,7 +764,7 @@ def process_memory_batch_multiprocess(queries: List[str]) -> List[List[Dict[str,
 
 # Factory function for production deployment
 def create_production_phase4_engine(
-    max_workers: Optional[int] = None, batch_size: int = 32, enable_multiprocessing: bool = True
+    max_workers: int | None = None, batch_size: int = 32, enable_multiprocessing: bool = True
 ) -> OptimizedPhase4Engine:
     """
     Create production-ready Phase 4 engine optimized for concurrent users

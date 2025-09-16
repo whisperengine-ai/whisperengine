@@ -4,20 +4,17 @@ Test script for macOS Native Window Management
 Demonstrates the window management capabilities we've implemented
 """
 
-import subprocess
-import time
-import sys
 import json
+import subprocess
+import sys
+import time
 from pathlib import Path
 
 
 def test_safari_integration():
     """Test Safari integration for window management"""
-    print("🪟 Testing Safari Integration")
-    print("=" * 40)
 
     # Test 1: Check if Safari is available
-    print("Test 1: Checking Safari availability...")
     try:
         script = """
         tell application "Safari"
@@ -26,13 +23,10 @@ def test_safari_integration():
         """
         result = subprocess.run(["osascript", "-e", script], capture_output=True, text=True)
         if result.returncode == 0:
-            version = result.stdout.strip()
-            print(f"✅ Safari available: {version}")
+            result.stdout.strip()
         else:
-            print(f"❌ Safari not available: {result.stderr}")
             return False
-    except Exception as e:
-        print(f"❌ Error checking Safari: {e}")
+    except Exception:
         return False
 
     return True
@@ -40,13 +34,10 @@ def test_safari_integration():
 
 def test_window_creation():
     """Test window creation capabilities"""
-    print("\n🪟 Testing Window Creation")
-    print("=" * 40)
 
     # Test URL for demonstration
     test_url = "http://127.0.0.1:8080"
 
-    print("Test 1: Creating new Safari window...")
     try:
         script = f"""
         tell application "Safari"
@@ -60,16 +51,14 @@ def test_window_creation():
         """
         result = subprocess.run(["osascript", "-e", script], capture_output=True, text=True)
         if result.returncode == 0:
-            bounds = result.stdout.strip()
-            print(f"✅ Window created with bounds: {bounds}")
+            result.stdout.strip()
         else:
-            print(f"❌ Failed to create window: {result.stderr}")
-    except Exception as e:
-        print(f"❌ Error creating window: {e}")
+            pass
+    except Exception:
+        pass
 
     time.sleep(2)
 
-    print("\nTest 2: Creating offset window...")
     try:
         script = f"""
         tell application "Safari"
@@ -81,20 +70,17 @@ def test_window_creation():
         """
         result = subprocess.run(["osascript", "-e", script], capture_output=True, text=True)
         if result.returncode == 0:
-            print("✅ Offset window created successfully")
+            pass
         else:
-            print(f"❌ Failed to create offset window: {result.stderr}")
-    except Exception as e:
-        print(f"❌ Error creating offset window: {e}")
+            pass
+    except Exception:
+        pass
 
 
 def test_window_controls():
     """Test window control operations"""
-    print("\n🎛️ Testing Window Controls")
-    print("=" * 40)
 
     # Test minimizing windows
-    print("Test 1: Minimizing windows...")
     try:
         script = """
         tell application "Safari"
@@ -107,16 +93,15 @@ def test_window_controls():
         """
         result = subprocess.run(["osascript", "-e", script], capture_output=True, text=True)
         if result.returncode == 0:
-            print("✅ Windows minimized")
+            pass
         else:
-            print(f"❌ Failed to minimize: {result.stderr}")
-    except Exception as e:
-        print(f"❌ Error minimizing: {e}")
+            pass
+    except Exception:
+        pass
 
     time.sleep(2)
 
     # Test restoring windows
-    print("\nTest 2: Restoring windows...")
     try:
         script = """
         tell application "Safari"
@@ -131,17 +116,15 @@ def test_window_controls():
         """
         result = subprocess.run(["osascript", "-e", script], capture_output=True, text=True)
         if result.returncode == 0:
-            print("✅ Windows restored")
+            pass
         else:
-            print(f"❌ Failed to restore: {result.stderr}")
-    except Exception as e:
-        print(f"❌ Error restoring: {e}")
+            pass
+    except Exception:
+        pass
 
 
 def test_window_positioning():
     """Test window positioning and sizing"""
-    print("\n📐 Testing Window Positioning")
-    print("=" * 40)
 
     positions = [
         (100, 100, 1100, 700),  # Top-left
@@ -149,8 +132,7 @@ def test_window_positioning():
         (150, 200, 1150, 800),  # Different size
     ]
 
-    for i, (x, y, width, height) in enumerate(positions, 1):
-        print(f"Test {i}: Setting window position to ({x}, {y}) size {width}x{height-y}...")
+    for _i, (x, y, width, height) in enumerate(positions, 1):
         try:
             script = f"""
             tell application "Safari"
@@ -162,22 +144,18 @@ def test_window_positioning():
             """
             result = subprocess.run(["osascript", "-e", script], capture_output=True, text=True)
             if result.returncode == 0:
-                bounds = result.stdout.strip()
-                print(f"✅ Position set, actual bounds: {bounds}")
+                result.stdout.strip()
             else:
-                print(f"❌ Failed to set position: {result.stderr}")
-        except Exception as e:
-            print(f"❌ Error setting position: {e}")
+                pass
+        except Exception:
+            pass
 
         time.sleep(1)
 
 
 def test_fullscreen_mode():
     """Test fullscreen toggle"""
-    print("\n🖥️ Testing Fullscreen Mode")
-    print("=" * 40)
 
-    print("Test 1: Entering fullscreen...")
     try:
         script = """
         tell application "Safari"
@@ -192,15 +170,14 @@ def test_fullscreen_mode():
         """
         result = subprocess.run(["osascript", "-e", script], capture_output=True, text=True)
         if result.returncode == 0:
-            print("✅ Entered fullscreen mode")
+            pass
         else:
-            print(f"❌ Failed to enter fullscreen: {result.stderr}")
-    except Exception as e:
-        print(f"❌ Error entering fullscreen: {e}")
+            pass
+    except Exception:
+        pass
 
     time.sleep(3)
 
-    print("\nTest 2: Exiting fullscreen...")
     try:
         script = """
         tell application "Safari"
@@ -215,19 +192,16 @@ def test_fullscreen_mode():
         """
         result = subprocess.run(["osascript", "-e", script], capture_output=True, text=True)
         if result.returncode == 0:
-            print("✅ Exited fullscreen mode")
+            pass
         else:
-            print(f"❌ Failed to exit fullscreen: {result.stderr}")
-    except Exception as e:
-        print(f"❌ Error exiting fullscreen: {e}")
+            pass
+    except Exception:
+        pass
 
 
 def test_window_enumeration():
     """Test window enumeration and information gathering"""
-    print("\n📋 Testing Window Enumeration")
-    print("=" * 40)
 
-    print("Test 1: Listing all Safari windows...")
     try:
         script = """
         tell application "Safari"
@@ -241,18 +215,15 @@ def test_window_enumeration():
         """
         result = subprocess.run(["osascript", "-e", script], capture_output=True, text=True)
         if result.returncode == 0:
-            windows_info = result.stdout.strip()
-            print(f"✅ Found windows: {windows_info}")
+            result.stdout.strip()
         else:
-            print(f"❌ Failed to enumerate windows: {result.stderr}")
-    except Exception as e:
-        print(f"❌ Error enumerating windows: {e}")
+            pass
+    except Exception:
+        pass
 
 
 def test_preference_management():
     """Test preference saving and loading"""
-    print("\n⚙️ Testing Preference Management")
-    print("=" * 40)
 
     # Create test preferences
     test_prefs = {
@@ -266,32 +237,27 @@ def test_preference_management():
 
     prefs_file = Path.home() / ".whisperengine" / "window_preferences.json"
 
-    print("Test 1: Saving preferences...")
     try:
         prefs_file.parent.mkdir(exist_ok=True)
         with open(prefs_file, "w") as f:
             json.dump(test_prefs, f, indent=2)
-        print("✅ Preferences saved")
-    except Exception as e:
-        print(f"❌ Failed to save preferences: {e}")
+    except Exception:
+        pass
 
-    print("\nTest 2: Loading preferences...")
     try:
-        with open(prefs_file, "r") as f:
+        with open(prefs_file) as f:
             loaded_prefs = json.load(f)
 
         if loaded_prefs == test_prefs:
-            print("✅ Preferences loaded correctly")
+            pass
         else:
-            print("❌ Preferences don't match")
-    except Exception as e:
-        print(f"❌ Failed to load preferences: {e}")
+            pass
+    except Exception:
+        pass
 
 
 def cleanup_test_windows():
     """Clean up test windows"""
-    print("\n🧹 Cleaning Up Test Windows")
-    print("=" * 40)
 
     try:
         script = """
@@ -305,41 +271,20 @@ def cleanup_test_windows():
         """
         result = subprocess.run(["osascript", "-e", script], capture_output=True, text=True)
         if result.returncode == 0:
-            print("✅ Test windows cleaned up")
+            pass
         else:
-            print(f"⚠️ Cleanup warning: {result.stderr}")
-    except Exception as e:
-        print(f"❌ Cleanup error: {e}")
+            pass
+    except Exception:
+        pass
 
 
 def show_window_management_capabilities():
     """Show window management capabilities"""
-    print("\n🚀 Native macOS Window Management Capabilities")
-    print("=" * 50)
-    print("✅ Safari-based window creation and management")
-    print("✅ Multi-window support for different conversations")
-    print("✅ Native window positioning and sizing")
-    print("✅ Minimize to dock functionality")
-    print("✅ Fullscreen mode toggle")
-    print("✅ Window enumeration and tracking")
-    print("✅ Preference management and persistence")
-    print("✅ Automatic window restoration")
-    print("✅ AppleScript-based native integration")
-    print("✅ Graceful cleanup and window management")
-    print("\n🎯 Features:")
-    print("  • Create new conversation windows")
-    print("  • Manage window positions and sizes")
-    print("  • Native macOS window controls")
-    print("  • Save and restore window layouts")
-    print("  • Multi-window conversation support")
 
 
 if __name__ == "__main__":
-    print("🪟 WhisperEngine Native macOS Window Management Test")
-    print("=" * 55)
 
     if sys.platform != "darwin":
-        print("❌ This test is only available on macOS")
         sys.exit(1)
 
     # Check command line arguments
@@ -353,7 +298,6 @@ if __name__ == "__main__":
 
     # Run full test suite
     if not test_safari_integration():
-        print("❌ Safari integration failed - skipping window tests")
         sys.exit(1)
 
     test_window_creation()
@@ -363,9 +307,5 @@ if __name__ == "__main__":
     test_window_enumeration()
     test_preference_management()
 
-    print("\n🎉 Window management test complete!")
-    print("All native macOS window management features are working.")
 
     # Ask if user wants to clean up
-    print("\nWould you like to clean up test windows? (they remain open for inspection)")
-    print("Run with --cleanup flag to clean up test windows.")

@@ -5,7 +5,6 @@ Manages conversation history with memory leak protection.
 
 import logging
 from collections import OrderedDict
-from typing import Dict, List
 
 logger = logging.getLogger(__name__)
 

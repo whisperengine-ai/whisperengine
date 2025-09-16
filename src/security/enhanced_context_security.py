@@ -12,9 +12,10 @@ SECURITY ENHANCEMENT: Addresses "Insufficient Context Boundaries" (CVSS 6.8)
 """
 
 import logging
-from typing import Dict, List, Optional, Any, Tuple
+from typing import Any
+
 from context_aware_memory_security import ContextAwareMemoryManager, MemoryContext
-from context_boundaries_security import get_context_boundaries_manager, ConsentStatus
+from context_boundaries_security import get_context_boundaries_manager
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +33,7 @@ class EnhancedContextAwareMemoryManager(ContextAwareMemoryManager):
 
     def retrieve_context_aware_memories(
         self, user_id: str, query: str, context: MemoryContext, limit: int = 10
-    ) -> List[Dict]:
+    ) -> list[dict]:
         """
         Enhanced memory retrieval with privacy controls and consent management
 
@@ -105,7 +106,7 @@ class EnhancedContextAwareMemoryManager(ContextAwareMemoryManager):
                 filtered_memories.append(
                     {
                         "id": "consent_required",
-                        "content": f"Additional information is available but requires your permission to share.",
+                        "content": "Additional information is available but requires your permission to share.",
                         "metadata": {
                             "is_consent_request": True,
                             "consent_requests": len(consent_requests),
@@ -127,8 +128,8 @@ class EnhancedContextAwareMemoryManager(ContextAwareMemoryManager):
         user_id: str,
         memory_context: MemoryContext,
         current_context: MemoryContext,
-        memory: Dict,
-    ) -> Dict[str, Any]:
+        memory: dict,
+    ) -> dict[str, Any]:
         """
         Check user privacy preferences for cross-context memory sharing
 
@@ -168,7 +169,7 @@ class EnhancedContextAwareMemoryManager(ContextAwareMemoryManager):
             # Default to requiring consent for safety
             return {"allowed": False, "reason": "error_safety_block", "requires_consent": True}
 
-    def _analyze_memory_sensitivity(self, memory: Dict) -> str:
+    def _analyze_memory_sensitivity(self, memory: dict) -> str:
         """
         Analyze memory content to determine sensitivity level
 
@@ -250,7 +251,7 @@ class EnhancedContextAwareMemoryManager(ContextAwareMemoryManager):
         user_id: str,
         user_message: str,
         bot_response: str,
-        context: Optional[MemoryContext] = None,
+        context: MemoryContext | None = None,
         **kwargs,
     ) -> None:
         """
@@ -295,8 +296,8 @@ class EnhancedContextAwareMemoryManager(ContextAwareMemoryManager):
             )
 
     def generate_consent_request_message(
-        self, user_id: str, consent_requests: List[Dict]
-    ) -> Optional[str]:
+        self, user_id: str, consent_requests: list[dict]
+    ) -> str | None:
         """
         Generate user-friendly consent request message for cross-context sharing
 
@@ -345,7 +346,7 @@ class EnhancedContextAwareMemoryManager(ContextAwareMemoryManager):
 
     def get_privacy_filtered_context_summary(
         self, user_id: str, context: MemoryContext
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Get summary of user's information in current context with privacy filtering
 
@@ -385,7 +386,7 @@ class EnhancedContextAwareMemoryManager(ContextAwareMemoryManager):
             logger.error(f"Error generating privacy-filtered context summary: {e}")
             return {"error": str(e), "user_id": user_id, "memories_available": 0}
 
-    def _generate_context_summary(self, memories: List[Dict]) -> str:
+    def _generate_context_summary(self, memories: list[dict]) -> str:
         """Generate a brief summary of available memories"""
         if not memories:
             return "No previous context available."

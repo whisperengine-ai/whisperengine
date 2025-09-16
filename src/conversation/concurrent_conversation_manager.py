@@ -5,18 +5,14 @@ Optimizes conversation thread handling for massive concurrent multi-user scenari
 
 import asyncio
 import logging
-import time
 import threading
+import time
 from collections import defaultdict, deque
-from typing import Dict, List, Optional, Any, Set, Tuple, Callable
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
-import weakref
-import hashlib
-import json
+from typing import Any
 
-import pandas as pd
 import numpy as np
 
 logger = logging.getLogger(__name__)
@@ -28,14 +24,14 @@ class ConversationSession:
 
     user_id: str
     channel_id: str
-    thread_id: Optional[str]
+    thread_id: str | None
     started_at: datetime
     last_activity: datetime
     message_count: int = 0
     processing_priority: int = 0
     is_active: bool = True
-    concurrent_users: Set[str] = field(default_factory=set)
-    context_cache: Dict[str, Any] = field(default_factory=dict)
+    concurrent_users: set[str] = field(default_factory=set)
+    context_cache: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -67,7 +63,7 @@ class ConversationQueue:
         self._lock = threading.RLock()
         self.total_items = 0
 
-    async def put(self, item: Dict[str, Any], priority: str = "normal"):
+    async def put(self, item: dict[str, Any], priority: str = "normal"):
         """Add item to appropriate priority queue"""
         with self._lock:
             if self.total_items >= self.max_size:
@@ -77,7 +73,7 @@ class ConversationQueue:
             self.queues[priority].append(item)
             self.total_items += 1
 
-    async def get(self) -> Optional[Dict[str, Any]]:
+    async def get(self) -> dict[str, Any] | None:
         """Get next item using weighted priority selection"""
         with self._lock:
             if self.total_items == 0:
@@ -130,7 +126,7 @@ class ConversationQueue:
                 if dropped >= drop_count:
                     break
 
-    def get_stats(self) -> Dict[str, int]:
+    def get_stats(self) -> dict[str, int]:
         """Get queue statistics"""
         with self._lock:
             return {priority: len(queue) for priority, queue in self.queues.items()}
@@ -171,8 +167,8 @@ class ConcurrentConversationManager:
         self.session_timeout = timedelta(minutes=session_timeout_minutes)
 
         # Session management
-        self.active_sessions: Dict[str, ConversationSession] = {}  # user_id -> session
-        self.channel_sessions: Dict[str, Set[str]] = defaultdict(set)  # channel_id -> user_ids
+        self.active_sessions: dict[str, ConversationSession] = {}  # user_id -> session
+        self.channel_sessions: dict[str, set[str]] = defaultdict(set)  # channel_id -> user_ids
 
         # Processing infrastructure
         self.conversation_queue = ConversationQueue(max_size=50000)
@@ -185,14 +181,14 @@ class ConcurrentConversationManager:
         self.message_timestamps: deque = deque(maxlen=1000)
 
         # Context caching for performance
-        self.context_cache: Dict[str, Any] = {}
-        self.cache_ttl: Dict[str, datetime] = {}
+        self.context_cache: dict[str, Any] = {}
+        self.cache_ttl: dict[str, datetime] = {}
         self.cache_max_size = 5000
         self.cache_ttl_seconds = 120
 
         # Background processing
         self.running = False
-        self.background_tasks: List[asyncio.Task] = []
+        self.background_tasks: list[asyncio.Task] = []
 
         # Thread safety
         self._session_lock = threading.RLock()
@@ -236,7 +232,7 @@ class ConcurrentConversationManager:
             await asyncio.wait_for(
                 asyncio.gather(*self.background_tasks, return_exceptions=True), timeout=5.0
             )
-        except asyncio.TimeoutError:
+        except TimeoutError:
             logger.warning("Background tasks didn't complete within timeout")
 
         # Shutdown thread pools
@@ -250,9 +246,9 @@ class ConcurrentConversationManager:
         user_id: str,
         message: str,
         channel_id: str = "default",
-        context: Optional[Dict[str, Any]] = None,
+        context: dict[str, Any] | None = None,
         priority: str = "normal",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Process conversation message with full concurrency optimization"""
 
         start_time = time.time()
@@ -290,7 +286,7 @@ class ConcurrentConversationManager:
             "session_id": task_data["session_id"],
         }
 
-    async def _process_message_immediate(self, task_data: Dict[str, Any]) -> Dict[str, Any]:
+    async def _process_message_immediate(self, task_data: dict[str, Any]) -> dict[str, Any]:
         """Process high-priority message immediately"""
 
         try:
@@ -373,7 +369,7 @@ class ConcurrentConversationManager:
                 logger.error(f"Error in conversation processor: {e}")
                 await asyncio.sleep(0.1)
 
-    def _process_conversation_sync(self, task_data: Dict[str, Any]) -> Dict[str, Any]:
+    def _process_conversation_sync(self, task_data: dict[str, Any]) -> dict[str, Any]:
         """Synchronous conversation processing for thread pool"""
 
         try:
@@ -443,7 +439,7 @@ class ConcurrentConversationManager:
             return session
 
     def _calculate_processing_priority(
-        self, session: ConversationSession, message: str, context: Dict[str, Any]
+        self, session: ConversationSession, message: str, context: dict[str, Any]
     ) -> int:
         """Calculate processing priority for conversation"""
 
@@ -490,7 +486,7 @@ class ConcurrentConversationManager:
 
         return min(float(estimated_wait), 30.0)  # Cap at 30 seconds
 
-    def _get_cached_context(self, context_key: str) -> Optional[Dict[str, Any]]:
+    def _get_cached_context(self, context_key: str) -> dict[str, Any] | None:
         """Get cached context if still valid"""
 
         with self._cache_lock:
@@ -506,7 +502,7 @@ class ConcurrentConversationManager:
 
             return self.context_cache[context_key]
 
-    def _cache_context(self, context_key: str, context_data: Dict[str, Any]):
+    def _cache_context(self, context_key: str, context_data: dict[str, Any]):
         """Cache context data with TTL"""
 
         with self._cache_lock:
@@ -528,7 +524,7 @@ class ConcurrentConversationManager:
             self.context_cache.pop(key, None)
             self.cache_ttl.pop(key, None)
 
-    def _get_session_context(self, user_id: str) -> Dict[str, Any]:
+    def _get_session_context(self, user_id: str) -> dict[str, Any]:
         """Get session context for user"""
 
         with self._session_lock:
@@ -547,7 +543,7 @@ class ConcurrentConversationManager:
                 "is_active_conversation": session.message_count > 1,
             }
 
-    def _update_session_result(self, user_id: str, result: Dict[str, Any]):
+    def _update_session_result(self, user_id: str, result: dict[str, Any]):
         """Update session with processing result"""
 
         with self._session_lock:
@@ -680,7 +676,7 @@ class ConcurrentConversationManager:
                 logger.error(f"Load balancer error: {e}")
                 await asyncio.sleep(10)
 
-    def get_performance_stats(self) -> Dict[str, Any]:
+    def get_performance_stats(self) -> dict[str, Any]:
         """Get comprehensive performance statistics"""
 
         queue_stats = self.conversation_queue.get_stats()

@@ -9,34 +9,27 @@ import sys
 
 async def test_streaming_components():
     """Test the streaming audio components"""
-    print("🧪 Testing Discord Streaming Audio Components...")
 
     try:
         # Test 1: Import check
-        print("📦 Testing imports...")
 
         try:
             from streaming_audio_source import (
-                stream_to_tempfile,
-                create_streaming_audio_source,
                 cleanup_streaming_audio,
+                create_streaming_audio_source,
+                stream_to_tempfile,
             )
 
-            print("✅ Streaming audio source imports successful")
-        except ImportError as e:
-            print(f"❌ Import failed: {e}")
+        except ImportError:
             return False
 
         try:
             import discord
 
-            print("✅ Discord.py import successful")
-        except ImportError as e:
-            print(f"❌ Discord.py import failed: {e}")
+        except ImportError:
             return False
 
         # Test 2: Mock streaming chunks
-        print("🌊 Testing chunk streaming to temp file...")
 
         async def mock_chunk_generator():
             """Generate mock audio chunks"""
@@ -48,8 +41,7 @@ async def test_streaming_components():
                 b"\x22" * 1000,  # Final audio data
             ]
 
-            for i, chunk in enumerate(chunks):
-                print(f"  📤 Yielding chunk {i+1}/{len(chunks)} ({len(chunk)} bytes)")
+            for _i, chunk in enumerate(chunks):
                 yield chunk
                 await asyncio.sleep(0.1)  # Simulate streaming delay
 
@@ -57,49 +49,39 @@ async def test_streaming_components():
         temp_path = await stream_to_tempfile(mock_chunk_generator())
 
         if os.path.exists(temp_path):
-            file_size = os.path.getsize(temp_path)
-            print(f"✅ Temp file created: {temp_path} ({file_size} bytes)")
+            os.path.getsize(temp_path)
 
             # Clean up
             cleanup_streaming_audio(temp_path)
 
             if not os.path.exists(temp_path):
-                print("✅ Temp file cleanup successful")
+                pass
             else:
-                print("⚠️  Temp file cleanup incomplete")
+                pass
         else:
-            print("❌ Temp file not created")
             return False
 
         # Test 3: Audio source creation (without actual playback)
-        print("🎵 Testing audio source creation...")
 
         try:
             audio_source, temp_path = await create_streaming_audio_source(mock_chunk_generator())
-            print(f"✅ Audio source created: {type(audio_source).__name__}")
 
             # Check if it's the right type
             if isinstance(audio_source, discord.FFmpegPCMAudio):
-                print("✅ Audio source is correct type (FFmpegPCMAudio)")
+                pass
             else:
-                print(f"⚠️  Audio source type unexpected: {type(audio_source)}")
+                pass
 
             # Clean up
             cleanup_streaming_audio(temp_path)
-            print("✅ Audio source cleanup successful")
 
-        except Exception as e:
-            print(f"❌ Audio source creation failed: {e}")
+        except Exception:
             return False
 
-        print("🎉 All streaming audio tests passed!")
         return True
 
-    except Exception as e:
-        print(f"❌ Test failed with exception: {e}")
-        import traceback
+    except Exception:
 
-        print(traceback.format_exc())
         return False
 
 

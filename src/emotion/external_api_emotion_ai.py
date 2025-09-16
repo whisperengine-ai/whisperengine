@@ -17,13 +17,13 @@ using multiple external API calls and advanced analysis techniques.
 """
 
 import asyncio
-import aiohttp
 import json
-import time
 import os
-from datetime import datetime, timezone
-from typing import Dict, List, Any, Optional, Union
+import time
 from dataclasses import dataclass
+from typing import Any
+
+import aiohttp
 
 # Import embedding manager for external embedding-based emotion analysis
 from src.utils.embedding_manager import ExternalEmbeddingManager
@@ -58,9 +58,9 @@ class ExternalAPIEmotionAI:
     def __init__(
         self,
         llm_client=None,
-        llm_api_url: Optional[str] = None,  # Deprecated, kept for compatibility
-        openai_api_key: Optional[str] = None,
-        huggingface_api_key: Optional[str] = None,  # Deprecated but kept for compatibility
+        llm_api_url: str | None = None,  # Deprecated, kept for compatibility
+        openai_api_key: str | None = None,
+        huggingface_api_key: str | None = None,  # Deprecated but kept for compatibility
         logger=None,
     ):
 
@@ -160,9 +160,9 @@ class ExternalAPIEmotionAI:
     async def analyze_emotion_cloud(
         self,
         text: str,
-        user_id: Optional[str] = None,
-        conversation_history: Optional[List[str]] = None,
-    ) -> Dict[str, Any]:
+        user_id: str | None = None,
+        conversation_history: list[str] | None = None,
+    ) -> dict[str, Any]:
         """
         Analyze emotion using external APIs with full capabilities
         """
@@ -208,9 +208,9 @@ class ExternalAPIEmotionAI:
     async def _analyze_full_capabilities(
         self,
         text: str,
-        user_id: Optional[str] = None,
-        conversation_history: Optional[List[str]] = None,
-    ) -> Dict[str, Any]:
+        user_id: str | None = None,
+        conversation_history: list[str] | None = None,
+    ) -> dict[str, Any]:
         """
         Full capabilities emotion analysis - Multiple API calls + advanced linguistic analysis
         Maximum accuracy with comprehensive emotional intelligence
@@ -286,7 +286,7 @@ class ExternalAPIEmotionAI:
             "detected_emotions_count": len(fused_emotions.get("all_emotions", {})),
         }
 
-    async def _call_lm_studio_emotion(self, text: str) -> Optional[Dict]:
+    async def _call_lm_studio_emotion(self, text: str) -> dict | None:
         """Simple emotion analysis via LLM provider"""
 
         prompt = f"""Analyze the emotion in this text and respond with ONLY a JSON object:
@@ -351,7 +351,7 @@ Response format:
 
         return None
 
-    async def _call_lm_studio_emotion_detailed(self, text: str) -> Dict:
+    async def _call_lm_studio_emotion_detailed(self, text: str) -> dict:
         """Detailed emotion analysis via LLM provider"""
 
         prompt = f"""Analyze the emotions in this text. Provide a detailed emotional breakdown.
@@ -438,7 +438,7 @@ Respond with ONLY a JSON object:
         # Fallback to keywords
         return self._analyze_with_keywords(text)
 
-    async def _call_external_sentiment_api(self, text: str) -> Dict:
+    async def _call_external_sentiment_api(self, text: str) -> dict:
         """Call external sentiment analysis API (Hugging Face as example)"""
 
         if not self.huggingface_api_key:
@@ -468,7 +468,7 @@ Respond with ONLY a JSON object:
 
         return {"label": "UNKNOWN", "score": 0.5}
 
-    async def _call_embedding_emotion_analysis(self, text: str) -> Optional[Dict]:
+    async def _call_embedding_emotion_analysis(self, text: str) -> dict | None:
         """Use external embeddings for emotion analysis via semantic similarity"""
 
         try:
@@ -524,7 +524,7 @@ Respond with ONLY a JSON object:
                     similarities = []
                     for ref_vec in ref_embeddings:
                         # Cosine similarity
-                        dot_product = sum(a * b for a, b in zip(text_vec, ref_vec))
+                        dot_product = sum(a * b for a, b in zip(text_vec, ref_vec, strict=False))
                         magnitude_text = sum(a * a for a in text_vec) ** 0.5
                         magnitude_ref = sum(a * a for a in ref_vec) ** 0.5
 
@@ -562,7 +562,7 @@ Respond with ONLY a JSON object:
                 self.logger.warning(f"Embedding-based emotion analysis failed: {e}")
             return None
 
-    def _analyze_with_keywords(self, text: str) -> Dict[str, Any]:
+    def _analyze_with_keywords(self, text: str) -> dict[str, Any]:
         """Enhanced keyword-based emotion analysis (no API calls)"""
 
         text_lower = text.lower()
@@ -645,7 +645,7 @@ Respond with ONLY a JSON object:
             "all_emotions": emotion_scores,
         }
 
-    def _fuse_emotion_results(self, emotion_sources: List[tuple]) -> Dict:
+    def _fuse_emotion_results(self, emotion_sources: list[tuple]) -> dict:
         """Fuse emotion results from multiple sources with weighted averaging"""
 
         # Source weights (can be adjusted based on reliability)
@@ -736,7 +736,7 @@ Respond with ONLY a JSON object:
         return combined_intensity
 
     def _calculate_emotional_intensity_advanced(
-        self, text: str, base_confidence: float, linguistic_features: Dict
+        self, text: str, base_confidence: float, linguistic_features: dict
     ) -> float:
         """Advanced emotional intensity calculation using linguistic features"""
 
@@ -756,7 +756,7 @@ Respond with ONLY a JSON object:
 
         return min(base_intensity + linguistic_boost, 1.0)
 
-    def _analyze_linguistic_features(self, text: str) -> Dict[str, Any]:
+    def _analyze_linguistic_features(self, text: str) -> dict[str, Any]:
         """Analyze linguistic features for advanced emotion detection"""
 
         return {
@@ -774,8 +774,8 @@ Respond with ONLY a JSON object:
         }
 
     async def _analyze_conversation_context_light(
-        self, user_id: str, conversation_history: List[str]
-    ) -> Optional[Dict]:
+        self, user_id: str, conversation_history: list[str]
+    ) -> dict | None:
         """Light conversation context analysis (minimal API calls)"""
 
         if not conversation_history or len(conversation_history) < 2:
@@ -800,8 +800,8 @@ Respond with ONLY a JSON object:
         return None
 
     async def _analyze_conversation_context_heavy(
-        self, user_id: str, conversation_history: List[str]
-    ) -> Optional[Dict]:
+        self, user_id: str, conversation_history: list[str]
+    ) -> dict | None:
         """Heavy conversation context analysis (multiple API calls)"""
 
         light_context = await self._analyze_conversation_context_light(
@@ -908,7 +908,7 @@ Respond with ONLY a JSON object:
                 )
 
     def build_cloud_emotional_prompt(
-        self, emotion_analysis: Dict, phase3_context: Optional[Dict] = None
+        self, emotion_analysis: dict, phase3_context: dict | None = None
     ) -> str:
         """Build emotional system prompt optimized for cloud deployment"""
 
@@ -917,10 +917,10 @@ Respond with ONLY a JSON object:
         intensity = emotion_analysis.get("intensity", 0.5)
         api_calls = emotion_analysis.get("api_calls_made", 3)
 
-        prompt = f"You are an advanced emotionally intelligent AI companion with comprehensive emotional analysis.\n\n"
+        prompt = "You are an advanced emotionally intelligent AI companion with comprehensive emotional analysis.\n\n"
 
         # Add emotion analysis details
-        prompt += f"EMOTION ANALYSIS (Full Capabilities):\n"
+        prompt += "EMOTION ANALYSIS (Full Capabilities):\n"
         prompt += f"- Primary emotion: {primary_emotion} (confidence: {confidence:.2f})\n"
         prompt += f"- Emotional intensity: {intensity:.2f}/1.0\n"
         prompt += f"- Analysis: Full capabilities ({api_calls} API calls)\n"
@@ -985,7 +985,7 @@ Respond with ONLY a JSON object:
 
         return prompt
 
-    def get_performance_stats(self) -> Dict[str, Any]:
+    def get_performance_stats(self) -> dict[str, Any]:
         """Get comprehensive performance statistics"""
 
         avg_analysis_time = (

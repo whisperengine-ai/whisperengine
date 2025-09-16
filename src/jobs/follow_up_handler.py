@@ -6,9 +6,7 @@ Handler for scheduling and executing follow-up messages to users.
 """
 
 import logging
-import asyncio
-from datetime import datetime, timezone, timedelta
-from typing import Dict, Any, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +24,7 @@ class FollowUpHandler:
         self.bot_client = bot_client
         logger.info("Bot client set for FollowUpHandler")
 
-    async def execute(self, payload: Dict[str, Any]):
+    async def execute(self, payload: dict[str, Any]):
         """Execute a follow-up message job"""
         try:
             user_id = payload.get("user_id")
@@ -86,8 +84,8 @@ class FollowUpHandler:
             async with self.postgres_pool.acquire() as conn:
                 result = await conn.fetchval(
                     """
-                    SELECT follow_ups_enabled 
-                    FROM user_profiles 
+                    SELECT follow_ups_enabled
+                    FROM user_profiles
                     WHERE user_id = $1
                 """,
                     user_id,
@@ -109,8 +107,8 @@ async def initialize_follow_up_schema(postgres_pool):
             table_exists = await conn.fetchval(
                 """
                 SELECT EXISTS (
-                    SELECT FROM information_schema.tables 
-                    WHERE table_schema = 'public' 
+                    SELECT FROM information_schema.tables
+                    WHERE table_schema = 'public'
                     AND table_name = 'user_profiles'
                 )
             """
@@ -134,9 +132,9 @@ async def initialize_follow_up_schema(postgres_pool):
                 column_exists = await conn.fetchval(
                     """
                     SELECT EXISTS (
-                        SELECT FROM information_schema.columns 
-                        WHERE table_schema = 'public' 
-                        AND table_name = 'user_profiles' 
+                        SELECT FROM information_schema.columns
+                        WHERE table_schema = 'public'
+                        AND table_name = 'user_profiles'
                         AND column_name = 'follow_ups_enabled'
                     )
                 """
@@ -146,7 +144,7 @@ async def initialize_follow_up_schema(postgres_pool):
                     # Add the follow_ups_enabled column
                     await conn.execute(
                         """
-                        ALTER TABLE user_profiles 
+                        ALTER TABLE user_profiles
                         ADD COLUMN follow_ups_enabled BOOLEAN DEFAULT TRUE
                     """
                     )
@@ -155,7 +153,7 @@ async def initialize_follow_up_schema(postgres_pool):
             # Create index for better performance (IF NOT EXISTS handles existing indexes)
             await conn.execute(
                 """
-                CREATE INDEX IF NOT EXISTS idx_user_profiles_follow_ups 
+                CREATE INDEX IF NOT EXISTS idx_user_profiles_follow_ups
                 ON user_profiles(user_id, follow_ups_enabled)
             """
             )

@@ -4,7 +4,7 @@ Clean up inappropriate facts from the memory system
 """
 import logging
 import re
-from typing import List
+
 from memory_manager import UserMemoryManager
 
 # Configure logging
@@ -147,7 +147,6 @@ def clean_all_users(memory_manager: UserMemoryManager) -> int:
 
 def main():
     """Main function to clean up bad facts"""
-    print("🧹 Cleaning up inappropriate facts from memory system...")
 
     try:
         # Initialize memory manager
@@ -159,16 +158,11 @@ def main():
         user_input = input("Enter user ID to clean (or 'all' for all users): ").strip()
 
         if user_input.lower() == "all":
-            total_removed = clean_all_users(memory_manager)
-            print(f"\n✅ Cleanup complete! Removed {total_removed} inappropriate facts.")
+            clean_all_users(memory_manager)
         else:
-            removed = clean_user_facts(memory_manager, user_input)
-            print(
-                f"\n✅ Cleanup complete! Removed {removed} inappropriate facts for user {user_input}."
-            )
+            clean_user_facts(memory_manager, user_input)
 
-    except Exception as e:
-        print(f"❌ Error during cleanup: {e}")
+    except Exception:
         return 1
 
     return 0

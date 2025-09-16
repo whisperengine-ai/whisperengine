@@ -4,10 +4,10 @@ Enhanced Bot Core with Datastore Abstraction
 Integrates the datastore factory for unified component management
 """
 
-import os
 import logging
+import os
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Any
 
 from src.core.bot import DiscordBotCore
 from src.database.simple_datastore_factory import create_simple_datastore_factory
@@ -78,8 +78,8 @@ class EnhancedBotCore:
         """Initialize minimal components when full initialization fails"""
         try:
             # Import required components
-            from src.llm.llm_client import LLMClient
             from src.llm.concurrent_llm_manager import ConcurrentLLMManager
+            from src.llm.llm_client import LLMClient
 
             # Initialize basic LLM client first
             if not self.base_bot_core.llm_client:
@@ -104,9 +104,7 @@ class EnhancedBotCore:
             # Create a safe memory manager reference (handle type mismatch)
             if not self.base_bot_core.safe_memory_manager:
                 # Use setattr to bypass type checking
-                setattr(
-                    self.base_bot_core, "safe_memory_manager", self.base_bot_core.memory_manager
-                )
+                self.base_bot_core.safe_memory_manager = self.base_bot_core.memory_manager
                 logger.info("✅ Safe memory manager reference created")
 
         except Exception as e:
@@ -191,7 +189,7 @@ class EnhancedBotCore:
         """Get the Discord bot instance"""
         return self.base_bot_core.get_bot()
 
-    def get_components(self) -> Dict[str, Any]:
+    def get_components(self) -> dict[str, Any]:
         """Get all bot components including datastore components"""
         base_components = self.base_bot_core.get_components()
 
@@ -207,7 +205,7 @@ class EnhancedBotCore:
 
         return enhanced_components
 
-    def get_datastore_info(self) -> Dict[str, Any]:
+    def get_datastore_info(self) -> dict[str, Any]:
         """Get information about datastore configuration"""
         if self.datastore_factory:
             return self.datastore_factory.get_availability_info()
@@ -269,7 +267,7 @@ class EnhancedBotCore:
             for component in self.datastore_components.values():
                 if hasattr(component, "close"):
                     try:
-                        if hasattr(component.close, "__call__"):
+                        if callable(component.close):
                             await component.close()
                     except Exception as e:
                         logger.warning(f"Error closing datastore component: {e}")

@@ -4,11 +4,10 @@ Desktop App LLM Integration Manager
 Seamlessly integrates local LLM detection and configuration into the desktop app startup process.
 """
 
-import asyncio
 import logging
 import os
-from typing import Dict, Any, Optional
 from pathlib import Path
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +20,7 @@ class DesktopLLMManager:
         self.fallback_to_cloud = True
         self.setup_guidance_enabled = True
 
-    async def initialize_llm_for_desktop(self) -> Dict[str, Any]:
+    async def initialize_llm_for_desktop(self) -> dict[str, Any]:
         """Initialize and configure LLM for desktop app"""
         logger.info("🤖 Initializing LLM for desktop app...")
 
@@ -114,7 +113,7 @@ class DesktopLLMManager:
 
         return False
 
-    def _get_current_config(self) -> Dict[str, str]:
+    def _get_current_config(self) -> dict[str, str]:
         """Get current LLM configuration from environment"""
         return {
             "LLM_CHAT_API_URL": os.getenv("LLM_CHAT_API_URL", ""),
@@ -149,14 +148,14 @@ class DesktopLLMManager:
             logger.error(f"Failed to apply server configuration: {e}")
             return False
 
-    async def _setup_cloud_fallback(self) -> Optional[Dict[str, str]]:
+    async def _setup_cloud_fallback(self) -> dict[str, str] | None:
         """Setup cloud API fallback configuration"""
         # For now, just provide guidance - don't auto-configure cloud APIs
         # as they require user API keys
         logger.info("🌐 Cloud fallback available - setup guidance provided")
         return None
 
-    async def validate_current_configuration(self) -> Dict[str, Any]:
+    async def validate_current_configuration(self) -> dict[str, Any]:
         """Validate the current LLM configuration"""
         try:
             from src.llm.llm_client import LLMClient
@@ -204,7 +203,7 @@ class DesktopLLMManager:
             logger.error(f"❌ Configuration validation error: {e}")
             return {"is_valid": False, "error": str(e), "service_name": "Validation Failed"}
 
-    def get_setup_guidance_for_ui(self, setup_recommendation) -> Dict[str, Any]:
+    def get_setup_guidance_for_ui(self, setup_recommendation) -> dict[str, Any]:
         """Format setup guidance for display in desktop app UI"""
         if not setup_recommendation:
             return {}
@@ -250,13 +249,13 @@ class DesktopLLMManager:
 
 
 # Factory function for easy integration
-async def initialize_desktop_llm() -> Dict[str, Any]:
+async def initialize_desktop_llm() -> dict[str, Any]:
     """Initialize LLM for desktop app - convenience function"""
     manager = DesktopLLMManager()
     return await manager.initialize_llm_for_desktop()
 
 
-async def configure_llamacpp_for_desktop() -> Dict[str, Any]:
+async def configure_llamacpp_for_desktop() -> dict[str, Any]:
     """Configure llama-cpp-python for desktop app"""
     logger.info("🔧 Configuring llama-cpp-python for desktop app...")
 
@@ -319,7 +318,7 @@ async def configure_llamacpp_for_desktop() -> Dict[str, Any]:
 
 
 # Validation function for UI
-async def validate_desktop_llm() -> Dict[str, Any]:
+async def validate_desktop_llm() -> dict[str, Any]:
     """Validate current LLM configuration - convenience function"""
     manager = DesktopLLMManager()
     return await manager.validate_current_configuration()

@@ -4,11 +4,11 @@ Quick setup script for llama-cpp-python integration
 Downloads a small test model and configures WhisperEngine to use it
 """
 
+import logging
 import os
 import sys
 import urllib.request
 from pathlib import Path
-import logging
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -30,22 +30,18 @@ def download_test_model():
 
     logger.info(f"📥 Downloading test model: {model_filename}")
     logger.info(f"   URL: {model_url}")
-    logger.info(f"   Size: ~650MB (this may take a few minutes)")
+    logger.info("   Size: ~650MB (this may take a few minutes)")
 
     try:
 
         def progress_hook(block_num, block_size, total_size):
             downloaded = block_num * block_size
             if total_size > 0:
-                percent = min(100, (downloaded * 100) // total_size)
-                mb_downloaded = downloaded // (1024 * 1024)
-                mb_total = total_size // (1024 * 1024)
-                print(
-                    f"\r   Progress: {percent}% ({mb_downloaded}/{mb_total} MB)", end="", flush=True
-                )
+                min(100, (downloaded * 100) // total_size)
+                downloaded // (1024 * 1024)
+                total_size // (1024 * 1024)
 
         urllib.request.urlretrieve(model_url, model_path, progress_hook)
-        print()  # New line after progress
         logger.info(f"✅ Download complete: {model_path}")
         return str(model_path)
 
@@ -64,7 +60,7 @@ def configure_environment(model_path):
 
     # Read existing .env if it exists
     if env_file.exists():
-        with open(env_file, "r") as f:
+        with open(env_file) as f:
             env_lines = f.readlines()
 
     # Update or add llamacpp configuration
@@ -129,8 +125,6 @@ def test_integration():
 
 
 def main():
-    print("🚀 WhisperEngine llama-cpp-python Quick Setup")
-    print("=" * 50)
 
     # Check installation
     if not verify_installation():
@@ -148,17 +142,6 @@ def main():
     if not test_integration():
         return 1
 
-    print("\n🎉 Setup complete! llama-cpp-python is ready to use.")
-    print("\nNext steps:")
-    print("1. Start WhisperEngine:")
-    print("   source .venv/bin/activate && python universal_native_app.py")
-    print("   OR (Discord bot):")
-    print("   source .venv/bin/activate && python run.py")
-    print("\n2. The AI will now use the optimized llama-cpp-python backend!")
-    print("\n3. Benefits you'll notice:")
-    print("   • Faster responses")
-    print("   • Lower memory usage")
-    print("   • No internet required")
 
     return 0
 

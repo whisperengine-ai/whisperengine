@@ -4,10 +4,8 @@ Simple test for Discord bot enhancements without ChromaDB
 Tests time awareness and fact extraction patterns
 """
 
-import sys
 import os
-import logging
-from datetime import datetime, timezone
+import sys
 
 # Add the project root to the path
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
@@ -15,21 +13,15 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 def test_time_awareness():
     """Test the time awareness functionality"""
-    print("🕐 Testing Time Awareness")
-    print("=" * 40)
 
     # Import and test time context
     from basic_discord_bot import get_current_time_context
 
-    time_context = get_current_time_context()
-    print(f"✅ Current time context: {time_context}")
-    print()
+    get_current_time_context()
 
 
 def test_fact_extraction_patterns():
     """Test enhanced fact extraction patterns"""
-    print("👤 Testing Enhanced Fact Extraction Patterns")
-    print("=" * 50)
 
     from fact_extractor import FactExtractor, GlobalFactExtractor
 
@@ -44,22 +36,16 @@ def test_fact_extraction_patterns():
         "My handle is DevCoder and I stream on Twitch sometimes",
     ]
 
-    print("User-specific facts:")
-    for i, message in enumerate(test_messages, 1):
-        print(f"\nTest {i}: {message}")
+    for _i, message in enumerate(test_messages, 1):
         facts = user_extractor.extract_facts_from_message(message)
 
         if facts:
-            for fact in facts:
-                print(
-                    f"  ✅ {fact['fact']} (Category: {fact['category']}, Confidence: {fact['confidence']:.2f})"
-                )
+            for _fact in facts:
+                pass
         else:
-            print("  ❌ No facts extracted")
+            pass
 
     # Test global facts
-    print("\n" + "=" * 50)
-    print("Global facts:")
 
     global_extractor = GlobalFactExtractor()
 
@@ -73,22 +59,16 @@ def test_fact_extraction_patterns():
         ("GitHub is where developers store code", "GitHub was acquired by Microsoft in 2018"),
     ]
 
-    for i, (user_msg, bot_response) in enumerate(test_conversations, 1):
-        print(f"\nTest {i}:")
-        print(f"  User: {user_msg}")
-        print(f"  Bot: {bot_response}")
+    for _i, (user_msg, bot_response) in enumerate(test_conversations, 1):
 
         facts = global_extractor.extract_global_facts_from_message(user_msg, bot_response)
 
         if facts:
-            for fact in facts:
-                print(
-                    f"  ✅ {fact['fact']} (Category: {fact['category']}, Confidence: {fact['confidence']:.2f})"
-                )
+            for _fact in facts:
+                pass
         else:
-            print("  ❌ No global facts extracted")
+            pass
 
-    print()
 
 
 class MockDiscordUser:
@@ -105,8 +85,6 @@ class MockDiscordUser:
 
 def test_discord_user_functions():
     """Test Discord user utility functions"""
-    print("📱 Testing Discord User Functions")
-    print("=" * 40)
 
     # Create a mock memory manager that doesn't use ChromaDB
     class MockMemoryManager:
@@ -115,9 +93,8 @@ def test_discord_user_functions():
 
         def store_global_fact(self, fact, context, added_by):
             self.stored_facts.append({"fact": fact, "context": context, "added_by": added_by})
-            print(f"  📝 Stored: {fact}")
 
-    from basic_discord_bot import store_discord_user_info, store_discord_server_info
+    from basic_discord_bot import store_discord_user_info
 
     mock_memory = MockMemoryManager()
 
@@ -129,28 +106,20 @@ def test_discord_user_functions():
     ]
 
     for user in users:
-        print(f"\nTesting user: {user} (Display: {user.display_name})")
         store_discord_user_info(user, mock_memory)
 
-    print(f"\n✅ Total facts stored: {len(mock_memory.stored_facts)}")
-    print()
 
 
 def main():
     """Run all tests"""
-    print("🧪 Testing Discord Bot Enhancements (Pattern Testing)")
-    print("=" * 60)
-    print()
 
     try:
         test_time_awareness()
         test_fact_extraction_patterns()
         test_discord_user_functions()
 
-        print("✅ All tests completed successfully!")
 
-    except Exception as e:
-        print(f"❌ Error during testing: {e}")
+    except Exception:
         import traceback
 
         traceback.print_exc()

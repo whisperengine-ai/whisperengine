@@ -5,11 +5,9 @@ Addresses: Resource leaks, improper async handling, shutdown issues
 
 import asyncio
 import logging
-import aiohttp
-import threading
-from typing import Dict, Optional, Set
 from contextlib import asynccontextmanager
-import weakref
+
+import aiohttp
 
 logger = logging.getLogger(__name__)
 
@@ -18,10 +16,10 @@ class AsyncResourceManager:
     """Manages async resources with proper lifecycle and cleanup"""
 
     def __init__(self):
-        self._sessions: Dict[str, aiohttp.ClientSession] = {}
-        self._session_locks: Dict[str, asyncio.Lock] = {}
+        self._sessions: dict[str, aiohttp.ClientSession] = {}
+        self._session_locks: dict[str, asyncio.Lock] = {}
         self._session_locks_manager = asyncio.Lock()
-        self._active_requests: Set[asyncio.Task] = set()
+        self._active_requests: set[asyncio.Task] = set()
         self._cleanup_callbacks = []
         self._shutdown_event = asyncio.Event()
 
@@ -89,7 +87,7 @@ class AsyncResourceManager:
             )
             logger.info("All requests completed")
             return True
-        except asyncio.TimeoutError:
+        except TimeoutError:
             logger.warning(f"Some requests did not complete within {timeout}s")
             # Cancel remaining requests
             for task in self._active_requests:
@@ -138,7 +136,7 @@ class AsyncResourceManager:
 
 
 # Global instance
-_resource_manager: Optional[AsyncResourceManager] = None
+_resource_manager: AsyncResourceManager | None = None
 
 
 def get_resource_manager() -> AsyncResourceManager:

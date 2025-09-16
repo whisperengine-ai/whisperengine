@@ -2,10 +2,10 @@
 Test configuration and fixtures for the WhisperEngine project
 """
 
-import pytest
 import os
 import tempfile
-from unittest.mock import patch
+
+import pytest
 
 # Use centralized environment management instead of direct dotenv
 from env_manager import load_environment

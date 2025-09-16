@@ -11,11 +11,10 @@ cross-context information leakage between:
 SECURITY ISSUE ADDRESSED: Cross-Context Memory Leakage (CVSS 8.5)
 """
 
-import logging
-from enum import Enum
-from typing import Dict, List, Optional, Set, Tuple
-from dataclasses import dataclass
 import hashlib
+import logging
+from dataclasses import dataclass
+from enum import Enum
 
 logger = logging.getLogger(__name__)
 
@@ -43,8 +42,8 @@ class MemoryContext:
     """Represents the context of a memory interaction"""
 
     context_type: MemoryContextType
-    server_id: Optional[str] = None  # Guild/Server ID (None for DMs)
-    channel_id: Optional[str] = None  # Channel ID
+    server_id: str | None = None  # Guild/Server ID (None for DMs)
+    channel_id: str | None = None  # Channel ID
     is_private: bool = True  # Default to private for safety
     security_level: ContextSecurity = ContextSecurity.PRIVATE_DM  # Default, may be overridden
 
@@ -194,7 +193,7 @@ class ContextAwareMemoryManager:
 
         return f"ctx_{context_hash}"
 
-    def get_compatible_contexts(self, current_context: MemoryContext) -> List[ContextSecurity]:
+    def get_compatible_contexts(self, current_context: MemoryContext) -> list[ContextSecurity]:
         """
         Get list of context security levels that are compatible with current context
 
@@ -210,7 +209,7 @@ class ContextAwareMemoryManager:
 
     def retrieve_context_aware_memories(
         self, user_id: str, query: str, context: MemoryContext, limit: int = 10
-    ) -> List[Dict]:
+    ) -> list[dict]:
         """
         Retrieve memories with context-aware security filtering
 
@@ -259,7 +258,7 @@ class ContextAwareMemoryManager:
             # Fallback to most restrictive filtering
             return self._emergency_safe_retrieval(user_id, query, context, limit)
 
-    def _get_memory_context(self, memory: Dict) -> MemoryContext:
+    def _get_memory_context(self, memory: dict) -> MemoryContext:
         """
         Extract context information from stored memory
 
@@ -298,7 +297,7 @@ class ContextAwareMemoryManager:
         self,
         memory_context: MemoryContext,
         current_context: MemoryContext,
-        compatible_levels: List[ContextSecurity],
+        compatible_levels: list[ContextSecurity],
     ) -> bool:
         """
         Check if memory context is compatible with current context
@@ -339,7 +338,7 @@ class ContextAwareMemoryManager:
 
     def _emergency_safe_retrieval(
         self, user_id: str, query: str, context: MemoryContext, limit: int
-    ) -> List[Dict]:
+    ) -> list[dict]:
         """
         Emergency fallback that only returns the safest memories
 
@@ -374,7 +373,7 @@ class ContextAwareMemoryManager:
             logger.error(f"Emergency safe retrieval failed: {e}")
             return []  # Return empty rather than risk data leakage
 
-    def enhance_memory_with_context(self, memory_data: Dict, context: MemoryContext) -> Dict:
+    def enhance_memory_with_context(self, memory_data: dict, context: MemoryContext) -> dict:
         """
         Add context metadata to memory before storage
 
@@ -407,8 +406,8 @@ class ContextAwareMemoryManager:
     # ========================================
 
     def retrieve_relevant_memories(
-        self, user_id: str, query: str, limit: int = 10, context: Optional[MemoryContext] = None
-    ) -> List[Dict]:
+        self, user_id: str, query: str, limit: int = 10, context: MemoryContext | None = None
+    ) -> list[dict]:
         """
         Drop-in replacement for base memory manager with context awareness
 
@@ -434,7 +433,7 @@ class ContextAwareMemoryManager:
         user_id: str,
         user_message: str,
         bot_response: str,
-        context: Optional[MemoryContext] = None,
+        context: MemoryContext | None = None,
         **kwargs,
     ) -> None:
         """

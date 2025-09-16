@@ -5,14 +5,14 @@ This module extends the existing emotion manager to optionally sync with
 a graph database while preserving all existing functionality.
 """
 
-import os
-import logging
 import asyncio
-from typing import Dict, List, Optional, Tuple, Any
+import logging
+import os
 from datetime import datetime
+from typing import Any
 
-from src.utils.emotion_manager import EmotionManager, UserProfile, EmotionProfile, RelationshipLevel
-from src.graph_database.neo4j_connector import get_neo4j_connector, Neo4jConnector
+from src.graph_database.neo4j_connector import Neo4jConnector, get_neo4j_connector
+from src.utils.emotion_manager import EmotionManager, EmotionProfile, RelationshipLevel, UserProfile
 
 logger = logging.getLogger(__name__)
 
@@ -33,15 +33,15 @@ class GraphIntegratedEmotionManager(EmotionManager):
         self.sync_interval = int(os.getenv("EMOTION_GRAPH_SYNC_INTERVAL", "10"))
 
         # Graph connection (lazy loaded)
-        self._graph_connector: Optional[Neo4jConnector] = None
+        self._graph_connector: Neo4jConnector | None = None
         self._graph_available = None  # Cache availability check
-        self._last_relationship_levels: Dict[str, RelationshipLevel] = {}
+        self._last_relationship_levels: dict[str, RelationshipLevel] = {}
 
         logger.info(
             f"Graph integration: enabled={self.enable_graph_sync}, mode={self.graph_sync_mode}"
         )
 
-    async def _get_graph_connector(self) -> Optional[Neo4jConnector]:
+    async def _get_graph_connector(self) -> Neo4jConnector | None:
         """Get graph connector with lazy loading and caching"""
         if not self.enable_graph_sync:
             return None
@@ -67,8 +67,8 @@ class GraphIntegratedEmotionManager(EmotionManager):
                 raise
 
     def process_interaction_enhanced(
-        self, user_id: str, message: str, display_name: Optional[str] = None
-    ) -> Tuple[UserProfile, EmotionProfile]:
+        self, user_id: str, message: str, display_name: str | None = None
+    ) -> tuple[UserProfile, EmotionProfile]:
         """Enhanced process_interaction with optional graph sync"""
 
         # Use existing emotion analysis system (preserve all functionality)
@@ -123,7 +123,7 @@ class GraphIntegratedEmotionManager(EmotionManager):
                     timestamp: datetime(),
                     resolved: false
                 })
-                
+
                 WITH ec
                 MATCH (u:User {id: $user_id})
                 CREATE (u)-[:EXPERIENCED {
@@ -178,7 +178,7 @@ class GraphIntegratedEmotionManager(EmotionManager):
                     """
                     MATCH (u:User {id: $user_id})
                     MERGE (bot:User {id: 'bot'})
-                    
+
                     CREATE (u)-[:RELATIONSHIP_MILESTONE {
                         level: $level,
                         achieved_at: datetime(),
@@ -203,7 +203,7 @@ class GraphIntegratedEmotionManager(EmotionManager):
         # Update cache
         self._last_relationship_levels[user_id] = current_level
 
-    async def _extract_topics_from_message(self, message: str) -> List[str]:
+    async def _extract_topics_from_message(self, message: str) -> list[str]:
         """Extract topics from message using enhanced detection"""
 
         topics = []
@@ -281,7 +281,7 @@ class GraphIntegratedEmotionManager(EmotionManager):
         return topics if topics else ["general"]
 
     async def _link_message_to_topics(
-        self, user_id: str, emotion_id: str, topics: List[str], emotion_profile: EmotionProfile
+        self, user_id: str, emotion_id: str, topics: list[str], emotion_profile: EmotionProfile
     ):
         """Link message topics to emotions in graph database"""
 
@@ -301,7 +301,7 @@ class GraphIntegratedEmotionManager(EmotionManager):
                                  t.first_mentioned = datetime(),
                                  t.importance_score = 0.5
                     ON MATCH SET t.last_mentioned = datetime()
-                    
+
                     WITH t
                     MATCH (ec:EmotionContext {id: $emotion_id})
                     CREATE (t)-[:TRIGGERS {
@@ -456,7 +456,7 @@ class GraphIntegratedEmotionManager(EmotionManager):
 
         return ""
 
-    async def health_check(self) -> Dict[str, Any]:
+    async def health_check(self) -> dict[str, Any]:
         """Check health of emotion manager and graph integration"""
 
         health_status = {

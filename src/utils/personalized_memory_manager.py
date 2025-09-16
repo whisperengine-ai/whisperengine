@@ -5,16 +5,14 @@ This module extends the existing UserMemoryManager to include graph-based
 relationship modeling for more natural and personable AI interactions.
 """
 
-import logging
 import asyncio
-from typing import Dict, List, Optional, Any, Tuple
+import logging
 from datetime import datetime
-import json
 
 # Import existing components
 from src.memory.memory_manager import UserMemoryManager
-from .graph_memory_manager import GraphMemoryManager, GraphMemoryConfig
-from .emotion_manager import EmotionalState, RelationshipLevel
+
+from .graph_memory_manager import GraphMemoryConfig, GraphMemoryManager
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +24,7 @@ class PersonalizedMemoryManager(UserMemoryManager):
         self,
         *args,
         enable_graph_memory: bool = True,
-        graph_config: Optional[GraphMemoryConfig] = None,
+        graph_config: GraphMemoryConfig | None = None,
         **kwargs,
     ):
         """Initialize with graph database capabilities"""
@@ -57,9 +55,9 @@ class PersonalizedMemoryManager(UserMemoryManager):
         user_id: str,
         user_message: str,
         bot_response: str,
-        channel_id: Optional[str] = None,
-        pre_analyzed_emotion_data: Optional[dict] = None,
-        metadata: Optional[dict] = None,
+        channel_id: str | None = None,
+        pre_analyzed_emotion_data: dict | None = None,
+        metadata: dict | None = None,
     ):
         """Enhanced conversation storage with graph relationship building"""
 
@@ -81,7 +79,7 @@ class PersonalizedMemoryManager(UserMemoryManager):
         user_id: str,
         user_message: str,
         bot_response: str,
-        emotion_data: Optional[dict] = None,
+        emotion_data: dict | None = None,
     ):
         """Store relationships in graph database"""
         try:
@@ -118,7 +116,7 @@ class PersonalizedMemoryManager(UserMemoryManager):
         except Exception as e:
             logger.error(f"Error storing graph relationships: {e}")
 
-    async def _extract_topics_from_message(self, message: str) -> List[str]:
+    async def _extract_topics_from_message(self, message: str) -> list[str]:
         """Extract topics from user message using simple keyword extraction"""
         # This is a simplified version - you could enhance with NLP
         common_topics = {
@@ -146,7 +144,7 @@ class PersonalizedMemoryManager(UserMemoryManager):
         return detected_topics[:5]  # Limit to top 5 topics
 
     def _calculate_memory_importance(
-        self, message: str, emotion_data: Optional[dict] = None
+        self, message: str, emotion_data: dict | None = None
     ) -> float:
         """Calculate importance score for memory storage"""
         importance = 0.5  # Base importance
@@ -170,7 +168,7 @@ class PersonalizedMemoryManager(UserMemoryManager):
 
         return min(importance, 1.0)  # Cap at 1.0
 
-    async def _infer_personality_traits(self, user_id: str) -> List[str]:
+    async def _infer_personality_traits(self, user_id: str) -> list[str]:
         """Infer personality traits from interaction history"""
         try:
             # Get recent conversations
@@ -273,7 +271,7 @@ class PersonalizedMemoryManager(UserMemoryManager):
                     )
                 elif intimacy > 0.4:
                     context_parts.append(
-                        f"\n[Growing Relationship: Developing friendship with this user]"
+                        "\n[Growing Relationship: Developing friendship with this user]"
                     )
 
                 if relationship_context.get("interests"):
@@ -312,7 +310,7 @@ class PersonalizedMemoryManager(UserMemoryManager):
 
         try:
             # This would be called asynchronously in practice
-            relationship_future = asyncio.ensure_future(
+            asyncio.ensure_future(
                 self.graph_manager.get_relationship_context(user_id)
             )
 
@@ -328,7 +326,7 @@ class PersonalizedMemoryManager(UserMemoryManager):
             return self.get_emotion_context(user_id)
 
     async def track_relationship_milestone(
-        self, user_id: str, milestone_type: str, context: Optional[str] = None
+        self, user_id: str, milestone_type: str, context: str | None = None
     ):
         """Track significant relationship progression events"""
         if self.enable_graph_memory and self.graph_manager:

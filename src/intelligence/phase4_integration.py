@@ -7,11 +7,10 @@ harmonizing Phase 1, 2, 3 systems with human-like conversation optimization.
 
 import asyncio
 import logging
-from datetime import datetime, timezone
-from typing import Dict, List, Optional, Any, Tuple
+from typing import Any
 
 # Import Phase 4 integration
-from .phase4_simple_integration import Phase4HumanLikeIntegration, Phase4Context
+from .phase4_simple_integration import Phase4Context, Phase4HumanLikeIntegration
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +25,7 @@ class HumanLikeMemoryOptimizer:
 
     async def optimize_memory_search(
         self, user_id: str, original_query: str, memory_manager, limit: int = 15
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """
         Use Phase 4 intelligence to optimize memory search for human-like results
 
@@ -242,8 +241,8 @@ def apply_phase4_integration_patch(
         async def process_with_phase4_intelligence(
             user_id: str,
             message: str,
-            conversation_context: Optional[List[Dict]] = None,
-            discord_context: Optional[Dict] = None,
+            conversation_context: list[dict] | None = None,
+            discord_context: dict | None = None,
         ) -> Phase4Context:
             """Process message with full Phase 4 intelligence"""
             return await phase4_integration.process_comprehensive_message(
@@ -256,14 +255,14 @@ def apply_phase4_integration_patch(
         memory_manager.process_with_phase4_intelligence = process_with_phase4_intelligence
 
         # Add method to get comprehensive response context
-        def get_phase4_response_context(phase4_context: Phase4Context) -> Dict[str, Any]:
+        def get_phase4_response_context(phase4_context: Phase4Context) -> dict[str, Any]:
             """Get comprehensive context for response generation"""
             return phase4_integration.get_comprehensive_context_for_response(phase4_context)
 
         memory_manager.get_phase4_response_context = get_phase4_response_context
 
         # Add Phase 4 status method
-        def get_phase4_status() -> Dict[str, Any]:
+        def get_phase4_status() -> dict[str, Any]:
             """Get Phase 4 integration status"""
             return phase4_integration.get_integration_status()
 
@@ -286,7 +285,7 @@ def apply_phase4_integration_patch(
 
 
 def create_phase4_enhanced_system_prompt(
-    phase4_context: Phase4Context, base_system_prompt: str, comprehensive_context: Dict[str, Any]
+    phase4_context: Phase4Context, base_system_prompt: str, comprehensive_context: dict[str, Any]
 ) -> str:
     """
     Create an enhanced system prompt that incorporates Phase 4 intelligence

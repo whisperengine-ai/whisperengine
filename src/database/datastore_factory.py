@@ -3,12 +3,12 @@ Unified Datastore Factory for WhisperEngine
 Automatically selects and configures appropriate datastore implementations based on deployment mode.
 """
 
-import os
 import logging
+import os
+from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Dict, Any, Optional, Union
-from dataclasses import dataclass
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +29,7 @@ class DeploymentInfo:
     scale_tier: str = "small"
     data_dir: Path = Path("data")
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for compatibility"""
         return {
             "mode": self.mode.value,
@@ -108,7 +108,7 @@ class DatastoreFactory:
     - Local graph storage vs Neo4j for graph operations (optional)
     """
 
-    def __init__(self, deployment_info: Optional[DeploymentInfo] = None):
+    def __init__(self, deployment_info: DeploymentInfo | None = None):
         """Initialize datastore factory with deployment configuration"""
         if deployment_info is None:
             deployment_info = self._detect_deployment_mode()
@@ -260,7 +260,7 @@ class DatastoreFactory:
 
             return BasicMemoryCache()
 
-    def create_vector_storage(self, **kwargs) -> Union[LocalVectorStorageAdapter, Any]:
+    def create_vector_storage(self, **kwargs) -> LocalVectorStorageAdapter | Any:
         """Create vector storage based on deployment mode and preferences"""
         vector_type = self.db_config.vector_type
 
@@ -351,7 +351,7 @@ class DatastoreFactory:
             logger.error(f"Failed to create memory manager: {e}")
             raise
 
-    def get_datastore_info(self) -> Dict[str, Any]:
+    def get_datastore_info(self) -> dict[str, Any]:
         """Get information about configured datastores"""
         return {
             "deployment_mode": self.deployment_info.mode,
@@ -410,7 +410,7 @@ class UnifiedMemoryManager:
             raise
 
     async def store_conversation(
-        self, user_id: str, message: str, response: str, metadata: Optional[Dict[str, Any]] = None
+        self, user_id: str, message: str, response: str, metadata: dict[str, Any] | None = None
     ) -> bool:
         """Store conversation in both cache and vector storage"""
         try:
@@ -448,7 +448,7 @@ class UnifiedMemoryManager:
             return []
 
     async def search_memories(
-        self, query: str, user_id: Optional[str] = None, limit: int = 10
+        self, query: str, user_id: str | None = None, limit: int = 10
     ) -> list:
         """Search memories using vector storage"""
         try:
@@ -464,7 +464,7 @@ class UnifiedMemoryManager:
             logger.error(f"Failed to search memories: {e}")
             return []
 
-    async def get_stats(self) -> Dict[str, Any]:
+    async def get_stats(self) -> dict[str, Any]:
         """Get statistics from all memory systems"""
         stats = {}
 
@@ -510,13 +510,13 @@ class UnifiedMemoryManager:
 
 
 def create_datastore_factory(
-    adaptive_config: Optional[AdaptiveConfigManager] = None,
+    adaptive_config: AdaptiveConfigManager | None = None,
 ) -> DatastoreFactory:
     """Convenience function to create a datastore factory"""
     return DatastoreFactory(adaptive_config)
 
 
-def create_memory_manager(adaptive_config: Optional[AdaptiveConfigManager] = None, **kwargs):
+def create_memory_manager(adaptive_config: AdaptiveConfigManager | None = None, **kwargs):
     """Convenience function to create a unified memory manager"""
     factory = DatastoreFactory(adaptive_config)
     return factory.create_memory_manager(**kwargs)

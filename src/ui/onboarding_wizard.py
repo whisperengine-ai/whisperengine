@@ -4,43 +4,43 @@ WhisperEngine Onboarding Dialog
 First-time setup and user configuration for the desktop application.
 """
 
-import logging
-import platform
-import requests
 import json
-from typing import Optional, Dict, Any, List, Tuple
-from pathlib import Path
+import logging
 import uuid
 from datetime import datetime
+from pathlib import Path
+from typing import Any
+
+import requests
 
 try:
+    from PySide6.QtCore import QSize, Qt, QThread, QTimer, Signal
+    from PySide6.QtGui import QFont, QIcon, QMovie, QPixmap
     from PySide6.QtWidgets import (
+        QButtonGroup,
+        QCheckBox,
+        QComboBox,
         QDialog,
-        QVBoxLayout,
+        QFormLayout,
+        QFrame,
+        QGroupBox,
         QHBoxLayout,
         QLabel,
         QLineEdit,
-        QPushButton,
-        QCheckBox,
-        QComboBox,
-        QTextEdit,
-        QGroupBox,
-        QFormLayout,
-        QProgressBar,
-        QMessageBox,
-        QWizard,
-        QWizardPage,
-        QRadioButton,
-        QButtonGroup,
-        QSpacerItem,
-        QSizePolicy,
-        QFrame,
-        QScrollArea,
         QListWidget,
         QListWidgetItem,
+        QMessageBox,
+        QProgressBar,
+        QPushButton,
+        QRadioButton,
+        QScrollArea,
+        QSizePolicy,
+        QSpacerItem,
+        QTextEdit,
+        QVBoxLayout,
+        QWizard,
+        QWizardPage,
     )
-    from PySide6.QtCore import Qt, QTimer, QThread, Signal, QSize
-    from PySide6.QtGui import QFont, QPixmap, QIcon, QMovie
 
     PYSIDE6_AVAILABLE = True
 except ImportError:
@@ -148,9 +148,9 @@ class WelcomePage(QWizardPage):
         welcome_text = QLabel(
             """
         <h2>🤖 Welcome to WhisperEngine!</h2>
-        
+
         <p>WhisperEngine is your personal AI chat companion with advanced features:</p>
-        
+
         <ul>
             <li><strong>🧠 Advanced Memory</strong> - Remembers your conversations and preferences</li>
             <li><strong>😊 Emotional Intelligence</strong> - Understands and responds to emotions</li>
@@ -158,7 +158,7 @@ class WelcomePage(QWizardPage):
             <li><strong>🎯 Personality Adaptation</strong> - Learns and adapts to your style</li>
             <li><strong>⚡ Local AI Models</strong> - Works with your local LLM servers</li>
         </ul>
-        
+
         <p>This wizard will help you configure everything in just a few steps.</p>
         """
         )
@@ -304,7 +304,7 @@ class LLMSetupPage(QWizardPage):
         """Update detection progress"""
         self.detection_label.setText(message)
 
-    def on_servers_detected(self, servers: List[Dict]):
+    def on_servers_detected(self, servers: list[dict]):
         """Handle detected servers"""
         self.detected_servers = servers
         self.progress_bar.setVisible(False)
@@ -406,7 +406,7 @@ class OnboardingWizard(QWizard):
         else:
             self.logger.info("Onboarding cancelled")
 
-    def get_user_config(self) -> Dict[str, Any]:
+    def get_user_config(self) -> dict[str, Any]:
         """Get the user configuration from the wizard"""
         return {
             "username": self.user_page.username_edit.text().strip(),
@@ -420,7 +420,7 @@ class OnboardingWizard(QWizard):
             },
         }
 
-    def get_llm_config(self) -> Optional[Dict[str, Any]]:
+    def get_llm_config(self) -> dict[str, Any] | None:
         """Get the LLM configuration from the wizard"""
         if self.llm_page.selected_server:
             server = self.llm_page.selected_server
@@ -434,7 +434,7 @@ class OnboardingWizard(QWizard):
         return None
 
 
-def show_onboarding_if_needed(parent=None) -> Tuple[bool, Optional[Dict], Optional[Dict]]:
+def show_onboarding_if_needed(parent=None) -> tuple[bool, dict | None, dict | None]:
     """
     Show onboarding wizard if this is the first run
     Returns: (completed, user_config, llm_config)
@@ -473,12 +473,12 @@ def show_onboarding_if_needed(parent=None) -> Tuple[bool, Optional[Dict], Option
     return False, None, None
 
 
-def get_current_user_config() -> Optional[Dict[str, Any]]:
+def get_current_user_config() -> dict[str, Any] | None:
     """Get the current user configuration"""
     user_config_path = Path.home() / ".whisperengine" / "user_config.json"
     if user_config_path.exists():
         try:
-            with open(user_config_path, "r") as f:
+            with open(user_config_path) as f:
                 return json.load(f)
         except Exception as e:
             logging.error(f"Failed to load user config: {e}")

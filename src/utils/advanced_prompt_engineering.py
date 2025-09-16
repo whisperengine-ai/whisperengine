@@ -6,12 +6,10 @@ LLM performance for memory search query generation, including few-shot learning,
 dynamic examples, user profiling, and adaptive prompting strategies.
 """
 
-import json
 import logging
-from typing import List, Dict, Optional, Any, Tuple
-from dataclasses import dataclass
-from datetime import datetime
 import re
+from dataclasses import dataclass
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -20,10 +18,10 @@ logger = logging.getLogger(__name__)
 class UserProfile:
     """Profile of user's communication patterns and interests"""
 
-    common_topics: List[str]
+    common_topics: list[str]
     communication_style: str  # "casual", "formal", "technical", "emotional"
-    typical_entities: List[str]
-    emotional_patterns: List[str]
+    typical_entities: list[str]
+    emotional_patterns: list[str]
     interaction_frequency: str  # "frequent", "occasional", "new"
 
 
@@ -31,11 +29,11 @@ class UserProfile:
 class PromptContext:
     """Rich context for prompt engineering"""
 
-    user_profile: Optional[UserProfile]
-    conversation_history: List[str]
-    current_emotion: Optional[str]
+    user_profile: UserProfile | None
+    conversation_history: list[str]
+    current_emotion: str | None
     time_context: str  # "morning", "afternoon", "evening", "night"
-    recent_topics: List[str]
+    recent_topics: list[str]
     message_complexity: str  # "simple", "moderate", "complex"
 
 
@@ -50,8 +48,8 @@ class AdvancedPromptEngineer:
         self.user_profiles = {}  # Cache user profiles
 
     def optimize_prompt_for_user(
-        self, message: str, user_id: str, context: Optional[PromptContext] = None
-    ) -> Tuple[str, str]:
+        self, message: str, user_id: str, context: PromptContext | None = None
+    ) -> tuple[str, str]:
         """
         Create optimized system and user prompts based on user profile and context
 
@@ -74,7 +72,7 @@ class AdvancedPromptEngineer:
 
         return system_prompt, user_prompt
 
-    def _analyze_message(self, message: str) -> Dict[str, Any]:
+    def _analyze_message(self, message: str) -> dict[str, Any]:
         """Analyze message characteristics for prompt optimization"""
 
         message_lower = message.lower()
@@ -124,9 +122,9 @@ class AdvancedPromptEngineer:
 
     def _build_optimized_system_prompt(
         self,
-        user_profile: Optional[UserProfile],
-        message_analysis: Dict[str, Any],
-        context: Optional[PromptContext],
+        user_profile: UserProfile | None,
+        message_analysis: dict[str, Any],
+        context: PromptContext | None,
     ) -> str:
         """Build optimized system prompt based on user and message characteristics"""
 
@@ -156,11 +154,11 @@ class AdvancedPromptEngineer:
             base_prompt += "\n\nMESSAGE COMPLEXITY: Simple - create 1-2 precise queries avoiding over-analysis."
 
         # Add optimization strategies
-        base_prompt += f"""
+        base_prompt += """
 
 OPTIMIZATION STRATEGIES:
 1. **Entity Priority**: Extract proper nouns, technical terms, and specific concepts first
-2. **Semantic Grouping**: Group related concepts into focused queries  
+2. **Semantic Grouping**: Group related concepts into focused queries
 3. **Noise Reduction**: Eliminate filler words, question markers, and conversational fluff
 4. **Context Preservation**: Maintain important contextual and emotional information
 5. **Query Diversity**: Create queries that capture different aspects of the message
@@ -182,9 +180,9 @@ QUERY GENERATION RULES:
     def _build_optimized_user_prompt(
         self,
         message: str,
-        user_profile: Optional[UserProfile],
-        message_analysis: Dict[str, Any],
-        context: Optional[PromptContext],
+        user_profile: UserProfile | None,
+        message_analysis: dict[str, Any],
+        context: PromptContext | None,
     ) -> str:
         """Build optimized user prompt with enhanced context"""
 
@@ -221,18 +219,18 @@ SPECIFIC INSTRUCTIONS FOR THIS MESSAGE:
 {instructions}"""
 
         # Add output format with validation
-        user_prompt += f"""
+        user_prompt += """
 
 OUTPUT FORMAT (return ONLY valid JSON):
-{{
+{
     "queries": [
-        {{
+        {
             "query": "focused search terms",
             "weight": 1.0,
             "query_type": "entity|topic|context|intent|emotion",
             "confidence": 0.9,
             "reasoning": "why this specific query will find relevant memories"
-        }}
+        }
     ],
     "entities": ["extracted entities"],
     "main_topics": ["core topics"],
@@ -240,18 +238,18 @@ OUTPUT FORMAT (return ONLY valid JSON):
     "emotional_context": "emotional tone if relevant",
     "search_strategy": "specific|broad|contextual|technical",
     "optimization_notes": "brief explanation of query optimization choices"
-}}
+}
 
 VALIDATION CHECKLIST:
 ✓ Queries are focused and searchable
-✓ No duplicate or overly similar queries  
+✓ No duplicate or overly similar queries
 ✓ Reasoning explains memory retrieval value
 ✓ Entities are actual mentioned items
 ✓ Search strategy matches message characteristics"""
 
         return user_prompt
 
-    def _get_message_specific_instructions(self, message_analysis: Dict[str, Any]) -> str:
+    def _get_message_specific_instructions(self, message_analysis: dict[str, Any]) -> str:
         """Get specific instructions based on message analysis"""
 
         instructions = []
@@ -299,7 +297,7 @@ VALIDATION CHECKLIST:
 
         return "\n".join(instructions)
 
-    def _get_user_profile(self, user_id: str, message: str) -> Optional[UserProfile]:
+    def _get_user_profile(self, user_id: str, message: str) -> UserProfile | None:
         """Get or create user profile for prompt optimization"""
 
         # For now, create a basic profile based on message analysis
@@ -345,7 +343,7 @@ VALIDATION CHECKLIST:
 
         return self.user_profiles[user_id]
 
-    def _build_few_shot_examples(self) -> Dict[str, str]:
+    def _build_few_shot_examples(self) -> dict[str, str]:
         """Build few-shot examples for different message types"""
 
         return {
@@ -384,11 +382,11 @@ OUTPUT: {
 }""",
         }
 
-    def _get_relevant_examples(self, message_type: str) -> Optional[str]:
+    def _get_relevant_examples(self, message_type: str) -> str | None:
         """Get relevant few-shot examples for message type"""
         return self.few_shot_examples.get(message_type)
 
-    def _build_dynamic_templates(self) -> Dict[str, str]:
+    def _build_dynamic_templates(self) -> dict[str, str]:
         """Build dynamic prompt templates for different scenarios"""
 
         return {
@@ -409,7 +407,7 @@ class TokenOptimizer:
     def __init__(self, max_tokens: int = 800):
         self.max_tokens = max_tokens
 
-    def optimize_prompt_length(self, system_prompt: str, user_prompt: str) -> Tuple[str, str]:
+    def optimize_prompt_length(self, system_prompt: str, user_prompt: str) -> tuple[str, str]:
         """Optimize prompt length while preserving key information"""
 
         # Estimate token count (rough approximation: 1 token ≈ 3-4 chars)
@@ -487,7 +485,7 @@ class AdaptivePromptManager:
         self.prompt_variations = {}
 
     def select_optimal_prompt_strategy(
-        self, user_id: str, message_type: str, recent_performance: Optional[Dict] = None
+        self, user_id: str, message_type: str, recent_performance: dict | None = None
     ) -> str:
         """Select the best prompt strategy based on historical performance"""
 
@@ -508,7 +506,7 @@ class AdaptivePromptManager:
         return strategy
 
     def update_performance_feedback(
-        self, user_id: str, message_type: str, performance_metrics: Dict[str, float]
+        self, user_id: str, message_type: str, performance_metrics: dict[str, float]
     ):
         """Update performance history for adaptive improvement"""
 

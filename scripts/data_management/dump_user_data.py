@@ -19,13 +19,13 @@ Examples:
 
 import argparse
 import json
-import sys
+import logging
 import os
+import sys
 from datetime import datetime
-from typing import Dict, List, Optional
+
 import chromadb
 from chromadb.config import Settings
-import logging
 
 # Set up logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
@@ -33,7 +33,7 @@ logger = logging.getLogger(__name__)
 
 
 class ChromaDBUserDumper:
-    def __init__(self, host: Optional[str] = None, port: Optional[int] = None):
+    def __init__(self, host: str | None = None, port: int | None = None):
         """Initialize ChromaDB HTTP client"""
         try:
             # Use environment variables for connection details
@@ -65,7 +65,7 @@ class ChromaDBUserDumper:
             logger.error(f"Failed to initialize ChromaDB: {e}")
             sys.exit(1)
 
-    def get_user_data(self, user_id: str, facts_only: bool = False) -> Dict:
+    def get_user_data(self, user_id: str, facts_only: bool = False) -> dict:
         """Get all data for a specific user"""
         try:
             # Get all documents for the user
@@ -125,7 +125,7 @@ class ChromaDBUserDumper:
             logger.error(f"Error retrieving user data: {e}")
             sys.exit(1)
 
-    def dump_to_json(self, user_data: Dict, output_file: Optional[str] = None) -> str:
+    def dump_to_json(self, user_data: dict, output_file: str | None = None) -> str:
         """Dump user data to JSON format"""
         json_data = json.dumps(user_data, indent=2, ensure_ascii=False)
 
@@ -136,11 +136,11 @@ class ChromaDBUserDumper:
 
         return json_data
 
-    def dump_to_text(self, user_data: Dict, output_file: Optional[str] = None) -> str:
+    def dump_to_text(self, user_data: dict, output_file: str | None = None) -> str:
         """Dump user data to human-readable text format"""
         lines = []
-        lines.append(f"ChromaDB User Data Dump")
-        lines.append(f"=" * 50)
+        lines.append("ChromaDB User Data Dump")
+        lines.append("=" * 50)
         lines.append(f"User ID: {user_data['user_id']}")
         lines.append(f"Total Entries: {user_data['total_entries']}")
         lines.append(f"Dump Timestamp: {user_data['dump_timestamp']}")
@@ -224,22 +224,19 @@ Examples:
     user_data = dumper.get_user_data(args.user_id, facts_only=args.facts_only)
 
     if args.stats_only:
-        print(f"User ID: {user_data['user_id']}")
-        print(f"Total entries: {user_data['total_entries']}")
         if "conversations" in user_data:
-            print(f"Conversations: {len(user_data['conversations'])}")
-        print(f"Facts: {len(user_data['facts'])}")
+            pass
         return
 
     # Output in requested format
     if args.format == "json":
-        output = dumper.dump_to_json(user_data, args.output)
+        dumper.dump_to_json(user_data, args.output)
         if not args.output:
-            print(output)
+            pass
     else:  # text format
-        output = dumper.dump_to_text(user_data, args.output)
+        dumper.dump_to_text(user_data, args.output)
         if not args.output:
-            print(output)
+            pass
 
 
 if __name__ == "__main__":

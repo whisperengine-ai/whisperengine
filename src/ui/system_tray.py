@@ -4,14 +4,11 @@ WhisperEngine System Tray Integration
 Provides system tray functionality for background operation with convenient access.
 """
 
+import logging
 import os
 import sys
-import webbrowser
-import logging
-from pathlib import Path
-from typing import Optional, Callable
 import threading
-import time
+import webbrowser
 
 try:
     import pystray
@@ -68,7 +65,6 @@ class WhisperEngineSystemTray:
             )
 
             # Draw "W" in the center
-            font_size = 32
             text = "W"
             # Calculate text position to center it
             bbox = draw.textbbox((0, 0), text)
@@ -213,7 +209,7 @@ def is_tray_available() -> bool:
 
 def create_system_tray(
     app_instance, host: str = "127.0.0.1", port: int = 8080
-) -> Optional[WhisperEngineSystemTray]:
+) -> WhisperEngineSystemTray | None:
     """
     Factory function to create system tray instance
 

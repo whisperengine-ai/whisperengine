@@ -15,15 +15,14 @@ Uses PostgreSQL backend for better data integrity and performance.
 """
 
 import logging
+
 import discord
 from discord.ext import commands
-from typing import Optional, Dict, Any
 
 from src.security.async_context_boundaries_security import (
-    AsyncContextBoundariesManager,
     get_async_context_boundaries_manager,
 )
-from src.security.context_boundaries_security import PrivacyLevel, ConsentStatus
+from src.security.context_boundaries_security import ConsentStatus, PrivacyLevel
 
 logger = logging.getLogger(__name__)
 
@@ -139,7 +138,7 @@ class AsyncContextBoundariesCommands(commands.Cog):
             await ctx.send("❌ Error retrieving your privacy settings. Please try again later.")
 
     @commands.command(name="privacy_level")
-    async def set_privacy_level(self, ctx, level: Optional[str] = None):
+    async def set_privacy_level(self, ctx, level: str | None = None):
         """Set privacy level (strict, moderate, permissive)"""
         user_id = str(ctx.author.id)
 
@@ -213,7 +212,7 @@ class AsyncContextBoundariesCommands(commands.Cog):
                 color=0x3498DB,
             )
 
-            for i, entry in enumerate(audit_entries[:10]):  # Show max 10 in embed
+            for _i, entry in enumerate(audit_entries[:10]):  # Show max 10 in embed
                 timestamp = entry["request_timestamp"]
                 if hasattr(timestamp, "strftime"):
                     time_str = timestamp.strftime("%Y-%m-%d %H:%M")
@@ -261,12 +260,12 @@ class AsyncContextBoundariesCommands(commands.Cog):
             • No cross-server sharing
             • No DM ↔ server sharing
             • No private → public sharing
-            
+
             **⚖️ Moderate** - Balanced approach
             • Cross-server sharing allowed
             • DM ↔ server sharing blocked
             • Private → public sharing blocked
-            
+
             **🔓 Permissive** - Convenience focused
             • Most sharing allowed
             • Still protects private → public

@@ -1,7 +1,7 @@
 import asyncio
 import logging
 import time
-from typing import Optional
+
 import discord
 from discord.ext import commands
 
@@ -18,7 +18,7 @@ class HeartbeatMonitor:
         self.bot = bot
         self.check_interval = check_interval
         self.last_heartbeat = None
-        self.heartbeat_task: Optional[asyncio.Task] = None
+        self.heartbeat_task: asyncio.Task | None = None
         self.connection_issues = 0
         self.max_connection_issues = 3
 

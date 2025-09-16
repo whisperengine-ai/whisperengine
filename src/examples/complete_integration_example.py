@@ -13,7 +13,6 @@ import asyncio
 import logging
 import os
 import sys
-from typing import Optional
 
 # Add project root to path and load environment (like main.py does)
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -23,15 +22,13 @@ sys.path.insert(0, project_root)
 from env_manager import load_environment
 
 if not load_environment():
-    print("❌ Failed to load environment configuration")
-    print("💡 Run: python setup_env.py --template minimal")
     sys.exit(1)
 
 # Import the integrated components
-from src.utils.graph_integrated_emotion_manager import GraphIntegratedEmotionManager
-from src.memory.memory_manager import UserMemoryManager
-from src.llm.llm_client import LLMClient
 from src.llm.concurrent_llm_manager import ConcurrentLLMManager
+from src.llm.llm_client import LLMClient
+from src.memory.memory_manager import UserMemoryManager
+from src.utils.graph_integrated_emotion_manager import GraphIntegratedEmotionManager
 
 logger = logging.getLogger(__name__)
 
@@ -42,56 +39,39 @@ class CompleteIntegratedBot:
     def __init__(self):
         """Initialize bot with full system integration"""
 
-        print("🔧 Initializing Complete Integrated Bot...")
-        print("-" * 60)
 
         # Initialize LLM client (like main.py does)
-        print("📡 Setting up LLM client connection...")
         try:
             base_llm_client = LLMClient()
             safe_llm_client = ConcurrentLLMManager(base_llm_client)
 
             # Test connection
             if base_llm_client.check_connection():
-                print(f"✅ LLM client connected to {os.getenv('LLM_CHAT_API_URL')}")
                 self.llm_client = safe_llm_client
             else:
-                print("⚠️  LLM client connection failed - proceeding without LLM features")
                 self.llm_client = None
-        except Exception as e:
-            print(f"⚠️  LLM client initialization failed: {e}")
+        except Exception:
             self.llm_client = None
 
         # Initialize memory manager with external embeddings support
-        print("💾 Setting up memory manager...")
         try:
             self.memory_manager = UserMemoryManager(
                 enable_auto_facts=True, enable_global_facts=False, llm_client=self.llm_client
             )
-            print(
-                f"✅ Memory manager initialized with external embeddings: {os.getenv('USE_EXTERNAL_EMBEDDINGS', 'false')}"
-            )
-        except Exception as e:
-            print(f"❌ Memory manager initialization failed: {e}")
+        except Exception:
             raise
 
         # Initialize graph-integrated emotion manager
-        print("🧠 Setting up enhanced emotion manager...")
         try:
             self.emotion_manager = GraphIntegratedEmotionManager(
                 llm_client=self.llm_client, memory_manager=self.memory_manager
             )
-            print(
-                f"✅ Emotion manager with graph integration: {os.getenv('ENABLE_GRAPH_DATABASE', 'false')}"
-            )
-        except Exception as e:
-            print(f"❌ Emotion manager initialization failed: {e}")
+        except Exception:
             raise
 
-        print("🚀 Complete integrated bot ready!")
 
     async def process_message(
-        self, user_id: str, message: str, display_name: Optional[str] = None
+        self, user_id: str, message: str, display_name: str | None = None
     ) -> dict:
         """Process a message through the complete integrated system"""
 
@@ -292,7 +272,7 @@ class CompleteIntegratedBot:
         # Check memory manager
         try:
             # Test memory system
-            test_memories = self.memory_manager.retrieve_relevant_memories(
+            self.memory_manager.retrieve_relevant_memories(
                 "test_user", "test", limit=1
             )
             status["components"]["memory_manager"] = {
@@ -324,20 +304,15 @@ class CompleteIntegratedBot:
 async def demonstrate_complete_integration():
     """Demonstrate the complete integrated system"""
 
-    print("🚀 Complete Graph Database Integration Demo")
-    print("=" * 70)
 
     # Initialize complete bot
     bot = CompleteIntegratedBot()
 
     # System status check
-    print("\\n🔍 System Status Check")
-    print("-" * 40)
     status = await bot.get_system_status()
-    print(f"Overall Health: {status['overall_health']}")
 
-    for component, details in status["components"].items():
-        status_indicator = {
+    for _component, details in status["components"].items():
+        {
             "healthy": "✅",
             "connected": "✅",
             "disconnected": "⚠️",
@@ -346,15 +321,12 @@ async def demonstrate_complete_integration():
             "limited": "⚠️",
         }.get(details.get("status"), "❓")
 
-        print(f"  {status_indicator} {component}: {details.get('status', 'unknown')}")
         if details.get("endpoint"):
-            print(f"    → {details['endpoint']}")
+            pass
         if details.get("external_embeddings"):
-            print(f"    → External embeddings: {details['external_embeddings']}")
+            pass
 
     # Conversation demonstration
-    print("\\n💬 Complete Integration Conversation Demo")
-    print("-" * 50)
 
     user_id = "123456789012345678"  # Discord user ID format (18 digits)
     conversations = [
@@ -365,38 +337,24 @@ async def demonstrate_complete_integration():
         ("What do you remember about my interests?", "Memory and context test"),
     ]
 
-    for i, (message, description) in enumerate(conversations, 1):
-        print(f"\\n[{i}] {description}")
-        print(f"User: {message}")
+    for _i, (message, _description) in enumerate(conversations, 1):
 
         # Process through complete system
         result = await bot.process_message(user_id, message, "Alex")
 
-        print(f"Bot: {result['response']}")
 
         # Show detailed analysis
-        print(f"📊 Analysis:")
         if "error" in result:
-            print(f"  ❌ Error: {result['error']}")
+            pass
         else:
-            print(
-                f"  Relationship: {result['user_profile']['relationship_level']} ({result['user_profile']['interaction_count']} interactions)"
-            )
-            print(
-                f"  Emotion: {result['emotion_analysis']['detected_emotion']} (confidence: {result['emotion_analysis']['confidence']:.2f})"
-            )
-            print(f"  Context Quality: {result['context_quality']:.2f}")
-            print(f"  Active Systems: {', '.join(result['context_sources'])}")
 
             if result["user_profile"]["trust_indicators"] > 0:
-                print(f"  🤝 Trust indicators: {result['user_profile']['trust_indicators']}")
+                pass
 
             if result["user_profile"]["escalation_count"] > 0:
-                print(f"  ⚠️ Escalation count: {result['user_profile']['escalation_count']}")
+                pass
 
     # Show final system capabilities
-    print("\\n🎯 Integration Summary")
-    print("-" * 30)
 
     capabilities = []
     if "llm_client" in [
@@ -412,19 +370,17 @@ async def demonstrate_complete_integration():
     if os.getenv("ENABLE_GRAPH_DATABASE", "false").lower() == "true":
         capabilities.append("✅ Graph database relationship tracking")
 
-    for capability in capabilities:
-        print(f"  {capability}")
+    for _capability in capabilities:
+        pass
 
     if not capabilities:
-        print("  ⚠️ Running in fallback mode")
+        pass
 
 
 if __name__ == "__main__":
     # Configure logging
     logging.basicConfig(level=logging.INFO, format="%(levelname)s - %(message)s")
 
-    print("🔧 Complete Graph Database Integration Test")
-    print("=" * 70)
 
     # Run the complete demonstration
     asyncio.run(demonstrate_complete_integration())

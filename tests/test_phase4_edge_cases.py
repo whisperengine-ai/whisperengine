@@ -14,18 +14,13 @@ Test Categories:
 """
 
 import asyncio
+import gc
 import logging
 import time
-import uuid
-import random
-import gc
-import threading
-from concurrent.futures import ThreadPoolExecutor
-from typing import List, Dict, Any, Optional
 
-from src.personality.memory_moments import MemoryTriggeredMoments
 from src.conversation.advanced_thread_manager import AdvancedConversationThreadManager
 from src.conversation.proactive_engagement_engine import ProactiveConversationEngagementEngine
+from src.personality.memory_moments import MemoryTriggeredMoments
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -83,7 +78,7 @@ class Phase4EdgeCaseTester:
                         user_id, f"context_{test_results['total_tests']}", str(message), None
                     )
                     test_results["memory_moments_invalid"] += 1
-                except Exception as e:
+                except Exception:
                     test_results["errors_handled"] += 1
                     # This is expected - we want graceful error handling
 
@@ -94,7 +89,7 @@ class Phase4EdgeCaseTester:
                 try:
                     await self.thread_manager.process_user_message(user_id, str(message), {})
                     test_results["thread_manager_invalid"] += 1
-                except Exception as e:
+                except Exception:
                     test_results["errors_handled"] += 1
 
         # Test engagement engine with invalid inputs
@@ -106,7 +101,7 @@ class Phase4EdgeCaseTester:
                         user_id, str(message), []
                     )
                     test_results["engagement_engine_invalid"] += 1
-                except Exception as e:
+                except Exception:
                     test_results["errors_handled"] += 1
 
         # Calculate results
@@ -181,7 +176,7 @@ class Phase4EdgeCaseTester:
             # Rapid engagement analysis that could cause state conflicts
             messages = ["High engagement!", "Low engagement...", "Medium engagement."] * 10
 
-            for i, message in enumerate(messages):
+            for _i, message in enumerate(messages):
                 task = self.engagement_engine.analyze_conversation_engagement(user_id, message, [])
                 tasks.append(task)
 
@@ -361,7 +356,7 @@ class Phase4EdgeCaseTester:
 
         # Simple memory leak detection (gc object count)
         gc.collect()
-        object_count_after = len(gc.get_objects())
+        len(gc.get_objects())
 
         success_rate = (
             stability_results["successful_operations"] / stability_results["total_operations"]

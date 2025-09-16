@@ -8,17 +8,17 @@ Usage: python scripts/verify_environment.py
 """
 
 import asyncio
-import sys
 import logging
-from typing import Dict, Any
+import sys
 import traceback
+from typing import Any
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
 
-async def verify_spacy() -> Dict[str, Any]:
+async def verify_spacy() -> dict[str, Any]:
     """Verify spaCy installation and model availability."""
     try:
         import spacy
@@ -73,7 +73,7 @@ async def verify_spacy() -> Dict[str, Any]:
         return {"status": "error", "error": f"spaCy not installed: {e}", "functional": False}
 
 
-async def verify_transformers() -> Dict[str, Any]:
+async def verify_transformers() -> dict[str, Any]:
     """Verify transformers installation."""
     try:
         import transformers
@@ -87,7 +87,7 @@ async def verify_transformers() -> Dict[str, Any]:
         return {"status": "error", "error": f"Transformers not installed: {e}", "functional": False}
 
 
-async def verify_sentence_transformers() -> Dict[str, Any]:
+async def verify_sentence_transformers() -> dict[str, Any]:
     """Verify sentence-transformers installation."""
     try:
         from sentence_transformers import SentenceTransformer
@@ -118,7 +118,7 @@ async def verify_sentence_transformers() -> Dict[str, Any]:
         }
 
 
-async def verify_existing_systems() -> Dict[str, Any]:
+async def verify_existing_systems() -> dict[str, Any]:
     """Verify existing bot systems are still functional."""
     try:
         # Test graph database connectivity
@@ -135,7 +135,7 @@ async def verify_existing_systems() -> Dict[str, Any]:
         try:
             from src.memory.user_memory_manager import UserMemoryManager
 
-            memory_manager = UserMemoryManager()
+            UserMemoryManager()
             # Basic initialization test
             memory_status = {"status": "success", "functional": True}
         except Exception as e:
@@ -147,7 +147,7 @@ async def verify_existing_systems() -> Dict[str, Any]:
         return {"error": f"Failed to verify existing systems: {e}", "functional": False}
 
 
-async def verify_advanced_topic_extractor() -> Dict[str, Any]:
+async def verify_advanced_topic_extractor() -> dict[str, Any]:
     """Verify the new Advanced Topic Extractor."""
     try:
         from src.analysis.advanced_topic_extractor import AdvancedTopicExtractor
@@ -179,89 +179,58 @@ async def verify_advanced_topic_extractor() -> Dict[str, Any]:
 
 async def main():
     """Run all environment verification tests."""
-    print("🔍 AI Memory Enhancement - Environment Verification")
-    print("=" * 60)
 
     all_functional = True
 
     # Test 1: spaCy
-    print("\n1. Testing spaCy...")
     spacy_result = await verify_spacy()
     if spacy_result["functional"]:
-        print(f"   ✅ spaCy {spacy_result['version']} with {spacy_result['model']} - OK")
-        print(f"   📝 Test entities: {spacy_result.get('test_entities', [])}")
+        pass
     else:
-        print(f"   ❌ spaCy - FAILED: {spacy_result.get('error', 'Unknown error')}")
         all_functional = False
 
     # Test 2: Transformers
-    print("\n2. Testing Transformers...")
     transformers_result = await verify_transformers()
     if transformers_result["functional"]:
-        print(f"   ✅ Transformers {transformers_result['version']} - OK")
+        pass
     else:
-        print(f"   ❌ Transformers - FAILED: {transformers_result.get('error', 'Unknown error')}")
         all_functional = False
 
     # Test 3: Sentence Transformers
-    print("\n3. Testing Sentence Transformers...")
     sentence_transformers_result = await verify_sentence_transformers()
     if sentence_transformers_result["functional"]:
-        print(f"   ✅ Sentence Transformers with {sentence_transformers_result['model']} - OK")
-        print(f"   📊 Embedding dimension: {sentence_transformers_result['embedding_dim']}")
+        pass
     else:
-        print(
-            f"   ❌ Sentence Transformers - FAILED: {sentence_transformers_result.get('error', 'Unknown error')}"
-        )
         all_functional = False
 
     # Test 4: Existing Systems
-    print("\n4. Testing Existing Bot Systems...")
     existing_result = await verify_existing_systems()
     if "graph_database" in existing_result:
         if existing_result["graph_database"]["functional"]:
-            print("   ✅ Graph Database (Neo4j) - OK")
+            pass
         else:
-            print(
-                f"   ⚠️  Graph Database - WARNING: {existing_result['graph_database'].get('error', 'Unknown error')}"
-            )
+            pass
 
         if existing_result["memory_system"]["functional"]:
-            print("   ✅ Memory System - OK")
+            pass
         else:
-            print(
-                f"   ⚠️  Memory System - WARNING: {existing_result['memory_system'].get('error', 'Unknown error')}"
-            )
+            pass
 
     # Test 5: Advanced Topic Extractor
-    print("\n5. Testing Advanced Topic Extractor...")
     extractor_result = await verify_advanced_topic_extractor()
     if extractor_result["functional"]:
-        print("   ✅ Advanced Topic Extractor - OK")
-        print(
-            f"   📊 Test results: {extractor_result['test_entities']} entities, {extractor_result['test_phrases']} phrases"
-        )
-        print(f"   ⏱️  Processing time: {extractor_result['processing_time']:.3f}s")
+        pass
     else:
-        print(
-            f"   ❌ Advanced Topic Extractor - FAILED: {extractor_result.get('error', 'Unknown error')}"
-        )
         if "traceback" in extractor_result:
-            print(f"   🔍 Traceback: {extractor_result['traceback']}")
+            pass
         all_functional = False
 
     # Summary
-    print("\n" + "=" * 60)
     if all_functional:
-        print("🎉 Environment Verification PASSED!")
-        print("✅ All required dependencies and systems are functional.")
-        print("🚀 Ready to begin Phase 1 development!")
+        pass
     else:
-        print("⚠️  Environment Verification completed with issues.")
-        print("❗ Please resolve the failed tests before proceeding.")
-        print("📖 Check the installation instructions in the documentation.")
+        pass
 
-    print(f"\n📅 Verification completed at: {asyncio.get_event_loop().time()}")
 
     return all_functional
 
@@ -271,9 +240,6 @@ if __name__ == "__main__":
         result = asyncio.run(main())
         sys.exit(0 if result else 1)
     except KeyboardInterrupt:
-        print("\n⏹️  Verification interrupted by user.")
         sys.exit(1)
-    except Exception as e:
-        print(f"\n💥 Verification failed with unexpected error: {e}")
-        print(f"🔍 Traceback: {traceback.format_exc()}")
+    except Exception:
         sys.exit(1)

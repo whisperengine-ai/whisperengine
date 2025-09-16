@@ -2,16 +2,17 @@
 Streaming audio utilities for Discord.py that works with ElevenLabs streaming API
 """
 
-import discord
 import asyncio
-import tempfile
-import os
-from typing import Optional, AsyncGenerator
 import logging
+import os
+import tempfile
+from collections.abc import AsyncGenerator
+
+import discord
 
 
 async def stream_to_tempfile(
-    chunk_generator: AsyncGenerator[bytes, None], logger: Optional[logging.Logger] = None
+    chunk_generator: AsyncGenerator[bytes], logger: logging.Logger | None = None
 ) -> str:
     """
     Stream audio chunks to a temporary file as they arrive for immediate playback
@@ -59,7 +60,7 @@ async def stream_to_tempfile(
 
 
 async def create_streaming_audio_source(
-    chunk_generator: AsyncGenerator[bytes, None], logger: Optional[logging.Logger] = None
+    chunk_generator: AsyncGenerator[bytes], logger: logging.Logger | None = None
 ) -> tuple[discord.FFmpegPCMAudio, str]:
     """
     Create a Discord audio source from streaming audio chunks with minimal latency
@@ -88,7 +89,7 @@ async def create_streaming_audio_source(
     return audio_source, temp_path
 
 
-def cleanup_streaming_audio(temp_path: str, logger: Optional[logging.Logger] = None):
+def cleanup_streaming_audio(temp_path: str, logger: logging.Logger | None = None):
     """
     Clean up temporary files created for streaming audio
 

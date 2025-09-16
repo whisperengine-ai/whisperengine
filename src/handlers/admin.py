@@ -4,12 +4,10 @@ Includes debug, health monitoring, backup management, job scheduling, and system
 """
 
 import logging
-import discord
-from discord.ext import commands
-from typing import Optional
-import asyncio
-import time
 import os
+import time
+
+import discord
 
 logger = logging.getLogger(__name__)
 
@@ -58,7 +56,7 @@ class AdminCommandHandlers:
             )
 
         @self.bot.command(name="job_status")
-        async def job_status(ctx, job_id: Optional[str] = None):
+        async def job_status(ctx, job_id: str | None = None):
             """Check job scheduler status or specific job status (admin only)"""
             await admin_handler_instance._job_status_handler(ctx, job_id, is_admin)
 
@@ -276,7 +274,7 @@ class AdminCommandHandlers:
                         """
                         INSERT INTO user_profiles (user_id, follow_ups_enabled)
                         VALUES ($1, FALSE)
-                        ON CONFLICT (user_id) 
+                        ON CONFLICT (user_id)
                         DO UPDATE SET follow_ups_enabled = FALSE
                     """,
                         user_id,
@@ -293,7 +291,7 @@ class AdminCommandHandlers:
                         """
                         INSERT INTO user_profiles (user_id, follow_ups_enabled)
                         VALUES ($1, TRUE)
-                        ON CONFLICT (user_id) 
+                        ON CONFLICT (user_id)
                         DO UPDATE SET follow_ups_enabled = TRUE
                     """,
                         user_id,

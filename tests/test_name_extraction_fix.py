@@ -4,9 +4,9 @@ Test the fixed emotion system to ensure names are not incorrectly extracted
 """
 
 import pytest
-from env_manager import load_environment
 from emotion_manager import EmotionManager
-from lmstudio_client import LMStudioClient
+
+from env_manager import load_environment
 
 # Load environment variables using centralized manager
 load_environment()
@@ -39,8 +39,6 @@ def _run_emotion_without_name_extraction_test(em):
         "I'm very excited",
     ]
 
-    print("Testing emotion analysis without incorrect name extraction:")
-    print("=" * 60)
 
     for i, message in enumerate(test_cases):
         user_id = f"test_user_{i}"
@@ -48,24 +46,14 @@ def _run_emotion_without_name_extraction_test(em):
         # Process the interaction
         profile, emotion = em.process_interaction(user_id, message)
 
-        print(f"Message: '{message}'")
-        print(f"Detected emotion: {emotion.detected_emotion.value}")
-        print(f"Extracted name: {profile.name}")
-        print(f"Name: {profile.name}")
 
         # Check if a name was incorrectly extracted
         if profile.name:
-            print(
-                f"❌ ERROR: Incorrectly extracted name '{profile.name}' from emotional expression"
-            )
+            pass
         else:
-            print("✅ GOOD: No name extracted from emotional expression")
+            pass
 
-        print("-" * 40)
 
 
 if __name__ == "__main__":
-    print("Use pytest to run these tests:")
-    print("  pytest tests/test_name_extraction_fix.py -v")
-    print("  pytest tests/test_name_extraction_fix.py -m unit")
-    print("  pytest tests/test_name_extraction_fix.py -m integration")
+    pass

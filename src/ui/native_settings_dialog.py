@@ -6,48 +6,47 @@ Comprehensive settings UI with tabbed interface and real-time validation.
 
 import logging
 import platform
-from typing import Optional, Dict, Any, List
 
 try:
+    from PySide6.QtCore import QSize, Qt, QThread, QTimer, Signal
+    from PySide6.QtGui import QColor, QFont, QIcon, QPalette, QPixmap
     from PySide6.QtWidgets import (
-        QDialog,
-        QVBoxLayout,
-        QHBoxLayout,
-        QTabWidget,
-        QWidget,
-        QLabel,
-        QLineEdit,
-        QPushButton,
+        QApplication,
+        QButtonGroup,
         QCheckBox,
         QComboBox,
-        QSpinBox,
-        QSlider,
-        QTextEdit,
-        QGroupBox,
-        QFormLayout,
+        QDialog,
+        QDoubleSpinBox,
         QFileDialog,
-        QMessageBox,
+        QFormLayout,
+        QFrame,
+        QGridLayout,
+        QGroupBox,
+        QHBoxLayout,
+        QLabel,
+        QLineEdit,
         QListWidget,
         QListWidgetItem,
+        QMessageBox,
         QProgressBar,
-        QFrame,
-        QScrollArea,
-        QSplitter,
-        QButtonGroup,
+        QPushButton,
         QRadioButton,
-        QDoubleSpinBox,
-        QApplication,
-        QGridLayout,
+        QScrollArea,
+        QSlider,
+        QSpinBox,
+        QSplitter,
+        QTabWidget,
+        QTextEdit,
+        QVBoxLayout,
+        QWidget,
     )
-    from PySide6.QtCore import Qt, QTimer, QThread, Signal, QSize
-    from PySide6.QtGui import QFont, QIcon, QPixmap, QColor, QPalette
 
     PYSIDE6_AVAILABLE = True
 except ImportError:
     PYSIDE6_AVAILABLE = False
 
 if PYSIDE6_AVAILABLE:
-    from .native_settings_manager import NativeSettingsManager, LLMConfig, UIConfig, PlatformConfig
+    from .native_settings_manager import NativeSettingsManager
 
 
 class LLMTestThread(QThread):
@@ -97,8 +96,8 @@ class NativeSettingsDialog(QDialog):
 
         # Track changes
         self.has_changes = False
-        self.test_thread: Optional[LLMTestThread] = None
-        self.model_fetch_thread: Optional[ModelFetchThread] = None
+        self.test_thread: LLMTestThread | None = None
+        self.model_fetch_thread: ModelFetchThread | None = None
 
         self.init_ui()
         self.load_current_settings()
@@ -628,7 +627,7 @@ class NativeSettingsDialog(QDialog):
         self.model_fetch_thread.models_fetched.connect(self.on_models_fetched)
         self.model_fetch_thread.start()
 
-    def on_models_fetched(self, models: List[str]):
+    def on_models_fetched(self, models: list[str]):
         """Handle fetched models"""
         current_text = self.model_name_combo.currentText()
 
@@ -896,26 +895,26 @@ class NativeSettingsDialog(QDialog):
             # macOS-specific enhancements
             self.setStyleSheet(
                 base_style
-                + f"""
-                QGroupBox {{
+                + """
+                QGroupBox {
                     border-radius: 10px;
-                }}
-                QPushButton {{
+                }
+                QPushButton {
                     border-radius: 6px;
-                }}
+                }
             """
             )
         elif platform_name == "Windows":  # Windows
             # Windows-specific enhancements
             self.setStyleSheet(
                 base_style
-                + f"""
-                QTabBar::tab {{
+                + """
+                QTabBar::tab {
                     border-radius: 0px;
-                }}
-                QPushButton {{
+                }
+                QPushButton {
                     border-radius: 2px;
-                }}
+                }
             """
             )
         else:  # Linux

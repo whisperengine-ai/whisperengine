@@ -2,17 +2,16 @@
 Discord Voice Commands for managing voice channel operations
 """
 
-import discord
-from discord.ext import commands
 import asyncio
 import logging
 import os
-from typing import Optional
 from functools import wraps
 
+import discord
+from discord.ext import commands
+
+from src.utils.exceptions import LLMConnectionError, LLMRateLimitError, LLMTimeoutError
 from src.voice.voice_manager import DiscordVoiceManager
-from src.llm.elevenlabs_client import ElevenLabsClient
-from src.utils.exceptions import LLMError, LLMConnectionError, LLMTimeoutError, LLMRateLimitError
 
 
 def should_bot_respond_voice(ctx: commands.Context) -> bool:
@@ -65,7 +64,7 @@ class VoiceCommands(commands.Cog):
 
     @commands.command(name="join", aliases=["j"])
     @voice_bot_name_filter()
-    async def join_voice(self, ctx: commands.Context, *, channel_name: Optional[str] = None):
+    async def join_voice(self, ctx: commands.Context, *, channel_name: str | None = None):
         """
         Join a voice channel
         Usage: !join [channel_name]

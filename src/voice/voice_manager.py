@@ -2,22 +2,20 @@
 Discord Voice Manager for handling voice channel operations with ElevenLabs integration
 """
 
-import discord
-from discord.ext import commands
 import asyncio
+import io
 import logging
 import os
-import time
-from typing import Dict, Optional, List, Tuple, Any, Union
-from collections import defaultdict, deque
-import io
-import wave
-import audioop
 import tempfile
-from datetime import datetime, timedelta
+import time
+from collections import defaultdict, deque
+from typing import Any
+
+import discord
+from discord.ext import commands
 
 from src.llm.elevenlabs_client import ElevenLabsClient
-from src.utils.exceptions import LLMError, LLMConnectionError, LLMTimeoutError, LLMRateLimitError
+from src.utils.exceptions import LLMConnectionError, LLMRateLimitError, LLMTimeoutError
 
 
 class VoiceState:
@@ -25,15 +23,15 @@ class VoiceState:
 
     def __init__(self, guild_id: int):
         self.guild_id = guild_id
-        self.voice_client: Optional[discord.VoiceClient] = None
+        self.voice_client: discord.VoiceClient | None = None
         self.is_listening = False
         self.is_speaking = False
-        self.current_channel_id: Optional[int] = None
+        self.current_channel_id: int | None = None
         self.audio_buffer = deque(maxlen=300)  # ~10 seconds at 30fps
         self.last_audio_time = 0
         self.silence_threshold = 2.0  # seconds of silence before processing
-        self.participants: Dict[int, str] = {}  # user_id -> display_name
-        self.recording_users: Dict[int, bool] = defaultdict(bool)
+        self.participants: dict[int, str] = {}  # user_id -> display_name
+        self.recording_users: dict[int, bool] = defaultdict(bool)
         self.audio_queue = asyncio.Queue()
         self.tts_queue = asyncio.Queue()
         self.processing_lock = asyncio.Lock()
@@ -81,7 +79,7 @@ class DiscordVoiceManager:
         self.logger = logging.getLogger(__name__)
 
         # Guild-specific voice states
-        self.voice_states: Dict[int, VoiceState] = {}
+        self.voice_states: dict[int, VoiceState] = {}
 
         # Configuration from environment
         self.auto_join_enabled = os.getenv("VOICE_AUTO_JOIN", "false").lower() == "true"
@@ -476,13 +474,13 @@ class DiscordVoiceManager:
                 # Process the audio
                 await self._process_audio_message(guild_id, audio_item)
 
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 continue
             except Exception as e:
                 self.logger.error(f"Error processing audio queue: {e}")
                 await asyncio.sleep(1.0)
 
-    async def _process_audio_message(self, guild_id: int, audio_item: Dict[str, Any]):
+    async def _process_audio_message(self, guild_id: int, audio_item: dict[str, Any]):
         """Process a single audio message"""
         voice_state = self.get_voice_state(guild_id)
         user_id = audio_item["user_id"]
@@ -557,7 +555,7 @@ class DiscordVoiceManager:
                 if not voice_state.is_speaking:
                     asyncio.create_task(self._process_tts_queue(guild_id))
 
-        except asyncio.TimeoutError:
+        except TimeoutError:
             self.logger.warning("LLM response timed out for voice message")
         except Exception as e:
             self.logger.error(f"Error generating voice response: {e}")
@@ -581,7 +579,7 @@ class DiscordVoiceManager:
                     # Small delay between responses
                     await asyncio.sleep(self.response_delay)
 
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     break
                 except Exception as e:
                     self.logger.error(f"Error in TTS processing: {e}")
@@ -611,8 +609,8 @@ class DiscordVoiceManager:
 
                 try:
                     from .streaming_audio_source import (
-                        create_streaming_audio_source,
                         cleanup_streaming_audio,
+                        create_streaming_audio_source,
                     )
 
                     # Get streaming audio chunks
@@ -732,7 +730,7 @@ class DiscordVoiceManager:
         voice_state = self.get_voice_state(guild_id)
         return voice_state.is_listening
 
-    def get_current_channel(self, guild_id: int) -> Optional[discord.VoiceChannel]:
+    def get_current_channel(self, guild_id: int) -> discord.VoiceChannel | None:
         """Get current voice channel for guild"""
         voice_state = self.get_voice_state(guild_id)
         if voice_state.current_channel_id:
@@ -741,7 +739,7 @@ class DiscordVoiceManager:
                 return channel
         return None
 
-    def get_participants(self, guild_id: int) -> Dict[int, str]:
+    def get_participants(self, guild_id: int) -> dict[int, str]:
         """Get current voice participants in guild"""
         voice_state = self.get_voice_state(guild_id)
         return voice_state.participants.copy()

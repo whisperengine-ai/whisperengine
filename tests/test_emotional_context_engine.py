@@ -15,29 +15,28 @@ Test Coverage:
 - Performance and scalability
 """
 
-import pytest
 import asyncio
 from datetime import datetime, timedelta
-from unittest.mock import Mock, AsyncMock, patch
-from typing import Dict, List, Any
+from unittest.mock import AsyncMock, Mock
+
+import pytest
 
 # Import the system under test
 try:
     from src.intelligence.emotional_context_engine import (
-        EmotionalContextEngine,
-        EmotionalState,
-        EmotionalPattern,
-        EmotionalTrigger,
-        EmotionalContext,
-        EmotionalMemoryCluster,
         EmotionalAdaptationStrategy,
+        EmotionalContext,
+        EmotionalContextEngine,
+        EmotionalMemoryCluster,
+        EmotionalPattern,
+        EmotionalState,
+        EmotionalTrigger,
         create_emotional_context_engine,
     )
 
     EMOTIONAL_CONTEXT_ENGINE_AVAILABLE = True
-except ImportError as e:
+except ImportError:
     EMOTIONAL_CONTEXT_ENGINE_AVAILABLE = False
-    print(f"Emotional Context Engine not available: {e}")
 
 
 # Test fixtures and mock data
@@ -449,7 +448,7 @@ class TestPerformanceAndScalability:
 
         assert len(results) == 10
         assert all(isinstance(result, EmotionalContext) for result in results)
-        assert len(set(result.user_id for result in results)) == 10  # All different users
+        assert len({result.user_id for result in results}) == 10  # All different users
 
     @pytest.mark.asyncio
     async def test_memory_usage_with_large_history(self, emotional_context_engine):
@@ -710,7 +709,7 @@ class TestIntegrationScenarios:
         # High-stress situations should trigger specific responses
         assert EmotionalTrigger.STRESS_INDICATORS in context.emotional_triggers
         assert EmotionalTrigger.OVERWHELMING_EMOTIONS in context.emotional_triggers
-        assert strategy.offer_support == True
+        assert strategy.offer_support
         assert strategy.empathy_emphasis > 0.8
         assert strategy.tone_adjustments.get("gentleness", 0) > 0.8
         assert strategy.communication_style_override in [
@@ -725,5 +724,4 @@ if __name__ == "__main__":
     if EMOTIONAL_CONTEXT_ENGINE_AVAILABLE:
         pytest.main([__file__, "-v", "--tb=short"])
     else:
-        print("❌ Cannot run tests - Emotional Context Engine not available")
-        print("Please ensure the emotional_context_engine module is properly installed")
+        pass

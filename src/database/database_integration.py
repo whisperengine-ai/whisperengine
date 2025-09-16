@@ -3,13 +3,13 @@ Database Integration for WhisperEngine
 Connects the database abstraction layer to the adaptive configuration system.
 """
 
-import os
 import asyncio
-from typing import Dict, Any, Optional
+import os
 from pathlib import Path
+from typing import Any
 
 from src.config.adaptive_config import AdaptiveConfigManager
-from src.database.abstract_database import create_database_manager, DatabaseManager
+from src.database.abstract_database import DatabaseManager, create_database_manager
 
 
 class WhisperEngineDatabaseConfig:
@@ -67,7 +67,7 @@ class WhisperEngineDatabaseConfig:
             backup_enabled=self.db_config.backup_enabled,
         )
 
-    def get_backup_configuration(self) -> Dict[str, Any]:
+    def get_backup_configuration(self) -> dict[str, Any]:
         """Get backup configuration for the database"""
         base_backup_dir = Path.home() / ".whisperengine" / "backups"
 
@@ -86,7 +86,7 @@ class WhisperEngineSchema:
     """WhisperEngine database schema definitions"""
 
     @staticmethod
-    def get_core_schema() -> Dict[str, str]:
+    def get_core_schema() -> dict[str, str]:
         """Get core WhisperEngine database schema"""
         return {
             "users": """
@@ -189,7 +189,7 @@ class WhisperEngineSchema:
         }
 
     @staticmethod
-    def get_postgresql_schema() -> Dict[str, str]:
+    def get_postgresql_schema() -> dict[str, str]:
         """Get PostgreSQL-specific schema (with UUID support)"""
         schema = WhisperEngineSchema.get_core_schema()
 
@@ -237,13 +237,13 @@ class WhisperEngineSchema:
 class DatabaseIntegrationManager:
     """Main integration manager for WhisperEngine database operations"""
 
-    def __init__(self, adaptive_config_manager: Optional[AdaptiveConfigManager] = None):
+    def __init__(self, adaptive_config_manager: AdaptiveConfigManager | None = None):
         if adaptive_config_manager is None:
             adaptive_config_manager = AdaptiveConfigManager()
 
         self.config_manager = adaptive_config_manager
         self.db_config = WhisperEngineDatabaseConfig(adaptive_config_manager)
-        self.database_manager: Optional[DatabaseManager] = None
+        self.database_manager: DatabaseManager | None = None
         self.initialized = False
 
     async def initialize(self) -> bool:
@@ -274,8 +274,7 @@ class DatabaseIntegrationManager:
             self.initialized = True
             return True
 
-        except Exception as e:
-            print(f"Database initialization failed: {e}")
+        except Exception:
             return False
 
     async def cleanup(self) -> None:
@@ -321,10 +320,9 @@ class DatabaseIntegrationManager:
             backup_path = backup_dir / backup_filename
 
             await self.database_manager.backup(str(backup_path))
-            print(f"Startup backup created: {backup_path}")
 
-        except Exception as e:
-            print(f"Startup backup failed: {e}")
+        except Exception:
+            pass
 
     def get_database_manager(self) -> DatabaseManager:
         """Get the database manager instance"""
@@ -332,7 +330,7 @@ class DatabaseIntegrationManager:
             raise RuntimeError("Database not initialized. Call initialize() first.")
         return self.database_manager
 
-    def get_deployment_info(self) -> Dict[str, Any]:
+    def get_deployment_info(self) -> dict[str, Any]:
         """Get database deployment information"""
         return {
             "database_type": self.db_config.db_config.primary_type,
@@ -347,7 +345,7 @@ class DatabaseIntegrationManager:
 
 # Factory function for easy integration
 def create_database_integration(
-    adaptive_config_manager: Optional[AdaptiveConfigManager] = None,
+    adaptive_config_manager: AdaptiveConfigManager | None = None,
 ) -> DatabaseIntegrationManager:
     """Factory function to create database integration"""
     return DatabaseIntegrationManager(adaptive_config_manager)
@@ -362,28 +360,24 @@ async def main():
     try:
         # Initialize database
         if await db_integration.initialize():
-            print("Database initialized successfully")
 
             # Get database manager for operations
             db_manager = db_integration.get_database_manager()
 
             # Example operation: insert a user
-            result = await db_manager.query(
+            await db_manager.query(
                 "INSERT OR IGNORE INTO users (user_id, username) VALUES (:user_id, :username)",
                 {"user_id": "test_user_123", "username": "TestUser"},
             )
-            print(f"User insert result: {result.success}")
 
             # Query users
-            result = await db_manager.query("SELECT * FROM users LIMIT 5")
-            print(f"Users in database: {len(result.rows)}")
+            await db_manager.query("SELECT * FROM users LIMIT 5")
 
             # Show deployment info
-            deployment_info = db_integration.get_deployment_info()
-            print(f"Database deployment: {deployment_info}")
+            db_integration.get_deployment_info()
 
         else:
-            print("Database initialization failed")
+            pass
 
     finally:
         await db_integration.cleanup()

@@ -4,16 +4,15 @@ This replaces the SQLite approach with PostgreSQL for better concurrent access a
 """
 
 import asyncio
-import asyncpg
 import json
 import logging
 import os
-from datetime import datetime, timezone
-from typing import Dict, List, Optional, Tuple, Any
-from dataclasses import asdict
 from contextlib import asynccontextmanager
+from typing import Any
 
-from src.utils.emotion_manager import UserProfile, EmotionProfile, RelationshipLevel, EmotionalState
+import asyncpg
+
+from src.utils.emotion_manager import EmotionalState, EmotionProfile, RelationshipLevel, UserProfile
 
 logger = logging.getLogger(__name__)
 
@@ -50,7 +49,7 @@ class PostgreSQLUserProfileDatabase:
         self.password = password
         self.min_size = min_size
         self.max_size = max_size
-        self.pool: Optional[asyncpg.Pool] = None
+        self.pool: asyncpg.Pool | None = None
         self._initialized = False
         self._lock = asyncio.Lock()
 
@@ -101,14 +100,14 @@ class PostgreSQLUserProfileDatabase:
         async with self.pool.acquire() as connection:
             yield connection
 
-    async def get_user_profile(self, user_id: str) -> Optional[UserProfile]:
+    async def get_user_profile(self, user_id: str) -> UserProfile | None:
         """Retrieve a user profile by user_id"""
         try:
             async with self.get_connection() as conn:
                 # Get user data
                 user_row = await conn.fetchrow(
                     """
-                    SELECT user_id, name, relationship_level, current_emotion, 
+                    SELECT user_id, name, relationship_level, current_emotion,
                            interaction_count, first_interaction, last_interaction,
                            escalation_count, trust_indicators
                     FROM users WHERE user_id = $1
@@ -123,8 +122,8 @@ class PostgreSQLUserProfileDatabase:
                 emotion_rows = await conn.fetch(
                     """
                     SELECT detected_emotion, confidence, triggers, intensity, timestamp
-                    FROM emotion_history 
-                    WHERE user_id = $1 
+                    FROM emotion_history
+                    WHERE user_id = $1
                     ORDER BY timestamp DESC
                     LIMIT 50
                     """,
@@ -224,7 +223,7 @@ class PostgreSQLUserProfileDatabase:
                         for emotion_profile in recent_history:
                             await conn.execute(
                                 """
-                                INSERT INTO emotion_history 
+                                INSERT INTO emotion_history
                                 (user_id, detected_emotion, confidence, triggers, intensity, timestamp)
                                 VALUES ($1, $2, $3, $4, $5, $6)
                                 """,
@@ -243,7 +242,7 @@ class PostgreSQLUserProfileDatabase:
             logger.error(f"Error saving user profile for {profile.user_id}: {e}")
             return False
 
-    async def get_all_users(self) -> List[str]:
+    async def get_all_users(self) -> list[str]:
         """Get list of all user IDs"""
         try:
             async with self.get_connection() as conn:
@@ -279,7 +278,7 @@ class PostgreSQLUserProfileDatabase:
             logger.error(f"Error deleting user profile for {user_id}: {e}")
             return False
 
-    async def get_user_stats(self) -> Dict[str, Any]:
+    async def get_user_stats(self) -> dict[str, Any]:
         """Get database statistics"""
         try:
             async with self.get_connection() as conn:
@@ -326,7 +325,7 @@ class PostgreSQLUserProfileDatabase:
             logger.error(f"Database health check failed: {e}")
             return False
 
-    async def load_all_profiles(self) -> Dict[str, UserProfile]:
+    async def load_all_profiles(self) -> dict[str, UserProfile]:
         """Load all user profiles - compatibility method for EmotionManager"""
         try:
             user_ids = await self.get_all_users()
@@ -343,11 +342,11 @@ class PostgreSQLUserProfileDatabase:
             logger.error(f"Error loading all profiles: {e}")
             return {}
 
-    async def save_all_profiles(self, profiles: Dict[str, UserProfile]) -> bool:
+    async def save_all_profiles(self, profiles: dict[str, UserProfile]) -> bool:
         """Save all user profiles - compatibility method for EmotionManager"""
         try:
             success_count = 0
-            for user_id, profile in profiles.items():
+            for _user_id, profile in profiles.items():
                 if await self.save_user_profile(profile):
                     success_count += 1
 

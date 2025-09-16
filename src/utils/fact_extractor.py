@@ -2,10 +2,8 @@
 Automatic fact extraction system for Discord bot conversations
 """
 
-import re
 import logging
-from typing import List, Dict, Optional, Tuple
-from datetime import datetime
+import re
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +21,7 @@ class GlobalFactExtractor:
 
     def extract_global_facts_from_message(
         self, user_message: str, bot_response: str = ""
-    ) -> List[Dict[str, str]]:
+    ) -> list[dict[str, str]]:
         """
         Extract global facts from conversation content using LLM
 
@@ -179,7 +177,7 @@ class GlobalFactExtractor:
 
         return True
 
-    def _filter_and_deduplicate_global(self, facts: List[Dict[str, str]]) -> List[Dict[str, str]]:
+    def _filter_and_deduplicate_global(self, facts: list[dict[str, str]]) -> list[dict[str, str]]:
         """Filter and remove duplicate global facts"""
         if not facts:
             return facts
@@ -241,7 +239,7 @@ class FactExtractor:
 
     def extract_facts_from_message(
         self, user_message: str, bot_response: str = ""
-    ) -> List[Dict[str, str]]:
+    ) -> list[dict[str, str]]:
         """
         Extract user facts from a message using LLM analysis
 
@@ -434,7 +432,7 @@ class FactExtractor:
 
         # Check if key words from the fact appear in the message
         fact_words = fact_content.split()
-        message_words = message_lower.split()
+        message_lower.split()
 
         # For very short facts (1-2 words), require at least one significant word match
         if len(fact_words) <= 2:

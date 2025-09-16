@@ -8,17 +8,16 @@ and pattern detection to create a comprehensive memory network system.
 Phase 3: Multi-Dimensional Memory Networks
 """
 
-import logging
 import asyncio
+import logging
 import os
-from datetime import datetime, timezone, timedelta
-from typing import Dict, List, Optional, Any, Tuple
-from dataclasses import dataclass, asdict
-import json
+from dataclasses import dataclass
+from datetime import UTC, datetime
+from typing import Any
 
-from .semantic_clusterer import SemanticMemoryClusterer, MemoryCluster, ClusterType
-from .memory_importance_engine import MemoryImportanceEngine, MemoryImportanceScore
+from .memory_importance_engine import MemoryImportanceEngine
 from .pattern_detector import CrossReferencePatternDetector, DetectedPattern, PatternType
+from .semantic_clusterer import ClusterType, MemoryCluster, SemanticMemoryClusterer
 
 logger = logging.getLogger(__name__)
 
@@ -45,8 +44,8 @@ class MemoryInsight:
     title: str
     description: str
     confidence: float
-    supporting_data: Dict[str, Any]
-    actionable_suggestions: List[str]
+    supporting_data: dict[str, Any]
+    actionable_suggestions: list[str]
     created_at: datetime
 
 
@@ -75,7 +74,7 @@ class Phase3MemoryNetworks:
             f"Phase 3 Memory Networks initialized with max_memories={self.max_memories_for_analysis}, strategy={self.memory_selection_strategy}"
         )
 
-    async def analyze_complete_memory_network(self, user_id: str, memory_manager) -> Dict[str, Any]:
+    async def analyze_complete_memory_network(self, user_id: str, memory_manager) -> dict[str, Any]:
         """
         Perform comprehensive analysis of user's memory network
 
@@ -96,7 +95,7 @@ class Phase3MemoryNetworks:
                 self._perform_memory_analysis(user_id, memory_manager),
                 timeout=self.analysis_timeout,
             )
-        except asyncio.TimeoutError:
+        except TimeoutError:
             logger.error(
                 f"Memory network analysis timed out after {self.analysis_timeout} seconds for user {user_id}"
             )
@@ -107,7 +106,7 @@ class Phase3MemoryNetworks:
             self._update_processing_status(user_id, "error")
             return self._create_minimal_analysis_result(user_id)
 
-    async def _perform_memory_analysis(self, user_id: str, memory_manager) -> Dict[str, Any]:
+    async def _perform_memory_analysis(self, user_id: str, memory_manager) -> dict[str, Any]:
         """Internal method to perform the actual memory analysis"""
         try:
             # Update processing status
@@ -144,7 +143,7 @@ class Phase3MemoryNetworks:
             # Create comprehensive result
             analysis_result = {
                 "user_id": user_id,
-                "analysis_timestamp": datetime.now(timezone.utc),
+                "analysis_timestamp": datetime.now(UTC),
                 "memory_clusters": clustering_results,
                 "importance_analysis": importance_results,
                 "pattern_detection": pattern_results,
@@ -174,7 +173,7 @@ class Phase3MemoryNetworks:
             self._update_processing_status(user_id, "error")
             return self._create_error_analysis_result(user_id, str(e))
 
-    async def _fetch_user_memories(self, user_id: str, memory_manager) -> List[Dict]:
+    async def _fetch_user_memories(self, user_id: str, memory_manager) -> list[dict]:
         """Fetch user memories for analysis with intelligent selection"""
         try:
             all_memories = await memory_manager.get_memories_by_user(user_id)
@@ -191,7 +190,7 @@ class Phase3MemoryNetworks:
                     "content": memory.get("content", ""),
                     "topic": memory.get("topic", ""),
                     "emotional_context": memory.get("emotional_context", {}),
-                    "timestamp": memory.get("timestamp", datetime.now(timezone.utc)),
+                    "timestamp": memory.get("timestamp", datetime.now(UTC)),
                     "importance_score": memory.get("importance_score", 0.5),
                     "metadata": memory.get("metadata", {}),
                 }
@@ -211,7 +210,7 @@ class Phase3MemoryNetworks:
             logger.error(f"Error fetching user memories: {e}")
             return []
 
-    def _select_memories_for_analysis(self, memories: List[Dict]) -> List[Dict]:
+    def _select_memories_for_analysis(self, memories: list[dict]) -> list[dict]:
         """Select most relevant memories for analysis based on strategy"""
         if len(memories) <= self.max_memories_for_analysis:
             return memories
@@ -248,7 +247,7 @@ class Phase3MemoryNetworks:
             sorted_memories = sorted(memories, key=lambda m: m["timestamp"], reverse=True)
             return sorted_memories[: self.max_memories_for_analysis]
 
-    async def _fetch_conversation_history(self, user_id: str, memory_manager) -> List[Dict]:
+    async def _fetch_conversation_history(self, user_id: str, memory_manager) -> list[dict]:
         """Fetch conversation history for pattern analysis"""
         try:
             # This would ideally fetch from a conversation history store
@@ -281,8 +280,8 @@ class Phase3MemoryNetworks:
             return []
 
     async def _analyze_memory_importance(
-        self, user_id: str, memories: List[Dict], conversation_history: List[Dict], memory_manager
-    ) -> Dict[str, Any]:
+        self, user_id: str, memories: list[dict], conversation_history: list[dict], memory_manager
+    ) -> dict[str, Any]:
         """Analyze importance scores for all memories"""
         logger.debug("Analyzing memory importance scores")
 
@@ -333,10 +332,10 @@ class Phase3MemoryNetworks:
     async def _generate_network_insights(
         self,
         user_id: str,
-        clustering_results: Dict,
-        importance_results: Dict,
-        pattern_results: Dict,
-    ) -> List[MemoryInsight]:
+        clustering_results: dict,
+        importance_results: dict,
+        pattern_results: dict,
+    ) -> list[MemoryInsight]:
         """Generate insights by combining results from all analysis components"""
         logger.debug("Generating cross-component network insights")
 
@@ -386,8 +385,8 @@ class Phase3MemoryNetworks:
             return []
 
     def _analyze_cluster_importance_correlation(
-        self, clustering_results: Dict, importance_results: Dict
-    ) -> Optional[MemoryInsight]:
+        self, clustering_results: dict, importance_results: dict
+    ) -> MemoryInsight | None:
         """Analyze correlation between cluster membership and memory importance"""
 
         try:
@@ -443,7 +442,7 @@ class Phase3MemoryNetworks:
                     "Use insights from this cluster for personalized responses",
                     f"Consider the {highest_cluster['memory_count']} memories in this cluster as key reference points",
                 ],
-                created_at=datetime.now(timezone.utc),
+                created_at=datetime.now(UTC),
             )
 
         except Exception as e:
@@ -451,13 +450,13 @@ class Phase3MemoryNetworks:
             return None
 
     def _analyze_pattern_memory_relevance(
-        self, pattern_results: Dict, importance_results: Dict
-    ) -> Optional[MemoryInsight]:
+        self, pattern_results: dict, importance_results: dict
+    ) -> MemoryInsight | None:
         """Analyze how detected patterns relate to memory importance"""
 
         try:
             all_patterns = []
-            for pattern_type, patterns in pattern_results.items():
+            for _pattern_type, patterns in pattern_results.items():
                 if isinstance(patterns, list):
                     all_patterns.extend(patterns)
 
@@ -512,7 +511,7 @@ class Phase3MemoryNetworks:
                     "Use this pattern for predictive conversation guidance",
                     "Monitor for continuation or evolution of this pattern",
                 ],
-                created_at=datetime.now(timezone.utc),
+                created_at=datetime.now(UTC),
             )
 
         except Exception as e:
@@ -520,8 +519,8 @@ class Phase3MemoryNetworks:
             return None
 
     def _analyze_emotional_pattern_clusters(
-        self, clustering_results: Dict, pattern_results: Dict
-    ) -> Optional[MemoryInsight]:
+        self, clustering_results: dict, pattern_results: dict
+    ) -> MemoryInsight | None:
         """Analyze relationship between emotional clusters and emotional patterns"""
 
         try:
@@ -562,7 +561,7 @@ class Phase3MemoryNetworks:
                         "Reference positive memories from this emotional cluster for support",
                         "Monitor for early warning signs of this emotional pattern",
                     ],
-                    created_at=datetime.now(timezone.utc),
+                    created_at=datetime.now(UTC),
                 )
 
             return None
@@ -572,8 +571,8 @@ class Phase3MemoryNetworks:
             return None
 
     def _analyze_network_density(
-        self, clustering_results: Dict, pattern_results: Dict, importance_results: Dict
-    ) -> Optional[MemoryInsight]:
+        self, clustering_results: dict, pattern_results: dict, importance_results: dict
+    ) -> MemoryInsight | None:
         """Analyze overall network density and connectivity"""
 
         try:
@@ -594,7 +593,7 @@ class Phase3MemoryNetworks:
 
             # Count connections from patterns
             pattern_connections = 0
-            for pattern_type, patterns in pattern_results.items():
+            for _pattern_type, patterns in pattern_results.items():
                 if isinstance(patterns, list):
                     for pattern in patterns:
                         if hasattr(pattern, "related_memories"):
@@ -629,7 +628,7 @@ class Phase3MemoryNetworks:
                         "Use network connectivity for better memory retrieval",
                         "Consider network patterns for predictive insights",
                     ],
-                    created_at=datetime.now(timezone.utc),
+                    created_at=datetime.now(UTC),
                 )
 
             return None
@@ -639,8 +638,8 @@ class Phase3MemoryNetworks:
             return None
 
     def _analyze_temporal_memory_evolution(
-        self, clustering_results: Dict, pattern_results: Dict, importance_results: Dict
-    ) -> Optional[MemoryInsight]:
+        self, clustering_results: dict, pattern_results: dict, importance_results: dict
+    ) -> MemoryInsight | None:
         """Analyze how memory network has evolved over time"""
 
         try:
@@ -687,7 +686,7 @@ class Phase3MemoryNetworks:
                         "Acknowledge user's evolving interests",
                         "Use historical context to understand current perspectives",
                     ],
-                    created_at=datetime.now(timezone.utc),
+                    created_at=datetime.now(UTC),
                 )
 
             return None
@@ -699,10 +698,10 @@ class Phase3MemoryNetworks:
     def _calculate_network_state(
         self,
         user_id: str,
-        memories: List[Dict],
-        clustering_results: Dict,
-        importance_results: Dict,
-        pattern_results: Dict,
+        memories: list[dict],
+        clustering_results: dict,
+        importance_results: dict,
+        pattern_results: dict,
     ) -> MemoryNetworkState:
         """Calculate current state of memory network"""
 
@@ -738,7 +737,7 @@ class Phase3MemoryNetworks:
                 core_memories_count=core_memories_count,
                 pattern_count=pattern_count,
                 network_density=min(network_density, 1.0),
-                last_updated=datetime.now(timezone.utc),
+                last_updated=datetime.now(UTC),
                 processing_status="complete",
             )
 
@@ -751,13 +750,13 @@ class Phase3MemoryNetworks:
                 core_memories_count=0,
                 pattern_count=0,
                 network_density=0.0,
-                last_updated=datetime.now(timezone.utc),
+                last_updated=datetime.now(UTC),
                 processing_status="error",
             )
 
     async def _generate_recommendations(
-        self, user_id: str, insights: List[MemoryInsight]
-    ) -> List[Dict[str, Any]]:
+        self, user_id: str, insights: list[MemoryInsight]
+    ) -> list[dict[str, Any]]:
         """Generate actionable recommendations based on insights"""
 
         recommendations = []
@@ -771,7 +770,7 @@ class Phase3MemoryNetworks:
                 insight_types[insight.insight_type].append(insight)
 
             # Generate recommendations for each insight type
-            for insight_type, type_insights in insight_types.items():
+            for insight_type, _type_insights in insight_types.items():
                 if insight_type == "cluster_importance_correlation":
                     recommendations.append(
                         {
@@ -835,7 +834,7 @@ class Phase3MemoryNetworks:
             return []
 
     def _calculate_analysis_completeness(
-        self, clustering_results: Dict, importance_results: Dict, pattern_results: Dict
+        self, clustering_results: dict, importance_results: dict, pattern_results: dict
     ) -> float:
         """Calculate how complete the analysis is"""
 
@@ -870,13 +869,13 @@ class Phase3MemoryNetworks:
 
     def _update_processing_status(self, user_id: str, status: str):
         """Update processing status for user"""
-        self.processing_queue[user_id] = {"status": status, "timestamp": datetime.now(timezone.utc)}
+        self.processing_queue[user_id] = {"status": status, "timestamp": datetime.now(UTC)}
 
-    def _create_minimal_analysis_result(self, user_id: str) -> Dict[str, Any]:
+    def _create_minimal_analysis_result(self, user_id: str) -> dict[str, Any]:
         """Create minimal analysis result for insufficient data"""
         return {
             "user_id": user_id,
-            "analysis_timestamp": datetime.now(timezone.utc),
+            "analysis_timestamp": datetime.now(UTC),
             "memory_clusters": {"clustering_metadata": {"total_memories": 0}},
             "importance_analysis": {"memory_scores": [], "core_memories": []},
             "pattern_detection": {},
@@ -888,7 +887,7 @@ class Phase3MemoryNetworks:
                 core_memories_count=0,
                 pattern_count=0,
                 network_density=0.0,
-                last_updated=datetime.now(timezone.utc),
+                last_updated=datetime.now(UTC),
                 processing_status="insufficient_data",
             ),
             "recommendations": [],
@@ -899,11 +898,11 @@ class Phase3MemoryNetworks:
             },
         }
 
-    def _create_error_analysis_result(self, user_id: str, error_message: str) -> Dict[str, Any]:
+    def _create_error_analysis_result(self, user_id: str, error_message: str) -> dict[str, Any]:
         """Create error analysis result"""
         return {
             "user_id": user_id,
-            "analysis_timestamp": datetime.now(timezone.utc),
+            "analysis_timestamp": datetime.now(UTC),
             "error": error_message,
             "memory_clusters": {},
             "importance_analysis": {},
@@ -916,7 +915,7 @@ class Phase3MemoryNetworks:
                 core_memories_count=0,
                 pattern_count=0,
                 network_density=0.0,
-                last_updated=datetime.now(timezone.utc),
+                last_updated=datetime.now(UTC),
                 processing_status="error",
             ),
             "recommendations": [],
@@ -930,8 +929,8 @@ class Phase3MemoryNetworks:
     # Public API methods
 
     async def get_memory_clusters(
-        self, user_id: str, cluster_type: Optional[ClusterType] = None, memory_manager=None
-    ) -> List[MemoryCluster]:
+        self, user_id: str, cluster_type: ClusterType | None = None, memory_manager=None
+    ) -> list[MemoryCluster]:
         """Get memory clusters for user, optionally filtered by type"""
         if cluster_type:
             return await self.semantic_clusterer.get_clusters_by_type(user_id, cluster_type)
@@ -945,13 +944,13 @@ class Phase3MemoryNetworks:
 
     async def get_core_memories(
         self, user_id: str, limit: int = 20, memory_manager=None
-    ) -> List[Dict]:
+    ) -> list[dict]:
         """Get core memories for user"""
         return await self.importance_engine.identify_core_memories(user_id, limit, memory_manager)
 
     async def get_memory_patterns(
-        self, user_id: str, pattern_type: Optional[PatternType] = None
-    ) -> List[DetectedPattern]:
+        self, user_id: str, pattern_type: PatternType | None = None
+    ) -> list[DetectedPattern]:
         """Get detected patterns for user, optionally filtered by type"""
         user_patterns = self.pattern_detector.detected_patterns.get(user_id, {})
 
@@ -965,11 +964,11 @@ class Phase3MemoryNetworks:
                     all_patterns.extend(pattern_list)
             return all_patterns
 
-    async def get_network_insights(self, user_id: str) -> List[MemoryInsight]:
+    async def get_network_insights(self, user_id: str) -> list[MemoryInsight]:
         """Get generated insights for user"""
         return self.insights_cache.get(user_id, [])
 
-    async def get_network_state(self, user_id: str) -> Optional[MemoryNetworkState]:
+    async def get_network_state(self, user_id: str) -> MemoryNetworkState | None:
         """Get current network state for user"""
         return self.network_states.get(user_id)
 
@@ -998,7 +997,7 @@ class Phase3MemoryNetworks:
         except Exception as e:
             logger.error(f"Error updating memory network: {e}")
 
-    def get_system_statistics(self) -> Dict[str, Any]:
+    def get_system_statistics(self) -> dict[str, Any]:
         """Get overall system statistics"""
         return {
             "total_users_analyzed": len(self.network_states),
@@ -1011,5 +1010,5 @@ class Phase3MemoryNetworks:
                 user_id: self.pattern_detector.get_pattern_statistics(user_id)
                 for user_id in self.pattern_detector.detected_patterns.keys()
             },
-            "timestamp": datetime.now(timezone.utc),
+            "timestamp": datetime.now(UTC),
         }

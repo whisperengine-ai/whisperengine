@@ -7,15 +7,13 @@ for seamless WhisperEngine integration.
 
 import asyncio
 import logging
-import aiohttp
-import requests
-import json
-import psutil
-from typing import Dict, List, Optional, Any, NamedTuple
-from dataclasses import dataclass
-from pathlib import Path
 import platform
 import subprocess
+from dataclasses import dataclass
+from typing import Any
+
+import aiohttp
+import psutil
 
 logger = logging.getLogger(__name__)
 
@@ -27,10 +25,10 @@ class ServerInfo:
     name: str
     url: str
     status: str  # 'available', 'no_models', 'unreachable'
-    models: List[str]
+    models: list[str]
     recommended: bool = False
     setup_required: bool = False
-    error_message: Optional[str] = None
+    error_message: str | None = None
 
 
 @dataclass
@@ -38,10 +36,10 @@ class SetupRecommendation:
     """Recommended setup based on system resources"""
 
     preferred_server: str
-    recommended_models: List[str]
+    recommended_models: list[str]
     setup_url: str
     memory_note: str
-    installation_steps: List[str]
+    installation_steps: list[str]
 
 
 @dataclass
@@ -66,7 +64,7 @@ class LocalLLMDetector:
         self.timeout = 5.0  # Connection timeout in seconds
         self.detected_servers = {}
 
-    async def detect_available_servers(self) -> Dict[str, ServerInfo]:
+    async def detect_available_servers(self) -> dict[str, ServerInfo]:
         """Scan for LM Studio, Ollama, and other local servers"""
         servers = {}
 
@@ -101,7 +99,7 @@ class LocalLLMDetector:
         self.detected_servers = servers
         return servers
 
-    async def _test_server(self, config: Dict[str, Any]) -> ServerInfo:
+    async def _test_server(self, config: dict[str, Any]) -> ServerInfo:
         """Test if a specific server is available and get its models"""
         name = config["name"]
         url = config["url"]
@@ -184,7 +182,7 @@ class LocalLLMDetector:
                 error_message=f"Detection error: {str(e)}",
             )
 
-    def _is_process_running(self, process_names: List[str]) -> bool:
+    def _is_process_running(self, process_names: list[str]) -> bool:
         """Check if any of the given process names are running"""
         try:
             for proc in psutil.process_iter(["pid", "name", "cmdline"]):
@@ -203,7 +201,7 @@ class LocalLLMDetector:
             logger.debug(f"Process detection error: {e}")
             return False
 
-    def _extract_models(self, response_data: Dict[str, Any], server_name: str) -> List[str]:
+    def _extract_models(self, response_data: dict[str, Any], server_name: str) -> list[str]:
         """Extract model names from server response"""
         models = []
 
@@ -430,7 +428,7 @@ class LocalLLMDetector:
                 ],
             )
 
-    async def auto_configure_llm(self) -> Dict[str, Any]:
+    async def auto_configure_llm(self) -> dict[str, Any]:
         """Automatically detect and configure the best available LLM"""
         logger.info("🔍 Auto-detecting local LLM servers...")
 
@@ -479,7 +477,7 @@ class LocalLLMDetector:
         else:
             # No servers available - provide setup guidance
             recommendation = self.get_setup_recommendation(resources)
-            logger.info(f"⚠️ No local LLM servers detected")
+            logger.info("⚠️ No local LLM servers detected")
             logger.info(f"💡 Recommended: {recommendation.preferred_server}")
 
             result["setup_recommendation"] = recommendation
@@ -489,13 +487,13 @@ class LocalLLMDetector:
 
 
 # Factory function for easy integration
-async def detect_and_configure_local_llm() -> Dict[str, Any]:
+async def detect_and_configure_local_llm() -> dict[str, Any]:
     """Convenience function to detect and configure local LLM"""
     detector = LocalLLMDetector()
     return await detector.auto_configure_llm()
 
 
 # Sync wrapper for environments that need it
-def detect_local_llm_sync() -> Dict[str, Any]:
+def detect_local_llm_sync() -> dict[str, Any]:
     """Synchronous wrapper for local LLM detection"""
     return asyncio.run(detect_and_configure_local_llm())

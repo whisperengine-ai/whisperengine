@@ -3,10 +3,9 @@ Helper utility functions for the Discord bot.
 Contains common functionality used across multiple modules.
 """
 
-import os
 import logging
-from datetime import datetime, timezone
-from typing import Optional, List, Dict, Any
+import os
+from datetime import UTC, datetime
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +36,7 @@ def is_admin(ctx) -> bool:
 
 def get_current_time_context() -> str:
     """Generate current date/time context for the bot"""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     local_time = now.astimezone()
 
     # Format for different time zones - you can customize this based on your needs
@@ -52,7 +51,7 @@ def add_debug_info_to_response(
     response: str,
     user_id: str,
     memory_manager,
-    message_id: Optional[str] = None,
+    message_id: str | None = None,
     debug_mode: bool = False,
 ) -> str:
     """SECURITY FIX: Secure debug logging that prevents sensitive information disclosure"""
@@ -121,7 +120,6 @@ def generate_conversation_summary(recent_messages, user_id: str, max_length: int
             return ""
 
         # Filter and analyze recent messages (last 10 for summary)
-        relevant_messages = []
         user_topics = []
         bot_responses = []
 
@@ -623,7 +621,7 @@ def fix_message_alternation(messages: list) -> list:
                 filtered_messages.append(placeholder)
                 filtered_messages.append(msg)
                 expected_role = "user"
-                logger.debug(f"Added placeholder user message before assistant message")
+                logger.debug("Added placeholder user message before assistant message")
             else:
                 # Other cases - just add the message
                 filtered_messages.append(msg)

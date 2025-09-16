@@ -13,22 +13,18 @@ Deployment Targets:
 Note: Desktop apps are NEVER containerized - they're built as native executables.
 """
 
+import logging
 import os
-import sys
 import shutil
 import subprocess
-import json
-import yaml
-from pathlib import Path
-from typing import Dict, List, Optional, Any, Union
-from dataclasses import dataclass, asdict
-from enum import Enum
-import logging
+import sys
 import tempfile
-import zipfile
-import tarfile
+from dataclasses import dataclass
+from enum import Enum
+from pathlib import Path
+from typing import Any
 
-from src.config.adaptive_config import AdaptiveConfigManager
+import yaml
 
 
 class DeploymentTarget(Enum):
@@ -69,7 +65,7 @@ class BuildConfig:
     bundle_dependencies: bool = True
     optimize_size: bool = True
     debug_mode: bool = False
-    custom_config: Optional[Dict[str, Any]] = None
+    custom_config: dict[str, Any] | None = None
 
 
 @dataclass
@@ -82,9 +78,9 @@ class BuildResult:
     output_path: str
     size_mb: float
     build_time_seconds: float
-    artifacts: List[str]
-    errors: Optional[List[str]] = None
-    warnings: Optional[List[str]] = None
+    artifacts: list[str]
+    errors: list[str] | None = None
+    warnings: list[str] | None = None
 
     def __post_init__(self):
         if self.errors is None:
@@ -100,7 +96,7 @@ class BaseBuildStrategy:
         self.config = config
         self.project_root = project_root
         self.output_path = Path(config.output_dir)
-        self.temp_dir: Optional[Path] = None
+        self.temp_dir: Path | None = None
 
     async def build(self) -> BuildResult:
         """Execute the build process"""
@@ -156,11 +152,11 @@ class BaseBuildStrategy:
             if self.temp_dir and self.temp_dir.exists():
                 shutil.rmtree(self.temp_dir)
 
-    async def _execute_build(self) -> List[str]:
+    async def _execute_build(self) -> list[str]:
         """Override in subclasses"""
         raise NotImplementedError
 
-    def _copy_source_files(self, exclude_patterns: Optional[List[str]] = None) -> Path:
+    def _copy_source_files(self, exclude_patterns: list[str] | None = None) -> Path:
         """Copy source files to temp directory"""
         if self.temp_dir is None:
             raise RuntimeError("temp_dir not initialized")
@@ -187,7 +183,7 @@ class BaseBuildStrategy:
 
         return source_dir
 
-    def _generate_environment_config(self, target_config: Dict[str, Any]) -> str:
+    def _generate_environment_config(self, target_config: dict[str, Any]) -> str:
         """Generate environment configuration for target"""
         env_config = {
             # Base configuration
@@ -218,7 +214,7 @@ class BaseBuildStrategy:
         env_content = "\n".join([f"{k}={v}" for k, v in env_config.items()])
         return env_content
 
-    def _run_command(self, command: List[str], cwd: Optional[Path] = None) -> str:
+    def _run_command(self, command: list[str], cwd: Path | None = None) -> str:
         """Run shell command and return output"""
         try:
             result = subprocess.run(
@@ -234,7 +230,7 @@ class BaseBuildStrategy:
 class NativeDesktopBuilder(BaseBuildStrategy):
     """Build native desktop applications"""
 
-    async def _execute_build(self) -> List[str]:
+    async def _execute_build(self) -> list[str]:
         """Build native desktop app using PyInstaller"""
         # Copy source files
         source_dir = self._copy_source_files()
@@ -345,46 +341,46 @@ async def main():
         from src.platforms.universal_chat import UniversalChatOrchestrator
         from src.config.adaptive_config import AdaptiveConfigManager, EnvironmentDetector
         from src.database.database_integration import DatabaseIntegrationManager
-        
+
         print("🤖 Starting WhisperEngine Desktop...")
-        
+
         # Detect environment first
         environment = EnvironmentDetector.detect_environment()
         print(f"🔍 Detected environment: {environment}")
-        
+
         # Initialize configuration
         config_manager = AdaptiveConfigManager()
-        
+
         # Initialize database
         db_manager = DatabaseIntegrationManager(config_manager)
         await db_manager.initialize()
-        
+
         # Create universal chat platform
         chat_platform = create_universal_chat_platform(config_manager, db_manager)
-        
+
         # Initialize chat platforms (Web UI + any configured platforms)
         if await chat_platform.initialize():
             print("✅ Chat platforms initialized")
         else:
             print("❌ Failed to initialize chat platforms")
             return 1
-        
+
         # Start web UI
         web_ui = WhisperEngineWebUI(db_manager, config_manager)
-        
+
         print("🌐 Starting web interface at http://localhost:8080")
         print("📱 Check your system tray for WhisperEngine icon")
         print("💬 Open your browser to start chatting!")
-        
+
         # Run web UI (this will block)
         await web_ui.start()
-        
+
     except KeyboardInterrupt:
         print("\\n👋 Shutting down WhisperEngine...")
     except Exception as e:
         logging.error(f"Error running WhisperEngine: {e}")
         return 1
-    
+
     return 0
 
 if __name__ == "__main__":
@@ -581,7 +577,7 @@ app = BUNDLE(
 class DockerBuilder(BaseBuildStrategy):
     """Build Docker containers"""
 
-    async def _execute_build(self) -> List[str]:
+    async def _execute_build(self) -> list[str]:
         """Build Docker containers"""
         # Copy source files
         source_dir = self._copy_source_files()
@@ -591,7 +587,7 @@ class DockerBuilder(BaseBuildStrategy):
         else:
             return await self._build_compose_setup(source_dir)
 
-    async def _build_single_container(self, source_dir: Path) -> List[str]:
+    async def _build_single_container(self, source_dir: Path) -> list[str]:
         """Build single Docker container"""
         # Create Dockerfile
         dockerfile = await self._create_dockerfile(source_dir)
@@ -715,22 +711,22 @@ echo "🛑 Stop: docker stop whisperengine"
         run_script.chmod(0o755)
         return run_script
 
-    async def _build_compose_setup(self, source_dir: Path) -> List[str]:
+    async def _build_compose_setup(self, source_dir: Path) -> list[str]:
         """Build Docker Compose setup"""
         # Create docker-compose.yml
         compose_file = await self._create_compose_file(source_dir)
 
         # Create Dockerfile
-        dockerfile = await self._create_dockerfile(source_dir)
+        await self._create_dockerfile(source_dir)
 
         # Copy compose file to output
         shutil.copy2(compose_file, self.output_path / "docker-compose.yml")
 
         # Create environment template
-        env_template = await self._create_env_template()
+        await self._create_env_template()
 
         # Create setup script
-        setup_script = await self._create_compose_setup_script()
+        await self._create_compose_setup_script()
 
         return ["docker-compose.yml", ".env.template", "setup.sh"]
 
@@ -869,7 +865,7 @@ fi
 class KubernetesBuilder(BaseBuildStrategy):
     """Build Kubernetes deployments"""
 
-    async def _execute_build(self) -> List[str]:
+    async def _execute_build(self) -> list[str]:
         """Build Kubernetes manifests"""
         # Create Kubernetes manifests
         manifests = await self._create_k8s_manifests()
@@ -879,13 +875,13 @@ class KubernetesBuilder(BaseBuildStrategy):
 
         return manifests + helm_chart
 
-    async def _create_k8s_manifests(self) -> List[str]:
+    async def _create_k8s_manifests(self) -> list[str]:
         """Create Kubernetes YAML manifests"""
         # Implementation for K8s manifests
         # This would create deployments, services, configmaps, etc.
         return ["deployment.yml", "service.yml", "configmap.yml"]
 
-    async def _create_helm_chart(self) -> List[str]:
+    async def _create_helm_chart(self) -> list[str]:
         """Create Helm chart for easy deployment"""
         # Implementation for Helm chart
         return ["helm-chart.tgz"]
@@ -894,7 +890,7 @@ class KubernetesBuilder(BaseBuildStrategy):
 class UnifiedPackagingSystem:
     """Main packaging system that coordinates all build strategies"""
 
-    def __init__(self, project_root: Optional[Path] = None):
+    def __init__(self, project_root: Path | None = None):
         self.project_root = project_root or Path.cwd()
         self.builders = {
             DeploymentTarget.NATIVE_DESKTOP: NativeDesktopBuilder,
@@ -925,7 +921,7 @@ class UnifiedPackagingSystem:
 
     async def build_all_targets(
         self, base_config: BuildConfig
-    ) -> Dict[DeploymentTarget, BuildResult]:
+    ) -> dict[DeploymentTarget, BuildResult]:
         """Build for all supported targets"""
         results = {}
 
@@ -954,7 +950,7 @@ class UnifiedPackagingSystem:
 
         return results
 
-    def get_supported_targets(self) -> List[DeploymentTarget]:
+    def get_supported_targets(self) -> list[DeploymentTarget]:
         """Get list of supported deployment targets"""
         return list(self.builders.keys())
 
@@ -1014,27 +1010,18 @@ async def main():
             # Build all targets
             results = await packaging_system.build_all_targets(config)
 
-            print("\n📊 Build Summary:")
-            for target, result in results.items():
-                status = "✅" if result.success else "❌"
-                print(
-                    f"{status} {target.value}: {result.size_mb}MB in {result.build_time_seconds}s"
-                )
+            for _target, result in results.items():
+                pass
         else:
             # Build single target
             result = await packaging_system.build(config)
 
             if result.success:
-                print(f"✅ Build completed successfully!")
-                print(f"📁 Output: {result.output_path}")
-                print(f"📦 Size: {result.size_mb}MB")
-                print(f"⏱️  Time: {result.build_time_seconds}s")
-                print(f"📄 Artifacts: {', '.join(result.artifacts)}")
+                pass
             else:
-                print(f"❌ Build failed!")
                 if result.errors:
-                    for error in result.errors:
-                        print(f"   {error}")
+                    for _error in result.errors:
+                        pass
                 return 1
 
     except Exception as e:

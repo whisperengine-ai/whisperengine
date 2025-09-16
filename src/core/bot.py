@@ -4,21 +4,21 @@ Discord Bot Core Module
 Handles bot initialization, setup, and configuration.
 """
 
+import asyncio
+import logging
+import os
+
 import discord
 from discord.ext import commands
-import os
-import logging
-import asyncio
-from typing import Optional
 
 # Core imports
 from env_manager import load_environment
 from src.llm.llm_client import LLMClient
-from src.memory.memory_manager import UserMemoryManager
 from src.memory.backup_manager import BackupManager
-from src.utils.image_processor import ImageProcessor
-from src.utils.heartbeat_monitor import HeartbeatMonitor
 from src.memory.conversation_cache import HybridConversationCache
+from src.memory.memory_manager import UserMemoryManager
+from src.utils.heartbeat_monitor import HeartbeatMonitor
+from src.utils.image_processor import ImageProcessor
 from src.utils.memory_integration_patch import apply_memory_enhancement_patch
 
 # GRAPH DATABASE INTEGRATION: Import enhanced memory components
@@ -32,36 +32,24 @@ except ImportError:
     IntegratedMemoryManager = None
     GraphIntegratedEmotionManager = None
 
-from src.memory.redis_conversation_cache import RedisConversationCache
-from src.utils.async_enhancements import (
-    initialize_async_components,
-    cleanup_async_components,
-    async_memory_manager,
-    async_llm_manager,
-    concurrent_image_processor,
-    AsyncUtilities,
-    async_timeout,
-)
-
-# Security and safety components
-from src.security.input_validator import validate_user_input, is_safe_admin_command
-from src.security.system_message_security import scan_response_for_system_leakage
-from src.memory.context_aware_memory_security import ContextAwareMemoryManager
-from src.security.async_context_boundaries_security import (
-    get_async_context_boundaries_manager,
-    cleanup_global_manager,
-)
-
-# CRITICAL INTEGRATION: Import new concurrent safety components
-from src.utils.graceful_shutdown import GracefulShutdownManager
-from src.memory.thread_safe_memory import ThreadSafeMemoryManager
 from src.llm.concurrent_llm_manager import ConcurrentLLMManager
-from src.utils.atomic_operations import store_conversation_atomic
+from src.memory.context_aware_memory_security import ContextAwareMemoryManager
 
 # MEMORY OPTIMIZATION INTEGRATION: Import optimized memory manager
 from src.memory.optimized_memory_manager import create_optimized_memory_manager
-from src.utils.health_monitor import HealthMonitor
+from src.memory.redis_conversation_cache import RedisConversationCache
+from src.memory.thread_safe_memory import ThreadSafeMemoryManager
+
+# Security and safety components
+from src.utils.async_enhancements import (
+    cleanup_async_components,
+    initialize_async_components,
+)
 from src.utils.conversation import ConversationHistoryManager
+
+# CRITICAL INTEGRATION: Import new concurrent safety components
+from src.utils.graceful_shutdown import GracefulShutdownManager
+from src.utils.health_monitor import HealthMonitor
 
 # Voice functionality imports
 try:
@@ -323,8 +311,8 @@ class DiscordBotCore:
         self.logger.info("🧠 Initializing Advanced Personality Profiler...")
         try:
             # All AI features are always enabled - unified AI system
-            from src.analysis.personality_profiler import PersonalityProfiler
             from src.analysis.graph_personality_manager import GraphPersonalityManager
+            from src.analysis.personality_profiler import PersonalityProfiler
 
             self.personality_profiler = PersonalityProfiler()
             self.logger.info("✅ Personality profiler initialized (always active)")
@@ -509,7 +497,7 @@ class DiscordBotCore:
                 memory_optimization = os.getenv("AI_MEMORY_OPTIMIZATION", "true").lower() == "true"
                 emotional_resonance = os.getenv("AI_EMOTIONAL_RESONANCE", "true").lower() == "true"
                 adaptive_mode = os.getenv("AI_ADAPTIVE_MODE", "true").lower() == "true"
-                personality_analysis = (
+                (
                     os.getenv("AI_PERSONALITY_ANALYSIS", "true").lower() == "true"
                 )
 
@@ -524,7 +512,7 @@ class DiscordBotCore:
                     "query_optimization": True,
                 }
                 self.logger.info(
-                    f"🎛️ AI Configuration: Full Capabilities - System prompt handles conversation adaptation"
+                    "🎛️ AI Configuration: Full Capabilities - System prompt handles conversation adaptation"
                 )
 
                 # Get the base LLM client from the concurrent wrapper
@@ -861,7 +849,7 @@ class DiscordBotCore:
                     logger = logging.getLogger(__name__)
                     logger.info("✅ Memory optimization integrated successfully")
                 except:
-                    print("✅ Memory optimization integrated successfully")
+                    pass
             else:
                 try:
                     import logging
@@ -869,7 +857,7 @@ class DiscordBotCore:
                     logger = logging.getLogger(__name__)
                     logger.info("ℹ️ Using standard memory manager (LLM client not available)")
                 except:
-                    print("ℹ️ Using standard memory manager (LLM client not available)")
+                    pass
         except Exception as e:
             try:
                 import logging
@@ -879,7 +867,7 @@ class DiscordBotCore:
                     f"Memory optimization initialization failed, using standard manager: {e}"
                 )
             except:
-                print(f"Memory optimization initialization failed, using standard manager: {e}")
+                pass
             optimized_memory_manager = self.memory_manager
 
         return {

@@ -5,23 +5,21 @@ Tests the optimized memory batching system with intelligent caching and parallel
 """
 
 import asyncio
-import time
-import random
-from typing import List, Dict, Any
 import logging
+import random
+import time
+from typing import Any
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 try:
-    import pandas as pd
     import numpy as np
+    import pandas as pd
 
-    print(f"✅ pandas {pd.__version__}, numpy {np.__version__}")
     LIBRARIES_AVAILABLE = True
-except ImportError as e:
-    print(f"❌ Missing libraries: {e}")
+except ImportError:
     LIBRARIES_AVAILABLE = False
 
 
@@ -35,7 +33,7 @@ class MockChromaDBManager:
         self.operation_delay = 0.01  # Simulate database latency
 
     def store_conversation(
-        self, user_id: str, message: str, response: str, metadata: Dict[str, Any]
+        self, user_id: str, message: str, response: str, metadata: dict[str, Any]
     ) -> str:
         """Mock conversation storage"""
         time.sleep(self.operation_delay)  # Simulate DB latency
@@ -52,7 +50,7 @@ class MockChromaDBManager:
         )
         return conversation_id
 
-    def store_user_fact(self, user_id: str, fact: str, metadata: Dict[str, Any]) -> str:
+    def store_user_fact(self, user_id: str, fact: str, metadata: dict[str, Any]) -> str:
         """Mock user fact storage"""
         time.sleep(self.operation_delay)  # Simulate DB latency
 
@@ -64,7 +62,7 @@ class MockChromaDBManager:
 
     def retrieve_relevant_memories(
         self, user_id: str, query: str, limit: int = 10
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Mock memory retrieval"""
         time.sleep(self.operation_delay * 2)  # Queries are slower
 
@@ -86,7 +84,7 @@ class MockChromaDBManager:
         return relevant
 
 
-def generate_test_data(num_users: int, conversations_per_user: int) -> List[Dict[str, Any]]:
+def generate_test_data(num_users: int, conversations_per_user: int) -> list[dict[str, Any]]:
     """Generate realistic test data for batching performance tests"""
 
     conversation_templates = [
@@ -149,14 +147,11 @@ async def test_batching_performance():
     """Test batching system performance vs direct operations"""
 
     if not LIBRARIES_AVAILABLE:
-        print("❌ Cannot run tests - missing required libraries")
         return
 
-    print("\n🗂️ Testing Advanced Memory Batching Performance")
-    print("=" * 60)
 
     try:
-        from src.memory.advanced_memory_batcher import AdvancedMemoryBatcher, BatchedMemoryAdapter
+        from src.memory.advanced_memory_batcher import BatchedMemoryAdapter
 
         # Create mock database
         mock_db = MockChromaDBManager()
@@ -170,19 +165,13 @@ async def test_batching_performance():
         ]
 
         for config in test_configs:
-            print(
-                f"\n📊 Testing {config['name']} "
-                f"({config['users']} users × {config['conversations']} conversations)"
-            )
 
             # Generate test data
             test_data = generate_test_data(config["users"], config["conversations"])
             total_operations = len(test_data)
 
-            print(f"  📈 Total operations: {total_operations}")
 
             # Test 1: Direct operations (no batching)
-            print(f"  🔄 Testing direct operations...")
             start_time = time.time()
 
             direct_results = []
@@ -194,17 +183,14 @@ async def test_batching_performance():
                     direct_results.append(result)
 
             direct_time = time.time() - start_time
-            direct_throughput = total_operations / direct_time
+            total_operations / direct_time
 
-            print(f"    ⚡ Direct time: {direct_time*1000:.1f}ms")
-            print(f"    📈 Direct throughput: {direct_throughput:.1f} ops/sec")
 
             # Reset mock database for fair comparison
             mock_db.conversations.clear()
             mock_db.user_facts.clear()
 
             # Test 2: Batched operations
-            print(f"  🚀 Testing batched operations...")
 
             adapter = BatchedMemoryAdapter(mock_db, enable_batching=True)
             await adapter.start()
@@ -220,35 +206,24 @@ async def test_batching_performance():
                     )
                     tasks.append(task)
 
-            batch_results = await asyncio.gather(*tasks)
+            await asyncio.gather(*tasks)
 
             batch_time = time.time() - start_time
-            batch_throughput = total_operations / batch_time
+            total_operations / batch_time
 
-            print(f"    ⚡ Batch time: {batch_time*1000:.1f}ms")
-            print(f"    📈 Batch throughput: {batch_throughput:.1f} ops/sec")
-            print(f"    🚀 Speedup: {batch_throughput/direct_throughput:.1f}x faster")
 
             # Get performance metrics
             stats = adapter.get_performance_stats()
-            batch_stats = stats.get("batch_metrics", {})
-            cache_stats = stats.get("cache_metrics", {})
+            stats.get("batch_metrics", {})
+            stats.get("cache_metrics", {})
 
-            print(f"    📊 Avg batch size: {batch_stats.get('avg_batch_size', 0):.1f}")
-            print(f"    ✅ Success rate: {batch_stats.get('success_rate', 0):.1%}")
-            print(f"    💾 Cache hit rate: {cache_stats.get('hit_rate', 0):.1%}")
 
             await adapter.stop()
 
             # Compare results
-            print(
-                f"    📋 Results comparison: {len(direct_results)} direct vs {len(batch_results)} batched"
-            )
 
-        print(f"\n✅ Batching performance tests completed!")
 
-    except Exception as e:
-        print(f"❌ Error in batching tests: {e}")
+    except Exception:
         import traceback
 
         traceback.print_exc()
@@ -260,8 +235,6 @@ async def test_caching_performance():
     if not LIBRARIES_AVAILABLE:
         return
 
-    print("\n💾 Testing Intelligent Caching Performance")
-    print("=" * 50)
 
     try:
         from src.memory.advanced_memory_batcher import BatchedMemoryAdapter
@@ -288,37 +261,28 @@ async def test_caching_performance():
             ("user_2", "help with project"),  # Repeat for cache testing
         ]
 
-        print(f"  🔍 Testing {len(test_queries)} queries (including repeats)")
 
         # Execute queries and measure performance
         query_times = []
-        cache_hits = 0
 
         for i, (user_id, query) in enumerate(test_queries):
             start_time = time.time()
 
-            results = await adapter.retrieve_relevant_memories(user_id, query, limit=5)
+            await adapter.retrieve_relevant_memories(user_id, query, limit=5)
 
             query_time = time.time() - start_time
             query_times.append(query_time)
 
-            print(f"    Query {i+1}: {query_time*1000:.1f}ms - {len(results)} results")
 
         # Get final cache statistics
         stats = adapter.get_performance_stats()
-        cache_stats = stats.get("cache_metrics", {})
+        stats.get("cache_metrics", {})
 
-        print(f"\n  📊 Cache Performance:")
-        print(f"    💾 Cache hits: {cache_stats.get('hits', 0)}")
-        print(f"    ❌ Cache misses: {cache_stats.get('misses', 0)}")
-        print(f"    🎯 Hit rate: {cache_stats.get('hit_rate', 0):.1%}")
-        print(f"    📏 Cache size: {cache_stats.get('size', 0)}")
-        print(f"    ⚡ Avg query time: {np.mean(query_times)*1000:.1f}ms")
 
         await adapter.stop()
 
-    except Exception as e:
-        print(f"❌ Error in caching tests: {e}")
+    except Exception:
+        pass
 
 
 async def test_concurrent_users():
@@ -327,8 +291,6 @@ async def test_concurrent_users():
     if not LIBRARIES_AVAILABLE:
         return
 
-    print("\n👥 Testing Concurrent Multi-User Performance")
-    print("=" * 50)
 
     try:
         from src.memory.advanced_memory_batcher import BatchedMemoryAdapter
@@ -350,7 +312,6 @@ async def test_concurrent_users():
             ops_per_user = scenario["ops_per_user"]
             total_ops = num_users * ops_per_user
 
-            print(f"\n  👥 Testing {num_users} concurrent users ({ops_per_user} ops each)")
 
             async def simulate_user(user_id: str, operations: int):
                 """Simulate a single user's operations"""
@@ -381,29 +342,21 @@ async def test_concurrent_users():
             all_results = await asyncio.gather(*user_tasks)
 
             total_time = time.time() - start_time
-            throughput = total_ops / total_time
+            total_ops / total_time
 
-            print(f"    ⚡ Total time: {total_time*1000:.1f}ms")
-            print(f"    📈 Throughput: {throughput:.1f} ops/sec")
-            print(f"    👤 Avg per-user time: {total_time/num_users*1000:.1f}ms")
 
             # Validate results
-            successful_users = sum(1 for results in all_results if len(results) == ops_per_user)
-            print(f"    ✅ Successful users: {successful_users}/{num_users}")
+            sum(1 for results in all_results if len(results) == ops_per_user)
 
             # Get performance stats
             stats = adapter.get_performance_stats()
-            batch_stats = stats.get("batch_metrics", {})
+            stats.get("batch_metrics", {})
 
-            print(
-                f"    📊 Batch efficiency: {batch_stats.get('avg_batch_size', 0):.1f} avg batch size"
-            )
-            print(f"    🎯 Success rate: {batch_stats.get('success_rate', 0):.1%}")
 
         await adapter.stop()
 
-    except Exception as e:
-        print(f"❌ Error in concurrent user tests: {e}")
+    except Exception:
+        pass
 
 
 async def test_deduplication():
@@ -412,8 +365,6 @@ async def test_deduplication():
     if not LIBRARIES_AVAILABLE:
         return
 
-    print("\n🔄 Testing Deduplication Performance")
-    print("=" * 45)
 
     try:
         from src.memory.advanced_memory_batcher import BatchedMemoryAdapter
@@ -435,7 +386,6 @@ async def test_deduplication():
             ),  # Duplicate of different
         ]
 
-        print(f"  🔄 Testing {len(duplicate_operations)} operations (including duplicates)")
 
         start_time = time.time()
 
@@ -447,33 +397,24 @@ async def test_deduplication():
 
         results = await asyncio.gather(*tasks)
 
-        processing_time = time.time() - start_time
+        time.time() - start_time
 
         # Analyze results
         unique_results = set(results)
-        dedup_rate = 1 - (len(unique_results) / len(results))
+        1 - (len(unique_results) / len(results))
 
-        print(f"    ⚡ Processing time: {processing_time*1000:.1f}ms")
-        print(f"    📋 Total operations: {len(results)}")
-        print(f"    🔄 Unique results: {len(unique_results)}")
-        print(f"    🎯 Deduplication rate: {dedup_rate:.1%}")
-        print(f"    💾 Actual DB operations: {len(mock_db.conversations)}")
 
         await adapter.stop()
 
-    except Exception as e:
-        print(f"❌ Error in deduplication tests: {e}")
+    except Exception:
+        pass
 
 
 async def main():
     """Run all memory batching performance tests"""
 
-    print("🗂️ WhisperEngine Advanced Memory Batching Performance Demo")
-    print("=" * 70)
 
     if not LIBRARIES_AVAILABLE:
-        print("❌ Required libraries not available. Please install:")
-        print("   pip install pandas numpy")
         return
 
     # Run all tests
@@ -482,13 +423,6 @@ async def main():
     await test_concurrent_users()
     await test_deduplication()
 
-    print("\n🎉 All memory batching tests completed!")
-    print("📊 Performance Summary:")
-    print("   • Intelligent batching with pandas optimization")
-    print("   • Smart caching with TTL and LRU eviction")
-    print("   • Concurrent user support with thread pools")
-    print("   • Automatic deduplication to reduce database load")
-    print("   • Comprehensive performance monitoring")
 
 
 if __name__ == "__main__":

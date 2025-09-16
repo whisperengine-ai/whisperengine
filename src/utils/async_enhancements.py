@@ -4,12 +4,13 @@ Provides thread-safe wrappers and async utilities for concurrent user operations
 """
 
 import asyncio
+import logging
 import threading
 import time
-import logging
-from typing import Dict, Optional, Any, Callable, Awaitable
-from functools import wraps
+from collections.abc import Awaitable, Callable
 from concurrent.futures import ThreadPoolExecutor
+from functools import wraps
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -49,9 +50,9 @@ class AsyncMemoryManager:
         user_id: str,
         user_message: str,
         bot_response: str,
-        channel_id: Optional[str] = None,
-        pre_analyzed_emotion_data: Optional[dict] = None,
-        metadata: Optional[dict] = None,
+        channel_id: str | None = None,
+        pre_analyzed_emotion_data: dict | None = None,
+        metadata: dict | None = None,
     ):
         """Async wrapper for thread-safe conversation storage"""
         user_lock = self._get_user_lock(user_id)
@@ -121,7 +122,7 @@ class AsyncLLMManager:
         self._semaphore = asyncio.Semaphore(max_concurrent_requests)
 
     async def get_chat_response_async(
-        self, conversation_context: list, user_id: Optional[str] = None
+        self, conversation_context: list, user_id: str | None = None
     ) -> str:
         """
         Async LLM call with concurrency control
@@ -138,7 +139,7 @@ class AsyncLLMManager:
                 logger.error(f"LLM request failed for user {user_id}: {e}")
                 raise
 
-    async def analyze_emotion_async(self, user_message: str, user_id: Optional[str] = None) -> dict:
+    async def analyze_emotion_async(self, user_message: str, user_id: str | None = None) -> dict:
         """Async emotion analysis"""
         async with self._semaphore:
             try:
@@ -182,7 +183,7 @@ def async_timeout(timeout_seconds: float = 30.0):
         async def wrapper(*args, **kwargs):
             try:
                 return await asyncio.wait_for(func(*args, **kwargs), timeout=timeout_seconds)
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 logger.warning(f"Function {func.__name__} timed out after {timeout_seconds}s")
                 raise
 
@@ -218,7 +219,7 @@ class AsyncUtilities:
         """Run a coroutine with timeout, returning default value on timeout"""
         try:
             return await asyncio.wait_for(coro, timeout=timeout)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             logger.warning(f"Operation timed out after {timeout}s")
             return default_value
 
@@ -245,9 +246,9 @@ class AsyncUtilities:
 
 
 # Global instances (to be initialized by the main bot)
-async_memory_manager: Optional[AsyncMemoryManager] = None
-async_llm_manager: Optional[AsyncLLMManager] = None
-concurrent_image_processor: Optional[ConcurrentImageProcessor] = None
+async_memory_manager: AsyncMemoryManager | None = None
+async_llm_manager: AsyncLLMManager | None = None
+concurrent_image_processor: ConcurrentImageProcessor | None = None
 
 
 def initialize_async_components(memory_manager, llm_client, image_processor):

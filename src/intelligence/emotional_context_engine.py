@@ -26,12 +26,12 @@ Key Integration Points:
 """
 
 import logging
+import statistics
+from collections import defaultdict
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from enum import Enum
-from dataclasses import dataclass
-from typing import Dict, List, Optional, Any, Tuple
-from collections import defaultdict
-import statistics
+from typing import Any
 
 # Import existing systems for integration
 try:
@@ -117,9 +117,9 @@ class EmotionalContext:
     emotion_intensity: float
 
     # Emotional analysis data
-    all_emotions: Dict[str, float]
+    all_emotions: dict[str, float]
     sentiment_score: float
-    emotional_triggers: List[EmotionalTrigger]
+    emotional_triggers: list[EmotionalTrigger]
 
     # Personality context
     personality_alignment: float  # How well emotion aligns with known personality
@@ -128,7 +128,7 @@ class EmotionalContext:
 
     # Contextual factors
     conversation_length: int
-    response_time_context: Optional[float]
+    response_time_context: float | None
     topic_emotional_weight: float
 
     # Adaptation recommendations
@@ -148,18 +148,18 @@ class EmotionalMemoryCluster:
 
     # Cluster characteristics
     dominant_emotion: EmotionalState
-    emotion_intensity_range: Tuple[float, float]
+    emotion_intensity_range: tuple[float, float]
     frequency: int  # How often this pattern occurs
 
     # Memory content
-    representative_memories: List[str]  # Key examples
-    common_triggers: List[str]
-    effective_responses: List[str]  # AI responses that worked well
+    representative_memories: list[str]  # Key examples
+    common_triggers: list[str]
+    effective_responses: list[str]  # AI responses that worked well
 
     # Temporal patterns
     created_at: datetime
     last_occurrence: datetime
-    typical_timing: Optional[str]  # e.g., "evening", "weekends", "stressful periods"
+    typical_timing: str | None  # e.g., "evening", "weekends", "stressful periods"
 
     # User feedback
     positive_outcomes: int
@@ -175,13 +175,13 @@ class EmotionalAdaptationStrategy:
     emotional_context: EmotionalContext
 
     # Adaptation parameters
-    tone_adjustments: Dict[str, float]  # warmth, formality, enthusiasm, etc.
+    tone_adjustments: dict[str, float]  # warmth, formality, enthusiasm, etc.
     response_length_modifier: float  # longer/shorter responses
     empathy_emphasis: float  # how much to emphasize understanding
 
     # Personality-based adaptations
-    personality_based_adjustments: Dict[PersonalityDimension, float]
-    communication_style_override: Optional[str]
+    personality_based_adjustments: dict[PersonalityDimension, float]
+    communication_style_override: str | None
 
     # Response strategies
     acknowledge_emotion: bool
@@ -203,9 +203,9 @@ class EmotionalContextEngine:
 
     def __init__(
         self,
-        emotional_ai: Optional[ExternalAPIEmotionAI] = None,
-        personality_profiler: Optional[DynamicPersonalityProfiler] = None,
-        personality_fact_classifier: Optional[PersonalityFactClassifier] = None,
+        emotional_ai: ExternalAPIEmotionAI | None = None,
+        personality_profiler: DynamicPersonalityProfiler | None = None,
+        personality_fact_classifier: PersonalityFactClassifier | None = None,
         emotional_memory_retention_days: int = 90,
         pattern_detection_threshold: int = 3,
     ):
@@ -227,19 +227,19 @@ class EmotionalContextEngine:
         self.pattern_threshold = pattern_detection_threshold
 
         # Emotional context storage
-        self.emotional_contexts: Dict[str, List[EmotionalContext]] = defaultdict(list)
-        self.emotional_clusters: Dict[str, List[EmotionalMemoryCluster]] = defaultdict(list)
-        self.adaptation_strategies: Dict[str, List[EmotionalAdaptationStrategy]] = defaultdict(list)
+        self.emotional_contexts: dict[str, list[EmotionalContext]] = defaultdict(list)
+        self.emotional_clusters: dict[str, list[EmotionalMemoryCluster]] = defaultdict(list)
+        self.adaptation_strategies: dict[str, list[EmotionalAdaptationStrategy]] = defaultdict(list)
 
         # Pattern recognition
-        self.emotional_patterns: Dict[str, Dict[EmotionalPattern, int]] = defaultdict(
+        self.emotional_patterns: dict[str, dict[EmotionalPattern, int]] = defaultdict(
             lambda: defaultdict(int)
         )
-        self.trigger_history: Dict[str, List[Tuple[datetime, EmotionalTrigger]]] = defaultdict(list)
+        self.trigger_history: dict[str, list[tuple[datetime, EmotionalTrigger]]] = defaultdict(list)
 
         # Performance tracking
-        self.adaptation_success_rates: Dict[str, float] = {}
-        self.emotional_accuracy_scores: Dict[str, List[float]] = defaultdict(list)
+        self.adaptation_success_rates: dict[str, float] = {}
+        self.emotional_accuracy_scores: dict[str, list[float]] = defaultdict(list)
 
         logger.info(
             "EmotionalContextEngine initialized with %d day retention",
@@ -251,7 +251,7 @@ class EmotionalContextEngine:
         user_id: str,
         context_id: str,
         user_message: str,
-        conversation_history: Optional[List[Dict]] = None,
+        conversation_history: list[dict] | None = None,
     ) -> EmotionalContext:
         """
         Analyze the complete emotional context of a user interaction.
@@ -412,7 +412,7 @@ class EmotionalContextEngine:
 
         return strategy
 
-    async def cluster_emotional_memories(self, user_id: str) -> List[EmotionalMemoryCluster]:
+    async def cluster_emotional_memories(self, user_id: str) -> list[EmotionalMemoryCluster]:
         """
         Group user's emotional memories into meaningful clusters for pattern recognition.
 
@@ -511,8 +511,8 @@ Respond naturally while being mindful of their emotional state."""
         return prompt
 
     async def get_conversation_emotional_context(
-        self, user_id: str, current_message: Optional[str] = None
-    ) -> Dict[str, Any]:
+        self, user_id: str, current_message: str | None = None
+    ) -> dict[str, Any]:
         """
         Get comprehensive emotional context for conversation enhancement.
 
@@ -590,7 +590,7 @@ Respond naturally while being mindful of their emotional state."""
             logger.warning("Failed to get conversation emotional context: %s", str(e))
             return context_data
 
-    def _fallback_emotional_analysis(self, text: str) -> Dict[str, Any]:
+    def _fallback_emotional_analysis(self, text: str) -> dict[str, Any]:
         """Provide basic emotional analysis when external AI is unavailable"""
         # Simple keyword-based emotion detection
         text_lower = text.lower()
@@ -627,8 +627,8 @@ Respond naturally while being mindful of their emotional state."""
         }
 
     def _detect_emotional_triggers(
-        self, message: str, emotional_data: Dict, personality_context: Dict
-    ) -> List[EmotionalTrigger]:
+        self, message: str, emotional_data: dict, personality_context: dict
+    ) -> list[EmotionalTrigger]:
         """Detect emotional triggers in the user message"""
         triggers = []
         message_lower = message.lower()
@@ -677,7 +677,7 @@ Respond naturally while being mindful of their emotional state."""
         return triggers
 
     def _calculate_personality_alignment(
-        self, emotion: EmotionalState, personality_traits: Dict
+        self, emotion: EmotionalState, personality_traits: dict
     ) -> float:
         """Calculate how well the emotion aligns with known personality"""
         # Analyze if emotion is consistent with user's typical emotional patterns
@@ -711,7 +711,7 @@ Respond naturally while being mindful of their emotional state."""
         else:
             return 0.5
 
-    def _determine_tone_adjustment(self, emotion: EmotionalState, personality_context: Dict) -> str:
+    def _determine_tone_adjustment(self, emotion: EmotionalState, personality_context: dict) -> str:
         """Determine how to adjust response tone based on emotion and personality"""
         # Base tone adjustment on emotion
         if emotion == EmotionalState.SADNESS:
@@ -745,7 +745,7 @@ Respond naturally while being mindful of their emotional state."""
 
         return tone
 
-    def _calculate_empathy_level(self, triggers: List[EmotionalTrigger], intensity: float) -> float:
+    def _calculate_empathy_level(self, triggers: list[EmotionalTrigger], intensity: float) -> float:
         """Calculate the level of empathy needed in the response"""
         base_empathy = 0.5
 
@@ -794,7 +794,7 @@ Respond naturally while being mindful of their emotional state."""
 
     def _analyze_historical_patterns(
         self, user_id: str, current_emotion: EmotionalState
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Analyze historical emotional patterns for the user"""
         user_contexts = self.emotional_contexts.get(user_id, [])
 
@@ -832,7 +832,7 @@ Respond naturally while being mindful of their emotional state."""
 
     def _get_personality_based_adaptations(
         self, context: EmotionalContext
-    ) -> Dict[PersonalityDimension, float]:
+    ) -> dict[PersonalityDimension, float]:
         """Get personality-based adaptation adjustments"""
         adaptations = {}
 
@@ -848,8 +848,8 @@ Respond naturally while being mindful of their emotional state."""
         return adaptations
 
     def _calculate_tone_adjustments(
-        self, context: EmotionalContext, historical_patterns: Dict
-    ) -> Dict[str, float]:
+        self, context: EmotionalContext, historical_patterns: dict
+    ) -> dict[str, float]:
         """Calculate specific tone adjustments based on context and history"""
         adjustments = {"warmth": 0.5, "formality": 0.5, "enthusiasm": 0.5, "gentleness": 0.5}
 
@@ -886,7 +886,7 @@ Respond naturally while being mindful of their emotional state."""
 
         return adjustments
 
-    def _determine_response_strategies(self, context: EmotionalContext) -> Dict[str, bool]:
+    def _determine_response_strategies(self, context: EmotionalContext) -> dict[str, bool]:
         """Determine which response strategies to use"""
         strategies = {
             "acknowledge_emotion": False,
@@ -940,7 +940,7 @@ Respond naturally while being mindful of their emotional state."""
 
         return base_modifier
 
-    def _get_communication_style_override(self, context: EmotionalContext) -> Optional[str]:
+    def _get_communication_style_override(self, context: EmotionalContext) -> str | None:
         """Get communication style override for specific situations"""
         if EmotionalTrigger.OVERWHELMING_EMOTIONS in context.emotional_triggers:
             return "calm_grounding"
@@ -952,7 +952,7 @@ Respond naturally while being mindful of their emotional state."""
             return None
 
     def _predict_strategy_effectiveness(
-        self, context: EmotionalContext, historical_patterns: Dict
+        self, context: EmotionalContext, historical_patterns: dict
     ) -> float:
         """Predict how effective the adaptation strategy will be"""
         base_effectiveness = 0.7
@@ -972,7 +972,7 @@ Respond naturally while being mindful of their emotional state."""
         return max(0.3, min(1.0, base_effectiveness))
 
     def _calculate_strategy_confidence(
-        self, context: EmotionalContext, historical_patterns: Dict
+        self, context: EmotionalContext, historical_patterns: dict
     ) -> float:
         """Calculate confidence in the adaptation strategy"""
         confidence = 0.6
@@ -989,7 +989,7 @@ Respond naturally while being mindful of their emotional state."""
         return max(0.3, min(1.0, confidence))
 
     def _create_emotional_cluster(
-        self, user_id: str, pattern: EmotionalPattern, contexts: List[EmotionalContext]
+        self, user_id: str, pattern: EmotionalPattern, contexts: list[EmotionalContext]
     ) -> EmotionalMemoryCluster:
         """Create an emotional memory cluster from similar contexts"""
         # Analyze cluster characteristics
@@ -1035,7 +1035,7 @@ Respond naturally while being mindful of their emotional state."""
             adaptation_success_rate=0.7,  # Initial estimate
         )
 
-    async def get_user_emotional_summary(self, user_id: str) -> Dict[str, Any]:
+    async def get_user_emotional_summary(self, user_id: str) -> dict[str, Any]:
         """Get a summary of the user's emotional patterns and context"""
         contexts = self.emotional_contexts.get(user_id, [])
         clusters = self.emotional_clusters.get(user_id, [])

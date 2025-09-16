@@ -15,14 +15,13 @@ SECURITY FEATURES:
 VULNERABILITY ADDRESSED: Insufficient Context Boundaries (CVSS 6.8)
 """
 
-import logging
 import json
+import logging
 import os
-from enum import Enum
-from typing import Dict, List, Optional, Set, Any
-from dataclasses import dataclass, asdict
+from dataclasses import asdict, dataclass
 from datetime import datetime
-import hashlib
+from enum import Enum
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -55,10 +54,10 @@ class PrivacyPreferences:
     allow_dm_to_server: bool = False
     allow_server_to_dm: bool = False
     allow_private_to_public: bool = False
-    custom_rules: Optional[Dict[str, bool]] = None
+    custom_rules: dict[str, bool] | None = None
     consent_status: ConsentStatus = ConsentStatus.NOT_ASKED
-    consent_timestamp: Optional[str] = None
-    updated_timestamp: Optional[str] = None
+    consent_timestamp: str | None = None
+    updated_timestamp: str | None = None
 
     def __post_init__(self):
         if self.custom_rules is None:
@@ -124,11 +123,11 @@ class ContextBoundariesManager:
 
         logger.info("Context boundaries manager initialized")
 
-    def _load_preferences(self) -> Dict[str, PrivacyPreferences]:
+    def _load_preferences(self) -> dict[str, PrivacyPreferences]:
         """Load user privacy preferences from disk"""
         try:
             if os.path.exists(self.preferences_file):
-                with open(self.preferences_file, "r") as f:
+                with open(self.preferences_file) as f:
                     data = json.load(f)
                     preferences = {}
                     for user_id, pref_data in data.items():
@@ -191,7 +190,7 @@ class ContextBoundariesManager:
             audit_log = []
             if os.path.exists(self.audit_file):
                 try:
-                    with open(self.audit_file, "r") as f:
+                    with open(self.audit_file) as f:
                         audit_log = json.load(f)
                 except:
                     audit_log = []
@@ -257,7 +256,7 @@ class ContextBoundariesManager:
 
     def request_consent(
         self, user_id: str, source_context: str, target_context: str
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Generate consent request for cross-context memory sharing
 
@@ -315,7 +314,7 @@ class ContextBoundariesManager:
 
     def process_consent_response(
         self, user_id: str, response: str, source_context: str, target_context: str
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Process user consent response"""
         try:
             prefs = self.get_user_preferences(user_id)
@@ -404,7 +403,7 @@ class ContextBoundariesManager:
         source_context: str,
         target_context: str,
         memory_sensitivity: str = "normal",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Check if cross-context memory sharing is allowed for user
 
@@ -506,7 +505,7 @@ class ContextBoundariesManager:
                 "error": str(e),
             }
 
-    def get_privacy_settings_ui(self, user_id: str) -> Dict[str, Any]:
+    def get_privacy_settings_ui(self, user_id: str) -> dict[str, Any]:
         """Generate privacy settings UI for user"""
         prefs = self.get_user_preferences(user_id)
 

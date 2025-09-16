@@ -4,16 +4,15 @@ Provides Redis-compatible interface using in-memory storage with optional file p
 Replacement for Redis in desktop/local deployment scenarios.
 """
 
-import json
-import time
-import logging
 import asyncio
+import json
+import logging
 import pickle
 import threading
-from typing import Dict, List, Optional, Any, Union
+import time
+from collections import OrderedDict
 from pathlib import Path
-from collections import defaultdict, OrderedDict
-import os
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -46,8 +45,8 @@ class LocalMemoryCache:
         self.persistence_interval = persistence_interval
 
         # In-memory storage
-        self._data: Dict[str, Any] = {}
-        self._expiry: Dict[str, float] = {}
+        self._data: dict[str, Any] = {}
+        self._expiry: dict[str, float] = {}
         self._access_order: OrderedDict = OrderedDict()
 
         # Thread safety
@@ -150,7 +149,7 @@ class LocalMemoryCache:
         if expired_keys:
             logger.debug(f"Cleaned up {len(expired_keys)} expired cache entries")
 
-    async def set(self, key: str, value: Any, ex: Optional[int] = None) -> bool:
+    async def set(self, key: str, value: Any, ex: int | None = None) -> bool:
         """Set a key-value pair with optional expiration (Redis-compatible)"""
         with self._lock:
             self._data[key] = value
@@ -164,7 +163,7 @@ class LocalMemoryCache:
 
         return True
 
-    async def get(self, key: str) -> Optional[Any]:
+    async def get(self, key: str) -> Any | None:
         """Get value by key (Redis-compatible)"""
         with self._lock:
             # Check if key has expired
@@ -225,7 +224,7 @@ class LocalMemoryCache:
             self._access_order[key] = time.time()
             return len(self._data[key])
 
-    async def lrange(self, key: str, start: int, stop: int) -> List[Any]:
+    async def lrange(self, key: str, start: int, stop: int) -> list[Any]:
         """Get a range of elements from a list (Redis-compatible)"""
         with self._lock:
             if key not in self._data or not isinstance(self._data[key], list):
@@ -288,7 +287,7 @@ class LocalMemoryCache:
 
             return 1 if is_new else 0
 
-    async def hget(self, key: str, field: str) -> Optional[Any]:
+    async def hget(self, key: str, field: str) -> Any | None:
         """Get field from a hash (Redis-compatible)"""
         with self._lock:
             if key not in self._data or not isinstance(self._data[key], dict):
@@ -297,7 +296,7 @@ class LocalMemoryCache:
             self._access_order[key] = time.time()
             return self._data[key].get(field)
 
-    async def hgetall(self, key: str) -> Dict[str, Any]:
+    async def hgetall(self, key: str) -> dict[str, Any]:
         """Get all fields from a hash (Redis-compatible)"""
         with self._lock:
             if key not in self._data or not isinstance(self._data[key], dict):
@@ -314,7 +313,7 @@ class LocalMemoryCache:
             self._access_order.clear()
         return True
 
-    async def keys(self, pattern: str = "*") -> List[str]:
+    async def keys(self, pattern: str = "*") -> list[str]:
         """Get all keys matching pattern (Redis-compatible)"""
         with self._lock:
             self._cleanup_expired_entries()
@@ -327,7 +326,7 @@ class LocalMemoryCache:
 
             return [key for key in self._data.keys() if fnmatch.fnmatch(key, pattern)]
 
-    async def info(self, section: str = "memory") -> Dict[str, Any]:
+    async def info(self, section: str = "memory") -> dict[str, Any]:
         """Get cache information (Redis-compatible)"""
         with self._lock:
             self._cleanup_expired_entries()
@@ -375,7 +374,7 @@ class LocalMemoryCacheAdapter:
         self.bootstrap_lock_key = self.cache.bootstrap_lock_key
 
     async def store_conversation(
-        self, user_id: str, message: str, response: str, metadata: Optional[Dict[str, Any]] = None
+        self, user_id: str, message: str, response: str, metadata: dict[str, Any] | None = None
     ) -> bool:
         """Store conversation in cache (compatible with existing interface)"""
         conversation_key = f"{self.messages_key}:{user_id}"
@@ -397,7 +396,7 @@ class LocalMemoryCacheAdapter:
 
         return True
 
-    async def get_conversation_history(self, user_id: str, limit: int = 10) -> List[Dict[str, Any]]:
+    async def get_conversation_history(self, user_id: str, limit: int = 10) -> list[dict[str, Any]]:
         """Get conversation history for user"""
         conversation_key = f"{self.messages_key}:{user_id}"
         raw_conversations = await self.cache.lrange(conversation_key, -limit, -1)
@@ -411,7 +410,7 @@ class LocalMemoryCacheAdapter:
 
         return conversations
 
-    async def get_stats(self) -> Dict[str, Any]:
+    async def get_stats(self) -> dict[str, Any]:
         """Get cache statistics"""
         info = await self.cache.info()
         all_keys = await self.cache.keys()

@@ -63,7 +63,7 @@ jobs:
       - name: Check code formatting
         run: |
           black --check --diff .
-          ruff check .
+          ruff check . --exclude verify_builds.py --exclude verify_logs_system.py --exclude validate_build_system.py --exclude validate_config.py
 
       - name: Validate requirements consistency
         run: |

@@ -12,11 +12,9 @@ from src.llm.llm_client import LLMClient
 
 def test_token_limits():
     """Test DialoGPT with longer realistic prompts."""
-    print("🧪 Testing token limits with realistic prompts...")
 
     # Load environment
     if not load_environment():
-        print("❌ Failed to load environment")
         return False
 
     try:
@@ -41,15 +39,8 @@ Please respond as Dream would - with empathy, wisdom, and perhaps a touch of the
         total_chars = sum(len(msg["content"]) for msg in test_messages)
         estimated_tokens = total_chars // 4
 
-        print(f"📊 Prompt Analysis:")
-        print(f"   Total characters: {total_chars}")
-        print(f"   Estimated tokens: {estimated_tokens}")
-        print(f"   DialoGPT limit: 1024 tokens")
-        print(f"   Status: {'❌ EXCEEDS LIMIT' if estimated_tokens > 1024 else '✅ Within limit'}")
 
         if estimated_tokens > 1024:
-            print(f"⚠️  This prompt will likely cause issues with DialoGPT")
-            print(f"   Overflow: {estimated_tokens - 1024} tokens over limit")
 
             # Try with shorter prompt
             short_messages = [
@@ -57,24 +48,19 @@ Please respond as Dream would - with empathy, wisdom, and perhaps a touch of the
                 {"role": "user", "content": "I have nightmares about mazes. What does this mean?"},
             ]
 
-            print(f"\n🔄 Testing with shortened prompt...")
             response = llm_client.generate_chat_completion(short_messages, max_tokens=100)
 
             if response and "choices" in response:
-                response_text = response["choices"][0]["message"]["content"]
-                print(f"✅ Short prompt worked: {response_text[:100]}...")
+                response["choices"][0]["message"]["content"]
                 return True
         else:
-            print(f"\n🔄 Testing full prompt...")
             response = llm_client.generate_chat_completion(test_messages, max_tokens=200)
 
             if response and "choices" in response:
-                response_text = response["choices"][0]["message"]["content"]
-                print(f"✅ Full prompt worked: {response_text[:100]}...")
+                response["choices"][0]["message"]["content"]
                 return True
 
-    except Exception as e:
-        print(f"❌ Token limit test failed: {e}")
+    except Exception:
         return False
 
 

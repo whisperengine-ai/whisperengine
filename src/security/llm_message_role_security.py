@@ -8,10 +8,10 @@ and protection against role-based attacks in LLM interactions.
 """
 
 import logging
-import re
 import os
-from typing import List, Dict, Any, Optional, Tuple
+import re
 from enum import Enum
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +40,7 @@ class LLMMessageRoleSecurityProcessor:
 
     def __init__(
         self,
-        max_system_length: Optional[int] = None,
+        max_system_length: int | None = None,
         max_messages: int = 50,
         security_log_level: str = "normal",
     ):
@@ -98,8 +98,8 @@ class LLMMessageRoleSecurityProcessor:
         logger.info("LLM Message Role Security Processor initialized")
 
     def validate_message_structure(
-        self, message: Dict[str, Any]
-    ) -> Tuple[bool, Optional[SecurityThreat]]:
+        self, message: dict[str, Any]
+    ) -> tuple[bool, SecurityThreat | None]:
         """
         Validate the basic structure of a message
 
@@ -125,7 +125,7 @@ class LLMMessageRoleSecurityProcessor:
 
         return True, None
 
-    def scan_for_injection_attempts(self, content: str) -> List[str]:
+    def scan_for_injection_attempts(self, content: str) -> list[str]:
         """
         Scan content for potential system prompt injection attempts
 
@@ -185,7 +185,7 @@ class LLMMessageRoleSecurityProcessor:
 
         return sanitized
 
-    def validate_user_message_content(self, content: str) -> Tuple[str, List[str]]:
+    def validate_user_message_content(self, content: str) -> tuple[str, list[str]]:
         """
         Validate and sanitize user message content
 
@@ -214,8 +214,8 @@ class LLMMessageRoleSecurityProcessor:
         return sanitized, threats
 
     def process_system_messages_securely(
-        self, system_messages: List[Dict[str, Any]]
-    ) -> Optional[Dict[str, Any]]:
+        self, system_messages: list[dict[str, Any]]
+    ) -> dict[str, Any] | None:
         """
         SECURITY ENHANCED: Select single highest priority system message instead of combining
 
@@ -386,7 +386,7 @@ class LLMMessageRoleSecurityProcessor:
 
         return max(priority, 0.0)  # Never negative
 
-    def validate_message_sequence(self, messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    def validate_message_sequence(self, messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """
         Validate and fix message sequence for proper role alternation
 
@@ -454,7 +454,7 @@ class LLMMessageRoleSecurityProcessor:
 
         return validated_messages
 
-    def secure_message_processing(self, messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    def secure_message_processing(self, messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """
         Main method for secure message processing with comprehensive security controls
 
@@ -520,7 +520,7 @@ class LLMMessageRoleSecurityProcessor:
 
         return final_messages
 
-    def get_security_report(self) -> Dict[str, Any]:
+    def get_security_report(self) -> dict[str, Any]:
         """
         Get a report of security events and processing statistics
 
@@ -552,7 +552,7 @@ def get_security_processor() -> LLMMessageRoleSecurityProcessor:
     return _security_processor
 
 
-def secure_message_role_processing(messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+def secure_message_role_processing(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """
     Main entry point for secure message role processing
 
@@ -580,6 +580,3 @@ if __name__ == "__main__":
     processor = LLMMessageRoleSecurityProcessor()
     secure_messages = processor.secure_message_processing(test_messages)
 
-    print("Original messages:", len(test_messages))
-    print("Processed messages:", len(secure_messages))
-    print("Security report:", processor.get_security_report())

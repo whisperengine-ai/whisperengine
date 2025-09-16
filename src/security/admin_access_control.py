@@ -11,19 +11,18 @@ This module provides comprehensive admin access control with:
 - Admin activity monitoring
 """
 
-import logging
 import hashlib
-import json
-from typing import Dict, List, Optional, Set, Any, Tuple
+import logging
 from dataclasses import dataclass, field
-from enum import Enum
 from datetime import datetime, timedelta
-import discord
+from enum import Enum
+from typing import Any
+
 from discord.ext import commands
 
 # Import secure logging for admin audit trail
 try:
-    from secure_logging import get_secure_logger, LogLevel, DataSensitivity
+    from secure_logging import DataSensitivity, LogLevel, get_secure_logger
 
     secure_logger = get_secure_logger("admin_access_control")
     HAS_SECURE_LOGGING = True
@@ -33,7 +32,7 @@ except ImportError:
     HAS_SECURE_LOGGING = False
 
 
-def log_admin_action(message: str, user_id: Optional[int] = None, level: str = "INFO"):
+def log_admin_action(message: str, user_id: int | None = None, level: str = "INFO"):
     """Helper function to log admin actions with fallback"""
     if HAS_SECURE_LOGGING:
         log_level = getattr(LogLevel, level, LogLevel.INFO)
@@ -51,10 +50,10 @@ def log_admin_action(message: str, user_id: Optional[int] = None, level: str = "
 
 def log_security_event(
     message: str,
-    user_id: Optional[int] = None,
+    user_id: int | None = None,
     threat_level: str = "medium",
     event_type: str = "admin_security",
-    additional_data: Optional[Dict] = None,
+    additional_data: dict | None = None,
 ):
     """Helper function to log security events with fallback"""
     if HAS_SECURE_LOGGING:
@@ -117,10 +116,10 @@ class AdminSession:
     session_start: datetime
     last_activity: datetime
     session_token: str
-    operations_performed: List[str] = field(default_factory=list)
-    failed_operations: List[str] = field(default_factory=list)
+    operations_performed: list[str] = field(default_factory=list)
+    failed_operations: list[str] = field(default_factory=list)
     is_elevated: bool = False
-    elevation_expires: Optional[datetime] = None
+    elevation_expires: datetime | None = None
 
 
 @dataclass
@@ -134,10 +133,10 @@ class AdminAuditEntry:
     success: bool
     details: str
     session_token: str
-    channel_id: Optional[int] = None
-    guild_id: Optional[int] = None
-    ip_address: Optional[str] = None
-    user_agent: Optional[str] = None
+    channel_id: int | None = None
+    guild_id: int | None = None
+    ip_address: str | None = None
+    user_agent: str | None = None
 
 
 class AdminAccessController:
@@ -162,22 +161,22 @@ class AdminAccessController:
     ):
 
         # Admin configuration
-        self.admin_users: Dict[int, AdminLevel] = {}
-        self.owner_user_ids: Set[int] = set()
+        self.admin_users: dict[int, AdminLevel] = {}
+        self.owner_user_ids: set[int] = set()
 
         # Session management
-        self.active_sessions: Dict[int, AdminSession] = {}
+        self.active_sessions: dict[int, AdminSession] = {}
         self.session_timeout = timedelta(minutes=session_timeout_minutes)
         self.elevation_timeout = timedelta(minutes=elevation_timeout_minutes)
 
         # Security controls
-        self.failed_attempts: Dict[int, List[datetime]] = {}
-        self.locked_users: Dict[int, datetime] = {}
+        self.failed_attempts: dict[int, list[datetime]] = {}
+        self.locked_users: dict[int, datetime] = {}
         self.max_failed_attempts = max_failed_attempts
         self.lockout_duration = timedelta(minutes=lockout_duration_minutes)
 
         # Audit logging
-        self.audit_log: List[AdminAuditEntry] = []
+        self.audit_log: list[AdminAuditEntry] = []
         self.max_audit_entries = 10000  # Keep last 10k entries in memory
 
         # Operation permissions mapping
@@ -206,7 +205,7 @@ class AdminAccessController:
 
         log_admin_action("Admin Access Controller initialized")
 
-    def load_admin_config(self, admin_config: Dict[str, Any]):
+    def load_admin_config(self, admin_config: dict[str, Any]):
         """
         Load admin configuration from environment or config file
 
@@ -325,7 +324,7 @@ class AdminAccessController:
 
         return AdminLevel.NONE
 
-    def create_admin_session(self, ctx: commands.Context) -> Optional[AdminSession]:
+    def create_admin_session(self, ctx: commands.Context) -> AdminSession | None:
         """
         Create admin session for user
 
@@ -358,7 +357,7 @@ class AdminAccessController:
 
         return session
 
-    def validate_admin_session(self, user_id: int) -> Optional[AdminSession]:
+    def validate_admin_session(self, user_id: int) -> AdminSession | None:
         """
         Validate and refresh admin session
 
@@ -396,7 +395,7 @@ class AdminAccessController:
 
     def check_operation_permission(
         self, ctx: commands.Context, operation: AdminOperation, require_elevation: bool = False
-    ) -> Tuple[bool, str]:
+    ) -> tuple[bool, str]:
         """
         Check if user has permission for specific operation
 
@@ -452,7 +451,7 @@ class AdminAccessController:
 
         return True, "Authorized"
 
-    def elevate_privileges(self, ctx: commands.Context) -> Tuple[bool, str]:
+    def elevate_privileges(self, ctx: commands.Context) -> tuple[bool, str]:
         """
         Elevate user's privileges for sensitive operations
 
@@ -535,7 +534,7 @@ class AdminAccessController:
             level="INFO" if success else "WARNING",
         )
 
-    def get_admin_status(self, ctx: commands.Context) -> Dict[str, Any]:
+    def get_admin_status(self, ctx: commands.Context) -> dict[str, Any]:
         """
         Get admin status information for user
 
@@ -574,7 +573,7 @@ class AdminAccessController:
 
         return status
 
-    def get_audit_summary(self, hours: int = 24) -> Dict[str, Any]:
+    def get_audit_summary(self, hours: int = 24) -> dict[str, Any]:
         """
         Get audit summary for recent admin activities
 
@@ -592,7 +591,7 @@ class AdminAccessController:
             "total_operations": len(recent_entries),
             "successful_operations": len([e for e in recent_entries if e.success]),
             "failed_operations": len([e for e in recent_entries if not e.success]),
-            "unique_users": len(set(e.user_id for e in recent_entries)),
+            "unique_users": len({e.user_id for e in recent_entries}),
             "operations_by_type": {},
             "users_by_activity": {},
         }

@@ -6,15 +6,12 @@ Provides a clean interface between native UIs and the AI core components.
 
 import asyncio
 import logging
-import threading
-from typing import Dict, List, Optional, Any
-from dataclasses import dataclass
-from datetime import datetime
-import json
 
 # Import AI core components
 import sys
-import os
+import threading
+from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 
 # Add src to path
@@ -28,9 +25,9 @@ class AIMessage:
     content: str
     timestamp: datetime
     message_type: str = "text"  # text, system, error
-    emotions: Optional[Dict] = None
-    suggestions: Optional[List[str]] = None
-    memory_updates: Optional[Dict] = None
+    emotions: dict | None = None
+    suggestions: list[str] | None = None
+    memory_updates: dict | None = None
 
 
 @dataclass
@@ -47,7 +44,7 @@ class ConversationInfo:
 class NativeAIService:
     """Platform-agnostic AI service for native desktop applications"""
 
-    def __init__(self, user_id: Optional[str] = None):
+    def __init__(self, user_id: str | None = None):
         """Initialize the AI service with core components"""
         self.logger = logging.getLogger(__name__)
         self.is_initialized = False
@@ -66,7 +63,7 @@ class NativeAIService:
         self.loop_thread = None
 
         # Conversation management
-        self.conversations: Dict[str, ConversationInfo] = {}
+        self.conversations: dict[str, ConversationInfo] = {}
 
     async def initialize(self) -> bool:
         """Initialize AI components asynchronously"""
@@ -199,7 +196,7 @@ class NativeAIService:
                 self.logger.warning(f"Error stopping event loop: {e}")
 
     async def process_message_async(
-        self, message: str, conversation_id: Optional[str] = None
+        self, message: str, conversation_id: str | None = None
     ) -> AIMessage:
         """Process a message asynchronously"""
         try:
@@ -213,7 +210,7 @@ class NativeAIService:
             conversation_id = conversation_id or self.current_conversation_id
 
             # Create context for the message
-            user_context = {
+            {
                 "user_id": self.current_user_id,
                 "conversation_id": conversation_id,
                 "platform": "native_macos",
@@ -223,8 +220,9 @@ class NativeAIService:
             # Process through Universal Chat Orchestrator
             if self.universal_chat:
                 # Create a Message object for the orchestrator
-                from src.platforms.universal_chat import Message, MessageType, ChatPlatform
                 import uuid
+
+                from src.platforms.universal_chat import ChatPlatform, Message, MessageType
 
                 message_obj = Message(
                     message_id=str(uuid.uuid4()),
@@ -275,7 +273,7 @@ class NativeAIService:
                 message_type="error",
             )
 
-    def process_message(self, message: str, conversation_id: Optional[str] = None) -> AIMessage:
+    def process_message(self, message: str, conversation_id: str | None = None) -> AIMessage:
         """Process a message synchronously (for native UI threads)"""
         if not self.event_loop:
             return AIMessage(
@@ -290,7 +288,7 @@ class NativeAIService:
         try:
             # Wait for result with timeout
             return future.result(timeout=30)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             return AIMessage(
                 content="Request timed out. Please try again.",
                 timestamp=datetime.now(),
@@ -301,7 +299,7 @@ class NativeAIService:
                 content=f"Error: {str(e)}", timestamp=datetime.now(), message_type="error"
             )
 
-    async def create_new_conversation(self, title: Optional[str] = None) -> str:
+    async def create_new_conversation(self, title: str | None = None) -> str:
         """Create a new conversation"""
         import uuid
 
@@ -321,7 +319,7 @@ class NativeAIService:
         self.logger.info(f"Created new conversation: {title}")
         return conversation_id
 
-    def get_conversations(self) -> List[ConversationInfo]:
+    def get_conversations(self) -> list[ConversationInfo]:
         """Get list of all conversations"""
         return list(self.conversations.values())
 
@@ -333,7 +331,7 @@ class NativeAIService:
             return True
         return False
 
-    def get_conversation_history(self, conversation_id: Optional[str] = None) -> List[Dict]:
+    def get_conversation_history(self, conversation_id: str | None = None) -> list[dict]:
         """Get conversation history (placeholder for now)"""
         # This would integrate with the memory system
         # For now, return empty list

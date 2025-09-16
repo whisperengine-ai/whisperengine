@@ -4,9 +4,9 @@ Test that legitimate name introductions still work after the fix
 """
 
 import pytest
-from env_manager import load_environment
 from emotion_manager import EmotionManager
-from lmstudio_client import LMStudioClient
+
+from env_manager import load_environment
 
 # Load environment variables using centralized manager
 load_environment()
@@ -38,8 +38,6 @@ def _run_legitimate_name_extraction_test(em):
         "Hi, my name is Jennifer",
     ]
 
-    print("Testing legitimate name extraction:")
-    print("=" * 50)
 
     for i, message in enumerate(test_cases):
         user_id = f"name_test_user_{i}"
@@ -47,21 +45,14 @@ def _run_legitimate_name_extraction_test(em):
         # Process the interaction
         profile, emotion = em.process_interaction(user_id, message)
 
-        print(f"Message: '{message}'")
-        print(f"Extracted name: {profile.name}")
-        print(f"Name: {profile.name}")
 
         # Check if a name was correctly extracted
         if profile.name:
-            print(f"✅ GOOD: Correctly extracted name '{profile.name}'")
+            pass
         else:
-            print("❌ ERROR: Failed to extract legitimate name")
+            pass
 
-        print("-" * 30)
 
 
 if __name__ == "__main__":
-    print("Use pytest to run these tests:")
-    print("  pytest tests/test_legitimate_names.py -v")
-    print("  pytest tests/test_legitimate_names.py -m unit")
-    print("  pytest tests/test_legitimate_names.py -m integration")
+    pass

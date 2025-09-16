@@ -3,12 +3,11 @@ Enhanced Shutdown Handler with Graceful Cleanup
 Addresses: Data loss, incomplete operations, resource leaks
 """
 
-import signal
 import asyncio
-import logging
-import threading
-from typing import Set
 import atexit
+import logging
+import signal
+import threading
 
 logger = logging.getLogger(__name__)
 
@@ -18,7 +17,7 @@ class GracefulShutdownManager:
 
     def __init__(self, bot=None):
         self.shutdown_requested = False
-        self.active_operations: Set[asyncio.Task] = set()
+        self.active_operations: set[asyncio.Task] = set()
         self.cleanup_functions = []
         self.shutdown_lock = threading.Lock()
         self.bot = bot  # Discord bot reference for proper shutdown
@@ -57,7 +56,7 @@ class GracefulShutdownManager:
         try:
             loop = asyncio.get_running_loop()
             # Schedule the shutdown coroutine from the signal handler context
-            future = asyncio.run_coroutine_threadsafe(self.graceful_shutdown(), loop)
+            asyncio.run_coroutine_threadsafe(self.graceful_shutdown(), loop)
             logger.debug("Graceful shutdown scheduled in event loop")
         except RuntimeError as e:
             logger.error(f"Could not schedule graceful shutdown: {e}")
@@ -116,7 +115,7 @@ class GracefulShutdownManager:
                     asyncio.gather(*self.active_operations, return_exceptions=True), timeout=timeout
                 )
                 logger.info("All operations completed")
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 logger.warning("Some operations did not complete in time")
                 # Cancel remaining operations
                 for task in self.active_operations:
@@ -155,7 +154,7 @@ class GracefulShutdownManager:
         """Emergency cleanup for atexit"""
         if self.cleanup_functions:
             logger.warning("Emergency cleanup triggered")
-            for priority, cleanup_func in self.cleanup_functions:
+            for _priority, cleanup_func in self.cleanup_functions:
                 try:
                     if not asyncio.iscoroutinefunction(cleanup_func):
                         cleanup_func()

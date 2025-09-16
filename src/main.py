@@ -13,17 +13,16 @@ import asyncio
 import logging
 import os
 import sys
-from typing import Optional
 
 # Core modular imports
 from src.core.bot import DiscordBotCore
-from src.core.bot_launcher import create_discord_bot, start_bot, bot_name_filter
+from src.core.bot_launcher import bot_name_filter, start_bot
+from src.handlers.admin import AdminCommandHandlers
 from src.handlers.events import BotEventHandlers
-from src.handlers.status import StatusCommandHandlers
 from src.handlers.help import HelpCommandHandlers
 from src.handlers.memory import MemoryCommandHandlers
-from src.handlers.admin import AdminCommandHandlers
 from src.handlers.privacy import PrivacyCommandHandlers
+from src.handlers.status import StatusCommandHandlers
 from src.handlers.voice import VoiceCommandHandlers
 from src.utils.health_server import create_health_server
 from src.utils.helpers import is_admin
@@ -47,9 +46,9 @@ class ModularBotManager:
             debug_mode: Enable debug logging and features
         """
         self.debug_mode = debug_mode
-        self.bot_core: Optional[DiscordBotCore] = None
+        self.bot_core: DiscordBotCore | None = None
         self.bot = None
-        self.event_handlers: Optional[BotEventHandlers] = None
+        self.event_handlers: BotEventHandlers | None = None
         self.command_handlers = {}
         self.health_server = None
 

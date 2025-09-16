@@ -3,15 +3,15 @@ Voice command handlers for Discord bot
 Manages voice channel operations, TTS, and voice-related functionality
 """
 
-import logging
-import discord
-from discord.ext import commands
 import asyncio
+import logging
 import os
-from typing import Optional
 from functools import wraps
 
-from src.utils.exceptions import LLMError, LLMConnectionError, LLMTimeoutError, LLMRateLimitError
+import discord
+from discord.ext import commands
+
+from src.utils.exceptions import LLMConnectionError, LLMRateLimitError, LLMTimeoutError
 
 logger = logging.getLogger(__name__)
 
@@ -84,7 +84,7 @@ class VoiceCommandHandlers:
 
         @self.bot.command(name="join", aliases=["j"])
         @bot_name_filter()
-        async def join_voice(ctx, *, channel_name: Optional[str] = None):
+        async def join_voice(ctx, *, channel_name: str | None = None):
             """
             Join a voice channel
             Usage: !join [channel_name] or !join whisperengine [channel_name]
@@ -187,7 +187,7 @@ class VoiceCommandHandlers:
             """
             await self._voice_help_handler(ctx)
 
-    async def _join_voice_handler(self, ctx, channel_name: Optional[str] = None):
+    async def _join_voice_handler(self, ctx, channel_name: str | None = None):
         """Handle join voice channel command"""
         try:
             self.logger.info(

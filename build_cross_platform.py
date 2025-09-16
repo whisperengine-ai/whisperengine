@@ -4,14 +4,12 @@ Cross-Platform Build System for WhisperEngine Desktop App
 Handles building native executables for macOS, Windows, and Linux.
 """
 
-import os
-import sys
-import platform
-import subprocess
-import shutil
-from pathlib import Path
-from typing import Dict, List, Optional
 import argparse
+import platform
+import shutil
+import subprocess
+import sys
+from pathlib import Path
 
 
 class CrossPlatformBuilder:
@@ -63,10 +61,10 @@ class CrossPlatformBuilder:
         else:
             raise ValueError(f"Unsupported platform: {system}")
 
-    def get_common_config(self) -> Dict:
+    def get_common_config(self) -> dict:
         """Get common configuration for all platforms"""
         src_path = self.project_root / "src"
-        ui_path = src_path / "ui"
+        src_path / "ui"
 
         return {
             "data_files": [
@@ -232,13 +230,11 @@ app = BUNDLE(
         with open(spec_path, "w", encoding="utf-8") as f:
             f.write(spec_content)
 
-        print(f"✅ Generated {config['name']} spec file: {spec_path}")
         return spec_path
 
     def build_platform(self, target_platform: str, clean: bool = True) -> bool:
         """Build for specific platform"""
         if target_platform not in self.platforms:
-            print(f"❌ Unsupported platform: {target_platform}")
             return False
 
         config = self.platforms[target_platform]
@@ -246,15 +242,8 @@ app = BUNDLE(
         # Check for cross-compilation
         is_cross_compile = target_platform != self.current_platform
         if is_cross_compile:
-            print(
-                f"⚠️  Cross-compilation detected: {self.platforms[self.current_platform]['name']} → {config['name']}"
-            )
-            print(
-                f"   Note: This creates a {config['name']}-configured build but may not be fully native"
-            )
-            print(f"   For best results, build on native {config['name']} system")
+            pass
 
-        print(f"🔨 Building WhisperEngine for {config['name']}...")
 
         try:
             # Generate spec file
@@ -276,7 +265,6 @@ app = BUNDLE(
             cmd.extend(["--noconfirm", str(spec_file)])
 
             # Run PyInstaller
-            print(f"🚀 Running: {' '.join(cmd)}")
             result = subprocess.run(cmd, cwd=self.project_root, capture_output=True, text=True)
 
             if result.returncode == 0:
@@ -314,28 +302,20 @@ app = BUNDLE(
                         break
 
                 if output_path:
-                    print(f"✅ {config['name']} build successful!")
-                    print(f"📦 Output: {output_path}")
                     return True
                 else:
-                    print(f"❌ Build completed but output not found")
-                    print(f"   Checked locations:")
                     for path in possible_outputs:
-                        print(f"     - {path}")
-                    print(f"   Available files in dist/:")
+                        pass
                     try:
-                        for item in self.dist_dir.iterdir():
-                            print(f"     - {item}")
+                        for _item in self.dist_dir.iterdir():
+                            pass
                     except:
-                        print("     (could not list dist directory)")
+                        pass
                     return False
             else:
-                print(f"❌ {config['name']} build failed!")
-                print(f"Error: {result.stderr}")
                 return False
 
-        except Exception as e:
-            print(f"❌ Build error: {e}")
+        except Exception:
             return False
 
     def build_current_platform(self, clean: bool = True) -> bool:
@@ -343,52 +323,37 @@ app = BUNDLE(
         current = self.detect_platform()
         return self.build_platform(current, clean)
 
-    def build_all_supported(self, clean: bool = True) -> Dict[str, bool]:
+    def build_all_supported(self, clean: bool = True) -> dict[str, bool]:
         """Build for all supported platforms (if possible)"""
         results = {}
 
-        print("🌍 Cross-platform build initiated...")
-        print(f"📍 Current platform: {self.platforms[self.current_platform]['name']}")
 
         for platform_key in self.platforms:
             if platform_key == self.current_platform:
-                print(f"\n🎯 Building for current platform: {self.platforms[platform_key]['name']}")
                 results[platform_key] = self.build_platform(platform_key, clean)
             else:
-                print(
-                    f"\n🔄 Attempting cross-compilation to: {self.platforms[platform_key]['name']}"
-                )
-                print(f"   ⚠️  Note: Cross-compiled builds may have limitations")
-                print(
-                    f"   💡 For production use, build on native {self.platforms[platform_key]['name']} system"
-                )
                 results[platform_key] = self.build_platform(platform_key, clean)
 
         return results
 
     def clean_build_artifacts(self):
         """Clean build artifacts"""
-        print("🧹 Cleaning build artifacts...")
 
         # Remove build and dist directories
         if self.build_dir.exists():
             shutil.rmtree(self.build_dir)
-            print(f"🗑️  Removed: {self.build_dir}")
 
         if self.dist_dir.exists():
             shutil.rmtree(self.dist_dir)
-            print(f"🗑️  Removed: {self.dist_dir}")
 
         # Remove spec files
         for platform_config in self.platforms.values():
             spec_path = self.project_root / platform_config["spec_file"]
             if spec_path.exists():
                 spec_path.unlink()
-                print(f"🗑️  Removed: {spec_path}")
 
-        print("✅ Cleanup complete")
 
-    def get_build_info(self) -> Dict:
+    def get_build_info(self) -> dict:
         """Get build environment information"""
         return {
             "platform": platform.platform(),
@@ -420,14 +385,11 @@ def main():
 
     builder = CrossPlatformBuilder()
 
-    print("🤖 WhisperEngine Cross-Platform Builder")
-    print("=" * 50)
 
     if args.command == "info":
         info = builder.get_build_info()
-        print("📊 Build Environment Information:")
-        for key, value in info.items():
-            print(f"   {key}: {value}")
+        for _key, _value in info.items():
+            pass
 
     elif args.command == "clean":
         builder.clean_build_artifacts()
@@ -440,24 +402,20 @@ def main():
             success = builder.build_current_platform(clean)
 
         if success:
-            print("\n🎉 Build completed successfully!")
+            pass
         else:
-            print("\n💥 Build failed!")
             sys.exit(1)
 
     elif args.command == "build-all":
         clean = not args.no_clean
         results = builder.build_all_supported(clean)
 
-        print("\n📊 Build Results:")
-        for platform, success in results.items():
-            status = "✅ Success" if success else "❌ Failed"
-            print(f"   {builder.platforms[platform]['name']}: {status}")
+        for _platform, success in results.items():
+            pass
 
         if any(results.values()):
-            print("\n🎉 At least one build succeeded!")
+            pass
         else:
-            print("\n💥 All builds failed!")
             sys.exit(1)
 
 

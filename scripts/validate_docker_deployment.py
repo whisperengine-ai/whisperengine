@@ -6,13 +6,12 @@ This script validates the WhisperEngine Docker Compose deployment
 by testing connectivity to all services and verifying schema setup.
 """
 
-import asyncio
+import logging
 import os
+import subprocess
 import sys
 import time
-from typing import Dict, Any, Optional
-import subprocess
-import logging
+from typing import Any
 
 # Set up logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
@@ -27,7 +26,7 @@ class DockerComposeValidator:
         self.required_services = ["whisperengine-bot", "postgres", "redis", "chromadb", "neo4j"]
         self.validation_results = {}
 
-    def run_command(self, command: str, shell: bool = True) -> Dict[str, Any]:
+    def run_command(self, command: str, shell: bool = True) -> dict[str, Any]:
         """Run a shell command and return results"""
         try:
             result = subprocess.run(
@@ -82,7 +81,7 @@ class DockerComposeValidator:
         required_vars = ["DISCORD_BOT_TOKEN", "POSTGRES_PASSWORD"]
         env_vars = {}
 
-        with open(".env", "r") as f:
+        with open(".env") as f:
             for line in f:
                 line = line.strip()
                 if line and not line.startswith("#") and "=" in line:
@@ -334,27 +333,6 @@ def main():
     cleanup_after = "--no-cleanup" not in sys.argv
 
     if "--help" in sys.argv or "-h" in sys.argv:
-        print(
-            """
-WhisperEngine Docker Compose Validation
-
-Usage:
-    python validate_docker_deployment.py [options]
-
-Options:
-    --no-cleanup    Don't stop services after validation
-    --help, -h      Show this help message
-
-This script will:
-1. Check Docker and Docker Compose prerequisites
-2. Start all services (postgres, redis, chromadb, neo4j, bot)
-3. Wait for services to become healthy
-4. Test connectivity to each service
-5. Verify database schema initialization
-6. Test application health endpoint
-7. Cleanup services (unless --no-cleanup is specified)
-"""
-        )
         return
 
     success = validator.run_validation(cleanup_after=cleanup_after)

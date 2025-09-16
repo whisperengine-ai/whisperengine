@@ -21,10 +21,8 @@ Examples:
 
 import argparse
 import json
-import sys
 import logging
-from datetime import datetime, timezone
-from typing import Dict, List, Optional, Tuple
+import sys
 from pathlib import Path
 
 # Add the src directory to Python path for imports first
@@ -37,8 +35,8 @@ from env_manager import load_environment
 load_environment()
 
 # Import our existing memory system
-from src.memory.memory_manager import UserMemoryManager
 from src.llm.llm_client import LLMClient
+from src.memory.memory_manager import UserMemoryManager
 from src.utils.exceptions import MemoryError, ValidationError
 
 # Set up logging
@@ -83,14 +81,14 @@ class ChatGPTImporter:
             logger.error(f"Failed to initialize ChatGPT importer: {e}")
             raise MemoryError(f"Failed to initialize importer: {e}")
 
-    def load_chatgpt_export(self, json_file_path: str) -> Dict:
+    def load_chatgpt_export(self, json_file_path: str) -> dict:
         """Load and parse ChatGPT export JSON file"""
         try:
             file_path = Path(json_file_path)
             if not file_path.exists():
                 raise FileNotFoundError(f"File not found: {json_file_path}")
 
-            with open(file_path, "r", encoding="utf-8") as f:
+            with open(file_path, encoding="utf-8") as f:
                 data = json.load(f)
 
             logger.info(f"Loaded ChatGPT export from {json_file_path}")
@@ -103,7 +101,7 @@ class ChatGPTImporter:
             logger.error(f"Error loading file: {e}")
             raise
 
-    def parse_conversations(self, export_data: Dict) -> List[Dict]:
+    def parse_conversations(self, export_data: dict) -> list[dict]:
         """Parse conversations from ChatGPT export data"""
         conversations = []
 
@@ -129,7 +127,7 @@ class ChatGPTImporter:
 
         logger.info(f"Processing {len(raw_conversations)} raw conversations...")
 
-        for i, conv_data in enumerate(raw_conversations):
+        for _i, conv_data in enumerate(raw_conversations):
             try:
                 parsed_conv = self._parse_single_conversation(conv_data)
                 if parsed_conv:
@@ -141,7 +139,7 @@ class ChatGPTImporter:
         logger.info(f"Parsed {len(conversations)} conversations from export")
         return conversations
 
-    def _parse_single_conversation(self, conv_data: Dict) -> Optional[Dict]:
+    def _parse_single_conversation(self, conv_data: dict) -> dict | None:
         """Parse a single conversation from ChatGPT export"""
         try:
             # Extract conversation metadata
@@ -178,7 +176,7 @@ class ChatGPTImporter:
             logger.warning(f"Error parsing conversation: {e}")
             return None
 
-    def _extract_messages_from_mapping(self, mapping: Dict) -> List[Dict]:
+    def _extract_messages_from_mapping(self, mapping: dict) -> list[dict]:
         """Extract messages from ChatGPT's mapping structure"""
         messages = []
 
@@ -243,7 +241,7 @@ class ChatGPTImporter:
         logger.debug(f"Extracted {len(messages)} messages from mapping")
         return messages
 
-    def _convert_to_conversation_turns(self, messages: List[Dict]) -> List[Tuple[str, str]]:
+    def _convert_to_conversation_turns(self, messages: list[dict]) -> list[tuple[str, str]]:
         """Convert messages to user-assistant conversation turns"""
         turns = []
         current_user_msg = ""
@@ -291,10 +289,10 @@ class ChatGPTImporter:
     def import_conversations(
         self,
         user_id: str,
-        conversations: List[Dict],
-        channel_id: Optional[str] = None,
+        conversations: list[dict],
+        channel_id: str | None = None,
         dry_run: bool = False,
-    ) -> Dict:
+    ) -> dict:
         """Import conversations into ChromaDB"""
         stats = {
             "total_conversations": len(conversations),
@@ -459,24 +457,14 @@ Examples:
         )
 
         # Print summary
-        print("\n" + "=" * 50)
-        print("IMPORT SUMMARY")
-        print("=" * 50)
-        print(f"Total conversations: {stats['total_conversations']}")
-        print(f"Total turns: {stats['total_turns']}")
-        print(f"Imported turns: {stats['imported_turns']}")
-        print(f"Skipped turns: {stats['skipped_turns']}")
-        print(f"Errors: {stats['errors']}")
 
         if args.dry_run:
-            print("\nDRY RUN COMPLETED - No data was actually stored")
+            pass
         else:
-            print(
-                f"\nSUCCESS - Imported {stats['imported_turns']} conversation turns for user {user_id}"
-            )
+            pass
 
         if stats["errors"] > 0:
-            print(f"\nWARNING - {stats['errors']} errors occurred during import")
+            pass
 
     except Exception as e:
         logger.error(f"Import failed: {e}")

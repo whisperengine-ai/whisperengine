@@ -3,22 +3,23 @@
 Enhanced environment configuration manager with best practices.
 """
 
+import logging
 import os
 import sys
 from pathlib import Path
+from typing import Any
+
 from dotenv import load_dotenv
-from typing import Optional, Dict, Any
-import logging
 
 
 class EnvironmentManager:
     """Centralized environment configuration management."""
 
-    def __init__(self, project_root: Optional[Path] = None):
+    def __init__(self, project_root: Path | None = None):
         self.project_root = project_root or Path(__file__).parent
         self.loaded_files = []
 
-    def load_environment(self, mode: Optional[str] = None, force_reload: bool = False) -> bool:
+    def load_environment(self, mode: str | None = None, force_reload: bool = False) -> bool:
         """
         Load environment configuration with proper precedence.
 
@@ -92,7 +93,7 @@ class EnvironmentManager:
             if any(key.startswith(prefix) for prefix in bot_prefixes):
                 del os.environ[key]
 
-    def validate_required_vars(self) -> Dict[str, Any]:
+    def validate_required_vars(self) -> dict[str, Any]:
         """Validate required environment variables."""
         required_vars = {
             "DISCORD_BOT_TOKEN": "Discord bot token is required",
@@ -113,7 +114,7 @@ class EnvironmentManager:
             "loaded_files": self.loaded_files,
         }
 
-    def get_environment_info(self) -> Dict[str, Any]:
+    def get_environment_info(self) -> dict[str, Any]:
         """Get comprehensive environment information."""
         return {
             "mode": self._detect_environment_mode(),
@@ -150,12 +151,12 @@ class EnvironmentManager:
 env_manager = EnvironmentManager()
 
 
-def load_environment(mode: Optional[str] = None) -> bool:
+def load_environment(mode: str | None = None) -> bool:
     """Convenience function for loading environment."""
     return env_manager.load_environment(mode)
 
 
-def validate_environment() -> Dict[str, Any]:
+def validate_environment() -> dict[str, Any]:
     """Convenience function for validation."""
     return env_manager.validate_required_vars()
 
@@ -184,22 +185,13 @@ if __name__ == "__main__":
         if args.validate:
             validation = env_manager.validate_required_vars()
             if validation["valid"]:
-                print("✅ All required environment variables are set")
+                pass
             else:
-                print("❌ Missing required environment variables:")
-                for missing in validation["missing"]:
-                    print(f"  - {missing}")
+                for _missing in validation["missing"]:
+                    pass
                 sys.exit(1)
 
         if args.info:
             info = env_manager.get_environment_info()
-            print(f"🔧 Environment mode: {info['mode']}")
-            print(f"📁 Loaded files: {', '.join(info['loaded_files'])}")
-            print(f"📊 Redis: {info['config']['redis_host']}")
-            print(f"🐘 PostgreSQL: {info['config']['postgres_host']}")
-            print(f"🔍 ChromaDB: {info['config']['chromadb_host']}")
-            print(f"🤖 LLM API: {info['config']['llm_api_url']}")
-            print(f"🐛 Debug mode: {info['config']['debug_mode']}")
     else:
-        print("❌ Failed to load environment configuration")
         sys.exit(1)

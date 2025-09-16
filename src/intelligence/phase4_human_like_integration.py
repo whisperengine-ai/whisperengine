@@ -11,18 +11,18 @@ The Phase 4 integration harmonizes all systems to create truly human-like intera
 while maintaining the sophisticated capabilities of existing phases.
 """
 
-import asyncio
 import logging
-from datetime import datetime, timezone
-from typing import Dict, List, Optional, Any, Tuple
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from enum import Enum
+from typing import Any
+
+from ..memory.phase3_integration import Phase3MemoryNetworks
+from ..utils.enhanced_query_processor import EnhancedQueryProcessor
+from ..utils.human_like_llm_processor import HumanLikeLLMProcessor
 
 # Import existing Phase systems
 from . import Phase2Integration
-from ..memory.phase3_integration import Phase3MemoryNetworks
-from ..utils.human_like_llm_processor import HumanLikeLLMProcessor
-from ..utils.enhanced_query_processor import EnhancedQueryProcessor
 
 logger = logging.getLogger(__name__)
 
@@ -54,11 +54,11 @@ class Phase4Context:
     message: str
     conversation_mode: ConversationMode
     interaction_type: InteractionType
-    phase2_results: Optional[Dict[str, Any]] = None
-    phase3_results: Optional[Dict[str, Any]] = None
-    human_like_results: Optional[Any] = None  # Changed to Any to accept different types
-    memory_enhancement_results: Optional[Dict[str, Any]] = None
-    processing_metadata: Optional[Dict[str, Any]] = None
+    phase2_results: dict[str, Any] | None = None
+    phase3_results: dict[str, Any] | None = None
+    human_like_results: Any | None = None  # Changed to Any to accept different types
+    memory_enhancement_results: dict[str, Any] | None = None
+    processing_metadata: dict[str, Any] | None = None
 
     def __post_init__(self):
         if self.processing_metadata is None:
@@ -75,8 +75,8 @@ class Phase4HumanLikeIntegration:
 
     def __init__(
         self,
-        phase2_integration: Optional[Phase2Integration] = None,
-        phase3_memory_networks: Optional[Phase3MemoryNetworks] = None,
+        phase2_integration: Phase2Integration | None = None,
+        phase3_memory_networks: Phase3MemoryNetworks | None = None,
         memory_manager=None,
         llm_client=None,
         enable_adaptive_mode: bool = True,
@@ -151,8 +151,8 @@ class Phase4HumanLikeIntegration:
         self,
         user_id: str,
         message: str,
-        conversation_context: Optional[List[Dict]] = None,
-        discord_context: Optional[Dict] = None,
+        conversation_context: list[dict] | None = None,
+        discord_context: dict | None = None,
     ) -> Phase4Context:
         """
         Comprehensive message processing that integrates all phases
@@ -166,7 +166,7 @@ class Phase4HumanLikeIntegration:
         Returns:
             Phase4Context with all analysis results
         """
-        processing_start = datetime.now(timezone.utc)
+        processing_start = datetime.now(UTC)
         logger.debug(f"Starting Phase 4 comprehensive processing for user {user_id}")
 
         try:
@@ -193,7 +193,7 @@ class Phase4HumanLikeIntegration:
             if self.phase2_integration:
                 try:
                     logger.debug("Executing Phase 2: Emotional Intelligence Analysis")
-                    phase2_start = datetime.now(timezone.utc)
+                    phase2_start = datetime.now(UTC)
 
                     phase2_context = {
                         "topic": self._extract_topic_hint(message),
@@ -214,7 +214,7 @@ class Phase4HumanLikeIntegration:
                     phase4_context.phase2_results = phase2_results
                     phase4_context.processing_metadata["phases_executed"].append("phase2")
                     phase4_context.processing_metadata["performance_metrics"]["phase2_duration"] = (
-                        datetime.now(timezone.utc) - phase2_start
+                        datetime.now(UTC) - phase2_start
                     ).total_seconds()
 
                     logger.debug("✅ Phase 2 analysis completed")
@@ -227,7 +227,7 @@ class Phase4HumanLikeIntegration:
             if self.phase3_memory_networks and self.memory_manager:
                 try:
                     logger.debug("Executing Phase 3: Memory Networks Analysis")
-                    phase3_start = datetime.now(timezone.utc)
+                    phase3_start = datetime.now(UTC)
 
                     # Trigger memory network analysis for user
                     phase3_results = (
@@ -239,7 +239,7 @@ class Phase4HumanLikeIntegration:
                     phase4_context.phase3_results = phase3_results
                     phase4_context.processing_metadata["phases_executed"].append("phase3")
                     phase4_context.processing_metadata["performance_metrics"]["phase3_duration"] = (
-                        datetime.now(timezone.utc) - phase3_start
+                        datetime.now(UTC) - phase3_start
                     ).total_seconds()
 
                     logger.debug("✅ Phase 3 analysis completed")
@@ -252,7 +252,7 @@ class Phase4HumanLikeIntegration:
             if self.human_like_processor:
                 try:
                     logger.debug("Executing Phase 4: Human-Like Conversation Processing")
-                    human_like_start = datetime.now(timezone.utc)
+                    human_like_start = datetime.now(UTC)
 
                     # Prepare enhanced context with Phase 2 & 3 results
                     enhanced_context = self._prepare_human_like_context(
@@ -273,7 +273,7 @@ class Phase4HumanLikeIntegration:
                     phase4_context.processing_metadata["phases_executed"].append("human_like")
                     phase4_context.processing_metadata["performance_metrics"][
                         "human_like_duration"
-                    ] = (datetime.now(timezone.utc) - human_like_start).total_seconds()
+                    ] = (datetime.now(UTC) - human_like_start).total_seconds()
 
                     logger.debug("✅ Human-like processing completed")
 
@@ -285,7 +285,7 @@ class Phase4HumanLikeIntegration:
             if self.enhanced_query_processor:
                 try:
                     logger.debug("Executing Enhanced Memory Query Processing")
-                    memory_enhancement_start = datetime.now(timezone.utc)
+                    memory_enhancement_start = datetime.now(UTC)
 
                     # Generate optimized memory queries based on all available context
                     enhanced_queries = await self._generate_enhanced_memory_queries(
@@ -315,7 +315,7 @@ class Phase4HumanLikeIntegration:
                     )
                     phase4_context.processing_metadata["performance_metrics"][
                         "memory_enhancement_duration"
-                    ] = (datetime.now(timezone.utc) - memory_enhancement_start).total_seconds()
+                    ] = (datetime.now(UTC) - memory_enhancement_start).total_seconds()
 
                     logger.debug("✅ Enhanced memory processing completed")
 
@@ -324,7 +324,7 @@ class Phase4HumanLikeIntegration:
                     phase4_context.memory_enhancement_results = None
 
             # Step 6: Calculate total processing time and update conversation state
-            total_duration = (datetime.now(timezone.utc) - processing_start).total_seconds()
+            total_duration = (datetime.now(UTC) - processing_start).total_seconds()
             phase4_context.processing_metadata["total_duration"] = total_duration
             phase4_context.processing_metadata["phases_completed"] = len(
                 phase4_context.processing_metadata["phases_executed"]
@@ -352,13 +352,13 @@ class Phase4HumanLikeIntegration:
                     "error": str(e),
                     "phases_executed": [],
                     "total_duration": (
-                        datetime.now(timezone.utc) - processing_start
+                        datetime.now(UTC) - processing_start
                     ).total_seconds(),
                 },
             )
 
     async def _determine_conversation_mode(
-        self, user_id: str, message: str, conversation_context: Optional[List[Dict]] = None
+        self, user_id: str, message: str, conversation_context: list[dict] | None = None
     ) -> ConversationMode:
         """Determine the optimal conversation mode for this interaction"""
 
@@ -394,7 +394,7 @@ class Phase4HumanLikeIntegration:
         return ConversationMode.BALANCED
 
     async def _classify_interaction_type(
-        self, message: str, conversation_context: Optional[List[Dict]] = None
+        self, message: str, conversation_context: list[dict] | None = None
     ) -> InteractionType:
         """Classify the type of interaction based on message content and context"""
 
@@ -441,9 +441,9 @@ class Phase4HumanLikeIntegration:
     def _prepare_human_like_context(
         self,
         phase4_context: Phase4Context,
-        conversation_context: Optional[List[Dict]] = None,
-        discord_context: Optional[Dict] = None,
-    ) -> Dict[str, Any]:
+        conversation_context: list[dict] | None = None,
+        discord_context: dict | None = None,
+    ) -> dict[str, Any]:
         """Prepare enhanced context for human-like processing"""
 
         context = {
@@ -482,7 +482,7 @@ class Phase4HumanLikeIntegration:
 
     async def _generate_enhanced_memory_queries(
         self, phase4_context: Phase4Context, original_message: str
-    ) -> Dict[str, Dict[str, Any]]:
+    ) -> dict[str, dict[str, Any]]:
         """Generate enhanced memory queries based on comprehensive analysis"""
 
         enhanced_queries = {}
@@ -586,7 +586,7 @@ class Phase4HumanLikeIntegration:
 
     def get_comprehensive_context_for_response(
         self, phase4_context: Phase4Context
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Generate comprehensive context for LLM response generation
 
@@ -701,7 +701,7 @@ class Phase4HumanLikeIntegration:
         except Exception as e:
             logger.error(f"Error during Phase 4 cleanup: {e}")
 
-    def get_integration_status(self) -> Dict[str, Any]:
+    def get_integration_status(self) -> dict[str, Any]:
         """Get the current status of all integrated systems"""
         return {
             "phase4_status": "active",

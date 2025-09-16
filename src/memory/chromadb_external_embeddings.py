@@ -6,14 +6,15 @@ Extends ChromaDB functionality to support external embedding APIs.
 import asyncio
 import logging
 import os
-from typing import List, Dict, Any, Optional, Union
+from typing import Any
+
 from src.utils.embedding_manager import embedding_manager
 
 logger = logging.getLogger(__name__)
 
 
 async def add_documents_with_embeddings(
-    collection, documents: List[str], metadatas: List[Dict[str, Any]], ids: List[str]
+    collection, documents: list[str], metadatas: list[dict[str, Any]], ids: list[str]
 ) -> bool:
     """
     Add documents using external or local embeddings based on configuration
@@ -55,8 +56,8 @@ async def add_documents_with_embeddings(
 
 
 async def query_with_embeddings(
-    collection, query_texts: List[str], n_results: int = 10, where: Optional[Dict[str, Any]] = None
-) -> Dict[str, Any]:
+    collection, query_texts: list[str], n_results: int = 10, where: dict[str, Any] | None = None
+) -> dict[str, Any]:
     """
     Query collection using external or local embeddings based on configuration
 
@@ -111,7 +112,7 @@ async def query_with_embeddings(
 
 
 async def upsert_documents_with_embeddings(
-    collection, documents: List[str], metadatas: List[Dict[str, Any]], ids: List[str]
+    collection, documents: list[str], metadatas: list[dict[str, Any]], ids: list[str]
 ) -> bool:
     """
     Upsert documents using external or local embeddings based on configuration
@@ -154,7 +155,7 @@ async def upsert_documents_with_embeddings(
         return False
 
 
-async def test_embedding_setup() -> Dict[str, Any]:
+async def test_embedding_setup() -> dict[str, Any]:
     """
     Test the current embedding setup (external or local)
 
@@ -215,11 +216,10 @@ def run_async_method(async_method, *args, **kwargs):
     """
     try:
         # Try to get existing event loop
-        loop = asyncio.get_running_loop()
+        asyncio.get_running_loop()
         # If we're already in an async context, we can't run another event loop
         # Create a task instead
         import concurrent.futures
-        import threading
 
         # Run in a separate thread to avoid blocking the current event loop
         def run_in_thread():
@@ -235,7 +235,7 @@ def run_async_method(async_method, *args, **kwargs):
 
 
 def add_documents_sync(
-    collection, documents: List[str], metadatas: List[Dict[str, Any]], ids: List[str]
+    collection, documents: list[str], metadatas: list[dict[str, Any]], ids: list[str]
 ) -> bool:
     """
     Sync wrapper for adding documents with embeddings
@@ -244,8 +244,8 @@ def add_documents_sync(
 
 
 def query_documents_sync(
-    collection, query_texts: List[str], n_results: int = 10, where: Optional[Dict[str, Any]] = None
-) -> Dict[str, Any]:
+    collection, query_texts: list[str], n_results: int = 10, where: dict[str, Any] | None = None
+) -> dict[str, Any]:
     """
     Sync wrapper for querying with embeddings
     """
@@ -253,7 +253,7 @@ def query_documents_sync(
 
 
 def upsert_documents_sync(
-    collection, documents: List[str], metadatas: List[Dict[str, Any]], ids: List[str]
+    collection, documents: list[str], metadatas: list[dict[str, Any]], ids: list[str]
 ) -> bool:
     """
     Sync wrapper for upserting documents with embeddings
@@ -261,7 +261,7 @@ def upsert_documents_sync(
     return run_async_method(upsert_documents_with_embeddings, collection, documents, metadatas, ids)
 
 
-def test_embeddings_sync() -> Dict[str, Any]:
+def test_embeddings_sync() -> dict[str, Any]:
     """
     Sync wrapper for testing embedding setup
     """

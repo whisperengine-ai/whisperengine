@@ -7,11 +7,11 @@ This module provides secure debug logging that prevents sensitive user informati
 from being exposed in logs while maintaining useful debugging capabilities.
 """
 
-import logging
-from typing import Optional, Dict, Any
-from enum import Enum
 import hashlib
+import logging
 import re
+from enum import Enum
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -86,7 +86,7 @@ class SecureDebugLogger:
         return sanitized
 
     def log_user_debug_info(
-        self, user_id: str, debug_data: Dict[str, Any], message_id: Optional[str] = None
+        self, user_id: str, debug_data: dict[str, Any], message_id: str | None = None
     ):
         """
         Log user debug information securely
@@ -126,7 +126,7 @@ class SecureDebugLogger:
         # Log at DEBUG level with hashed identifiers
         logger.debug(f"USER_DEBUG [{hashed_user}] [{hashed_message}] - {secure_debug}")
 
-    def log_user_activity(self, user_id: str, activity: str, details: Optional[str] = None):
+    def log_user_activity(self, user_id: str, activity: str, details: str | None = None):
         """
         Log user activity securely
 
@@ -143,7 +143,7 @@ class SecureDebugLogger:
 
         logger.debug(f"USER_ACTIVITY [{hashed_user}] - {activity} {safe_details}".strip())
 
-    def log_system_debug(self, component: str, message: str, sensitive_data: Optional[Dict] = None):
+    def log_system_debug(self, component: str, message: str, sensitive_data: dict | None = None):
         """
         Log system debug information securely
 
@@ -180,7 +180,7 @@ def secure_add_debug_info_to_response(
     response: str,
     user_id: str,
     memory_manager,
-    message_id: Optional[str] = None,
+    message_id: str | None = None,
     enable_debug_mode: bool = False,
 ) -> str:
     """
@@ -210,7 +210,7 @@ def secure_add_debug_info_to_response(
             if message_key in secure_add_debug_info_to_response._processed_messages:
                 debug_logger.log_system_debug(
                     "debug",
-                    f"Skipping duplicate debug processing for message",
+                    "Skipping duplicate debug processing for message",
                     {"user_hash": debug_logger.hash_user_id(user_id)},
                 )
                 return response
@@ -317,26 +317,21 @@ def secure_log_server_info(guild, memory_manager, enable_debug_mode: bool = Fals
 # Test functions to validate the security enhancements
 def test_secure_debug_logging():
     """Test the secure debug logging functionality"""
-    print("🧪 Testing secure debug logging...")
 
     # Test with debug mode enabled
     debug_logger = SecureDebugLogger(enable_debug_mode=True)
 
     # Test user ID hashing
     user_id = "123456789"
-    hashed = debug_logger.hash_user_id(user_id)
-    print(f"  User ID {user_id} -> {hashed}")
+    debug_logger.hash_user_id(user_id)
 
     # Test username sanitization
     username = "sensitive_user@example.com"
-    sanitized = debug_logger.sanitize_username(username)
-    print(f"  Username {username} -> {sanitized}")
+    debug_logger.sanitize_username(username)
 
     # Test sensitive data sanitization
     sensitive_text = "My SSN is 123-45-6789 and my email is user@example.com"
-    sanitized_text = debug_logger.sanitize_sensitive_data(sensitive_text)
-    print(f"  Sensitive: {sensitive_text}")
-    print(f"  Sanitized: {sanitized_text}")
+    debug_logger.sanitize_sensitive_data(sensitive_text)
 
     # Test debug logging
     debug_data = {
@@ -348,7 +343,6 @@ def test_secure_debug_logging():
 
     debug_logger.log_user_debug_info(user_id, debug_data, "test_message_123")
 
-    print("✅ Secure debug logging test complete")
 
 
 if __name__ == "__main__":

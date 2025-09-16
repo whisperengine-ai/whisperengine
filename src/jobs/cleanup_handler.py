@@ -7,9 +7,9 @@ Handler for various cleanup tasks including old conversations, failed jobs, etc.
 
 import logging
 import os
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from datetime import datetime, timezone, timedelta
-from typing import Dict, Any
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -20,7 +20,7 @@ class CleanupHandler:
     def __init__(self, postgres_pool):
         self.postgres_pool = postgres_pool
 
-    async def execute(self, payload: Dict[str, Any]):
+    async def execute(self, payload: dict[str, Any]):
         """Execute a cleanup job"""
         cleanup_type = payload.get("type", "old_conversations")
         days_to_keep = payload.get("days_to_keep", 30)
@@ -36,12 +36,12 @@ class CleanupHandler:
 
     async def _cleanup_old_conversations(self, days_to_keep: int):
         """Clean up old conversation history"""
-        cutoff_date = datetime.now(timezone.utc) - timedelta(days=days_to_keep)
+        cutoff_date = datetime.now(UTC) - timedelta(days=days_to_keep)
 
         async with self.postgres_pool.acquire() as conn:
             result = await conn.execute(
                 """
-                DELETE FROM conversation_history 
+                DELETE FROM conversation_history
                 WHERE timestamp < $1
             """,
                 cutoff_date,
@@ -52,13 +52,13 @@ class CleanupHandler:
 
     async def _cleanup_failed_jobs(self, days_to_keep: int):
         """Clean up old failed jobs"""
-        cutoff_date = datetime.now(timezone.utc) - timedelta(days=days_to_keep)
+        cutoff_date = datetime.now(UTC) - timedelta(days=days_to_keep)
 
         async with self.postgres_pool.acquire() as conn:
             result = await conn.execute(
                 """
-                DELETE FROM scheduled_jobs 
-                WHERE status IN ('failed', 'completed') 
+                DELETE FROM scheduled_jobs
+                WHERE status IN ('failed', 'completed')
                 AND completed_at < $1
             """,
                 cutoff_date,

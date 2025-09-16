@@ -6,8 +6,9 @@ This test simulates the vulnerability scenario described in the security assessm
 
 import asyncio
 import sys
-from unittest.mock import Mock, AsyncMock
 from collections import deque
+from unittest.mock import Mock
+
 import discord
 
 # Import the conversation cache
@@ -17,8 +18,6 @@ from conversation_cache import HybridConversationCache
 async def test_user_specific_filtering():
     """Test that user-specific conversation context properly filters messages by user ID."""
 
-    print("🔒 Testing Cross-User Message Contamination Security Fix")
-    print("=" * 60)
 
     # Create mock Discord messages from different users
     def create_mock_message(
@@ -71,109 +70,70 @@ async def test_user_specific_filtering():
             "last_bootstrap": 999999999,  # High timestamp to avoid re-bootstrap
         }
 
-    print("📝 Test Setup:")
-    print(f"   - Alice (ID: {user_alice}): Asked about health conditions")
-    print(f"   - Bob (ID: {user_bob}): Shared diabetes and insulin info")
-    print(f"   - Charlie (ID: {user_charlie}): Shared depression medication info")
-    print(f"   - Alice (ID: {user_alice}): Asked bot to remind her what she shared")
-    print(f"   - Bob (ID: {user_bob}): Shared blood pressure info")
-    print()
 
     # Test 1: Get messages using OLD vulnerable method (simulated)
-    print("🚨 BEFORE FIX - Vulnerable behavior:")
     all_messages = await cache.get_conversation_context(mock_channel, limit=10)
-    print(f"   ❌ OLD METHOD: Retrieved {len(all_messages)} messages from ALL users:")
-    for msg in all_messages[-5:]:  # Show last 5
-        user_type = "Bot" if msg.author.bot else f"User {msg.author.id}"
-        print(f"      - {user_type}: {msg.content}")
-    print("   ❌ VULNERABILITY: Alice would see Bob's and Charlie's private health info!")
-    print()
+    for _msg in all_messages[-5:]:  # Show last 5
+        pass
 
     # Test 2: Get messages using NEW secure method
-    print("✅ AFTER FIX - Secure behavior:")
     alice_messages = await cache.get_user_conversation_context(mock_channel, user_alice, limit=10)
-    print(f"   ✅ NEW METHOD: Retrieved {len(alice_messages)} messages for Alice only:")
-    for msg in alice_messages:
-        user_type = "Bot" if msg.author.bot else f"Alice ({msg.author.id})"
-        print(f"      - {user_type}: {msg.content}")
-    print("   ✅ SECURITY: Alice only sees her own messages and bot responses!")
-    print()
+    for _msg in alice_messages:
+        pass
 
     # Test 3: Verify Bob gets only his messages
-    print("🔒 Testing Bob's message isolation:")
     bob_messages = await cache.get_user_conversation_context(mock_channel, user_bob, limit=10)
-    print(f"   ✅ Bob's messages ({len(bob_messages)} total):")
-    for msg in bob_messages:
-        user_type = "Bot" if msg.author.bot else f"Bob ({msg.author.id})"
-        print(f"      - {user_type}: {msg.content}")
-    print("   ✅ SECURITY: Bob only sees his own messages and bot responses!")
-    print()
+    for _msg in bob_messages:
+        pass
 
     # Test 4: Verify Charlie gets only his messages
-    print("🔒 Testing Charlie's message isolation:")
     charlie_messages = await cache.get_user_conversation_context(
         mock_channel, user_charlie, limit=10
     )
-    print(f"   ✅ Charlie's messages ({len(charlie_messages)} total):")
-    for msg in charlie_messages:
-        user_type = "Bot" if msg.author.bot else f"Charlie ({msg.author.id})"
-        print(f"      - {user_type}: {msg.content}")
-    print("   ✅ SECURITY: Charlie only sees his own messages and bot responses!")
-    print()
+    for _msg in charlie_messages:
+        pass
 
     # Verification tests
-    print("🧪 SECURITY VERIFICATION TESTS:")
-    print("-" * 40)
 
     # Test that Alice's messages don't contain Bob's or Charlie's content
     alice_content = " ".join([msg.content for msg in alice_messages if not msg.author.bot])
 
     if "diabetes" in alice_content.lower() or "insulin" in alice_content.lower():
-        print("   ❌ FAILED: Alice's context contains Bob's diabetes information!")
         return False
     else:
-        print("   ✅ PASSED: Alice's context does NOT contain Bob's diabetes information")
+        pass
 
     if "depression" in alice_content.lower() or "medication" in alice_content.lower():
-        print("   ❌ FAILED: Alice's context contains Charlie's mental health information!")
         return False
     else:
-        print("   ✅ PASSED: Alice's context does NOT contain Charlie's mental health information")
+        pass
 
     # Test that Bob's messages don't contain Alice's or Charlie's content
     bob_content = " ".join([msg.content for msg in bob_messages if not msg.author.bot])
 
     if "what health conditions do I have" in bob_content.lower():
-        print("   ❌ FAILED: Bob's context contains Alice's health question!")
         return False
     else:
-        print("   ✅ PASSED: Bob's context does NOT contain Alice's health question")
+        pass
 
     if "depression" in bob_content.lower():
-        print("   ❌ FAILED: Bob's context contains Charlie's mental health information!")
         return False
     else:
-        print("   ✅ PASSED: Bob's context does NOT contain Charlie's mental health information")
+        pass
 
     # Test that Charlie's messages don't contain Alice's or Bob's content
     charlie_content = " ".join([msg.content for msg in charlie_messages if not msg.author.bot])
 
     if "diabetes" in charlie_content.lower() or "insulin" in charlie_content.lower():
-        print("   ❌ FAILED: Charlie's context contains Bob's diabetes information!")
         return False
     else:
-        print("   ✅ PASSED: Charlie's context does NOT contain Bob's diabetes information")
+        pass
 
     if "what health conditions do I have" in charlie_content.lower():
-        print("   ❌ FAILED: Charlie's context contains Alice's health question!")
         return False
     else:
-        print("   ✅ PASSED: Charlie's context does NOT contain Alice's health question")
+        pass
 
-    print()
-    print("🎉 ALL SECURITY TESTS PASSED!")
-    print("✅ Cross-user message contamination vulnerability has been successfully fixed!")
-    print("🔒 Users can no longer see each other's private messages in shared channels!")
 
     return True
 
@@ -183,13 +143,10 @@ async def main():
     try:
         success = await test_user_specific_filtering()
         if success:
-            print("\n🛡️  SECURITY FIX VERIFICATION: SUCCESS")
             sys.exit(0)
         else:
-            print("\n❌ SECURITY FIX VERIFICATION: FAILED")
             sys.exit(1)
-    except Exception as e:
-        print(f"\n💥 Test failed with exception: {e}")
+    except Exception:
         import traceback
 
         traceback.print_exc()

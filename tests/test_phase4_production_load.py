@@ -14,16 +14,16 @@ Test Scenarios:
 
 import asyncio
 import logging
+import random
+import statistics
 import time
 import uuid
-import random
-from typing import List, Dict, Any
-import statistics
+
+from src.conversation.advanced_thread_manager import AdvancedConversationThreadManager
+from src.conversation.proactive_engagement_engine import ProactiveConversationEngagementEngine
 
 # Import Phase 4 components
 from src.personality.memory_moments import MemoryTriggeredMoments
-from src.conversation.advanced_thread_manager import AdvancedConversationThreadManager
-from src.conversation.proactive_engagement_engine import ProactiveConversationEngagementEngine
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +38,7 @@ class Phase4ProductionLoadTester:
 
         logger.info("✅ Phase 4 components initialized for load testing")
 
-    def generate_conversation_patterns(self, pattern_count: int) -> List[List[str]]:
+    def generate_conversation_patterns(self, pattern_count: int) -> list[list[str]]:
         """Generate realistic conversation patterns for testing"""
         patterns = [
             # Career development conversation
@@ -138,7 +138,7 @@ class Phase4ProductionLoadTester:
 
                         try:
                             # Process message through thread manager
-                            result = await self.thread_manager.process_user_message(
+                            await self.thread_manager.process_user_message(
                                 user_id, message, {"pattern": pattern_idx, "message": msg_idx}
                             )
 
@@ -242,7 +242,7 @@ class Phase4ProductionLoadTester:
                         message = memory_scenarios[i % len(memory_scenarios)]
 
                         # Test memory analysis with realistic emotional context
-                        connections = await self.memory_moments.analyze_conversation_for_memories(
+                        await self.memory_moments.analyze_conversation_for_memories(
                             user_id, f"memory_context_{i}", message, None
                         )
 
@@ -351,7 +351,7 @@ class Phase4ProductionLoadTester:
                         message = engagement_patterns[i % len(engagement_patterns)]
 
                         # Test engagement analysis
-                        analysis = await self.engagement_engine.analyze_conversation_engagement(
+                        await self.engagement_engine.analyze_conversation_engagement(
                             user_id, message, []  # Empty recent messages for simplicity
                         )
 

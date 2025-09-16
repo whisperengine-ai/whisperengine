@@ -6,17 +6,15 @@ for the Discord bot, replacing the SQLite implementation.
 """
 
 import asyncio
-import asyncpg
 import json
 import logging
 import os
-from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Any
-from dataclasses import dataclass, asdict
-from enum import Enum
+from datetime import datetime
+
+import asyncpg
 
 # Import the shared emotion and user profile classes from emotion_manager
-from .emotion_manager import EmotionalState, RelationshipLevel, EmotionProfile, UserProfile
+from .emotion_manager import EmotionalState, EmotionProfile, RelationshipLevel, UserProfile
 
 logger = logging.getLogger(__name__)
 
@@ -128,18 +126,18 @@ class PostgreSQLUserDB:
             escalation_count INTEGER DEFAULT 0,
             trust_indicators JSONB DEFAULT '[]'::jsonb
         );
-        
-        CREATE INDEX IF NOT EXISTS idx_user_profiles_last_interaction 
+
+        CREATE INDEX IF NOT EXISTS idx_user_profiles_last_interaction
         ON user_profiles(last_interaction);
-        
-        CREATE INDEX IF NOT EXISTS idx_user_profiles_relationship_level 
+
+        CREATE INDEX IF NOT EXISTS idx_user_profiles_relationship_level
         ON user_profiles(relationship_level);
         """
 
         async with self.pool.acquire() as connection:
             await connection.execute(create_table_sql)
 
-    async def get_user_profile(self, user_id: str) -> Optional[UserProfile]:
+    async def get_user_profile(self, user_id: str) -> UserProfile | None:
         """Get a user profile by user_id"""
         if not self.pool:
             await self.initialize()
@@ -274,7 +272,7 @@ class PostgreSQLUserDB:
                     # If we get here, the operation was successful
                     return
 
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     logger.warning(
                         f"Database operation timed out for user {profile.user_id}, attempt {attempt + 1}/{max_retries}"
                     )
@@ -307,7 +305,7 @@ class PostgreSQLUserDB:
                         except Exception as e:
                             logger.warning(f"Error releasing connection: {e}")
 
-    async def get_all_profiles(self) -> Dict[str, UserProfile]:
+    async def get_all_profiles(self) -> dict[str, UserProfile]:
         """Get all user profiles"""
         if not self.pool:
             await self.initialize()
@@ -382,7 +380,7 @@ class PostgreSQLUserDB:
             logger.info("PostgreSQL database connection closed")
 
     # Sync compatibility methods (for gradual migration)
-    def get_profile(self, user_id: str) -> Optional[UserProfile]:
+    def get_profile(self, user_id: str) -> UserProfile | None:
         """Thread-safe sync wrapper for get_user_profile"""
         try:
             # Try to get the current event loop
@@ -407,7 +405,7 @@ class PostgreSQLUserDB:
             "save_profile should not be called synchronously - use async save_user_profile instead"
         )
 
-    def get_all_user_profiles(self) -> Dict[str, UserProfile]:
+    def get_all_user_profiles(self) -> dict[str, UserProfile]:
         """Thread-safe sync wrapper for get_all_profiles"""
         try:
             # Try to get the current event loop
@@ -426,6 +424,6 @@ class PostgreSQLUserDB:
             # No event loop in current thread, create a new one
             return asyncio.run(self.get_all_profiles())
 
-    def load_all_profiles(self) -> Dict[str, UserProfile]:
+    def load_all_profiles(self) -> dict[str, UserProfile]:
         """Alias for get_all_user_profiles to match expected interface"""
         return self.get_all_user_profiles()

@@ -5,12 +5,13 @@ Tracks schema changes and enables migrations across all datastores
 """
 
 import asyncio
-import asyncpg
 import json
 import logging
 import os
-from datetime import datetime, timezone
-from typing import Dict, List, Optional, Tuple, Any
+from datetime import UTC, datetime
+from typing import Any
+
+import asyncpg
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +35,7 @@ class SchemaVersionManager:
             "user": postgres_user,
             "password": postgres_password,
         }
-        self.pool: Optional[asyncpg.Pool] = None
+        self.pool: asyncpg.Pool | None = None
 
         # Schema version definitions
         self.schema_versions = {
@@ -153,7 +154,7 @@ class SchemaVersionManager:
                         RETURN NEW;
                     END;
                     $$ language 'plpgsql';
-                    
+
                     DROP TRIGGER IF EXISTS update_schema_versions_updated_at ON schema_versions;
                     CREATE TRIGGER update_schema_versions_updated_at
                         BEFORE UPDATE ON schema_versions
@@ -169,7 +170,7 @@ class SchemaVersionManager:
             logger.error(f"Failed to create schema versions table: {e}")
             return False
 
-    async def get_current_version(self, component: str) -> Optional[int]:
+    async def get_current_version(self, component: str) -> int | None:
         """Get current schema version for a component"""
         try:
             if not self.pool:
@@ -186,7 +187,7 @@ class SchemaVersionManager:
             return None
 
     async def set_version(
-        self, component: str, version: int, migration_info: Optional[Dict] = None
+        self, component: str, version: int, migration_info: dict | None = None
     ) -> bool:
         """Set schema version for a component"""
         try:
@@ -206,7 +207,7 @@ class SchemaVersionManager:
                 if migration_info:
                     migration_entry = {
                         "version": version,
-                        "timestamp": datetime.now(timezone.utc).isoformat(),
+                        "timestamp": datetime.now(UTC).isoformat(),
                         **migration_info,
                     }
                     migration_history.append(migration_entry)
@@ -224,7 +225,7 @@ class SchemaVersionManager:
                 """,
                     component,
                     version,
-                    datetime.now(timezone.utc),
+                    datetime.now(UTC),
                     json.dumps(migration_history),
                 )
 
@@ -235,7 +236,7 @@ class SchemaVersionManager:
             logger.error(f"Failed to set version for {component}: {e}")
             return False
 
-    async def check_migrations_needed(self) -> Dict[str, List[int]]:
+    async def check_migrations_needed(self) -> dict[str, list[int]]:
         """Check which components need migrations"""
         migrations_needed = {}
 
@@ -254,10 +255,10 @@ class SchemaVersionManager:
 
         return migrations_needed
 
-    async def get_status_report(self) -> Dict[str, Any]:
+    async def get_status_report(self) -> dict[str, Any]:
         """Get comprehensive status report of all schema versions"""
         report = {
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "components": {},
             "migrations_needed": await self.check_migrations_needed(),
         }
@@ -294,7 +295,7 @@ class SchemaVersionManager:
         try:
             logger.info("🔄 Initializing component version tracking...")
 
-            for component, schema_info in self.schema_versions.items():
+            for component, _schema_info in self.schema_versions.items():
                 current_version = await self.get_current_version(component)
 
                 if current_version is None:
@@ -322,7 +323,7 @@ class SchemaVersionManager:
             await self.pool.close()
 
 
-def get_postgres_config() -> Dict[str, Any]:
+def get_postgres_config() -> dict[str, Any]:
     """Get PostgreSQL configuration from environment"""
     return {
         "postgres_host": os.getenv("POSTGRES_HOST", "localhost"),
@@ -339,8 +340,6 @@ async def main():
         level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
     )
 
-    print("🔄 Database Schema Version Manager")
-    print("=" * 50)
 
     # Get configuration
     config = get_postgres_config()
@@ -351,32 +350,28 @@ async def main():
     try:
         # Initialize
         if not await manager.initialize():
-            print("❌ Failed to initialize schema version manager")
             return
 
         # Initialize component version tracking
         await manager.initialize_component_versions()
 
         # Get status report
-        print("\n📊 Schema Version Status:")
         report = await manager.get_status_report()
 
-        for component, info in report["components"].items():
-            status = "✅" if info["up_to_date"] else "⚠️"
-            current = info["current_version"] or "untracked"
-            target = info["target_version"]
-            print(f"{status} {component}: {current} / {target}")
+        for _component, info in report["components"].items():
+            "✅" if info["up_to_date"] else "⚠️"
+            info["current_version"] or "untracked"
+            info["target_version"]
 
         # Show needed migrations
         if report["migrations_needed"]:
-            print("\n🔄 Migrations Needed:")
-            for component, versions in report["migrations_needed"].items():
-                print(f"  {component}: versions {versions}")
+            for _component, _versions in report["migrations_needed"].items():
+                pass
         else:
-            print("\n✅ All components up to date!")
+            pass
 
-    except Exception as e:
-        print(f"❌ Error: {e}")
+    except Exception:
+        pass
     finally:
         await manager.close()
 

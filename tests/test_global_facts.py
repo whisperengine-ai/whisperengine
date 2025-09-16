@@ -3,11 +3,11 @@
 Test script for global facts feature
 """
 
-import os
-import sys
 import logging
-from memory_manager import UserMemoryManager
+import sys
+
 from fact_extractor import GlobalFactExtractor
+from memory_manager import UserMemoryManager
 
 # Set up basic logging
 logging.basicConfig(level=logging.INFO)
@@ -16,8 +16,6 @@ logger = logging.getLogger(__name__)
 
 def test_global_fact_extraction():
     """Test the global fact extraction functionality"""
-    print("🧪 Testing Global Fact Extraction Feature")
-    print("=" * 50)
 
     # Initialize global fact extractor
     extractor = GlobalFactExtractor()
@@ -57,8 +55,7 @@ def test_global_fact_extraction():
     total_tests = len(test_conversations)
     passed_tests = 0
 
-    for i, test_case in enumerate(test_conversations, 1):
-        print(f"\nTest {i}/{total_tests}: {test_case['user_message'][:50]}...")
+    for _i, test_case in enumerate(test_conversations, 1):
 
         try:
             # Extract facts
@@ -66,33 +63,24 @@ def test_global_fact_extraction():
                 test_case["user_message"], test_case["bot_response"]
             )
 
-            print(f"  Extracted {len(extracted_facts)} global facts:")
-            for fact in extracted_facts:
-                print(
-                    f"    - {fact['fact']} (confidence: {fact['confidence']:.2f}, category: {fact['category']})"
-                )
+            for _fact in extracted_facts:
+                pass
 
             # Simple validation - check if we extracted any facts
             if extracted_facts:
                 passed_tests += 1
-                print(f"  ✅ PASSED - Extracted facts from global conversation")
             else:
-                print(f"  ❌ FAILED - No facts extracted")
+                pass
 
-        except Exception as e:
-            print(f"  ❌ ERROR - {e}")
+        except Exception:
+            pass
 
-    print(f"\nGlobal Fact Extraction Summary:")
-    print(f"✅ Passed: {passed_tests}/{total_tests}")
-    print(f"❌ Failed: {total_tests - passed_tests}/{total_tests}")
 
     return passed_tests == total_tests
 
 
 def test_global_fact_storage():
     """Test global fact storage and retrieval"""
-    print("\n🧪 Testing Global Fact Storage and Retrieval")
-    print("=" * 50)
 
     try:
         # Initialize memory manager
@@ -105,18 +93,15 @@ def test_global_fact_storage():
         memory_manager.store_global_fact(
             test_fact, "Test fact for global facts feature", "test_admin"
         )
-        print(f"✅ Stored global fact: {test_fact}")
 
         # Test retrieving global facts
         query = "Eiffel Tower location"
         retrieved_facts = memory_manager.retrieve_relevant_global_facts(query, limit=5)
 
         if retrieved_facts:
-            print(f"✅ Retrieved {len(retrieved_facts)} relevant global facts:")
-            for fact in retrieved_facts:
-                print(f"  - {fact['metadata']['fact']} (score: {fact['relevance_score']:.2f})")
+            for _fact in retrieved_facts:
+                pass
         else:
-            print("❌ No global facts retrieved")
             return False
 
         # Test global fact priority in combined retrieval
@@ -124,46 +109,36 @@ def test_global_fact_storage():
         memory_manager.store_user_fact(user_id, "I like visiting towers", "Test user fact")
 
         combined_memories = memory_manager.retrieve_relevant_memories(user_id, query, limit=10)
-        global_facts_count = len(
+        len(
             [m for m in combined_memories if m["metadata"].get("is_global", False)]
         )
-        user_facts_count = len(
+        len(
             [m for m in combined_memories if not m["metadata"].get("is_global", False)]
         )
 
-        print(
-            f"✅ Combined retrieval: {global_facts_count} global facts, {user_facts_count} user facts"
-        )
 
         # Verify global facts have higher scores (priority)
         if combined_memories:
             first_result = combined_memories[0]
             if first_result["metadata"].get("is_global", False):
-                print("✅ Global fact prioritized in results")
+                pass
             else:
-                print("⚠️  User fact ranked higher than global fact")
+                pass
 
         # Test getting all global facts
-        all_global_facts = memory_manager.get_all_global_facts()
-        print(f"✅ Retrieved all global facts: {len(all_global_facts)} total")
+        memory_manager.get_all_global_facts()
 
         # Test collection stats
-        stats = memory_manager.get_collection_stats()
-        print(
-            f"✅ Collection stats: {stats.get('total_global_facts', 0)} global facts, {stats.get('total_memories', 0)} user memories"
-        )
+        memory_manager.get_collection_stats()
 
         return True
 
-    except Exception as e:
-        print(f"❌ Error in global fact storage test: {e}")
+    except Exception:
         return False
 
 
 def main():
     """Run all global fact tests"""
-    print("🚀 Starting Global Facts Feature Tests")
-    print("=" * 60)
 
     # Test 1: Fact Extraction
     extraction_passed = test_global_fact_extraction()
@@ -172,25 +147,20 @@ def main():
     storage_passed = test_global_fact_storage()
 
     # Summary
-    print("\n" + "=" * 60)
-    print("📊 FINAL TEST SUMMARY")
-    print("=" * 60)
 
     if extraction_passed:
-        print("✅ Global Fact Extraction: PASSED")
+        pass
     else:
-        print("❌ Global Fact Extraction: FAILED")
+        pass
 
     if storage_passed:
-        print("✅ Global Fact Storage: PASSED")
+        pass
     else:
-        print("❌ Global Fact Storage: FAILED")
+        pass
 
     if extraction_passed and storage_passed:
-        print("\n🎉 ALL TESTS PASSED! Global facts feature is working correctly.")
         return True
     else:
-        print("\n⚠️  Some tests failed. Please check the implementation.")
         return False
 
 

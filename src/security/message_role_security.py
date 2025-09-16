@@ -15,11 +15,12 @@ SECURITY FEATURES:
 VULNERABILITY ADDRESSED: Message Role Assignment (CVSS 6.5)
 """
 
-import logging
 import hashlib
-from typing import Dict, List, Optional, Any, Tuple
+import logging
 from dataclasses import dataclass
 from enum import Enum
+from typing import Any
+
 import discord
 
 logger = logging.getLogger(__name__)
@@ -50,12 +51,12 @@ class MessageAttribution:
 
     user_id: str
     username: str
-    display_name: Optional[str]
+    display_name: str | None
     role_type: MessageRoleType
     attribution_id: str  # Context-specific user identifier
     timestamp: str
     channel_context: str
-    server_context: Optional[str] = None
+    server_context: str | None = None
     is_bot: bool = False
     identity_level: UserIdentityLevel = UserIdentityLevel.CONTEXTUALIZED
 
@@ -78,7 +79,7 @@ class MessageRoleAssignmentManager:
         )
 
     def generate_attribution_id(
-        self, user_id: str, context: str, identity_level: Optional[UserIdentityLevel] = None
+        self, user_id: str, context: str, identity_level: UserIdentityLevel | None = None
     ) -> str:
         """
         Generate a context-appropriate attribution ID for a user
@@ -206,7 +207,7 @@ class MessageRoleAssignmentManager:
 
     def convert_message_to_role_format(
         self, message: discord.Message, context: str, bot_user: discord.User
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Convert Discord message to secure role format with proper attribution
 
@@ -256,8 +257,8 @@ class MessageRoleAssignmentManager:
             }
 
     def convert_conversation_to_llm_format(
-        self, role_messages: List[Dict[str, Any]], preserve_attribution: bool = True
-    ) -> List[Dict[str, str]]:
+        self, role_messages: list[dict[str, Any]], preserve_attribution: bool = True
+    ) -> list[dict[str, str]]:
         """
         Convert attributed messages to LLM-compatible format
 
@@ -303,7 +304,7 @@ class MessageRoleAssignmentManager:
             # Safe fallback - return messages as-is
             return [{"role": "user", "content": str(msg)} for msg in role_messages]
 
-    def validate_message_attribution(self, role_message: Dict[str, Any]) -> Dict[str, Any]:
+    def validate_message_attribution(self, role_message: dict[str, Any]) -> dict[str, Any]:
         """
         Validate message attribution for security and consistency
 
@@ -374,7 +375,7 @@ class MessageRoleAssignmentManager:
                 "errors": [f"Validation error: {str(e)}"],
             }
 
-    def get_conversation_participants(self, context: str) -> Dict[str, Any]:
+    def get_conversation_participants(self, context: str) -> dict[str, Any]:
         """
         Get information about conversation participants
 
@@ -441,7 +442,7 @@ class MessageRoleAssignmentManager:
             logger.error(f"Error clearing context attribution: {e}")
             return False
 
-    def generate_attribution_summary(self) -> Dict[str, Any]:
+    def generate_attribution_summary(self) -> dict[str, Any]:
         """
         Generate summary of current attribution state for debugging
 

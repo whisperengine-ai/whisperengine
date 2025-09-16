@@ -6,15 +6,12 @@ Comprehensive metrics framework for measuring human-like AI performance
 across all integrated phases (memory, emotion, personality, conversation).
 """
 
-import asyncio
 import logging
-import time
-from datetime import datetime, timezone, timedelta
-from typing import Dict, List, Optional, Any, Tuple
-from dataclasses import dataclass, asdict
-from enum import Enum
-import json
 import statistics
+import time
+from dataclasses import asdict, dataclass
+from datetime import UTC, datetime, timedelta
+from enum import Enum
 
 logger = logging.getLogger(__name__)
 
@@ -128,7 +125,7 @@ class HolisticAIMetrics:
             self.metrics_cache[interaction_id]["quality_scores"][metric] = score
 
     async def finalize_conversation_metrics(
-        self, interaction_id: str, response: str, memory_results: List[Dict], emotion_results: Dict
+        self, interaction_id: str, response: str, memory_results: list[dict], emotion_results: dict
     ) -> ConversationMetrics:
         """Complete metrics collection for a conversation"""
         if interaction_id not in self.metrics_cache:
@@ -152,7 +149,7 @@ class HolisticAIMetrics:
         # Create conversation metrics
         metrics = ConversationMetrics(
             user_id=cache_data["user_id"],
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             total_response_time=total_time,
             memory_retrieval_time=cache_data["phase_times"].get("memory", 0),
             emotion_analysis_time=cache_data["phase_times"].get("emotion", 0),
@@ -214,7 +211,7 @@ class HolisticAIMetrics:
 
     async def generate_system_metrics(self, time_period: str = "daily") -> SystemMetrics:
         """Generate aggregated system metrics"""
-        end_time = datetime.now(timezone.utc)
+        end_time = datetime.now(UTC)
 
         if time_period == "hourly":
             start_time = end_time - timedelta(hours=1)
@@ -263,7 +260,7 @@ class HolisticAIMetrics:
         )
 
     # Helper methods for metric calculations
-    async def _calculate_memory_hit_rate(self, memory_results: List[Dict]) -> float:
+    async def _calculate_memory_hit_rate(self, memory_results: list[dict]) -> float:
         """Calculate how often relevant memories are found"""
         if not memory_results:
             return 0.0
@@ -272,7 +269,7 @@ class HolisticAIMetrics:
         hits = sum(1 for m in memory_results if m.get("score", 0) > 0.5)
         return hits / len(memory_results)
 
-    async def _calculate_memory_relevance(self, memory_results: List[Dict], query: str) -> float:
+    async def _calculate_memory_relevance(self, memory_results: list[dict], query: str) -> float:
         """Calculate average relevance of retrieved memories"""
         if not memory_results:
             return 0.0
@@ -280,7 +277,7 @@ class HolisticAIMetrics:
         return statistics.mean([m.get("score", 0) for m in memory_results])
 
     async def _calculate_emotional_appropriateness(
-        self, emotion_results: Dict, response: str
+        self, emotion_results: dict, response: str
     ) -> float:
         """Calculate how emotionally appropriate the response is"""
         try:
@@ -397,7 +394,7 @@ class HolisticAIMetrics:
         }
         return emotion_scores.get(emotion.lower(), 0.5)
 
-    def _percentile(self, data: List[float], percentile: int) -> float:
+    def _percentile(self, data: list[float], percentile: int) -> float:
         """Calculate percentile of data"""
         if not data:
             return 0.0
@@ -412,7 +409,7 @@ class HolisticAIMetrics:
 
     async def _get_metrics_for_period(
         self, start_time: datetime, end_time: datetime
-    ) -> List[ConversationMetrics]:
+    ) -> list[ConversationMetrics]:
         """Retrieve metrics for a time period"""
         # Placeholder - would query database
         return []
@@ -449,7 +446,7 @@ class HolisticAIMetrics:
         """Calculate user retention rate"""
         return 0.85  # Placeholder
 
-    async def _calculate_consistency_trend(self, metrics: List[ConversationMetrics]) -> float:
+    async def _calculate_consistency_trend(self, metrics: list[ConversationMetrics]) -> float:
         """Calculate trend in consistency over time"""
         if len(metrics) < 2:
             return 0.0

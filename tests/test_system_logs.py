@@ -16,7 +16,6 @@ def test_logging():
 
     logger = logging.getLogger("TestLogger")
 
-    print("Generating test log messages...")
 
     # Generate various log levels
     logger.debug("This is a DEBUG message - used for detailed diagnostic info")
@@ -44,8 +43,6 @@ def test_logging():
     thread_logger = logging.getLogger("ThreadTest")
     thread_logger.info(f"Running on thread: {threading.current_thread().name}")
 
-    print("✅ Test log messages generated")
-    print("🔍 Check the 'System Logs' tab in the WhisperEngine app to see them")
 
 
 if __name__ == "__main__":

@@ -6,15 +6,15 @@ This module provides secure logging with automatic PII sanitization,
 data masking, and compliance with privacy standards.
 """
 
-import logging
-import re
 import hashlib
 import json
-from typing import Any, Dict, List, Optional, Union
+import logging
+import re
 from dataclasses import dataclass
-from enum import Enum
-import discord
 from datetime import datetime
+from enum import Enum
+
+import discord
 
 
 class LogLevel(Enum):
@@ -44,11 +44,11 @@ class LogEntry:
     timestamp: datetime
     level: LogLevel
     message: str
-    context: Optional[str] = None
-    user_id_hash: Optional[str] = None
-    channel_type: Optional[str] = None
+    context: str | None = None
+    user_id_hash: str | None = None
+    channel_type: str | None = None
     sensitive_data_removed: bool = False
-    original_length: Optional[int] = None
+    original_length: int | None = None
 
 
 class SecureLogger:
@@ -115,7 +115,7 @@ class SecureLogger:
         else:
             self.logger.setLevel(getattr(logging, self.log_level.value))
 
-    def _hash_user_id(self, user_id: Union[str, int]) -> str:
+    def _hash_user_id(self, user_id: str | int) -> str:
         """Create privacy-safe hash of user ID for logging"""
         if user_id is None:
             return "anonymous"
@@ -134,7 +134,6 @@ class SecureLogger:
         if not content:
             return "", False
 
-        original_content = content
         modified = False
 
         # Remove PII patterns
@@ -185,9 +184,9 @@ class SecureLogger:
         self,
         level: LogLevel,
         message: str,
-        user_id: Optional[Union[str, int]] = None,
+        user_id: str | int | None = None,
         discord_message=None,
-        context: Optional[str] = None,
+        context: str | None = None,
         sensitivity: DataSensitivity = DataSensitivity.INTERNAL,
     ):
         """
@@ -260,10 +259,10 @@ class SecureLogger:
     def log_security_event(
         self,
         message: str,
-        user_id: Optional[Union[str, int]] = None,
+        user_id: str | int | None = None,
         threat_level: str = "medium",
         event_type: str = "security_violation",
-        additional_data: Optional[Dict] = None,
+        additional_data: dict | None = None,
     ):
         """
         Log security-related events with high priority
@@ -332,9 +331,9 @@ class SecureLogger:
         api_name: str,
         endpoint: str,
         status: str,
-        user_id: Optional[Union[str, int]] = None,
-        response_size: Optional[int] = None,
-        error_details: Optional[str] = None,
+        user_id: str | int | None = None,
+        response_size: int | None = None,
+        error_details: str | None = None,
     ):
         """
         Log API interactions with security focus
@@ -374,8 +373,8 @@ class SecureLogger:
         self,
         operation: str,
         table: str,
-        user_id: Optional[Union[str, int]] = None,
-        record_count: Optional[int] = None,
+        user_id: str | int | None = None,
+        record_count: int | None = None,
         operation_result: str = "success",
     ):
         """

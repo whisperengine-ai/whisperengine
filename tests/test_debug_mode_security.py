@@ -4,25 +4,25 @@ Test suite for Debug Mode Information Disclosure security fix
 Tests the fix for CVSS 7.1 vulnerability - Debug Mode Information Disclosure
 """
 
-import sys
 import os
+import sys
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+
+import io
+import logging
+from unittest.mock import Mock
 
 from debug_mode_security import (
     SecureDebugLogger,
     secure_add_debug_info_to_response,
     test_secure_debug_logging,
 )
-from unittest.mock import Mock, patch
-import logging
-import io
 
 
 def test_sensitive_data_sanitization():
     """Test that sensitive data is properly sanitized"""
 
-    print("🧪 Testing sensitive data sanitization...")
 
     debug_logger = SecureDebugLogger(enable_debug_mode=True)
 
@@ -41,15 +41,12 @@ def test_sensitive_data_sanitization():
         assert (
             expected == sanitized
         ), f"Failed to sanitize: {original} -> {sanitized}, expected: {expected}"
-        print(f"  ✅ {original[:20]}... -> {sanitized[:30]}...")
 
-    print("✅ Sensitive data sanitization test passed")
 
 
 def test_user_id_hashing():
     """Test that user IDs are consistently hashed"""
 
-    print("\n🧪 Testing user ID hashing...")
 
     debug_logger = SecureDebugLogger(enable_debug_mode=True)
 
@@ -63,25 +60,18 @@ def test_user_id_hashing():
     assert len(hash1) == 13, f"Hash should be 13 chars (user_ + 8), got: {len(hash1)}"
     assert user_id not in hash1, "Original user ID should not appear in hash"
 
-    print(f"  Original: {user_id}")
-    print(f"  Hashed: {hash1}")
-    print("  ✅ User ID hashing is consistent and secure")
 
     # Test different user IDs produce different hashes
     user_id2 = "987654321"
     hash2 = debug_logger.hash_user_id(user_id2)
 
     assert hash1 != hash2, "Different user IDs should produce different hashes"
-    print(f"  Different user: {user_id2} -> {hash2}")
-    print("  ✅ Different users produce different hashes")
 
-    print("✅ User ID hashing test passed")
 
 
 def test_username_sanitization():
     """Test username sanitization"""
 
-    print("\n🧪 Testing username sanitization...")
 
     debug_logger = SecureDebugLogger(enable_debug_mode=True)
 
@@ -104,15 +94,12 @@ def test_username_sanitization():
         assert (
             sanitized == expected
         ), f"Username sanitization failed: {original} -> {sanitized}, expected: {expected}"
-        print(f"  {original} -> {sanitized}")
 
-    print("✅ Username sanitization test passed")
 
 
 def test_production_mode_security():
     """Test that production mode (debug disabled) hides sensitive information"""
 
-    print("\n🧪 Testing production mode security...")
 
     # Test with debug mode disabled
     debug_logger = SecureDebugLogger(enable_debug_mode=False)
@@ -124,8 +111,6 @@ def test_production_mode_security():
         sanitized == "[username_hidden]"
     ), f"Production mode should hide usernames, got: {sanitized}"
 
-    print(f"  Production username: {sensitive_username} -> {sanitized}")
-    print("  ✅ Production mode hides sensitive usernames")
 
     # Test logging in production mode
     # Capture log output
@@ -147,18 +132,15 @@ def test_production_mode_security():
     assert "123456789" not in log_output, "User ID should not appear in production logs"
     assert "TestUser" not in log_output, "Real names should not appear in production logs"
 
-    print("  ✅ Production mode limits debug output")
 
     # Clean up
     logger.removeHandler(handler)
 
-    print("✅ Production mode security test passed")
 
 
 def test_debug_function_integration():
     """Test integration with the actual bot debug functions"""
 
-    print("\n🧪 Testing debug function integration...")
 
     # Mock memory manager with emotion profile
     mock_memory_manager = Mock()
@@ -186,7 +168,6 @@ def test_debug_function_integration():
 
     # Response should be unchanged (debug info is logged, not added to response)
     assert secure_response == response, "Debug info should not be added to response"
-    print("  ✅ Debug info is logged, not added to response")
 
     # Test with debug mode disabled
     secure_response_prod = secure_add_debug_info_to_response(
@@ -194,7 +175,6 @@ def test_debug_function_integration():
     )
 
     assert secure_response_prod == response, "Response should be unchanged in production"
-    print("  ✅ Production mode returns clean response")
 
     # Test duplicate message processing
     secure_response_dup = secure_add_debug_info_to_response(
@@ -204,15 +184,12 @@ def test_debug_function_integration():
     assert (
         secure_response_dup == response
     ), "Duplicate processing should still return clean response"
-    print("  ✅ Duplicate message processing handled correctly")
 
-    print("✅ Debug function integration test passed")
 
 
 def test_log_level_security():
     """Test that sensitive information doesn't leak through different log levels"""
 
-    print("\n🧪 Testing log level security...")
 
     # Capture all log output
     log_capture = io.StringIO()
@@ -262,18 +239,15 @@ def test_log_level_security():
     # Hashed user ID should appear (for debugging)
     assert "user_" in all_output, "Hashed user ID should be present for debugging"
 
-    print("  ✅ Sensitive data properly sanitized at all log levels")
 
     # Clean up
     logger.removeHandler(handler)
 
-    print("✅ Log level security test passed")
 
 
 def test_edge_cases():
     """Test edge cases and error conditions"""
 
-    print("\n🧪 Testing edge cases...")
 
     debug_logger = SecureDebugLogger(enable_debug_mode=True)
 
@@ -295,27 +269,21 @@ def test_edge_cases():
     long_hash = debug_logger.hash_user_id(very_long_id)
     assert len(long_hash) == 13, "Very long user ID should still produce standard hash length"
 
-    print("  ✅ Edge cases handled properly")
 
     # Test error conditions
     try:
         # Test with invalid data types (should handle gracefully)
         debug_logger.log_user_debug_info("test_user", {"invalid": object()})
-        print("  ✅ Invalid data types handled gracefully")
-    except Exception as e:
-        print(f"  ⚠️ Exception in error handling test: {e}")
+    except Exception:
+        pass
 
-    print("✅ Edge cases test passed")
 
 
 if __name__ == "__main__":
-    print("🔒 Debug Mode Information Disclosure - Security Fix Test Suite")
-    print("=" * 70)
 
     try:
         # Run core functionality test first
         test_secure_debug_logging()
-        print()
 
         # Run comprehensive security tests
         test_sensitive_data_sanitization()
@@ -326,37 +294,12 @@ if __name__ == "__main__":
         test_log_level_security()
         test_edge_cases()
 
-        print("\n" + "=" * 70)
-        print("🎉 All debug mode security tests PASSED!")
 
-        print("\n🔒 Security Test Summary:")
-        print("  ✅ Sensitive data sanitization (SSN, credit cards, emails)")
-        print("  ✅ User ID hashing for privacy protection")
-        print("  ✅ Username sanitization in debug mode")
-        print("  ✅ Production mode information hiding")
-        print("  ✅ Debug function integration security")
-        print("  ✅ Log level security validation")
-        print("  ✅ Edge cases and error handling")
 
-        print("\n🛡️  CVSS 7.1 Vulnerability - FIXED:")
-        print("  ❌ Sensitive user data in INFO-level logs")
-        print("  ❌ Emotional states exposed to administrators")
-        print("  ❌ Relationship data in production logs")
-        print("  ❌ User names disclosed in debug output")
-        print("  ✅ Secure debug logging with data sanitization")
-        print("  ✅ User privacy protected at all log levels")
 
-        print("\n🎯 Technical Implementation:")
-        print("  ✅ Secure debug module replaces vulnerable logging")
-        print("  ✅ User IDs hashed consistently for debugging")
-        print("  ✅ Sensitive patterns masked automatically")
-        print("  ✅ Production mode hides all sensitive details")
-        print("  ✅ Debug info logged, never added to responses")
 
-        print("\n✅ Debug Mode Information Disclosure (CVSS 7.1) - SECURITY FIX COMPLETE ✅")
 
-    except Exception as e:
-        print(f"❌ Security test failed: {e}")
+    except Exception:
         import traceback
 
         traceback.print_exc()
