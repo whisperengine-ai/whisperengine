@@ -127,8 +127,7 @@ $quickStartUrl = "$baseUrl/docker/quick-start"
 
 $files = @{
     "docker-compose.yml" = "$quickStartUrl/docker-compose.yml"
-    ".env.minimal" = "$quickStartUrl/.env.minimal"
-    "system_prompt.md" = "$baseUrl/system_prompt.md"
+    ".env.minimal" = "$quickStartUrl/.env.minimal" 
     "README.md" = "$quickStartUrl/README.md"
 }
 
@@ -245,7 +244,7 @@ try {
     Write-Host ""
     Write-Info "Configuration files:"
     Write-Host "  Environment:      .env (hidden), env.example (visible)" -ForegroundColor Cyan
-    Write-Host "  Bot personality:  system_prompt.md" -ForegroundColor Cyan
+    Write-Host "  Bot personality:  prompts/default.md" -ForegroundColor Cyan  
     Write-Host "  Services:         docker-compose.yml" -ForegroundColor Cyan
     Write-Host ""
     Write-Dream "🎭 Dream of the Endless now dwells in your Discord server..."

@@ -1027,10 +1027,10 @@ class UniversalChatOrchestrator:
             content = load_system_prompt()
         except Exception as e:
             logging.warning(f"Could not load system prompt via config: {e}")
-            # Try fallback to direct file loading
+            # Try fallback to prompts/default.md
             try:
                 import os
-                prompt_path = os.path.join(os.path.dirname(__file__), '..', '..', 'system_prompt.md')
+                prompt_path = os.path.join(os.path.dirname(__file__), '..', '..', 'prompts', 'default.md')
                 if os.path.exists(prompt_path):
                     with open(prompt_path, 'r', encoding='utf-8') as f:
                         content = f.read()

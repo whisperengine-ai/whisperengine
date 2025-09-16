@@ -20,7 +20,7 @@ class GraphEnhancedBot:
     def _load_base_system_prompt(self) -> str:
         """Load the base system prompt from file."""
         try:
-            with open("system_prompt.md", "r") as f:
+            with open("prompts/default.md", "r") as f:
                 return f.read()
         except FileNotFoundError:
             return "You are a helpful AI assistant."

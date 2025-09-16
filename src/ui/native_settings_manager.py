@@ -36,7 +36,7 @@ class LLMConfig:
     api_key: str = ""
     max_tokens: int = 2048
     temperature: float = 0.7
-    system_prompt_file: str = "system_prompt.md"
+    system_prompt_file: str = "prompts/default.md"
     timeout_seconds: int = 30
 
 @dataclass

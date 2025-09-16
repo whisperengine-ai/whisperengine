@@ -124,11 +124,11 @@ class OptimizedPromptManager:
                 prompt_candidates = [
                     self.optimized_dir / "system_prompt_optimized.md",
                     self.quick_templates_dir / "dream_minimal.md",
-                    self.prompts_dir / "system_prompt.md"  # Fallback
+                    self.prompts_dir / "default.md"  # Updated fallback
                 ]
             else:
                 prompt_candidates = [
-                    self.prompts_dir / "system_prompt.md",
+                    self.prompts_dir / "default.md",  # Updated default
                     self.optimized_dir / "system_prompt_optimized.md"
                 ]
         
@@ -185,11 +185,11 @@ class OptimizedPromptManager:
             return fallback, selection_metadata
         
         # Absolute fallback - default system prompt
-        absolute_fallback = self.prompts_dir / "system_prompt.md"
+        absolute_fallback = self.prompts_dir / "default.md"
         selection_metadata.update({
             'selected_file': str(absolute_fallback),
             'estimated_tokens': self._get_token_estimate(absolute_fallback),
-            'reason': 'Absolute fallback - original system prompt'
+            'reason': 'Absolute fallback - default system prompt'
         })
         return absolute_fallback, selection_metadata
     

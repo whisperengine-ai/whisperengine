@@ -108,14 +108,6 @@ if errorlevel 1 (
     goto :download_error
 )
 
-REM Download system_prompt.md
-echo   Downloading system_prompt.md...
-powershell -Command "try { Invoke-WebRequest -Uri '%BASE_URL%/system_prompt.md' -OutFile 'system_prompt.md' -UseBasicParsing; exit 0 } catch { exit 1 }"
-if errorlevel 1 (
-    echo ❌ Failed to download system_prompt.md
-    goto :download_error
-)
-
 REM Download README.md
 echo   Downloading README.md...
 powershell -Command "try { Invoke-WebRequest -Uri '%QUICKSTART_URL%/README.md' -OutFile 'README.md' -UseBasicParsing; exit 0 } catch { exit 1 }"
@@ -213,7 +205,7 @@ echo   Update images:    docker-compose pull ^&^& docker-compose up -d
 echo.
 echo ℹ️  Configuration files:
 echo   Environment:      .env (hidden), env.example (visible)
-echo   Bot personality:  system_prompt.md
+echo   Bot personality:  prompts/default.md
 echo   Services:         docker-compose.yml
 echo.
 echo 🎭 Dream of the Endless now dwells in your Discord server...
