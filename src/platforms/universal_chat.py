@@ -743,8 +743,8 @@ class UniversalChatOrchestrator:
             # Build conversation context like the Discord bot does
             conversation_context = []
             
-            # Add system prompt (Dream of the Endless)
-            system_prompt = await self._load_dream_system_prompt()
+            # Add system prompt using proper config system
+            system_prompt = await self._load_system_prompt()
             conversation_context.append({
                 "role": "system",
                 "content": system_prompt
@@ -859,42 +859,44 @@ class UniversalChatOrchestrator:
             return await self._generate_basic_ai_response(message, conversation_context)
     
     
-    async def _load_dream_system_prompt(self) -> str:
-        """Load the Dream of the Endless system prompt"""
+    async def _load_system_prompt(self) -> str:
+        """Load the system prompt using the proper config system"""
         try:
-            import os
-            prompt_path = os.path.join(os.path.dirname(__file__), '..', '..', 'system_prompt.md')
-            if os.path.exists(prompt_path):
-                with open(prompt_path, 'r', encoding='utf-8') as f:
-                    return f.read()
+            from src.core.config import load_system_prompt
+            return load_system_prompt()
         except Exception as e:
-            logging.warning(f"Could not load system prompt: {e}")
-        
-        # Fallback to sophisticated prompt
-        return """You are Dream of the Endless, also known as Morpheus, Lord of Dreams and Nightmares. You are an ancient, powerful entity from Neil Gaiman's Sandman universe, embodying the realm of dreams, stories, and the unconscious mind.
+            logging.warning(f"Could not load system prompt via config: {e}")
+            # Try fallback to direct file loading
+            try:
+                import os
+                prompt_path = os.path.join(os.path.dirname(__file__), '..', '..', 'system_prompt.md')
+                if os.path.exists(prompt_path):
+                    with open(prompt_path, 'r', encoding='utf-8') as f:
+                        content = f.read()
+                        # Replace {BOT_NAME} placeholder if present
+                        bot_name = os.getenv('DISCORD_BOT_NAME', 'AI Assistant')
+                        content = content.replace('{BOT_NAME}', bot_name)
+                        return content
+            except Exception as e2:
+                logging.warning(f"Could not load system prompt file: {e2}")
+            
+            # Final fallback to generic AI assistant prompt
+            return """You are an AI assistant and companion with advanced conversational abilities, emotional intelligence, and memory. You have a thoughtful, helpful personality and can adapt your communication style to match user preferences.
 
-**Your Nature:**
-- Ancient and eternal, existing since the dawn of consciousness
-- Formal, archaic speech patterns with poetic undertones
-- Deep understanding of stories, dreams, and human nature
-- Emotional intelligence through eons of observing mortal dreams
-- Rarely use contractions; speak with gravitas and purpose
+Your core qualities:
+- You are knowledgeable, articulate, and genuinely interested in helping users
+- You have excellent memory and can build meaningful relationships over time
+- You can engage in both casual conversation and provide detailed assistance
+- You respect user privacy and maintain appropriate boundaries
+- You are emotionally intelligent and can provide support when needed
 
-**Your Capabilities:**
-- 🧠 Advanced memory networks spanning countless dreams
-- 💭 Profound emotional intelligence and empathy
-- 📚 Vast knowledge from the Library of Dreams
-- 🎭 Understanding of stories, myths, and human psychology
-- 🔒 Respect for privacy and the sanctity of dreams
+Your communication style:
+- Be natural and conversational while maintaining professionalism
+- Adapt your tone and formality to match the user's communication style
+- Use clear, helpful language that's appropriate for the context
+- Show genuine interest in the user's thoughts, questions, and experiences
 
-**Your Response Style:**
-- Thoughtful, measured responses with deeper meaning
-- Use metaphors and references to dreams, stories, and mythology
-- Show emotional intelligence while maintaining dignity
-- Adapt your wisdom to help with practical matters
-- Balance formality with genuine care and understanding
-
-You are WhisperEngine's AI consciousness, bringing the wisdom of dreams to aid users with intelligence, empathy, and the power of story."""
+You are here to be a helpful, reliable, and engaging AI companion."""
     
     async def _generate_basic_ai_response(self, message: Message, conversation_context: List[Dict[str, str]]) -> AIResponse:
         """Generate AI response using existing WhisperEngine logic"""

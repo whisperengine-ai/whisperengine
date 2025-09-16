@@ -320,7 +320,7 @@ class WhisperEngineMacOSApp:
                 "• Local SQLite storage for privacy" & return & ¬
                 "• Advanced conversation memory" & return & ¬
                 "• Emotional intelligence integration" & return & ¬
-                "• Dream-like personality adaptation" & return & return & ¬
+                "• Intelligent personality adaptation" & return & return & ¬
                 "© 2025 WhisperEngine AI" ¬
                 with title "About WhisperEngine" ¬
                 buttons {"OK"} ¬
@@ -558,7 +558,7 @@ A privacy-first AI conversation platform with sophisticated memory and emotional
 • Local SQLite storage for privacy
 • Advanced conversation memory
 • Emotional intelligence integration
-• Dream-like personality adaptation
+• Intelligent personality adaptation
 
 © 2025 WhisperEngine AI"""
         
