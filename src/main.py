@@ -147,7 +147,8 @@ class ModularBotManager:
                 safe_memory_manager=getattr(self.bot_core, 'safe_memory_manager', None),
                 context_memory_manager=getattr(self.bot_core, 'context_memory_manager', None),
                 graph_personality_manager=components.get('graph_personality_manager'),
-                personality_profiler=components.get('personality_profiler')
+                personality_profiler=components.get('personality_profiler'),
+                dynamic_personality_profiler=components.get('dynamic_personality_profiler')
             )
             self.command_handlers['memory'].register_commands(is_admin, bot_name_filter)
             logger.info("✅ Memory command handlers registered")

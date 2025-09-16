@@ -48,6 +48,9 @@ from src.utils.graceful_shutdown import GracefulShutdownManager
 from src.memory.thread_safe_memory import ThreadSafeMemoryManager
 from src.llm.concurrent_llm_manager import ConcurrentLLMManager
 from src.utils.atomic_operations import store_conversation_atomic
+
+# MEMORY OPTIMIZATION INTEGRATION: Import optimized memory manager
+from src.memory.optimized_memory_manager import create_optimized_memory_manager
 from src.utils.health_monitor import HealthMonitor
 from src.utils.conversation import ConversationHistoryManager
 
@@ -282,6 +285,26 @@ class DiscordBotCore:
         except Exception as e:
             self.logger.error(f"Failed to initialize personality profiler: {e}")
             self.logger.warning("⚠️ Continuing without personality profiling features")
+
+        # Initialize Dynamic Personality Profiler
+        self.logger.info("🎭 Initializing Dynamic Personality Profiler...")
+        try:
+            # Check if dynamic personality profiling is enabled
+            enable_dynamic_personality = os.getenv("ENABLE_DYNAMIC_PERSONALITY", "true").lower() == "true"
+            
+            if enable_dynamic_personality:
+                from src.intelligence.dynamic_personality_profiler import PersistentDynamicPersonalityProfiler
+                
+                self.dynamic_personality_profiler = PersistentDynamicPersonalityProfiler()
+                self.logger.info("✅ Dynamic personality profiler initialized (always active)")
+            else:
+                self.dynamic_personality_profiler = None
+                self.logger.info("📊 Dynamic personality profiler disabled by configuration")
+            
+        except Exception as e:
+            self.logger.error(f"Failed to initialize dynamic personality profiler: {e}")
+            self.logger.warning("⚠️ Continuing without dynamic personality profiling features")
+            self.dynamic_personality_profiler = None
 
         # Initialize Predictive Emotional Intelligence
         self.logger.info("🎯 Initializing Predictive Emotional Intelligence...")
@@ -631,10 +654,53 @@ class DiscordBotCore:
         
     def get_components(self):
         """Get all initialized bot components as a dictionary."""
+        
+        # Create optimized memory manager if components are available
+        optimized_memory_manager = self.memory_manager
+        try:
+            if hasattr(self, 'llm_client') and self.llm_client and self.memory_manager:
+                # Try to find embedding manager from memory manager
+                embedding_manager = None
+                if hasattr(self.memory_manager, 'embedding_manager') and self.memory_manager.embedding_manager:
+                    embedding_manager = self.memory_manager.embedding_manager
+                elif (hasattr(self.memory_manager, 'memory_manager') and 
+                      self.memory_manager.memory_manager and
+                      hasattr(self.memory_manager.memory_manager, 'embedding_manager')):
+                    embedding_manager = self.memory_manager.memory_manager.embedding_manager
+                
+                optimized_memory_manager = create_optimized_memory_manager(
+                    llm_client=self.llm_client,
+                    embedding_manager=embedding_manager,
+                    memory_manager=self.memory_manager
+                )
+                
+                # Use logging if available
+                try:
+                    import logging
+                    logger = logging.getLogger(__name__)
+                    logger.info("✅ Memory optimization integrated successfully")
+                except:
+                    print("✅ Memory optimization integrated successfully")
+            else:
+                try:
+                    import logging
+                    logger = logging.getLogger(__name__)
+                    logger.info("ℹ️ Using standard memory manager (LLM client not available)")
+                except:
+                    print("ℹ️ Using standard memory manager (LLM client not available)")
+        except Exception as e:
+            try:
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.warning(f"Memory optimization initialization failed, using standard manager: {e}")
+            except:
+                print(f"Memory optimization initialization failed, using standard manager: {e}")
+            optimized_memory_manager = self.memory_manager
+        
         return {
             'bot': self.bot,
             'llm_client': self.llm_client,
-            'memory_manager': self.memory_manager,
+            'memory_manager': optimized_memory_manager,
             'conversation_cache': self.conversation_cache,
             'image_processor': self.image_processor,
             'health_monitor': self.health_monitor,
@@ -646,6 +712,7 @@ class DiscordBotCore:
             'conversation_history': self.conversation_history,
             'postgres_config': self.postgres_config,
             'personality_profiler': self.personality_profiler,
+            'dynamic_personality_profiler': getattr(self, 'dynamic_personality_profiler', None),
             'graph_personality_manager': self.graph_personality_manager,
             'phase2_integration': self.phase2_integration,
             'phase3_memory_networks': self.phase3_memory_networks,

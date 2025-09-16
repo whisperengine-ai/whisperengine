@@ -69,6 +69,7 @@ class BotEventHandlers:
         self.heartbeat_monitor = getattr(bot_core, 'heartbeat_monitor', None)
         self.image_processor = getattr(bot_core, 'image_processor', None)
         self.personality_profiler = getattr(bot_core, 'personality_profiler', None)
+        self.dynamic_personality_profiler = getattr(bot_core, 'dynamic_personality_profiler', None)
         self.graph_personality_manager = getattr(bot_core, 'graph_personality_manager', None)
         self.phase2_integration = getattr(bot_core, 'phase2_integration', None)
         self.external_emotion_ai = getattr(bot_core, 'external_emotion_ai', None)
@@ -362,6 +363,13 @@ class BotEventHandlers:
                 user_id, message.content, message
             )
         
+        # Dynamic Personality Analysis (always available when configured)
+        dynamic_personality_context = None
+        if self.dynamic_personality_profiler:
+            dynamic_personality_context = await self._analyze_dynamic_personality(
+                user_id, message.content, message, recent_messages
+            )
+        
         # Phase 4: Human-Like Conversation Intelligence
         if hasattr(self.memory_manager, 'process_with_phase4_intelligence'):
             phase4_context, comprehensive_context, enhanced_system_prompt = await self._process_phase4_intelligence(
@@ -378,7 +386,7 @@ class BotEventHandlers:
         await self._generate_and_send_response(
             reply_channel, message, user_id, conversation_context, 
             current_emotion_data, external_emotion_data, phase2_context,
-            phase4_context, comprehensive_context
+            phase4_context, comprehensive_context, dynamic_personality_context
         )
     
     async def _handle_guild_message(self, message):
@@ -463,6 +471,13 @@ class BotEventHandlers:
                 user_id, content, message, context_type='guild_message'
             )
         
+        # Dynamic Personality Analysis for guild message (always available when configured)
+        dynamic_personality_context = None
+        if self.dynamic_personality_profiler:
+            dynamic_personality_context = await self._analyze_dynamic_personality(
+                user_id, content, message, recent_messages
+            )
+        
         # Process message with images (content with mentions removed)
         conversation_context = await process_message_with_images(
             content, message.attachments, conversation_context,
@@ -473,7 +488,7 @@ class BotEventHandlers:
         await self._generate_and_send_response(
             reply_channel, message, user_id, conversation_context,
             current_emotion_data, external_emotion_data, phase2_context,
-            None, None, original_content=content
+            None, None, dynamic_personality_context, content
         )
     
     async def _get_recent_messages(self, channel, user_id, exclude_message_id):
@@ -755,7 +770,8 @@ class BotEventHandlers:
     
     async def _generate_and_send_response(self, reply_channel, message, user_id, conversation_context, 
                                          current_emotion_data, external_emotion_data, phase2_context,
-                                         phase4_context=None, comprehensive_context=None, original_content=None):
+                                         phase4_context=None, comprehensive_context=None, 
+                                         dynamic_personality_context=None, original_content=None):
         """Generate AI response and send to channel using Universal Chat Architecture."""
         # Show typing indicator
         async with reply_channel.typing():
@@ -802,7 +818,7 @@ class BotEventHandlers:
                 await self._store_conversation_memory(
                     message, user_id, response, current_emotion_data, 
                     external_emotion_data, phase2_context, phase4_context, 
-                    comprehensive_context, original_content
+                    comprehensive_context, dynamic_personality_context, original_content
                 )
                 
                 # Add debug information if needed
@@ -861,7 +877,7 @@ class BotEventHandlers:
     
     async def _store_conversation_memory(self, message, user_id, response, current_emotion_data, 
                                        external_emotion_data, phase2_context, phase4_context, 
-                                       comprehensive_context, original_content=None):
+                                       comprehensive_context, dynamic_personality_context=None, original_content=None):
         """Store conversation in memory with all AI analysis data."""
         try:
             # Extract content for storage
@@ -930,6 +946,23 @@ class BotEventHandlers:
                         else:
                             personality_simple[f"personality_{key}"] = str(value)
                 storage_metadata.update(personality_simple)
+            
+            # Add dynamic personality metadata
+            if dynamic_personality_context:
+                dynamic_personality_simple = {}
+                for key, value in dynamic_personality_context.items():
+                    if value is not None:
+                        if key == 'personality_dimensions' and isinstance(value, dict):
+                            # Flatten personality dimensions
+                            for dim_name, dim_data in value.items():
+                                if isinstance(dim_data, dict):
+                                    dynamic_personality_simple[f"dynamic_personality_{dim_name}_value"] = dim_data.get('value', 0.0)
+                                    dynamic_personality_simple[f"dynamic_personality_{dim_name}_confidence"] = dim_data.get('confidence', 0.0)
+                        elif isinstance(value, (str, int, float, bool)):
+                            dynamic_personality_simple[f"dynamic_personality_{key}"] = value
+                        else:
+                            dynamic_personality_simple[f"dynamic_personality_{key}"] = str(value)
+                storage_metadata.update(dynamic_personality_simple)
             
             # Add emotional intelligence metadata
             if emotional_intelligence_results:
@@ -1080,6 +1113,60 @@ class BotEventHandlers:
                 emotional_intelligence_results = None
         
         return emotional_intelligence_results
+    
+    async def _analyze_dynamic_personality(self, user_id, content, message, recent_messages):
+        """Analyze personality with the dynamic personality profiler and store results."""
+        try:
+            if not self.dynamic_personality_profiler:
+                return None
+                
+            logger.debug(f"Analyzing dynamic personality for user {user_id}")
+            
+            # Get emotional data if available
+            emotional_data = None
+            if hasattr(self.bot_core, 'components') and 'emotion_ai' in self.bot_core.components:
+                emotion_ai = self.bot_core.components['emotion_ai']
+                try:
+                    emotional_data = await emotion_ai.analyze_emotion(content)
+                except Exception as e:
+                    logger.debug(f"Could not get emotional analysis: {e}")
+            
+            # Get the last bot response for context
+            bot_response = ""
+            for msg in reversed(recent_messages):
+                if msg.get('bot', False):
+                    bot_response = msg.get('content', '')
+                    break
+            
+            # Analyze the conversation for personality insights (using correct method signature)
+            analysis = await self.dynamic_personality_profiler.analyze_conversation(
+                user_id=user_id,
+                context_id=str(message.channel.id),
+                user_message=content,
+                bot_response=bot_response,
+                response_time_seconds=0.0,  # Could be calculated if needed
+                emotional_data=emotional_data
+            )
+            
+            # Update the personality profile (this automatically saves to database!)
+            profile = await self.dynamic_personality_profiler.update_personality_profile(analysis)
+            
+            logger.debug(f"Dynamic personality profile updated for user {user_id}: "
+                       f"traits={len(profile.traits)}, relationship_depth={profile.relationship_depth:.2f}")
+            
+            # Return analysis context for system prompt enhancement
+            return {
+                'personality_traits': dict(profile.traits),
+                'communication_style': profile.preferred_response_style,
+                'relationship_depth': profile.relationship_depth,
+                'trust_level': profile.trust_level,
+                'conversation_count': profile.total_conversations,
+                'topics_of_interest': profile.topics_of_high_engagement
+            }
+            
+        except Exception as e:
+            logger.warning(f"Dynamic personality analysis failed for user {user_id}: {e}")
+            return None
     
     async def _send_response_chunks(self, channel, response):
         """Send response in chunks if it's too long."""

@@ -17,13 +17,14 @@ class MemoryCommandHandlers:
     """Handles memory-related commands"""
     
     def __init__(self, bot, memory_manager, safe_memory_manager, context_memory_manager, 
-                 graph_personality_manager, personality_profiler):
+                 graph_personality_manager, personality_profiler, dynamic_personality_profiler=None):
         self.bot = bot
         self.memory_manager = memory_manager
         self.safe_memory_manager = safe_memory_manager
         self.context_memory_manager = context_memory_manager
         self.graph_personality_manager = graph_personality_manager
         self.personality_profiler = personality_profiler
+        self.dynamic_personality_profiler = dynamic_personality_profiler
     
     def register_commands(self, is_admin, bot_name_filter=None):
         """Register all memory commands"""
@@ -32,55 +33,28 @@ class MemoryCommandHandlers:
         if bot_name_filter is None:
             bot_name_filter = lambda: lambda func: func
         
-        @self.bot.command(name='add_fact')
-        @bot_name_filter()
-        async def add_fact(ctx, *, fact):
-            """Add a fact about yourself to the bot's memory"""
-            await self._add_fact_handler(ctx, fact)
-        
-        @self.bot.command(name='remove_fact')
-        @bot_name_filter()
-        async def remove_fact(ctx, *, search_term):
-            """Search and remove facts about yourself"""
-            await self._remove_fact_handler(ctx, search_term)
-        
-        @self.bot.command(name='remove_fact_by_number')
-        @bot_name_filter()
-        async def remove_fact_by_number(ctx, fact_number: int, *, search_term):
-            """Remove a specific fact by its number from the search results"""
-            await self._remove_fact_by_number_handler(ctx, fact_number, search_term)
-        
-        @self.bot.command(name='list_facts')
+        @self.bot.command(name='list_facts', aliases=['facts'])
         @bot_name_filter()
         async def list_facts(ctx):
             """List all facts the bot knows about you"""
             await self._list_facts_handler(ctx)
-        
-        @self.bot.command(name='add_global_fact')
-        async def add_global_fact(ctx, *, fact):
-            """Add a global fact about the world or relationships (admin only)"""
-            await self._add_global_fact_handler(ctx, fact, is_admin)
         
         @self.bot.command(name='list_global_facts')
         async def list_global_facts(ctx):
             """List all global facts (admin only)"""
             await self._list_global_facts_handler(ctx, is_admin)
         
-        @self.bot.command(name='remove_global_fact')
-        async def remove_global_fact(ctx, *, search_term):
-            """Search and remove global facts (admin only)"""
-            await self._remove_global_fact_handler(ctx, search_term, is_admin)
-        
-        @self.bot.command(name='remove_global_fact_by_number')
-        async def remove_global_fact_by_number(ctx, fact_number: int, *, search_term):
-            """Remove a specific global fact by its number from the search results (admin only)"""
-            await self._remove_global_fact_by_number_handler(ctx, fact_number, search_term, is_admin)
-        
         @self.bot.command(name='personality', aliases=['profile', 'my_personality'])
         @bot_name_filter()
         async def show_personality(ctx, user: Optional[discord.Member] = None):
             """Show personality profile for yourself or another user"""
             await self._personality_handler(ctx, user, is_admin)
+        
+        @self.bot.command(name='dynamic_personality', aliases=['dynamic_profile', 'adaptive_profile'])
+        @bot_name_filter()
+        async def show_dynamic_personality(ctx, user: Optional[discord.Member] = None):
+            """Show dynamic personality profile with adaptive insights"""
+            await self._dynamic_personality_handler(ctx, user, is_admin)
         
         @self.bot.command(name='sync_check')
         async def sync_check(ctx):
@@ -119,198 +93,214 @@ class MemoryCommandHandlers:
             """Test fact extraction on a message"""
             await self._extract_facts_handler(ctx, message)
     
-    async def _add_fact_handler(self, ctx, fact):
-        """Handle add fact command"""
+    async def _list_facts_handler(self, ctx):
+        """Handle list facts command - showcasing personality-driven AI insights"""
         user_id = str(ctx.author.id)
         
         try:
-            self.memory_manager.store_user_fact(
-                user_id, 
-                fact, 
-                f"Added via !add_fact command in {ctx.channel.name if ctx.guild else 'DM'}"
-            )
-            await ctx.send(f"✅ **Fact added to memory:**\n> {fact}")
-            logger.info(f"User {ctx.author.name} added fact: {fact[:50]}...")
-        except ValidationError as e:
-            logger.warning(f"Invalid input for add_fact: {e}")
-            await ctx.send(f"❌ **Invalid input:** {str(e)}")
-        except MemoryStorageError as e:
-            logger.error(f"Error storing user fact: {e}")
-            await ctx.send("❌ **Error:** Could not save the fact. Please try again later.")
-        except Exception as e:
-            logger.error(f"Unexpected error storing user fact: {e}")
-            await ctx.send("❌ **Error:** An unexpected error occurred. Please try again later.")
-    
-    async def _remove_fact_handler(self, ctx, search_term):
-        """Handle remove fact command"""
-        user_id = str(ctx.author.id)
-        
-        try:
-            # Search for facts containing the search term
-            relevant_memories = self.memory_manager.retrieve_relevant_memories(user_id, search_term, limit=5)
-            facts = [m for m in relevant_memories if m['metadata'].get('type') == 'user_fact']
+            # Get modern personality facts (primary data source)
+            personality_facts = []
+            try:
+                personality_facts = self.memory_manager.retrieve_personality_facts(
+                    user_id=user_id,
+                    limit=30
+                )
+                logger.debug(f"Retrieved {len(personality_facts)} personality facts for user {user_id}")
+            except Exception as e:
+                logger.debug(f"Could not retrieve personality facts: {e}")
             
-            if not facts:
-                await ctx.send(f"❌ **No facts found** containing: `{search_term}`")
-                return
-            
-            if len(facts) == 1:
-                # If only one fact found, delete it directly
-                fact = facts[0]
-                fact_text = fact['metadata'].get('fact', 'Unknown fact')
-                
-                # Delete the fact
-                if self.memory_manager.delete_specific_memory(fact['id']):
-                    await ctx.send(f"✅ **Fact removed:** {fact_text}")
-                    logger.info(f"User {ctx.author.name} removed fact: {fact_text}")
-                else:
-                    await ctx.send("❌ **Error:** Failed to remove the fact.")
-            else:
-                # Multiple facts found, show them with numbered options
-                embed = discord.Embed(
-                    title="🔍 Multiple Facts Found",
-                    description=f"Found {len(facts)} fact(s) containing `{search_term}`. Please use a more specific search term or select one by number:",
-                    color=0xf39c12
+            # Get legacy facts for comparison/completeness
+            legacy_facts = []
+            try:
+                results = self.memory_manager.collection.get(
+                    where={"$and": [{"user_id": user_id}, {"type": "user_fact"}]},
+                    limit=10
                 )
                 
-                for i, fact in enumerate(facts[:5], 1):  # Limit to 5 facts
-                    fact_text = fact['metadata'].get('fact', 'Unknown fact')
-                    timestamp = fact['metadata'].get('timestamp', 'Unknown time')
+                if results['documents']:
+                    facts_with_meta = list(zip(results['documents'], results['metadatas']))
+                    facts_with_meta.sort(key=lambda x: x[1].get('timestamp', ''), reverse=True)
+                    
+                    for doc, metadata in facts_with_meta:
+                        legacy_facts.append({
+                            'content': metadata.get('fact', doc),
+                            'timestamp': metadata.get('timestamp', 'Unknown'),
+                            'type': 'legacy'
+                        })
+            except Exception as e:
+                logger.debug(f"Could not retrieve legacy facts: {e}")
+            
+            total_facts = len(personality_facts) + len(legacy_facts)
+            
+            if total_facts == 0:
+                embed = discord.Embed(
+                    title=f"🧠 AI Memory: {ctx.author.display_name}",
+                    description="No personality insights discovered yet!",
+                    color=0x3498db
+                )
+                embed.add_field(
+                    name="🚀 Get Started",
+                    value="� **Chat more** to build your personality profile\n"
+                          "🎯 **Share interests** and preferences\n"
+                          "🤖 **AI learns** your communication style automatically\n"
+                          "📊 **Facts emerge** from natural conversation",
+                    inline=False
+                )
+                embed.set_footer(text="Personality facts are extracted automatically • No manual entry needed")
+                await ctx.send(embed=embed)
+                return
+            
+            # Create personality-focused embed
+            embed = discord.Embed(
+                title=f"🧠 AI Personality Profile: {ctx.author.display_name}",
+                description=f"Discovered **{len(personality_facts)} personality insights** + {len(legacy_facts)} legacy facts",
+                color=0x9b59b6,
+                timestamp=datetime.now(timezone.utc)
+            )
+            
+            # Group personality facts by type with relevance sorting
+            if personality_facts:
+                from collections import defaultdict
+                facts_by_type = defaultdict(list)
+                
+                for fact in personality_facts:
+                    fact_type = fact.get('fact_type', 'general')
+                    facts_by_type[fact_type].append(fact)
+                
+                # Show top categories by highest relevance
+                categories_by_relevance = []
+                for fact_type, type_facts in facts_by_type.items():
+                    max_relevance = max([f.get('relevance_score', 0) for f in type_facts])
+                    categories_by_relevance.append((fact_type, type_facts, max_relevance))
+                
+                categories_by_relevance.sort(key=lambda x: x[2], reverse=True)
+                
+                # Display top 5 personality fact categories
+                for fact_type, type_facts, max_relevance in categories_by_relevance[:5]:
+                    type_display = fact_type.replace('_', ' ').title()
+                    type_emoji = self._get_personality_type_emoji(fact_type)
+                    
+                    # Show top 3 facts from this category
+                    sorted_facts = sorted(type_facts, key=lambda x: x.get('relevance_score', 0), reverse=True)
+                    
+                    category_text = ""
+                    for i, fact in enumerate(sorted_facts[:3], 1):
+                        content = fact.get('content', 'Unknown')[:70]
+                        relevance = fact.get('relevance_score', 0.0)
+                        privacy_tier = fact.get('privacy_tier', 'unknown')
+                        
+                        # Relevance indicators
+                        if relevance >= 0.8:
+                            relevance_icon = "🔥"
+                        elif relevance >= 0.6:
+                            relevance_icon = "⭐"
+                        elif relevance >= 0.4:
+                            relevance_icon = "💡"
+                        else:
+                            relevance_icon = "📝"
+                        
+                        # Privacy indicators
+                        privacy_icon = "🔒" if privacy_tier == "high" else "👁️" if privacy_tier == "medium" else "📢"
+                        
+                        category_text += f"{relevance_icon} {content}... ({relevance:.2f}) {privacy_icon}\n"
+                    
+                    # Add category summary
+                    if len(type_facts) > 3:
+                        category_text += f"*...and {len(type_facts) - 3} more insights*\n"
+                    
                     embed.add_field(
-                        name=f"{i}. {fact_text[:100]}{'...' if len(fact_text) > 100 else ''}",
-                        value=f"*Added: {timestamp[:10]}*",
+                        name=f"{type_emoji} {type_display} ({len(type_facts)})",
+                        value=category_text[:1024] or "No content",
                         inline=False
                     )
                 
-                embed.set_footer(text="Use `!remove_fact_by_number <number>` to remove a specific fact.")
-                await ctx.send(embed=embed)
+                # Add personality insights summary
+                high_relevance = len([f for f in personality_facts if f.get('relevance_score', 0) >= 0.7])
+                medium_relevance = len([f for f in personality_facts if 0.4 <= f.get('relevance_score', 0) < 0.7])
+                low_relevance = len(personality_facts) - high_relevance - medium_relevance
                 
-        except Exception as e:
-            logger.error(f"Error removing user fact: {e}")
-            await ctx.send(f"❌ **Error:** {str(e)}")
-    
-    async def _remove_fact_by_number_handler(self, ctx, fact_number, search_term):
-        """Handle remove fact by number command"""
-        user_id = str(ctx.author.id)
-        
-        try:
-            # Search for facts containing the search term
-            relevant_memories = self.memory_manager.retrieve_relevant_memories(user_id, search_term, limit=5)
-            facts = [m for m in relevant_memories if m['metadata'].get('type') == 'user_fact']
+                insights_summary = f"🔥 **High Impact:** {high_relevance} insights\n"
+                insights_summary += f"⭐ **Medium Impact:** {medium_relevance} insights\n"
+                insights_summary += f"💡 **Supporting:** {low_relevance} insights"
+                
+                embed.add_field(
+                    name="📊 Insight Quality Distribution",
+                    value=insights_summary,
+                    inline=True
+                )
+                
+                # Privacy distribution
+                privacy_counts = defaultdict(int)
+                for fact in personality_facts:
+                    tier = fact.get('privacy_tier', 'unknown')
+                    privacy_counts[tier] += 1
+                
+                privacy_summary = ""
+                if privacy_counts['high']:
+                    privacy_summary += f"🔒 **Private:** {privacy_counts['high']}\n"
+                if privacy_counts['medium']:
+                    privacy_summary += f"👁️ **Semi-Private:** {privacy_counts['medium']}\n"
+                if privacy_counts['low']:
+                    privacy_summary += f"📢 **Public:** {privacy_counts['low']}\n"
+                
+                if privacy_summary:
+                    embed.add_field(
+                        name="🛡️ Privacy Distribution",
+                        value=privacy_summary,
+                        inline=True
+                    )
+                
+                # Show how facts are used in AI
+                embed.add_field(
+                    name="🤖 AI Integration",
+                    value=f"💬 **Conversation Context:** Active\n"
+                          f"🎯 **Response Personalization:** Enabled\n"
+                          f"🧠 **Memory Retrieval:** Semantic search\n"
+                          f"⚙️ **Behavior Adaptation:** Real-time",
+                    inline=True
+                )
             
-            if not facts:
-                await ctx.send(f"❌ **No facts found** containing: `{search_term}`")
-                return
+            # Show legacy facts if available (smaller section)
+            if legacy_facts:
+                legacy_text = ""
+                for fact in legacy_facts[:3]:
+                    content = fact['content'][:50]
+                    timestamp = fact['timestamp'][:10] if fact['timestamp'] != 'Unknown' else 'Unknown'
+                    legacy_text += f"📝 {content}... *(legacy, {timestamp})*\n"
+                
+                if len(legacy_facts) > 3:
+                    legacy_text += f"*...and {len(legacy_facts) - 3} more legacy facts*\n"
+                
+                embed.add_field(
+                    name=f"📚 Legacy Facts ({len(legacy_facts)})",
+                    value=legacy_text[:1024] if legacy_text else "None",
+                    inline=False
+                )
             
-            if fact_number < 1 or fact_number > len(facts):
-                await ctx.send(f"❌ **Invalid number.** Please choose a number between 1 and {len(facts)}.")
-                return
+            # Advanced commands hint
+            if len(personality_facts) > 10:
+                embed.add_field(
+                    name="🔍 Advanced Commands",
+                    value=f"• `!personality` - Full dynamic profile\n"
+                          f"• `!personality_types` - Filter by fact type\n"
+                          f"• `!memory_search <query>` - Find specific insights",
+                    inline=False
+                )
             
-            # Get the selected fact
-            fact = facts[fact_number - 1]
-            fact_text = fact['metadata'].get('fact', 'Unknown fact')
-            
-            # Delete the fact
-            if self.memory_manager.delete_specific_memory(fact['id']):
-                await ctx.send(f"✅ **Fact removed:** {fact_text}")
-                logger.info(f"User {ctx.author.name} removed fact: {fact_text}")
+            # Footer with system info
+            if total_facts > 15:
+                embed.set_footer(text=f"Showing highlights from {total_facts} total facts • Personality AI system active")
             else:
-                await ctx.send("❌ **Error:** Failed to remove the fact.")
-                
-        except ValueError:
-            await ctx.send("❌ **Invalid number format.** Please provide a valid number.")
-        except Exception as e:
-            logger.error(f"Error removing user fact by number: {e}")
-            await ctx.send(f"❌ **Error:** {str(e)}")
-    
-    async def _list_facts_handler(self, ctx):
-        """Handle list facts command"""
-        user_id = str(ctx.author.id)
-        
-        try:
-            # Get all user facts using proper ChromaDB syntax
-            results = self.memory_manager.collection.get(
-                where={"$and": [{"user_id": user_id}, {"type": "user_fact"}]},
-                limit=50
-            )
-            
-            if not results['documents']:
-                await ctx.send("📝 **No facts stored** about you yet. Use `!add_fact` to add some!")
-                return
-            
-            # Sort by timestamp
-            facts_with_meta = list(zip(results['documents'], results['metadatas']))
-            facts_with_meta.sort(key=lambda x: x[1].get('timestamp', ''), reverse=True)
-            
-            # Create embed
-            embed = discord.Embed(
-                title=f"📋 Facts about {ctx.author.display_name}",
-                color=0x3498db
-            )
-            
-            fact_list = []
-            for i, (doc, metadata) in enumerate(facts_with_meta[:20], 1):  # Limit to 20
-                fact = metadata.get('fact', doc)
-                timestamp = metadata.get('timestamp', 'Unknown')[:10]
-                fact_list.append(f"{i}. {fact} *(added {timestamp})*")
-            
-            embed.description = '\n'.join(fact_list) if fact_list else "No facts found."
-            
-            if len(facts_with_meta) > 20:
-                embed.set_footer(text=f"Showing first 20 of {len(facts_with_meta)} facts")
+                embed.set_footer(text=f"Personality AI has discovered {total_facts} facts about you • System learning from conversations")
             
             await ctx.send(embed=embed)
             
         except Exception as e:
-            logger.error(f"Error listing user facts: {e}")
-            await ctx.send(f"❌ **Error:** {str(e)}")
-    
-    async def _add_global_fact_handler(self, ctx, fact, is_admin):
-        """Handle add global fact command (admin only)"""
-        if not is_admin(ctx):
-            await ctx.send("❌ **Admin only:** This command requires administrator permissions.")
-            return
-        
-        # SECURITY ENHANCEMENT: Validate admin command input
-        from src.security.input_validator import validate_user_input, is_safe_admin_command
-        
-        user_id = str(ctx.author.id)
-        if not is_safe_admin_command(fact, user_id):
-            logger.error(f"SECURITY: Unsafe admin command attempted by {user_id}: add_global_fact")
-            await ctx.send("❌ **Security Error:** This command contains potentially dangerous content and has been blocked.")
-            return
-        
-        # Validate input content
-        validation_result = validate_user_input(fact, user_id, "admin_command")
-        if not validation_result['is_safe']:
-            logger.error(f"SECURITY: Malicious admin command input from {user_id}: {validation_result['blocked_patterns']}")
-            await ctx.send("❌ **Security Error:** Command input contains potentially malicious content.")
-            return
-        
-        # Use sanitized input
-        fact = validation_result['sanitized_content']
-        
-        try:
-            admin_name = ctx.author.display_name
-            self.memory_manager.store_global_fact(
-                fact, 
-                f"Added via !add_global_fact command by {admin_name} in {ctx.channel.name if ctx.guild else 'DM'}",
-                added_by=admin_name
-            )
-            await ctx.send(f"✅ **Global fact added:**\n> {fact}")
-            logger.info(f"Admin {admin_name} added global fact: {fact[:50]}...")
-        except ValidationError as e:
-            logger.warning(f"Invalid input for add_global_fact: {e}")
-            await ctx.send(f"❌ **Invalid input:** {str(e)}")
-        except MemoryStorageError as e:
-            logger.error(f"Error storing global fact: {e}")
-            await ctx.send("❌ **Error:** Could not save the global fact. Please try again later.")
-        except Exception as e:
-            logger.error(f"Unexpected error storing global fact: {e}")
-            await ctx.send("❌ **Error:** An unexpected error occurred. Please try again later.")
+            logger.error(f"Error displaying personality facts: {e}")
+            await ctx.send(f"❌ **Error:** Could not retrieve your personality profile: {str(e)}")
     
     async def _list_global_facts_handler(self, ctx, is_admin):
-        """Handle list global facts command (admin only)"""
+        """Handle list global facts command (admin only) - read-only display"""
         if not is_admin(ctx):
             await ctx.send("❌ **Admin only:** This command requires administrator permissions.")
             return
@@ -319,13 +309,13 @@ class MemoryCommandHandlers:
             global_facts = self.memory_manager.get_all_global_facts(limit=30)
             
             if not global_facts:
-                await ctx.send("📝 **No global facts stored** yet. Use `!add_global_fact` to add some!")
+                await ctx.send("📝 **No global facts found** in the system.")
                 return
             
             # Create embed
             embed = discord.Embed(
                 title="🌍 Global Facts",
-                description="Facts about the world, relationships, and the bot",
+                description="Facts about the world, relationships, and system knowledge",
                 color=0xe74c3c
             )
             
@@ -334,104 +324,22 @@ class MemoryCommandHandlers:
                 metadata = fact_data['metadata']
                 fact = metadata.get('fact', fact_data['content'])
                 timestamp = metadata.get('timestamp', 'Unknown')[:10]
-                added_by = metadata.get('added_by', 'system')
-                fact_list.append(f"{i}. {fact} *(added {timestamp} by {added_by})*")
+                source = metadata.get('extraction_method', 'system')
+                fact_list.append(f"{i}. {fact} *(source: {source}, {timestamp})*")
             
             embed.description = '\n'.join(fact_list) if fact_list else "No global facts found."
             
             if len(global_facts) > 20:
-                embed.set_footer(text=f"Showing first 20 of {len(global_facts)} global facts")
+                embed.set_footer(text=f"Showing first 20 of {len(global_facts)} global facts (read-only)")
+            else:
+                embed.set_footer(text="Global facts display (read-only)")
             
             await ctx.send(embed=embed)
             
         except Exception as e:
             logger.error(f"Error listing global facts: {e}")
             await ctx.send(f"❌ **Error:** {str(e)}")
-    
-    async def _remove_global_fact_handler(self, ctx, search_term, is_admin):
-        """Handle remove global fact command (admin only)"""
-        if not is_admin(ctx):
-            await ctx.send("❌ **Admin only:** This command requires administrator permissions.")
-            return
-        
-        try:
-            # Search for global facts containing the search term
-            relevant_facts = self.memory_manager.retrieve_relevant_global_facts(search_term, limit=5)
-            
-            if not relevant_facts:
-                await ctx.send(f"❌ **No global facts found** containing: `{search_term}`")
-                return
-            
-            if len(relevant_facts) == 1:
-                # If only one fact found, delete it directly
-                fact = relevant_facts[0]
-                fact_text = fact['metadata'].get('fact', 'Unknown fact')
-                
-                # Delete the fact
-                if self.memory_manager.delete_global_fact(fact['id']):
-                    await ctx.send(f"✅ **Global fact removed:** {fact_text}")
-                    logger.info(f"Admin {ctx.author.display_name} removed global fact: {fact_text}")
-                else:
-                    await ctx.send("❌ **Error:** Failed to remove the global fact.")
-            else:
-                # Multiple facts found, show them with numbered options
-                embed = discord.Embed(
-                    title="🔍 Multiple Global Facts Found",
-                    description=f"Found {len(relevant_facts)} global fact(s) containing `{search_term}`. Please use a more specific search term or select one by number:",
-                    color=0xf39c12
-                )
-                
-                for i, fact in enumerate(relevant_facts[:5], 1):  # Limit to 5 facts
-                    fact_text = fact['metadata'].get('fact', 'Unknown fact')
-                    timestamp = fact['metadata'].get('timestamp', 'Unknown time')
-                    embed.add_field(
-                        name=f"{i}. {fact_text[:100]}{'...' if len(fact_text) > 100 else ''}",
-                        value=f"*Added: {timestamp[:10]}*",
-                        inline=False
-                    )
-                
-                embed.set_footer(text="Use `!remove_global_fact_by_number <number> <search_term>` to remove a specific global fact.")
-                await ctx.send(embed=embed)
-                
-        except Exception as e:
-            logger.error(f"Error removing global fact: {e}")
-            await ctx.send(f"❌ **Error:** {str(e)}")
-    
-    async def _remove_global_fact_by_number_handler(self, ctx, fact_number, search_term, is_admin):
-        """Handle remove global fact by number command (admin only)"""
-        if not is_admin(ctx):
-            await ctx.send("❌ **Admin only:** This command requires administrator permissions.")
-            return
-        
-        try:
-            # Search for global facts containing the search term
-            relevant_facts = self.memory_manager.retrieve_relevant_global_facts(search_term, limit=5)
-            
-            if not relevant_facts:
-                await ctx.send(f"❌ **No global facts found** containing: `{search_term}`")
-                return
-            
-            if fact_number < 1 or fact_number > len(relevant_facts):
-                await ctx.send(f"❌ **Invalid number.** Please choose a number between 1 and {len(relevant_facts)}.")
-                return
-            
-            # Get the selected fact
-            fact = relevant_facts[fact_number - 1]
-            fact_text = fact['metadata'].get('fact', 'Unknown fact')
-            
-            # Delete the fact
-            if self.memory_manager.delete_global_fact(fact['id']):
-                await ctx.send(f"✅ **Global fact removed:** {fact_text}")
-                logger.info(f"Admin {ctx.author.display_name} removed global fact: {fact_text}")
-            else:
-                await ctx.send("❌ **Error:** Failed to remove the global fact.")
-                
-        except ValueError:
-            await ctx.send("❌ **Invalid number format.** Please provide a valid number.")
-        except Exception as e:
-            logger.error(f"Error removing global fact by number: {e}")
-            await ctx.send(f"❌ **Error:** {str(e)}")
-    
+
     async def _personality_handler(self, ctx, user, is_admin):
         """Handle personality command"""
         # Determine target user
@@ -613,12 +521,332 @@ class MemoryCommandHandlers:
                         inline=False
                     )
             
+            # Add Dynamic Personality Profile section
+            if self.dynamic_personality_profiler:
+                try:
+                    dynamic_profile = None
+                    
+                    # Try to get existing dynamic profile
+                    if hasattr(self.dynamic_personality_profiler, 'profiles') and user_id in self.dynamic_personality_profiler.profiles:
+                        dynamic_profile = self.dynamic_personality_profiler.profiles[user_id]
+                    else:
+                        # Try to load from database
+                        if hasattr(self.dynamic_personality_profiler, 'load_profile_from_db'):
+                            dynamic_profile = await self.dynamic_personality_profiler.load_profile_from_db(user_id)
+                    
+                    if dynamic_profile:
+                        embed.add_field(
+                            name="🎭 Dynamic Personality Profile",
+                            value="Real-time adaptive personality insights",
+                            inline=False
+                        )
+                        
+                        # Relationship metrics
+                        embed.add_field(
+                            name="🤝 Relationship Depth",
+                            value=f"**Trust Level:** {dynamic_profile.trust_level:.2f}/1.0\n"
+                                  f"**Relationship Depth:** {dynamic_profile.relationship_depth:.2f}/1.0\n"
+                                  f"**Total Conversations:** {dynamic_profile.total_conversations}",
+                            inline=True
+                        )
+                        
+                        # Dynamic personality traits (top 3)
+                        if dynamic_profile.traits:
+                            trait_text = ""
+                            sorted_traits = sorted(dynamic_profile.traits.items(), 
+                                                 key=lambda x: x[1].confidence, reverse=True)
+                            for i, (trait_name, trait) in enumerate(sorted_traits[:3]):
+                                trait_display = trait_name.name.replace('_', ' ').title()
+                                trait_text += f"**{trait_display}:** {trait.value:.2f} ({trait.confidence:.1f}% confidence)\n"
+                            
+                            embed.add_field(
+                                name="🎯 Top Personality Dimensions",
+                                value=trait_text or "No traits analyzed yet",
+                                inline=True
+                            )
+                        
+                        # Adaptation preferences
+                        if hasattr(dynamic_profile, 'preferred_response_style') and dynamic_profile.preferred_response_style:
+                            style_text = ""
+                            for key, value in dynamic_profile.preferred_response_style.items():
+                                if isinstance(value, (int, float)) and value > 0.6:
+                                    style_text += f"• {key.replace('_', ' ').title()}: {value:.1f}\n"
+                            
+                            if style_text:
+                                embed.add_field(
+                                    name="⚙️ AI Adaptation Preferences",
+                                    value=style_text,
+                                    inline=True
+                                )
+                        
+                        # Recent conversation patterns
+                        if hasattr(dynamic_profile, 'conversation_analyses') and dynamic_profile.conversation_analyses:
+                            recent_analyses = list(dynamic_profile.conversation_analyses)[-5:]
+                            if recent_analyses:
+                                avg_formality = sum(a.formality_score for a in recent_analyses) / len(recent_analyses)
+                                avg_openness = sum(a.emotional_openness for a in recent_analyses) / len(recent_analyses)
+                                humor_freq = sum(1 for a in recent_analyses if a.humor_detected) / len(recent_analyses)
+                                
+                                embed.add_field(
+                                    name="📊 Recent Communication Patterns",
+                                    value=f"**Formality:** {avg_formality:.2f}/1.0\n"
+                                          f"**Emotional Openness:** {avg_openness:.2f}/1.0\n"
+                                          f"**Humor Frequency:** {humor_freq:.1%}",
+                                    inline=True
+                                )
+                    else:
+                        embed.add_field(
+                            name="🎭 Dynamic Personality Profile",
+                            value="No dynamic profile data yet. Chat more for adaptive insights!",
+                            inline=False
+                        )
+                        
+                except Exception as e:
+                    logger.debug(f"Could not load dynamic personality profile: {e}")
+                    embed.add_field(
+                        name="🎭 Dynamic Personality Profile",
+                        value="Dynamic profiling temporarily unavailable.",
+                        inline=False
+                    )
+            
             embed.set_footer(text="Personality profiles improve with more interactions • AI-powered analysis")
             await ctx.send(embed=embed)
             
         except Exception as e:
             logger.error(f"Error showing personality profile: {e}")
             await ctx.send(f"❌ **Error:** Could not retrieve personality profile.")
+    
+    async def _dynamic_personality_handler(self, ctx, user, is_admin):
+        """Handle dynamic personality command - integrated with personality facts"""
+        # Determine target user
+        target_user = user if user and is_admin(ctx) else ctx.author
+        user_id = str(target_user.id)
+        
+        # Check if dynamic personality profiling is enabled
+        if not self.dynamic_personality_profiler:
+            await ctx.send("🎭 **Dynamic personality profiling is not enabled** in this bot configuration.")
+            return
+        
+        try:
+            embed = discord.Embed(
+                title=f"🎭 Dynamic Personality Profile: {target_user.display_name}",
+                description="Real-time adaptive personality insights with AI behavior analysis",
+                color=0xe91e63,
+                timestamp=datetime.now(timezone.utc)
+            )
+            
+            dynamic_profile = None
+            personality_facts = []
+            
+            # Try to get existing dynamic profile
+            if hasattr(self.dynamic_personality_profiler, 'profiles') and user_id in self.dynamic_personality_profiler.profiles:
+                dynamic_profile = self.dynamic_personality_profiler.profiles[user_id]
+            else:
+                # Try to load from database
+                if hasattr(self.dynamic_personality_profiler, 'load_profile_from_db'):
+                    dynamic_profile = await self.dynamic_personality_profiler.load_profile_from_db(user_id)
+            
+            # Get personality facts to complement dynamic profile
+            try:
+                personality_facts = self.memory_manager.retrieve_personality_facts(
+                    user_id=user_id,
+                    limit=20
+                )
+            except Exception as e:
+                logger.debug(f"Could not retrieve personality facts: {e}")
+            
+            if dynamic_profile:
+                # Profile summary with integrated personality insights
+                personality_insights_count = len(personality_facts)
+                embed.add_field(
+                    name="📈 Adaptive Profile Summary",
+                    value=f"**Conversations Analyzed:** {dynamic_profile.total_conversations}\n"
+                          f"**Relationship Depth:** {dynamic_profile.relationship_depth:.2f}/1.0\n"
+                          f"**Trust Level:** {dynamic_profile.trust_level:.2f}/1.0\n"
+                          f"**Personality Facts:** {personality_insights_count} insights\n"
+                          f"**Last Updated:** {dynamic_profile.last_updated.strftime('%Y-%m-%d %H:%M') if hasattr(dynamic_profile, 'last_updated') else 'Unknown'}",
+                    inline=False
+                )
+                
+                # Dynamic personality dimensions with fact support
+                if dynamic_profile.traits:
+                    dimensions_text = ""
+                    sorted_traits = sorted(dynamic_profile.traits.items(), 
+                                         key=lambda x: x[1].confidence, reverse=True)
+                    
+                    for trait_name, trait in sorted_traits[:6]:  # Top 6 traits
+                        trait_display = trait_name.name.replace('_', ' ').title()
+                        confidence_stars = "⭐" * min(5, int(trait.confidence * 5))
+                        
+                        # Create visual bar for trait value
+                        bar_length = 10
+                        filled = int((trait.value + 1) / 2 * bar_length)  # Convert -1,1 to 0,10
+                        value_bar = "█" * filled + "░" * (bar_length - filled)
+                        
+                        # Get supporting personality facts for this dimension
+                        supporting_facts = [f for f in personality_facts 
+                                          if trait_name.value in f.get('fact_type', '')]
+                        fact_support = f" ({len(supporting_facts)} facts)" if supporting_facts else ""
+                        
+                        dimensions_text += f"**{trait_display}**{fact_support}\n`{value_bar}` {trait.value:.2f} {confidence_stars}\n\n"
+                    
+                    embed.add_field(
+                        name="🎯 Personality Dimensions (Top 6)",
+                        value=dimensions_text[:1024] if dimensions_text else "No dimensions analyzed yet",
+                        inline=False
+                    )
+                
+                # Show most relevant personality facts by type
+                if personality_facts:
+                    from collections import defaultdict
+                    facts_by_type = defaultdict(list)
+                    
+                    for fact in personality_facts:
+                        fact_type = fact.get('fact_type', 'unknown')
+                        facts_by_type[fact_type].append(fact)
+                    
+                    # Show top 3 fact categories with highest relevance
+                    top_categories = sorted(facts_by_type.items(), 
+                                          key=lambda x: max([f.get('relevance_score', 0) for f in x[1]]), 
+                                          reverse=True)[:3]
+                    
+                    facts_text = ""
+                    for fact_type, type_facts in top_categories:
+                        type_display = fact_type.replace('_', ' ').title()
+                        type_emoji = self._get_personality_type_emoji(fact_type)
+                        best_fact = max(type_facts, key=lambda x: x.get('relevance_score', 0))
+                        
+                        relevance = best_fact.get('relevance_score', 0.0)
+                        content = best_fact.get('content', '')[:60]
+                        facts_text += f"{type_emoji} **{type_display}** ({len(type_facts)})\n`{content}...` (score: {relevance:.2f})\n\n"
+                    
+                    if facts_text:
+                        embed.add_field(
+                            name="🧠 Supporting Personality Facts",
+                            value=facts_text[:1024],
+                            inline=False
+                        )
+                
+                # AI Adaptation insights with personality integration
+                adaptation_text = ""
+                if hasattr(dynamic_profile, 'preferred_response_style') and dynamic_profile.preferred_response_style:
+                    for key, value in dynamic_profile.preferred_response_style.items():
+                        if isinstance(value, (int, float)):
+                            adaptation_text += f"**{key.replace('_', ' ').title()}:** {value:.2f}\n"
+                
+                # Add personality-based adaptations
+                if personality_facts:
+                    high_relevance_facts = [f for f in personality_facts if f.get('relevance_score', 0) >= 0.7]
+                    adaptation_text += f"**Personality Integration:** {len(high_relevance_facts)} high-relevance insights\n"
+                    
+                    # Show communication style adaptation
+                    comm_facts = [f for f in personality_facts if 'communication' in f.get('fact_type', '')]
+                    if comm_facts:
+                        adaptation_text += f"**Communication Adaptation:** {len(comm_facts)} style preferences\n"
+                
+                if adaptation_text:
+                    embed.add_field(
+                        name="⚙️ AI Adaptation Settings",
+                        value=adaptation_text,
+                        inline=True
+                    )
+                
+                # Recent conversation patterns
+                if hasattr(dynamic_profile, 'conversation_analyses') and dynamic_profile.conversation_analyses:
+                    recent_analyses = list(dynamic_profile.conversation_analyses)[-10:]
+                    if recent_analyses:
+                        avg_formality = sum(a.formality_score for a in recent_analyses) / len(recent_analyses)
+                        avg_openness = sum(a.emotional_openness for a in recent_analyses) / len(recent_analyses)
+                        avg_depth = sum(a.conversation_depth for a in recent_analyses) / len(recent_analyses)
+                        humor_freq = sum(1 for a in recent_analyses if a.humor_detected) / len(recent_analyses)
+                        support_freq = sum(1 for a in recent_analyses if a.support_seeking) / len(recent_analyses)
+                        
+                        embed.add_field(
+                            name="📊 Communication Patterns",
+                            value=f"**Formality Level:** {avg_formality:.2f}/1.0\n"
+                                  f"**Emotional Openness:** {avg_openness:.2f}/1.0\n"
+                                  f"**Conversation Depth:** {avg_depth:.2f}/1.0\n"
+                                  f"**Uses Humor:** {humor_freq:.1%}\n"
+                                  f"**Seeks Support:** {support_freq:.1%}",
+                            inline=True
+                        )
+                        
+                        # Topic analysis integrated with personality facts
+                        all_topics = []
+                        for analysis in recent_analyses:
+                            all_topics.extend(analysis.topics_discussed)
+                        
+                        if all_topics:
+                            from collections import Counter
+                            top_topics = Counter(all_topics).most_common(3)
+                            
+                            # Cross-reference with personality fact topics
+                            fact_topics = set()
+                            for fact in personality_facts:
+                                content = fact.get('content', '').lower()
+                                for topic, _ in top_topics:
+                                    if topic.lower() in content:
+                                        fact_topics.add(topic)
+                            
+                            topics_text = ""
+                            for topic, count in top_topics:
+                                emoji = "🎯" if topic in fact_topics else "💬"
+                                topics_text += f"{emoji} {topic} ({count}x)\n"
+                            
+                            embed.add_field(
+                                name="🗣️ Frequent Topics",
+                                value=topics_text,
+                                inline=True
+                            )
+                
+                # Integration health score
+                if personality_facts and dynamic_profile.traits:
+                    fact_trait_overlap = 0
+                    for fact in personality_facts:
+                        fact_type = fact.get('fact_type', '')
+                        for trait_name in dynamic_profile.traits.keys():
+                            if trait_name.value in fact_type:
+                                fact_trait_overlap += 1
+                                break
+                    
+                    integration_score = fact_trait_overlap / len(personality_facts) if personality_facts else 0
+                    
+                    embed.add_field(
+                        name="� System Integration",
+                        value=f"**Fact-Trait Alignment:** {integration_score:.1%}\n"
+                              f"**Profile Completeness:** {len(dynamic_profile.traits)}/10 dimensions\n"
+                              f"**Data Sources:** Conversations + Facts",
+                        inline=True
+                    )
+                
+            else:
+                # Show what we do have from personality facts
+                if personality_facts:
+                    embed.add_field(
+                        name="🧠 Personality Facts Available",
+                        value=f"Found {len(personality_facts)} personality insights!\n\n"
+                              f"💬 **Continue chatting** to build dynamic profile\n"
+                              f"📊 **Facts are ready** for integration\n"
+                              f"⚙️ **AI adaptation** will improve over time",
+                        inline=False
+                    )
+                else:
+                    embed.add_field(
+                        name="🆕 Getting Started",
+                        value="No personality data yet!\n\n"
+                              "💬 **Chat with me more** to build your profile\n"
+                              "🎯 **Share interests** and preferences\n"
+                              "⚙️ **AI learns** your communication style\n"
+                              "📈 **Check back** after a few conversations!",
+                        inline=False
+                    )
+            
+            embed.set_footer(text="Dynamic profiles + Personality facts = Adaptive AI • Privacy-first analysis")
+            await ctx.send(embed=embed)
+            
+        except Exception as e:
+            logger.error(f"Error showing dynamic personality profile: {e}")
+            await ctx.send(f"❌ **Error:** Could not retrieve dynamic personality profile.")
     
     async def _sync_check_handler(self, ctx):
         """Handle sync check command - now works globally across all contexts"""
@@ -1040,16 +1268,11 @@ class MemoryCommandHandlers:
             return
         
         if setting.lower() in ['on', 'enable', 'true', '1']:
-            self.memory_manager.enable_auto_facts = True
-            if not self.memory_manager.fact_extractor:
-                from src.utils.fact_extractor import FactExtractor
-                self.memory_manager.fact_extractor = FactExtractor()
-            
-            await ctx.send("✅ **Automatic user fact extraction enabled!**\nThe bot will now automatically identify and remember personal facts from your messages. Global facts are managed by admins only.")
-            logger.info(f"User {ctx.author.name} enabled automatic fact extraction")
+            await ctx.send("❌ **Legacy feature:** Manual fact extraction has been replaced by automatic personality-driven classification.\n\nThe system now uses advanced AI to automatically classify and store facts based on your personality profile. This provides better accuracy and requires no manual management.")
+            logger.info(f"User {ctx.author.name} attempted to enable legacy fact extraction")
             
         elif setting.lower() in ['off', 'disable', 'false', '0']:
-            self.memory_manager.enable_auto_facts = False
+            await ctx.send("ℹ️ **Info:** Legacy fact extraction is already disabled. The system uses personality-driven classification instead.")
             await ctx.send("🔕 **Automatic user fact extraction disabled.**\nThe bot will only remember personal facts you explicitly add with `!add_fact`. Global facts are managed by admins only.")
             logger.info(f"User {ctx.author.name} disabled automatic fact extraction")
             
@@ -1181,3 +1404,29 @@ class MemoryCommandHandlers:
         except Exception as e:
             logger.error(f"Error testing fact extraction: {e}")
             await ctx.send(f"❌ **Error:** {str(e)}")
+    
+    def _get_personality_type_emoji(self, fact_type: str) -> str:
+        """Get emoji for personality fact type"""
+        emoji_map = {
+            'interest_discovery': '🎯',
+            'preference_expression': '❤️',
+            'value_system': '⚖️',
+            'emotional_insight': '🎭',
+            'communication_style': '💬',
+            'decision_making': '🤔',
+            'life_context': '🏠',
+            'social_dynamics': '👥',
+            'learning_style': '📚',
+            'goal_setting': '🚀',
+            'problem_solving': '🧩',
+            'relationship_patterns': '🤝',
+            'behavioral_traits': '🎪',
+            'cognitive_patterns': '🧠',
+            'motivational_drivers': '💪',
+            'creative_expression': '🎨',
+            'stress_management': '😌',
+            'adaptation_style': '🔄',
+            'temporal_patterns': '⏰',
+            'environmental_preferences': '🌍'
+        }
+        return emoji_map.get(fact_type, '💡')
