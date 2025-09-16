@@ -37,9 +37,6 @@ vaderSentiment>=3.3.2    # Real-time sentiment analysis
 # Advanced NLP Dependencies (Phase 1)
 transformers>=4.30.0
 
-# Optimized Local LLM Inference
-llama-cpp-python>=0.2.0
-
 # ENHANCED: Async Redis and Caching
 redis==5.2.1
 aioredis>=2.0.0          # Async Redis operations for better performance
