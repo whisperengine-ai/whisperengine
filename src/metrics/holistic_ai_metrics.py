@@ -269,24 +269,94 @@ class HolisticAIMetrics:
     
     async def _calculate_emotional_appropriateness(self, emotion_results: Dict, response: str) -> float:
         """Calculate how emotionally appropriate the response is"""
-        # This would involve analyzing response sentiment vs detected emotion
-        # Placeholder implementation
-        detected_emotion = emotion_results.get('detected_emotion', 'neutral')
-        response_sentiment = emotion_results.get('response_sentiment', 'neutral')
-        
-        # Simple matching score - in practice, use more sophisticated analysis
-        if detected_emotion == response_sentiment:
-            return 1.0
-        elif abs(self._emotion_to_score(detected_emotion) - self._emotion_to_score(response_sentiment)) < 0.3:
-            return 0.7
-        else:
-            return 0.3
+        try:
+            detected_emotion = emotion_results.get('detected_emotion', 'neutral')
+            response_sentiment = emotion_results.get('response_sentiment', 'neutral')
+            
+            # Define emotion compatibility matrix
+            emotion_compatibility = {
+                'joy': {'positive': 1.0, 'neutral': 0.8, 'negative': 0.2},
+                'sadness': {'negative': 0.9, 'neutral': 0.7, 'positive': 0.3},
+                'anger': {'negative': 0.8, 'neutral': 0.6, 'positive': 0.1},
+                'fear': {'negative': 0.8, 'neutral': 0.7, 'positive': 0.4},
+                'surprise': {'positive': 0.8, 'neutral': 0.8, 'negative': 0.6},
+                'disgust': {'negative': 0.9, 'neutral': 0.6, 'positive': 0.2},
+                'neutral': {'neutral': 1.0, 'positive': 0.8, 'negative': 0.7}
+            }
+            
+            # Get base compatibility score
+            compatibility = emotion_compatibility.get(detected_emotion, {}).get(response_sentiment, 0.5)
+            
+            # Adjust based on response content analysis
+            response_lower = response.lower()
+            
+            # Boost score for empathetic responses
+            empathy_indicators = ['understand', 'sorry', 'hear', 'feel', 'support', 'help']
+            if any(word in response_lower for word in empathy_indicators):
+                compatibility = min(1.0, compatibility + 0.1)
+            
+            # Reduce score for inappropriate responses to negative emotions
+            if detected_emotion in ['sadness', 'anger', 'fear']:
+                dismissive_words = ['just', 'simply', 'calm down', 'get over', 'no big deal']
+                if any(phrase in response_lower for phrase in dismissive_words):
+                    compatibility = max(0.0, compatibility - 0.3)
+            
+            return compatibility
+            
+        except Exception as e:
+            logger.warning(f"Emotional appropriateness calculation failed: {e}")
+            return 0.5
     
     async def _calculate_personality_consistency(self, user_id: str, response: str) -> float:
         """Calculate personality consistency score"""
-        # Analyze response against established personality profile
-        # Placeholder implementation
-        return 0.8  # Would implement actual personality analysis
+        try:
+            # Analyze response against established personality patterns
+            response_lower = response.lower()
+            
+            # Define personality indicators and scoring
+            personality_traits = {
+                'formal': ['please', 'thank you', 'sir', 'madam', 'kindly', 'appreciate'],
+                'casual': ['hey', 'yeah', 'cool', 'awesome', 'no worries', 'sure thing'],
+                'helpful': ['help', 'assist', 'support', 'guide', 'explain', 'show'],
+                'empathetic': ['understand', 'feel', 'sorry', 'hear you', 'support', 'care'],
+                'analytical': ['analyze', 'consider', 'examine', 'evaluate', 'data', 'evidence'],
+                'creative': ['imagine', 'creative', 'idea', 'innovative', 'unique', 'artistic']
+            }
+            
+            # Score each trait presence
+            trait_scores = {}
+            total_words = len(response.split())
+            
+            for trait, indicators in personality_traits.items():
+                matches = sum(1 for indicator in indicators if indicator in response_lower)
+                trait_scores[trait] = matches / max(total_words, 1)  # Normalize by response length
+            
+            # Calculate consistency based on trait dominance
+            if not trait_scores:
+                return 0.5
+            
+            max_trait_score = max(trait_scores.values())
+            trait_variety = len([score for score in trait_scores.values() if score > 0])
+            
+            # Higher consistency if one or two traits dominate (clear personality)
+            if max_trait_score > 0.1 and trait_variety <= 2:
+                consistency = 0.9
+            elif max_trait_score > 0.05:
+                consistency = 0.7
+            elif trait_variety > 0:
+                consistency = 0.6
+            else:
+                consistency = 0.5
+            
+            # Bonus for helpful and empathetic traits (core AI personality)
+            if trait_scores.get('helpful', 0) > 0.05 or trait_scores.get('empathetic', 0) > 0.05:
+                consistency = min(1.0, consistency + 0.1)
+            
+            return consistency
+            
+        except Exception as e:
+            logger.warning("Personality consistency calculation failed: %s", str(e))
+            return 0.5
     
     async def _calculate_response_naturalness(self, response: str) -> float:
         """Calculate how natural/human-like the response sounds"""

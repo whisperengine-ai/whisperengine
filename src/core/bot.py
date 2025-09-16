@@ -72,6 +72,14 @@ except ImportError:
     EXTERNAL_EMOTION_AI_AVAILABLE = False
     ExternalAPIEmotionAI = None
 
+# Production Optimization Integration
+try:
+    from src.integration.production_system_integration import WhisperEngineProductionAdapter
+    PRODUCTION_OPTIMIZATION_AVAILABLE = True
+except ImportError:
+    PRODUCTION_OPTIMIZATION_AVAILABLE = False
+    WhisperEngineProductionAdapter = None
+
 
 class DiscordBotCore:
     """Core Discord bot initialization and management class."""
@@ -115,6 +123,9 @@ class DiscordBotCore:
         self.phase2_integration = None
         self.phase3_memory_networks = None
         self.graph_emotion_manager = None  # Reference to update later with external emotion AI
+        
+        # Production optimization components
+        self.production_adapter = None
         
     def initialize_bot(self):
         """Initialize the Discord bot instance with proper configuration."""
@@ -482,6 +493,33 @@ class DiscordBotCore:
         else:
             self.logger.info("Voice functionality not available - missing dependencies")
             
+    def initialize_production_optimization(self):
+        """Initialize the production optimization system if available."""
+        enable_production_optimization = os.getenv("ENABLE_PRODUCTION_OPTIMIZATION", "true").lower() == "true"
+        
+        if PRODUCTION_OPTIMIZATION_AVAILABLE and enable_production_optimization and WhisperEngineProductionAdapter is not None:
+            try:
+                self.logger.info("Initializing production optimization system...")
+                
+                # Initialize production adapter with bot core
+                self.production_adapter = WhisperEngineProductionAdapter(bot_core=self)
+                
+                # Initialize production mode asynchronously
+                # Note: This will be called during bot startup
+                self.logger.info("✅ Production optimization adapter initialized successfully!")
+                self.logger.info("🚀 Production mode will be enabled during bot startup")
+                
+            except Exception as e:
+                self.logger.error(f"Failed to initialize production optimization adapter: {e}")
+                self.logger.warning("Bot will continue with standard performance")
+                self.production_adapter = None
+        else:
+            if not enable_production_optimization:
+                self.logger.info("Production optimization system disabled via ENABLE_PRODUCTION_OPTIMIZATION")
+            else:
+                self.logger.info("Production optimization system dependencies not available")
+            self.production_adapter = None
+            
     def initialize_postgres_config(self):
         """Initialize PostgreSQL configuration for job scheduler."""
         self.logger.info("Setting up PostgreSQL configuration")
@@ -577,6 +615,7 @@ class DiscordBotCore:
         # Optional enhancements
         self.initialize_ai_enhancements()
         self.initialize_voice_system()
+        self.initialize_production_optimization()
         self.initialize_postgres_config()
         
         # Cleanup registration
@@ -610,4 +649,5 @@ class DiscordBotCore:
             'graph_personality_manager': self.graph_personality_manager,
             'phase2_integration': self.phase2_integration,
             'phase3_memory_networks': self.phase3_memory_networks,
+            'production_adapter': self.production_adapter,
         }

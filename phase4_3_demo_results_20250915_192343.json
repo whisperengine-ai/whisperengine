@@ -1,0 +1,391 @@
+{
+  "success": true,
+  "scenario_results": [
+    {
+      "scenario_name": "Conversation Stagnation Detection",
+      "user_id": "demo_user_stagnation",
+      "messages_analyzed": 3,
+      "flow_states_detected": [
+        "declining",
+        "stagnant",
+        "stagnant"
+      ],
+      "interventions_triggered": [
+        {
+          "triggered_at_message": 1,
+          "flow_state": "declining",
+          "engagement_score": 0.3,
+          "stagnation_risk": 1.0
+        },
+        {
+          "triggered_at_message": 2,
+          "flow_state": "stagnant",
+          "engagement_score": 0.05,
+          "stagnation_risk": 1.0
+        },
+        {
+          "triggered_at_message": 3,
+          "flow_state": "stagnant",
+          "engagement_score": 0.1,
+          "stagnation_risk": 0.8333333333333333
+        }
+      ],
+      "recommendations_generated": [
+        {
+          "type": "conversation_prompt",
+          "strategy": "follow_up_question",
+          "content": "That's interesting! Could you tell me more about really?",
+          "engagement_potential": 0.7
+        },
+        {
+          "type": "topic_suggestion",
+          "strategy": "topic_suggestion",
+          "content": "I'm curious about personal growth and learning - what are your thoughts on personal growth and learning?",
+          "engagement_potential": 0.6
+        },
+        {
+          "type": "topic_suggestion",
+          "strategy": "topic_suggestion",
+          "content": "I'm curious about creative projects and hobbies - what are your thoughts on creative projects and hobbies?",
+          "engagement_potential": 0.6
+        },
+        {
+          "type": "conversation_prompt",
+          "strategy": "follow_up_question",
+          "content": "That's interesting! Could you tell me more about pretty?",
+          "engagement_potential": 0.7
+        },
+        {
+          "type": "topic_suggestion",
+          "strategy": "topic_suggestion",
+          "content": "I'm curious about health and wellness practices - what are your thoughts on health and wellness practices?",
+          "engagement_potential": 0.6
+        },
+        {
+          "type": "topic_suggestion",
+          "strategy": "topic_suggestion",
+          "content": "I'm curious about personal growth and learning - what are your thoughts on personal growth and learning?",
+          "engagement_potential": 0.6
+        },
+        {
+          "type": "conversation_prompt",
+          "strategy": "curiosity_prompt",
+          "content": "I'm curious - what's something that's been on your mind lately?",
+          "engagement_potential": 0.7
+        },
+        {
+          "type": "topic_suggestion",
+          "strategy": "topic_suggestion",
+          "content": "I'm curious about recent technological innovations - what are your thoughts on recent technological innovations?",
+          "engagement_potential": 0.6
+        },
+        {
+          "type": "topic_suggestion",
+          "strategy": "topic_suggestion",
+          "content": "I'm curious about travel and cultural experiences - what are your thoughts on travel and cultural experiences?",
+          "engagement_potential": 0.6
+        }
+      ],
+      "proactive_strategies_used": [
+        "follow_up_question",
+        "topic_suggestion",
+        "curiosity_prompt"
+      ],
+      "engagement_success": true
+    },
+    {
+      "scenario_name": "Natural Topic Transition Support",
+      "user_id": "demo_user_transition",
+      "messages_analyzed": 3,
+      "flow_states_detected": [
+        "stagnating",
+        "stagnant",
+        "stagnant"
+      ],
+      "interventions_triggered": [
+        {
+          "triggered_at_message": 1,
+          "flow_state": "stagnating",
+          "engagement_score": 0.25,
+          "stagnation_risk": 1.0
+        },
+        {
+          "triggered_at_message": 2,
+          "flow_state": "stagnant",
+          "engagement_score": 0.0,
+          "stagnation_risk": 1.0
+        },
+        {
+          "triggered_at_message": 3,
+          "flow_state": "stagnant",
+          "engagement_score": 0.0,
+          "stagnation_risk": 0.8333333333333333
+        }
+      ],
+      "recommendations_generated": [
+        {
+          "type": "conversation_prompt",
+          "strategy": "follow_up_question",
+          "content": "That's interesting! Could you tell me more about learning?",
+          "engagement_potential": 0.7
+        },
+        {
+          "type": "topic_suggestion",
+          "strategy": "topic_suggestion",
+          "content": "I'm curious about personal growth and learning - what are your thoughts on personal growth and learning?",
+          "engagement_potential": 0.6
+        },
+        {
+          "type": "topic_suggestion",
+          "strategy": "topic_suggestion",
+          "content": "I'm curious about recent technological innovations - what are your thoughts on recent technological innovations?",
+          "engagement_potential": 0.6
+        },
+        {
+          "type": "conversation_prompt",
+          "strategy": "follow_up_question",
+          "content": "That's interesting! Could you tell me more about syntax?",
+          "engagement_potential": 0.7
+        },
+        {
+          "type": "topic_suggestion",
+          "strategy": "topic_suggestion",
+          "content": "I'm curious about creative projects and hobbies - what are your thoughts on creative projects and hobbies?",
+          "engagement_potential": 0.6
+        },
+        {
+          "type": "topic_suggestion",
+          "strategy": "topic_suggestion",
+          "content": "I'm curious about travel and cultural experiences - what are your thoughts on travel and cultural experiences?",
+          "engagement_potential": 0.6
+        },
+        {
+          "type": "conversation_prompt",
+          "strategy": "follow_up_question",
+          "content": "That's interesting! Could you tell me more about about?",
+          "engagement_potential": 0.7
+        },
+        {
+          "type": "topic_suggestion",
+          "strategy": "topic_suggestion",
+          "content": "I'm curious about recent technological innovations - what are your thoughts on recent technological innovations?",
+          "engagement_potential": 0.6
+        },
+        {
+          "type": "topic_suggestion",
+          "strategy": "topic_suggestion",
+          "content": "I'm curious about creative projects and hobbies - what are your thoughts on creative projects and hobbies?",
+          "engagement_potential": 0.6
+        }
+      ],
+      "proactive_strategies_used": [
+        "follow_up_question",
+        "topic_suggestion"
+      ],
+      "engagement_success": true
+    },
+    {
+      "scenario_name": "Emotional Engagement Support",
+      "user_id": "demo_user_emotional",
+      "messages_analyzed": 3,
+      "flow_states_detected": [
+        "stagnating",
+        "stagnant",
+        "stagnant"
+      ],
+      "interventions_triggered": [
+        {
+          "triggered_at_message": 1,
+          "flow_state": "stagnating",
+          "engagement_score": 0.25,
+          "stagnation_risk": 1.0
+        },
+        {
+          "triggered_at_message": 2,
+          "flow_state": "stagnant",
+          "engagement_score": 0.0,
+          "stagnation_risk": 1.0
+        },
+        {
+          "triggered_at_message": 3,
+          "flow_state": "stagnant",
+          "engagement_score": 0.0,
+          "stagnation_risk": 0.8333333333333333
+        }
+      ],
+      "recommendations_generated": [
+        {
+          "type": "conversation_prompt",
+          "strategy": "follow_up_question",
+          "content": "That's interesting! Could you tell me more about feeling?",
+          "engagement_potential": 0.7
+        },
+        {
+          "type": "topic_suggestion",
+          "strategy": "topic_suggestion",
+          "content": "I'm curious about creative projects and hobbies - what are your thoughts on creative projects and hobbies?",
+          "engagement_potential": 0.6
+        },
+        {
+          "type": "topic_suggestion",
+          "strategy": "topic_suggestion",
+          "content": "I'm curious about personal growth and learning - what are your thoughts on personal growth and learning?",
+          "engagement_potential": 0.6
+        },
+        {
+          "type": "conversation_prompt",
+          "strategy": "follow_up_question",
+          "content": "That's interesting! Could you tell me more about prepared?",
+          "engagement_potential": 0.7
+        },
+        {
+          "type": "topic_suggestion",
+          "strategy": "topic_suggestion",
+          "content": "I'm curious about recent technological innovations - what are your thoughts on recent technological innovations?",
+          "engagement_potential": 0.6
+        },
+        {
+          "type": "topic_suggestion",
+          "strategy": "topic_suggestion",
+          "content": "I'm curious about travel and cultural experiences - what are your thoughts on travel and cultural experiences?",
+          "engagement_potential": 0.6
+        },
+        {
+          "type": "conversation_prompt",
+          "strategy": "curiosity_prompt",
+          "content": "I'm curious - what's something that's been on your mind lately?",
+          "engagement_potential": 0.7
+        },
+        {
+          "type": "topic_suggestion",
+          "strategy": "topic_suggestion",
+          "content": "I'm curious about health and wellness practices - what are your thoughts on health and wellness practices?",
+          "engagement_potential": 0.6
+        },
+        {
+          "type": "topic_suggestion",
+          "strategy": "topic_suggestion",
+          "content": "I'm curious about travel and cultural experiences - what are your thoughts on travel and cultural experiences?",
+          "engagement_potential": 0.6
+        }
+      ],
+      "proactive_strategies_used": [
+        "follow_up_question",
+        "topic_suggestion",
+        "curiosity_prompt"
+      ],
+      "engagement_success": true
+    },
+    {
+      "scenario_name": "Vibrant Conversation Maintenance",
+      "user_id": "demo_user_vibrant",
+      "messages_analyzed": 3,
+      "flow_states_detected": [
+        "declining",
+        "stagnating",
+        "stagnating"
+      ],
+      "interventions_triggered": [
+        {
+          "triggered_at_message": 1,
+          "flow_state": "declining",
+          "engagement_score": 0.35,
+          "stagnation_risk": 1.0
+        },
+        {
+          "triggered_at_message": 2,
+          "flow_state": "stagnating",
+          "engagement_score": 0.2,
+          "stagnation_risk": 1.0
+        },
+        {
+          "triggered_at_message": 3,
+          "flow_state": "stagnating",
+          "engagement_score": 0.2,
+          "stagnation_risk": 0.8333333333333333
+        }
+      ],
+      "recommendations_generated": [
+        {
+          "type": "conversation_prompt",
+          "strategy": "follow_up_question",
+          "content": "That's interesting! Could you tell me more about discovered?",
+          "engagement_potential": 0.7
+        },
+        {
+          "type": "topic_suggestion",
+          "strategy": "topic_suggestion",
+          "content": "I'm curious about creative projects and hobbies - what are your thoughts on creative projects and hobbies?",
+          "engagement_potential": 0.6
+        },
+        {
+          "type": "topic_suggestion",
+          "strategy": "topic_suggestion",
+          "content": "I'm curious about recent technological innovations - what are your thoughts on recent technological innovations?",
+          "engagement_potential": 0.6
+        },
+        {
+          "type": "conversation_prompt",
+          "strategy": "follow_up_question",
+          "content": "That's interesting! Could you tell me more about atmosphere?",
+          "engagement_potential": 0.7
+        },
+        {
+          "type": "topic_suggestion",
+          "strategy": "topic_suggestion",
+          "content": "I'm curious about books, movies, or entertainment - what are your thoughts on books, movies, or entertainment?",
+          "engagement_potential": 0.6
+        },
+        {
+          "type": "topic_suggestion",
+          "strategy": "topic_suggestion",
+          "content": "I'm curious about personal growth and learning - what are your thoughts on personal growth and learning?",
+          "engagement_potential": 0.6
+        },
+        {
+          "type": "conversation_prompt",
+          "strategy": "follow_up_question",
+          "content": "That's interesting! Could you tell me more about think?",
+          "engagement_potential": 0.7
+        },
+        {
+          "type": "topic_suggestion",
+          "strategy": "topic_suggestion",
+          "content": "I'm curious about travel and cultural experiences - what are your thoughts on travel and cultural experiences?",
+          "engagement_potential": 0.6
+        },
+        {
+          "type": "topic_suggestion",
+          "strategy": "topic_suggestion",
+          "content": "I'm curious about books, movies, or entertainment - what are your thoughts on books, movies, or entertainment?",
+          "engagement_potential": 0.6
+        }
+      ],
+      "proactive_strategies_used": [
+        "follow_up_question",
+        "topic_suggestion"
+      ],
+      "engagement_success": false
+    }
+  ],
+  "integration_results": {
+    "thread_manager_integration": true,
+    "memory_moments_integration": true,
+    "combined_system_functionality": true,
+    "proactive_thread_management": true
+  },
+  "systems_available": {
+    "engagement_engine": true,
+    "thread_manager": true,
+    "memory_moments": true
+  },
+  "features_demonstrated": [
+    "Real-time conversation flow analysis",
+    "Intelligent stagnation detection",
+    "Context-aware topic suggestions",
+    "Natural conversation prompt generation",
+    "Proactive engagement strategies",
+    "Integration with thread management",
+    "Personality-driven recommendations"
+  ]
+}
