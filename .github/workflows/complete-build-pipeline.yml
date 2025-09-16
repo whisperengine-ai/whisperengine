@@ -48,7 +48,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: '3.12'
           cache: 'pip'
 
       - name: Install validation dependencies
@@ -63,7 +63,7 @@ jobs:
       - name: Check code formatting
         run: |
           black --check --diff .
-          ruff check . --exclude verify_builds.py --exclude verify_logs_system.py --exclude validate_build_system.py --exclude validate_config.py
+          ruff check .
 
       - name: Validate requirements consistency
         run: |
@@ -181,7 +181,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: '3.12'
           cache: 'pip'
 
       - name: Install system dependencies (Ubuntu)
