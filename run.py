@@ -29,18 +29,29 @@ setup_logging(debug=debug_mode, environment=environment, log_dir=log_dir, app_na
 
 # Import and run the main function (logging is now configured)
 import asyncio
-from src.main import sync_main
+from src.main import main as bot_async_main  # Import the real async entry point
 from src.utils.onboarding_manager import ensure_onboarding_complete
 
-async def main():
-    """Main entry point with onboarding check"""
-     Check if onboarding is needed
+
+async def launcher_main():
+    """Launcher entry point that performs onboarding then delegates to the core async bot."""
+    # Run onboarding / first‑run check
     should_continue = await ensure_onboarding_complete()
     if not should_continue:
         return 1
-    
-    # Run the main application
-    return sync_main()
+
+    # Delegate directly to the bot's async main (avoid nested asyncio.run())
+    return await bot_async_main()
+
+
+def main():  # Keep a sync facade if other tooling imports run:main
+    try:
+        return asyncio.run(launcher_main())
+    except KeyboardInterrupt:
+        # If Ctrl+C occurs before internal graceful shutdown handlers are registered
+        print("\n🛑 Shutdown requested (Ctrl+C). Attempting graceful cleanup...")
+        return 130  # Conventional exit code for SIGINT
+
 
 if __name__ == "__main__":
-    sys.exit(asyncio.run(main()))
+    sys.exit(main())

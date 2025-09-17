@@ -20,7 +20,7 @@ class FirstRunDetector:
     """
     
     def __init__(self, project_root: Optional[Path] = None):
-        self.project_root = project_root or Path(__file__).parent
+        self.project_root = project_root or Path(__file__).parent.parent.parent
         self.setup_markers_file = self.project_root / ".setup_complete"
         self.config_files = [
             ".env",
