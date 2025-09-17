@@ -155,11 +155,13 @@ class DiscordVisualEmotionHandler:
             'timestamp': message.created_at,
             'filename': attachment.filename
         }
+        logger.info(f"[VISUAL-CTX] Processing image message_id={message.id} user_id={message.author.id} channel_id={message.channel.id} guild_id={getattr(message.guild, 'id', None)} text='{message.content[:60]}' context={context}")
         
         # Perform visual emotion analysis
         analysis = await self.emotion_processor.analyze_image(image_data, context)
         
         if analysis and analysis.emotion_confidence >= self.config.confidence_threshold:
+            logger.info(f"[VISUAL-CTX] Analysis complete for message_id={message.id} user_id={message.author.id} emotions={analysis.primary_emotions} confidence={analysis.emotion_confidence}")
             # Update statistics
             self.stats['emotions_detected'] += len(analysis.primary_emotions)
             self.stats['processing_time_total'] += analysis.processing_time_ms
@@ -169,10 +171,12 @@ class DiscordVisualEmotionHandler:
                 await self._store_visual_emotion_memory(analysis, message)
             
             # Update user's emotional context
+            logger.info(f"[VISUAL-CTX] Updating emotional context for message_id={message.id} user_id={message.author.id}")
             await self._update_emotional_context(analysis, message)
             
             # Generate contextual response if enabled
             if self.config.generate_responses and self._should_generate_response():
+                logger.info(f"[VISUAL-CTX] Generating response for message_id={message.id} user_id={message.author.id}")
                 await self._generate_visual_emotion_response(analysis, message)
                 self.stats['responses_generated'] += 1
             

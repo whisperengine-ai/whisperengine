@@ -498,17 +498,20 @@ class BotEventHandlers:
         """Handle message where bot is mentioned."""
         reply_channel = message.channel
         user_id = str(message.author.id)
-        logger.debug(f"Bot mentioned by {message.author.name} in {message.channel.name}")
+        logger.info(f"[CONV-CTX] Handling mention message_id={message.id} user_id={user_id} channel_id={getattr(message.channel, 'id', None)} guild_id={getattr(message.guild, 'id', None)} content='{message.content[:60]}'")
 
         # Remove mentions from content
         content = message.content
+        logger.info(f"[CONV-CTX] Original message content: '{message.content}'")
         for mention in message.mentions:
             if mention == self.bot.user:
                 content = (
                     content.replace(f"<@{mention.id}>", "").replace(f"<@!{mention.id}>", "").strip()
                 )
+        logger.info(f"[CONV-CTX] Content after mention removal: '{content}'")
 
         if not content:
+            logger.info(f"[CONV-CTX] No content after mention removal, processing as command")
             await self.bot.process_commands(message)
             return
 
@@ -561,6 +564,7 @@ class BotEventHandlers:
         conversation_context = await self._build_conversation_context(
             message, relevant_memories, emotion_context, recent_messages, None, content
         )
+        logger.info(f"[CONV-CTX] Built conversation context for message_id={message.id} user_id={user_id} context_type={type(conversation_context)} context_preview={str(conversation_context)[:120]}")
 
         # External emotion analysis for guild message (always available when configured)
         external_emotion_data = None
@@ -594,6 +598,7 @@ class BotEventHandlers:
         )
 
         # Generate and send response for guild mention
+        logger.info(f"[CONV-CTX] Sending to LLM: message_id={message.id} user_id={user_id} final_content='{content}' context_length={len(conversation_context)}")
         await self._generate_and_send_response(
             reply_channel,
             message,
