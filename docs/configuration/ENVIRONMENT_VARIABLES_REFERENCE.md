@@ -191,12 +191,21 @@ MEMORY_SEARCH_LIMIT=20                      # Default: 20 (Maximum memory search
 ```bash
 # Enable/disable Phase 4 features
 ENABLE_PHASE4_INTELLIGENCE=true             # Default: true (Enable Phase 4 human-like intelligence)
+ENABLE_PHASE4_HUMAN_LIKE=true               # Default: true (Enable full human-like conversation system)
 
 # Phase 4 configuration
 PHASE4_CONVERSATION_MODE=adaptive           # Default: adaptive (Options: human_like, analytical, balanced, adaptive)
 PHASE4_MEMORY_OPTIMIZATION=true            # Default: true (Advanced memory optimization)
 PHASE4_EMOTIONAL_RESONANCE=true            # Default: true (Deep emotional understanding)
 PHASE4_ADAPTIVE_MODE=true                   # Default: true (Learn and adapt to user preferences)
+
+# Human-like personality configuration
+PHASE4_PERSONALITY_TYPE=caring_friend       # Default: caring_friend (Options: caring_friend, wise_mentor, playful_companion, supportive_counselor)
+PHASE4_EMOTIONAL_INTELLIGENCE_LEVEL=high   # Default: high (Options: basic, moderate, high)
+PHASE4_RELATIONSHIP_AWARENESS=true         # Default: true (Enable relationship depth tracking)
+PHASE4_CONVERSATION_FLOW_PRIORITY=true     # Default: true (Prioritize natural conversation flow)
+PHASE4_EMPATHETIC_LANGUAGE=true            # Default: true (Use empathetic language patterns)
+PHASE4_MEMORY_PERSONAL_DETAILS=true        # Default: true (Remember and reference personal details)
 
 # Personality adaptation
 PERSONALITY_ADAPTATION_ENABLED=true         # Default: true (Dynamic personality adjustment)

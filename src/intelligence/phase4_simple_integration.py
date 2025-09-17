@@ -117,11 +117,255 @@ class Phase4HumanLikeIntegration:
         except Exception as e:
             logger.warning(f"Enhanced query processor not available: {e}")
 
-        # Conversation state tracking
-        self.interaction_history = {}  # user_id -> List[InteractionType]
-        self.relationship_depth = {}  # user_id -> relationship level
+        # Conversation state tracking - now with persistent storage
+        self.interaction_history = {}  # Cache for user_id -> List[InteractionType]
+        self.relationship_depth = {}  # Cache for user_id -> relationship level
+        
+        # Initialize persistent storage
+        self._init_persistence()
 
         logger.info("🤖 Phase 4: Human-Like Integration initialized")
+    
+    def _init_persistence(self):
+        """Initialize persistence manager if available"""
+        try:
+            from ..database.human_like_persistence import get_persistence_manager
+            self.persistence_manager = get_persistence_manager()
+            logger.info("✅ Phase 4 persistence initialized")
+        except ImportError:
+            self.persistence_manager = None
+            logger.warning("Human-like persistence not available - falling back to memory-only storage")
+    
+    async def _load_conversation_state(self, user_id: str) -> dict:
+        """Load conversation state from persistent storage"""
+        if self.persistence_manager:
+            try:
+                state = await self.persistence_manager.load_conversation_state(user_id)
+                if state:
+                    return state["state"]
+            except Exception as e:
+                logger.error("Failed to load conversation state: %s", e)
+        return {}
+    
+    async def _save_conversation_state(
+        self, 
+        user_id: str, 
+        current_mode: str = "balanced",
+        interaction_history: list | None = None,
+        conversation_context: dict | None = None
+    ):
+        """Save conversation state to persistent storage"""
+        if self.persistence_manager:
+            try:
+                interaction_history = interaction_history or self.interaction_history.get(user_id, [])
+                conversation_context = conversation_context or {}
+                
+                await self.persistence_manager.save_conversation_state(
+                    user_id, 
+                    current_mode, 
+                    interaction_history, 
+                    conversation_context
+                )
+            except Exception as e:
+                logger.error("Failed to save conversation state: %s", e)
+    
+    async def track_empathetic_response(
+        self,
+        user_id: str,
+        original_message: str,
+        ai_response: str,
+        interaction_type: str,
+        detected_emotion: str = None
+    ) -> str:
+        """
+        Track an empathetic response for later effectiveness measurement
+        
+        Args:
+            user_id: User identifier
+            original_message: Original user message that triggered empathetic response
+            ai_response: AI's empathetic response
+            interaction_type: Type of interaction (emotional_support, etc.)
+            detected_emotion: Detected user emotion if available
+            
+        Returns:
+            Response tracking ID for later effectiveness measurement
+        """
+        if self.persistence_manager:
+            try:
+                # Map interaction type to intervention type
+                intervention_type = interaction_type.lower() if interaction_type else "general"
+                
+                # Determine response style based on AI response characteristics
+                response_style = self._determine_response_style(ai_response)
+                
+                # Start with neutral effectiveness score (will be updated later)
+                initial_effectiveness = 0.5
+                
+                # Build context
+                context = {
+                    "original_message": original_message,
+                    "ai_response": ai_response,
+                    "detected_emotion": detected_emotion or "unknown",
+                    "timestamp": datetime.now(UTC).isoformat()
+                }
+                
+                response_id = await self.persistence_manager.track_empathetic_response(
+                    user_id=user_id,
+                    intervention_type=intervention_type,
+                    response_style=response_style,
+                    effectiveness_score=initial_effectiveness,
+                    context=context
+                )
+                
+                logger.debug("Tracked empathetic response %s for user %s", response_id, user_id)
+                return response_id
+            except Exception as e:
+                logger.error("Failed to track empathetic response: %s", e)
+        
+        return ""
+    
+    def _determine_response_style(self, ai_response: str) -> str:
+        """
+        Determine the style of an AI response for categorization
+        
+        Args:
+            ai_response: The AI's response text
+            
+        Returns:
+            Style category string
+        """
+        response_lower = ai_response.lower()
+        
+        # Check for empathetic language
+        empathy_indicators = ["understand", "feel", "sorry", "empathize", "here for you"]
+        if any(indicator in response_lower for indicator in empathy_indicators):
+            return "empathetic"
+        
+        # Check for solution-focused language
+        solution_indicators = ["try", "consider", "might help", "suggestion", "could"]
+        if any(indicator in response_lower for indicator in solution_indicators):
+            return "solution-focused"
+        
+        # Check for supportive language
+        support_indicators = ["support", "believe", "capable", "strong", "together"]
+        if any(indicator in response_lower for indicator in support_indicators):
+            return "supportive"
+        
+        # Check for informational language
+        info_indicators = ["information", "research", "studies", "according to", "fact"]
+        if any(indicator in response_lower for indicator in info_indicators):
+            return "informational"
+        
+        return "conversational"
+    
+    async def update_response_effectiveness(
+        self,
+        response_id: str,
+        user_follow_up: str,
+        effectiveness_score: float
+    ) -> bool:
+        """
+        Update the effectiveness of a previously tracked empathetic response
+        
+        Args:
+            response_id: Response tracking ID from track_empathetic_response
+            user_follow_up: User's follow-up message after the empathetic response
+            effectiveness_score: Calculated effectiveness score (0.0-1.0)
+            
+        Returns:
+            True if update successful, False otherwise
+        """
+        if self.persistence_manager:
+            try:
+                success = await self.persistence_manager.update_response_effectiveness(
+                    response_id=response_id,
+                    user_follow_up=user_follow_up,
+                    effectiveness_score=effectiveness_score
+                )
+                if success:
+                    logger.debug(f"Updated effectiveness for response {response_id}: {effectiveness_score}")
+                return success
+            except Exception as e:
+                logger.error("Failed to update response effectiveness: %s", e)
+        
+        return False
+    
+    async def get_response_patterns(self, user_id: str, response_type: str | None = None) -> list:
+        """
+        Get patterns of effective empathetic responses for this user
+        
+        Args:
+            user_id: User identifier
+            response_type: Optional filter by response type
+            
+        Returns:
+            List of effective response patterns
+        """
+        if self.persistence_manager:
+            try:
+                patterns = await self.persistence_manager.get_effective_response_patterns(
+                    user_id=user_id,
+                    response_type=response_type,
+                    min_effectiveness=0.7  # Only return highly effective patterns
+                )
+                logger.debug(f"Retrieved {len(patterns)} effective response patterns for user {user_id}")
+                return patterns
+            except Exception as e:
+                logger.error("Failed to get response patterns: %s", e)
+        
+        return []
+    
+    def _calculate_response_effectiveness(self, user_follow_up: str, original_emotion: str) -> float:
+        """
+        Calculate effectiveness score based on user's follow-up response
+        
+        Args:
+            user_follow_up: User's message after receiving empathetic response
+            original_emotion: Originally detected emotion
+            
+        Returns:
+            Effectiveness score between 0.0 and 1.0
+        """
+        follow_up_lower = user_follow_up.lower()
+        
+        # Positive indicators (high effectiveness)
+        positive_indicators = [
+            "thank", "helpful", "better", "appreciate", "understand", "right",
+            "exactly", "feel better", "good point", "makes sense", "glad"
+        ]
+        
+        # Negative indicators (low effectiveness)
+        negative_indicators = [
+            "wrong", "don't understand", "not helpful", "worse", "still upset",
+            "not what i meant", "you don't get it", "unhelpful"
+        ]
+        
+        # Neutral continuation indicators (moderate effectiveness)
+        neutral_indicators = [
+            "ok", "sure", "i see", "anyway", "so", "well", "but"
+        ]
+        
+        positive_count = sum(1 for indicator in positive_indicators if indicator in follow_up_lower)
+        negative_count = sum(1 for indicator in negative_indicators if indicator in follow_up_lower)
+        neutral_count = sum(1 for indicator in neutral_indicators if indicator in follow_up_lower)
+        
+        # Calculate base score
+        if positive_count > 0:
+            base_score = 0.8 + (positive_count * 0.05)  # High effectiveness
+        elif negative_count > 0:
+            base_score = 0.2 - (negative_count * 0.05)  # Low effectiveness
+        elif neutral_count > 0:
+            base_score = 0.5  # Moderate effectiveness
+        else:
+            base_score = 0.6  # Default moderate-high if unclear
+        
+        # Adjust based on message length (longer responses often indicate engagement)
+        length_factor = min(len(user_follow_up) / 100, 0.2)  # Up to 0.2 bonus for longer messages
+        
+        # Ensure score stays within bounds
+        final_score = max(0.0, min(1.0, base_score + length_factor))
+        
+        return final_score
 
     async def process_comprehensive_message(
         self,
@@ -286,7 +530,7 @@ class Phase4HumanLikeIntegration:
             processing_metadata["phases_completed"] = len(processing_metadata["phases_executed"])
 
             # Update conversation state for future interactions
-            self._update_conversation_state(user_id, phase4_context)
+            await self._update_conversation_state(user_id, phase4_context)
 
             logger.info(
                 f"✅ Phase 4 comprehensive processing completed for user {user_id} "
@@ -356,26 +600,47 @@ class Phase4HumanLikeIntegration:
         else:
             return "general"
 
-    def _update_conversation_state(self, user_id: str, phase4_context: Phase4Context):
-        """Update conversation state for future interactions"""
+    async def _update_conversation_state(self, user_id: str, phase4_context: Phase4Context):
+        """Update conversation state for future interactions with persistent storage"""
 
-        # Update interaction history
-        if user_id not in self.interaction_history:
-            self.interaction_history[user_id] = []
-        self.interaction_history[user_id].append(phase4_context.interaction_type)
-
+        # Load current interaction history from persistent storage
+        conversation_state = await self._load_conversation_state(user_id)
+        current_history = conversation_state.get("interaction_history", [])
+        
+        # Add new interaction
+        current_history.append(phase4_context.interaction_type.value if hasattr(phase4_context.interaction_type, 'value') else str(phase4_context.interaction_type))
+        
         # Keep only last 20 interactions to prevent memory bloat
-        if len(self.interaction_history[user_id]) > 20:
-            self.interaction_history[user_id] = self.interaction_history[user_id][-20:]
-
+        if len(current_history) > 20:
+            current_history = current_history[-20:]
+        
+        # Update memory cache
+        self.interaction_history[user_id] = current_history
+        
         # Update relationship depth based on interaction patterns
-        self._update_relationship_depth(user_id, phase4_context)
+        await self._update_relationship_depth(user_id, phase4_context, current_history)
+        
+        # Save updated state to persistent storage
+        await self._save_conversation_state(
+            user_id=user_id,
+            current_mode=phase4_context.conversation_mode.value if hasattr(phase4_context.conversation_mode, 'value') else str(phase4_context.conversation_mode),
+            interaction_history=current_history,
+            conversation_context={
+                "last_interaction_type": str(phase4_context.interaction_type),
+                "relationship_depth": self.relationship_depth.get(user_id, "new"),
+                "last_updated": datetime.now(UTC).isoformat()
+            }
+        )
 
-    def _update_relationship_depth(self, user_id: str, phase4_context: Phase4Context):
-        """Update relationship depth based on interaction patterns"""
+    async def _update_relationship_depth(self, user_id: str, phase4_context: Phase4Context, interaction_history: list | None = None):
+        """Update relationship depth based on interaction patterns with persistent storage"""
 
+        # Use provided history or load from memory cache
+        if interaction_history is None:
+            interaction_history = self.interaction_history.get(user_id, [])
+        
         current_level = self.relationship_depth.get(user_id, "new")
-        interaction_count = len(self.interaction_history.get(user_id, []))
+        interaction_count = len(interaction_history) if interaction_history else 0
 
         # Simple relationship progression based on interaction count and types
         if interaction_count < 5:
@@ -388,11 +653,11 @@ class Phase4HumanLikeIntegration:
             new_level = "deep"
 
         # Consider emotional support interactions for deeper relationships
-        if user_id in self.interaction_history:
+        if interaction_history:
             emotional_interactions = sum(
                 1
-                for interaction in self.interaction_history[user_id]
-                if interaction == InteractionType.EMOTIONAL_SUPPORT
+                for interaction in interaction_history
+                if interaction == "EMOTIONAL_SUPPORT" or interaction == InteractionType.EMOTIONAL_SUPPORT
             )
             if emotional_interactions >= 3 and new_level in ["developing", "established"]:
                 if new_level == "developing":
@@ -400,6 +665,7 @@ class Phase4HumanLikeIntegration:
                 elif new_level == "established":
                     new_level = "deep"
 
+        # Update both memory cache and persistent storage will be done by caller
         self.relationship_depth[user_id] = new_level
 
         if new_level != current_level:
