@@ -1,0 +1,60 @@
+name: Nightly Metrics Snapshot
+
+on:
+  schedule:
+    - cron: '0 3 * * *'  # 03:00 UTC nightly
+  workflow_dispatch:
+
+jobs:
+  metrics-snapshot:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install deps (core)
+        run: |
+          python -m venv .venv
+          source .venv/bin/activate
+          pip install --upgrade pip
+          pip install -r requirements-core.txt || pip install -r requirements.txt
+          # Install pytest if not present (fallback)
+          python -c "import pytest" 2>/dev/null || pip install pytest
+      - name: Run metrics unit test
+        env:
+          ENABLE_METRICS_LOGGING: 'true'
+        run: |
+          source .venv/bin/activate
+          pytest tests/test_metrics_snapshot.py -q
+      - name: Export metrics snapshot (empty baseline context)
+        env:
+          ENABLE_METRICS_LOGGING: 'true'
+        run: |
+          source .venv/bin/activate
+          python scripts/metrics/export_snapshot.py --output metrics_snapshot.json --pretty
+      - name: Compare with baseline
+        env:
+          ENABLE_METRICS_LOGGING: 'true'
+        run: |
+          source .venv/bin/activate
+          if [ ! -f benchmarks/metrics_baseline.json ]; then
+            echo "No baseline found; copying current snapshot as baseline.";
+            cp metrics_snapshot.json benchmarks/metrics_baseline.json;
+          fi
+          python scripts/metrics/compare_snapshots.py --old benchmarks/metrics_baseline.json --new metrics_snapshot.json --warn-pct 40 --error-pct 120 --output-json metrics_delta.json || EXIT_CODE=$?
+          # If exit code 2 (error threshold) fail workflow; if 1 (warn) continue
+          if [ "${EXIT_CODE:-0}" = "2" ]; then
+            echo "Severe regression detected (error threshold exceeded). Failing job.";
+            exit 2;
+          fi
+          echo "Comparison exit code: ${EXIT_CODE:-0} (0=ok,1=warn,2=error)"
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightly-metrics-snapshot
+          path: |
+            metrics_snapshot.json
+            metrics_delta.json
