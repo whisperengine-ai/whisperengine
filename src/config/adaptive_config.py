@@ -306,6 +306,15 @@ class ConfigurationOptimizer:
             "enable_monitoring": scale_tier >= 3,
             "enable_logging": True,
             "enable_debug_mode": False,
+            # Multi-Entity Relationship Features
+            "enable_multi_entity_relationships": True,
+            "enable_character_creation": True,
+            "enable_ai_facilitated_introductions": scale_tier >= 2,
+            "enable_relationship_evolution": True,
+            "enable_cross_character_awareness": scale_tier >= 2,
+            "enable_graph_database": scale_tier >= 2,  # Neo4j for complex relationships
+            "enable_character_similarity_matching": scale_tier >= 3,
+            "enable_social_network_analysis": scale_tier >= 3,
         }
 
         return base_features
@@ -383,6 +392,23 @@ class AdaptiveConfigManager:
         if "WHISPERENGINE_SCALE_TIER" in os.environ:
             overrides["scale_tier"] = int(os.environ["WHISPERENGINE_SCALE_TIER"])
 
+        # Multi-Entity Relationship Feature Overrides
+        multi_entity_features = [
+            "ENABLE_MULTI_ENTITY_RELATIONSHIPS",
+            "ENABLE_CHARACTER_CREATION", 
+            "ENABLE_AI_FACILITATED_INTRODUCTIONS",
+            "ENABLE_RELATIONSHIP_EVOLUTION",
+            "ENABLE_CROSS_CHARACTER_AWARENESS",
+            "ENABLE_GRAPH_DATABASE",
+            "ENABLE_CHARACTER_SIMILARITY_MATCHING",
+            "ENABLE_SOCIAL_NETWORK_ANALYSIS"
+        ]
+        
+        for feature in multi_entity_features:
+            if feature in os.environ:
+                feature_key = f"features.{feature.lower()}"
+                overrides[feature_key] = os.environ[feature].lower() == "true"
+
         return overrides
 
     def get_env_vars(self) -> dict[str, str]:
@@ -429,6 +455,16 @@ class AdaptiveConfigManager:
         env_vars["FOLLOW_UP_ENABLED"] = str(features.get("enable_follow_up", True)).lower()
         env_vars["JOB_SCHEDULER_ENABLED"] = str(features.get("enable_job_scheduler", True)).lower()
         env_vars["DEBUG_MODE"] = str(features.get("enable_debug_mode", False)).lower()
+
+        # Multi-Entity Relationship Features
+        env_vars["ENABLE_MULTI_ENTITY_RELATIONSHIPS"] = str(features.get("enable_multi_entity_relationships", True)).lower()
+        env_vars["ENABLE_CHARACTER_CREATION"] = str(features.get("enable_character_creation", True)).lower()
+        env_vars["ENABLE_AI_FACILITATED_INTRODUCTIONS"] = str(features.get("enable_ai_facilitated_introductions", False)).lower()
+        env_vars["ENABLE_RELATIONSHIP_EVOLUTION"] = str(features.get("enable_relationship_evolution", True)).lower()
+        env_vars["ENABLE_CROSS_CHARACTER_AWARENESS"] = str(features.get("enable_cross_character_awareness", False)).lower()
+        env_vars["ENABLE_GRAPH_DATABASE"] = str(features.get("enable_graph_database", False)).lower()
+        env_vars["ENABLE_CHARACTER_SIMILARITY_MATCHING"] = str(features.get("enable_character_similarity_matching", False)).lower()
+        env_vars["ENABLE_SOCIAL_NETWORK_ANALYSIS"] = str(features.get("enable_social_network_analysis", False)).lower()
 
         return env_vars
 

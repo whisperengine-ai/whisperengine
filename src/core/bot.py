@@ -83,6 +83,17 @@ except ImportError:
     PRODUCTION_OPTIMIZATION_AVAILABLE = False
     WhisperEngineProductionAdapter = None
 
+# Multi-Entity Relationship Integration
+try:
+    from src.graph_database.multi_entity_manager import MultiEntityRelationshipManager
+    from src.graph_database.ai_self_bridge import AISelfEntityBridge
+
+    MULTI_ENTITY_AVAILABLE = True
+except ImportError:
+    MULTI_ENTITY_AVAILABLE = False
+    MultiEntityRelationshipManager = None
+    AISelfEntityBridge = None
+
 
 class DiscordBotCore:
     """Core Discord bot initialization and management class."""
@@ -129,6 +140,10 @@ class DiscordBotCore:
 
         # Production optimization components
         self.production_adapter = None
+
+        # Multi-Entity Relationship components
+        self.multi_entity_manager = None
+        self.ai_self_bridge = None
 
     def initialize_bot(self):
         """Initialize the Discord bot instance with proper configuration."""
@@ -719,6 +734,45 @@ class DiscordBotCore:
                 self.logger.info("Production optimization system dependencies not available")
             self.production_adapter = None
 
+    def initialize_multi_entity_system(self):
+        """Initialize the multi-entity relationship system if available."""
+        enable_multi_entity = (
+            os.getenv("ENABLE_MULTI_ENTITY_RELATIONSHIPS", "true").lower() == "true"
+        )
+
+        if (
+            MULTI_ENTITY_AVAILABLE
+            and enable_multi_entity
+            and MultiEntityRelationshipManager is not None
+            and AISelfEntityBridge is not None
+        ):
+            try:
+                self.logger.info("🌐 Initializing Multi-Entity Relationship System...")
+
+                # Initialize multi-entity relationship manager
+                self.multi_entity_manager = MultiEntityRelationshipManager()
+
+                # Initialize AI Self bridge
+                self.ai_self_bridge = AISelfEntityBridge()
+
+                self.logger.info("✅ Multi-Entity Relationship System initialized successfully!")
+                self.logger.info("🎭 Characters can now be connected to users and AI Self")
+
+            except Exception as e:
+                self.logger.error(f"Failed to initialize multi-entity relationship system: {e}")
+                self.logger.warning("Bot will continue without multi-entity features")
+                self.multi_entity_manager = None
+                self.ai_self_bridge = None
+        else:
+            if not enable_multi_entity:
+                self.logger.info(
+                    "Multi-entity relationship system disabled via ENABLE_MULTI_ENTITY_RELATIONSHIPS"
+                )
+            else:
+                self.logger.info("Multi-entity relationship system dependencies not available")
+            self.multi_entity_manager = None
+            self.ai_self_bridge = None
+
     def initialize_postgres_config(self):
         """Initialize PostgreSQL configuration for job scheduler."""
         self.logger.info("Setting up PostgreSQL configuration")
@@ -833,6 +887,7 @@ class DiscordBotCore:
         self.initialize_ai_enhancements()
         self.initialize_voice_system()
         self.initialize_production_optimization()
+        self.initialize_multi_entity_system()
         self.initialize_postgres_config()
 
         # Cleanup registration
@@ -922,4 +977,6 @@ class DiscordBotCore:
             "phase3_memory_networks": self.phase3_memory_networks,
             "memory_moments": getattr(self, "memory_moments", None),
             "production_adapter": self.production_adapter,
+            "multi_entity_manager": self.multi_entity_manager,
+            "ai_self_bridge": self.ai_self_bridge,
         }
