@@ -1319,10 +1319,6 @@ class BotEventHandlers:
                         )
 
                         response = ai_response.content
-                        logger.debug(f"[LLM-RESPONSE-DEBUG] AI response from orchestrator for message_id={message.id} user_id={user_id}")
-                        logger.debug(f"[LLM-RESPONSE-DEBUG] Response length: {len(response)} chars")  
-                        logger.debug(f"[LLM-RESPONSE-DEBUG] Response preview: {response[:300]}...")
-                        logger.debug(f"[LLM-RESPONSE-DEBUG] Model: {ai_response.model_used}, Tokens: {ai_response.tokens_used}")
                         
                         logger.debug(f"Universal Chat response: {len(response)} characters")
                         logger.debug(
@@ -1343,9 +1339,6 @@ class BotEventHandlers:
                             comprehensive_context,
                             dynamic_personality_context,
                         )
-                        logger.debug(f"[LLM-RESPONSE-DEBUG] Fallback LLM response for message_id={message.id} user_id={user_id}")
-                        logger.debug(f"[LLM-RESPONSE-DEBUG] Fallback response length: {len(response)} chars")  
-                        logger.debug(f"[LLM-RESPONSE-DEBUG] Fallback response preview: {response[:300]}...")
 
                 else:
                     logger.warning(
@@ -1361,9 +1354,6 @@ class BotEventHandlers:
                         comprehensive_context,
                         dynamic_personality_context,
                     )
-                    logger.debug(f"[LLM-RESPONSE-DEBUG] No orchestrator fallback LLM response for message_id={message.id} user_id={user_id}")
-                    logger.debug(f"[LLM-RESPONSE-DEBUG] No orchestrator fallback response length: {len(response)} chars")  
-                    logger.debug(f"[LLM-RESPONSE-DEBUG] No orchestrator fallback response preview: {response[:300]}...")
 
                 # Security scan for system leakage
                 leakage_scan = scan_response_for_system_leakage(response)
@@ -1491,15 +1481,6 @@ class BotEventHandlers:
                 response_with_debug = add_debug_info_to_response(
                     response, user_id, self.memory_manager, str(message.id)
                 )
-
-                # CRITICAL DEBUG: Log actual response content being sent to Discord
-                logger.debug(f"[RESPONSE-DEBUG] About to send response for message_id={message.id} user_id={user_id}")
-                logger.debug(f"[RESPONSE-DEBUG] Original response length: {len(response)} chars")
-                logger.debug(f"[RESPONSE-DEBUG] Original response preview: {response[:200]}...")
-                logger.debug(f"[RESPONSE-DEBUG] Debug response length: {len(response_with_debug)} chars")
-                logger.debug(f"[RESPONSE-DEBUG] Debug response preview: {response_with_debug[:200]}...")
-                if response != response_with_debug:
-                    logger.debug(f"[RESPONSE-DEBUG] DEBUG INFO WAS ADDED! Length difference: {len(response_with_debug) - len(response)}")
 
                 # Send response (chunked if too long)
                 await self._send_response_chunks(reply_channel, response_with_debug)
