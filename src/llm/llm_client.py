@@ -15,6 +15,7 @@ from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
 from src.utils.exceptions import LLMConnectionError, LLMError, LLMRateLimitError, LLMTimeoutError
+from src.utils.performance_monitor import monitor_performance
 
 
 class LLMClient:
@@ -685,6 +686,7 @@ class LLMClient:
             self.logger.debug(f"Async connection check failed: {e}")
             return False
 
+    @monitor_performance("llm_request", timeout_ms=30000)
     def generate_chat_completion(
         self,
         messages: list[dict[str, str]],
@@ -980,6 +982,7 @@ class LLMClient:
             self.logger.error(f"Unexpected error generating completion: {e}")
             raise LLMError(f"Unexpected error: {str(e)}")
 
+    @monitor_performance("emotion_analysis", timeout_ms=15000)
     def generate_emotion_chat_completion(
         self,
         messages: list[dict[str, str]],
@@ -1075,6 +1078,7 @@ class LLMClient:
             self.logger.error(f"Invalid JSON response: {e}")
             raise LLMError(f"Invalid response from {self.emotion_service_name} server")
 
+    @monitor_performance("facts_analysis", timeout_ms=15000)
     def generate_facts_chat_completion(
         self,
         messages: list[dict[str, str]],
