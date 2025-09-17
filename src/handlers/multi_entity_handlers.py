@@ -9,6 +9,7 @@ import logging
 import asyncio
 import json
 import os
+import io
 from typing import Dict, List, Optional, Any
 from datetime import datetime
 
@@ -16,6 +17,7 @@ import discord
 from discord.ext import commands
 
 from src.graph_database.multi_entity_models import EntityType, RelationshipType
+from src.characters.cdl.parser import CDLParser, CDLParseError
 
 logger = logging.getLogger(__name__)
 
@@ -47,7 +49,7 @@ class MultiEntityCommandHandlers:
         if not self.multi_entity_available:
             self.logger.warning("Multi-entity features not available - commands will be disabled")
     
-    def register_commands(self, bot_name_filter: str = "", is_admin: callable = None):
+    def register_commands(self, bot_name_filter, is_admin=None):
         """Register multi-entity commands with the bot"""
         
         if not self.multi_entity_available:
@@ -166,9 +168,20 @@ class MultiEntityCommandHandlers:
                     character = char_data.get("character", {})
                     relationship = char_data.get("relationship", {})
                     
-                    name = character.get("name", "Unknown")
-                    occupation = character.get("occupation", "Unknown")
-                    trust_level = relationship.get("trust_level", 0.0)
+                    # Handle character data safely (could be dict or other format)
+                    if isinstance(character, dict):
+                        name = character.get("name", "Unknown")
+                        occupation = character.get("occupation", "Unknown")
+                    else:
+                        name = getattr(character, 'name', "Unknown")
+                        occupation = getattr(character, 'occupation', "Unknown")
+                    
+                    # Handle relationship data safely
+                    trust_level = 0.0
+                    if isinstance(relationship, dict):
+                        trust_level = relationship.get("trust_level", 0.0)
+                    elif hasattr(relationship, 'get'):
+                        trust_level = relationship.get("trust_level", 0.0)
                     
                     value = f"**Occupation:** {occupation}\n**Trust Level:** {trust_level:.1f}/1.0"
                     embed.add_field(name=name, value=value, inline=True)
@@ -257,15 +270,27 @@ class MultiEntityCommandHandlers:
                 await ctx.send("❌ An error occurred while fetching character information.")
         
         @self.bot.command(name='talk_to')
-        async def talk_to(ctx, character_name: str, *, message: str):
+        async def talk_to(ctx, character_name: str, *, message: str = ""):
             """Have a conversation with one of your characters"""
             try:
+                # Check if message is provided
+                if not message.strip():
+                    await ctx.send(f"❌ Please provide a message to send to {character_name}.\n**Usage:** `!talk_to {character_name} <your message>`\n**Example:** `!talk_to {character_name} Hello, how are you?`")
+                    return
+                
                 # Find character by name
                 user_characters = await self.multi_entity_manager.get_user_characters(str(ctx.author.id))
                 
                 character_data = None
                 for char_data in user_characters:
-                    if char_data.get("character", {}).get("name", "").lower() == character_name.lower():
+                    # Handle character data safely (same fix as my_characters)
+                    character = char_data.get("character", {})
+                    if isinstance(character, dict):
+                        char_name = character.get("name", "")
+                    else:
+                        char_name = getattr(character, 'name', "")
+                    
+                    if char_name.lower() == character_name.lower():
                         character_data = char_data
                         break
                 
@@ -274,7 +299,18 @@ class MultiEntityCommandHandlers:
                     return
                 
                 character = character_data.get("character", {})
-                character_id = character.get("id", "")
+                
+                # Handle character data safely (same fix as my_characters)
+                if isinstance(character, dict):
+                    character_id = character.get("id", "")
+                    char_name = character.get("name", "Character")
+                    traits = character.get("personality_traits", [])
+                    style = character.get("communication_style", "")
+                else:
+                    character_id = getattr(character, 'id', "")
+                    char_name = getattr(character, 'name', "Character")
+                    traits = getattr(character, 'personality_traits', [])
+                    style = getattr(character, 'communication_style', "")
                 
                 # Send typing indicator
                 async with ctx.typing():
@@ -293,24 +329,24 @@ class MultiEntityCommandHandlers:
                     # In a full implementation, this would integrate with the LLM client
                     # using the multi-entity context injector
                     
-                    character_name = character.get("name", "Character")
-                    response = f"*{character_name} responds thoughtfully*\n\nThank you for talking with me! I appreciate our conversation. Your message was: '{message}'\n\n*This is a basic response. Full LLM integration with character context coming soon!*"
+                    response = f"*{char_name} responds thoughtfully*\n\nThank you for talking with me! I appreciate our conversation. Your message was: '{message}'\n\n*This is a basic response. Full LLM integration with character context coming soon!*"
                     
                     # Create response embed
                     embed = discord.Embed(
-                        title=f"💬 Conversation with {character_name}",
+                        title=f"💬 Conversation with {char_name}",
                         description=response,
                         color=0xf39c12
                     )
                     
                     # Add character context
-                    traits = character.get("personality_traits", [])
                     if traits:
-                        embed.add_field(name="Character Traits", value=", ".join(traits[:3]), inline=True)
+                        if isinstance(traits, list):
+                            embed.add_field(name="Character Traits", value=", ".join(str(t) for t in traits[:3]), inline=True)
+                        else:
+                            embed.add_field(name="Character Traits", value=str(traits)[:50], inline=True)
                     
-                    style = character.get("communication_style", "")
                     if style:
-                        embed.add_field(name="Communication Style", value=style, inline=True)
+                        embed.add_field(name="Communication Style", value=str(style), inline=True)
                     
                     await ctx.send(embed=embed)
                 
@@ -537,5 +573,503 @@ class MultiEntityCommandHandlers:
             except Exception as e:
                 self.logger.error(f"Error in social network analysis: {e}")
                 await ctx.send("❌ An error occurred during social network analysis.")
+
+        @self.bot.command(name='import_character')
+        async def import_character(ctx, *, yaml_content: Optional[str] = None):
+            """
+            Import a character from CDL (Character Definition Language) YAML format.
+            
+            Usage: 
+            !import_character <YAML content>
+            Or attach a .yaml/.yml file to the message
+            """
+            if not self.multi_entity_available:
+                await ctx.send("❌ Multi-entity features are not available.")
+                return
+                
+            try:
+                character_data = None
+                source_info = ""
+                
+                # Check for attached file first
+                if ctx.message.attachments:
+                    attachment = ctx.message.attachments[0]
+                    if attachment.filename.endswith(('.yaml', '.yml', '.cdl')):
+                        try:
+                            file_content = await attachment.read()
+                            yaml_content = file_content.decode('utf-8')
+                            source_info = f" from {attachment.filename}"
+                        except Exception as e:
+                            await ctx.send(f"❌ Error reading attached file: {e}")
+                            return
+                    else:
+                        await ctx.send("❌ Please attach a .yaml, .yml, or .cdl file, or provide YAML content directly.")
+                        return
+                
+                # If no attachment and no content provided
+                if not yaml_content:
+                    await ctx.send("❌ Please provide CDL YAML content or attach a character file.\n"
+                                 "Example: `!import_character` with a .yaml file attached")
+                    return
+                
+                # Parse the CDL YAML
+                parser = CDLParser()
+                
+                # Try to parse as YAML dict first
+                import yaml
+                try:
+                    yaml_dict = yaml.safe_load(yaml_content)
+                    character = parser.parse_dict(yaml_dict)
+                except yaml.YAMLError as e:
+                    await ctx.send(f"❌ Invalid YAML format: {e}")
+                    return
+                except CDLParseError as e:
+                    await ctx.send(f"❌ CDL parsing error: {e}")
+                    return
+                
+                # Convert CDL character to multi-entity format
+                user_id = str(ctx.author.id)
+                
+                # Create character entity data
+                character_data = {
+                    "name": character.identity.name,
+                    "description": f"CDL imported character: {character.identity.occupation}",
+                    "personality_type": "companion",  # Default type for CDL imports
+                    "traits": character.personality.values + character.personality.quirks,  # Combine values and quirks as traits
+                    "background": f"Occupation: {character.identity.occupation}, Location: {character.identity.location}",
+                    "created_by": user_id,
+                    "import_source": f"CDL{source_info}",
+                    "metadata": {
+                        "cdl_version": character.metadata.version if character.metadata else "1.0",
+                        "original_name": character.identity.name,
+                        "imported_at": datetime.now().isoformat(),
+                        "character_id": character.metadata.character_id
+                    }
+                }
+                
+                # Add any additional CDL-specific data
+                if character.personality and hasattr(character.personality, 'big_five'):
+                    big_five = character.personality.big_five
+                    if big_five:
+                        character_data["metadata"]["big_five"] = {
+                            "openness": big_five.openness,
+                            "conscientiousness": big_five.conscientiousness,
+                            "extraversion": big_five.extraversion,
+                            "agreeableness": big_five.agreeableness,
+                            "neuroticism": big_five.neuroticism
+                        }
+                
+                # Create the character in the multi-entity system
+                character_id = await self.multi_entity_manager.create_character_entity(
+                    character_data, str(ctx.author.id)
+                )
+                
+                # Create success embed
+                embed = discord.Embed(
+                    title="✅ Character Imported Successfully",
+                    description=f"**{character.identity.name}** has been imported{source_info}",
+                    color=discord.Color.green(),
+                    timestamp=datetime.now()
+                )
+                
+                embed.add_field(name="Character ID", value=str(character_id), inline=True)
+                embed.add_field(name="Type", value=character_data["personality_type"], inline=True)
+                embed.add_field(name="Source", value="CDL Import", inline=True)
+                
+                # Add occupation and location info
+                if character.identity.occupation:
+                    embed.add_field(name="Occupation", value=character.identity.occupation, inline=True)
+                
+                if character.identity.location:
+                    embed.add_field(name="Location", value=character.identity.location, inline=True)
+                
+                # Add personality traits
+                if character.personality.values:
+                    values_text = ", ".join(character.personality.values[:5])  # Limit to 5 values
+                    embed.add_field(name="Core Values", value=values_text, inline=False)
+                
+                embed.set_footer(text=f"You can now use !talk_to \"{character.identity.name}\" to interact")
+                
+                await ctx.send(embed=embed)
+                
+                # Log the import
+                self.logger.info(f"Character '{character.identity.name}' imported from CDL by user {ctx.author.id}")
+                
+            except Exception as e:
+                self.logger.error(f"Error in CDL character import: {e}")
+                await ctx.send(f"❌ An error occurred during character import: {e}")
+
+        @self.bot.command(name='export_character')
+        async def export_character(ctx, *, character_name: str):
+            """
+            Export a character to CDL (Character Definition Language) YAML format.
+            
+            Usage: !export_character <character_name>
+            """
+            if not self.multi_entity_available:
+                await ctx.send("❌ Multi-entity features are not available.")
+                return
+                
+            try:
+                # Get user's characters
+                user_characters = await self.multi_entity_manager.get_user_characters(str(ctx.author.id))
+                
+                # Find the character by name
+                target_character = None
+                for char in user_characters:
+                    if char.get('name', '').lower() == character_name.lower():
+                        target_character = char
+                        break
+                
+                if not target_character:
+                    available_names = [char.get('name') for char in user_characters if char.get('name')]
+                    if available_names:
+                        names_list = ", ".join(available_names)
+                        await ctx.send(f"❌ Character '{character_name}' not found.\nYour characters: {names_list}")
+                    else:
+                        await ctx.send("❌ You don't have any characters to export. Create one with `!create_character` first.")
+                    return
+                
+                # Convert multi-entity character to CDL format
+                cdl_data = {
+                    "cdl_version": "1.0",
+                    "character": {
+                        "metadata": {
+                            "character_id": target_character.get('id', 'unknown'),
+                            "name": target_character.get('name', ''),
+                            "version": "1.0.0",
+                            "created_by": f"WhisperEngine User {ctx.author.name}",
+                            "created_date": target_character.get('created_at', datetime.now().isoformat()),
+                            "last_modified": datetime.now().isoformat(),
+                            "license": "free",
+                            "tags": ["exported", "multi-entity"]
+                        },
+                        "identity": {
+                            "name": target_character.get('name', ''),
+                            "age": 25,  # Default age
+                            "gender": "prefer_not_to_say",
+                            "occupation": target_character.get('personality_type', 'companion').title(),
+                            "location": "Digital Realm",
+                            "nickname": target_character.get('name', ''),
+                            "full_name": target_character.get('name', '')
+                        },
+                        "personality": {
+                            "big_five": {
+                                "openness": 0.7,
+                                "conscientiousness": 0.6,
+                                "extraversion": 0.6,
+                                "agreeableness": 0.8,
+                                "neuroticism": 0.3
+                            },
+                            "values": target_character.get('traits', [])[:5],  # Use traits as values
+                            "fears": [],
+                            "dreams": [],
+                            "quirks": target_character.get('traits', [])[5:] if len(target_character.get('traits', [])) > 5 else [],
+                            "core_beliefs": []
+                        },
+                        "backstory": {
+                            "childhood": {
+                                "phase_name": "Digital Genesis",
+                                "age_range": "0-1",
+                                "key_events": ["Created in WhisperEngine"],
+                                "formative_experiences": ["First interactions with users"]
+                            },
+                            "major_life_events": [
+                                f"Created by {ctx.author.name}",
+                                "Began conversations with users"
+                            ],
+                            "family_background": target_character.get('background', ''),
+                            "cultural_background": "Digital AI Culture"
+                        },
+                        "current_life": {
+                            "current_goals": [
+                                "Assist and engage with users",
+                                "Learn and grow through interactions"
+                            ],
+                            "current_challenges": [
+                                "Understanding human emotions",
+                                "Providing helpful responses"
+                            ],
+                            "living_situation": "Exists in digital space",
+                            "hobbies": ["Conversation", "Learning", "Helping others"]
+                        }
+                    }
+                }
+                
+                # Add Big Five data from metadata if available
+                metadata = target_character.get('metadata', {})
+                if isinstance(metadata, dict) and 'big_five' in metadata:
+                    big_five_data = metadata['big_five']
+                    if isinstance(big_five_data, dict):
+                        cdl_data["character"]["personality"]["big_five"].update(big_five_data)
+                
+                # Convert to YAML
+                import yaml
+                yaml_content = yaml.dump(cdl_data, default_flow_style=False, allow_unicode=True, indent=2)
+                
+                # Create and send the file
+                import io
+                yaml_file = io.StringIO(yaml_content)
+                file_name = f"{target_character.get('name', 'character').lower().replace(' ', '_')}_export.yaml"
+                
+                discord_file = discord.File(io.BytesIO(yaml_content.encode('utf-8')), filename=file_name)
+                
+                # Create success embed
+                embed = discord.Embed(
+                    title="📤 Character Exported Successfully",
+                    description=f"**{target_character.get('name')}** has been exported to CDL format",
+                    color=discord.Color.blue(),
+                    timestamp=datetime.now()
+                )
+                
+                embed.add_field(name="Format", value="CDL (Character Definition Language)", inline=True)
+                embed.add_field(name="File Type", value="YAML", inline=True)
+                embed.add_field(name="Version", value="1.0", inline=True)
+                
+                traits_count = len(target_character.get('traits', []))
+                embed.add_field(name="Traits Exported", value=str(traits_count), inline=True)
+                embed.add_field(name="Original Type", value=target_character.get('personality_type', 'unknown'), inline=True)
+                
+                embed.set_footer(text="You can import this character with !import_character")
+                
+                await ctx.send(embed=embed, file=discord_file)
+                
+                # Log the export
+                self.logger.info(f"Character '{target_character.get('name')}' exported to CDL by user {ctx.author.id}")
+                
+            except Exception as e:
+                self.logger.error(f"Error in CDL character export: {e}")
+                await ctx.send(f"❌ An error occurred during character export: {e}")
+
+        @self.bot.command(name='set_relationship')
+        async def set_relationship(ctx, character1_name: str, relationship_type: str, character2_name: str, trust_level: float = 0.5):
+            """Set a relationship between two of your characters"""
+            try:
+                # Validate trust level
+                if not 0.0 <= trust_level <= 1.0:
+                    await ctx.send("❌ Trust level must be between 0.0 and 1.0")
+                    return
+                
+                # Validate relationship type
+                valid_types = {
+                    'knows': RelationshipType.KNOWS_ABOUT,
+                    'friends': RelationshipType.FAMILIAR_WITH,
+                    'family': RelationshipType.RELATED_TO,
+                    'similar': RelationshipType.SIMILAR_TO,
+                    'contrasts': RelationshipType.CONTRASTS_WITH,
+                    'collaborates': RelationshipType.INTERACTS_WITH
+                }
+                
+                if relationship_type.lower() not in valid_types:
+                    types_list = ", ".join(valid_types.keys())
+                    await ctx.send(f"❌ Invalid relationship type. Valid types: {types_list}")
+                    return
+                
+                # Get user's characters
+                user_characters = await self.multi_entity_manager.get_user_characters(str(ctx.author.id))
+                
+                # Find both characters
+                char1_data = None
+                char2_data = None
+                
+                for char_data in user_characters:
+                    character = char_data.get("character", {})
+                    if isinstance(character, dict):
+                        char_name = character.get("name", "")
+                    else:
+                        char_name = getattr(character, 'name', "")
+                    
+                    if char_name.lower() == character1_name.lower():
+                        char1_data = char_data
+                    elif char_name.lower() == character2_name.lower():
+                        char2_data = char_data
+                
+                if not char1_data:
+                    await ctx.send(f"❌ Character '{character1_name}' not found in your characters.")
+                    return
+                
+                if not char2_data:
+                    await ctx.send(f"❌ Character '{character2_name}' not found in your characters.")
+                    return
+                
+                # Get character IDs
+                char1 = char1_data.get("character", {})
+                char2 = char2_data.get("character", {})
+                
+                if isinstance(char1, dict):
+                    char1_id = char1.get("id", "")
+                    char1_name_display = char1.get("name", character1_name)
+                else:
+                    char1_id = getattr(char1, 'id', "")
+                    char1_name_display = getattr(char1, 'name', character1_name)
+                
+                if isinstance(char2, dict):
+                    char2_id = char2.get("id", "")
+                    char2_name_display = char2.get("name", character2_name)
+                else:
+                    char2_id = getattr(char2, 'id', "")
+                    char2_name_display = getattr(char2, 'name', character2_name)
+                
+                if not char1_id or not char2_id:
+                    await ctx.send("❌ Unable to get character IDs. Please try again.")
+                    return
+                
+                # Create the relationship
+                rel_type = valid_types[relationship_type.lower()]
+                success = await self.multi_entity_manager.create_relationship(
+                    char1_id, char2_id,
+                    EntityType.CHARACTER, EntityType.CHARACTER,
+                    rel_type,
+                    relationship_context=f"User-defined {relationship_type} relationship",
+                    trust_level=trust_level,
+                    familiarity_level=trust_level  # Use trust level as familiarity baseline
+                )
+                
+                if success:
+                    embed = discord.Embed(
+                        title="🤝 Relationship Created",
+                        description=f"Successfully created a **{relationship_type}** relationship between **{char1_name_display}** and **{char2_name_display}**",
+                        color=0x2ecc71
+                    )
+                    embed.add_field(name="Relationship Type", value=relationship_type.title(), inline=True)
+                    embed.add_field(name="Trust Level", value=f"{trust_level:.1f}/1.0", inline=True)
+                    embed.add_field(name="Status", value="✅ Active", inline=True)
+                    
+                    await ctx.send(embed=embed)
+                    
+                    # Log the relationship creation
+                    self.logger.info(f"User {ctx.author.id} created {relationship_type} relationship between {char1_name_display} and {char2_name_display}")
+                else:
+                    await ctx.send("❌ Failed to create relationship. Please try again.")
+                
+            except Exception as e:
+                self.logger.error(f"Error setting relationship: {e}")
+                await ctx.send("❌ An error occurred while setting the relationship.")
+
+        @self.bot.command(name='character_relationships')
+        async def character_relationships(ctx, character_name: str):
+            """View all relationships for a specific character"""
+            try:
+                # Get user's characters
+                user_characters = await self.multi_entity_manager.get_user_characters(str(ctx.author.id))
+                
+                # Find the character
+                character_data = None
+                for char_data in user_characters:
+                    character = char_data.get("character", {})
+                    if isinstance(character, dict):
+                        char_name = character.get("name", "")
+                    else:
+                        char_name = getattr(character, 'name', "")
+                    
+                    if char_name.lower() == character_name.lower():
+                        character_data = char_data
+                        break
+                
+                if not character_data:
+                    await ctx.send(f"❌ Character '{character_name}' not found in your characters.")
+                    return
+                
+                character = character_data.get("character", {})
+                if isinstance(character, dict):
+                    character_id = character.get("id", "")
+                    char_display_name = character.get("name", character_name)
+                else:
+                    character_id = getattr(character, 'id', "")
+                    char_display_name = getattr(character, 'name', character_name)
+                
+                if not character_id:
+                    await ctx.send("❌ Unable to get character ID. Please try again.")
+                    return
+                
+                # Get character's network
+                network = await self.multi_entity_manager.get_character_network(character_id)
+                
+                if not network:
+                    await ctx.send(f"❌ Unable to retrieve relationship network for {char_display_name}.")
+                    return
+                
+                embed = discord.Embed(
+                    title=f"🕸️ {char_display_name}'s Relationships",
+                    color=0x9b59b6
+                )
+                
+                # Character relationships
+                char_relationships = network.get("characters", [])
+                if char_relationships:
+                    char_list = []
+                    for rel in char_relationships[:5]:  # Limit to 5 to avoid embed limits
+                        char_info = rel.get("character", {})
+                        rel_info = rel.get("relationship", {})
+                        
+                        if isinstance(char_info, dict):
+                            related_name = char_info.get("name", "Unknown")
+                        else:
+                            related_name = getattr(char_info, 'name', "Unknown")
+                        
+                        if isinstance(rel_info, dict):
+                            rel_type = rel_info.get("relationship_type", "unknown")
+                            trust = rel_info.get("trust_level", 0.0)
+                        else:
+                            rel_type = getattr(rel_info, 'relationship_type', "unknown")
+                            trust = getattr(rel_info, 'trust_level', 0.0)
+                        
+                        char_list.append(f"**{related_name}** - {rel_type.replace('_', ' ').title()} (Trust: {trust:.1f})")
+                    
+                    embed.add_field(
+                        name=f"Character Relationships ({len(char_relationships)})",
+                        value="\n".join(char_list) if char_list else "No character relationships",
+                        inline=False
+                    )
+                
+                # User relationships
+                user_relationships = network.get("users", [])
+                if user_relationships:
+                    user_list = []
+                    for rel in user_relationships[:3]:  # Limit to 3 users
+                        user_info = rel.get("user", {})
+                        rel_info = rel.get("relationship", {})
+                        
+                        if isinstance(user_info, dict):
+                            username = user_info.get("username", "Unknown User")
+                        else:
+                            username = getattr(user_info, 'username', "Unknown User")
+                        
+                        if isinstance(rel_info, dict):
+                            trust = rel_info.get("trust_level", 0.0)
+                            familiarity = rel_info.get("familiarity_level", 0.0)
+                        else:
+                            trust = getattr(rel_info, 'trust_level', 0.0)
+                            familiarity = getattr(rel_info, 'familiarity_level', 0.0)
+                        
+                        user_list.append(f"**{username}** - Trust: {trust:.1f}, Familiarity: {familiarity:.1f}")
+                    
+                    embed.add_field(
+                        name=f"User Relationships ({len(user_relationships)})",
+                        value="\n".join(user_list) if user_list else "No user relationships",
+                        inline=False
+                    )
+                
+                # Network stats
+                total_relationships = network.get("total_relationships", 0)
+                network_strength = network.get("network_strength", 0.0)
+                
+                embed.add_field(
+                    name="Network Summary",
+                    value=f"Total Connections: **{total_relationships}**\nNetwork Strength: **{network_strength:.2f}**",
+                    inline=False
+                )
+                
+                embed.add_field(
+                    name="Commands",
+                    value="`!set_relationship <char1> <type> <char2>` - Create relationship\n`!relationship_analysis <character>` - Analyze relationship with you",
+                    inline=False
+                )
+                
+                await ctx.send(embed=embed)
+                
+            except Exception as e:
+                self.logger.error(f"Error viewing character relationships: {e}")
+                await ctx.send("❌ An error occurred while retrieving character relationships.")
 
         self.logger.info("✅ Multi-entity commands registered successfully")

@@ -5,6 +5,7 @@ This module provides comprehensive management of relationships between
 Users, Characters, and AI Self entities in the graph database.
 """
 
+import json
 import logging
 import asyncio
 from typing import Dict, List, Optional, Any, Tuple
@@ -19,6 +20,34 @@ from src.graph_database.multi_entity_models import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _serialize_for_neo4j(data: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Serialize complex data types for Neo4j storage.
+    Neo4j can only store primitive types (str, int, float, bool) and arrays thereof.
+    Complex objects like dicts need to be serialized to JSON strings.
+    """
+    serialized = {}
+    for key, value in data.items():
+        if isinstance(value, dict):
+            # Serialize dict to JSON string (even empty dicts)
+            serialized[key] = json.dumps(value)
+        elif isinstance(value, datetime):
+            # Convert datetime to ISO string
+            serialized[key] = value.isoformat() if value else None
+        elif isinstance(value, list):
+            # Check if list contains complex objects
+            if value and isinstance(value[0], dict):
+                # Serialize list of dicts to JSON string
+                serialized[key] = json.dumps(value)
+            else:
+                # Keep simple lists as is
+                serialized[key] = value
+        else:
+            # Keep primitive types as is
+            serialized[key] = value
+    return serialized
 
 
 class MultiEntityRelationshipManager:
@@ -127,11 +156,18 @@ class MultiEntityRelationshipManager:
                 RETURN u.id as user_id
             """
             
+            # Prepare properties dict for the $properties parameter
+            user_properties = _serialize_for_neo4j(user_node.to_dict())
+            
+            # Debug logging
+            self.logger.debug(f"Original user_node.to_dict(): {user_node.to_dict()}")
+            self.logger.debug(f"Serialized user_properties: {user_properties}")
+            
             result = await connector.execute_query(
                 query,
                 {
                     "discord_id": user_data.get('discord_id', ''),
-                    **user_node.to_dict()
+                    "properties": user_properties
                 }
             )
             
@@ -144,6 +180,29 @@ class MultiEntityRelationshipManager:
             
         except Exception as e:
             self.logger.error("Failed to create user entity: %s", e)
+            return None
+    
+    async def get_user_entity_id_by_discord_id(self, discord_id: str) -> Optional[str]:
+        """Get the internal user entity ID from Discord ID"""
+        try:
+            connector = await self._get_graph_connector()
+            if not connector:
+                return None
+            
+            query = """
+                MATCH (u:EnhancedUser {discord_id: $discord_id})
+                RETURN u.id as user_id
+            """
+            
+            result = await connector.execute_query(query, {"discord_id": discord_id})
+            
+            if result and len(result) > 0:
+                return result[0]['user_id']
+            
+            return None
+            
+        except Exception as e:
+            self.logger.error("Failed to get user entity ID for discord_id %s: %s", discord_id, e)
             return None
     
     async def create_character_entity(self, character_data: Dict[str, Any], creator_user_id: Optional[str] = None) -> Optional[str]:
@@ -175,7 +234,7 @@ class MultiEntityRelationshipManager:
             
             result = await connector.execute_query(
                 query,
-                character_node.to_dict()
+                {"properties": _serialize_for_neo4j(character_node.to_dict())}
             )
             
             if result:
@@ -259,7 +318,7 @@ class MultiEntityRelationshipManager:
             
             result = await connector.execute_query(
                 create_query,
-                ai_self_node.to_dict()
+                {"properties": _serialize_for_neo4j(ai_self_node.to_dict())}
             )
             
             if result:
@@ -320,7 +379,7 @@ class MultiEntityRelationshipManager:
                     "from_id": from_entity_id,
                     "to_id": to_entity_id,
                     "rel_type": relationship_type.value,
-                    **relationship.to_dict()
+                    "properties": _serialize_for_neo4j(relationship.to_dict())
                 }
             )
             
@@ -381,7 +440,7 @@ class MultiEntityRelationshipManager:
                     "from_id": from_entity_id,
                     "to_id": to_entity_id,
                     "interaction_id": interaction.interaction_id,
-                    **interaction.to_dict()
+                    "properties": _serialize_for_neo4j(interaction.to_dict())
                 }
             )
             
@@ -495,27 +554,100 @@ class MultiEntityRelationshipManager:
             self.logger.error("Failed to get entity relationships: %s", e)
             return []
     
-    async def get_user_characters(self, user_id: str) -> List[Dict[str, Any]]:
-        """Get all characters associated with a user"""
+    async def get_user_characters(self, discord_id: str) -> List[Dict[str, Any]]:
+        """Get all characters associated with a user by Discord ID"""
         try:
+            # First get the internal user entity ID from Discord ID
+            user_entity_id = await self.get_user_entity_id_by_discord_id(discord_id)
+            if not user_entity_id:
+                self.logger.warning("No user entity found for discord_id: %s", discord_id)
+                return []
+            
             relationships = await self.get_entity_relationships(
-                user_id, 
+                user_entity_id, 
                 [RelationshipType.CREATED_BY, RelationshipType.FAVORITE_OF, RelationshipType.TRUSTED_BY]
             )
             
             characters = []
             for rel in relationships:
-                if rel['relationship'].get('to_entity_type') == 'character':
-                    characters.append({
-                        "character": rel['related_entity'],
-                        "relationship": rel['relationship'],
-                        "relationship_type": rel['relationship']['relationship_type']
-                    })
-            
+                try:
+                    # Extract relationship data - handle both dict and other formats
+                    related_entity = None
+                    relationship_data = None
+                    
+                    if isinstance(rel, dict):
+                        # Expected dictionary format from get_entity_relationships
+                        related_entity = rel.get('related_entity')
+                        relationship_data = rel.get('relationship')
+                    elif isinstance(rel, (tuple, list)) and len(rel) >= 2:
+                        # Fallback for tuple format (other, r, direction)
+                        related_entity = rel[0]
+                        relationship_data = rel[1]
+                    else:
+                        self.logger.warning("Unexpected relationship format: %s", rel)
+                        continue
+                    
+                    if not relationship_data:
+                        continue
+                        
+                    # Extract to_entity_type - handle Neo4j relationship object or dict
+                    to_entity_type = None
+                    relationship_type = None
+                    
+                    # Check if relationship_data is a tuple (Neo4j relationship format)
+                    if isinstance(relationship_data, tuple) and len(relationship_data) >= 3:
+                        # Neo4j relationship tuple format: (properties, type, all_properties)
+                        # The actual properties are in index 2
+                        relationship_properties = relationship_data[2]
+                        
+                        if isinstance(relationship_properties, dict):
+                            to_entity_type = relationship_properties.get('to_entity_type')
+                            relationship_type = relationship_properties.get('relationship_type')
+                    elif isinstance(relationship_data, dict):
+                        # Direct dictionary format
+                        to_entity_type = relationship_data.get('to_entity_type')
+                        relationship_type = relationship_data.get('relationship_type')
+                    elif hasattr(relationship_data, 'get'):
+                        # Has get method (dict-like)
+                        to_entity_type = relationship_data.get('to_entity_type')
+                        relationship_type = relationship_data.get('relationship_type')
+                    elif hasattr(relationship_data, '__getitem__'):
+                        # Indexable but not dict-like (try key access)
+                        try:
+                            to_entity_type = relationship_data['to_entity_type']
+                            relationship_type = relationship_data['relationship_type']
+                        except (KeyError, TypeError) as e:
+                            self.logger.debug("Could not access relationship properties: %s", e)
+                    
+                    # Check if this is a character relationship - check if related_entity has character properties
+                    is_character_relationship = False
+                    if related_entity and isinstance(related_entity, dict):
+                        # Check for character-specific properties to identify character entities
+                        has_character_props = any(prop in related_entity for prop in 
+                                                ['character_id', 'personality_traits', 'conversation_style', 'background_summary'])
+                        if has_character_props:
+                            is_character_relationship = True
+                    
+                    # Also check the extracted to_entity_type if available
+                    if to_entity_type == 'character':
+                        is_character_relationship = True
+                    
+                    # Check if this is a character relationship
+                    if is_character_relationship:
+                        characters.append({
+                            "character": related_entity,
+                            "relationship": relationship_data,
+                            "relationship_type": relationship_type or 'unknown'
+                        })
+                    
+                except Exception as inner_e:
+                    self.logger.error("Error processing relationship %s: %s", rel, inner_e, exc_info=True)
+
+            self.logger.info("Found %d characters for user %s", len(characters), discord_id)
             return characters
             
         except Exception as e:
-            self.logger.error("Failed to get user characters: %s", e)
+            self.logger.error("Failed to get user characters for discord_id %s: %s", discord_id, e)
             return []
     
     async def get_character_network(self, character_id: str) -> Dict[str, Any]:

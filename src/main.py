@@ -21,6 +21,7 @@ from src.handlers.admin import AdminCommandHandlers
 from src.handlers.events import BotEventHandlers
 from src.handlers.help import HelpCommandHandlers
 from src.handlers.memory import MemoryCommandHandlers
+from src.handlers.multi_entity_handlers import MultiEntityCommandHandlers
 from src.handlers.onboarding_commands import create_onboarding_commands
 from src.handlers.performance_commands import create_performance_commands
 from src.handlers.privacy import PrivacyCommandHandlers
@@ -289,6 +290,16 @@ class ModularBotManager:
             )
             self.command_handlers["performance"].register_commands(bot_name_filter, is_admin)
             logger.info("✅ Performance monitoring command handlers registered")
+
+            # Multi-Entity Character System Commands
+            self.command_handlers["multi_entity"] = MultiEntityCommandHandlers(
+                bot=self.bot,
+                multi_entity_manager=components.get("multi_entity_manager"),
+                ai_self_bridge=components.get("ai_self_bridge"),
+                memory_manager=components.get("memory_manager")
+            )
+            self.command_handlers["multi_entity"].register_commands(bot_name_filter, is_admin)
+            logger.info("✅ Multi-entity character command handlers registered")
 
             # Onboarding and enhanced help commands
             self.command_handlers["onboarding"] = create_onboarding_commands(
