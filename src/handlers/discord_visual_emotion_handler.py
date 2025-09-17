@@ -79,17 +79,31 @@ class DiscordVisualEmotionHandler:
     def _register_handlers(self):
         """Register Discord event handlers for image processing"""
         
-        @self.bot.event
-        async def on_message(message):
-            """Handle incoming messages with image attachments"""
-            
-            # Skip if disabled or bot message
-            if not self.config.enabled or not self.config.discord_enabled or message.author.bot:
-                return
-            
-            # Process image attachments
-            if message.attachments:
-                await self._process_message_attachments(message)
+        # IMPORTANT: Do NOT override the core bot on_message handler. Using @self.bot.event here
+        # would replace the primary event pipeline (responses, commands, memory, etc.).
+        # Instead we register an additional listener so the main handler in events.py still runs.
+
+        async def visual_emotion_on_message(message):
+            """Passive listener for messages to extract visual emotional signals.
+
+            This listener is additive only: it never blocks or returns early to change normal
+            processing. The main on_message handler (BotEventHandlers.on_message) remains intact.
+            """
+            try:
+                if not self.config.enabled or not self.config.discord_enabled:
+                    return
+                if message.author.bot:
+                    return
+
+                # Only act if there are attachments that might be images
+                if message.attachments:
+                    await self._process_message_attachments(message)
+            except Exception as e:
+                logger.warning("Visual emotion listener error (non-fatal): %s", e)
+
+        # Register additive listener
+        self.bot.add_listener(visual_emotion_on_message, 'on_message')
+        logger.info("✅ Visual emotion listener registered (non-intrusive)")
     
     async def _process_message_attachments(self, message: discord.Message):
         """Process all image attachments in a message"""
