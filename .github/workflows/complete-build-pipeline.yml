@@ -18,6 +18,13 @@ on:
           - release
           - docker-only
 
+# Default least-privilege permissions for all jobs.
+# Individual jobs (release, docker-build) will elevate where required.
+permissions:
+  contents: read        # Source checkout
+  packages: read        # Pull public packages if needed
+  actions: read         # Access to action metadata
+
 # Prevent multiple concurrent builds
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -458,26 +465,62 @@ jobs:
     runs-on: ubuntu-latest
     needs: validation
     if: needs.validation.outputs.should_build == 'true'
+    permissions:
+      contents: read
+      packages: write   # Needed if publishing to GHCR (safe even if using Docker Hub)
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Compute derived tags
+        id: vars
+        run: |
+          echo "short_sha=${GITHUB_SHA::12}" >> $GITHUB_OUTPUT
+          echo "ref_slug=${GITHUB_REF_NAME//\//-}" >> $GITHUB_OUTPUT
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
+      - name: Determine push settings
+        id: pushmeta
+        run: |
+          echo "event_name=${{ github.event_name }}" >> $GITHUB_OUTPUT
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "will_push=false" >> $GITHUB_OUTPUT
+            echo "🔒 PR build: images will not be pushed.";
+          else
+            # Prefer DOCKERHUB_USERNAME/DOCKERHUB_TOKEN; fallback to legacy DOCKER_USERNAME/DOCKER_PASSWORD
+            if { [ -n "${{ secrets.DOCKERHUB_USERNAME }}" ] && [ -n "${{ secrets.DOCKERHUB_TOKEN }}" ]; } || { [ -n "${{ secrets.DOCKER_USERNAME }}" ] && [ -n "${{ secrets.DOCKER_PASSWORD }}" ]; }; then
+              echo "will_push=true" >> $GITHUB_OUTPUT
+              if [ -n "${{ secrets.DOCKERHUB_USERNAME }}" ]; then
+                echo "using_secret_set=DOCKERHUB" >> $GITHUB_OUTPUT
+                echo "✅ DockerHub (token) credentials detected; images will be pushed.";
+              else
+                echo "using_secret_set=LEGACY" >> $GITHUB_OUTPUT
+                echo "✅ Legacy Docker credentials detected; images will be pushed.";
+              fi
+            else
+              echo "will_push=false" >> $GITHUB_OUTPUT
+              echo "⚠️  No Docker credentials found; build only (no push).";
+            fi
+          fi
+
       - name: Log in to Docker Hub
-        if: github.event_name != 'pull_request'
+        if: steps.pushmeta.outputs.will_push == 'true'
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
+          username: ${{ secrets.DOCKERHUB_USERNAME || secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN || secrets.DOCKER_PASSWORD }}
 
       - name: Extract metadata
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          # Publish to both Docker Hub and GHCR (mirror)
+          images: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+            ghcr.io/${{ github.repository }}
           tags: |
             type=ref,event=branch
             type=ref,event=pr
@@ -485,22 +528,66 @@ jobs:
             type=semver,pattern={{major}}.{{minor}}
             type=raw,value=latest,enable={{is_default_branch}}
             type=raw,value=${{ needs.validation.outputs.version }}
+            type=raw,value=sha-${{ github.sha }}
+            type=raw,value=short-${{ steps.vars.outputs.short_sha }}
+            type=raw,value=${{ steps.vars.outputs.ref_slug }}
 
-      - name: Build and push Docker image
+      - name: Build (and optionally push) Docker image
+        id: buildimage
         uses: docker/build-push-action@v6
         with:
           context: .
           file: ./docker/Dockerfile.multi-stage
           platforms: linux/amd64,linux/arm64
           target: production
-          push: ${{ github.event_name != 'pull_request' }}
+          push: ${{ steps.pushmeta.outputs.will_push == 'true' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          sbom: true            # Generate SBOM (Software Bill of Materials)
+          provenance: true      # Supply chain provenance (SLSA-style attestations)
           build-args: |
             VERSION=${{ needs.validation.outputs.version }}
             BUILD_DATE=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.created'] }}
+
+      - name: Generate SBOM (image reference)
+        if: steps.pushmeta.outputs.will_push == 'true'
+        uses: anchore/sbom-action@v0
+        with:
+          image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.buildimage.outputs.digest }}
+          format: spdx-json
+          output-file: sbom-image-${{ steps.vars.outputs.short_sha }}.spdx.json
+
+      - name: Generate SBOM (source fallback)
+        if: steps.pushmeta.outputs.will_push != 'true'
+        uses: anchore/sbom-action@v0
+        with:
+          path: .
+          format: spdx-json
+          output-file: sbom-source-${{ steps.vars.outputs.short_sha }}.spdx.json
+
+      - name: Upload SBOM artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-${{ steps.vars.outputs.short_sha }}
+          path: |
+            sbom-*.spdx.json
+          retention-days: 30
+
+      - name: Log in to GHCR (mirror)
+        if: steps.pushmeta.outputs.will_push == 'true'
+        uses: docker/login-action@v3
+        with:
+            registry: ghcr.io
+            username: ${{ github.actor }}
+            password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Warn if push skipped due to missing credentials
+        if: steps.pushmeta.outputs.will_push != 'true' && github.event_name != 'pull_request'
+        run: |
+          echo "⚠️  Docker credentials not provided; image not pushed. Set DOCKER_USERNAME & DOCKER_PASSWORD secrets to enable publishing." && exit 0
 
   # ===================================================================
   # Cross-Platform Native Builds
@@ -590,6 +677,9 @@ jobs:
     runs-on: ubuntu-latest
     needs: [validation, docker-build, build-matrix]
     if: github.ref_type == 'tag' && startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: write   # Required to create release & upload assets
+      packages: write   # Allow publishing package metadata / GHCR tags
     
     steps:
       - name: Checkout code
@@ -639,6 +729,8 @@ jobs:
     runs-on: ubuntu-latest
     needs: [docker-build, onboarding_validation]
     if: always() && needs.validation.outputs.should_build == 'true'
+    permissions:
+      contents: read
     
     steps:
       - name: Test Docker image
