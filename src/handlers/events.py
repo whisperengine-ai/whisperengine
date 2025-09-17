@@ -291,9 +291,15 @@ class BotEventHandlers:
                         self.conversation_cache.add_message(str(message.channel.id), message)
             return
 
-        logger.debug(
-            f"Received message from {message.author.name} ({message.author.id}) in {message.channel.name if message.guild else 'DM'}"
-        )
+        # Conditional elevated logging for debugging silent bot issues
+        if os.getenv("DISCORD_MESSAGE_TRACE", "false").lower() == "true":
+            logger.info(
+                f"[TRACE] Received message from {message.author.name} ({message.author.id}) in {message.channel.name if message.guild else 'DM'}: {message.content[:120].replace('\n',' ')}"
+            )
+        else:
+            logger.debug(
+                f"Received message from {message.author.name} ({message.author.id}) in {message.channel.name if message.guild else 'DM'}"
+            )
 
         # Check if the message is a DM
         if message.guild is None:
@@ -425,11 +431,67 @@ class BotEventHandlers:
 
     async def _handle_guild_message(self, message):
         """Handle guild (server) message."""
-        # Check for bot mentions first
+        # Configurable response behavior:
+        # DISCORD_RESPOND_MODE options:
+        #   mention (default)  -> only reply when explicitly mentioned
+        #   name               -> reply when bot name OR fallback name appears as a whole word OR mentioned
+        #   all                -> reply to any non-command message in guild channel (acts like a chat bot)
+        # Backward compatibility: if REQUIRE_DISCORD_MENTION=true force mention mode.
+
+        try:
+            respond_mode = os.getenv("DISCORD_RESPOND_MODE", "mention").lower().strip()
+            if os.getenv("REQUIRE_DISCORD_MENTION", "false").lower() == "true":
+                respond_mode = "mention"
+        except Exception:
+            respond_mode = "mention"
+
+        # Fast‑path for commands (always allow the command system to process first)
+        # Commands are handled by discord.py after this method returns from process_commands
+        # We avoid double-processing: if command prefix matches, let process_commands handle and exit early
+        command_prefix = os.getenv("DISCORD_COMMAND_PREFIX", "!")
+        if message.content.startswith(command_prefix):
+            await self.bot.process_commands(message)
+            return
+
+        bot_name = os.getenv("DISCORD_BOT_NAME", "").lower()
+        fallback_name = "whisperengine"
+        content_words = message.content.lower().split()
+
+        should_active_reply = False
+
+        # Mention always triggers active reply
         if self.bot.user in message.mentions:
+            should_active_reply = True
+        else:
+            if respond_mode == "name":
+                if (bot_name and bot_name in content_words) or fallback_name in content_words:
+                    should_active_reply = True
+            elif respond_mode == "all":
+                should_active_reply = True
+            # mention mode (default) leaves should_active_reply False unless mentioned
+
+        # Optional verbose logging when debugging interaction issues
+        if logger.isEnabledFor(logging.INFO) and should_active_reply:
+            logger.info(
+                "💬 Guild message triggering reply (mode=%s, author=%s, channel=%s): %.80s",
+                respond_mode,
+                getattr(message.author, 'name', 'unknown'),
+                getattr(message.channel, 'name', 'dm'),
+                message.content.replace("\n", " "),
+            )
+        elif logger.isEnabledFor(logging.DEBUG):
+            logger.debug(
+                "Guild message received (mode=%s, reply=%s, author=%s, channel=%s)",
+                respond_mode,
+                should_active_reply,
+                getattr(message.author, 'name', 'unknown'),
+                getattr(message.channel, 'name', 'dm'),
+            )
+
+        if should_active_reply:
             await self._handle_mention_message(message)
         else:
-            # Process commands as normal
+            # Still allow command processing (in case of edge cases like missing prefix detection)
             await self.bot.process_commands(message)
 
     async def _handle_mention_message(self, message):
