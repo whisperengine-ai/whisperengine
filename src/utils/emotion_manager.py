@@ -308,6 +308,13 @@ class RelationshipManager:
 
     def detect_trust_indicators(self, message: str) -> list[str]:
         """Detect trust indicators in a message using LLM"""
+        import os
+        
+        # Check if trust detection is disabled (for local LLM compatibility)
+        if os.getenv("ENABLE_LLM_TRUST_DETECTION", "true").lower() == "false":
+            logger.debug("LLM trust detection disabled via ENABLE_LLM_TRUST_DETECTION=false")
+            return []
+            
         if not self.llm_client:
             logger.warning("No LLM client available for trust detection")
             return []

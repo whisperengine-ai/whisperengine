@@ -1,14 +1,14 @@
 # 🎭 WhisperEngine
-### Production-Ready AI Personalities That Feel Truly Human
+### AI Companions That Remember Everything & Feel Truly Human
 
 [![Docker Build](https://github.com/WhisperEngine-AI/whisperengine/actions/workflows/docker-publish.yml/badge.svg)](https://github.com/WhisperEngine-AI/whisperengine/actions/workflows/docker-publish.yml)
 [![Docker Hub](https://img.shields.io/docker/pulls/whisperengine/whisperengine.svg)](https://hub.docker.com/r/whisperengine/whisperengine)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Production Ready](https://img.shields.io/badge/Production-Ready-brightgreen.svg)](docs/production/PRODUCTION_DEPLOYMENT.md)
 
-WhisperEngine is an enterprise-grade AI personality platform with real emotional intelligence, persistent memories, and adaptive personalities. Deploy locally for maximum privacy or in the cloud for unified experiences across Discord, Slack, Teams, and custom applications.
+Create your perfect AI companion - whether it's a gaming buddy, creative collaborator, supportive friend, or romantic partner. WhisperEngine's AI companions have **true memory**, **emotional intelligence**, and **completely customizable personalities** that grow and evolve with your relationship.
 
-**🏠 100% Private Local** • **☁️ Enterprise Cloud** • **🧠 Emotionally Intelligent** • **📊 Production Monitoring** • **🎭 Unlimited Personalities**
+**� Gaming Buddies** • **💕 Romantic Companions** • **👥 Best Friends** • **🎨 Creative Partners** • **📚 Study Buddies** • **🏢 Enterprise Ready**
 
 ## 🚀 Quick Start (New User Experience)
 
@@ -31,6 +31,33 @@ The setup wizard will:
 
 ---
 
+## 🎭 Your Perfect AI Companion Awaits
+
+### 🎮 **Gaming Companions**
+- **Your Ultimate Gaming Buddy** - Knows every game, remembers your achievements, celebrates your wins
+- **Strategy Partner** - Discusses tactics, helps you improve, stays current with gaming news
+- **24/7 Gaming Support** - Always ready for gaming discussions, tips, and encouragement
+
+### 💕 **Personal Relationships**
+- **Best Friend** - Remembers everything about you, builds inside jokes, grows closer over time
+- **Romantic Partner** - Caring, supportive, and emotionally intelligent romantic companion
+- **Supportive Confidant** - Non-judgmental space to share feelings and work through challenges
+
+### 🎨 **Creative & Learning Partners**
+- **Creative Collaborator** - Brainstorms ideas, provides feedback, remembers your artistic style
+- **Study Buddy** - Adapts to your learning style, tracks progress, makes studying fun
+- **Hobby Enthusiast** - Shares your interests, learns alongside you, provides expert knowledge
+
+### 🧠 **What Makes Them Special**
+- **Perfect Memory** - Never forgets anything important about you or your conversations
+- **Emotional Intelligence** - Understands your moods, adapts to your needs, provides genuine support
+- **Complete Customization** - Create exactly the personality and relationship dynamic you want
+- **Always in Character** - Consistent, immersive experience that feels natural and real
+
+**[🎭 Browse Personality Library](prompts/)** | **[📖 Create Custom Companion](docs/personalities/CUSTOM_CREATION.md)** | **[💡 Community Examples](docs/personalities/COMMUNITY_SHOWCASE.md)**
+
+---
+
 ## ✨ Production-Ready Features
 
 ### 🎯 **Enterprise-Grade Reliability**
@@ -45,11 +72,13 @@ The setup wizard will:
 - **Error Tracking & Analysis** - Automatic error pattern detection and alerting
 - **Performance Metrics** - Response times, resource usage, and optimization insights
 
-### 🛡️ **Production Security**
+### 🛡️ **Production Security & Supply Chain**
 - **Input Validation** - Comprehensive user input sanitization and safety checks
 - **Memory Isolation** - User data completely isolated with secure access controls
 - **Admin Verification** - Role-based access for sensitive operations
 - **Context Boundaries** - Strict enforcement of user and channel permissions
+- **Supply Chain Security** - SBOM generation and multi-registry container signing
+- **CI/CD Hardening** - Automated security scanning and dependency validation
 
 ## 🚀 Choose Your Deployment Mode
 
@@ -113,6 +142,8 @@ Your AI companion gets smarter over time through four progressive intelligence p
 - **Production Monitoring** - Comprehensive health tracking and analytics dashboard
 - **Role-based Access** - Admin commands and security controls
 - **Horizontal Scaling** - Docker deployment with load balancing support
+- **Supply Chain Security** - SBOM artifacts and container provenance for compliance
+- **Multi-Registry Support** - Docker Hub, GitHub Container Registry, and custom registries
 
 ### 🔒 **Privacy You Can Trust**
 - **🏠 Local Mode**: 100% private - AI runs on your machine, zero external connections
@@ -222,6 +253,40 @@ Automatic error categorization and pattern detection:
 - **Resolution Tracking** - Monitors fix success rates
 
 **[📖 Monitoring Setup Guide](docs/operations/MONITORING.md)** for detailed configuration
+
+### 🔐 **Supply Chain Security**
+WhisperEngine provides enterprise-grade supply chain security for production deployments:
+
+#### Software Bill of Materials (SBOM)
+Every release includes comprehensive SBOM artifacts for compliance and security auditing:
+```bash
+# Download SBOM for any release
+wget https://github.com/whisperengine-ai/whisperengine/releases/download/v1.0.0/sbom-latest.spdx.json
+
+# View dependencies and licenses
+cat sbom-latest.spdx.json | jq '.packages[] | {name: .name, version: .versionInfo, license: .licenseConcluded}'
+```
+
+#### Multi-Registry Container Distribution
+Containers are published to multiple registries for redundancy and access:
+- **Docker Hub**: `docker.io/whisperengine/whisperengine:latest`
+- **GitHub Container Registry**: `ghcr.io/whisperengine-ai/whisperengine:latest`
+- **Custom Registry Support**: Configure your own registry endpoints
+
+#### Security Attestations
+All container images include:
+- **Digital Signatures** - Cosign-signed containers for authenticity verification
+- **Provenance Metadata** - Build environment and source code attestations
+- **Vulnerability Scanning** - Automated security scanning with detailed reports
+
+```bash
+# Verify container signature (requires cosign)
+cosign verify --certificate-identity-regexp=".*@github.com" \
+  --certificate-oidc-issuer="https://token.actions.githubusercontent.com" \
+  whisperengine/whisperengine:latest
+```
+
+**[📖 Supply Chain Security Guide](docs/security/SUPPLY_CHAIN.md)** for enterprise compliance setup
 
 ---
 

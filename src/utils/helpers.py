@@ -225,18 +225,44 @@ async def process_message_with_images(
 
     logger.info(f"Found {len(processed_images)} valid images in message")
 
-    # Check if vision is supported
+    # Check if vision is supported directly; if not, attempt hybrid summarizer
     if not llm_client.has_vision_support():
-        # Vision not supported, add text description of images instead
-        image_description = image_processor.get_image_description_prompt(processed_images)
-        combined_content = (
-            f"{message_content}\n\n{image_description}"
-            if message_content.strip()
-            else image_description
-        )
-        conversation_context.append({"role": "user", "content": combined_content})
-        logger.info("Added image descriptions to text message (vision not supported)")
-        return conversation_context
+        try:
+            from src.vision.vision_summarizer import get_vision_summarizer
+            summarizer = get_vision_summarizer()
+        except Exception as e:
+            summarizer = None
+            logger.warning(f"Hybrid vision summarizer import failed: {e}")
+
+        summary_text = None
+        if summarizer and summarizer.is_available():
+            try:
+                summary_text = await summarizer.summarize_images(attachments, user_prompt=message_content[:200])
+            except Exception as e:
+                logger.error(f"Vision summarizer error: {e}")
+                summary_text = None
+
+        if summary_text:
+            # Insert as system-level visual context to prevent model treating it as user intent to analyze
+            visual_context_msg = (
+                "Visual context (user shared images): " + summary_text.strip()
+            )
+            if message_content.strip():
+                conversation_context.append({"role": "user", "content": message_content})
+            conversation_context.append({"role": "system", "content": visual_context_msg})
+            logger.info("Added hybrid vision summary via secondary model")
+            return conversation_context
+        else:
+            # Fallback: simple description prompt (legacy behavior)
+            image_description = image_processor.get_image_description_prompt(processed_images)
+            combined_content = (
+                f"{message_content}\n\n{image_description}"
+                if message_content.strip()
+                else image_description
+            )
+            conversation_context.append({"role": "user", "content": combined_content})
+            logger.info("Added image descriptions to text message (vision not supported; summarizer unavailable)")
+            return conversation_context
 
     # Vision is supported, create multimodal message
     encoded_images = [img["encoded_data"] for img in processed_images]

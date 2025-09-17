@@ -47,6 +47,42 @@ from src.utils.helpers import (
 
 logger = logging.getLogger(__name__)
 
+# Reusable meta/analysis pattern list for filtering & sanitization
+META_ANALYSIS_PATTERNS = [
+    "Core Conversation Analysis",
+    "Emotional Analysis",
+    "Technical Metadata",
+    "Personality & Interaction",
+    "Overall Assessment",
+    "Overall Analysis",
+    "Overall Impression",
+    "Combined Response",
+    "Why this response works",
+    "Would you like me to generate",
+    "Would you like me to",
+    "Do you want me to",
+    "Here is a breakdown",
+    "Here's a breakdown",
+    "Relevance Score",
+    "API Success Rate",
+    "Key Points",
+    "In Essence",
+]
+
+def _strict_mode_enabled() -> bool:
+    return os.getenv("STRICT_IMMERSIVE_MODE", "true").lower() in ("1", "true", "yes", "on")
+
+def _minimal_context_mode_enabled() -> bool:
+    """Return True if MINIMAL_CONTEXT_MODE is enabled via environment.
+
+    When enabled we intentionally suppress enrichment layers (phase2 emotion, dynamic personality,
+    phase4 intelligence, external emotion API, and memory narrative) to obtain a clean baseline
+    model behavior. Only the consolidated core system prompt + last few raw user/assistant turns
+    are sent (attachments still guarded). This helps diagnose style contamination originating from
+    higher-level adaptive systems vs base model tendencies.
+    """
+    return os.getenv("MINIMAL_CONTEXT_MODE", "false").lower() in ("1", "true", "yes", "on")
+
 
 class BotEventHandlers:
     """
@@ -91,6 +127,69 @@ class BotEventHandlers:
 
         # Register event handlers
         self._register_events()
+
+    # === Minimal Context Mode Utilities ===
+    def _apply_minimal_mode_cleanse(self, text: str) -> str:
+        """Apply aggressive formatting and meta-analysis cleansing for minimal context mode.
+
+        Strips bullet lists, numbered outlines, trailing coaching offers, and known analytical lead-ins.
+        Ensures single-paragraph poetic output <= ~120 words while preserving core semantic content.
+        """
+        import re
+
+        original = text
+
+        # Remove menu/coaching prompts
+        coaching_patterns = [
+            r"Do you want me to[^.?]*[.?]",
+            r"Would you like me to[^.?]*[.?]",
+            r"Shall I[^.?]*[.?]",
+        ]
+        for pat in coaching_patterns:
+            text = re.sub(pat, "", text, flags=re.IGNORECASE)
+
+        # Remove headings (lines ending with colon or title case single-line headings)
+        lines = [l for l in text.splitlines() if l.strip()]
+        cleaned_lines = []
+        for l in lines:
+            if re.match(r"^[A-Z][A-Za-z ]{2,40}:$", l.strip()):
+                continue
+            # Skip list markers
+            if re.match(r"^\s*([*\-•]|\d+\.)\s+", l):
+                # Keep inline content but without marker if short
+                content = re.sub(r"^\s*([*\-•]|\d+\.)\s+", "", l).strip()
+                if content and len(content.split()) > 2:
+                    cleaned_lines.append(content)
+                continue
+            cleaned_lines.append(l)
+
+        text = " ".join(cleaned_lines)
+
+        # Collapse multiple spaces
+        text = re.sub(r"\s+", " ", text).strip()
+
+        # Remove analytic lead-ins
+        analytic_leads = [
+            r"^Okay, let's break down .*? - ",
+            r"^Okay, let's break down .*? based on the data provided\. ",
+            r"^Here(?:'s| is) (?:an |a )analysis of .*?\. ",
+            r"^Overall Impression: .*?\. ",
+        ]
+        for pat in analytic_leads:
+            text = re.sub(pat, "", text, flags=re.IGNORECASE)
+
+        # Word limit trim
+        words = text.split()
+        if len(words) > 130:
+            text = " ".join(words[:130])
+            if not text.endswith(('.', '!', '?')):
+                text += '.'
+
+        # Fallback if emptied accidentally
+        if len(text) < 20:
+            text = original.split('\n\n')[0][:180].strip()
+
+        return text.strip()
 
     async def setup_universal_chat(self):
         """Setup Universal Chat Orchestrator for proper layered architecture"""
@@ -264,6 +363,10 @@ class BotEventHandlers:
         # Log successful startup
         logger.info("🚀 Bot initialization complete - ready to chat!")
 
+        # Emit diagnostic warning if minimal context mode is active
+        if _minimal_context_mode_enabled():
+            logger.warning("⚠️ MINIMAL_CONTEXT_MODE active: suppressing emotion, personality, phase4, and memory enrichment layers for baseline output isolation.")
+
     async def on_message(self, message):
         """
         Handle incoming messages.
@@ -376,35 +479,39 @@ class BotEventHandlers:
             message, relevant_memories, emotion_context, recent_messages, enhanced_system_prompt
         )
 
-        # External API emotion analysis (always available when configured)
         external_emotion_data = None
-        if self.external_emotion_ai:
-            external_emotion_data = await self._analyze_external_emotion(
-                message.content, user_id, conversation_context
-            )
-
-        # Phase 2: Emotional Intelligence Analysis (always available when configured)
         phase2_context = None
         current_emotion_data = None
-        if self.phase2_integration:
-            phase2_context, current_emotion_data = await self._analyze_phase2_emotion(
-                user_id, message.content, message
-            )
-
-        # Dynamic Personality Analysis (always available when configured)
         dynamic_personality_context = None
-        if self.dynamic_personality_profiler:
-            dynamic_personality_context = await self._analyze_dynamic_personality(
-                user_id, message.content, message, recent_messages
-            )
+        phase4_context = None
+        comprehensive_context = None
+        enhanced_system_prompt = None
 
-        # Phase 4: Human-Like Conversation Intelligence
-        if hasattr(self.memory_manager, "process_with_phase4_intelligence"):
-            phase4_context, comprehensive_context, enhanced_system_prompt = (
-                await self._process_phase4_intelligence(
-                    user_id, message, recent_messages, external_emotion_data, phase2_context
+        if not _minimal_context_mode_enabled():
+            # External API emotion analysis
+            if self.external_emotion_ai:
+                external_emotion_data = await self._analyze_external_emotion(
+                    message.content, user_id, conversation_context
                 )
-            )
+            # Phase 2 emotional intelligence
+            if self.phase2_integration:
+                phase2_context, current_emotion_data = await self._analyze_phase2_emotion(
+                    user_id, message.content, message
+                )
+            # Dynamic personality
+            if self.dynamic_personality_profiler:
+                dynamic_personality_context = await self._analyze_dynamic_personality(
+                    user_id, message.content, message, recent_messages
+                )
+            # Phase 4 intelligence
+            if hasattr(self.memory_manager, "process_with_phase4_intelligence"):
+                phase4_context, comprehensive_context, enhanced_system_prompt = (
+                    await self._process_phase4_intelligence(
+                        user_id, message, recent_messages, external_emotion_data, phase2_context
+                    )
+                )
+        else:
+            logger.debug("[MINIMAL_CONTEXT_MODE] Skipping emotion/personality/phase4 enrichment for DM message.")
 
         # Process message with images
         conversation_context = await process_message_with_images(
@@ -566,27 +673,35 @@ class BotEventHandlers:
         )
         logger.info(f"[CONV-CTX] Built conversation context for message_id={message.id} user_id={user_id} context_type={type(conversation_context)} context_preview={str(conversation_context)[:120]}")
 
-        # External emotion analysis for guild message (always available when configured)
         external_emotion_data = None
-        if self.external_emotion_ai:
-            external_emotion_data = await self._analyze_external_emotion(
-                content, user_id, conversation_context
-            )
-
-        # Phase 2 emotional intelligence for guild message (always available when configured)
         phase2_context = None
         current_emotion_data = None
-        if self.phase2_integration:
-            phase2_context, current_emotion_data = await self._analyze_phase2_emotion(
-                user_id, content, message, context_type="guild_message"
-            )
-
-        # Dynamic Personality Analysis for guild message (always available when configured)
         dynamic_personality_context = None
-        if self.dynamic_personality_profiler:
-            dynamic_personality_context = await self._analyze_dynamic_personality(
-                user_id, content, message, recent_messages
-            )
+        phase4_context = None
+        comprehensive_context = None
+        enhanced_system_prompt = None
+
+        if not _minimal_context_mode_enabled():
+            if self.external_emotion_ai:
+                external_emotion_data = await self._analyze_external_emotion(
+                    content, user_id, conversation_context
+                )
+            if self.phase2_integration:
+                phase2_context, current_emotion_data = await self._analyze_phase2_emotion(
+                    user_id, content, message, context_type="guild_message"
+                )
+            if self.dynamic_personality_profiler:
+                dynamic_personality_context = await self._analyze_dynamic_personality(
+                    user_id, content, message, recent_messages
+                )
+            if hasattr(self.memory_manager, "process_with_phase4_intelligence"):
+                phase4_context, comprehensive_context, enhanced_system_prompt = (
+                    await self._process_phase4_intelligence(
+                        user_id, message, recent_messages, external_emotion_data, phase2_context
+                    )
+                )
+        else:
+            logger.debug("[MINIMAL_CONTEXT_MODE] Skipping emotion/personality/phase4 enrichment for guild mention.")
 
         # Process message with images (content with mentions removed)
         conversation_context = await process_message_with_images(
@@ -631,16 +746,30 @@ class BotEventHandlers:
                         user_id, query="conversation history recent messages", limit=15
                     )
 
+                    # CRITICAL DEBUG: Log what ChromaDB is returning
+                    logger.error(f"[CHROMADB-DEBUG] Retrieved {len(chromadb_memories)} memories for user {user_id}")
+                    for i, memory in enumerate(chromadb_memories):
+                        metadata = memory.get("metadata", {})
+                        logger.error(f"[CHROMADB-DEBUG] Memory {i}: user_msg='{metadata.get('user_message', 'N/A')[:100]}...' bot_response='{metadata.get('bot_response', 'N/A')[:100]}...'")
+
                     # Process ChromaDB memories into message format
                     conversation_count = 0
                     for memory in reversed(chromadb_memories):
                         metadata = memory.get("metadata", {})
 
                         if "user_message" in metadata and "bot_response" in metadata:
+                            user_content = metadata["user_message"][:500]
+                            bot_content = metadata["bot_response"][:500]
+                            
+                            # CRITICAL DEBUG: Log what's being added to conversation context
+                            logger.error(f"[CONTEXT-DEBUG] Adding ChromaDB conversation:")
+                            logger.error(f"[CONTEXT-DEBUG] User: '{user_content}'")
+                            logger.error(f"[CONTEXT-DEBUG] Bot: '{bot_content}'")
+                            
                             # Add user message
                             recent_messages.append(
                                 {
-                                    "content": metadata["user_message"][:500],
+                                    "content": user_content,
                                     "author_id": user_id,
                                     "author_name": metadata.get("user_name", "User"),
                                     "timestamp": metadata.get("timestamp", ""),
@@ -651,7 +780,7 @@ class BotEventHandlers:
                             # Add bot response
                             recent_messages.append(
                                 {
-                                    "content": metadata["bot_response"][:500],
+                                    "content": bot_content,
                                     "author_id": str(self.bot.user.id) if self.bot.user else "bot",
                                     "author_name": (
                                         self.bot.user.display_name if self.bot.user else "Bot"
@@ -751,63 +880,116 @@ class BotEventHandlers:
                 system_prompt_content = get_system_prompt()
                 logger.debug("Falling back to basic system prompt")
 
-        conversation_context.append({"role": "system", "content": system_prompt_content})
+        # STRICT immersive mode OR minimal context mode: consolidate system messages into a single narrative instruction
+        if _strict_mode_enabled() or _minimal_context_mode_enabled():
+            # Build compact memory narrative
+            memory_fragments = []
+            if relevant_memories and not _minimal_context_mode_enabled():
+                global_facts = [m for m in relevant_memories if m["metadata"].get("is_global", False)]
+                user_memories = [m for m in relevant_memories if not m["metadata"].get("is_global", False)]
+                if global_facts:
+                    gf_text = "; ".join(
+                        memory["metadata"].get("fact", "")[:160] for memory in global_facts
+                        if memory["metadata"].get("type") == "global_fact"
+                    )
+                    if gf_text:
+                        memory_fragments.append(f"Shared truths: {gf_text}")
+                if user_memories and not _minimal_context_mode_enabled():
+                    um_text_parts = []
+                    for memory in user_memories[:6]:  # limit
+                        md = memory["metadata"]
+                        if md.get("user_message"):
+                            um_text_parts.append(md.get("user_message")[:120])
+                        elif md.get("type") == "user_fact":
+                            um_text_parts.append(md.get("fact", "")[:120])
+                    if um_text_parts:
+                        memory_fragments.append("You recall: " + "; ".join(um_text_parts))
+            memory_narrative = " " .join(memory_fragments)
 
-        # Add time and emotion context
-        conversation_context.append({"role": "system", "content": f"Current time: {time_context}"})
+            # Conversation summary (compressed)
+            conversation_summary = None
+            if not _minimal_context_mode_enabled():
+                conversation_summary = generate_conversation_summary(
+                    recent_messages, str(message.author.id)
+                )
+                if conversation_summary and len(conversation_summary) > 600:
+                    conversation_summary = conversation_summary[:600] + "..."
 
-        if emotion_context:
-            conversation_context.append(
-                {
-                    "role": "system",
-                    "content": f"User relationship and emotional context: {emotion_context}",
-                }
+            # Emotion context inline
+            emotion_inline = ""
+            if emotion_context and not _minimal_context_mode_enabled():
+                emotion_inline = f" Emotive context: {emotion_context}."
+
+            # Attachment guard if needed
+            attachment_guard = ""
+            if getattr(message, "attachments", None) and len(message.attachments) > 0:
+                attachment_guard = (
+                    " Image policy: respond only in-character (Dream), never output analysis sections, headings, scores, tables, coaching offers, or 'Would you like me to' prompts."
+                )
+
+            guidance_clause = (
+                " Invariant style: one immersive, poetic reply as Dream. No meta-analysis, no breakdowns, no bullet summaries, no section headings."
             )
-            logger.debug(f"Added emotion context for user {message.author.id}: {emotion_context}")
-
-        # Add relevant memories
-        if relevant_memories:
-            memory_context = "Previous conversation context:\n"
-
-            # Separate global and user-specific memories
-            global_facts = [m for m in relevant_memories if m["metadata"].get("is_global", False)]
-            user_memories = [
-                m for m in relevant_memories if not m["metadata"].get("is_global", False)
-            ]
-
-            if global_facts:
-                memory_context += "\nGlobal Facts (about the world, relationships, and the bot):\n"
-                for memory in global_facts:
-                    if memory["metadata"].get("type") == "global_fact":
-                        memory_context += f"- {memory['metadata']['fact']}\n"
-
-            if user_memories:
-                memory_context += "\nUser-specific information:\n"
-                for memory in user_memories:
-                    if "user_message" in memory["metadata"]:
-                        memory_context += f"- User previously mentioned: {memory['metadata']['user_message'][:500]}\n"
-                        memory_context += f"- Your response was about: {memory['metadata']['bot_response'][:500]}\n"
-                    elif memory["metadata"].get("type") == "user_fact":
-                        memory_context += f"- User fact: {memory['metadata']['fact']}\n"
-
-            conversation_context.append({"role": "system", "content": memory_context})
-
-        # Generate conversation summary
-        conversation_summary = generate_conversation_summary(
-            recent_messages, str(message.author.id)
-        )
-        if conversation_summary:
-            conversation_context.append(
-                {
-                    "role": "system",
-                    "content": f"Recent conversation summary: {conversation_summary}",
-                }
+            if _minimal_context_mode_enabled():
+                guidance_clause += " Minimal baseline mode: do NOT fabricate context, just respond naturally in-character."
+            consolidated = (
+                f"{system_prompt_content}\n\nTime: {time_context}.{emotion_inline}\n"
+                + (f"{memory_narrative}\n" if memory_narrative else "")
+                + (f"Recent thread: {conversation_summary}\n" if conversation_summary else "")
+                + attachment_guard
+                + guidance_clause
             )
-            logger.debug(f"Added conversation summary for user {message.author.id}")
+            conversation_context.append({"role": "system", "content": consolidated})
+        else:
+            # Fallback to original multi-system approach if strict mode disabled
+            conversation_context.append({"role": "system", "content": system_prompt_content})
+            conversation_context.append({"role": "system", "content": f"Current time: {time_context}"})
+            if emotion_context:
+                conversation_context.append(
+                    {"role": "system", "content": f"User relationship and emotional context: {emotion_context}"}
+                )
+            if relevant_memories:
+                memory_context = "Previous conversation context:\n"
+                global_facts = [m for m in relevant_memories if m["metadata"].get("is_global", False)]
+                user_memories = [m for m in relevant_memories if not m["metadata"].get("is_global", False)]
+                if global_facts:
+                    memory_context += "\nGlobal Facts:\n"
+                    for memory in global_facts:
+                        if memory["metadata"].get("type") == "global_fact":
+                            memory_context += f"- {memory['metadata']['fact']}\n"
+                if user_memories:
+                    memory_context += "\nUser-specific information:\n"
+                    for memory in user_memories:
+                        md = memory["metadata"]
+                        if md.get("user_message"):
+                            memory_context += f"- User said: {md.get('user_message')[:160]}\n"
+                        elif md.get("type") == "user_fact":
+                            memory_context += f"- Fact: {md.get('fact','')}\n"
+                conversation_context.append({"role": "system", "content": memory_context})
+            conversation_summary = generate_conversation_summary(
+                recent_messages, str(message.author.id)
+            )
+            if conversation_summary:
+                conversation_context.append(
+                    {"role": "system", "content": f"Recent conversation summary: {conversation_summary}"}
+                )
 
         # Add recent messages with proper alternation
         user_assistant_messages = []
         filtered_messages = list(reversed(recent_messages[1:]))  # Skip current message
+
+        # Strict or minimal context mode: remove prior assistant meta-analysis leaks from history
+        if _strict_mode_enabled() or _minimal_context_mode_enabled():
+            cleaned = []
+            for msg in filtered_messages:
+                content_preview = getattr(msg, "content", "") or ""
+                if any(pat in content_preview for pat in META_ANALYSIS_PATTERNS):
+                    logger.debug(
+                        f"[STRICT] Dropping prior meta-style message from history: '{content_preview[:80]}'"
+                    )
+                    continue
+                cleaned.append(msg)
+            filtered_messages = cleaned
 
         # Filter out commands and responses
         skip_next_bot_response = False
@@ -831,7 +1013,37 @@ class BotEventHandlers:
 
         # Apply alternation fix
         fixed_history = fix_message_alternation(user_assistant_messages)
+        if _minimal_context_mode_enabled():
+            # Keep only last 6 alternating turns for isolation
+            fixed_history = fixed_history[-12:]
+        
         conversation_context.extend(fixed_history)
+
+        # If the triggering message contains attachments (e.g. images), add an explicit anti-analysis guard
+        # to prevent the model from responding with coaching-style analytical breakdowns (observed regression
+        # when images are included). This instruction is additive and limited in scope.
+        try:
+            if getattr(message, "attachments", None):
+                if len(message.attachments) > 0:
+                    conversation_context.append(
+                        {
+                            "role": "system",
+                            "content": (
+                                "IMAGE RESPONSE POLICY: The user has shared one or more images. "
+                                "Respond ONLY with an in-character, natural reply consistent with the Dream persona. "
+                                "Describe or reference the visual/emotional/aesthetic qualities succinctly. DO NOT include: "
+                                "section headings (e.g. 'Core Conversation Analysis', 'Emotional Analysis', 'Technical Metadata', 'Overall Assessment'), "
+                                "numerical scores, personality trait tables, API success rates, relevance scores, or offers like 'Do you want me to:'. "
+                                "Never present internal evaluation, coaching options, or meta commentary. Stay immersive, poetic, concise."
+                            ),
+                        }
+                    )
+                    logger.debug(
+                        "Added image anti-analysis guard system instruction (attachments=%d)",
+                        len(message.attachments),
+                    )
+        except Exception as e:
+            logger.warning(f"Failed to add image anti-analysis guard: {e}")
 
         return conversation_context
 
@@ -1107,6 +1319,11 @@ class BotEventHandlers:
                         )
 
                         response = ai_response.content
+                        logger.debug(f"[LLM-RESPONSE-DEBUG] AI response from orchestrator for message_id={message.id} user_id={user_id}")
+                        logger.debug(f"[LLM-RESPONSE-DEBUG] Response length: {len(response)} chars")  
+                        logger.debug(f"[LLM-RESPONSE-DEBUG] Response preview: {response[:300]}...")
+                        logger.debug(f"[LLM-RESPONSE-DEBUG] Model: {ai_response.model_used}, Tokens: {ai_response.tokens_used}")
+                        
                         logger.debug(f"Universal Chat response: {len(response)} characters")
                         logger.debug(
                             f"Model used: {ai_response.model_used}, Tokens: {ai_response.tokens_used}"
@@ -1126,6 +1343,9 @@ class BotEventHandlers:
                             comprehensive_context,
                             dynamic_personality_context,
                         )
+                        logger.debug(f"[LLM-RESPONSE-DEBUG] Fallback LLM response for message_id={message.id} user_id={user_id}")
+                        logger.debug(f"[LLM-RESPONSE-DEBUG] Fallback response length: {len(response)} chars")  
+                        logger.debug(f"[LLM-RESPONSE-DEBUG] Fallback response preview: {response[:300]}...")
 
                 else:
                     logger.warning(
@@ -1141,6 +1361,9 @@ class BotEventHandlers:
                         comprehensive_context,
                         dynamic_personality_context,
                     )
+                    logger.debug(f"[LLM-RESPONSE-DEBUG] No orchestrator fallback LLM response for message_id={message.id} user_id={user_id}")
+                    logger.debug(f"[LLM-RESPONSE-DEBUG] No orchestrator fallback response length: {len(response)} chars")  
+                    logger.debug(f"[LLM-RESPONSE-DEBUG] No orchestrator fallback response preview: {response[:300]}...")
 
                 # Security scan for system leakage
                 leakage_scan = scan_response_for_system_leakage(response)
@@ -1151,6 +1374,104 @@ class BotEventHandlers:
                     logger.error(f"SECURITY: Leaked patterns: {leakage_scan['leaked_patterns']}")
                     response = leakage_scan["sanitized_response"]
                     logger.info("SECURITY: Response sanitized to remove system message leakage")
+
+                # Additional sanitization: prevent coaching/meta analytical sections (image-triggered regression)
+                def _sanitize_meta_analysis(resp: str) -> str:
+                    try:
+                        import re
+                        patterns = [
+                            "Core Conversation Analysis",
+                            "Emotional Analysis",
+                            "Technical Metadata",
+                            "Personality & Interaction",
+                            "Overall Assessment",
+                        ]
+                        trigger_count = sum(p in resp for p in patterns)
+                        coaching_phrase = "Do you want me to" in resp
+                        # Heuristic: if two or more section headings OR explicit coaching phrase, sanitize
+                        if trigger_count >= 2 or coaching_phrase:
+                            logger.warning(
+                                "Meta/coaching analytical response detected (patterns=%d, coaching=%s) - sanitizing",
+                                trigger_count,
+                                coaching_phrase,
+                            )
+                            # Extract first natural paragraph before any heading
+                            lines = resp.splitlines()
+                            natural_parts = []
+                            for line in lines:
+                                if any(p in line for p in patterns) or re.match(
+                                    r"^[A-Z][A-Za-z &]+:\s*$", line.strip()
+                                ):
+                                    break
+                                if line.strip():
+                                    natural_parts.append(line.strip())
+                            base_text = " ".join(natural_parts).strip()
+                            if not base_text:
+                                base_text = (
+                                    "I behold the image you have shared—its quiet details drift like motes in the dark between stars."
+                                )
+                            sanitized = (
+                                base_text
+                                + "\n\n"
+                                + "(Your image was received. I have omitted internal analytical sections to preserve an immersive, in-character reply.)"
+                            )
+                            return sanitized
+                        return resp
+                    except Exception as e:
+                        logger.error(f"Meta-analysis sanitization failure: {e}")
+                        return resp
+
+                pre_meta_len = len(response)
+                response = _sanitize_meta_analysis(response)
+                if len(response) != pre_meta_len:
+                    logger.debug(
+                        "Applied meta-analysis sanitization (old_len=%d new_len=%d)",
+                        pre_meta_len,
+                        len(response),
+                    )
+
+                # Two-pass rewrite if still leaking patterns in strict mode
+                if (_strict_mode_enabled() or _minimal_context_mode_enabled()) and any(p in response for p in META_ANALYSIS_PATTERNS):
+                    logger.warning("Meta patterns still detected post-sanitization - invoking rewrite pass")
+                    try:
+                        rewrite_context = [
+                            {"role": "system", "content": (
+                                "You are a style refiner. Rewrite the assistant content into a SINGLE immersive in-character reply as Dream of the Endless. Remove all analysis sections, headings, breakdowns, score talk, coaching offers, or meta commentary. Keep poetic tone, <=120 words."
+                            )},
+                            {"role": "user", "content": response[:4000]},
+                        ]
+                        rewritten = await self.llm_client.generate_chat_completion_safe(
+                            rewrite_context
+                        )
+                        if rewritten and any(c.isprintable() for c in rewritten):
+                            if any(p in rewritten for p in META_ANALYSIS_PATTERNS):
+                                logger.warning(
+                                    "Rewrite still contains meta markers; using first paragraph fallback"
+                                )
+                                para = rewritten.split("\n\n")[0].strip()
+                                if para:
+                                    response = para
+                            else:
+                                response = rewritten.strip()
+                                logger.debug(
+                                    f"Rewrite pass successful (len={len(response)})"
+                                )
+                    except Exception as e:
+                        logger.error(f"Rewrite pass failed: {e}")
+
+                # Final minimal context hard-cleanse pass
+                if _minimal_context_mode_enabled():
+                    try:
+                        new_response = self._apply_minimal_mode_cleanse(response)
+                        if new_response != response:
+                            logger.debug(
+                                "[MINIMAL_CONTEXT_MODE] Hard cleanse adjusted response length %d -> %d",
+                                len(response),
+                                len(new_response),
+                            )
+                            response = new_response
+                    except Exception as cleanse_err:
+                        logger.error(f"Minimal context cleansing error: {cleanse_err}")
 
                 # Store conversation in memory
                 await self._store_conversation_memory(
@@ -1170,6 +1491,15 @@ class BotEventHandlers:
                 response_with_debug = add_debug_info_to_response(
                     response, user_id, self.memory_manager, str(message.id)
                 )
+
+                # CRITICAL DEBUG: Log actual response content being sent to Discord
+                logger.debug(f"[RESPONSE-DEBUG] About to send response for message_id={message.id} user_id={user_id}")
+                logger.debug(f"[RESPONSE-DEBUG] Original response length: {len(response)} chars")
+                logger.debug(f"[RESPONSE-DEBUG] Original response preview: {response[:200]}...")
+                logger.debug(f"[RESPONSE-DEBUG] Debug response length: {len(response_with_debug)} chars")
+                logger.debug(f"[RESPONSE-DEBUG] Debug response preview: {response_with_debug[:200]}...")
+                if response != response_with_debug:
+                    logger.debug(f"[RESPONSE-DEBUG] DEBUG INFO WAS ADDED! Length difference: {len(response_with_debug) - len(response)}")
 
                 # Send response (chunked if too long)
                 await self._send_response_chunks(reply_channel, response_with_debug)

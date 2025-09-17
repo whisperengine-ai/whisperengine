@@ -493,20 +493,40 @@ class EmotionalContextEngine:
         if strategy.empathy_emphasis > 0.7:
             adaptations.append("Emphasize understanding and emotional connection")
 
-        # Create prompt
+        # Create natural, internal guidance instead of visible coaching prompts
         if adaptations:
-            adaptation_text = ". ".join(adaptations)
-            prompt = f"""EMOTIONAL ADAPTATION GUIDANCE:
-{adaptation_text}
-
-Current emotional context: User is experiencing {context.primary_emotion.value} (confidence: {context.emotion_confidence:.2f}, intensity: {context.emotion_intensity:.2f}).
-Relationship depth: {context.relationship_depth:.2f}
-Trust level: {context.trust_level:.2f}
-
-Respond in a way that demonstrates emotional intelligence and builds the relationship appropriately."""
+            # Convert adaptations to natural behavioral guidelines
+            internal_guidance = []
+            for adaptation in adaptations:
+                # Convert coaching language to natural behavioral guidance
+                if "Acknowledge" in adaptation:
+                    internal_guidance.append("be understanding and empathetic")
+                elif "Adjust tone" in adaptation:
+                    if "more supportive" in adaptation:
+                        internal_guidance.append("use a warm, supportive tone")
+                    elif "more encouraging" in adaptation:
+                        internal_guidance.append("be encouraging and uplifting")
+                    elif "less formal" in adaptation:
+                        internal_guidance.append("be casual and friendly")
+                elif "Offer appropriate support" in adaptation:
+                    internal_guidance.append("be helpful and supportive")
+                elif "Validate" in adaptation:
+                    internal_guidance.append("validate their feelings")
+                elif "detailed" in adaptation:
+                    internal_guidance.append("provide thoughtful responses")
+                elif "concise" in adaptation:
+                    internal_guidance.append("be direct and clear")
+                elif "understanding and emotional connection" in adaptation:
+                    internal_guidance.append("show genuine understanding")
+            
+            # Create natural system guidance
+            if internal_guidance:
+                guidance_text = ", ".join(internal_guidance[:2])  # Limit to top 2 guidelines
+                prompt = f"For this conversation, {guidance_text} while staying true to your character."
+            else:
+                prompt = f"Respond naturally while being mindful of the user's {context.primary_emotion.value} emotional state."
         else:
-            prompt = f"""Current emotional context: User is experiencing {context.primary_emotion.value}.
-Respond naturally while being mindful of their emotional state."""
+            prompt = f"Respond naturally while being mindful of the user's {context.primary_emotion.value} emotional state."
 
         return prompt
 
