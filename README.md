@@ -257,6 +257,70 @@ cp .env.production .env
 ./bot.sh start
 ```
 
+### 📊 Observability & Metrics
+
+WhisperEngine ships with a lightweight in‑process metrics collector (no external deps) guarded by `ENABLE_METRICS_LOGGING` (default: `true`). It tracks counters & timings for emotional assessment, memory importance, retrieval, pattern learning hooks, and end‑to‑end conversation phases.
+
+Key tooling:
+
+| Purpose | Command (venv active) | Output |
+|---------|-----------------------|--------|
+| One‑time Sprint 1‑3 feature verification (human readable) | `python verify_sprint_features.py` | Console summary |
+| Same verification + machine readable JSON | `python verify_sprint_features.py --json verifications/sprint1_3.json` | JSON file |
+| Ad‑hoc metrics snapshot (no workload) | `python scripts/metrics/export_snapshot.py --output metrics_snapshot.json --pretty` | Current counters & timings |
+| Reset metrics after snapshot | `python scripts/metrics/export_snapshot.py --reset` | Snapshot + collector cleared |
+| Baseline synthetic workload + KPIs | `python scripts/perf/collect_baseline.py --iterations 25 --output baseline_perf.json` | KPIs + raw metrics |
+
+Environment Flag:
+
+```
+# .env
+ENABLE_METRICS_LOGGING=true   # set false to disable collection
+```
+
+Example verification JSON payload structure:
+
+```jsonc
+{
+    "generated_at": "2025-09-16T12:34:56.123456+00:00",
+    "summary": { "total_checks": 7, "passed": 7, "percentage": 100.0 },
+    "results": {
+        "environment_config": true,
+        "database_connectivity": true,
+        "sprint1_emotional_intelligence": true,
+        "sprint2_memory_importance": true,
+        "sprint3_emotional_memory_bridge": true,
+        "sprint3_automatic_learning": true,
+        "full_integration": true
+    },
+    "environment": {
+        "enable_emotional_intelligence": "true",
+        "enable_phase3_memory": "true"
+    }
+}
+```
+
+Metrics snapshot JSON (truncated example):
+
+```jsonc
+{
+    "generated_at": "2025-09-16T12:35:10.789012+00:00",
+    "metrics_enabled": true,
+    "snapshot": {
+        "counters": [ { "name": "interventions_triggered", "value": 4, "labels": {"type": "support"} } ],
+        "timings": [ { "name": "emotional_assessment_seconds", "avg_seconds": 0.034, "count": 10, "min_seconds": 0.028, "max_seconds": 0.042 } ]
+    }
+}
+```
+
+Use cases:
+* CI artifact comparison (`git diff` on JSON files) for performance regressions
+* Local tuning & before/after measurements when adjusting emotional or memory algorithms
+* Historical baselines (store `baseline_perf.json` per release)
+
+> Tip: Pair a metrics snapshot before & after running a workload to measure incremental cost of a new feature.
+
+
 ## 🎯 **Use Cases**
 
 - **Virtual Companions**: Create AI friends with unique personalities

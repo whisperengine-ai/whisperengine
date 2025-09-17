@@ -11,6 +11,7 @@ import logging
 import os
 from datetime import datetime
 from typing import Any
+from src.metrics import metrics_collector as metrics
 
 from src.graph_database.neo4j_connector import get_neo4j_connector
 from src.memory.memory_manager import UserMemoryManager
@@ -46,7 +47,9 @@ class IntegratedMemoryManager:
 
         self._graph_connector = None
 
-        logger.info(f"Integrated memory manager initialized (graph sync: {self.enable_graph_sync})")
+        logger.info(
+            "Integrated memory manager initialized (graph sync: %s)", self.enable_graph_sync
+        )
 
     # ========================================================================
     # PROXY METHODS - Forward all UserMemoryManager methods and attributes
@@ -56,7 +59,7 @@ class IntegratedMemoryManager:
         """Proxy all missing attributes to the underlying memory manager"""
         if hasattr(self.memory_manager, name):
             return getattr(self.memory_manager, name)
-        raise AttributeError(f"'{self.__class__.__name__}' object has no attribute '{name}'")
+        raise AttributeError(f"{self.__class__.__name__} object has no attribute '{name}'")
 
     # Explicit proxy properties for commonly accessed attributes
     @property
@@ -105,8 +108,9 @@ class IntegratedMemoryManager:
 
     def store_user_fact(self, user_id: str, fact: str, metadata: dict | None = None):
         """Proxy to memory manager's store_user_fact method"""
-        if hasattr(self.memory_manager, "store_user_fact"):
-            return self.memory_manager.store_user_fact(user_id, fact, str(metadata or {}))
+        func = getattr(self.memory_manager, "store_user_fact", None)
+        if callable(func):
+            return func(user_id, fact, str(metadata or {}))
         return None
 
     def get_user_facts(self, user_id: str, limit: int = 10):
@@ -142,8 +146,8 @@ class IntegratedMemoryManager:
                     user_facts = self.fact_extractor.extract_facts(message)
                     for fact in user_facts:
                         self.store_user_fact(user_id, fact)
-                except Exception as e:
-                    logger.warning(f"Fact extraction failed: {e}")
+                except (ValueError, RuntimeError) as e:
+                    logger.warning("Fact extraction failed: %s", e)
 
             # Link memory to graph database if enabled
             if self.enable_graph_memory and conversation_memory_id:
@@ -158,11 +162,11 @@ class IntegratedMemoryManager:
                     )
                 )
 
-            logger.debug(f"Stored conversation with full context for user {user_id}")
+            logger.debug("Stored conversation with full context for user %s", user_id)
             return str(conversation_memory_id) if conversation_memory_id else ""
 
-        except Exception as e:
-            logger.error(f"Error storing conversation with full context: {e}")
+        except (RuntimeError, ValueError) as e:
+            logger.error("Error storing conversation with full context: %s", e)
             # Fallback to basic storage
             fallback_result = self.store_conversation(user_id, message, response)
             return str(fallback_result) if fallback_result else ""
@@ -186,8 +190,8 @@ class IntegratedMemoryManager:
             if self.emotion_manager:
                 try:
                     topics = await self.emotion_manager._extract_topics_from_message(message)
-                except Exception as e:
-                    logger.warning(f"Topic extraction failed: {e}")
+                except (RuntimeError, ValueError) as e:
+                    logger.warning("Topic extraction failed: %s", e)
 
             await graph_connector.create_memory_with_relationships(
                 memory_id=memory_id,
@@ -205,14 +209,14 @@ class IntegratedMemoryManager:
                 importance=importance,
             )
 
-            logger.debug(f"Linked memory {memory_id} to graph database")
+            logger.debug("Linked memory %s to graph database", memory_id)
 
-        except Exception as e:
-            logger.warning(f"Failed to link memory to graph: {e}")
+        except (RuntimeError, ValueError) as e:
+            logger.warning("Failed to link memory to graph: %s", e)
 
     def _calculate_memory_importance(self, message: str, emotion_profile, user_profile) -> float:
         """Calculate memory importance based on multiple factors"""
-
+        start_ts = datetime.now().timestamp()
         importance = 0.5  # Base importance
 
         # Emotional intensity increases importance
@@ -260,7 +264,36 @@ class IntegratedMemoryManager:
             importance += 0.1
 
         # Return the calculated importance value
-        return min(importance, 1.0)  # Cap at 1.0
+        final_val = min(importance, 1.0)  # Cap at 1.0
+
+        # Metrics: timing + bucket distribution
+        if metrics and metrics.metrics_enabled():
+            duration = datetime.now().timestamp() - start_ts
+            try:
+                metrics.record_timing(
+                    "memory_importance_calc_seconds",
+                    duration,
+                    emotion=getattr(
+                        getattr(emotion_profile, "detected_emotion", None), "value", "unknown"
+                    ),
+                    relationship=getattr(
+                        getattr(user_profile, "relationship_level", None), "value", "unknown"
+                    ),
+                )
+                bucket = (
+                    "high"
+                    if final_val >= 0.75
+                    else "medium"
+                    if final_val >= 0.5
+                    else "low"
+                    if final_val >= 0.25
+                    else "very_low"
+                )
+                metrics.incr("memory_importance_bucket", bucket=bucket)
+            except (ValueError, RuntimeError, TypeError) as metrics_err:
+                logger.debug("Memory importance metrics skipped: %s", metrics_err)
+
+        return final_val
 
     async def get_memories_by_user(self, user_id: str) -> list[dict]:
         """
@@ -281,8 +314,8 @@ class IntegratedMemoryManager:
             # Use a safer get approach
             try:
                 result = self.memory_manager.collection.get(where={"user_id": user_id})
-            except Exception as e:
-                logger.error(f"Error querying collection: {e}")
+            except (RuntimeError, ValueError) as e:
+                logger.error("Error querying collection: %s", e)
                 return []
 
             # Check if result exists and has expected properties
@@ -325,21 +358,23 @@ class IntegratedMemoryManager:
                         "metadata": metadata,
                     }
                     memories.append(memory)
-                except Exception as e:
-                    logger.error(f"Error formatting memory {memory_id}: {e}")
+                except (ValueError, RuntimeError) as e:
+                    logger.error("Error formatting memory %s: %s", memory_id, e)
 
-            logger.debug(f"Retrieved {len(memories)} memories for user {user_id}")
+            logger.debug("Retrieved %d memories for user %s", len(memories), user_id)
             return memories
 
-        except Exception as e:
-            logger.error(f"Error retrieving memories for user {user_id}: {e}")
+        except (RuntimeError, ValueError) as e:
+            logger.error("Error retrieving memories for user %s: %s", user_id, e)
             return []
 
     async def retrieve_contextual_memories(
         self, user_id: str, query: str, limit: int = 10
     ) -> list[dict[str, Any]]:
         """Retrieve memories with enhanced context from emotion and graph systems"""
-
+        import time as _time
+        _start = _time.perf_counter()
+        error_flag = False
         # Get standard ChromaDB memories (existing functionality)
         chromadb_memories = self.retrieve_relevant_memories(user_id, query, limit)
 
@@ -365,11 +400,32 @@ class IntegratedMemoryManager:
                     enhanced_memory["graph_memories"] = graph_memories_text
                     enhanced_memories.append(enhanced_memory)
 
+                duration = _time.perf_counter() - _start
+                try:
+                    metrics.record_timing(
+                        "memory_retrieval_seconds", duration,
+                        mode="graph_enhanced", base=len(chromadb_memories), enhanced=len(enhanced_memories)
+                    )
+                    metrics.incr("memory_retrieval_requests", mode="graph_enhanced")
+                except (ValueError, RuntimeError, TypeError):
+                    pass
                 return enhanced_memories
 
-            except Exception as e:
-                logger.warning(f"Graph memory enhancement failed, using ChromaDB only: {e}")
+            except (RuntimeError, ValueError) as e:
+                logger.warning(
+                    "Graph memory enhancement failed, using ChromaDB only: %s", e
+                )
+                error_flag = True
 
+        duration = _time.perf_counter() - _start
+        try:
+            metrics.record_timing(
+                "memory_retrieval_seconds", duration,
+                mode="chromadb_only", base=len(chromadb_memories), error=error_flag
+            )
+            metrics.incr("memory_retrieval_requests", mode="chromadb_only", error=str(error_flag).lower())
+        except (ValueError, RuntimeError, TypeError):
+            pass
         return chromadb_memories
 
     def get_comprehensive_user_context(
@@ -406,8 +462,8 @@ class IntegratedMemoryManager:
                 context["current_emotion"] = profile.current_emotion.value
                 context["escalation_count"] = profile.escalation_count
 
-        except Exception as e:
-            logger.warning(f"Failed to get emotion context: {e}")
+        except (RuntimeError, ValueError) as e:
+            logger.warning("Failed to get emotion context: %s", e)
             context["emotion_context"] = "Emotion system unavailable"
 
         try:
@@ -418,8 +474,8 @@ class IntegratedMemoryManager:
             context["recent_memories"] = [m.get("content", "")[:100] for m in recent_memories]
             context["systems_active"].append("chromadb_memory")
 
-        except Exception as e:
-            logger.warning(f"Failed to get memory context: {e}")
+        except (RuntimeError, ValueError) as e:
+            logger.warning("Failed to get memory context: %s", e)
             context["recent_memories"] = []
 
         try:
@@ -429,8 +485,8 @@ class IntegratedMemoryManager:
                 context["user_facts"] = recent_facts
                 context["systems_active"].append("fact_extraction")
 
-        except Exception as e:
-            logger.warning(f"Failed to get facts context: {e}")
+        except (RuntimeError, ValueError) as e:
+            logger.warning("Failed to get facts context: %s", e)
             context["user_facts"] = []
 
         try:
@@ -445,8 +501,8 @@ class IntegratedMemoryManager:
                     context["graph_insights"] = graph_memories
                     context["systems_active"].append("neo4j_graph")
 
-        except Exception as e:
-            logger.warning(f"Failed to get graph insights: {e}")
+        except (RuntimeError, ValueError) as e:
+            logger.warning("Failed to get graph insights: %s", e)
 
         return context
 
@@ -505,8 +561,8 @@ class IntegratedMemoryManager:
 
             return "\n".join(prompt_parts)
 
-        except Exception as e:
-            logger.error(f"Failed to generate system prompt context: {e}")
+        except (RuntimeError, ValueError) as e:
+            logger.error("Failed to generate system prompt context: %s", e)
             return "Error: Unable to generate user context"
 
     async def health_check(self) -> dict[str, Any]:

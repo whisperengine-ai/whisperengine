@@ -9,13 +9,14 @@ enabled and working in your WhisperEngine setup.
 import asyncio
 import sys
 import os
+import json
 from datetime import datetime, timezone as tz
 
 # Load environment early so .env variables are present
 try:
     from env_manager import load_environment
     load_environment()
-except Exception as _env_err:
+except Exception as _env_err:  # noqa: BLE001
     print(f"⚠️  Warning: environment load failed early: {_env_err}")
 
 # Add src to path for imports
@@ -77,18 +78,18 @@ async def verify_sprint_features():
             "user": os.getenv("POSTGRES_USER", "bot_user"),
             "password": os.getenv("POSTGRES_PASSWORD", "securepassword123")
         }
-        
-        conn = psycopg2.connect(**conn_params)
+        # Psycopg2 stubs may not precisely match our dynamic dict unpack; ignore type check here.
+        conn = psycopg2.connect(**conn_params)  # type: ignore[arg-type]
         cursor = conn.cursor()
         cursor.execute("SELECT version();")
         db_version = cursor.fetchone()[0]
         print(f"✅ PostgreSQL connected: {db_version[:50]}...")
-        
+
         cursor.close()
         conn.close()
         verification_results["database_connectivity"] = True
         
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         print(f"❌ Database connection failed: {e}")
     
     # Step 3: Test Sprint 1 - Emotional Intelligence
@@ -112,13 +113,10 @@ async def verify_sprint_features():
         try:
             # Preferred path (enum with .value)
             mood_value = assessment.mood_assessment.category.value  # type: ignore[attr-defined]
-        except Exception:
-            for attr_name in [
-                "category", "mood", "state", "label"
-            ]:
+        except Exception:  # noqa: BLE001
+            for attr_name in ["category", "mood", "state", "label"]:
                 if hasattr(assessment.mood_assessment, attr_name):
                     candidate = getattr(assessment.mood_assessment, attr_name)
-                    # If it's an enum-like with value
                     if hasattr(candidate, "value"):
                         mood_value = candidate.value
                     else:
@@ -129,7 +127,7 @@ async def verify_sprint_features():
         print(f"✅ Emotional assessment working: mood={mood_value}")
         verification_results["sprint1_emotional_intelligence"] = True
         
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         print(f"❌ Sprint 1 emotional intelligence failed: {e}")
     
     # Step 4: Test Sprint 2 - Memory Importance Engine
@@ -159,7 +157,7 @@ async def verify_sprint_features():
         print(f"✅ Memory importance calculation working: {importance_score.overall_score:.3f}")
         verification_results["sprint2_memory_importance"] = True
         
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         print(f"❌ Sprint 2 memory importance failed: {e}")
     
     # Step 5: Test Sprint 3 - Full Integration
@@ -183,7 +181,7 @@ async def verify_sprint_features():
         
         # Initialize persistence systems
         if hasattr(enhanced_manager, '_initialize_persistence_systems'):
-            await enhanced_manager._initialize_persistence_systems()
+            await enhanced_manager._initialize_persistence_systems()  # noqa: SLF001
         
         # Check components
         components_status = {
@@ -192,8 +190,8 @@ async def verify_sprint_features():
             "emotional_memory_bridge": enhanced_manager.emotional_memory_bridge is not None,
             "automatic_learning_hooks": enhanced_manager.automatic_learning_hooks is not None,
         }
-        
-        print(f"✅ Component Status:")
+
+        print("✅ Component Status:")
         for component, status in components_status.items():
             print(f"   • {component}: {'✅' if status else '❌'}")
         
@@ -205,7 +203,7 @@ async def verify_sprint_features():
         else:
             print("❌ Some Sprint 3 components not available")
         
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         print(f"❌ Sprint 3 integration test failed: {e}")
         import traceback
         traceback.print_exc()
@@ -247,12 +245,54 @@ async def verify_sprint_features():
     return verification_results
 
 
-async def main():
-    """Run the verification"""
+from typing import TypedDict, Optional
+
+
+class _CLIArgs(TypedDict, total=False):
+    json_path: Optional[str]
+
+
+def _parse_args(argv: list[str]) -> _CLIArgs:
+    """Very lightweight CLI parser for --json <file>."""
+    args: _CLIArgs = {"json_path": None}
+    if "--json" in argv:
+        try:
+            idx = argv.index("--json")
+            args["json_path"] = argv[idx + 1]
+        except (ValueError, IndexError):
+            print("⚠️  --json flag provided without path - ignoring")
+    return args
+
+
+async def main(json_path: str | None = None):
+    """Run the verification and optionally write JSON output."""
     try:
         results = await verify_sprint_features()
+        if json_path:
+            try:
+                os.makedirs(os.path.dirname(json_path) or ".", exist_ok=True)
+                total = len(results)
+                passed = sum(results.values())
+                payload = {
+                    "generated_at": datetime.now(tz.utc).isoformat(),
+                    "summary": {
+                        "total_checks": total,
+                        "passed": passed,
+                        "percentage": round(passed / total * 100, 2) if total else 0.0,
+                    },
+                    "results": results,
+                    "environment": {
+                        "enable_emotional_intelligence": os.getenv("ENABLE_EMOTIONAL_INTELLIGENCE"),
+                        "enable_phase3_memory": os.getenv("ENABLE_PHASE3_MEMORY"),
+                    },
+                }
+                with open(json_path, "w", encoding="utf-8") as f:
+                    json.dump(payload, f, indent=2)
+                print(f"📝 Results written to {json_path}")
+            except OSError as io_err:
+                print(f"❌ Failed to write JSON results: {io_err}")
         return results
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         print(f"❌ Verification script failed: {e}")
         import traceback
         traceback.print_exc()
@@ -260,10 +300,11 @@ async def main():
 
 
 if __name__ == "__main__":
+    cli_args = _parse_args(sys.argv[1:])
     print("Starting Sprint 1-3 feature verification...")
-    results = asyncio.run(main())
-    
-    if results.get("full_integration", False):
+    verification_outcome = asyncio.run(main(json_path=cli_args.get("json_path")))
+
+    if verification_outcome.get("full_integration", False):
         print("\n✅ Verification complete - All systems ready!")
     else:
         print("\n⚠️  Verification complete - Check results above")

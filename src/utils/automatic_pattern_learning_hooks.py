@@ -14,6 +14,11 @@ from dataclasses import dataclass
 
 logger = logging.getLogger(__name__)
 
+try:
+    from src.metrics import metrics_collector as metrics
+except ImportError:  # pragma: no cover
+    metrics = None
+
 
 @dataclass
 class LearningEvent:
@@ -80,7 +85,11 @@ class AutomaticPatternLearningHooks:
         based on content, context, and emotional significance.
         """
         try:
+            import time as _time
+            _start = _time.perf_counter()
             if self.session_learning_count >= self.learning_config["max_learning_events_per_session"]:
+                if metrics and metrics.metrics_enabled():
+                    metrics.incr("learning_events_skipped", reason="session_limit", type="memory_stored")
                 return
                 
             # Extract learning signals from storage event
@@ -89,6 +98,8 @@ class AutomaticPatternLearningHooks:
             
             # Only learn from significant memories
             if importance_score < self.learning_config["min_importance_threshold"]:
+                if metrics and metrics.metrics_enabled():
+                    metrics.incr("learning_events_skipped", reason="low_importance", type="memory_stored")
                 return
                 
             # Create learning event
@@ -113,6 +124,9 @@ class AutomaticPatternLearningHooks:
             
             logger.debug("Learned from memory storage: user=%s, importance=%.3f", 
                         user_id, importance_score)
+            if metrics and metrics.metrics_enabled():
+                metrics.incr("learning_event", event="memory_stored")
+                metrics.record_timing("learning_hook_latency_seconds", _time.perf_counter() - _start, hook="memory_stored")
             
         except (ValueError, KeyError) as e:
             logger.warning("Error in memory storage learning hook: %s", e)
@@ -131,7 +145,11 @@ class AutomaticPatternLearningHooks:
         memories are most valuable and relevant to users.
         """
         try:
+            import time as _time
+            _start = _time.perf_counter()
             if self.session_learning_count >= self.learning_config["max_learning_events_per_session"]:
+                if metrics and metrics.metrics_enabled():
+                    metrics.incr("learning_events_skipped", reason="session_limit", type="memory_accessed")
                 return
                 
             # Extract access signals
@@ -166,6 +184,9 @@ class AutomaticPatternLearningHooks:
             
             logger.debug("Learned from memory access: user=%s, access_count=%d, boost=%.3f", 
                         user_id, access_frequency, access_boost)
+            if metrics and metrics.metrics_enabled():
+                metrics.incr("learning_event", event="memory_accessed")
+                metrics.record_timing("learning_hook_latency_seconds", _time.perf_counter() - _start, hook="memory_accessed")
             
         except (ValueError, KeyError) as e:
             logger.warning("Error in memory access learning hook: %s", e)
@@ -184,7 +205,11 @@ class AutomaticPatternLearningHooks:
         query patterns, and memory relevance relationships.
         """
         try:
+            import time as _time
+            _start = _time.perf_counter()
             if self.session_learning_count >= self.learning_config["max_learning_events_per_session"]:
+                if metrics and metrics.metrics_enabled():
+                    metrics.incr("learning_events_skipped", reason="session_limit", type="memory_retrieved")
                 return
                 
             # Analyze retrieval session for learning opportunities
@@ -223,6 +248,9 @@ class AutomaticPatternLearningHooks:
             
             logger.debug("Learned from retrieval session: user=%s, query='%s', memories=%d", 
                         user_id, query[:50], len(retrieved_memories))
+            if metrics and metrics.metrics_enabled():
+                metrics.incr("learning_event", event="memory_retrieved", amount=sum(1 for m in retrieved_memories if m.get("relevance_score", 0.0) > 0.7))
+                metrics.record_timing("learning_hook_latency_seconds", _time.perf_counter() - _start, hook="memory_retrieved_session")
             
         except (ValueError, KeyError) as e:
             logger.warning("Error in memory retrieval learning hook: %s", e)
