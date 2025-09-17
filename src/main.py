@@ -16,7 +16,7 @@ import sys
 
 # Core modular imports
 from src.core.bot import DiscordBotCore
-from src.core.bot_launcher import bot_name_filter, start_bot
+from src.core.bot_launcher import start_bot
 from src.handlers.admin import AdminCommandHandlers
 from src.handlers.events import BotEventHandlers
 from src.handlers.help import HelpCommandHandlers
@@ -25,7 +25,6 @@ from src.handlers.privacy import PrivacyCommandHandlers
 from src.handlers.status import StatusCommandHandlers
 from src.handlers.voice import VoiceCommandHandlers
 from src.utils.health_server import create_health_server
-from src.utils.helpers import is_admin
 
 # Logging is already configured by the root launcher
 logger = logging.getLogger(__name__)
@@ -111,6 +110,10 @@ class ModularBotManager:
 
         # Get components from bot core
         components = self.bot_core.get_components()
+        
+        # Import bot command decorators and helpers
+        from src.core.bot_launcher import bot_name_filter
+        from src.utils.helpers import is_admin
 
         try:
             # Status commands
@@ -190,6 +193,21 @@ class ModularBotManager:
                 logger.info("✅ Voice command handlers registered")
             else:
                 logger.info("⚠️ Voice command handlers skipped - voice functionality not available")
+
+            # Visual emotion commands (Sprint 6)
+            visual_emotion_enabled = os.getenv('ENABLE_VISUAL_EMOTION_ANALYSIS', 'true').lower() == 'true'
+            if visual_emotion_enabled:
+                from src.handlers.discord_visual_emotion_handler import create_discord_visual_emotion_handler
+                
+                self.command_handlers["visual_emotion"] = create_discord_visual_emotion_handler(
+                    bot=self.bot,
+                    llm_client=components["llm_client"],
+                    memory_manager=components["memory_manager"]
+                )
+                self.command_handlers["visual_emotion"].register_commands(bot_name_filter, is_admin)
+                logger.info("✅ Visual emotion command handlers registered")
+            else:
+                logger.info("⚠️ Visual emotion handlers skipped - feature disabled")
 
         except Exception as e:
             logger.error(f"Failed to initialize command handlers: {e}")
