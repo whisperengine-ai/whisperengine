@@ -25,7 +25,7 @@ whisperengine/
 ### Core Dependencies (`requirements-core.txt`)
 Shared across both Discord bot and desktop app:
 - AI/ML frameworks (transformers, chromadb)
-- LLM backends (llama-cpp-python, openai)
+- LLM backends (openai API clients)
 - Utilities (requests, asyncio)
 - Memory systems
 
@@ -221,7 +221,7 @@ WhisperEngine automatically detects and configures the optimal LLM backend for y
 
 #### Desktop App Fallback Priority:
 1. **Local Servers**: Search for existing Ollama or LM Studio server on localhost
-2. **Python APIs**: Use MLX for Apple Silicon or llama-cpp-python for other platforms
+2. **Python APIs**: Use MLX for Apple Silicon for direct Python integration
 
 #### User Override Variables:
 ```bash
@@ -235,7 +235,6 @@ export LLM_BASE_URL="https://api.openrouter.ai/api/v1"      # Alternative base U
 
 # Backend-specific overrides
 export MLX_MODEL_NAME="llama-3.1-8b-instruct"              # MLX model
-export LLAMACPP_MODEL_PATH="/path/to/model.gguf"            # llama-cpp model path
 ```
 
 #### Configuration Validation:

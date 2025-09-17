@@ -48,7 +48,7 @@ DOTENV_PATH=.env.desktop-app python universal_native_app.py
 - 🚀 **High performance** settings
 
 ### Desktop App (`.env.desktop-app`)
-- 🖥️ **llama-cpp-python** for local privacy
+- 🖥️ **LM Studio/Ollama** for local privacy
 - 💾 **SQLite database** for local storage
 - 🔇 **Voice disabled** by default
 - ⚡ **Conservative** performance settings

@@ -929,10 +929,41 @@ def get_contextualized_system_prompt(
     Returns:
         System prompt with variables replaced with actual AI analysis
     """
-    # Load the base system prompt template
-    from src.core.config import get_system_prompt
+    # ADAPTIVE PROMPT INTEGRATION: Use model-size-aware prompt loading
+    try:
+        from src.utils.adaptive_prompt_engineering import get_model_optimized_prompt
+        
+        # Determine personality type based on context
+        personality_type = "dream"  # Default to Dream character
+        if personality_metadata and isinstance(personality_metadata, dict):
+            if personality_metadata.get('character_type'):
+                personality_type = personality_metadata['character_type']
+        
+        # Count context items for budget calculation
+        context_items = 0
+        if comprehensive_context:
+            context_items += len(comprehensive_context.get('memory_insights', {}).get('key_topics', []))
+        if emotional_intelligence_results:
+            context_items += 1
+        if memory_moments_context:
+            context_items += 1
+            
+        # Get adaptive system prompt optimized for current model
+        system_prompt_template, optimization_metadata = get_model_optimized_prompt(
+            personality_type=personality_type,
+            context_items=context_items
+        )
+        
+        logger.debug("Using adaptive prompt: %s model (%s tokens)", 
+                    optimization_metadata['model_size'], optimization_metadata['estimated_tokens'])
+        
+    except Exception as e:
+        logger.warning("Adaptive prompt system failed, falling back to basic template: %s", str(e))
+        # Fallback to original template loading
+        from src.core.config import get_system_prompt
+        system_prompt_template = get_system_prompt()
 
-    system_prompt_template = get_system_prompt()
+    # Rest of the function continues with context variable replacement...
 
     # PHASE 4 CONTEXT VARIABLES
     interaction_context = ""
