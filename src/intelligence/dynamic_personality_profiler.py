@@ -1359,15 +1359,23 @@ class PersistentDynamicPersonalityProfiler(DynamicPersonalityProfiler):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.persistence_enabled = POSTGRES_AVAILABLE
+        self._persistence_initialized = False
 
-        # Initialize database schema and load existing profiles
-        if self.persistence_enabled:
-            asyncio.create_task(self.initialize_persistence())
+        # Database initialization will be done lazily when first accessed
+
+    async def _ensure_persistence_initialized(self):
+        """Ensure database persistence is initialized (lazy initialization)"""
+        if self.persistence_enabled and not self._persistence_initialized:
+            await self.initialize_persistence()
+            self._persistence_initialized = True
 
     async def update_personality_profile(
         self, analysis: ConversationAnalysis
     ) -> PersonalityProfile:
         """Update personality profile with automatic database persistence"""
+        # Ensure persistence is initialized
+        await self._ensure_persistence_initialized()
+        
         # Load existing profile from database if not in memory
         if analysis.user_id not in self.profiles and self.persistence_enabled:
             db_profile = await self.load_profile_from_db(analysis.user_id)

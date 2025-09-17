@@ -9,7 +9,9 @@ recency, access frequency, and uniqueness.
 Phase 3: Multi-Dimensional Memory Networks
 """
 
+import json
 import logging
+import os
 import statistics
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime, timedelta
@@ -17,6 +19,14 @@ from enum import Enum
 from typing import Any
 
 import numpy as np
+
+# Database imports for persistence
+try:
+    import psycopg2
+    import psycopg2.extras
+    POSTGRES_AVAILABLE = True
+except ImportError:
+    POSTGRES_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
 
@@ -86,8 +96,222 @@ class MemoryImportanceEngine:
         # Caching
         self.importance_cache = {}
         self.user_statistics = {}
+        
+        # Database persistence
+        self._persistence_initialized = False
 
         logger.info("Memory Importance Engine initialized")
+
+    async def ensure_persistence_initialized(self):
+        """Ensure database persistence is initialized (lazy initialization)"""
+        if not self._persistence_initialized:
+            await self.initialize_persistence()
+            self._persistence_initialized = True
+
+    async def calculate_memory_importance_with_patterns(
+        self,
+        memory_id: str,
+        user_id: str,
+        memory_data: dict,
+        user_history: list[dict],
+        memory_manager=None,
+    ) -> MemoryImportanceScore:
+        """
+        Calculate memory importance using learned user patterns
+        
+        This enhanced version uses persisted user patterns to personalize
+        importance calculations based on what the user has shown to value.
+        """
+        # Ensure persistence is initialized
+        await self.ensure_persistence_initialized()
+        
+        # Load user-specific patterns if available
+        user_patterns = await self.load_user_importance_patterns(user_id)
+        learned_weights = await self._get_user_learned_weights(user_id)
+        
+        # Use learned weights if available, otherwise use defaults
+        if learned_weights:
+            original_weights = self.importance_weights.copy()
+            self.importance_weights = learned_weights
+        
+        try:
+            # Calculate base importance using existing method
+            base_score = await self.calculate_memory_importance(
+                memory_id, user_id, memory_data, user_history, memory_manager
+            )
+            
+            # Apply user-specific pattern boosts
+            pattern_boost = await self._apply_pattern_boosts(memory_data, user_patterns)
+            
+            # Adjust overall score with pattern learning
+            enhanced_factor_scores = ImportanceFactors(
+                emotional_intensity=base_score.factor_scores.emotional_intensity * pattern_boost.get("emotional_multiplier", 1.0),
+                personal_relevance=base_score.factor_scores.personal_relevance * pattern_boost.get("personal_multiplier", 1.0),
+                recency=base_score.factor_scores.recency,
+                access_frequency=base_score.factor_scores.access_frequency,
+                uniqueness=base_score.factor_scores.uniqueness,
+                relationship_milestone=base_score.factor_scores.relationship_milestone,
+            )
+            
+            # Recalculate overall score with enhanced factors
+            enhanced_overall_score = sum(
+                getattr(enhanced_factor_scores, factor.value) * weight
+                for factor, weight in self.importance_weights.items()
+            )
+            
+            # Update pattern learning based on this calculation
+            await self._update_pattern_learning(user_id, memory_data, enhanced_overall_score)
+            
+            return MemoryImportanceScore(
+                memory_id=memory_id,
+                user_id=user_id,
+                overall_score=min(1.0, enhanced_overall_score),
+                factor_scores=enhanced_factor_scores,
+                calculation_timestamp=datetime.now(UTC),
+                score_explanation=f"Enhanced with learned patterns (boost: {pattern_boost})",
+                decay_rate=base_score.decay_rate,
+                boost_events=base_score.boost_events + ["pattern_learning_applied"],
+            )
+            
+        finally:
+            # Restore original weights
+            if learned_weights:
+                self.importance_weights = original_weights
+
+    async def _get_user_learned_weights(self, user_id: str) -> dict | None:
+        """Get user-specific learned importance weights"""
+        user_stats = await self.load_user_memory_statistics(user_id)
+        if not user_stats:
+            return None
+            
+        return {
+            ImportanceFactor.EMOTIONAL_INTENSITY: user_stats.get("emotional_intensity_weight", 0.30),
+            ImportanceFactor.PERSONAL_RELEVANCE: user_stats.get("personal_relevance_weight", 0.25),
+            ImportanceFactor.RECENCY: user_stats.get("recency_weight", 0.15),
+            ImportanceFactor.ACCESS_FREQUENCY: user_stats.get("access_frequency_weight", 0.15),
+            ImportanceFactor.UNIQUENESS: user_stats.get("uniqueness_weight", 0.10),
+            ImportanceFactor.RELATIONSHIP_MILESTONE: user_stats.get("relationship_milestone_weight", 0.05),
+        }
+
+    async def _apply_pattern_boosts(self, memory_data: dict, user_patterns: list[dict]) -> dict:
+        """Apply learned pattern boosts to memory importance"""
+        boosts = {
+            "emotional_multiplier": 1.0,
+            "personal_multiplier": 1.0,
+            "total_boost": 0.0,
+        }
+        
+        if not user_patterns:
+            return boosts
+            
+        memory_content = str(memory_data.get("content", "")).lower()
+        
+        for pattern in user_patterns:
+            if pattern["confidence_score"] < 0.3:  # Skip low-confidence patterns
+                continue
+                
+            # Check if pattern keywords match memory content
+            pattern_keywords = pattern.get("pattern_keywords", [])
+            keyword_matches = sum(1 for keyword in pattern_keywords if keyword in memory_content)
+            
+            if keyword_matches > 0:
+                # Calculate boost based on pattern strength and matches
+                match_ratio = keyword_matches / max(len(pattern_keywords), 1)
+                boost_strength = pattern["importance_multiplier"] * pattern["confidence_score"] * match_ratio
+                
+                # Apply boosts based on pattern type
+                if pattern["pattern_type"] == "emotional_trigger":
+                    boosts["emotional_multiplier"] *= (1.0 + boost_strength * 0.5)
+                elif pattern["pattern_type"] == "personal_anchor":
+                    boosts["personal_multiplier"] *= (1.0 + boost_strength * 0.6)
+                elif pattern["pattern_type"] == "topic_interest":
+                    boosts["personal_multiplier"] *= (1.0 + boost_strength * 0.4)
+                    
+                boosts["total_boost"] += boost_strength
+        
+        return boosts
+
+    async def _update_pattern_learning(self, user_id: str, memory_data: dict, importance_score: float):
+        """Update pattern learning based on calculated importance"""
+        # Extract patterns from this memory for learning
+        content = str(memory_data.get("content", "")).lower()
+        metadata = memory_data.get("metadata", {})
+        
+        # Learn emotional patterns
+        emotional_context = metadata.get("emotional_context")
+        if emotional_context and importance_score > 0.7:  # High importance memory
+            await self._learn_emotional_pattern(user_id, content, emotional_context, importance_score)
+        
+        # Learn topic patterns  
+        topics = self._extract_topics_from_content(content)
+        for topic in topics:
+            if importance_score > 0.6:  # Above average importance
+                await self._learn_topic_pattern(user_id, topic, importance_score)
+
+    async def _learn_emotional_pattern(self, user_id: str, content: str, emotional_context: dict, importance_score: float):
+        """Learn emotional trigger patterns"""
+        emotion = emotional_context.get("primary_emotion", "unknown")
+        intensity = emotional_context.get("emotion_intensity", 0.5)
+        
+        if intensity > 0.6:  # Strong emotional content
+            pattern_data = {
+                "pattern_name": f"emotional_trigger_{emotion}",
+                "importance_multiplier": min(2.0, 1.0 + intensity),
+                "confidence_score": min(1.0, importance_score),
+                "frequency_count": 1,
+                "pattern_keywords": self._extract_emotional_keywords(content),
+                "emotional_associations": [emotion],
+                "context_requirements": {"min_intensity": intensity * 0.8},
+            }
+            await self.save_importance_pattern(user_id, "emotional_trigger", pattern_data)
+
+    async def _learn_topic_pattern(self, user_id: str, topic: str, importance_score: float):
+        """Learn topic interest patterns"""
+        pattern_data = {
+            "pattern_name": f"topic_interest_{topic}",
+            "importance_multiplier": min(1.8, 1.0 + (importance_score - 0.5)),
+            "confidence_score": importance_score,
+            "frequency_count": 1,
+            "pattern_keywords": [topic],
+            "emotional_associations": [],
+            "context_requirements": {},
+        }
+        await self.save_importance_pattern(user_id, "topic_interest", pattern_data)
+
+    def _extract_topics_from_content(self, content: str) -> list[str]:
+        """Extract topics from memory content for pattern learning"""
+        # Simple topic extraction - could be enhanced with NLP
+        topics = []
+        topic_keywords = {
+            "work": ["work", "job", "career", "office", "boss", "colleague"],
+            "family": ["family", "mom", "dad", "sister", "brother", "parent"],
+            "technology": ["programming", "code", "computer", "software", "tech"],
+            "health": ["health", "medical", "doctor", "exercise", "fitness"],
+            "hobbies": ["hobby", "music", "art", "game", "sport", "reading"],
+            "travel": ["travel", "vacation", "trip", "journey", "visit"],
+            "education": ["school", "learn", "study", "education", "class"],
+        }
+        
+        for topic, keywords in topic_keywords.items():
+            if any(keyword in content for keyword in keywords):
+                topics.append(topic)
+        
+        return topics[:3]  # Limit to top 3 topics
+
+    def _extract_emotional_keywords(self, content: str) -> list[str]:
+        """Extract emotional keywords from content"""
+        emotional_words = []
+        emotion_keywords = [
+            "excited", "happy", "sad", "angry", "frustrated", "worried", "anxious",
+            "proud", "disappointed", "grateful", "surprised", "confused", "scared"
+        ]
+        
+        words = content.split()
+        for word in words:
+            if word in emotion_keywords:
+                emotional_words.append(word)
+        
+        return emotional_words[:5]  # Limit to top 5 emotional words
 
     async def calculate_memory_importance(
         self,
@@ -177,8 +401,6 @@ class MemoryImportanceEngine:
         if isinstance(emotional_context, str):
             # If it's a string, try to parse it as JSON
             try:
-                import json
-
                 emotional_context = json.loads(emotional_context)
             except (json.JSONDecodeError, TypeError):
                 # If parsing fails, create a default dict
@@ -784,3 +1006,305 @@ class MemoryImportanceEngine:
             # Clear all cache
             self.importance_cache.clear()
             logger.info("Cleared all importance cache")
+
+    # ===== DATABASE PERSISTENCE METHODS =====
+
+    async def initialize_persistence(self):
+        """Initialize database persistence for memory importance patterns"""
+        if self._get_db_connection():
+            self._ensure_memory_importance_tables()
+            logger.info("Memory importance persistence initialized")
+            
+            # Load existing patterns for optimization
+            logger.info("Memory importance persistence ready")
+        else:
+            logger.warning(
+                "Database not available - memory importance patterns will not persist across restarts"
+            )
+
+    def _get_db_connection(self):
+        """Get database connection for memory importance persistence"""
+        if not POSTGRES_AVAILABLE:
+            logger.warning("PostgreSQL not available - memory importance data will not persist")
+            return None
+
+        try:
+            connection = psycopg2.connect(
+                host=os.getenv("POSTGRES_HOST", "localhost"),
+                port=int(os.getenv("POSTGRES_PORT", "5432")),
+                database=os.getenv("POSTGRES_DB", "whisper_engine"),
+                user=os.getenv("POSTGRES_USER", "bot_user"),
+                password=os.getenv("POSTGRES_PASSWORD", "securepassword123"),
+            )
+            return connection
+        except Exception as e:
+            logger.error(f"Failed to connect to PostgreSQL for memory importance persistence: {e}")
+            return None
+
+    def _ensure_memory_importance_tables(self):
+        """Ensure memory importance tables exist in the database"""
+        connection = self._get_db_connection()
+        if not connection:
+            return False
+
+        try:
+            with connection.cursor() as cursor:
+                # Read and execute schema
+                import pathlib
+                schema_path = pathlib.Path(__file__).parent.parent.parent / "docs" / "database" / "memory_importance_schema.sql"
+                with open(schema_path, "r", encoding="utf-8") as f:
+                    schema_sql = f.read()
+                cursor.execute(schema_sql)
+                connection.commit()
+                logger.info("Memory importance database tables ensured")
+                return True
+        except Exception as e:
+            logger.error(f"Failed to create memory importance tables: {e}")
+            return False
+        finally:
+            connection.close()
+
+    async def save_user_memory_statistics(self, user_id: str, statistics_data: dict) -> bool:
+        """Save user memory statistics to database"""
+        connection = self._get_db_connection()
+        if not connection:
+            return False
+
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    INSERT INTO user_memory_statistics (
+                        user_id, total_memories_scored, average_importance_score,
+                        median_importance_score, max_importance_score, min_importance_score,
+                        core_memory_count, emotional_intensity_weight, personal_relevance_weight,
+                        recency_weight, access_frequency_weight, uniqueness_weight,
+                        relationship_milestone_weight, pattern_learning_confidence,
+                        total_pattern_adjustments, factor_averages, memory_type_preferences,
+                        temporal_patterns, updated_at
+                    ) VALUES (
+                        %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
+                    )
+                    ON CONFLICT (user_id) DO UPDATE SET
+                        total_memories_scored = EXCLUDED.total_memories_scored,
+                        average_importance_score = EXCLUDED.average_importance_score,
+                        median_importance_score = EXCLUDED.median_importance_score,
+                        max_importance_score = EXCLUDED.max_importance_score,
+                        min_importance_score = EXCLUDED.min_importance_score,
+                        core_memory_count = EXCLUDED.core_memory_count,
+                        emotional_intensity_weight = EXCLUDED.emotional_intensity_weight,
+                        personal_relevance_weight = EXCLUDED.personal_relevance_weight,
+                        recency_weight = EXCLUDED.recency_weight,
+                        access_frequency_weight = EXCLUDED.access_frequency_weight,
+                        uniqueness_weight = EXCLUDED.uniqueness_weight,
+                        relationship_milestone_weight = EXCLUDED.relationship_milestone_weight,
+                        pattern_learning_confidence = EXCLUDED.pattern_learning_confidence,
+                        total_pattern_adjustments = EXCLUDED.total_pattern_adjustments,
+                        factor_averages = EXCLUDED.factor_averages,
+                        memory_type_preferences = EXCLUDED.memory_type_preferences,
+                        temporal_patterns = EXCLUDED.temporal_patterns,
+                        updated_at = EXCLUDED.updated_at
+                    """,
+                    (
+                        user_id,
+                        statistics_data.get("total_memories_scored", 0),
+                        statistics_data.get("average_importance", 0.5),
+                        statistics_data.get("median_importance", 0.5),
+                        statistics_data.get("max_importance", 0.0),
+                        statistics_data.get("min_importance", 1.0),
+                        statistics_data.get("core_memory_candidates", 0),
+                        self.importance_weights.get(ImportanceFactor.EMOTIONAL_INTENSITY, 0.30),
+                        self.importance_weights.get(ImportanceFactor.PERSONAL_RELEVANCE, 0.25),
+                        self.importance_weights.get(ImportanceFactor.RECENCY, 0.15),
+                        self.importance_weights.get(ImportanceFactor.ACCESS_FREQUENCY, 0.15),
+                        self.importance_weights.get(ImportanceFactor.UNIQUENESS, 0.10),
+                        self.importance_weights.get(ImportanceFactor.RELATIONSHIP_MILESTONE, 0.05),
+                        0.0,  # pattern_learning_confidence - will be calculated
+                        0,    # total_pattern_adjustments
+                        json.dumps(statistics_data.get("factor_averages", {})),
+                        json.dumps({}),  # memory_type_preferences - to be implemented
+                        json.dumps({}),  # temporal_patterns - to be implemented
+                        datetime.now(UTC),
+                    ),
+                )
+                connection.commit()
+                logger.debug("Saved memory statistics for user %s", user_id)
+                return True
+        except Exception as e:
+            logger.error("Failed to save memory statistics for user %s: %s", user_id, e)
+            return False
+        finally:
+            connection.close()
+
+    async def load_user_memory_statistics(self, user_id: str) -> dict | None:
+        """Load user memory statistics from database"""
+        connection = self._get_db_connection()
+        if not connection:
+            return None
+
+        try:
+            with connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cursor:
+                cursor.execute(
+                    """
+                    SELECT * FROM user_memory_statistics
+                    WHERE user_id = %s
+                    """,
+                    (user_id,),
+                )
+                result = cursor.fetchone()
+                if result:
+                    # Convert to regular dict and parse JSON fields
+                    stats = dict(result)
+                    stats["factor_averages"] = self._safe_json_loads(stats.get("factor_averages", "{}"), {})
+                    stats["memory_type_preferences"] = self._safe_json_loads(stats.get("memory_type_preferences", "{}"), {})
+                    stats["temporal_patterns"] = self._safe_json_loads(stats.get("temporal_patterns", "{}"), {})
+                    logger.debug("Loaded memory statistics for user %s", user_id)
+                    return stats
+                return None
+        except Exception as e:
+            logger.error("Failed to load memory statistics for user %s: %s", user_id, e)
+            return None
+        finally:
+            connection.close()
+
+    async def save_importance_pattern(self, user_id: str, pattern_type: str, pattern_data: dict) -> bool:
+        """Save a memory importance pattern for a user"""
+        connection = self._get_db_connection()
+        if not connection:
+            return False
+
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    INSERT INTO user_memory_importance_patterns (
+                        user_id, pattern_type, pattern_name, importance_multiplier,
+                        confidence_score, frequency_count, success_rate,
+                        pattern_keywords, emotional_associations, context_requirements,
+                        user_feedback_score, memory_recall_frequency, pattern_metadata,
+                        updated_at
+                    ) VALUES (
+                        %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
+                    )
+                    ON CONFLICT (user_id, pattern_type, pattern_name) DO UPDATE SET
+                        importance_multiplier = EXCLUDED.importance_multiplier,
+                        confidence_score = EXCLUDED.confidence_score,
+                        frequency_count = EXCLUDED.frequency_count,
+                        success_rate = EXCLUDED.success_rate,
+                        pattern_keywords = EXCLUDED.pattern_keywords,
+                        emotional_associations = EXCLUDED.emotional_associations,
+                        context_requirements = EXCLUDED.context_requirements,
+                        user_feedback_score = EXCLUDED.user_feedback_score,
+                        memory_recall_frequency = EXCLUDED.memory_recall_frequency,
+                        pattern_metadata = EXCLUDED.pattern_metadata,
+                        updated_at = EXCLUDED.updated_at
+                    """,
+                    (
+                        user_id,
+                        pattern_type,
+                        pattern_data.get("pattern_name", ""),
+                        pattern_data.get("importance_multiplier", 1.0),
+                        pattern_data.get("confidence_score", 0.0),
+                        pattern_data.get("frequency_count", 1),
+                        pattern_data.get("success_rate", 0.0),
+                        json.dumps(pattern_data.get("pattern_keywords", [])),
+                        json.dumps(pattern_data.get("emotional_associations", [])),
+                        json.dumps(pattern_data.get("context_requirements", {})),
+                        pattern_data.get("user_feedback_score", 0.0),
+                        pattern_data.get("memory_recall_frequency", 0.0),
+                        json.dumps(pattern_data.get("pattern_metadata", {})),
+                        datetime.now(UTC),
+                    ),
+                )
+                connection.commit()
+                logger.debug("Saved importance pattern for user %s: %s", user_id, pattern_type)
+                return True
+        except Exception as e:
+            logger.error("Failed to save importance pattern for user %s: %s", user_id, e)
+            return False
+        finally:
+            connection.close()
+
+    async def load_user_importance_patterns(self, user_id: str, pattern_type: str | None = None) -> list[dict]:
+        """Load importance patterns for a user"""
+        connection = self._get_db_connection()
+        if not connection:
+            return []
+
+        try:
+            with connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cursor:
+                if pattern_type:
+                    cursor.execute(
+                        """
+                        SELECT * FROM user_memory_importance_patterns
+                        WHERE user_id = %s AND pattern_type = %s
+                        ORDER BY confidence_score DESC, frequency_count DESC
+                        """,
+                        (user_id, pattern_type),
+                    )
+                else:
+                    cursor.execute(
+                        """
+                        SELECT * FROM user_memory_importance_patterns
+                        WHERE user_id = %s
+                        ORDER BY pattern_type, confidence_score DESC
+                        """,
+                        (user_id,),
+                    )
+                
+                results = cursor.fetchall()
+                patterns = []
+                for result in results:
+                    pattern = dict(result)
+                    # Parse JSON fields
+                    pattern["pattern_keywords"] = self._safe_json_loads(pattern.get("pattern_keywords", "[]"), [])
+                    pattern["emotional_associations"] = self._safe_json_loads(pattern.get("emotional_associations", "[]"), [])
+                    pattern["context_requirements"] = self._safe_json_loads(pattern.get("context_requirements", "{}"), {})
+                    pattern["pattern_metadata"] = self._safe_json_loads(pattern.get("pattern_metadata", "{}"), {})
+                    patterns.append(pattern)
+                
+                logger.debug("Loaded %d importance patterns for user %s", len(patterns), user_id)
+                return patterns
+        except Exception as e:
+            logger.error("Failed to load importance patterns for user %s: %s", user_id, e)
+            return []
+        finally:
+            connection.close()
+
+    def _safe_json_loads(self, value, default=None):
+        """Safely parse JSON value with fallback"""
+        if value is None:
+            return default if default is not None else {}
+        
+        if isinstance(value, (dict, list)):
+            return value
+            
+        try:
+            if isinstance(value, str):
+                return json.loads(value)
+            return value
+        except (json.JSONDecodeError, TypeError) as e:
+            logger.warning("Failed to parse JSON: %s... Error: %s", str(value)[:50], e)
+            return default if default is not None else {}
+
+    async def update_user_importance_weights(self, user_id: str, learned_weights: dict) -> bool:
+        """Update user-specific importance factor weights based on learning"""
+        # Update internal weights
+        for factor, weight in learned_weights.items():
+            if factor in self.importance_weights:
+                self.importance_weights[factor] = weight
+        
+        # Save to database as part of user statistics
+        current_stats = await self.load_user_memory_statistics(user_id) or {}
+        current_stats.update({
+            "emotional_intensity_weight": learned_weights.get(ImportanceFactor.EMOTIONAL_INTENSITY, 0.30),
+            "personal_relevance_weight": learned_weights.get(ImportanceFactor.PERSONAL_RELEVANCE, 0.25),
+            "recency_weight": learned_weights.get(ImportanceFactor.RECENCY, 0.15),
+            "access_frequency_weight": learned_weights.get(ImportanceFactor.ACCESS_FREQUENCY, 0.15),
+            "uniqueness_weight": learned_weights.get(ImportanceFactor.UNIQUENESS, 0.10),
+            "relationship_milestone_weight": learned_weights.get(ImportanceFactor.RELATIONSHIP_MILESTONE, 0.05),
+            "pattern_learning_confidence": min(1.0, current_stats.get("pattern_learning_confidence", 0.0) + 0.1),
+            "total_pattern_adjustments": current_stats.get("total_pattern_adjustments", 0) + 1,
+        })
+        
+        return await self.save_user_memory_statistics(user_id, current_stats)

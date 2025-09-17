@@ -8,7 +8,9 @@ into a comprehensive emotional intelligence framework.
 Phase 2: Complete Implementation
 """
 
+import json
 import logging
+import os
 from collections import defaultdict, deque
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime, timedelta
@@ -30,6 +32,14 @@ from .proactive_support import (
     SupportOutcome,
     SupportStrategy,
 )
+
+# Database imports for persistence
+try:
+    import psycopg2
+    import psycopg2.extras
+    POSTGRES_AVAILABLE = True
+except ImportError:
+    POSTGRES_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
 
@@ -106,8 +116,8 @@ class PredictiveEmotionalIntelligence:
 
         # Memory and caching
         self.user_assessments = defaultdict(deque)  # Last 20 assessments per user
-        self.user_strategies = {}  # Personalized support strategies
-        self.active_interventions = {}  # Currently active interventions
+        self.user_strategies = {}  # Personalized support strategies (WILL BE PERSISTENT)
+        self.active_interventions = {}  # Currently active interventions (EPHEMERAL - session only)
         self.system_metrics = EmotionalIntelligenceMetrics(
             total_assessments=0,
             prediction_accuracy=0.0,
@@ -120,6 +130,9 @@ class PredictiveEmotionalIntelligence:
 
         # Assessment history for learning
         self.max_history_per_user = 20
+
+        # Initialize database persistence
+        self._persistence_initialized = False
 
         logger.info("Phase 2 Emotional Intelligence System initialized successfully")
 
@@ -575,19 +588,8 @@ class PredictiveEmotionalIntelligence:
         # Extract user_id from intervention_id (format: user_id_intervention_number)
         user_id = intervention_id.split("_intervention_")[0]
 
-        # Update or create user strategy
-        if user_id not in self.user_strategies:
-            self.user_strategies[user_id] = SupportStrategy(
-                strategy_id=f"{user_id}_strategy",
-                user_preferences={},
-                effective_approaches=[],
-                approaches_to_avoid=[],
-                optimal_timing={},
-                communication_style="casual",
-                support_history=[],
-                last_updated=datetime.now(UTC),
-            )
-
+        # Load or create user strategy with persistence
+        await self._ensure_user_strategy_loaded(user_id)
         user_strategy = self.user_strategies[user_id]
 
         # Update strategy based on outcome
@@ -617,6 +619,9 @@ class PredictiveEmotionalIntelligence:
         user_strategy.support_history = user_strategy.support_history[-10:]
 
         user_strategy.last_updated = datetime.now(UTC)
+        
+        # Save updated strategy to database
+        await self._save_strategy_if_updated(user_id)
 
     async def get_user_emotional_dashboard(self, user_id: str) -> dict[str, Any]:
         """
@@ -839,3 +844,426 @@ class PredictiveEmotionalIntelligence:
             },
             "summary": f"Phase 2 Assessment: {assessment.phase_status.value} status, {assessment.mood_assessment.mood_category.value} mood, {assessment.stress_assessment.stress_level.value} stress",
         }
+
+    # ===== STRATEGY MANAGEMENT HELPERS =====
+
+    async def _ensure_user_strategy_loaded(self, user_id: str):
+        """Ensure user strategy is loaded from database or create new one"""
+        if user_id in self.user_strategies:
+            return  # Already loaded
+
+        # Try to load from database first
+        if not self._persistence_initialized:
+            await self.initialize_persistence()
+            self._persistence_initialized = True
+
+        # Load existing strategy from database
+        existing_strategy = await self.load_user_strategy(user_id, f"{user_id}_strategy")
+        
+        if existing_strategy:
+            self.user_strategies[user_id] = existing_strategy
+            logger.debug(f"Loaded existing strategy for user {user_id}")
+        else:
+            # Create new strategy
+            new_strategy = SupportStrategy(
+                strategy_id=f"{user_id}_strategy",
+                user_preferences={},
+                effective_approaches=[],
+                approaches_to_avoid=[],
+                optimal_timing={},
+                communication_style="casual",
+                support_history=[],
+                last_updated=datetime.now(UTC),
+            )
+            self.user_strategies[user_id] = new_strategy
+            # Save to database
+            await self.save_user_strategy(user_id, new_strategy)
+            logger.debug(f"Created new strategy for user {user_id}")
+
+    async def _save_strategy_if_updated(self, user_id: str):
+        """Save user strategy to database if it has been updated"""
+        if user_id in self.user_strategies:
+            strategy = self.user_strategies[user_id]
+            strategy.last_updated = datetime.now(UTC)
+            await self.save_user_strategy(user_id, strategy)
+
+    # ===== DATABASE PERSISTENCE METHODS =====
+
+    def _get_db_connection(self):
+        """Get database connection for emotional intelligence persistence"""
+        if not POSTGRES_AVAILABLE:
+            logger.warning("PostgreSQL not available - emotional intelligence data will not persist")
+            return None
+
+        try:
+            connection = psycopg2.connect(
+                host=os.getenv("POSTGRES_HOST", "localhost"),
+                port=int(os.getenv("POSTGRES_PORT", "5432")),
+                database=os.getenv("POSTGRES_DB", "whisper_engine"),
+                user=os.getenv("POSTGRES_USER", "bot_user"),
+                password=os.getenv("POSTGRES_PASSWORD", "securepassword123"),
+            )
+            return connection
+        except Exception as e:
+            logger.error(f"Failed to connect to PostgreSQL for emotional intelligence persistence: {e}")
+            return None
+
+    def _ensure_emotional_intelligence_tables(self):
+        """Ensure emotional intelligence tables exist in the database"""
+        connection = self._get_db_connection()
+        if not connection:
+            return False
+
+        try:
+            with connection.cursor() as cursor:
+                # User emotional profiles table
+                cursor.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS user_emotional_profiles (
+                        user_id VARCHAR(255) PRIMARY KEY,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        
+                        -- Core emotional intelligence metrics
+                        total_assessments INTEGER DEFAULT 0,
+                        prediction_accuracy FLOAT DEFAULT 0.0,
+                        intervention_success_rate FLOAT DEFAULT 0.0,
+                        crisis_prevention_count INTEGER DEFAULT 0,
+                        user_satisfaction_score FLOAT DEFAULT 0.0,
+                        average_response_time FLOAT DEFAULT 0.0,
+                        
+                        -- Emotional patterns
+                        primary_emotional_patterns JSONB DEFAULT '[]'::jsonb,
+                        stress_triggers JSONB DEFAULT '[]'::jsonb,
+                        emotional_recovery_patterns JSONB DEFAULT '{}'::jsonb,
+                        
+                        -- System metrics
+                        last_assessment_time TIMESTAMP,
+                        next_assessment_time TIMESTAMP,
+                        phase_status VARCHAR(50) DEFAULT 'monitoring'
+                    )
+                """
+                )
+
+                # User support strategies table
+                cursor.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS user_support_strategies (
+                        id SERIAL PRIMARY KEY,
+                        user_id VARCHAR(255) NOT NULL,
+                        strategy_type VARCHAR(100) NOT NULL,
+                        
+                        -- Strategy details
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        last_used TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        
+                        -- Effectiveness metrics
+                        success_rate FLOAT DEFAULT 0.0,
+                        usage_count INTEGER DEFAULT 0,
+                        user_feedback_score FLOAT DEFAULT 0.0,
+                        
+                        -- Strategy content
+                        effective_approaches JSONB DEFAULT '[]'::jsonb,
+                        approaches_to_avoid JSONB DEFAULT '[]'::jsonb,
+                        personalized_triggers JSONB DEFAULT '[]'::jsonb,
+                        recommended_responses JSONB DEFAULT '[]'::jsonb,
+                        
+                        -- Context
+                        context_patterns JSONB DEFAULT '{}'::jsonb,
+                        support_history JSONB DEFAULT '[]'::jsonb,
+                        
+                        -- Constraints
+                        CONSTRAINT fk_user_emotional_profile
+                            FOREIGN KEY (user_id)
+                            REFERENCES user_emotional_profiles(user_id)
+                            ON DELETE CASCADE,
+                        
+                        -- Unique constraint for user + strategy type
+                        CONSTRAINT unique_user_strategy
+                            UNIQUE (user_id, strategy_type)
+                    )
+                """
+                )
+
+                # Support strategy history table
+                cursor.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS support_strategy_history (
+                        id SERIAL PRIMARY KEY,
+                        user_id VARCHAR(255) NOT NULL,
+                        strategy_id INTEGER NOT NULL,
+                        
+                        -- Historical record
+                        timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        action_type VARCHAR(50) NOT NULL,
+                        
+                        -- Context of the action
+                        context_data JSONB DEFAULT '{}'::jsonb,
+                        effectiveness_score FLOAT,
+                        user_response VARCHAR(500),
+                        
+                        -- What changed
+                        changes_made JSONB DEFAULT '{}'::jsonb,
+                        previous_values JSONB DEFAULT '{}'::jsonb,
+                        
+                        -- Constraints
+                        CONSTRAINT fk_user_emotional_profile_history
+                            FOREIGN KEY (user_id)
+                            REFERENCES user_emotional_profiles(user_id)
+                            ON DELETE CASCADE,
+                        
+                        CONSTRAINT fk_support_strategy
+                            FOREIGN KEY (strategy_id)
+                            REFERENCES user_support_strategies(id)
+                            ON DELETE CASCADE
+                    )
+                """
+                )
+
+                # Emotional assessments table
+                cursor.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS emotional_assessments (
+                        id SERIAL PRIMARY KEY,
+                        user_id VARCHAR(255) NOT NULL,
+                        
+                        -- Assessment details
+                        assessment_timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        assessment_type VARCHAR(100) NOT NULL,
+                        
+                        -- Assessment results
+                        primary_emotion VARCHAR(50),
+                        emotional_intensity FLOAT,
+                        stress_level FLOAT,
+                        confidence_score FLOAT,
+                        
+                        -- Predictions and recommendations
+                        predicted_emotional_state JSONB DEFAULT '{}'::jsonb,
+                        recommended_intervention_type VARCHAR(100),
+                        support_recommendations JSONB DEFAULT '[]'::jsonb,
+                        
+                        -- Context
+                        conversation_context JSONB DEFAULT '{}'::jsonb,
+                        environmental_factors JSONB DEFAULT '{}'::jsonb,
+                        
+                        -- Results tracking
+                        intervention_applied BOOLEAN DEFAULT FALSE,
+                        intervention_success BOOLEAN,
+                        user_feedback JSONB DEFAULT '{}'::jsonb,
+                        
+                        -- Constraints
+                        CONSTRAINT fk_user_emotional_profile_assessment
+                            FOREIGN KEY (user_id)
+                            REFERENCES user_emotional_profiles(user_id)
+                            ON DELETE CASCADE
+                    )
+                """
+                )
+
+                # Indexes for performance
+                cursor.execute(
+                    """
+                    CREATE INDEX IF NOT EXISTS idx_user_support_strategies_user_id 
+                    ON user_support_strategies(user_id)
+                """
+                )
+                cursor.execute(
+                    """
+                    CREATE INDEX IF NOT EXISTS idx_user_support_strategies_type 
+                    ON user_support_strategies(user_id, strategy_type)
+                """
+                )
+                cursor.execute(
+                    """
+                    CREATE INDEX IF NOT EXISTS idx_support_strategy_history_user_id 
+                    ON support_strategy_history(user_id)
+                """
+                )
+                cursor.execute(
+                    """
+                    CREATE INDEX IF NOT EXISTS idx_emotional_assessments_user_id 
+                    ON emotional_assessments(user_id)
+                """
+                )
+
+                connection.commit()
+                logger.info("Emotional intelligence database tables ensured")
+                return True
+
+        except Exception as e:
+            logger.error(f"Failed to create emotional intelligence tables: {e}")
+            connection.rollback()
+            return False
+        finally:
+            connection.close()
+
+    async def save_user_strategy(self, user_id: str, strategy: SupportStrategy):
+        """Save user support strategy to database"""
+        connection = self._get_db_connection()
+        if not connection:
+            return False
+
+        try:
+            with connection.cursor() as cursor:
+                # First ensure user profile exists
+                cursor.execute(
+                    """
+                    INSERT INTO user_emotional_profiles (user_id)
+                    VALUES (%s)
+                    ON CONFLICT (user_id) DO UPDATE SET
+                        updated_at = CURRENT_TIMESTAMP
+                """,
+                    (user_id,)
+                )
+
+                # Insert or update strategy
+                cursor.execute(
+                    """
+                    INSERT INTO user_support_strategies
+                    (user_id, strategy_type, last_updated, effective_approaches, 
+                     approaches_to_avoid, context_patterns, support_history)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                    ON CONFLICT (user_id, strategy_type) DO UPDATE SET
+                        last_updated = EXCLUDED.last_updated,
+                        effective_approaches = EXCLUDED.effective_approaches,
+                        approaches_to_avoid = EXCLUDED.approaches_to_avoid,
+                        context_patterns = EXCLUDED.context_patterns,
+                        support_history = EXCLUDED.support_history
+                """,
+                    (
+                        user_id,
+                        strategy.strategy_id,  # Use strategy_id as strategy_type
+                        strategy.last_updated,
+                        json.dumps(strategy.effective_approaches),
+                        json.dumps(strategy.approaches_to_avoid),
+                        json.dumps(strategy.user_preferences),  # Store user_preferences as context_patterns
+                        json.dumps(strategy.support_history),
+                    ),
+                )
+
+                connection.commit()
+                logger.debug(f"Saved support strategy for user {user_id}, type {strategy.strategy_id}")
+                return True
+
+        except Exception as e:
+            logger.error(f"Failed to save support strategy for user {user_id}: {e}")
+            connection.rollback()
+            return False
+        finally:
+            connection.close()
+
+    async def load_user_strategy(self, user_id: str, strategy_type: str) -> SupportStrategy | None:
+        """Load user support strategy from database"""
+        connection = self._get_db_connection()
+        if not connection:
+            return None
+
+        try:
+            with connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cursor:
+                cursor.execute(
+                    """
+                    SELECT * FROM user_support_strategies
+                    WHERE user_id = %s AND strategy_type = %s
+                """,
+                    (user_id, strategy_type),
+                )
+                strategy_row = cursor.fetchone()
+
+                if not strategy_row:
+                    return None
+
+                # Reconstruct SupportStrategy object
+                strategy = SupportStrategy(
+                    strategy_id=strategy_row["strategy_type"],
+                    user_preferences=self._safe_json_loads(strategy_row["context_patterns"], {}),
+                    effective_approaches=self._safe_json_loads(strategy_row["effective_approaches"], []),
+                    approaches_to_avoid=self._safe_json_loads(strategy_row["approaches_to_avoid"], []),
+                    optimal_timing={"any": "flexible"},  # Default timing
+                    communication_style="adaptive",  # Default style
+                    support_history=self._safe_json_loads(strategy_row["support_history"], []),
+                    last_updated=strategy_row["last_updated"],
+                )
+
+                logger.debug(f"Loaded support strategy for user {user_id}, type {strategy_type}")
+                return strategy
+
+        except Exception as e:
+            logger.error(f"Failed to load support strategy for user {user_id}: {e}")
+            return None
+        finally:
+            connection.close()
+
+    async def load_all_user_strategies(self, user_id: str) -> dict[str, SupportStrategy]:
+        """Load all support strategies for a user"""
+        connection = self._get_db_connection()
+        if not connection:
+            return {}
+
+        try:
+            strategies = {}
+            with connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cursor:
+                cursor.execute(
+                    """
+                    SELECT * FROM user_support_strategies
+                    WHERE user_id = %s
+                """,
+                    (user_id,),
+                )
+                strategy_rows = cursor.fetchall()
+
+                for strategy_row in strategy_rows:
+                    strategy = SupportStrategy(
+                        strategy_id=strategy_row["strategy_type"],
+                        user_preferences=self._safe_json_loads(strategy_row["context_patterns"], {}),
+                        effective_approaches=self._safe_json_loads(strategy_row["effective_approaches"], []),
+                        approaches_to_avoid=self._safe_json_loads(strategy_row["approaches_to_avoid"], []),
+                        optimal_timing={"any": "flexible"},
+                        communication_style="adaptive",
+                        support_history=self._safe_json_loads(strategy_row["support_history"], []),
+                        last_updated=strategy_row["last_updated"],
+                    )
+                    strategies[strategy.strategy_id] = strategy
+
+                logger.debug(f"Loaded {len(strategies)} support strategies for user {user_id}")
+                return strategies
+
+        except Exception as e:
+            logger.error(f"Failed to load support strategies for user {user_id}: {e}")
+            return {}
+        finally:
+            connection.close()
+
+    def _safe_json_loads(self, value, default=None):
+        """Safely load JSON data, handling various input types"""
+        if value is None:
+            return default if default is not None else {}
+
+        if isinstance(value, (dict, list)):
+            return value
+
+        if isinstance(value, str):
+            if not value.strip():
+                return default if default is not None else {}
+            try:
+                return json.loads(value)
+            except (json.JSONDecodeError, ValueError) as e:
+                logger.warning(f"Failed to parse JSON: {value[:50]}... Error: {e}")
+                return default if default is not None else {}
+
+        logger.warning(f"Unexpected value type for JSON parsing: {type(value)} - {value}")
+        return default if default is not None else {}
+
+    async def initialize_persistence(self):
+        """Initialize database persistence for emotional intelligence"""
+        if self._get_db_connection():
+            self._ensure_emotional_intelligence_tables()
+            logger.info("Emotional intelligence persistence initialized")
+            
+            # Load existing strategies for all users that have them
+            # This could be optimized to load on-demand instead
+            logger.info("Emotional intelligence persistence ready")
+        else:
+            logger.warning(
+                "Database not available - emotional intelligence data will not persist across restarts"
+            )
