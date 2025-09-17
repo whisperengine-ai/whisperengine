@@ -21,10 +21,19 @@ from src.handlers.admin import AdminCommandHandlers
 from src.handlers.events import BotEventHandlers
 from src.handlers.help import HelpCommandHandlers
 from src.handlers.memory import MemoryCommandHandlers
+from src.handlers.onboarding_commands import create_onboarding_commands
+from src.handlers.performance_commands import create_performance_commands
 from src.handlers.privacy import PrivacyCommandHandlers
 from src.handlers.status import StatusCommandHandlers
 from src.handlers.voice import VoiceCommandHandlers
 from src.utils.health_server import create_health_server
+
+# Enhanced production systems
+from src.utils.production_error_handler import (
+    ErrorCategory, ErrorSeverity, handle_errors, 
+    error_handler, GracefulDegradation
+)
+from src.utils.configuration_validator import config_validator
 
 # Logging is already configured by the root launcher
 logger = logging.getLogger(__name__)
@@ -51,22 +60,47 @@ class ModularBotManager:
         self.command_handlers = {}
         self.health_server = None
 
+    @handle_errors(
+        category=ErrorCategory.CONFIGURATION,
+        severity=ErrorSeverity.CRITICAL,
+        operation="bot_initialization",
+        max_retries=1
+    )
     async def initialize(self):
-        """Initialize all bot components in the correct order."""
+        """Initialize all bot components with enhanced error handling and validation."""
         try:
             logger.info("🚀 Initializing WhisperEngine Bot with modular architecture...")
 
+            # Step 0: Quick configuration validation
+            logger.info("🔍 Validating configuration...")
+            essential_valid = await self._validate_essential_config()
+            if not essential_valid:
+                raise ValueError("Essential configuration is invalid. Please check your .env file.")
+
             # Step 1: Initialize bot core with all components
-            self.bot_core = DiscordBotCore(debug_mode=self.debug_mode)
-            self.bot_core.initialize_all()  # Initialize all components synchronously
-            self.bot = self.bot_core.get_bot()  # Get the initialized Discord bot
+            logger.info("⚙️ Initializing bot core components...")
+            async with GracefulDegradation("bot_core_initialization") as core_init:
+                self.bot_core = DiscordBotCore(debug_mode=self.debug_mode)
+                self.bot_core.initialize_all()  # Initialize all components synchronously
+                self.bot = self.bot_core.get_bot()  # Get the initialized Discord bot
+            
+            if core_init.error_occurred:
+                raise RuntimeError("Failed to initialize bot core components")
+            
             logger.info("✅ Bot core components initialized")
 
             # Step 2: Initialize event handlers
-            self.event_handlers = BotEventHandlers(self.bot_core)
-            logger.info("✅ Event handlers registered")
+            logger.info("📡 Initializing event handlers...")
+            async with GracefulDegradation("event_handlers") as event_init:
+                self.event_handlers = BotEventHandlers(self.bot_core)
+            
+            if event_init.error_occurred:
+                logger.warning("⚠️ Event handlers initialization had issues, but continuing...")
+            else:
+                logger.info("✅ Event handlers registered")
 
             # Step 3: Initialize command handlers with dependency injection
+            logger.info("🎛️ Initializing command handlers...")
             await self._initialize_command_handlers()
             logger.info("✅ Command handlers initialized")
 
@@ -77,29 +111,66 @@ class ModularBotManager:
             # Get bot name for personalized startup message
             bot_name = os.getenv("DISCORD_BOT_NAME", "")
             if bot_name:
-                logger.info(f"🤖 {bot_name} bot initialization complete - all systems ready!")
+                logger.info("🤖 %s bot initialization complete - all systems ready!", bot_name)
             else:
                 logger.info("🤖 WhisperEngine bot initialization complete - all systems ready!")
 
         except Exception as e:
-            # Check if this is a memory initialization error and provide cleaner messaging
-            error_msg = str(e)
-            if "Failed to initialize memory system" in error_msg or "ChromaDB" in error_msg:
-                logger.error(f"💥 Failed to initialize bot: {e}")
-                if "ChromaDB server is not available" in error_msg:
-                    logger.error(
-                        "💡 Solution: Start ChromaDB with 'docker compose up chromadb' or set USE_CHROMADB_HTTP=false"
-                    )
-                elif "ChromaDB server connection test failed" in error_msg:
-                    logger.error("💡 Solution: Ensure ChromaDB server is running and accessible")
-                # Don't print full traceback for known ChromaDB issues
-            else:
-                # For other errors, print full details
-                logger.error(f"💥 Failed to initialize bot: {e}")
-                import traceback
-
-                logger.error(f"Traceback: {traceback.format_exc()}")
+            await self._handle_initialization_error(e)
             raise
+
+    async def _validate_essential_config(self) -> bool:
+        """Validate essential configuration before initialization"""
+        essential_vars = ['DISCORD_BOT_TOKEN', 'LLM_CHAT_API_URL']
+        
+        missing_vars = []
+        for var in essential_vars:
+            if not os.getenv(var):
+                missing_vars.append(var)
+        
+        if missing_vars:
+            logger.error("❌ Missing essential configuration variables: %s", ', '.join(missing_vars))
+            logger.error("💡 Please check your .env file and ensure these variables are set")
+            return False
+        
+        return True
+
+    async def _handle_initialization_error(self, error: Exception):
+        """Handle initialization errors with helpful messages and suggestions"""
+        error_msg = str(error)
+        
+        # Provide specific guidance for common issues
+        if "Failed to initialize memory system" in error_msg or "ChromaDB" in error_msg:
+            logger.error("💥 Memory system initialization failed: %s", error)
+            if "ChromaDB server is not available" in error_msg:
+                logger.error("💡 Solution: Start ChromaDB with 'docker compose up chromadb' or set USE_CHROMADB_HTTP=false")
+            elif "ChromaDB server connection test failed" in error_msg:
+                logger.error("💡 Solution: Ensure ChromaDB server is running and accessible")
+            else:
+                logger.error("💡 Check your database configuration in .env file")
+        
+        elif "Discord" in error_msg or "Bot" in error_msg:
+            logger.error("💥 Discord bot initialization failed: %s", error)
+            logger.error("💡 Check your DISCORD_BOT_TOKEN in .env file")
+            logger.error("💡 Ensure your bot has proper permissions in Discord")
+        
+        elif "LLM" in error_msg or "API" in error_msg:
+            logger.error("💥 LLM API initialization failed: %s", error)
+            logger.error("💡 Check your LLM_CHAT_API_URL and LLM_CHAT_API_KEY in .env file")
+            logger.error("💡 Ensure your LLM service is running and accessible")
+        
+        elif "configuration" in error_msg.lower() or "invalid" in error_msg.lower():
+            logger.error("💥 Configuration error: %s", error)
+            logger.error("💡 Run 'python env_manager.py --validate' to check your configuration")
+        
+        else:
+            # For other errors, provide general guidance
+            logger.error("💥 Initialization failed: %s", error)
+            logger.error("💡 Check the troubleshooting guide: docs/troubleshooting/")
+            
+            # Show traceback for unknown errors
+            import traceback
+            logger.debug("Full error details: %s", traceback.format_exc())
 
     async def _initialize_command_handlers(self):
         """Initialize all command handler modules with proper dependency injection."""
@@ -208,6 +279,25 @@ class ModularBotManager:
                 logger.info("✅ Visual emotion command handlers registered")
             else:
                 logger.info("⚠️ Visual emotion handlers skipped - feature disabled")
+
+            # Performance monitoring commands
+            self.command_handlers["performance"] = create_performance_commands(
+                bot=self.bot,
+                llm_client=components["llm_client"],
+                memory_manager=components["memory_manager"],
+                emotion_manager=components.get("emotion_manager")
+            )
+            self.command_handlers["performance"].register_commands(bot_name_filter, is_admin)
+            logger.info("✅ Performance monitoring command handlers registered")
+
+            # Onboarding and enhanced help commands
+            self.command_handlers["onboarding"] = create_onboarding_commands(
+                bot=self.bot,
+                llm_client=components["llm_client"],
+                memory_manager=components["memory_manager"]
+            )
+            self.command_handlers["onboarding"].register_commands(bot_name_filter, is_admin)
+            logger.info("✅ Onboarding command handlers registered")
 
         except Exception as e:
             logger.error(f"Failed to initialize command handlers: {e}")

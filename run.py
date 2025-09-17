@@ -28,7 +28,19 @@ app_name = os.getenv("LOG_APP_NAME", "discord_bot")
 setup_logging(debug=debug_mode, environment=environment, log_dir=log_dir, app_name=app_name)
 
 # Import and run the main function (logging is now configured)
+import asyncio
 from src.main import sync_main
+from src.utils.onboarding_manager import ensure_onboarding_complete
+
+async def main():
+    """Main entry point with onboarding check"""
+     Check if onboarding is needed
+    should_continue = await ensure_onboarding_complete()
+    if not should_continue:
+        return 1
+    
+    # Run the main application
+    return sync_main()
 
 if __name__ == "__main__":
-    sys.exit(sync_main())
+    sys.exit(asyncio.run(main()))

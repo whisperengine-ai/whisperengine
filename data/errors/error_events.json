@@ -1,0 +1,29 @@
+[
+  {
+    "error_id": "5741cffef22f4a43",
+    "timestamp": "2025-09-17T14:21:46.393573+00:00",
+    "severity": "low",
+    "category": "file_system",
+    "message": "Test error for monitoring system",
+    "exception_type": "ValueError",
+    "stack_trace": "Traceback (most recent call last):\n  File \"<string>\", line 73, in test_monitoring\n    raise ValueError('Test error for monitoring system')\nValueError: Test error for monitoring system\n",
+    "resolved": false,
+    "resolution_notes": null,
+    "resolved_at": null,
+    "first_occurrence": "2025-09-17T14:21:46.393573+00:00",
+    "occurrence_count": 1,
+    "context": {
+      "user_id": null,
+      "channel_id": null,
+      "guild_id": null,
+      "command": null,
+      "platform": "unknown",
+      "session_id": null,
+      "request_id": null,
+      "memory_usage": null,
+      "cpu_usage": null,
+      "active_connections": null,
+      "additional_data": {}
+    }
+  }
+]

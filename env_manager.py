@@ -162,10 +162,11 @@ def validate_environment() -> dict[str, Any]:
 
 
 if __name__ == "__main__":
-    # CLI usage
+    # Enhanced CLI with comprehensive validation and setup
     import argparse
+    import asyncio
 
-    parser = argparse.ArgumentParser(description="Environment configuration manager")
+    parser = argparse.ArgumentParser(description="WhisperEngine Environment Manager")
     # Get available modes dynamically
     available_modes = env_manager.get_available_modes()
     parser.add_argument(
@@ -173,25 +174,86 @@ if __name__ == "__main__":
         choices=available_modes if available_modes else ["development", "production"],
         help=f'Environment mode (available: {", ".join(available_modes) if available_modes else "development, production"})',
     )
-    parser.add_argument("--validate", action="store_true", help="Validate configuration")
+    parser.add_argument("--validate", action="store_true", help="Basic configuration validation")
+    parser.add_argument("--validate-full", action="store_true", help="Comprehensive validation with connection tests")
+    parser.add_argument("--setup", action="store_true", help="Interactive setup assistant")
     parser.add_argument("--info", action="store_true", help="Show environment info")
+    parser.add_argument("--force", action="store_true", help="Force reload environment")
 
     args = parser.parse_args()
 
     # Set up logging
     logging.basicConfig(level=logging.INFO, format="%(message)s")
 
-    if env_manager.load_environment(args.mode):
-        if args.validate:
+    if env_manager.load_environment(args.mode, force_reload=args.force):
+        if args.setup:
+            # Run interactive setup
+            try:
+                from src.utils.configuration_validator import interactive_setup
+                asyncio.run(interactive_setup())
+            except ImportError:
+                print("❌ Interactive setup not available. Please ensure all dependencies are installed.")
+                sys.exit(1)
+        
+        elif args.validate_full:
+            # Run comprehensive validation
+            try:
+                from src.utils.configuration_validator import config_validator
+                async def run_validation():
+                    print("🔍 Running comprehensive configuration validation...")
+                    results = await config_validator.validate_configuration(test_connections=True)
+                    
+                    # Show summary
+                    summary = config_validator.get_validation_summary()
+                    print(f"\\n📊 Validation Results:")
+                    print(f"   ✅ {summary['valid_checks']}/{summary['total_checks']} checks passed ({summary['validation_percentage']}%)")
+                    print(f"   🔴 {summary['required_issues']} required issues found")
+                    print(f"   🚀 Ready to deploy: {'Yes' if summary['ready_to_deploy'] else 'No'}")
+                    
+                    # Show detailed results
+                    required_issues = [r for r in results if r.level.value == 'required' and not r.is_valid]
+                    if required_issues:
+                        print(f"\\n🔴 Required Issues:")
+                        for issue in required_issues:
+                            print(f"   • {issue.variable}: {issue.message}")
+                            if issue.suggestion:
+                                print(f"     💡 {issue.suggestion}")
+                    
+                    recommended_issues = [r for r in results if r.level.value == 'recommended' and not r.is_valid]
+                    if recommended_issues:
+                        print(f"\\n🟡 Recommended Improvements:")
+                        for issue in recommended_issues:
+                            print(f"   • {issue.variable}: {issue.message}")
+                    
+                    return summary['ready_to_deploy']
+                
+                is_valid = asyncio.run(run_validation())
+                sys.exit(0 if is_valid else 1)
+                
+            except ImportError:
+                print("❌ Full validation not available. Please ensure all dependencies are installed.")
+                sys.exit(1)
+        
+        elif args.validate:
+            # Basic validation
             validation = env_manager.validate_required_vars()
             if validation["valid"]:
-                pass
+                print("✅ Basic configuration validation passed")
+                print("💡 For comprehensive validation, use: --validate-full")
             else:
-                for _missing in validation["missing"]:
-                    pass
+                print("❌ Configuration validation failed")
+                print("Missing required variables:")
+                for missing in validation["missing"]:
+                    print(f"   • {missing}")
+                print("\\n💡 Check your .env file or run: --setup")
                 sys.exit(1)
 
         if args.info:
             info = env_manager.get_environment_info()
+            print("🌍 Environment Information:")
+            for key, value in info.items():
+                print(f"   {key}: {value}")
     else:
+        print("❌ Failed to load environment configuration")
+        print("💡 Try running: --setup")
         sys.exit(1)

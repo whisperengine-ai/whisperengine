@@ -2150,6 +2150,23 @@ def main():
     return app.exec()
 
 
+async def main_with_onboarding():
+    """Main entry point with onboarding check"""
+    try:
+        from src.utils.onboarding_manager import ensure_onboarding_complete
+        
+        # Check if onboarding is needed
+        should_continue = await ensure_onboarding_complete()
+        if not should_continue:
+            return 1
+    except ImportError:
+        # If onboarding manager is not available, continue anyway
+        print("⚠️ Onboarding manager not available, starting desktop app...")
+    
+    # Run the main application
+    return main()
+
+
 if __name__ == "__main__":
-    exit_code = main()
+    exit_code = asyncio.run(main_with_onboarding())
     sys.exit(exit_code)

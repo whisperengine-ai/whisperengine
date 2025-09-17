@@ -31,7 +31,174 @@ env:
 
 jobs:
   # ===================================================================
-  # Pre-flight Checks
+  # Comprehensive Testing Suite
+  # ===================================================================
+  comprehensive_tests:
+    name: 🧪 Comprehensive Test Suite
+    runs-on: ubuntu-latest
+    needs: validation
+    if: needs.validation.outputs.should_build == 'true'
+    strategy:
+      matrix:
+        test_category: [unit, integration, performance, security]
+      fail-fast: false
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13.0'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements-core.txt
+          pip install -r requirements-dev.txt
+
+      - name: Configure test environment
+        run: |
+          # Set up test environment variables
+          echo "ENV_MODE=testing" >> $GITHUB_ENV
+          echo "LLM_CHAT_API_URL=http://mock-llm-server" >> $GITHUB_ENV
+          echo "DISCORD_BOT_TOKEN=test_token_for_ci" >> $GITHUB_ENV
+
+      - name: Run ${{ matrix.test_category }} tests
+        run: |
+          python tests/ci_test_runner.py \
+            --category ${{ matrix.test_category }} \
+            --report test_report_${{ matrix.test_category }}.json \
+            --workspace .
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results-${{ matrix.test_category }}
+          path: |
+            test_report_${{ matrix.test_category }}.json
+            coverage.json
+            benchmark.json
+          retention-days: 30
+
+      - name: Upload coverage to Codecov
+        if: matrix.test_category == 'unit' || matrix.test_category == 'integration'
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./coverage.json
+          flags: ${{ matrix.test_category }}
+          name: codecov-${{ matrix.test_category }}
+          fail_ci_if_error: false
+
+  # ===================================================================
+  # Test Results Aggregation
+  # ===================================================================
+  test_aggregation:
+    name: 📊 Test Results Summary
+    runs-on: ubuntu-latest
+    needs: [comprehensive_tests, onboarding_validation]
+    if: always()
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download all test results
+        uses: actions/download-artifact@v4
+        with:
+          path: test-results/
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13.0'
+
+      - name: Aggregate test results
+        run: |
+          python -c "
+          import json
+          import os
+          from pathlib import Path
+          
+          # Collect all test reports
+          test_results = []
+          for result_dir in Path('test-results').iterdir():
+              if result_dir.is_dir():
+                  for report_file in result_dir.glob('test_report_*.json'):
+                      try:
+                          with open(report_file) as f:
+                              data = json.load(f)
+                              test_results.append(data)
+                      except Exception as e:
+                          print(f'Error reading {report_file}: {e}')
+          
+          # Calculate totals
+          total_tests = sum(r['overall_statistics']['total_tests'] for r in test_results)
+          total_passed = sum(r['overall_statistics']['passed'] for r in test_results)
+          total_failed = sum(r['overall_statistics']['failed'] for r in test_results)
+          
+          # Check onboarding validation status
+          onboarding_status = '${{ needs.onboarding_validation.result }}'
+          onboarding_passed = onboarding_status == 'success'
+          
+          success_rate = (total_passed / total_tests * 100) if total_tests > 0 else 0
+          
+          print(f'📊 COMPREHENSIVE TEST SUMMARY')
+          print(f'Total Tests: {total_tests}')
+          print(f'✅ Passed: {total_passed}')
+          print(f'❌ Failed: {total_failed}')
+          print(f'📈 Success Rate: {success_rate:.1f}%')
+          print(f'🎯 Onboarding Validation: {"✅ Passed" if onboarding_passed else "❌ Failed"}')
+          
+          # Set GitHub Actions output
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+              f.write(f'total_tests={total_tests}\n')
+              f.write(f'success_rate={success_rate}\n')
+              f.write(f'all_passed={total_failed == 0 and onboarding_passed}\n')
+              f.write(f'onboarding_passed={onboarding_passed}\n')
+          "
+        id: aggregate
+
+      - name: Comment on PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const testSummary = `
+            ## 🧪 Test Results Summary
+            
+            | Metric | Value |
+            |--------|-------|
+            | Total Tests | ${{ steps.aggregate.outputs.total_tests }} |
+            | Success Rate | ${{ steps.aggregate.outputs.success_rate }}% |
+            | Test Status | ${{ steps.aggregate.outputs.all_passed == 'true' && '✅ All Passed' || '❌ Some Failed' }} |
+            | Onboarding Validation | ${{ steps.aggregate.outputs.onboarding_passed == 'true' && '✅ Passed' || '❌ Failed' }} |
+            
+            ### 🎯 Test Categories
+            - **Unit Tests**: Core functionality validation
+            - **Integration Tests**: End-to-end workflow testing  
+            - **Performance Tests**: Scalability and resource usage
+            - **Security Tests**: Vulnerability and protection validation
+            - **Onboarding Tests**: User experience and setup validation
+            
+            **Detailed results are available in the workflow artifacts.**
+            `;
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: testSummary
+            });
+
+      - name: Fail if tests failed
+        if: steps.aggregate.outputs.all_passed != 'true'
+        run: |
+          echo "❌ Some tests failed. Check the detailed results above."
+          exit 1
+
+  # ===================================================================
+  # Pre-flight Checks (keep existing validation section)
   # ===================================================================
   validation:
     name: 🔍 Validation & Linting
@@ -59,6 +226,35 @@ jobs:
       - name: Validate environment configuration
         run: |
           python -c "from env_manager import load_environment; assert load_environment()"
+
+      - name: Test onboarding functionality
+        run: |
+          # Test onboarding manager functionality
+          python -c "
+          import asyncio
+          from src.utils.onboarding_manager import ensure_onboarding_complete, OnboardingManager
+          
+          async def test_onboarding():
+              # Test onboarding manager creation
+              manager = OnboardingManager()
+              print('✅ OnboardingManager created successfully')
+              
+              # Test configuration detection
+              config_status = manager.detect_configuration_completeness()
+              print(f'✅ Configuration detection: {config_status}')
+              
+              # Test that onboarding doesn't block in CI
+              # Set CI environment to skip interactive prompts
+              import os
+              os.environ['CI'] = 'true'
+              os.environ['SKIP_ONBOARDING'] = 'true'
+              
+              result = await ensure_onboarding_complete()
+              assert result == True, 'Onboarding should not block in CI'
+              print('✅ Onboarding bypassed correctly in CI environment')
+          
+          asyncio.run(test_onboarding())
+          "
           
       - name: Check code formatting
         run: |
@@ -95,6 +291,164 @@ jobs:
               echo "should_build=false" >> $GITHUB_OUTPUT
             fi
           fi
+
+  # ===================================================================
+  # Onboarding Experience Validation
+  # ===================================================================
+  onboarding_validation:
+    name: 🎯 Onboarding Experience Test
+    runs-on: ubuntu-latest
+    needs: validation
+    if: needs.validation.outputs.should_build == 'true'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13.0'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements-core.txt
+          pip install -r requirements-dev.txt
+
+      - name: Test onboarding in clean environment
+        run: |
+          # Test onboarding with minimal configuration
+          export ENV_MODE=testing
+          export CI=true
+          export SKIP_ONBOARDING=false  # Actually test onboarding logic
+          
+          # Remove any existing config to simulate fresh install
+          rm -f .env .env.* .setup_complete || true
+          
+          # Test onboarding detection and flow
+          python -c "
+          import asyncio
+          import os
+          from src.utils.onboarding_manager import FirstRunDetector, OnboardingManager
+          
+          async def test_complete_onboarding():
+              print('🧪 Testing complete onboarding experience...')
+              
+              # Test 1: Fresh installation detection
+              detector = FirstRunDetector()
+              is_first_run = detector.is_first_run()
+              assert is_first_run, 'Fresh install should be detected as first run'
+              print('✅ Fresh installation correctly detected')
+              
+              # Test 2: Missing requirements detection
+              missing = detector.get_missing_requirements()
+              print(f'📊 Missing requirements: {missing}')
+              
+              # Test 3: Configuration validation with sample config
+              import tempfile
+              from pathlib import Path
+              
+              # Create a sample valid config
+              with tempfile.NamedTemporaryFile(mode='w', suffix='.env', delete=False) as f:
+                  f.write('LLM_CHAT_API_URL=http://localhost:1234/v1\\n')
+                  f.write('LLM_CHAT_API_KEY=not-needed\\n')
+                  f.write('ENV_MODE=testing\\n')
+                  sample_config = Path(f.name)
+              
+              is_valid = detector._has_valid_configuration(sample_config)
+              assert is_valid, 'Sample config should be valid'
+              print('✅ Configuration validation working')
+              
+              # Cleanup
+              os.unlink(sample_config)
+              
+              # Test 4: OnboardingManager creation and flow
+              manager = OnboardingManager()
+              assert hasattr(manager, 'detector'), 'Manager should have detector'
+              assert hasattr(manager, 'user_preferences'), 'Manager should have preferences'
+              print('✅ OnboardingManager correctly initialized')
+              
+              # Test 5: Startup help generation
+              help_text = detector.get_startup_help()
+              assert isinstance(help_text, str), 'Help should be string'
+              assert len(help_text) > 0, 'Help should not be empty'
+              assert 'WhisperEngine' in help_text, 'Help should mention WhisperEngine'
+              print('✅ Startup help generation working')
+              
+              print('🎉 All onboarding tests passed!')
+              
+          asyncio.run(test_complete_onboarding())
+          "
+
+      - name: Test run.py with onboarding integration
+        run: |
+          # Test the actual run.py with onboarding integration
+          export ENV_MODE=testing
+          export CI=true
+          export DEBUG_MODE=true
+          export DISCORD_BOT_TOKEN=test_token_12345
+          export LLM_CHAT_API_URL=http://localhost:1234/v1
+          export LLM_MODEL_NAME=test-model
+          
+          # Create setup completion marker to skip interactive onboarding
+          touch .setup_complete
+          
+          # Test that run.py can import and setup without errors
+          python -c "
+          import sys
+          import os
+          sys.path.insert(0, '.')
+          
+          # Test imports and basic setup
+          from env_manager import load_environment
+          from src.utils.onboarding_manager import ensure_onboarding_complete
+          from src.utils.logging_config import setup_logging
+          
+          print('✅ All key imports successful')
+          
+          # Test environment loading
+          result = load_environment()
+          assert result is True, 'Environment should load successfully'
+          print('✅ Environment loading successful')
+          
+          # Test logging setup
+          setup_logging(debug=True, environment='testing')
+          print('✅ Logging setup successful')
+          
+          print('✅ run.py integration test passed')
+          "
+
+      - name: Test onboarding skip in CI
+        run: |
+          # Test that onboarding is properly skipped in CI environments
+          export CI=true
+          export ENV_MODE=testing
+          
+          # Create setup completion marker to test non-first-run behavior
+          touch .setup_complete
+          
+          python -c "
+          import asyncio
+          from src.utils.onboarding_manager import ensure_onboarding_complete
+          
+          async def test_non_first_run():
+              # Should return True for non-first-run
+              result = await ensure_onboarding_complete()
+              assert result == True, 'Should complete successfully when setup exists'
+              print('✅ Onboarding correctly handled with existing setup')
+          
+          asyncio.run(test_non_first_run())
+          "
+
+      - name: Upload onboarding test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: onboarding-test-results
+          path: |
+            .setup_complete
+            .env*
+          retention-days: 7
 
   # ===================================================================
   # Docker Builds (Multi-architecture)
@@ -283,7 +637,7 @@ jobs:
   validate-builds:
     name: ✅ Validate Builds
     runs-on: ubuntu-latest
-    needs: [docker-build]
+    needs: [docker-build, onboarding_validation]
     if: always() && needs.validation.outputs.should_build == 'true'
     
     steps:
@@ -297,12 +651,36 @@ jobs:
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.validation.outputs.version }} \
             -c "import src.main; print('✅ Import test passed')"
 
+      - name: Test Docker onboarding experience
+        if: needs.docker-build.result == 'success'
+        run: |
+          # Test that onboarding works correctly in Docker environment
+          docker run --rm \
+            -e CI=true \
+            -e SKIP_ONBOARDING=true \
+            -e DEBUG_MODE=true \
+            -e ENV_MODE=testing \
+            --entrypoint python \
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.validation.outputs.version }} \
+            -c "
+          import asyncio
+          from src.utils.onboarding_manager import ensure_onboarding_complete
+          
+          async def test():
+              result = await ensure_onboarding_complete()
+              assert result == True, 'Onboarding should work in Docker'
+              print('✅ Docker onboarding test passed')
+          
+          asyncio.run(test())
+          "
+
       - name: Report status
         run: |
           echo "## 📊 Build Results" >> $GITHUB_STEP_SUMMARY
           echo "| Component | Status |" >> $GITHUB_STEP_SUMMARY
           echo "|-----------|--------|" >> $GITHUB_STEP_SUMMARY
           echo "| Docker Build | ${{ needs.docker-build.result == 'success' && '✅ Success' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Onboarding Validation | ${{ needs.onboarding_validation.result == 'success' && '✅ Success' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
           if [ "${{ github.ref_type }}" = "tag" ]; then
             echo "| Native Builds | ${{ needs.build-matrix.result == 'success' && '✅ Success' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
           fi

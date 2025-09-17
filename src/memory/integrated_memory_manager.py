@@ -12,6 +12,7 @@ import os
 from datetime import datetime
 from typing import Any
 from src.metrics import metrics_collector as metrics
+from src.utils.performance_monitor import monitor_performance
 
 from src.graph_database.neo4j_connector import get_neo4j_connector
 from src.memory.memory_manager import UserMemoryManager
@@ -368,6 +369,7 @@ class IntegratedMemoryManager:
             logger.error("Error retrieving memories for user %s: %s", user_id, e)
             return []
 
+    @monitor_performance("memory_retrieval", timeout_ms=5000)
     async def retrieve_contextual_memories(
         self, user_id: str, query: str, limit: int = 10
     ) -> list[dict[str, Any]]:
