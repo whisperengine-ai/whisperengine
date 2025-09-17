@@ -145,6 +145,7 @@ python validate_build_system.py  # Comprehensive validation
 | **[🍎 MLX Integration Guide](MLX_INTEGRATION_GUIDE.md)** | Apple Users | 20 min | Native Apple Silicon optimization |
 | **[🧪 MLX Testing Guide](MLX_TESTING_GUIDE.md)** | Developers | 15 min | Comprehensive MLX validation |
 | **[🧠 Memory System](docs/ai-systems/MEMORY_SYSTEM_README.md)** | Advanced | 20 min | Understanding AI memory |
+| **[🔄 Memory Aging System](docs/ai-systems/MEMORY_AGING.md)** | Advanced | 15 min | Intelligent memory consolidation & aging |
 | **[🎭 Character Creation](docs/character/character_prompt_guide.md)** | All Users | 15 min | Creating unique personalities |
 
 ## 🎯 **AI System Configuration**
@@ -160,6 +161,11 @@ WhisperEngine provides unified full AI capabilities:
 # Configure AI behavior style in .env
 AI_MEMORY_OPTIMIZATION=true
 AI_EMOTIONAL_RESONANCE=true
+
+# Memory Aging System (Sprint 4 - NEW!)
+MEMORY_AGING_ENABLED=true
+MEMORY_DECAY_LAMBDA=0.01
+MEMORY_PRUNE_THRESHOLD=0.2
 ```
 
 ## 🏛️ **Architecture Overview**
