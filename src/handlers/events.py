@@ -860,6 +860,55 @@ class BotEventHandlers:
                 discord_context=discord_context,
             )
 
+            # Try human-like memory processing if available
+            human_like_context = None
+            conversation_analysis = None
+            if hasattr(self.memory_manager, 'human_like_system'):
+                try:
+                    logger.debug("Using Human-Like Memory System for enhanced processing...")
+                    
+                    # Prepare conversation history
+                    conversation_history = [msg['content'] for msg in recent_messages[-5:] if 'content' in msg]
+                    
+                    # Build relationship context
+                    relationship_context = {
+                        "interaction_history": len(recent_messages),
+                        "emotional_data": external_emotion_data,
+                        "phase2_context": phase2_context,
+                        "discord_context": discord_context
+                    }
+                    
+                    # Analyze conversation for human-like response guidance
+                    from src.utils.human_like_conversation_engine import analyze_conversation_for_human_response
+                    
+                    conversation_analysis = analyze_conversation_for_human_response(
+                        user_id=user_id,
+                        message=message.content,
+                        conversation_history=[{"content": msg} for msg in conversation_history],
+                        emotional_context=external_emotion_data,
+                        relationship_context=relationship_context
+                    )
+                    
+                    # Use human-like memory search
+                    human_like_result = await self.memory_manager.human_like_system.search_like_human_friend(
+                        user_id=user_id,
+                        message=message.content,
+                        conversation_history=conversation_history,
+                        relationship_context=relationship_context,
+                        limit=20
+                    )
+                    
+                    human_like_context = human_like_result
+                    logger.debug(f"Human-like processing: {human_like_result['human_context']['emotional_understanding']} | "
+                               f"Purpose: {human_like_result['human_context']['conversation_purpose']} | "
+                               f"Mode: {conversation_analysis['mode']} | "
+                               f"Personality: {conversation_analysis['personality_type']}")
+                    
+                except Exception as human_error:
+                    logger.warning(f"Human-like memory processing failed: {human_error}")
+                    human_like_context = None
+                    conversation_analysis = None
+
             comprehensive_context = None
             enhanced_system_prompt = None
 
@@ -919,6 +968,23 @@ class BotEventHandlers:
                     f"{phase4_context.interaction_type.value} interaction, "
                     f"{len(phases_executed)} phases executed"
                 )
+
+            # Merge human-like context into comprehensive context if available
+            if human_like_context and comprehensive_context:
+                comprehensive_context["human_like_context"] = human_like_context["human_context"]
+                comprehensive_context["human_like_memories"] = human_like_context["memories"]
+                comprehensive_context["human_like_performance"] = human_like_context["search_performance"]
+                
+                # Add conversation analysis for enhanced response guidance
+                if conversation_analysis:
+                    comprehensive_context["conversation_analysis"] = conversation_analysis
+                    comprehensive_context["response_guidance"] = conversation_analysis["response_guidance"]
+                    comprehensive_context["conversation_mode"] = conversation_analysis["mode"]
+                    comprehensive_context["interaction_type"] = conversation_analysis["interaction_type"]
+                    comprehensive_context["personality_type"] = conversation_analysis["personality_type"]
+                    comprehensive_context["relationship_level"] = conversation_analysis["relationship_level"]
+                
+                logger.debug("Enhanced comprehensive context with human-like intelligence and conversation analysis")
 
             return phase4_context, comprehensive_context, enhanced_system_prompt
 
