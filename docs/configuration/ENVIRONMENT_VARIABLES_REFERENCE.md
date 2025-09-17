@@ -359,6 +359,37 @@ VOICE_RECONNECT_DELAY=5.0                   # Default: 5.0 (Reconnection delay i
 
 ---
 
+## 🖼️ Visual Emotion Analysis - Sprint 6
+
+### Core Visual Emotion Features
+```bash
+# Main feature toggle
+ENABLE_VISUAL_EMOTION_ANALYSIS=true         # Default: true (Enable visual emotion analysis system)
+
+# Processing configuration
+VISUAL_EMOTION_PROCESSING_MODE=auto          # Default: auto (Options: auto/local/cloud)
+VISUAL_EMOTION_CONFIDENCE_THRESHOLD=0.6      # Default: 0.6 (Minimum confidence for emotion detection)
+VISUAL_EMOTION_MAX_IMAGE_SIZE=10             # Default: 10 (Maximum image size in MB)
+
+# Vision model settings
+VISION_MODEL_PROVIDER=openai                 # Default: openai (Options: openai/anthropic/local)
+VISION_MODEL_NAME=gpt-4-vision-preview       # Default: gpt-4-vision-preview (Cloud model name)
+LOCAL_VISION_MODEL=llava-1.5-7b              # Default: llava-1.5-7b (Local model name)
+
+# Privacy and data retention
+VISUAL_EMOTION_RETENTION_DAYS=30             # Default: 30 (Days to keep visual emotion memories)
+VISUAL_EMOTION_PRIVACY_MODE=enhanced         # Default: enhanced (Options: basic/enhanced/strict)
+STORE_VISUAL_EMOTIONS_LOCALLY=true           # Default: true (Desktop mode: local storage only)
+
+# Discord integration
+DISCORD_VISUAL_EMOTION_ENABLED=true          # Default: true (Enable Discord image analysis)
+DISCORD_VISUAL_RESPONSE_ENABLED=true         # Default: true (Generate AI responses to images)
+DISCORD_VISUAL_REACTION_ENABLED=true         # Default: true (Add emoji reactions based on emotions)
+DISCORD_VISUAL_RESPONSE_PROBABILITY=0.7      # Default: 0.7 (Probability of generating responses)
+```
+
+---
+
 ## ⏰ Job Scheduler & Automation
 
 ### Job Scheduler
@@ -519,6 +550,6 @@ python -c "from src.core.bot import DiscordBotCore; print('AI system running wit
 
 ---
 
-**Total Environment Variables: 100+**
+**Total Environment Variables: 115+**
 
-This comprehensive reference includes all configuration options with their actual default values as found in the codebase. Each variable includes its purpose, default value, and usage context.
+This comprehensive reference includes all configuration options with their actual default values as found in the codebase. Each variable includes its purpose, default value, and usage context. Recently updated with Sprint 6 Visual Emotion Analysis features.
