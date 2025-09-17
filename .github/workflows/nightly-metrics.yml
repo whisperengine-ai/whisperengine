@@ -1,5 +1,9 @@
 name: Nightly Metrics Snapshot
 
+# Explicit minimal permissions (read-only access to repository contents)
+permissions:
+  contents: read
+
 on:
   schedule:
     - cron: '0 3 * * *'  # 03:00 UTC nightly
