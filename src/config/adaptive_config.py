@@ -343,6 +343,63 @@ class AdaptiveConfigManager:
         """Get the current deployment mode"""
         return self.config.deployment_mode
 
+    # Multi-Entity Relationship Feature Properties
+    @property
+    def enable_multi_entity_relationships(self) -> bool:
+        """Check if multi-entity relationships are enabled"""
+        env_override = os.getenv("ENABLE_MULTI_ENTITY_RELATIONSHIPS")
+        if env_override is not None:
+            return env_override.lower() == "true"
+        return self.config.features.get("enable_multi_entity_relationships", True)
+
+    @property
+    def enable_character_creation(self) -> bool:
+        """Check if character creation is enabled"""
+        env_override = os.getenv("ENABLE_CHARACTER_CREATION")
+        if env_override is not None:
+            return env_override.lower() == "true"
+        return self.config.features.get("enable_character_creation", True)
+
+    @property
+    def enable_relationship_evolution(self) -> bool:
+        """Check if relationship evolution is enabled"""
+        env_override = os.getenv("ENABLE_RELATIONSHIP_EVOLUTION")
+        if env_override is not None:
+            return env_override.lower() == "true"
+        return self.config.features.get("enable_relationship_evolution", True)
+
+    @property
+    def enable_ai_facilitated_introductions(self) -> bool:
+        """Check if AI facilitated introductions are enabled"""
+        env_override = os.getenv("ENABLE_AI_FACILITATED_INTRODUCTIONS")
+        if env_override is not None:
+            return env_override.lower() == "true"
+        return self.config.features.get("enable_ai_facilitated_introductions", self.scale_tier >= 2)
+
+    @property
+    def enable_cross_character_awareness(self) -> bool:
+        """Check if cross-character awareness is enabled"""
+        env_override = os.getenv("ENABLE_CROSS_CHARACTER_AWARENESS")
+        if env_override is not None:
+            return env_override.lower() == "true"
+        return self.config.features.get("enable_cross_character_awareness", self.scale_tier >= 2)
+
+    @property
+    def enable_character_similarity_matching(self) -> bool:
+        """Check if character similarity matching is enabled"""
+        env_override = os.getenv("ENABLE_CHARACTER_SIMILARITY_MATCHING")
+        if env_override is not None:
+            return env_override.lower() == "true"
+        return self.config.features.get("enable_character_similarity_matching", self.scale_tier >= 3)
+
+    @property
+    def enable_social_network_analysis(self) -> bool:
+        """Check if social network analysis is enabled"""
+        env_override = os.getenv("ENABLE_SOCIAL_NETWORK_ANALYSIS")
+        if env_override is not None:
+            return env_override.lower() == "true"
+        return self.config.features.get("enable_social_network_analysis", self.scale_tier >= 3)
+
     def get_storage_configuration(self) -> dict[str, Any]:
         """Get storage configuration details"""
         return {

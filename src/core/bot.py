@@ -752,6 +752,9 @@ class DiscordBotCore:
                 # Initialize multi-entity relationship manager
                 self.multi_entity_manager = MultiEntityRelationshipManager()
 
+                # Note: Schema initialization will happen when first database operation is called
+                self.logger.info("📊 Multi-entity schema will be initialized on first use")
+
                 # Initialize AI Self bridge
                 self.ai_self_bridge = AISelfEntityBridge()
 
