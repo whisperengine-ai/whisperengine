@@ -248,6 +248,72 @@ flake8 src/
 ./bot.sh cleanup
 ```
 
+### CI/CD Pipeline & Release Process
+
+WhisperEngine includes a comprehensive CI/CD pipeline with security hardening:
+
+#### Automated Testing
+```bash
+# The CI pipeline runs:
+# - Unit tests with mocking
+# - Integration tests with real LLMs
+# - Performance benchmarks
+# - Security vulnerability scanning
+# - Code quality analysis
+```
+
+#### Release Artifacts
+Every release includes:
+- **Multi-platform containers** (AMD64, ARM64)
+- **SBOM artifacts** for compliance auditing
+- **Security scan reports** with vulnerability analysis
+- **Signed containers** with provenance attestations
+
+#### Contributing to Production
+```bash
+# 1. Create feature branch
+git checkout -b feature/your-feature
+
+# 2. Develop with tests
+pytest -m unit  # Fast feedback during development
+
+# 3. Full test suite before PR
+pytest  # Run all tests
+./scripts/validate-build.sh  # Validate build system
+
+# 4. Open PR - CI pipeline will:
+#    - Run comprehensive tests
+#    - Generate security reports  
+#    - Build and scan containers
+#    - Generate SBOM artifacts
+```
+
+#### Release Workflow
+```bash
+# For maintainers:
+git tag v1.2.3
+git push origin v1.2.3
+
+# CI automatically:
+# 1. Builds multi-platform containers
+# 2. Signs with Cosign
+# 3. Generates SBOM files
+# 4. Publishes to multiple registries
+# 5. Creates GitHub release with artifacts
+```
+
+**Data Management:**
+```bash
+# Clear cache but keep memories
+./bot.sh restart-clean infrastructure
+
+# View service status
+./bot.sh status
+
+# Clean up orphaned containers
+./bot.sh cleanup
+```
+
 ## 🧠 AI System Overview
 
 WhisperEngine features a 4-phase AI intelligence system:
@@ -275,6 +341,57 @@ WhisperEngine features a 4-phase AI intelligence system:
 - Relationship-based communication styles
 
 All phases are **enabled by default** for the full experience.
+
+## 🏭 Production & Security Features
+
+WhisperEngine includes enterprise-grade features for production deployments:
+
+### Supply Chain Security
+- **SBOM Generation** - Software Bill of Materials for compliance
+- **Container Signing** - Cosign-signed containers with provenance
+- **Multi-Registry Support** - Docker Hub, GitHub Container Registry, custom registries
+- **Vulnerability Scanning** - Automated security scanning in CI/CD
+
+### Production Monitoring
+- **Health Endpoints** - REST APIs for external monitoring systems
+- **Prometheus Metrics** - Comprehensive metrics export
+- **Real-time Dashboard** - Web-based monitoring interface
+- **Discord Admin Commands** - Monitor system health from Discord
+
+```bash
+# Monitor system health
+!health              # Basic health check
+!health detailed     # Component-by-component analysis
+!errors             # Recent error analysis
+!performance        # System performance metrics
+!dashboard          # Get web dashboard access
+```
+
+### Error Tracking & Analytics
+- **Intelligent Error Categorization** - AI, System, User, Network errors
+- **Pattern Detection** - Automatic identification of recurring issues
+- **Resolution Tracking** - Monitor fix effectiveness
+- **User Engagement Analytics** - Usage patterns and conversation quality
+
+### Configuration for Production
+```env
+# Enable production monitoring
+ENABLE_WEB_DASHBOARD=true
+HEALTH_CHECK_ENABLED=true
+PERFORMANCE_MONITORING_ENABLED=true
+
+# Security features
+ENABLE_PRODUCTION_OPTIMIZATION=true
+STRICT_IMMERSIVE_MODE=true
+ENABLE_LLM_TRUST_DETECTION=false  # Disable for local models
+
+# Alert configuration
+ALERT_DISCORD_ENABLED=true
+ALERT_EMAIL_ENABLED=true
+ALERT_SLACK_ENABLED=true
+```
+
+See **[Production Monitoring Guide](docs/operations/MONITORING.md)** and **[Supply Chain Security](docs/security/SUPPLY_CHAIN.md)** for detailed setup.
 
 ## 📁 Project Structure
 

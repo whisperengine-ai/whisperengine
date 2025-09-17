@@ -1763,6 +1763,16 @@ Respond only with valid JSON, no other text.""",
         Returns:
             Dict containing trust analysis results
         """
+        # Check if trust detection is disabled
+        if not os.getenv('ENABLE_LLM_TRUST_DETECTION', 'true').lower() in ['true', '1', 'yes']:
+            self.logger.debug("Trust detection disabled via ENABLE_LLM_TRUST_DETECTION environment variable")
+            return {
+                "trust_indicators": [],
+                "trust_level": "low",
+                "confidence": 0.0,
+                "reasoning": "Trust detection disabled"
+            }
+            
         try:
             messages = [
                 {
