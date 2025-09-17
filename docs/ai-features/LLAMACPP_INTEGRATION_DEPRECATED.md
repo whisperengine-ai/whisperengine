@@ -1,4 +1,18 @@
-# llama-cpp-python Integration for WhisperEngine
+# ⚠️ DEPRECATED: llama-cpp-python Integration for WhisperEngine
+
+## ⚠️ **DEPRECATION NOTICE**
+**This integration is no longer supported as of Sprint 6 (September 2025).** 
+
+WhisperEngine now uses **LM Studio** and **Ollama** as the primary local AI backends instead of direct llama-cpp-python integration. 
+
+**For current local AI setup, see:**
+- **[LM Studio Setup](../deployment/LOCAL_SETUP.md)** - User-friendly local AI
+- **[Ollama Setup](../deployment/LOCAL_SETUP.md)** - Production-ready local AI  
+- **[Deployment Modes](../deployment/DEPLOYMENT_MODES.md)** - Choose your setup
+
+---
+
+# llama-cpp-python Integration for WhisperEngine (DEPRECATED)
 
 ## Overview
 

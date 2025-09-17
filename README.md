@@ -5,21 +5,29 @@
 [![Docker Hub](https://img.shields.io/docker/pulls/whisperengine/whisperengine.svg)](https://hub.docker.com/r/whisperengine/whisperengine)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-WhisperEngine lets you create deeply personalized AI companions with real emotional intelligence, lasting memories, and unique personalities. Unlike cloud-based AI services, everything runs locally on your machine - your conversations, relationships, and personal data never leave your computer.
+WhisperEngine lets you create deeply personalized AI companions with real emotional intelligence, lasting memories, and unique personalities. Choose your deployment mode: run completely local for maximum privacy, or connect to cloud platforms for unified experiences across Discord, Slack, and more.
 
-**🔒 100% Private** • **🧠 Emotionally Intelligent** • **💭 Remembers Everything** • **🎭 Unlimited Personalities**
+**🏠 Local Mode: 100% Private** • **☁️ Cloud Mode: Unified Experience** • **🧠 Emotionally Intelligent** • **🎭 Unlimited Personalities**
 
-## 🚀 Get Started in 2 Minutes
+## 🚀 Choose Your Deployment Mode
 
-### 👤 **Just Want to Chat?** - Download & Run
-**[📥 Download Pre-Built App](USERS.md)** (~18GB)  
-Download → Extract → Run → Start chatting immediately. No technical setup required.
+### � **Demo Mode (Try It Now!)** - One-Click Experience
+**[📥 Download Demo Package](https://github.com/whisperengine-ai/whisperengine/releases)** (~10GB)  
+Complete demo with bundled AI models. Download → Extract → Double-click → Start chatting!
+- ✅ Pre-configured AI personalities
+- ✅ No setup or technical knowledge required  
+- ✅ 100% private and offline
+- ✅ Works immediately out of the box
 
-### 🔧 **Want to Customize?** - Developer Setup  
+### 🏠 **Local Mode (Maximum Privacy)** - Full Installation
+**[📖 Local Setup Guide](docs/deployment/LOCAL_SETUP.md)**  
+Complete local installation with your choice of AI models and full customization.
+
+### ☁️ **Cloud Mode (Unified Experience)** - Developer Setup  
 ```bash
 git clone https://github.com/whisperengine-ai/whisperengine
 cd whisperengine && ./setup.sh
-python run.py  # Discord bot OR python universal_native_app.py  # Desktop app
+python run.py  # Discord bot with cloud AI
 ```
 
 **[📖 Full Setup Guide](docs/getting-started/QUICK_START.md)** for detailed instructions
@@ -42,17 +50,17 @@ Your AI companion gets smarter over time through four progressive intelligence p
 - **Gaming Companion** - Fun, engaging, remembers your play style
 - **Custom Characters** - Build anyone from scratch with our personality engine
 
-### 🔒 **Privacy That Actually Matters**
-- **100% Local Processing** - AI runs on your machine, not in the cloud
-- **Zero Data Collection** - No telemetry, analytics, or tracking
-- **Your Data Stays Yours** - Conversations and memories stored locally
+### 🔒 **Privacy You Can Trust**
+- **🏠 Local Mode**: 100% private - AI runs on your machine, zero external connections
+- **☁️ Cloud Mode**: Transparent about data flow - conversations sync across platforms
+- **Your Choice**: Pick your privacy level based on your needs
 - **Open Source** - Full transparency, audit the code yourself
 
 ### 💭 **Memory That Feels Human**
 - **Relationship Building** - Remembers your shared jokes, preferences, and history
 - **Emotional Context** - Knows when you're stressed, excited, or need support
-- **Cross-Platform Sync** - Same personality and memories across Discord and desktop
-- **Intelligent Forgetting** - Important memories stay, trivial ones fade naturally
+- **🏠 Local**: Private memories stored only on your machine
+- **☁️ Cloud**: Unified memories across Discord, Slack, Teams, and more
 
 ---
 

@@ -1,21 +1,32 @@
-# 🌐 Cross-Platform Optimization - Sprint 5
+# 🌐 Cross-Platform Optimization - Sprint 5 (Cloud Mode Only)
 
 ## 🎯 Overview
-Cross-Platform Optimization ensures unified AI experience and seamless data synchronization across WhisperEngine's Discord bot and desktop application platforms.
+Cross-Platform Optimization enables unified AI experience across cloud-based chat platforms (Discord, Slack, Teams, etc.). This feature is **only available in Cloud Mode** and does not sync with Desktop Mode installations.
 
-## ✨ Key Features
+## 🔒 **Privacy Architecture**
+This feature operates under WhisperEngine's **Cloud Mode deployment**, which provides:
+- **Deployment Separation**: Desktop Mode remains 100% isolated - no cloud connectivity or data sharing
+- **Cloud Mode Unification**: Discord, Slack, Teams share unified memory and experience
+- **Clear Boundaries**: Users choose their deployment mode based on privacy requirements
 
-### 🔄 **Unified Experience**
-- **Consistent AI Behavior**: Same personality and responses across platforms
-- **Memory Synchronization**: Conversation history and emotional context sync
-- **Configuration Sync**: User preferences and settings consistency
-- **Platform Adaptation**: Native UI/UX while maintaining core functionality
+### **Deployment Modes**
+- **Desktop Mode**: Complete isolation, local-only, maximum privacy
+- **Cloud Mode**: Unified cross-platform experience with shared cloud storage
+- **Demo Mode**: Safe trial environment with data lifecycle warnings
 
-### 🗂️ **Data Synchronization**
-- **Memory State Sync**: Real-time conversation memory updates
-- **Emotional Context**: Emotional intelligence state preservation
-- **User Preferences**: Settings and configuration synchronization
-- **Conflict Resolution**: Intelligent handling of concurrent modifications
+## ✨ Key Features (Cloud Mode Only)
+
+### 🔄 **Cloud Platform Unification**
+- **Consistent AI Behavior**: Same personality across Discord, Slack, Teams
+- **Unified Memory**: Shared conversation history across all cloud platforms
+- **Cross-Platform Identity**: AI recognizes you regardless of platform
+- **Seamless Transitions**: Continue conversations across platforms
+
+### 🗂️ **Data Synchronization (Cloud Mode Only)**
+- **Memory State Sync**: Real-time conversation memory updates across platforms
+- **Emotional Context**: Emotional intelligence state shared across platforms  
+- **User Preferences**: Settings synchronized across all connected platforms
+- **Conflict Resolution**: Intelligent handling of concurrent platform usage
 
 ### ⚡ **Platform-Specific Optimizations**
 - **Performance Tuning**: Platform-specific AI model optimizations

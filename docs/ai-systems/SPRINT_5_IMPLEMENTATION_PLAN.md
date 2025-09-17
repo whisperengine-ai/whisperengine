@@ -237,37 +237,46 @@ async def dashboard_websocket(websocket: WebSocket, session_id: str):
 
 ### **Architecture Enhancements**
 
-#### **Cross-Platform Synchronization**
+#### **Cross-Platform Synchronization (Cloud Mode Only)**
 ```
 src/platforms/
-├── sync_manager.py                   # Central sync orchestrator
-├── memory_sync_engine.py            # Memory state synchronization
-├── emotional_state_sync.py          # Emotional context synchronization
-├── settings_sync_manager.py         # Configuration synchronization
+├── sync_manager.py                   # Central sync orchestrator (Cloud Mode)
+├── memory_sync_engine.py            # Memory state synchronization (Cloud platforms)
+├── emotional_state_sync.py          # Emotional context synchronization (Cloud platforms)
+├── settings_sync_manager.py         # Configuration synchronization (Cloud platforms)
 └── platform_optimization.py        # Platform-specific optimizations
 
 src/platforms/adapters/
 ├── discord_sync_adapter.py          # Discord-specific sync handling
-├── desktop_sync_adapter.py          # Desktop app sync handling
-└── universal_sync_protocol.py       # Common sync protocol
+├── slack_sync_adapter.py            # Slack-specific sync handling (Cloud Mode)
+├── teams_sync_adapter.py            # Teams-specific sync handling (Cloud Mode)
+└── universal_sync_protocol.py       # Common cloud sync protocol
 ```
 
-#### **Unified Configuration System**
+**Note**: Desktop Mode installations do NOT use sync adapters and remain completely isolated.
+
+#### **Unified Configuration System (Cloud Mode)**
 ```python
-# Central configuration management
+# Central configuration management for cloud platforms only
 class UnifiedConfigurationManager:
-    """Manages configuration across all platforms with sync capability"""
+    """Manages configuration across cloud platforms with sync capability
     
-    def __init__(self):
+    Note: Desktop Mode installations use separate, isolated configuration
+    """
+    
+    def __init__(self, deployment_mode: str):
+        if deployment_mode == 'desktop':
+            raise ValueError("Desktop Mode does not support cross-platform sync")
+        
         self.platform_configs = {}
         self.user_preferences = {}
         self.sync_status = {}
     
     async def sync_user_config(self, user_id: str, platform: str) -> bool:
-        """Synchronize user configuration across platforms"""
+        """Synchronize user configuration across cloud platforms only"""
         
     async def sync_emotional_state(self, user_id: str, emotional_context: EmotionalContext) -> bool:
-        """Synchronize emotional state across platforms"""
+        """Synchronize emotional state across cloud platforms only"""
         
     async def sync_memory_state(self, user_id: str, conversation_context: str) -> bool:
         """Synchronize conversation memory across platforms"""
@@ -428,11 +437,12 @@ class SyncAwareEmotionalContextEngine(EmotionalContextEngine):
 - ✅ User and admin dashboard views
 - ✅ WebSocket-based live updates
 
-### **Cross-Platform Optimization**
-- ✅ Memory and emotional state sync across Discord/Desktop
-- ✅ Unified configuration management
+### **Cross-Platform Optimization (Cloud Mode Only)**
+- ✅ Memory and emotional state sync across cloud platforms (Discord/Slack/Teams)
+- ✅ Unified configuration management for cloud deployments
 - ✅ Platform-specific performance optimizations
-- ✅ Conflict resolution for sync issues
+- ✅ Desktop Mode isolation and privacy boundaries maintained
+- ✅ Conflict resolution for cloud sync issues
 
 ---
 
