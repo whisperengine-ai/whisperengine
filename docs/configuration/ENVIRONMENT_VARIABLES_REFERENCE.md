@@ -274,21 +274,61 @@ FALLBACK_TO_EXISTING=true                   # Default: true (Fallback to existin
 EMOTION_GRAPH_SYNC_INTERVAL=10              # Default: 10 (Graph sync interval in seconds)
 ```
 
-### Redis Cache
+### Redis High-Performance Caching
 ```bash
-# Redis connection
-REDIS_HOST=localhost                        # Default: localhost (Redis host)
+# Redis connection configuration
+REDIS_HOST=localhost                        # Default: localhost (Redis host - use "redis" for Docker)
 REDIS_PORT=6379                             # Default: 6379 (Redis port)
-REDIS_DB=0                                  # Default: 0 (Redis database number)
+REDIS_DB=0                                  # Default: 0 (Redis database number 0-15)
+REDIS_PASSWORD=                             # Default: empty (Redis password if authentication enabled)
 
-# Redis cache settings
-USE_REDIS_CACHE=true                        # Default: true (Enable Redis-based conversation cache)
-CONVERSATION_CACHE_TIMEOUT_MINUTES=15       # Default: 15 (Cache timeout in minutes)
+# Redis cache activation
+USE_REDIS_CACHE=true                        # Default: true (Enable Redis-based high-performance caching)
+
+# Conversation caching (legacy system)
+CONVERSATION_CACHE_TIMEOUT_MINUTES=15       # Default: 15 (Conversation cache timeout in minutes)
 CONVERSATION_CACHE_BOOTSTRAP_LIMIT=20       # Default: 20 (Bootstrap message limit)
 CONVERSATION_CACHE_MAX_LOCAL=50             # Default: 50 (Max local cache messages)
 
+# Performance caching (new system)
+REDIS_CACHE_TTL_MINUTES=20                  # Default: 20 (Time-to-live for memory/profile cache)
+CACHE_STRATEGY=hybrid                       # Default: hybrid (Options: lru/ttl/hybrid/adaptive)
+CACHE_MAX_SIZE=1000                         # Default: 1000 (Maximum number of cached items)
+CACHE_TTL_SECONDS=1200                      # Default: 1200 (Default cache time-to-live in seconds)
+
 # Legacy Redis URL format (alternative to individual settings)
 REDIS_URL=redis://localhost:6379            # Alternative format (not used if individual settings present)
+```
+
+---
+
+## 🚀 Performance Optimization Configuration
+
+### Production Performance Settings
+```bash
+# Master performance optimization switch
+ENABLE_PRODUCTION_OPTIMIZATION=true         # Default: true (Master switch for all production optimizations)
+
+# Parallel AI processing (3-5x speed improvement)
+ENABLE_PARALLEL_PROCESSING=true             # Default: true (Process AI components concurrently)
+PARALLEL_PROCESSING_MAX_WORKERS=4           # Default: 4 (Max concurrent AI processing tasks)
+
+# Memory performance optimizations
+AI_MEMORY_OPTIMIZATION=true                 # Default: true (Advanced memory retrieval optimizations)
+ENABLE_MEMORY_OPTIMIZATION=auto             # Default: auto (Memory system optimization level)
+MEMORY_OPTIMIZATION_LEVEL=auto              # Default: auto (Optimization level: minimal/balanced/aggressive/auto)
+
+# Background processing optimizations
+ENABLE_BACKGROUND_PROCESSING=true           # Default: true (Async background AI processing)
+BACKGROUND_PROCESSING_QUEUE_SIZE=100        # Default: 100 (Background task queue size)
+
+# Performance monitoring and debugging
+ENABLE_PERFORMANCE_MONITORING=auto          # Default: auto (Track and log performance metrics)
+PERFORMANCE_LOG_LEVEL=info                  # Default: info (Performance logging level: debug/info/warning)
+
+# Memory batch processing
+MEMORY_BATCH_SIZE=20                        # Default: 20 (ChromaDB batch processing size)
+SEMANTIC_CLUSTERING_MAX_MEMORIES=20         # Default: 20 (Max memories per clustering batch)
 ```
 
 ---
