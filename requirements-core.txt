@@ -16,7 +16,7 @@ httpx==0.28.1
 aiosqlite==0.21.0
 
 # AI/ML and Memory System Dependencies (Core)
-chromadb==1.0.20
+chromadb>=1.1.0
 sentence-transformers==5.1.0
 numpy==2.3.2
 vaderSentiment==3.3.2

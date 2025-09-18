@@ -100,9 +100,10 @@ check_env() {
 show_help() {
     echo "Discord Bot Management Script"
     echo ""
-    echo "🚀 For Development: Use direct Python execution for the best experience!"
-    echo "   Discord Bot:  python run.py"
-    echo "   Desktop App:  python universal_native_app.py"
+    echo "🚀 For Development: Choose your preferred development style!"
+    echo "   Containerized Development:  ./bot.sh start dev   # Hot-reload, mounted code"
+    echo "   Native Development:         python run.py        # After starting infrastructure"
+    echo "   Desktop App:                python universal_native_app.py"
     echo ""
     echo "🚀 New to WhisperEngine? Try our cross-platform quick-start scripts:"
     echo "   Linux/macOS:   curl -sSL https://raw.githubusercontent.com/WhisperEngine-AI/whisperengine/main/scripts/quick-start.sh | bash"
@@ -112,42 +113,51 @@ show_help() {
     echo "Usage: $0 <command> [mode]"
     echo ""
     echo "Commands:"
-    echo "  start [prod|infrastructure]  - Start services (mode required)"
-    echo "  stop [prod|infrastructure]   - Stop services"
-    echo "  logs [service]               - View logs (default: whisperengine-bot)"
-    echo "  status                       - Show container status"
+    echo "  start [prod|dev|infrastructure]  - Start services (mode required)"
+    echo "  stop [prod|dev|infrastructure]   - Stop services"
+    echo "  logs [service]                   - View logs (default: whisperengine-bot)"
+    echo "  status                           - Show container status"
     echo ""
     echo "Restart Commands (Data Preservation):"
-    echo "  restart [prod|infrastructure]     - Restart services"
-    echo "  restart-all [prod|infrastructure] - Restart all services, PRESERVE data"
-    echo "  restart-full [prod|infrastructure] - Alias for restart-all (preserve data)"
-    echo "  restart-clean [prod|infrastructure] - Restart all services, CLEAR cache only"
+    echo "  restart [prod|dev|infrastructure]     - Restart services"
+    echo "  restart-all [prod|dev|infrastructure] - Restart all services, PRESERVE data"
+    echo "  restart-full [prod|dev|infrastructure] - Alias for restart-all (preserve data)"
+    echo "  restart-clean [prod|dev|infrastructure] - Restart all services, CLEAR cache only"
     echo ""
     echo "Data Management:"
-    echo "  clear-cache [prod|infrastructure] - Clear Redis cache, keep persistent data"
-    echo "  reset-data [prod|infrastructure]  - ⚠️  DANGER: Clear ALL data volumes"
-    echo "  cleanup                            - Remove orphaned containers and volumes"
-    echo "  backup <create|list|restore|help>  - Data backup operations"
+    echo "  clear-cache [prod|dev|infrastructure] - Clear Redis cache, keep persistent data"
+    echo "  reset-data [prod|dev|infrastructure]  - ⚠️  DANGER: Clear ALL data volumes"
+    echo "  cleanup                                - Remove orphaned containers and volumes"
+    echo "  backup <create|list|restore|help>      - Data backup operations"
     echo ""
     echo "Development:"
     echo "  build-push [options]     - Build and push Docker image to Docker Hub"
     echo ""
     echo "Modes:"
     echo "  prod           - Full production deployment (Discord bot + all services in containers)"
+    echo "  dev            - Full development deployment with hot-reload and mounted source code"
     echo "  infrastructure - Infrastructure services only (for developers running bot natively)"
     echo ""
     echo ""
     echo "Examples:"
     echo "  $0 start prod                     # Full production deployment"
-    echo "  $0 start infrastructure           # Start databases only (recommended for development)"
-    echo "  $0 restart prod                   # Restart production services"
-    echo "  $0 restart-all infrastructure     # Restart all infrastructure, preserve data"
-    echo "  $0 restart-clean infrastructure   # Restart all, clear cache only"
-    echo "  $0 clear-cache infrastructure     # Clear cache without restarting"
-    echo "  $0 logs                           # View bot logs"
+    echo "  $0 start dev                      # Development with hot-reload (recommended for dev)"
+    echo "  $0 start infrastructure           # Start databases only (for native Python development)"
+    echo "  $0 restart dev                    # Restart development services with code changes"
+    echo "  $0 restart-all dev                # Restart all dev services, preserve data"
+    echo "  $0 restart-clean dev              # Restart all, clear cache only"
+    echo "  $0 clear-cache dev                # Clear cache without restarting"
+    echo "  $0 logs                           # View bot logs (auto-detects mode)"
     echo "  $0 logs redis                     # View redis logs"
     echo "  $0 stop                           # Stop (auto-detects mode)"
     echo "  $0 cleanup                        # Clean orphaned containers"
+    echo ""
+    echo "💡 Development Mode Benefits (dev):"
+    echo "   • 🔄 Hot-reload: Code changes automatically restart the bot"
+    echo "   • 📁 Local mounts: /src, /prompts, /config directories mounted from host"
+    echo "   • 🐛 Debug logging: Detailed logs and error information"
+    echo "   • 🏥 Health checks: Monitor bot status during development"
+    echo "   • 🚀 Full stack: All services running in containers for consistency"
     echo ""
     echo "💡 Data Persistence Guide:"
     echo "   • restart         → Bot only, everything preserved"
@@ -234,13 +244,15 @@ start_bot() {
     
     # Require explicit mode selection
     if [[ -z "$mode" ]]; then
-        print_error "Mode is required. Please specify: prod or infrastructure"
+        print_error "Mode is required. Please specify: prod, dev, or infrastructure"
         echo ""
         echo "Usage: $0 start <mode>"
         echo "  prod           - Full production deployment (Discord bot + all services)"
+        echo "  dev            - Full development deployment with hot-reload and mounted code"
         echo "  infrastructure - Infrastructure services only (for native bot development)" 
         echo ""
-        echo "💡 For development, we recommend: python run.py (after starting infrastructure)"
+        echo "💡 For development, we recommend: $0 start dev (for containerized development with hot-reload)"
+        echo "💡 Or: python run.py (after starting infrastructure for native development)"
         exit 1
     fi
     
@@ -255,6 +267,12 @@ start_bot() {
                 exit 1
             fi
             ;;
+        "dev")
+            if [[ ! -f "docker-compose.yml" ]] || [[ ! -f "docker-compose.dev.yml" ]]; then
+                print_error "Required compose files not found (docker-compose.yml and docker-compose.dev.yml)"
+                exit 1
+            fi
+            ;;
         "infrastructure")
             if [[ ! -f "docker-compose.yml" ]]; then
                 print_error "docker-compose.yml not found"
@@ -263,7 +281,7 @@ start_bot() {
             ;;
         *)
             print_error "Invalid mode: $mode"
-            echo "Valid modes: prod, infrastructure"
+            echo "Valid modes: prod, dev, infrastructure"
             exit 1
             ;;
     esac
@@ -288,6 +306,38 @@ start_bot() {
             echo "   $0 logs        # View logs"
             echo "   $0 stop        # Stop bot"
             echo "   $0 status      # Check status"
+            ;;
+        "dev")
+            echo "🚀 Starting Discord Bot in Development Mode with Hot-Reload..."
+            echo "   🔄 Code changes will automatically reload"
+            echo "   📁 Local prompts and config mounted"
+            echo "   🐛 Debug mode enabled with detailed logging"
+            
+            $COMPOSE_CMD -f docker-compose.yml -f docker-compose.dev.yml up -d --build
+            
+            # Use improved health check waiting
+            if wait_for_services "-f docker-compose.yml -f docker-compose.dev.yml"; then
+                print_status "Bot started in development mode with all services healthy!"
+                echo ""
+                echo "🏥 Health Check: http://localhost:9090/health"
+                echo "📊 Bot Status: http://localhost:9090/status" 
+                echo "🔄 Hot-reload: Code changes will automatically restart the bot"
+            else
+                print_warning "Some services may still be initializing"
+            fi
+            
+            echo ""
+            echo "📋 Development Features:"
+            echo "   • Hot-reload: Edit code and see changes instantly"
+            echo "   • Debug logging: Detailed logs for troubleshooting"
+            echo "   • Local mounts: /src, /prompts, /config directories mounted"
+            echo "   • Health endpoints: Monitor bot status during development"
+            echo ""
+            echo "📋 Quick Commands:"
+            echo "   $0 logs        # View detailed debug logs"
+            echo "   $0 stop        # Stop development environment"
+            echo "   $0 status      # Check service health"
+            echo "   $0 restart dev # Restart with code changes"
             ;;
         "infrastructure")
             echo "🚀 Starting infrastructure services for native development..."
@@ -411,6 +461,9 @@ stop_bot() {
             # Check if prod compose is running
             if $COMPOSE_CMD -f docker-compose.yml -f docker-compose.prod.yml ps -q 2>/dev/null | grep -q .; then
                 mode="prod"
+            # Check if dev compose is running
+            elif $COMPOSE_CMD -f docker-compose.yml -f docker-compose.dev.yml ps -q 2>/dev/null | grep -q .; then
+                mode="dev"
             else
                 mode="infrastructure"  # fallback to infrastructure mode
             fi
@@ -418,6 +471,7 @@ stop_bot() {
             print_warning "No running containers detected. Stopping all compose configurations..."
             $COMPOSE_CMD down 2>/dev/null || true
             $COMPOSE_CMD -f docker-compose.yml -f docker-compose.prod.yml down 2>/dev/null || true
+            $COMPOSE_CMD -f docker-compose.yml -f docker-compose.dev.yml down 2>/dev/null || true
             print_status "Services stopped!"
             return 0
         fi
@@ -432,6 +486,14 @@ stop_bot() {
             echo "   🗄️ Stopping datastores..."
             $COMPOSE_CMD -f docker-compose.yml -f docker-compose.prod.yml down
             ;;
+        "dev")
+            echo "🛑 Stopping development services..."
+            # Graceful shutdown: Bot first, then datastores
+            echo "   🤖 Stopping development bot..."
+            $COMPOSE_CMD -f docker-compose.yml -f docker-compose.dev.yml stop whisperengine-bot 2>/dev/null || true
+            echo "   🗄️ Stopping datastores..."
+            $COMPOSE_CMD -f docker-compose.yml -f docker-compose.dev.yml down
+            ;;
         "infrastructure")
             echo "🛑 Stopping infrastructure services..."
             echo "   💡 Note: Your native Discord bot (if running) will continue running"
@@ -439,7 +501,7 @@ stop_bot() {
             ;;
         *)
             print_error "Invalid mode: $mode"
-            echo "Valid modes: prod, infrastructure"
+            echo "Valid modes: prod, dev, infrastructure"
             exit 1
             ;;
     esac
@@ -462,6 +524,8 @@ show_logs() {
     local compose_files=""
     if $COMPOSE_CMD -f docker-compose.yml -f docker-compose.prod.yml ps -q 2>/dev/null | grep -q .; then
         compose_files="-f docker-compose.yml -f docker-compose.prod.yml"
+    elif $COMPOSE_CMD -f docker-compose.yml -f docker-compose.dev.yml ps -q 2>/dev/null | grep -q .; then
+        compose_files="-f docker-compose.yml -f docker-compose.dev.yml"
     else
         compose_files=""  # Default to base compose only (infrastructure mode)
     fi
@@ -576,10 +640,11 @@ restart_bot() {
     
     # Require explicit mode selection
     if [[ -z "$mode" ]]; then
-        print_error "Mode is required. Please specify: prod or infrastructure"
+        print_error "Mode is required. Please specify: prod, dev, or infrastructure"
         echo ""
         echo "Usage: $0 restart <mode>"
         echo "  prod           - Restart production bot container"
+        echo "  dev            - Restart development bot container with hot-reload"
         echo "  infrastructure - Restart infrastructure services only"
         echo ""
         echo "💡 For native development, restart your Python process manually."
@@ -607,6 +672,23 @@ restart_bot() {
                 print_warning "Bot container may still be starting. Check status with: $0 status"
             fi
             ;;
+        "dev")
+            compose_files="-f docker-compose.yml -f docker-compose.dev.yml"
+            echo "🔄 Restarting development bot container with hot-reload..."
+            eval "$COMPOSE_CMD $compose_files restart whisperengine-bot"
+            
+            # Wait a moment for the container to be ready
+            echo "⏳ Waiting for bot to restart..."
+            sleep 3
+            
+            # Check if the bot container is running
+            if eval "$COMPOSE_CMD $compose_files ps whisperengine-bot" | grep -q "Up"; then
+                print_status "Development bot container restarted successfully!"
+                echo "🔄 Hot-reload is active - code changes will automatically restart the bot"
+            else
+                print_warning "Bot container may still be starting. Check status with: $0 status"
+            fi
+            ;;
         "infrastructure")
             echo "🔄 Restarting infrastructure services..."
             $COMPOSE_CMD restart postgres redis chromadb neo4j
@@ -619,7 +701,7 @@ restart_bot() {
             ;;
         *)
             print_error "Invalid mode: $mode"
-            echo "Valid modes: prod, infrastructure"
+            echo "Valid modes: prod, dev, infrastructure"
             exit 1
             ;;
     esac
@@ -630,7 +712,7 @@ restart_all() {
     
     # Require explicit mode selection
     if [[ -z "$mode" ]]; then
-        print_error "Mode is required. Please specify: prod or infrastructure"
+        print_error "Mode is required. Please specify: prod, dev, or infrastructure"
         echo ""
         echo "Usage: $0 restart-all <mode>"
         echo "💡 This preserves all data (memories, embeddings, relationships)"
@@ -653,7 +735,7 @@ restart_clean() {
     
     # Require explicit mode selection
     if [[ -z "$mode" ]]; then
-        print_error "Mode is required. Please specify: prod or infrastructure"
+        print_error "Mode is required. Please specify: prod, dev, or infrastructure"
         echo ""
         echo "Usage: $0 restart-clean <mode>"
         echo "💡 This clears cache but preserves memories and embeddings"
@@ -702,7 +784,7 @@ reset_data() {
     
     # Require explicit mode selection
     if [[ -z "$mode" ]]; then
-        print_error "Mode is required. Please specify: prod or infrastructure"
+        print_error "Mode is required. Please specify: prod, dev, or infrastructure"
         echo ""
         echo "Usage: $0 reset-data <mode>"
         exit 1
@@ -735,6 +817,9 @@ reset_data() {
     case $mode in
         "prod")
             compose_files="-f docker-compose.yml -f docker-compose.prod.yml"
+            ;;
+        "dev")
+            compose_files="-f docker-compose.yml -f docker-compose.dev.yml"
             ;;
         "infrastructure")
             compose_files=""

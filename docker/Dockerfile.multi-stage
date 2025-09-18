@@ -1,5 +1,5 @@
 # Multi-stage Dockerfile for production optimization
-FROM python:3.11-slim AS base
+FROM python:3.12-slim AS base
 
 # Build arguments for flexible configuration
 ARG SYSTEM_PROMPT_SOURCE=prompts/default.md
@@ -56,21 +56,29 @@ FROM base AS production
 # Copy dependency files for better layer caching
 COPY requirements-core.txt requirements-platform.txt requirements-discord.txt ./
 
-# Install Python dependencies with cache mount for faster builds
-RUN --mount=type=cache,target=/root/.cache/pip \
-    pip install --no-cache-dir -r requirements-core.txt && \
-    pip install --no-cache-dir -r requirements-platform.txt && \
-    pip install --no-cache-dir -r requirements-discord.txt && \
-    python -m spacy download en_core_web_sm
+    # Install Python dependencies with cache mount for faster builds
+    RUN --mount=type=cache,target=/root/.cache/pip \
+        pip install --no-cache-dir -r requirements-core.txt && \
+        pip install --no-cache-dir -r requirements-platform.txt && \
+        pip install --no-cache-dir -r requirements-discord.txt && \
+        python -m spacy download en_core_web_sm
 
-# Copy only necessary application files
-COPY src/ ./src/
-COPY pyproject.toml validate_config.py env_manager.py run.py ./
-COPY prompts/ ./prompts/
-COPY config/ ./config/
-COPY data/ ./data/
+    # Copy model download script and download all models during build
+    COPY scripts/download_models.py ./
+    RUN python download_models.py
 
-# Create non-root user and directories
+    # Copy only necessary application files
+    COPY src/ ./src/
+    COPY pyproject.toml validate_config.py env_manager.py run.py ./
+    COPY prompts/ ./prompts/
+    COPY config/ ./config/
+    COPY data/ ./data/
+
+    # Pre-download and bundle AI models to eliminate runtime network dependencies
+    COPY scripts/download_models.py ./scripts/
+    RUN python scripts/download_models.py
+
+    # Create non-root user and directories
 RUN useradd --create-home --no-log-init appuser && \
     mkdir -p backups privacy_data temp_images logs && \
     chown -R appuser:appuser /app && \
@@ -90,7 +98,7 @@ CMD ["sh", "-c", "python validate_config.py && python run.py"]
 
 # ============================================================================
 # Minimal/End-user stage (even smaller)
-FROM python:3.11-alpine AS minimal
+FROM python:3.12-slim AS minimal
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
@@ -99,9 +107,9 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /app
 
 # Install minimal dependencies
-RUN apk add --no-cache \
-    gcc musl-dev libffi-dev openssl-dev \
-    ffmpeg opus-dev wget netcat-openbsd procps && \
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc g++ libffi-dev libssl-dev \
+    ffmpeg libopus-dev wget netcat-openbsd procps && \
     pip install --upgrade pip
 
 # Copy dependency files for better layer caching
@@ -112,7 +120,9 @@ RUN pip install --no-cache-dir -r requirements-core.txt && \
     pip install --no-cache-dir -r requirements-platform.txt && \
     pip install --no-cache-dir -r requirements-discord.txt && \
     python -m spacy download en_core_web_sm && \
-    apk del gcc musl-dev libffi-dev openssl-dev
+    apt-get remove -y gcc g++ libffi-dev libssl-dev && \
+    apt-get autoremove -y && apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
 # Copy application
 COPY src/ ./src/

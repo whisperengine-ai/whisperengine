@@ -56,6 +56,25 @@ def download_emotion_models():
         logger.error(f"❌ Failed to download emotion models: {e}")
         return False
 
+def download_spacy_models():
+    """Download spaCy NLP models"""
+    try:
+        import spacy
+        from spacy.cli import download
+        
+        models_dir = Path("/app/models/spacy")
+        models_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Download English model
+        logger.info("📥 Downloading spaCy model: en_core_web_sm")
+        download("en_core_web_sm")
+        logger.info("✅ spaCy model en_core_web_sm downloaded successfully")
+        
+        return True
+    except Exception as e:
+        logger.error(f"❌ Failed to download spaCy models: {e}")
+        return False
+
 def create_model_config():
     """Create configuration file for local model paths"""
     config = {
@@ -64,6 +83,9 @@ def create_model_config():
         },
         "emotion_models": {
             "roberta_sentiment": "/app/models/emotion/roberta-sentiment"
+        },
+        "spacy_models": {
+            "english": "en_core_web_sm"
         },
         "model_cache_dir": "/app/models",
         "offline_mode": True
@@ -110,13 +132,16 @@ def main():
     if download_emotion_models():
         success_count += 1
     
+    if download_spacy_models():
+        success_count += 1
+    
     # Create configuration
     create_model_config()
     
     # Verify everything downloaded
     if verify_downloads():
         logger.info("🎉 All models downloaded successfully!")
-        logger.info("💾 Total models bundled: 2 (1 embedding + 1 emotion)")
+        logger.info("💾 Total models bundled: 3 (1 embedding + 1 emotion + 1 spaCy)")
         
         # Calculate approximate sizes
         total_size = 0

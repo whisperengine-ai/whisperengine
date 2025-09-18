@@ -232,7 +232,7 @@ python test_llm_integration.py
 #### **Single Container (Desktop)**
 ```dockerfile
 # Dockerfile.desktop
-FROM python:3.9-slim
+FROM python:3.13-slim
 
 # Copy app and models
 COPY . /app

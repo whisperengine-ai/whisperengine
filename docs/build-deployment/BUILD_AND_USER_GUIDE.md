@@ -128,7 +128,7 @@ CONVERSATION_CACHE_SIZE=100
 
 ### **Prerequisites**
 
-- Python 3.9+ 
+- Python 3.13+ 
 - Git
 - 16GB+ RAM (for model downloads)
 - 10GB+ free disk space
