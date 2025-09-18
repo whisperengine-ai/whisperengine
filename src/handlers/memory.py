@@ -155,7 +155,7 @@ class MemoryCommandHandlers:
                     color=0x3498DB,
                 )
                 embed.add_field(
-                    name="🚀 Get Started",
+                    name="✨ Get Started",
                     value="� **Chat more** to build your personality profile\n"
                     "🎯 **Share interests** and preferences\n"
                     "🤖 **AI learns** your communication style automatically\n"
@@ -1593,7 +1593,7 @@ class MemoryCommandHandlers:
             "life_context": "🏠",
             "social_dynamics": "👥",
             "learning_style": "📚",
-            "goal_setting": "🚀",
+            "goal_setting": "✨",
             "problem_solving": "🧩",
             "relationship_patterns": "🤝",
             "behavioral_traits": "🎪",

@@ -504,7 +504,13 @@ class EngagementTracker:
         # Save data
         self._save_persisted_data()
         
-        logger.info(f"Generated engagement summary: {len(active_24h)} active users")
+        # Only log when there are active users or when in debug mode
+        if len(active_24h) > 0:
+            logger.info(f"Generated engagement summary: {len(active_24h)} active users")
+        else:
+            # Downgrade to debug level for zero activity to reduce log noise
+            logger.debug(f"Generated engagement summary: 0 active users")
+            
         return summary
     
     def export_engagement_report(self, days: int = 7) -> Dict[str, Any]:

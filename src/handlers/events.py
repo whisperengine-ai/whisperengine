@@ -326,7 +326,7 @@ class BotEventHandlers:
         # Initialize Production Optimization System if available
         if hasattr(self.bot_core, "production_adapter") and self.bot_core.production_adapter:
             try:
-                logger.info("🚀 Initializing Production Optimization System...")
+                logger.info("✨ Initializing Production Optimization System...")
                 success = await self.bot_core.production_adapter.initialize_production_mode()
                 if success:
                     logger.info(
@@ -366,7 +366,7 @@ class BotEventHandlers:
                 logger.error(f"Error checking LLM connection: {e}")
 
         # Log successful startup
-        logger.info("🚀 Bot initialization complete - ready to chat!")
+        logger.info("✨ Bot initialization complete - ready to chat!")
 
         # Emit diagnostic warning if minimal context mode is active
         if _minimal_context_mode_enabled():
@@ -1202,7 +1202,7 @@ class BotEventHandlers:
                     # Analyze conversation for human-like response guidance
                     from src.utils.human_like_conversation_engine import analyze_conversation_for_human_response
                     
-                    conversation_analysis = analyze_conversation_for_human_response(
+                    conversation_analysis = await analyze_conversation_for_human_response(
                         user_id=user_id,
                         message=message.content,
                         conversation_history=[{"content": msg} for msg in conversation_history],
@@ -1666,6 +1666,11 @@ class BotEventHandlers:
     ):
         """Store conversation in memory with all AI analysis data."""
         try:
+            # Validate response before storing
+            if not response or not response.strip():
+                logger.warning("Attempted to store conversation with empty response for user %s", user_id)
+                return  # Skip storage for empty responses
+                
             # Extract content for storage
             content_to_store = original_content if original_content else message.content
             storage_content = extract_text_for_memory_storage(content_to_store, message.attachments)
@@ -2018,17 +2023,23 @@ class BotEventHandlers:
             return None
 
     async def _send_response_chunks(self, channel, response):
-        """Send response in chunks if it's too long."""
+        """Send response in chunks if it's too long. Prevent sending empty/whitespace-only messages."""
+        if not response or not str(response).strip():
+            logger.warning("Attempted to send empty or whitespace-only message. Skipping send.")
+            return
         if len(response) > 2000:
             chunks = [response[i : i + 1900] for i in range(0, len(response), 1900)]
             logger.info(
                 f"Response too long ({len(response)} chars), splitting into {len(chunks)} chunks"
             )
             for i, chunk in enumerate(chunks):
-                await channel.send(
-                    f"{chunk}" + (f"\n*(continued {i+1}/{len(chunks)})*" if len(chunks) > 1 else "")
-                )
-                logger.debug(f"Sent chunk {i+1}/{len(chunks)}")
+                if chunk and str(chunk).strip():
+                    await channel.send(
+                        f"{chunk}" + (f"\n*(continued {i+1}/{len(chunks)})*" if len(chunks) > 1 else "")
+                    )
+                    logger.debug(f"Sent chunk {i+1}/{len(chunks)}")
+                else:
+                    logger.warning(f"Skipped sending empty chunk {i+1}/{len(chunks)}")
         else:
             await channel.send(response)
             logger.debug("Sent single message response")

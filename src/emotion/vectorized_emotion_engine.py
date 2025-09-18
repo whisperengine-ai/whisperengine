@@ -436,8 +436,8 @@ class ProductionEmotionEngine:
         # Performance tracking
         self.cache_hits = 0
         self.cache_misses = 0
-
-        logger.info(f"🚀 Initialized ProductionEmotionEngine with caching={enable_caching}")
+        
+        logger.info(f"✨ Initialized ProductionEmotionEngine with caching={enable_caching}")
 
     async def analyze_emotion(
         self, text: str, user_id: str | None = None, metadata: dict[str, Any] | None = None

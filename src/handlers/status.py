@@ -318,7 +318,7 @@ class StatusCommandHandlers:
         )
 
         embed.add_field(
-            name="🚀 Performance Benefits",
+            name="✨ Performance Benefits",
             value="• Reduces Discord API calls by ~90%\n"
             "• Faster response times for active conversations\n"
             "• Automatic cache refresh when stale",

@@ -113,3 +113,6 @@ docker-data/
 *.ckpt
 
 # Temporary development files
+
+# Data and runtime files
+/data/

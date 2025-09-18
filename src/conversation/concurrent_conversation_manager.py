@@ -195,7 +195,7 @@ class ConcurrentConversationManager:
         self._cache_lock = threading.RLock()
 
         logger.info(
-            f"🚀 Initialized ConcurrentConversationManager "
+            f"✨ Initialized ConcurrentConversationManager "
             f"(sessions: {max_concurrent_sessions}, "
             f"threads: {max_workers_threads}, "
             f"processes: {max_workers_processes})"

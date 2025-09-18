@@ -217,7 +217,7 @@ class FirstRunDetector:
    • Local (Free): LM Studio (localhost:1234) or Ollama (localhost:11434)
    • Cloud (Paid): OpenAI (api.openai.com) or OpenRouter (openrouter.ai)
 
-🚀 Quick Commands:
+✨ Quick Commands:
    • Discord Bot: python run.py
    • Desktop App: python universal_native_app.py
    • Setup Wizard: python setup_wizard.py

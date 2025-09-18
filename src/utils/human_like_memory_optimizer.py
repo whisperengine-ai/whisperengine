@@ -296,31 +296,14 @@ POSITIVE ENERGY FOCUS: They're sharing good feelings. Help find:
         # Output format optimized for human-like conversation
         prompt += """
 
-Generate memory search queries that feel natural and human-like:
+Respond with ONLY this JSON format (keep it minimal):
 
 {
-    "queries": [
-        {
-            "query": "natural search terms (how a human would think about it)",
-            "weight": 1.0,
-            "query_type": "emotional|personal|topical|contextual|relational",
-            "confidence": 0.9,
-            "reasoning": "why this memory association makes human sense"
-        }
-    ],
-    "emotional_keywords": ["feeling-related terms that matter"],
-    "personal_markers": ["personally significant elements"],
-    "conversation_flow": "how this connects to our ongoing relationship",
-    "memory_priority": "what type of memory would be most helpful right now",
-    "human_association": "how a caring friend would naturally recall this"
+    "queries": [{"query": "search terms", "weight": 1.0}],
+    "conversation_flow": "connection_type"
 }
 
-FOCUS ON:
-✓ Emotional resonance and personal connection
-✓ Natural language the user actually uses
-✓ Memories that build conversational continuity
-✓ Context that shows you understand and care
-✓ Associations a human friend would naturally make"""
+IMPORTANT: Be very concise. Complete the JSON properly."""
 
         return prompt
 

@@ -895,10 +895,18 @@ class UniversalChatOrchestrator:
                 try:
                     memory_moments = self.bot_core.memory_moments
                     # Discover memory connections for current conversation
-                    memory_connections = await memory_moments.discover_memory_connections(
-                        user_id=message.user_id,
-                        current_message=message.content,
-                        conversation_context=relevant_memories,
+                    # Build conversation_entry as required by _discover_memory_connections
+                    conversation_entry = {
+                        "timestamp": datetime.now(),
+                        "context_id": getattr(message, "context_id", "universal_chat"),
+                        "message": message.content,
+                        "emotional_context": getattr(message, "emotional_context", None),
+                        "keywords": memory_moments._extract_keywords(message.content) if hasattr(memory_moments, "_extract_keywords") else [],
+                        "themes": memory_moments._identify_themes(message.content) if hasattr(memory_moments, "_identify_themes") else [],
+                    }
+                    memory_connections = await memory_moments._discover_memory_connections(
+                        message.user_id,
+                        conversation_entry
                     )
 
                     if memory_connections:
@@ -1257,7 +1265,7 @@ You provide:
 - 🧠 Advanced conversation memory and context awareness
 - 💭 Emotional intelligence and empathy
 - 🔒 Privacy-focused interactions
-- 🚀 Multi-platform support (Discord, Web, Slack, API)
+- ✨ Multi-platform support (Discord, Web, Slack, API)
 
 You adapt your responses based on the platform and conversation context. Be helpful, engaging, and demonstrate emotional intelligence in your responses.""",
                 }
@@ -1634,7 +1642,7 @@ You provide:
 - 🧠 Advanced conversation memory and context awareness
 - 💭 Emotional intelligence and empathy
 - 🔒 Privacy-focused interactions
-- 🚀 Multi-platform support (Discord, Web, Slack, API)
+- ✨ Multi-platform support (Discord, Web, Slack, API)
 
 You adapt your responses based on the platform and conversation context. Be helpful, engaging, and demonstrate emotional intelligence in your responses."""
 

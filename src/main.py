@@ -71,7 +71,7 @@ class ModularBotManager:
     async def initialize(self):
         """Initialize all bot components with enhanced error handling and validation."""
         try:
-            logger.info("🚀 Initializing WhisperEngine Bot with modular architecture...")
+            logger.info("✨ Initializing WhisperEngine Bot with modular architecture...")
 
             # Step 0: Quick configuration validation
             logger.info("🔍 Validating configuration...")

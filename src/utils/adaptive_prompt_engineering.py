@@ -587,7 +587,7 @@ nuanced emotional understanding, sophisticated conversation patterns, creative e
         if capabilities.size == ModelSize.SMALL:
             recommendations.extend([
                 "✨ Using minimal templates optimized for small models",
-                "🚀 Aggressive prompt compression active for better performance",
+                "✨ Aggressive prompt compression active for better performance",
                 "💡 Consider upgrading to a larger model for richer conversations"
             ])
         elif capabilities.size == ModelSize.MEDIUM:
