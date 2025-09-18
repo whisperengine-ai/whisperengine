@@ -3,6 +3,7 @@ Automatic fact extraction system for Discord bot conversations
 """
 
 import logging
+import os
 import re
 
 logger = logging.getLogger(__name__)
@@ -47,6 +48,11 @@ class GlobalFactExtractor:
 
         # Clean and normalize user message
         message = self._clean_message(user_message)
+
+        # REDUNDANCY CHECK: Skip LLM fact extraction if disabled (local patterns used instead)
+        if os.getenv("DISABLE_REDUNDANT_FACT_EXTRACTION", "true").lower() == "true":
+            logger.debug("Skipping LLM fact extraction (redundant - using local patterns instead)")
+            return facts  # Return empty list, memory manager uses local pattern extraction
 
         # Use LLM-based fact extraction
         try:
