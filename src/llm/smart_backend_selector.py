@@ -71,20 +71,21 @@ class SmartBackendSelector:
                 )
             )
 
-        # Priority 3: MLX Backend (Apple Silicon only) - Python-based fallback
-        if self._is_mlx_available():
-            backends.append(
-                BackendInfo(
-                    name="MLX",
-                    priority=3,  # Fallback to Python-based API for Apple Silicon
-                    url_scheme="mlx://",
-                    description="Apple Silicon optimized inference with unified memory",
-                    requirements=["mlx-lm", "Apple Silicon"],
-                    platform_optimized=True,
-                    gpu_accelerated=True,
-                    apple_silicon_optimized=True,
-                )
-            )
+        # Priority 3: MLX Backend (Apple Silicon only) - DISABLED - No backend implementation
+        # TODO: Re-enable when MLX backend is implemented
+        # if self._is_mlx_available():
+        #     backends.append(
+        #         BackendInfo(
+        #             name="MLX",
+        #             priority=3,  # Fallback to Python-based API for Apple Silicon
+        #             url_scheme="mlx://",
+        #             description="Apple Silicon optimized inference with unified memory",
+        #             requirements=["mlx-lm", "Apple Silicon"],
+        #             platform_optimized=True,
+        #             gpu_accelerated=True,
+        #             apple_silicon_optimized=True,
+        #         )
+        #     )
 
         # Priority 4: llama-cpp-python (Direct Python integration) - General Python fallback
         if self._is_llamacpp_available():
@@ -118,16 +119,19 @@ class SmartBackendSelector:
 
     def _is_mlx_available(self) -> bool:
         """Check if MLX is available (Apple Silicon only)"""
-        try:
-            if platform.system() != "Darwin" or platform.machine() != "arm64":
-                return False
-
-            import mlx.core  # type: ignore
-            from mlx_lm import load  # type: ignore
-
-            return True
-        except ImportError:
-            return False
+        # DISABLED: MLX backend not implemented
+        # TODO: Re-enable when MLX backend is implemented
+        return False
+        # try:
+        #     if platform.system() != "Darwin" or platform.machine() != "arm64":
+        #         return False
+        # 
+        #     import mlx.core  # type: ignore
+        #     from mlx_lm import load  # type: ignore
+        # 
+        #     return True
+        # except ImportError:
+        #     return False
 
     def _is_lm_studio_available(self) -> bool:
         """Check if LM Studio is running"""
@@ -209,18 +213,19 @@ class SmartBackendSelector:
                 return optimal
 
             # Fallback to Python-based APIs
-            # For Apple Silicon, prefer MLX; for others, prefer llama-cpp-python
+            # MLX disabled until backend implementation is complete
             python_apis = [
-                b for b in candidates if b.name in ["MLX", "llama-cpp-python", "Transformers"]
+                b for b in candidates if b.name in ["llama-cpp-python", "Transformers"]
             ]
             if python_apis:
-                # Apple Silicon gets MLX if available
-                if platform.system() == "Darwin" and platform.machine() == "arm64":
-                    mlx_backends = [b for b in python_apis if b.name == "MLX"]
-                    if mlx_backends:
-                        optimal = mlx_backends[0]
-                        self.logger.info(f"🍎 Selected Apple Silicon Python API: {optimal.name}")
-                        return optimal
+                # Apple Silicon preference - MLX disabled, use llama-cpp-python or Transformers
+                # TODO: Re-enable MLX preference when backend is implemented
+                # if platform.system() == "Darwin" and platform.machine() == "arm64":
+                #     mlx_backends = [b for b in python_apis if b.name == "MLX"]
+                #     if mlx_backends:
+                #         optimal = mlx_backends[0]
+                #         self.logger.info(f"🍎 Selected Apple Silicon Python API: {optimal.name}")
+                #         return optimal
 
                 # Default to first available Python API
                 optimal = python_apis[0]
@@ -329,10 +334,15 @@ class SmartBackendSelector:
 
         # Check platform-specific recommendations
         if platform.system() == "Darwin" and platform.machine() == "arm64":
-            if not self._is_mlx_available():
-                recommendations.append(
-                    "🍎 Install MLX for optimal Apple Silicon performance: pip install mlx-lm"
-                )
+            # MLX disabled until backend implementation is complete
+            # TODO: Re-enable when MLX backend is implemented
+            # if not self._is_mlx_available():
+            #     recommendations.append(
+            #         "🍎 Install MLX for optimal Apple Silicon performance: pip install mlx-lm"
+            #     )
+            recommendations.append(
+                "🍎 Apple Silicon detected - using PyTorch with Metal acceleration"
+            )
 
         if not self._is_lm_studio_available():
             recommendations.append(

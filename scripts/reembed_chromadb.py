@@ -32,7 +32,7 @@ Options:
     --dry-run                  Show plan only, no changes
 
 Environment variables respected:
-    USE_CHROMADB_HTTP, CHROMADB_HOST, CHROMADB_PORT, CHROMADB_PATH
+    CHROMADB_HOST, CHROMADB_PORT
 
 Backup export file naming:
     chroma_export_<collection>_<timestamp>.json
@@ -85,17 +85,12 @@ def parse_args() -> argparse.Namespace:
 
 
 def connect_client(args: argparse.Namespace):
-    use_http = os.getenv("USE_CHROMADB_HTTP", "false").lower() == "true"
+    # Always use HTTP client for ChromaDB
     host = args.host or os.getenv("CHROMADB_HOST", "localhost")
     port = args.port or int(os.getenv("CHROMADB_PORT", "8000"))
-    persist_path = args.persist_path or os.getenv("CHROMADB_PATH", "./chromadb_data")
 
-    if use_http:
-        print(f"🌐 Connecting to ChromaDB HTTP at {host}:{port}")
-        return chromadb.HttpClient(host=host, port=port)
-    else:
-        print(f"📁 Connecting to local ChromaDB at {persist_path}")
-        return chromadb.Client(Settings(is_persistent=True, persist_directory=persist_path))
+    print(f"🌐 Connecting to ChromaDB HTTP at {host}:{port}")
+    return chromadb.HttpClient(host=host, port=port)
 
 
 def list_collections(client) -> List[str]:

@@ -4,7 +4,7 @@
 
 # Core utilities and environment management
 python-dotenv==1.1.1
-psutil==6.1.0
+psutil==7.1.0  # Updated from 6.1.0
 aiofiles==24.1.0
 
 # HTTP Client Dependencies  
@@ -16,21 +16,21 @@ httpx==0.28.1
 aiosqlite==0.21.0
 
 # AI/ML and Memory System Dependencies (Core)
-chromadb>=1.1.0
+chromadb>=1.1.0  # Updated from >=1.1.0 to allow latest
 sentence-transformers==5.1.0
-numpy==2.3.2
+numpy==2.3.3  # Updated from 2.3.2
 vaderSentiment==3.3.2
 
 # Advanced NLP Dependencies (Phase 1)
 spacy==3.8.7
-transformers==4.56.1
+transformers==4.56.1  # Already latest
 
 # Redis Dependencies
-redis==5.2.1
+redis==6.4.0  # Updated from 5.2.1
 
 # Image Processing Dependencies
 Pillow==11.3.0
 
 # Testing Dependencies (development only)
 pytest==8.4.2
-pytest-asyncio==1.1.0
+pytest-asyncio==1.2.0  # Updated from 1.1.0

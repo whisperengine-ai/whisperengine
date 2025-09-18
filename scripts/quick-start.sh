@@ -214,7 +214,7 @@ NEO4J_PASSWORD=neo4j
 DEBUG_MODE=false
 LOG_LEVEL=INFO
 USE_REDIS_CACHE=true
-USE_CHROMADB_HTTP=true
+# ChromaDB always uses HTTP client mode
 EOF
     
     # Also create visible copy

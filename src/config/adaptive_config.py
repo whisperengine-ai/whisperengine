@@ -50,7 +50,7 @@ class DatabaseConfig:
     """Database configuration"""
 
     primary_type: str  # sqlite, postgresql
-    vector_type: str  # local_chromadb, http_chromadb, distributed_chromadb
+    vector_type: str  # http_chromadb, distributed_chromadb
     cache_type: str  # memory, redis, redis_cluster
     connection_pool_size: int
     backup_enabled: bool
@@ -262,7 +262,7 @@ class ConfigurationOptimizer:
         if scale_tier == 1:  # Desktop/Constrained
             return DatabaseConfig(
                 primary_type="sqlite",
-                vector_type="local_chromadb",
+                vector_type="http_chromadb",  # Always use HTTP client
                 cache_type="memory",
                 connection_pool_size=2,
                 backup_enabled=True,

@@ -3,24 +3,24 @@
 # All versions locked for reproducible builds
 
 # Discord Bot Framework
-discord.py==2.6.3
+discord.py==2.6.3  # Already latest
 
 # PostgreSQL Dependencies (Production Discord Bot)
 asyncpg==0.30.0  # For main connection pool and privacy manager
-psycopg[binary]==3.2.3  # Alternative PostgreSQL driver
+psycopg[binary]==3.2.10  # Updated from 3.2.3
 psycopg2-binary==2.9.10  # Synchronous PostgreSQL driver for emotion manager
 
 # Neo4j Graph Database Dependencies (Optional)
-neo4j==5.15.0
+neo4j==5.28.2  # Updated from 5.15.0
 networkx==3.5  # For graph analysis and visualization
 matplotlib==3.10.0  # For graph visualization and debugging
 
 # Voice functionality dependencies (Discord-specific)
-PyNaCl==1.5.0
+PyNaCl==1.6.0  # Updated from 1.5.0
 audioop-lts==0.2.2
 
 # API integrations for Discord
-elevenlabs==2.15.0
+elevenlabs==2.16.0  # Updated from 2.15.0
 
 # Local AI processing for Discord bot
 vaderSentiment==3.3.2  # Fast local emotion analysis
