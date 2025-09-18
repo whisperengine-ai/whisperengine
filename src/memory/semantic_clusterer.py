@@ -64,12 +64,22 @@ class ClusteringMetrics:
 class SemanticMemoryClusterer:
     """Advanced semantic memory clustering system"""
 
-    def __init__(self):
-        """Initialize semantic memory clusterer"""
-        # Historical: All embedding is now local. External embedding manager removed Sept 2025.
-        self.embedding_manager = None
+    def __init__(self, embedding_manager=None):
+        """Initialize semantic memory clusterer with local embedding support"""
+        # Use provided embedding manager or create a local one
+        if embedding_manager:
+            self.embedding_manager = embedding_manager
+        else:
+            try:
+                from src.utils.embedding_manager import LocalEmbeddingManager
+                self.embedding_manager = LocalEmbeddingManager()
+                # Note: initialize() should be called separately in async context
+                logger.info("Created LocalEmbeddingManager (initialization needed)")
+            except ImportError:
+                logger.warning("LocalEmbeddingManager not available - clustering disabled")
+                self.embedding_manager = None
 
-        # No longer use external API calls - clustering now disabled
+        # Clustering configuration
         self.clustering_algorithm = "hierarchical"
         self.similarity_threshold = 0.8
         self.max_cluster_size = 50
@@ -87,9 +97,10 @@ class SemanticMemoryClusterer:
             "hierarchical": {"n_clusters": None, "distance_threshold": 0.4, "linkage": "ward"},
         }
 
-        logger.info(
-            "Semantic Memory Clusterer initialized with local embedding only"
-        )
+        if self.embedding_manager:
+            logger.info("Semantic Memory Clusterer initialized with local embedding support")
+        else:
+            logger.info("Semantic Memory Clusterer initialized with clustering disabled")
 
     @property
     def embedding_model(self):
@@ -218,21 +229,34 @@ class SemanticMemoryClusterer:
             return embeddings
 
         try:
-            logger.debug(f"Computing embeddings for {len(texts)} new memories - external embedding removed")
+            logger.debug(f"Computing embeddings for {len(texts)} new memories using local embedding manager")
 
-            # Historical: External embedding functionality removed Sept 2025.
-            # Semantic clustering is now disabled until local embedding integration is added.
-            logger.warning("Semantic clustering disabled - external embedding removed Sept 2025")
-            return {}
+            # Check if embedding manager is available
+            if not self.embedding_manager:
+                logger.debug("No embedding manager available - skipping embedding generation")
+                return {}
+
+            # Ensure embedding manager is initialized
+            if hasattr(self.embedding_manager, '_is_initialized') and not self.embedding_manager._is_initialized:
+                logger.debug("Initializing embedding manager...")
+                await self.embedding_manager.initialize()
+
+            # Generate embeddings using local embedding manager
+            batch_embeddings = await self.embedding_manager.get_embeddings(texts)
+            
+            if not batch_embeddings:
+                logger.warning("Failed to generate embeddings - empty result from embedding manager")
+                return {}
 
             # Store results and cache them
             for i, memory_id in enumerate(memory_ids):
-                embedding = np.array(batch_embeddings[i])  # Convert to numpy array
-                embeddings[memory_id] = embedding
-                self.embeddings_cache[memory_id] = embedding
+                if i < len(batch_embeddings):
+                    embedding = np.array(batch_embeddings[i])  # Convert to numpy array
+                    embeddings[memory_id] = embedding
+                    self.embeddings_cache[memory_id] = embedding
 
             logger.debug(
-                f"Generated embeddings for {len(texts)} memories via API, total {len(embeddings)} available"
+                f"Generated embeddings for {len(batch_embeddings)} memories via local embedding manager, total {len(embeddings)} available"
             )
             return embeddings
 
@@ -252,10 +276,31 @@ class SemanticMemoryClusterer:
         if len(memories) < self.min_cluster_size:
             return []
 
+        # Check if embeddings are available
+        if not embeddings:
+            logger.debug("No embeddings available for topic clustering - skipping")
+            return []
+
         try:
             # Prepare embedding matrix
             memory_ids = list(embeddings.keys())
             embedding_matrix = np.array([embeddings[mid] for mid in memory_ids])
+
+            # Validate embedding matrix
+            if embedding_matrix.size == 0:
+                logger.debug("Empty embedding matrix - skipping topic clustering")
+                return []
+
+            # Ensure we have a 2D array
+            if embedding_matrix.ndim == 1:
+                logger.debug("1D embedding matrix detected - reshaping or skipping")
+                if len(memory_ids) == 1:
+                    # Single memory, no clustering needed
+                    return []
+                else:
+                    # Unexpected case - log and skip
+                    logger.warning(f"Unexpected 1D array for {len(memory_ids)} memories")
+                    return []
 
             # Perform clustering
             if self.clustering_algorithm == "dbscan":
