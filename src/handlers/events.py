@@ -578,7 +578,8 @@ class BotEventHandlers:
 
         bot_name = os.getenv("DISCORD_BOT_NAME", "").lower()
         fallback_name = "whisperengine"
-        content_words = message.content.lower().split()
+        content_lower = message.content.lower()
+        content_words = content_lower.split()
 
         should_active_reply = False
 
@@ -587,8 +588,19 @@ class BotEventHandlers:
             should_active_reply = True
         else:
             if respond_mode == "name":
-                if (bot_name and bot_name in content_words) or fallback_name in content_words:
+                # Check if bot name appears anywhere in message (improved detection)
+                name_found = False
+                if bot_name:
+                    # Check both as separate word and as substring
+                    if bot_name in content_words or bot_name in content_lower:
+                        name_found = True
+                # Also check fallback name
+                if fallback_name in content_words or fallback_name in content_lower:
+                    name_found = True
+                
+                if name_found:
                     should_active_reply = True
+                    logger.debug(f"Bot name detected in message: '{message.content[:50]}...'")
             elif respond_mode == "all":
                 should_active_reply = True
             # mention mode (default) leaves should_active_reply False unless mentioned
@@ -2173,6 +2185,11 @@ class BotEventHandlers:
             processing_time = time.time() - start_time
             logger.info(f"✅ Parallel AI processing completed in {processing_time:.2f}s for user {user_id}")
             
+            # Return the tuple expected by calling code
+            return (external_emotion_data, phase2_context, current_emotion_data, 
+                   dynamic_personality_context, phase4_context, comprehensive_context, 
+                   enhanced_system_prompt)
+            
         except Exception as e:
             logger.error(f"Parallel AI component processing failed: {e}")
             # Set safe defaults if parallel processing fails
@@ -2183,6 +2200,9 @@ class BotEventHandlers:
             self._last_phase4_context = None
             self._last_comprehensive_context = None
             self._last_enhanced_system_prompt = None
+            
+            # Return safe defaults tuple
+            return (None, None, None, None, None, None, None)
             
     async def _create_none_result(self):
         """Helper method for disabled AI components in parallel processing."""
