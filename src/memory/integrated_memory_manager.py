@@ -32,9 +32,9 @@ class IntegratedMemoryManager:
     ):
         """Initialize integrated memory manager"""
 
-        # Use provided memory manager or create new one with proper external embedding setup
+        # Use provided memory manager or create new one with proper local embedding setup
         if memory_manager is None:
-            # Initialize with the same external embedding configuration as main system
+            # Initialize with the same local embedding configuration as main system
             self.memory_manager = UserMemoryManager(llm_client=llm_client)
         else:
             self.memory_manager = memory_manager

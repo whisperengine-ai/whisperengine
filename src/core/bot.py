@@ -60,14 +60,11 @@ try:
     from src.llm.elevenlabs_client import ElevenLabsClient
     from src.voice.voice_manager import DiscordVoiceManager
 
-    # from src.voice.voice_commands import VoiceCommands  # Disabled - using VoiceCommandHandlers instead
     VOICE_AVAILABLE = True
 except ImportError:
     VOICE_AVAILABLE = False
     ElevenLabsClient = None
     DiscordVoiceManager = None
-
-VoiceCommands = None  # Explicitly set to None - using VoiceCommandHandlers instead
 
 # External API Emotion AI Integration
 try:
@@ -218,7 +215,7 @@ class DiscordBotCore:
             ):
                 self.logger.info("🕸️ Initializing Graph-Enhanced Memory System...")
 
-                # Initialize base memory manager with external embeddings
+                # Initialize base memory manager with local embeddings
                 base_memory_manager = UserMemoryManager(
                     enable_auto_facts=True, enable_global_facts=True, llm_client=base_llm_client
                 )
