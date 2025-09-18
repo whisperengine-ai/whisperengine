@@ -383,42 +383,42 @@ class ConfigurationValidator:
     
     def generate_setup_guide(self) -> str:
         """Generate a personalized setup guide based on validation results"""
-        
+
         required_issues = [r for r in self.validation_results if r.level == ValidationLevel.REQUIRED and not r.is_valid]
         recommended_issues = [r for r in self.validation_results if r.level == ValidationLevel.RECOMMENDED and not r.is_valid]
-        
-        guide = "🚀 **WhisperEngine Setup Guide**\\n\\n"
-        
+
+        guide = "✨ **WhisperEngine Setup Guide**\n\n"
+
         if not required_issues and not recommended_issues:
-            guide += "✅ **Congratulations!** Your configuration looks great!\\n"
-            guide += "You're ready to start your bot with: `python run.py`\\n\\n"
+            guide += "✅ **Congratulations!** Your configuration looks great!\n"
+            guide += "You're ready to start your bot with: `python run.py`\n\n"
         else:
             if required_issues:
-                guide += "🔴 **Required Issues (Must Fix):**\\n"
+                guide += "🔴 **Required Issues (Must Fix):**\n"
                 for issue in required_issues:
-                    guide += f"• **{issue.variable}**: {issue.message}\\n"
+                    guide += f"• **{issue.variable}**: {issue.message}\n"
                     if issue.suggestion:
-                        guide += f"  💡 {issue.suggestion}\\n"
+                        guide += f"  💡 {issue.suggestion}\n"
                     if issue.expected_format:
-                        guide += f"  📝 Format: {issue.expected_format}\\n"
-                guide += "\\n"
-            
+                        guide += f"  📝 Format: {issue.expected_format}\n"
+                guide += "\n"
+
             if recommended_issues:
-                guide += "🟡 **Recommended Improvements:**\\n"
+                guide += "🟡 **Recommended Improvements:**\n"
                 for issue in recommended_issues:
-                    guide += f"• **{issue.variable}**: {issue.message}\\n"
+                    guide += f"• **{issue.variable}**: {issue.message}\n"
                     if issue.suggestion:
-                        guide += f"  💡 {issue.suggestion}\\n"
-                guide += "\\n"
-            
-            guide += "📋 **Next Steps:**\\n"
-            guide += "1. Create or update your `.env` file\\n"
-            guide += "2. Fix the required issues above\\n"
-            guide += "3. Optionally address recommended items\\n"
-            guide += "4. Run validation again: `python env_manager.py --validate`\\n"
-            guide += "5. Start your bot: `python run.py`\\n\\n"
-        
-        guide += "📚 **Need Help?**\\n"
+                        guide += f"  💡 {issue.suggestion}\n"
+                guide += "\n"
+
+            guide += "📋 **Next Steps:**\n"
+            guide += "1. Create or update your `.env` file\n"
+            guide += "2. Fix the required issues above\n"
+            guide += "3. Optionally address recommended items\n"
+            guide += "4. Run validation again: `python env_manager.py --validate`\n"
+            guide += "5. Start your bot: `python run.py`\n\n"
+
+        return guide
         guide += "• Check the documentation: `docs/configuration/`\\n"
         guide += "• Example configuration: `.env.example`\\n"
         guide += "• Environment variables guide: `docs/configuration/ENVIRONMENT_VARIABLES_REFERENCE.md`\\n"
@@ -480,7 +480,7 @@ async def interactive_setup():
     print(f"📊 Validation Summary:")
     print(f"   ✅ {summary['valid_checks']}/{summary['total_checks']} checks passed ({summary['validation_percentage']}%)")
     print(f"   🔴 {summary['required_issues']} required issues found")
-    print(f"   🚀 Ready to deploy: {'Yes' if summary['ready_to_deploy'] else 'No'}\\n")
+    print(f"   ✨ Ready to deploy: {'Yes' if summary['ready_to_deploy'] else 'No'}\\n")
     
     # Show setup guide
     guide = config_validator.generate_setup_guide()

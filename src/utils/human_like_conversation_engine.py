@@ -349,10 +349,35 @@ class PersonalityAdaptationEngine:
     def adapt_personality_for_user(self, user_id: str, user_feedback: Optional[Dict[str, Any]] = None) -> PersonalityType:
         """Synchronous adapter for backwards compatibility"""
         try:
+            # Try to get existing event loop
             loop = asyncio.get_event_loop()
+            if loop.is_running():
+                # If loop is running, we can't use run_until_complete
+                # Log at debug level instead of warning since this is expected in async contexts
+                logger.debug("Event loop is running, using default personality for user %s", user_id)
+                return self.default_personality
             return loop.run_until_complete(self.adapt_personality(user_id, None, user_feedback))
         except RuntimeError:
-            # If no event loop, use default
+            # No event loop exists, create one
+            try:
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                result = loop.run_until_complete(self.adapt_personality(user_id, None, user_feedback))
+                loop.close()
+                return result
+            except Exception as e:
+                logger.warning("Failed to adapt personality for user %s: %s, using default", user_id, e)
+                return self.default_personality
+        except Exception as e:
+            logger.warning("Unexpected error adapting personality for user %s: %s, using default", user_id, e)
+            return self.default_personality
+
+    async def adapt_personality_for_user_async(self, user_id: str, user_feedback: Optional[Dict[str, Any]] = None) -> PersonalityType:
+        """Async version of personality adaptation - preferred when in async context"""
+        try:
+            return await self.adapt_personality(user_id, None, user_feedback)
+        except Exception as e:
+            logger.warning("Failed to adapt personality for user %s: %s, using default", user_id, e)
             return self.default_personality
 
 
@@ -546,7 +571,7 @@ mode_detector = ConversationModeDetector()
 personality_engine = PersonalityAdaptationEngine()
 
 
-def analyze_conversation_for_human_response(
+async def analyze_conversation_for_human_response(
     user_id: str,
     message: str,
     conversation_history: List[Dict[str, Any]] = None,
@@ -559,7 +584,7 @@ def analyze_conversation_for_human_response(
     Returns a comprehensive analysis for generating human-like responses
     """
     
-    context = conversation_engine.analyze_conversation_context(
+    context = await conversation_engine.analyze_conversation_context(
         user_id=user_id,
         message=message,
         conversation_history=conversation_history,

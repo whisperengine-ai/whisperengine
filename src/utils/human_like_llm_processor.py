@@ -2,7 +2,11 @@
 Human-Like LLM Query Processor
 
 This module combines advanced prompt engineering with human-like conversation
-optimization specifically for chatbots that need to feel natural and emotionally intelligent.
+optimiza            response = self.llm_client.generate_chat_completion(
+                messages=messages,
+                max_tokens=200,  # Drastically reduced to force concise responses
+                temperature=0.1,  # Very low temperature for consistent output
+            )specifically for chatbots that need to feel natural and emotionally intelligent.
 """
 
 import json
@@ -89,7 +93,7 @@ class HumanLikeLLMProcessor:
             )
 
             # Call LLM with optimized prompts
-            response = await self._call_human_optimized_llm(
+            response = self._call_human_optimized_llm(
                 system_prompt, user_prompt, flow_optimization
             )
 
@@ -100,7 +104,7 @@ class HumanLikeLLMProcessor:
             logger.warning(f"Human-like LLM processing failed: {e}")
             return self._create_human_fallback(message, conversation_history)
 
-    async def _call_human_optimized_llm(
+    def _call_human_optimized_llm(
         self, system_prompt: str, user_prompt: str, flow_optimization: dict[str, Any]
     ) -> dict[str, Any]:
         """Call LLM with human-optimized prompts"""
@@ -120,23 +124,38 @@ Flow analysis: {flow_optimization.get('flow_analysis', {})}"""
                 {"role": "user", "content": enhanced_user_prompt},
             ]
 
-            response = await self.llm_client.generate_response_async(
+            response = self.llm_client.generate_chat_completion(
                 messages=messages,
-                max_tokens=500,  # Slightly more tokens for human-like reasoning
-                temperature=0.4,  # Balanced creativity for natural responses
+                max_tokens=300,  # Reduced from 500 - JSON structure doesn't need many tokens
+                temperature=0.3,  # Reduced from 0.4 for more consistent JSON format
             )
-
-            # Parse JSON response
-            response_text = response.strip()
+            
+            # Extract content from response
+            response_text = response.get('choices', [{}])[0].get('message', {}).get('content', '')
+            if not response_text:
+                logger.warning("Empty response from LLM, using fallback")
+                return self._create_fallback_response(enhanced_user_prompt)
+                
+            # Clean up response text
+            response_text = response_text.strip()
             if response_text.startswith("```json"):
                 response_text = response_text[7:]
             if response_text.endswith("```"):
                 response_text = response_text[:-3]
+            response_text = response_text.strip()
+            
+            if not response_text:
+                logger.warning("Response became empty after cleanup, using fallback")
+                return self._create_fallback_response(enhanced_user_prompt)
 
-            return json.loads(response_text.strip())
+            try:
+                return json.loads(response_text)
+            except json.JSONDecodeError as json_err:
+                logger.warning("Failed to parse JSON response: %s. Response text: %s", json_err, response_text[:200])
+                return self._create_fallback_response(enhanced_user_prompt)
 
         except Exception as e:
-            logger.error(f"Human-optimized LLM call failed: {e}")
+            logger.error("Human-optimized LLM call failed: %s", e)
             raise
 
     def _parse_human_like_response(
@@ -162,9 +181,9 @@ Flow analysis: {flow_optimization.get('flow_analysis', {})}"""
             query = HumanLikeSearchQuery(
                 query=query_data.get("query", ""),
                 weight=float(query_data.get("weight", 1.0)),
-                query_type=query_data.get("query_type", "conversational"),
-                confidence=float(query_data.get("confidence", 1.0)),
-                reasoning=query_data.get("reasoning", ""),
+                query_type=query_data.get("query_type", "conversational"),  # Default fallback
+                confidence=float(query_data.get("confidence", 0.8)),  # Default fallback
+                reasoning=query_data.get("reasoning", "Memory search query"),  # Default fallback
                 emotional_resonance=emotional_resonance,
                 relationship_relevance=relationship_relevance,
                 conversation_flow_score=conversation_flow_score,
@@ -186,7 +205,7 @@ Flow analysis: {flow_optimization.get('flow_analysis', {})}"""
         return HumanLikeQueryResult(
             primary_queries=primary_queries,
             fallback_query=self._create_safe_fallback_query(original_message),
-            emotional_context=response.get("emotional_keywords"),
+            emotional_context=response.get("emotional_keywords", ""),
             conversation_purpose=response.get("conversation_flow", "continuing_chat"),
             relationship_tone=response.get("memory_priority", "friendly"),
             memory_priority=response.get("memory_priority", "contextual_relevance"),
@@ -362,6 +381,17 @@ Flow analysis: {flow_optimization.get('flow_analysis', {})}"""
         else:
             return "casual_conversation"
 
+    def _create_fallback_response(self, user_prompt: str) -> dict[str, Any]:
+        """Create a fallback response when LLM fails to return valid JSON"""
+        # Extract basic query from user prompt
+        basic_query = user_prompt.split('\n')[0] if '\n' in user_prompt else user_prompt
+        basic_query = basic_query.strip()[:50]  # Further reduced length for minimal format
+        
+        return {
+            "queries": [{"query": basic_query, "weight": 1.0}],
+            "conversation_flow": "maintaining_connection"
+        }
+
 
 class HumanLikeMemorySearch:
     """
@@ -405,10 +435,10 @@ class HumanLikeMemorySearch:
 
             for query in human_result.primary_queries:
                 try:
-                    memories = await self.base_memory_manager.retrieve_relevant_memories(
-                        user_id=user_id,
-                        query=query.query,
-                        limit=max(3, limit // len(human_result.primary_queries)),
+                    memories = self.base_memory_manager.retrieve_relevant_memories(
+                        user_id,
+                        query.query,
+                        max(3, limit // len(human_result.primary_queries)),
                     )
 
                     # Enhance memories with human-like context
@@ -530,8 +560,8 @@ class HumanLikeMemorySearch:
 
         try:
             # Simple but caring search
-            memories = await self.base_memory_manager.retrieve_relevant_memories(
-                user_id=user_id, query=message, limit=limit
+            memories = self.base_memory_manager.retrieve_relevant_memories(
+                user_id, message, limit
             )
 
             return {

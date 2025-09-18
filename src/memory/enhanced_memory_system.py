@@ -183,7 +183,7 @@ class EnhancedMemorySystem:
                 self.memory_graph = nx.MultiDiGraph()
                 self.logger.info("✅ Memory connection graph initialized")
 
-            self.logger.info("🚀 Enhanced memory system components ready")
+            self.logger.info("✨ Enhanced memory system components ready")
 
         except Exception as e:
             self.logger.error(f"❌ Enhanced memory component initialization failed: {e}")

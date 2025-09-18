@@ -230,7 +230,7 @@ class AdvancedMemoryBatcher:
         self._lock = threading.RLock()
 
         logger.info(
-            f"🚀 Initialized AdvancedMemoryBatcher with batch_size={batch_size}, "
+            f"✨ Initialized AdvancedMemoryBatcher with batch_size={batch_size}, "
             f"flush_interval={flush_interval}s"
         )
 

@@ -230,7 +230,7 @@ class OnboardingCommands:
                 
                 # Platform features
                 embed.add_field(
-                    name="🚀 Deployment Options",
+                    name="✨ Deployment Options",
                     value="• Discord bot mode\n"
                           "• Desktop application\n"
                           "• Docker containers\n"
@@ -298,7 +298,7 @@ class OnboardingCommands:
                 
                 # Quick start
                 embed.add_field(
-                    name="🚀 Quick Start",
+                    name="✨ Quick Start",
                     value="Try saying: *\"Tell me about yourself\"* or *\"What can you remember about our past conversations?\"*\n"
                           "Use `!getting-started` for a complete guide.",
                     inline=False

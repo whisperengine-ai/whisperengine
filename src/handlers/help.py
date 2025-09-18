@@ -94,7 +94,7 @@ class HelpCommandHandlers:
 
         if ctx.guild:  # In a server
             embed.add_field(
-                name="🚀 Getting Started",
+                name="✨ Getting Started",
                 value=f"• **Chat:** Mention me or send a DM to talk\n"
                 f"• **Quick test:** `!ping{name_suffix}`\n"
                 f"• **Voice chat:** `!join{name_suffix}` to join your voice channel",
@@ -109,7 +109,7 @@ class HelpCommandHandlers:
                 )
         else:  # In a DM
             embed.add_field(
-                name="🚀 Getting Started",
+                name="✨ Getting Started",
                 value="• **Chat:** Just type messages - no commands needed!\n"
                 "• **Quick test:** `!ping` (bot name optional in DMs)\n"
                 "• **Voice chat:** `!join` to connect to voice",
@@ -414,18 +414,26 @@ class HelpCommandHandlers:
         ]
 
         essential_text = "\n".join([f"`{cmd}` - {desc}" for cmd, desc in essential_commands])
-        embed.add_field(name="🚀 Essential Commands", value=essential_text, inline=False)
+        embed.add_field(name="✨ Essential Commands", value=essential_text, inline=False)
 
         # Quick start guide
         if ctx.guild:
-            quick_start = f"1. Try: `!help` (standard Discord help)\n2. Test bot: `!ping {self.bot_name or 'whisperengine'}`\n3. Chat by mentioning the bot\n4. Use voice with `!join {self.bot_name or 'whisperengine'}`"
+            quick_start = (
+                f"1. Try: `!help` (standard Discord help)\n"
+                f"2. Test bot: `!ping {self.bot_name or 'whisperengine'}`\n"
+                "3. Chat by mentioning the bot\n"
+                f"4. Use voice with `!join {self.bot_name or 'whisperengine'}`"
+            )
         else:
-            quick_start = "1. Try: `!help` (works everywhere)\n2. Test bot: `!ping` (bot name optional in DMs)\n3. Just type messages to chat\n4. Use `!join` for voice features"
+            quick_start = (
+                "1. Try: `!help` (works everywhere)\n"
+                "2. Test bot: `!ping` (bot name optional in DMs)\n"
+                "3. Just type messages to chat\n"
+                "4. Use `!join` for voice features"
+            )
 
         embed.add_field(name="⚡ Quick Start", value=quick_start, inline=False)
-
         embed.set_footer(
             text="Standard Discord help: !help • This discovery help also works without bot name"
         )
-
         await ctx.send(embed=embed)
