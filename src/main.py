@@ -21,6 +21,7 @@ from src.handlers.admin import AdminCommandHandlers
 from src.handlers.events import BotEventHandlers
 from src.handlers.help import HelpCommandHandlers
 from src.handlers.memory import MemoryCommandHandlers
+from src.handlers.monitoring_commands import MonitoringCommands
 from src.handlers.multi_entity_handlers import MultiEntityCommandHandlers
 from src.handlers.onboarding_commands import create_onboarding_commands
 from src.handlers.performance_commands import create_performance_commands
@@ -309,6 +310,14 @@ class ModularBotManager:
             )
             self.command_handlers["onboarding"].register_commands(bot_name_filter, is_admin)
             logger.info("✅ Onboarding command handlers registered")
+
+            # Monitoring commands for system health and metrics
+            self.command_handlers["monitoring"] = MonitoringCommands(
+                bot=self.bot,
+                is_admin=is_admin
+            )
+            self.command_handlers["monitoring"].register_commands(bot_name_filter, is_admin)
+            logger.info("✅ Monitoring command handlers registered")
 
         except Exception as e:
             logger.error(f"Failed to initialize command handlers: {e}")

@@ -60,14 +60,11 @@ try:
     from src.llm.elevenlabs_client import ElevenLabsClient
     from src.voice.voice_manager import DiscordVoiceManager
 
-    # from src.voice.voice_commands import VoiceCommands  # Disabled - using VoiceCommandHandlers instead
     VOICE_AVAILABLE = True
 except ImportError:
     VOICE_AVAILABLE = False
     ElevenLabsClient = None
     DiscordVoiceManager = None
-
-VoiceCommands = None  # Explicitly set to None - using VoiceCommandHandlers instead
 
 # External API Emotion AI Integration
 try:
