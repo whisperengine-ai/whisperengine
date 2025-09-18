@@ -444,9 +444,9 @@ DEBUG_MODE=true python run.py
 # Verbose logging
 LOG_LEVEL=DEBUG python run.py
 
-# Component debugging
-python debug_memory_manager.py
-python debug_attribute_error.py
+# Component debugging (moved to utilities directory)
+python utilities/debug/debug_memory_manager.py
+python utilities/debug/debug_attribute_error.py
 ```
 
 ---

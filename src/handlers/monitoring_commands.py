@@ -35,15 +35,15 @@ class MonitoringCommands:
         """Register monitoring commands."""
         self.is_admin = is_admin
         
-        @self.bot.command(name='health', aliases=['status'])
+        @self.bot.command(name='monitor_health', aliases=['monitor_status'])
         async def health_command(ctx):
-            """Get system health status."""
+            """Get detailed system monitoring and health status."""
             if not self.is_admin(ctx):
                 await ctx.send("❌ This command requires administrator privileges.")
                 return
             
             try:
-                await ctx.send("🔍 Checking system health...")
+                await ctx.send("🔍 Checking system monitoring health...")
                 
                 # Perform health check
                 health = await self.monitoring_manager.check_health(full_check=True)

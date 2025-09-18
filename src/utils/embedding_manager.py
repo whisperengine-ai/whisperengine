@@ -54,11 +54,6 @@ class LocalEmbeddingManager:
 
         logger.info(f"LocalEmbeddingManager initialized with model: {self.embedding_model_name}")
 
-    @property
-    def use_external(self):
-        """Always returns False for LocalEmbeddingManager"""
-        return False
-
     async def initialize(self):
         """Initialize the embedding model"""
         if self._is_initialized:
@@ -250,9 +245,6 @@ class LocalEmbeddingManager:
         self._is_initialized = False
         logger.info("✅ LocalEmbeddingManager shutdown complete")
 
-
-# Compatibility alias for existing code
-ExternalEmbeddingManager = LocalEmbeddingManager
 
 # Create default instance
 _default_manager = None
