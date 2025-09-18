@@ -1,5 +1,6 @@
 # WhisperEngine Enhanced Core Dependencies
 # Optimized with industry-standard AI/ML libraries for better performance
+# All versions locked for reproducible builds
 
 # Core utilities and environment management
 python-dotenv==1.1.1
@@ -9,35 +10,60 @@ aiofiles==24.1.0
 # HTTP Client Dependencies  
 aiohttp==3.12.15
 requests==2.32.5
-httpx
+httpx==0.28.1
 
 # Database abstraction
 aiosqlite==0.21.0
 
 # AI/ML and Memory System Dependencies (Core)
-chromadb
+chromadb==1.0.20
 sentence-transformers==5.1.0
 numpy==2.3.2
 
 # ENHANCED: Advanced Scientific Computing
-scipy>=1.9.0              # Scientific computing and optimization
-pandas>=2.0.0             # Efficient data manipulation and analysis
-scikit-learn>=1.3.0       # Machine learning algorithms for clustering and classification
+scipy==1.16.2              # Scientific computing and optimization
+pandas==2.3.0              # Efficient data manipulation and analysis
+scikit-learn==1.7.2        # Machine learning algorithms for clustering and classification
 
 # ENHANCED: Ultra-fast Vector Search and Graph Analysis
-faiss-cpu>=1.7.0          # Fast similarity search and clustering (CPU version)
-# faiss-gpu>=1.7.0        # GPU version for production scaling (uncomment if needed)
-networkx>=3.1             # Graph analysis for memory connections
+faiss-cpu==1.9.0           # Fast similarity search and clustering (CPU version)
+# faiss-gpu==1.9.0         # GPU version for production scaling (uncomment if needed)
+networkx==3.5              # Graph analysis for memory connections
 
 # ENHANCED: Advanced NLP and Topic Modeling
-spacy>=3.6.0             # Advanced NLP (already included, version updated)
-gensim>=4.3.0            # Topic modeling and document similarity
-vaderSentiment>=3.3.2    # Real-time sentiment analysis
+spacy==3.8.7              # Advanced NLP (already included, version updated)
+gensim==4.3.3             # Topic modeling and document similarity
+vaderSentiment==3.3.2     # Real-time sentiment analysis
 
 # Advanced NLP Dependencies (Phase 1)
-transformers>=4.30.0
+transformers==4.56.1
 
 # ENHANCED: Async Redis and Caching
+redis==5.2.1
+aioredis==2.1.1          # Async Redis operations for better performance
+
+# ENHANCED: Monitoring and Metrics
+prometheus-client==0.22.0 # Performance monitoring and metrics
+
+# Image Processing Dependencies
+Pillow==11.3.0
+
+# ENHANCED: Async I/O Operations
+aiodns==3.2.0            # Async DNS resolution
+cchardet==2.1.8          # Fast character encoding detection
+
+# Testing Dependencies (development only)
+pytest==8.4.2
+pytest-asyncio==1.1.0
+
+# OPTIONAL: For production scaling (uncomment as needed)
+# ray[default]==2.40.0     # Distributed computing and ML orchestration
+# celery==5.5.0            # Background task processing
+# mlflow==2.22.0           # ML experiment tracking and model management
+
+# OPTIONAL: GPU acceleration (uncomment if available)
+# torch==2.8.0             # PyTorch for GPU-accelerated ML
+# cupy==13.5.0             # GPU-accelerated NumPy
 redis==5.2.1
 aioredis>=2.0.0          # Async Redis operations for better performance
 
