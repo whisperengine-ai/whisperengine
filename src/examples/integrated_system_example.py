@@ -25,9 +25,6 @@ from env_manager import load_environment
 if not load_environment():
     sys.exit(1)
 
-# Import the integrated components
-import os
-
 from src.memory.memory_manager import UserMemoryManager
 from src.utils.graph_integrated_emotion_manager import GraphIntegratedEmotionManager
 
@@ -41,69 +38,62 @@ class EnhancedBot:
 
     def __init__(self, llm_client=None):
         """Initialize bot with integrated systems"""
-
-        # Initialize memory manager using your existing external embedding setup
-        # This respects USE_EXTERNAL_EMBEDDINGS and won't cause conflicts
+        # Initialize memory manager (always uses unified local embedding model)
         self.memory_manager = UserMemoryManager(llm_client=llm_client)
 
-        # Initialize graph-integrated emotion manager
-        # This will work with existing ChromaDB collections without conflicts
+        # Initialize graph-integrated emotion manager (shares same memory manager)
         self.emotion_manager = GraphIntegratedEmotionManager(
             llm_client=llm_client, memory_manager=self.memory_manager
         )
 
-        logger.info("Enhanced bot initialized with integrated systems")
+        logger.info("Enhanced bot initialized with integrated systems (local embeddings)")
 
     async def process_message(
         self, user_id: str, message: str, display_name: str | None = None
     ) -> dict:
         """Process a message using all integrated systems"""
 
-        try:
-            # 1. Process through emotion manager (gets emotion + relationship context)
-            #    This also syncs to graph database if enabled
+        try:  # Broad catch acceptable here to return safe structured error (mixed sources)
+            # 1. Process interaction (emotion + relationship + optional graph sync)
             profile, emotion_profile = self.emotion_manager.process_interaction_enhanced(
                 user_id, message, display_name
             )
+        except Exception as e:  # noqa: BLE001 - multiple underlying libs may raise arbitrary errors
+            logger.error("Emotion processing failed: %s", e)
+            return {"response": "Temporary processing issue.", "error": str(e)}
 
-            # 2. Store conversation in memory system
+        # 2. Store conversation stub (actual response inserted later if you extend logic)
+        memory_id = None
+        try:  # Conversation storage failures shouldn't abort entire flow
             memory_id = self.memory_manager.store_conversation(
-                user_id, message, "Response will be generated"
+                user_id, message, "(pending response)"
             )
+        except Exception as e:  # noqa: BLE001
+            logger.warning("Failed to store conversation: %s", e)
 
-            # 3. Get comprehensive context for response generation
-            context = await self._get_comprehensive_context(user_id, message)
+        # 3. Build context
+        context = await self._get_comprehensive_context(user_id, message)
 
-            # 4. Generate response using context (replace with your actual LLM call)
-            response = await self._generate_response(message, context)
+        # 4. Generate response (replace with actual LLM usage if desired)
+        response = await self._generate_response(message, context)
 
-            # 5. Store the actual response
-            if memory_id:
-                # Update the stored conversation with actual response
-                pass  # Your existing response storage logic here
+        # 5. (Optional) Update stored conversation with real response here
 
-            return {
-                "response": response,
-                "user_profile": {
-                    "relationship_level": profile.relationship_level.value,
-                    "current_emotion": profile.current_emotion.value,
-                    "interaction_count": profile.interaction_count,
-                },
-                "emotion_analysis": {
-                    "detected_emotion": emotion_profile.detected_emotion.value,
-                    "confidence": emotion_profile.confidence,
-                    "intensity": emotion_profile.intensity,
-                },
-                "context_sources": context.get("systems_active", []),
-                "memory_id": memory_id,
-            }
-
-        except Exception as e:
-            logger.error(f"Error processing message: {e}")
-            return {
-                "response": "I apologize, but I encountered an error processing your message.",
-                "error": str(e),
-            }
+        return {
+            "response": response,
+            "user_profile": {
+                "relationship_level": profile.relationship_level.value,
+                "current_emotion": profile.current_emotion.value,
+                "interaction_count": profile.interaction_count,
+            },
+            "emotion_analysis": {
+                "detected_emotion": emotion_profile.detected_emotion.value,
+                "confidence": emotion_profile.confidence,
+                "intensity": emotion_profile.intensity,
+            },
+            "context_sources": context.get("systems_active", []),
+            "memory_id": memory_id,
+        }
 
     async def _get_comprehensive_context(self, user_id: str, message: str) -> dict:
         """Get context from all available systems"""
@@ -115,7 +105,7 @@ class EnhancedBot:
             "graph_insights": "",
         }
 
-        try:
+        try:  # Context enrichment is best-effort
             # Get emotion context (enhanced with graph data if available)
             emotion_context = await self.emotion_manager.get_enhanced_emotion_context(
                 user_id, message
@@ -126,19 +116,18 @@ class EnhancedBot:
             if self.emotion_manager.enable_graph_sync:
                 context["systems_active"].append("graph_database")
 
-        except Exception as e:
-            logger.warning(f"Failed to get emotion context: {e}")
+        except Exception as e:  # noqa: BLE001
+            logger.warning("Failed to get emotion context: %s", e)
 
-        try:
+        try:  # Memory retrieval is optional for response quality
             # Get relevant memories
             memories = self.memory_manager.retrieve_relevant_memories(user_id, message, limit=5)
             context["memory_context"] = [m.get("content", "")[:100] for m in memories]
             context["systems_active"].append("chromadb")
+        except Exception as e:  # noqa: BLE001
+            logger.warning("Failed to get memory context: %s", e)
 
-        except Exception as e:
-            logger.warning(f"Failed to get memory context: {e}")
-
-        try:
+        try:  # Graph insights are optional
             # Get graph-based contextual memories if available
             if self.emotion_manager.enable_graph_sync:
                 graph_memories = await self.emotion_manager.get_contextual_memories_for_prompt(
@@ -146,9 +135,8 @@ class EnhancedBot:
                 )
                 if graph_memories:
                     context["graph_insights"] = graph_memories
-
-        except Exception as e:
-            logger.warning(f"Failed to get graph insights: {e}")
+        except Exception as e:  # noqa: BLE001
+            logger.warning("Failed to get graph insights: %s", e)
 
         return context
 
@@ -197,7 +185,7 @@ class EnhancedBot:
 
         summary = {"user_id": user_id, "timestamp": asyncio.get_event_loop().time()}
 
-        try:
+        try:  # Profile retrieval may fail if emotion subsystem degraded
             # Get emotion manager profile
             profile = self.emotion_manager.get_or_create_profile(user_id)
             summary.update(
@@ -211,37 +199,36 @@ class EnhancedBot:
                 }
             )
 
-        except Exception as e:
-            logger.warning(f"Failed to get emotion profile: {e}")
+        except Exception as e:  # noqa: BLE001
+            logger.warning("Failed to get emotion profile: %s", e)
 
-        try:
+        try:  # Memory stats are optional
             # Get memory statistics
             memories = self.memory_manager.retrieve_relevant_memories(
                 user_id, "all conversations", limit=100
             )
             summary["total_memories"] = len(memories)
+        except Exception as e:  # noqa: BLE001
+            logger.warning("Failed to get memory statistics: %s", e)
 
-        except Exception as e:
-            logger.warning(f"Failed to get memory statistics: {e}")
-
-        try:
-            # Get graph insights if available
+        try:  # Graph analysis optional
             if self.emotion_manager.enable_graph_sync:
-                graph_connector = await self.emotion_manager._get_graph_connector()
-                if graph_connector:
-                    relationship_context = await graph_connector.get_user_relationship_context(
-                        user_id
-                    )
-                    summary["graph_analysis"] = {
-                        "intimacy_level": relationship_context.get("intimacy_level", 0),
-                        "topics_discussed": len(relationship_context.get("topics", [])),
-                        "emotional_patterns": len(
-                            relationship_context.get("experienced_emotions", [])
-                        ),
-                    }
-
-        except Exception as e:
-            logger.warning(f"Failed to get graph analysis: {e}")
+                connector_getter = getattr(self.emotion_manager, "_get_graph_connector", None)
+                if callable(connector_getter):  # Private access guarded intentionally
+                    graph_connector = await connector_getter()  # noqa: SLF001
+                    if graph_connector:
+                        relationship_context = await graph_connector.get_user_relationship_context(
+                            user_id
+                        )
+                        summary["graph_analysis"] = {
+                            "intimacy_level": relationship_context.get("intimacy_level", 0),
+                            "topics_discussed": len(relationship_context.get("topics", [])),
+                            "emotional_patterns": len(
+                                relationship_context.get("experienced_emotions", [])
+                            ),
+                        }
+        except Exception as e:  # noqa: BLE001
+            logger.warning("Failed to get graph analysis: %s", e)
 
         return summary
 
@@ -255,17 +242,17 @@ class EnhancedBot:
         }
 
         # Check emotion manager
-        try:
+        try:  # Emotion manager health
             emotion_health = await self.emotion_manager.health_check()
             health["components"]["emotion_manager"] = emotion_health
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             health["components"]["emotion_manager"] = {"status": "error", "error": str(e)}
 
         # Check memory manager
-        try:
+        try:  # Memory subsystem health
             self.memory_manager.retrieve_relevant_memories("health_check", "test", limit=1)
             health["components"]["memory_manager"] = {"status": "healthy"}
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             health["components"]["memory_manager"] = {"status": "error", "error": str(e)}
 
         # Overall status
@@ -333,7 +320,7 @@ class DiscordBotIntegration:
         display_name = message.author.display_name
         content = message.content
 
-        try:
+        try:  # Discord message processing should never raise uncaught errors
             # Process through enhanced system
             result = await self.enhanced_bot.process_message(user_id, content, display_name)
 
@@ -342,13 +329,14 @@ class DiscordBotIntegration:
 
             # Log interaction details
             logger.info(
-                f"Processed message from {display_name}: "
-                f"emotion={result['emotion_analysis']['detected_emotion']}, "
-                f"relationship={result['user_profile']['relationship_level']}"
+                "Processed message from %s: emotion=%s, relationship=%s",
+                display_name,
+                result['emotion_analysis']['detected_emotion'],
+                result['user_profile']['relationship_level'],
             )
 
-        except Exception as e:
-            logger.error(f"Error processing Discord message: {e}")
+        except Exception as e:  # noqa: BLE001
+            logger.error("Error processing Discord message: %s", e)
             await message.channel.send("I'm sorry, I encountered an error processing your message.")
 
 

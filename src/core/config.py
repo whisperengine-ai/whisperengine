@@ -32,7 +32,7 @@ def load_system_prompt() -> str:
         with open(prompt_file, encoding="utf-8") as f:
             prompt_content = f.read().strip()
     except FileNotFoundError:
-        logger.warning(f"System prompt file {prompt_file} not found, using default")
+        logger.warning("System prompt file %s not found, using default", prompt_file)
         prompt_content = default_system_prompt()
 
     # Replace {BOT_NAME} template variable with actual bot name
@@ -129,32 +129,13 @@ def validate_llm_and_embedding_endpoints() -> bool:
     facts_api_url = os.getenv("LLM_FACTS_API_URL", llm_api_url)
     facts_api_key = os.getenv("LLM_FACTS_API_KEY", llm_api_key)
 
-    # Get embedding configuration
-    use_external_embeddings = os.getenv("USE_EXTERNAL_EMBEDDINGS", "false").lower() == "true"
-
-    if use_external_embeddings:
-        # Embedding configuration - use standardized variable names
-        embedding_api_url = os.getenv("LLM_EMBEDDING_API_URL")
-        embedding_api_key = os.getenv("LLM_EMBEDDING_API_KEY", "")
-        embedding_model = os.getenv("LLM_EMBEDDING_MODEL")
-
-        # Validate required embedding configuration
-        if not embedding_api_url:
-            logger.error("❌ LLM_EMBEDDING_API_URL environment variable not set")
-            return False
-
-        if not embedding_model:
-            logger.error("❌ LLM_EMBEDDING_MODEL environment variable not set")
-            return False
-    else:
-        embedding_api_url = None
-        embedding_api_key = ""
-        embedding_model = "local"
+    # Embeddings now always local (single 384-dim MiniLM); external embedding option removed
+    # (embedding_api_* variables removed; always local embeddings in-process)
 
     def test_llm_endpoint(name, url, api_key, model_name):
         """Test a single LLM endpoint by calling /models"""
         try:
-            logger.info(f"Checking {name} endpoint: {url} - Model: {model_name}")
+            logger.info("Checking %s endpoint: %s - Model: %s", name, url, model_name)
 
             # Prepare headers
             headers = {"Content-Type": "application/json"}
@@ -175,23 +156,28 @@ def validate_llm_and_embedding_endpoints() -> bool:
                 available_models = models_data["models"]
 
             logger.info(
-                f"✅ {name} endpoint accessible - URL: {url} - Available models: {len(available_models)}"
+                "✅ %s endpoint accessible - URL: %s - Available models: %d",
+                name,
+                url,
+                len(available_models),
             )
             return True
-
         except requests.exceptions.HTTPError as e:
             if e.response and e.response.status_code == 401:
-                logger.error(f"❌ Authentication error for {name} endpoint - URL: {url}")
+                logger.error("❌ Authentication error for %s endpoint - URL: %s", name, url)
             else:
+                status = e.response.status_code if e.response else 'Unknown'
                 logger.error(
-                    f"❌ HTTP error for {name} endpoint - URL: {url} - Status: {e.response.status_code if e.response else 'Unknown'}"
+                    "❌ HTTP error for %s endpoint - URL: %s - Status: %s", name, url, status
                 )
             return False
         except requests.exceptions.ConnectionError:
-            logger.error(f"❌ Connection error for {name} endpoint - URL: {url}")
+            logger.error("❌ Connection error for %s endpoint - URL: %s", name, url)
             return False
-        except Exception as e:
-            logger.error(f"❌ Error validating {name} endpoint - URL: {url} - Error: {e}")
+        except requests.RequestException as e:  # Narrowed exception scope
+            logger.error(
+                "❌ Error validating %s endpoint - URL: %s - Error: %s", name, url, e
+            )
             return False
 
     # Test main LLM endpoint
@@ -216,16 +202,8 @@ def validate_llm_and_embedding_endpoints() -> bool:
             "Facts endpoint same as main/emotion LLM endpoint - skipping separate validation"
         )
 
-    # Test embedding endpoint (if using external embeddings)
-    if use_external_embeddings:
-        logger.info("Checking embedding endpoint...")
-
-        if not test_llm_endpoint(
-            "Embedding", embedding_api_url, embedding_api_key, embedding_model
-        ):
-            validation_passed = False
-    else:
-        logger.info("Using local embeddings - skipping external embedding validation")
+    # Embeddings: always local, skip external validation
+    logger.info("Using local embeddings (MiniLM 384-dim) - no external embedding endpoint to validate")
 
     if validation_passed:
         logger.info("✅ All LLM and embedding endpoints validated successfully")

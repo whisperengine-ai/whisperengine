@@ -485,7 +485,7 @@ class AdaptiveConfigManager:
         env_vars["EMBEDDING_BATCH_SIZE"] = str(perf.batch_size)
 
         # AI/ML configuration
-        env_vars["USE_EXTERNAL_EMBEDDINGS"] = str(not perf.enable_local_ai).lower()
+    # Historical: USE_EXTERNAL_EMBEDDINGS was deprecated in September 2025. Local embedding is always used.
         env_vars["ENABLE_SEMANTIC_CLUSTERING"] = str(perf.enable_semantic_clustering).lower()
 
         # Database configuration

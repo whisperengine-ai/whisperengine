@@ -33,7 +33,7 @@ class NLPConfiguration:
 
     environment: DeploymentEnvironment
     spacy_model: str
-    use_external_embeddings: bool
+    # Historical: use_external_embeddings was deprecated in September 2025. Local embedding is always used.
     use_gpu_acceleration: bool
     performance_mode: str  # 'fast', 'balanced', 'accurate'
 
@@ -79,62 +79,49 @@ def get_optimal_nlp_config() -> NLPConfiguration:
 
     # Base configuration
     config = {
-        "use_external_embeddings": True,  # Always use external embeddings (your proven approach)
+        # Historical: use_external_embeddings always True (deprecated Sept 2025)
         "performance_mode": "balanced",
     }
 
     if environment == DeploymentEnvironment.NATIVE_MACOS:
         # Native macOS: Use large models with GPU acceleration
-        config.update(
-            {
-                "spacy_model": os.getenv("NLP_SPACY_MODEL", "en_core_web_lg"),
-                "use_gpu_acceleration": True,
-                "performance_mode": "accurate",
-            }
-        )
+        config["spacy_model"] = os.getenv("NLP_SPACY_MODEL", "en_core_web_lg")
+        config["use_gpu_acceleration"] = True
+        config["performance_mode"] = "accurate"
         logger.info("Configured for native macOS with GPU acceleration")
 
     elif environment == DeploymentEnvironment.DOCKER_CONTAINER:
         # Docker: Use smaller CPU-optimized models
-        config.update(
-            {
-                "spacy_model": "en_core_web_sm",  # Smaller model for Docker
-                "use_gpu_acceleration": False,
-                "performance_mode": "fast",
-            }
-        )
+        config["spacy_model"] = "en_core_web_sm"  # Smaller model for Docker
+        config["use_gpu_acceleration"] = False
+        config["performance_mode"] = "fast"
         logger.info("Configured for Docker container with CPU optimization")
 
     elif environment == DeploymentEnvironment.CLOUD_INSTANCE:
         # Cloud: Balanced approach, check for GPU availability
         try:
             import torch
-
             has_gpu = torch.cuda.is_available()
         except ImportError:
             has_gpu = False
-
-        config.update(
-            {
-                "spacy_model": "en_core_web_md" if has_gpu else "en_core_web_sm",
-                "use_gpu_acceleration": has_gpu,
-                "performance_mode": "balanced",
-            }
-        )
-        logger.info(f"Configured for cloud deployment (GPU: {has_gpu})")
+        config["spacy_model"] = "en_core_web_md" if has_gpu else "en_core_web_sm"
+        config["use_gpu_acceleration"] = has_gpu
+        config["performance_mode"] = "balanced"
+        logger.info("Configured for cloud deployment (GPU: %s)", has_gpu)
 
     else:
         # Unknown environment: Conservative settings
-        config.update(
-            {
-                "spacy_model": "en_core_web_sm",
-                "use_gpu_acceleration": False,
-                "performance_mode": "fast",
-            }
-        )
+        config["spacy_model"] = "en_core_web_sm"
+        config["use_gpu_acceleration"] = False
+        config["performance_mode"] = "fast"
         logger.warning("Unknown deployment environment - using conservative settings")
 
-    return NLPConfiguration(environment=environment, **config)
+    return NLPConfiguration(
+        environment=environment,
+        spacy_model=config["spacy_model"],
+        use_gpu_acceleration=config["use_gpu_acceleration"],
+        performance_mode=config["performance_mode"]
+    )
 
 
 def get_deployment_recommendations() -> dict[str, Any]:
@@ -146,7 +133,7 @@ def get_deployment_recommendations() -> dict[str, Any]:
         "current_config": {
             "environment": config.environment.value,
             "spacy_model": config.spacy_model,
-            "external_embeddings": config.use_external_embeddings,
+            # Historical: external_embeddings field deprecated Sept 2025
             "gpu_acceleration": config.use_gpu_acceleration,
             "performance_mode": config.performance_mode,
         },
@@ -191,7 +178,7 @@ def create_docker_optimized_config() -> dict[str, str]:
     return {
         "NLP_SPACY_MODEL": "en_core_web_sm",
         "ENABLE_ADVANCED_TOPIC_EXTRACTION": "true",
-        "USE_EXTERNAL_EMBEDDINGS": "true",
+    # Historical: USE_EXTERNAL_EMBEDDINGS deprecated Sept 2025
         "NLP_PERFORMANCE_MODE": "fast",
         "DOCKER_CONTAINER": "true",
     }
@@ -202,7 +189,7 @@ def create_native_optimized_config() -> dict[str, str]:
     return {
         "NLP_SPACY_MODEL": "en_core_web_lg",
         "ENABLE_ADVANCED_TOPIC_EXTRACTION": "true",
-        "USE_EXTERNAL_EMBEDDINGS": "true",
+    # Historical: USE_EXTERNAL_EMBEDDINGS deprecated Sept 2025
         "NLP_PERFORMANCE_MODE": "accurate",
         "DOCKER_CONTAINER": "false",
     }

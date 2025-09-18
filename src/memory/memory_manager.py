@@ -10,14 +10,14 @@ from chromadb.utils import embedding_functions
 logger = logging.getLogger(__name__)
 
 # Environment variables are loaded by main.py using env_manager
-from src.utils.embedding_manager import ExternalEmbeddingManager
-from src.utils.emotion_manager import EmotionManager, UserProfile
+# Historical: ExternalEmbeddingManager and all external embedding logic removed Sept 2025
 from src.utils.exceptions import (
     MemoryError,
     MemoryRetrievalError,
     MemoryStorageError,
     ValidationError,
 )
+from src.utils.emotion_manager import EmotionManager, UserProfile
 
 # Memory tier system removed for performance optimization
 
@@ -102,94 +102,48 @@ class UserMemoryManager:
             # Store the LLM client for emotion analysis
             self.llm_client = llm_client
 
-            # Initialize external embedding manager for consistent embeddings
-            self.external_embedding_manager = ExternalEmbeddingManager()
+            # Historical: All embedding is now local. External embedding logic removed Sept 2025.
+            use_local_models = os.getenv("USE_LOCAL_MODELS", "false").lower() == "true"
+            local_models_dir = os.getenv("LOCAL_MODELS_DIR", "./models")
+            embedding_model = os.getenv("LLM_LOCAL_EMBEDDING_MODEL", "all-MiniLM-L6-v2")
 
-            # Configure embedding function based on external embedding setting
-            # Check for both new LLM_EMBEDDING_* pattern and legacy variables for backward compatibility
-            self.use_external_embeddings = (
-                os.getenv("LLM_EMBEDDING_API_URL") is not None
-                or os.getenv("USE_EXTERNAL_EMBEDDINGS", "false").lower() == "true"
-            )
-
-            if self.use_external_embeddings:
-                # Use None for embedding function - we'll handle embeddings manually
-                self.embedding_function = None
-                # Import external embedding manager
-                try:
-                    from src.memory.chromadb_external_embeddings import (
-                        add_documents_with_embeddings,
-                        query_with_embeddings,
+            if use_local_models and os.path.exists(
+                os.path.join(local_models_dir, embedding_model)
+            ):
+                # Use bundled local model
+                model_path = os.path.join(local_models_dir, embedding_model)
+                logger.info(f"Using bundled local embedding model: {model_path}")
+                self.embedding_function = (
+                    embedding_functions.SentenceTransformerEmbeddingFunction(
+                        model_name=model_path
                     )
-
-                    self.add_documents_with_embeddings = add_documents_with_embeddings
-                    self.query_with_embeddings = query_with_embeddings
-                    logger.info("External embeddings configured")
-                except ImportError:
-                    logger.warning("External embeddings module not available")
+                )
             else:
-                # Use local embedding model (check for bundled models first)
-                use_local_models = os.getenv("USE_LOCAL_MODELS", "false").lower() == "true"
-                local_models_dir = os.getenv("LOCAL_MODELS_DIR", "./models")
-                embedding_model = os.getenv("LLM_LOCAL_EMBEDDING_MODEL", "all-Mpnet-BASE-v2")
-
-                if use_local_models and os.path.exists(
-                    os.path.join(local_models_dir, embedding_model)
-                ):
-                    # Use bundled local model
-                    model_path = os.path.join(local_models_dir, embedding_model)
-                    logger.info(f"Using bundled local embedding model: {model_path}")
-                    self.embedding_function = (
-                        embedding_functions.SentenceTransformerEmbeddingFunction(
-                            model_name=model_path
-                        )
+                # Use online model (will download if not cached)
+                self.embedding_function = (
+                    embedding_functions.SentenceTransformerEmbeddingFunction(
+                        model_name=embedding_model
                     )
-                else:
-                    # Use online model (will download if not cached)
-                    self.embedding_function = (
-                        embedding_functions.SentenceTransformerEmbeddingFunction(
-                            model_name=embedding_model
-                        )
-                    )
-                    logger.info(f"Local embedding model: {embedding_model}")
+                )
+                logger.info(f"Local embedding model: {embedding_model}")
 
-                self.add_documents_with_embeddings = None
-                self.query_with_embeddings = None
+            self.add_documents_with_embeddings = None
+            self.query_with_embeddings = None
 
             # Create or get collection with appropriate embedding function
             collection_name = os.getenv("CHROMADB_COLLECTION_NAME", "user_memories")
-            if self.use_external_embeddings:
-                # Create collection with 768-dimensional metadata for external embeddings
-                embedding_model = os.getenv(
-                    "LLM_EMBEDDING_MODEL", "text-embedding-nomic-embed-text-v1.5"
-                )
-                if "nomic" in embedding_model.lower() or "768" in embedding_model:
-                    embedding_dim = 768
-                else:
-                    embedding_dim = 384  # Default fallback
-
-                self.collection = self.client.get_or_create_collection(
-                    name=collection_name, metadata={"embedding_dimension": embedding_dim}
-                )
-            else:
-                # Create collection with local embedding function
-                self.collection = self.client.get_or_create_collection(
-                    name=collection_name, embedding_function=self.embedding_function  # type: ignore
-                )
+            # Always use local embedding function (external removed)
+            self.collection = self.client.get_or_create_collection(
+                name=collection_name, embedding_function=self.embedding_function  # type: ignore
+            )
 
             # Create or get collection for global facts
             global_collection_name = os.getenv("CHROMADB_GLOBAL_COLLECTION_NAME", "global_facts")
-            if self.use_external_embeddings:
-                # Create collection with 768-dimensional metadata for external embeddings
-                self.global_collection = self.client.get_or_create_collection(
-                    name=global_collection_name, metadata={"embedding_dimension": embedding_dim}
-                )
-            else:
-                # Create collection with local embedding function
-                self.global_collection = self.client.get_or_create_collection(
-                    name=global_collection_name,
-                    embedding_function=self.embedding_function,  # type: ignore
-                )
+            # Always use local embedding function (external removed)
+            self.global_collection = self.client.get_or_create_collection(
+                name=global_collection_name,
+                embedding_function=self.embedding_function,  # type: ignore
+            )
 
             # Automatic fact extraction has been replaced by personality-driven fact classification
             self.enable_auto_facts = False  # Legacy feature disabled
@@ -410,35 +364,13 @@ class UserMemoryManager:
 
             # Store in ChromaDB using appropriate method
             try:
-                logger.debug(
-                    f"Storage decision - use_external_embeddings: {self.use_external_embeddings}, add_documents_with_embeddings: {self.add_documents_with_embeddings}"
+                # Always use ChromaDB's built-in embeddings (external removed)
+                logger.debug("Using ChromaDB built-in embeddings for storage")
+                self.collection.add(
+                    documents=[conversation_text], metadatas=[metadata], ids=[doc_id]
                 )
-
-                if self.use_external_embeddings and self.add_documents_with_embeddings:
-                    # Use external embeddings
-                    from src.memory.chromadb_external_embeddings import run_async_method
-
-                    success = run_async_method(
-                        self.add_documents_with_embeddings,
-                        self.collection,
-                        [conversation_text],
-                        [metadata],
-                        [doc_id],
-                    )
-                    if not success:
-                        raise MemoryStorageError(
-                            "Failed to store conversation with external embeddings"
-                        )
-                else:
-                    # Use ChromaDB's built-in embeddings
-                    logger.debug("Using ChromaDB built-in embeddings for storage")
-                    self.collection.add(
-                        documents=[conversation_text], metadatas=[metadata], ids=[doc_id]
-                    )
             except Exception as e:
-                logger.error(
-                    f"Storage error details - use_external: {self.use_external_embeddings}, method: {self.add_documents_with_embeddings}, error: {e}"
-                )
+                logger.error(f"Storage error details: {e}")
                 raise e
 
             logger.debug(
@@ -837,35 +769,10 @@ class UserMemoryManager:
             if limit <= 0 or limit > 20:  # Reasonable limits for global facts
                 limit = 5
 
-            # Query the global collection for relevant facts using external embeddings
-            if self.external_embedding_manager.use_external:
-                # Generate embeddings using external API
-                try:
-                    # Use sync wrapper to get embeddings
-                    embeddings = self.external_embedding_manager.get_embeddings_sync([query])
-
-                    if embeddings:
-                        results = self.global_collection.query(
-                            query_embeddings=[embeddings[0]],
-                            where={"type": "global_fact"},
-                            n_results=limit,
-                        )
-                    else:
-                        # Fallback to query_texts if embeddings fail
-                        results = self.global_collection.query(
-                            query_texts=[query], where={"type": "global_fact"}, n_results=limit
-                        )
-                except Exception as e:
-                    logger.error(f"Failed to use external embeddings for global facts: {e}")
-                    # Fallback to query_texts
-                    results = self.global_collection.query(
-                        query_texts=[query], where={"type": "global_fact"}, n_results=limit
-                    )
-            else:
-                # Use ChromaDB's internal embeddings
-                results = self.global_collection.query(
-                    query_texts=[query], where={"type": "global_fact"}, n_results=limit
-                )
+            # Always use ChromaDB's internal embeddings (external removed)
+            results = self.global_collection.query(
+                query_texts=[query], where={"type": "global_fact"}, n_results=limit
+            )
 
             global_facts = []
             if results["documents"] and results["documents"][0]:
@@ -975,24 +882,10 @@ class UserMemoryManager:
             )
 
             # Store using appropriate embedding method
-            if self.use_external_embeddings and self.add_documents_with_embeddings:
-                from src.memory.chromadb_external_embeddings import run_async_method
-
-                success = run_async_method(
-                    self.add_documents_with_embeddings,
-                    self.collection,
-                    [fact_text],
-                    [storage_metadata],
-                    [doc_id],
-                )
-                if not success:
-                    raise MemoryStorageError(
-                        "Failed to store personality fact with external embeddings"
-                    )
-            else:
-                self.collection.add(
-                    documents=[fact_text], metadatas=[storage_metadata], ids=[doc_id]
-                )
+            # Always use ChromaDB's built-in embeddings (external removed)
+            self.collection.add(
+                documents=[fact_text], metadatas=[storage_metadata], ids=[doc_id]
+            )
 
             logger.debug(
                 "Stored personality fact for %s: %s (relevance: %.2f)",
@@ -1050,31 +943,12 @@ class UserMemoryManager:
             # Filter by minimum relevance if specified (can't use $gte in ChromaDB where)
             # We'll filter these after retrieval
 
-            # Perform search
+            # Perform search - always use local embeddings
             if query:
-                # Semantic search with filters
-                if self.external_embedding_manager.use_external:
-                    try:
-                        embeddings = self.external_embedding_manager.get_embeddings_sync([query])
-                        if embeddings:
-                            results = self.collection.query(
-                                query_embeddings=[embeddings[0]],
-                                where=where_conditions,
-                                n_results=limit,
-                            )
-                        else:
-                            results = self.collection.query(
-                                query_texts=[query], where=where_conditions, n_results=limit
-                            )
-                    except Exception as e:
-                        logger.error(f"Failed to use external embeddings: {e}")
-                        results = self.collection.query(
-                            query_texts=[query], where=where_conditions, n_results=limit
-                        )
-                else:
-                    results = self.collection.query(
-                        query_texts=[query], where=where_conditions, n_results=limit
-                    )
+                # Semantic search with filters (local embeddings only)
+                results = self.collection.query(
+                    query_texts=[query], where=where_conditions, n_results=limit
+                )
             else:
                 # Filter-only retrieval (no semantic search)
                 results = self.collection.get(where=where_conditions, limit=limit)
@@ -1199,37 +1073,10 @@ class UserMemoryManager:
             # Then get user-specific memories, reducing limit by number of global facts found
             remaining_limit = max(1, limit - len(global_facts))
 
-            # Query the user collection for relevant memories using external embeddings
-            if self.external_embedding_manager.use_external:
-                # Generate embeddings using external API
-                try:
-                    # Use sync wrapper to get embeddings
-                    embeddings = self.external_embedding_manager.get_embeddings_sync([query])
-
-                    if embeddings:
-                        results = self.collection.query(
-                            query_embeddings=[embeddings[0]],
-                            where={"user_id": user_id},
-                            n_results=remaining_limit,
-                        )
-                    else:
-                        # Fallback to query_texts if embeddings fail
-                        results = self.collection.query(
-                            query_texts=[query],
-                            where={"user_id": user_id},
-                            n_results=remaining_limit,
-                        )
-                except Exception as e:
-                    logger.error(f"Failed to use external embeddings: {e}")
-                    # Fallback to query_texts
-                    results = self.collection.query(
-                        query_texts=[query], where={"user_id": user_id}, n_results=remaining_limit
-                    )
-            else:
-                # Use ChromaDB's internal embeddings
-                results = self.collection.query(
-                    query_texts=[query], where={"user_id": user_id}, n_results=remaining_limit
-                )
+            # Query the user collection for relevant memories using local embeddings
+            results = self.collection.query(
+                query_texts=[query], where={"user_id": user_id}, n_results=remaining_limit
+            )
 
             memories = []
 
