@@ -1,0 +1,77 @@
+# WhisperEngine Minimal Dependencies for Pre-Bundled Models
+# Optimized for containers with pre-downloaded models
+
+# Core utilities and environment management
+python-dotenv==1.1.1
+psutil==6.1.0
+aiofiles==24.1.0
+
+# HTTP Client Dependencies  
+aiohttp==3.12.15
+requests==2.32.5
+httpx
+
+# Database abstraction
+aiosqlite==0.21.0
+
+# MINIMAL AI/ML Stack (90% size reduction)
+# sentence-transformers for embeddings (pre-bundled models)
+sentence-transformers==5.1.0
+numpy==2.3.2
+
+# Lightweight alternatives to full transformers
+tokenizers>=0.15.0              # Tokenization only (~50MB vs 2.5GB)
+# transformers>=4.30.0          # REMOVED: Use only for model download stage
+
+# Fast local emotion analysis  
+vaderSentiment>=3.3.2
+
+# Essential NLP (keep - production ready)
+spacy>=3.6.0
+
+# Vector operations and scientific computing (keep essential)
+scipy>=1.9.0
+scikit-learn>=1.3.0
+faiss-cpu>=1.7.0
+
+# Database and caching
+redis==5.2.1
+aioredis>=2.0.0
+chromadb
+
+# Graph analysis (lightweight)
+networkx>=3.1
+
+# Image processing
+Pillow==11.3.0
+
+# Discord Integration
+discord.py>=2.3.0
+python-multipart==0.0.6
+
+# Development and testing
+pytest==8.4.2
+pytest-asyncio==1.1.0
+
+# Production optimization libraries
+prometheus-client>=0.17.0
+
+# ONNX Runtime for optimized model inference (optional)
+# onnxruntime>=1.16.0           # Uncomment for ONNX optimization
+
+# Environment-specific dependencies
+# PostgreSQL (production)
+asyncpg>=0.28.0
+
+# Neo4j (optional graph features)  
+neo4j>=5.12.0
+
+# Voice processing (optional)
+PyNaCl>=1.5.0
+
+# Desktop app dependencies (minimal subset)
+fastapi>=0.104.0
+uvicorn>=0.24.0
+
+# Note: transformers library is only needed during Docker build stage
+# for model downloads, not in runtime environment with pre-bundled models

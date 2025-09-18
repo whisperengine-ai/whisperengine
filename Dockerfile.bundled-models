@@ -1,0 +1,70 @@
+# Multi-stage Dockerfile for pre-bundled models
+# Eliminates runtime model downloads and reduces network dependencies
+
+# Stage 1: Model Download & Bundle
+FROM python:3.11-slim as model-downloader
+
+# Install model download dependencies
+RUN pip install --no-cache-dir \
+    sentence-transformers==5.1.0 \
+    transformers>=4.30.0 \
+    torch>=1.13.0 \
+    numpy>=1.24.0
+
+# Create models directory
+WORKDIR /app
+RUN mkdir -p /app/models
+
+# Copy model download script
+COPY scripts/download_models.py .
+
+# Download all models during build (network required only at build time)
+RUN python download_models.py
+
+# Verify models were downloaded
+RUN ls -la /app/models/ && \
+    echo "📊 Model bundle contents:" && \
+    du -sh /app/models/* || echo "No models found"
+
+# Stage 2: Minimal Runtime (Production)
+FROM python:3.11-slim as production
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    gcc \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy pre-downloaded models from builder stage
+COPY --from=model-downloader /app/models /app/models
+
+# Install minimal runtime dependencies
+COPY requirements-minimal.txt .
+RUN pip install --no-cache-dir -r requirements-minimal.txt
+
+# Copy application code
+COPY . /app
+WORKDIR /app
+
+# Set environment for offline model usage
+ENV MODEL_CACHE_DIR=/app/models
+ENV TRANSFORMERS_OFFLINE=1
+ENV HF_DATASETS_OFFLINE=1
+ENV SENTENCE_TRANSFORMERS_HOME=/app/models
+
+# Verify models are accessible
+RUN python -c "\
+import os; \
+import json; \
+config_path = '/app/models/model_config.json'; \
+config = json.load(open(config_path)) if os.path.exists(config_path) else {}; \
+print('✅ Model configuration loaded' if config else '❌ Model configuration not found'); \
+print(f'📁 Models available: {list(config.get(\"embedding_models\", {}).keys())}' if config else ''); \
+exit(0 if config else 1) \
+"
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
+    CMD python -c "import sys; sys.exit(0)" || exit 1
+
+# Run application
+CMD ["python", "run.py"]

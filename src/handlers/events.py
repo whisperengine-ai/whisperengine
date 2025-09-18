@@ -488,12 +488,17 @@ class BotEventHandlers:
         enhanced_system_prompt = None
 
         if not _minimal_context_mode_enabled():
-            # External API emotion analysis
-            if self.external_emotion_ai:
+            # REMOVED: External API emotion analysis (redundant with Phase 2)
+            # Skip external_emotion_ai calls - Phase 2 already provides comprehensive emotion analysis
+            if os.getenv("DISABLE_EXTERNAL_EMOTION_API", "true").lower() == "true":
+                logger.debug("Skipping external emotion API (redundant with Phase 2)")
+                external_emotion_data = None
+            elif self.external_emotion_ai:
                 external_emotion_data = await self._analyze_external_emotion(
                     message.content, user_id, conversation_context
                 )
-            # Phase 2 emotional intelligence
+                
+            # Phase 2 emotional intelligence (primary emotion source)
             if self.phase2_integration:
                 phase2_context, current_emotion_data = await self._analyze_phase2_emotion(
                     user_id, message.content, message
@@ -682,7 +687,12 @@ class BotEventHandlers:
         enhanced_system_prompt = None
 
         if not _minimal_context_mode_enabled():
-            if self.external_emotion_ai:
+            # REMOVED: External API emotion analysis (redundant with Phase 2)  
+            # Skip external_emotion_ai calls - Phase 2 already provides comprehensive emotion analysis
+            if os.getenv("DISABLE_EXTERNAL_EMOTION_API", "true").lower() == "true":
+                logger.debug("Skipping external emotion API for DM (redundant with Phase 2)")
+                external_emotion_data = None
+            elif self.external_emotion_ai:
                 external_emotion_data = await self._analyze_external_emotion(
                     content, user_id, conversation_context
                 )

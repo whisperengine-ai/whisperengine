@@ -1,7 +1,24 @@
 #!/usr/bin/env python3
 """
-ChromaDB Performance Monitor
-Detects GPU availability and provides performance recommendations for embedding generation.
+ChromaDB Performance Monitor (Local Embeddings Focus)
+
+Purpose:
+    Provide simple, actionable guidance for optimizing local embedding generation now that
+    the system uses a single unified local embedding model (no external embedding API toggle).
+
+What this module does NOT do anymore:
+    - Recommend switching to external embedding APIs
+    - Check deprecated USE_EXTERNAL_EMBEDDINGS or external embedding URLs
+
+Key optimizations surfaced:
+    - Batch sizing (LLM_EMBEDDING_BATCH_SIZE)
+    - Concurrency limits (EMBEDDING_MAX_CONCURRENT)
+    - Retry / backoff indicators
+    - Hardware capability (CPU vs potential GPU inside container)
+
+Historical Note:
+    External embedding configuration was deprecated in September 2025 in favor of a
+    single consistent local model to reduce complexity and eliminate dimension mismatch risk.
 """
 
 import logging
@@ -38,7 +55,7 @@ class ChromaDBPerformanceMonitor:
         """Check if Docker is available"""
         try:
             result = subprocess.run(
-                ["docker", "--version"], capture_output=True, text=True, timeout=5
+                ["docker", "--version"], capture_output=True, text=True, timeout=5, check=False
             )
             return result.returncode == 0
         except (subprocess.TimeoutExpired, FileNotFoundError):
@@ -59,6 +76,7 @@ class ChromaDBPerformanceMonitor:
                 capture_output=True,
                 text=True,
                 timeout=10,
+                check=False,
             )
             return result.returncode == 0 and "Up" in result.stdout
         except (subprocess.TimeoutExpired, FileNotFoundError):
@@ -73,21 +91,25 @@ class ChromaDBPerformanceMonitor:
 
             # Check cgroup (another indicator)
             try:
-                with open("/proc/1/cgroup") as f:
+                with open("/proc/1/cgroup", encoding="utf-8") as f:
                     content = f.read()
                     return "docker" in content or "containerd" in content
             except (FileNotFoundError, PermissionError):
                 pass
 
             return False
-        except Exception:
+        except OSError:
             return False
 
-    def _check_external_embedding_configured(self) -> bool:
-        """Check if external embedding API is configured"""
-        from src.utils.embedding_manager import is_external_embedding_configured
-
-        return is_external_embedding_configured()
+    def _deprecated_external_embedding_indicator(self) -> bool:
+        """Return True if legacy external embedding env vars are still present (for warning)."""
+        legacy_vars = [
+            "LLM_EMBEDDING_API_URL",
+            "LLM_EMBEDDING_MODEL",
+            "USE_EXTERNAL_EMBEDDINGS",
+            "EMBEDDING_API_URL",
+        ]
+        return any(os.getenv(v) for v in legacy_vars)
 
     def _check_container_gpu_access(self) -> dict[str, Any]:
         """Check if ChromaDB container has GPU access"""
@@ -107,6 +129,7 @@ class ChromaDBPerformanceMonitor:
                 capture_output=True,
                 text=True,
                 timeout=10,
+                check=False,
             )
 
             has_gpu_request = (
@@ -129,6 +152,7 @@ class ChromaDBPerformanceMonitor:
                     capture_output=True,
                     text=True,
                     timeout=10,
+                    check=False,
                 )
 
                 if gpu_test.returncode == 0 and "no-gpu" not in gpu_test.stdout.lower():
@@ -144,98 +168,85 @@ class ChromaDBPerformanceMonitor:
             return {"available": False, "reason": "Unable to check container GPU access"}
 
     def _estimate_embedding_performance(self) -> dict[str, Any]:
-        """Estimate embedding performance based on system configuration"""
-        # These are rough estimates based on typical performance
-        performance_estimates = {
-            "macos_arm64_cpu": {
-                "tokens_per_second": 500,  # M1/M2 CPU is decent
-                "warning_threshold": 1000,  # Warn if processing >1000 tokens
-                "recommendation": "Consider external embedding API for better performance",
-            },
-            "macos_x86_cpu": {
-                "tokens_per_second": 200,  # Intel Mac CPU slower
-                "warning_threshold": 500,
-                "recommendation": "Strongly recommend external embedding API",
-            },
-            "linux_gpu": {
-                "tokens_per_second": 5000,  # GPU acceleration
-                "warning_threshold": 10000,
-                "recommendation": "GPU acceleration available - good performance expected",
-            },
-            "linux_cpu": {
-                "tokens_per_second": 800,  # Linux CPU generally faster
-                "warning_threshold": 2000,
-                "recommendation": "Consider external embedding API for heavy usage",
-            },
-            "windows_gpu": {
-                "tokens_per_second": 4500,  # Windows GPU
-                "warning_threshold": 10000,
-                "recommendation": "GPU acceleration available - good performance expected",
-            },
-            "windows_cpu": {
-                "tokens_per_second": 600,  # Windows CPU
-                "warning_threshold": 1500,
-                "recommendation": "Consider external embedding API for heavy usage",
-            },
-        }
-
-        # Determine configuration key
+        """Estimate local embedding throughput class (coarse heuristic)."""
         gpu_info = self._check_container_gpu_access()
-
+        if self.system_info["is_macos"] and self.system_info["is_arm64"]:
+            return {
+                "class": "macos_arm64_cpu",
+                "approx_embeddings_per_second": 55,
+                "note": "Apple Silicon CPU baseline (no container GPU).",
+            }
         if self.system_info["is_macos"]:
-            if self.system_info["is_arm64"]:
-                key = "macos_arm64_cpu"  # macOS Docker never has GPU
-            else:
-                key = "macos_x86_cpu"
-        elif self.system_info["is_linux"]:
-            key = "linux_gpu" if gpu_info["available"] else "linux_cpu"
-        elif self.system_info["is_windows"]:
-            key = "windows_gpu" if gpu_info["available"] else "windows_cpu"
-        else:
-            key = "linux_cpu"  # Default fallback
-
-        return performance_estimates[key]
+            return {
+                "class": "macos_intel_cpu",
+                "approx_embeddings_per_second": 25,
+                "note": "Older Intel Mac; expect slower throughput.",
+            }
+        if self.system_info["is_linux"] and gpu_info["available"]:
+            return {
+                "class": "linux_gpu",
+                "approx_embeddings_per_second": 400,
+                "note": "Container GPU detected; good scaling potential.",
+            }
+        if self.system_info["is_linux"]:
+            return {
+                "class": "linux_cpu",
+                "approx_embeddings_per_second": 80,
+                "note": "General Linux CPU baseline.",
+            }
+        if self.system_info["is_windows"] and gpu_info["available"]:
+            return {
+                "class": "windows_gpu",
+                "approx_embeddings_per_second": 300,
+                "note": "Windows GPU path; ensure drivers are stable.",
+            }
+        if self.system_info["is_windows"]:
+            return {
+                "class": "windows_cpu",
+                "approx_embeddings_per_second": 50,
+                "note": "Windows CPU baseline.",
+            }
+        return {
+            "class": "generic_cpu",
+            "approx_embeddings_per_second": 60,
+            "note": "Fallback heuristic.",
+        }
 
     async def benchmark_embedding_performance(self, test_duration: float = 5.0) -> dict[str, Any]:
         """Benchmark actual embedding performance"""
         try:
             from src.utils.embedding_manager import embedding_manager
-
-            # Test texts of varying lengths
-            test_texts = [
-                "Short test.",
-                "This is a medium length test sentence with more words.",
-                "This is a longer test sentence that contains significantly more words and should take more time to process through the embedding system to get a better sense of performance characteristics.",
-                " ".join(["Performance"] * 50),  # Very long text
-            ]
-
-            start_time = time.time()
-            embeddings_generated = 0
-
-            # Run benchmark for specified duration
-            while time.time() - start_time < test_duration:
-                try:
-                    embeddings = await embedding_manager.get_embeddings(test_texts)
-                    if embeddings:
-                        embeddings_generated += len(test_texts)
-                except Exception as e:
-                    logger.error(f"Embedding benchmark error: {e}")
-                    break
-
-            elapsed_time = time.time() - start_time
-            embeddings_per_second = embeddings_generated / elapsed_time if elapsed_time > 0 else 0
-
-            return {
-                "embeddings_per_second": embeddings_per_second,
-                "total_embeddings": embeddings_generated,
-                "duration": elapsed_time,
-                "service": "external" if embedding_manager.use_external else "local_chromadb",
-            }
-
         except ImportError:
             return {"error": "Embedding manager not available for benchmarking"}
-        except Exception as e:
-            return {"error": f"Benchmark failed: {e}"}
+
+        test_texts = [
+            "Short test.",
+            "This is a medium length test sentence with more words.",
+            "This is a longer test sentence that contains significantly more words and should take more time to process through the embedding system to get a better sense of performance characteristics.",
+            " ".join(["Performance"] * 50),  # Very long text
+        ]
+
+        start_time = time.time()
+        embeddings_generated = 0
+
+        try:
+            while time.time() - start_time < test_duration:
+                embeddings = await embedding_manager.get_embeddings(test_texts)
+                if embeddings:
+                    embeddings_generated += len(test_texts)
+        except Exception as e:  # Runtime benchmark failure
+            logger.error("Embedding benchmark error: %s", e)
+            return {"error": str(e)}
+
+        elapsed_time = time.time() - start_time
+        embeddings_per_second = embeddings_generated / elapsed_time if elapsed_time > 0 else 0
+
+        return {
+            "embeddings_per_second": embeddings_per_second,
+            "total_embeddings": embeddings_generated,
+            "duration": elapsed_time,
+            "service": "local",
+        }
 
     def get_performance_recommendations(self) -> dict[str, Any]:
         """Get performance recommendations based on system analysis"""
@@ -247,43 +258,53 @@ class ChromaDBPerformanceMonitor:
 
         # Check conditions where we should suppress warnings
         running_in_container = self._check_running_in_container()
-        external_embedding_configured = self._check_external_embedding_configured()
+        legacy_external_detected = self._deprecated_external_embedding_indicator()
         chromadb_container_running = self._check_chromadb_container_running()
 
-        # Only show warnings if:
-        # 1. Service is NOT running in a container AND
-        # 2. External embedding API is NOT configured AND
-        # 3. ChromaDB container is running (indicating we're using local ChromaDB)
+        # Show warnings primarily when running locally with container ChromaDB active
         should_show_warnings = (
-            not running_in_container
-            and not external_embedding_configured
-            and chromadb_container_running
+            not running_in_container and chromadb_container_running
         )
 
-        # macOS specific warnings (only if conditions are met)
+        # macOS informational notes
         if self.system_info["is_macos"] and should_show_warnings:
-            warnings.append("⚠️  macOS Docker containers cannot access GPU acceleration")
-            warnings.append("⚠️  ChromaDB embeddings will run on CPU only, which can be slow")
+            warnings.append("macOS containers have no GPU access; embeddings run on CPU.")
             if self.system_info["is_arm64"]:
                 recommendations.append(
-                    "✅ Apple Silicon CPU provides decent performance for small workloads"
+                    "Apple Silicon is usually sufficient for moderate conversational workloads."
                 )
-            recommendations.append(
-                "🚀 Consider using external embedding API (LM Studio/Ollama) for better performance"
-            )
+            else:
+                recommendations.append(
+                    "Older Intel Mac detected; consider reducing concurrency or using a Linux host for heavier loads."
+                )
 
-        # GPU availability warnings (only if conditions are met)
+        # GPU absence info (non-macOS)
         if not gpu_info["available"] and not self.system_info["is_macos"] and should_show_warnings:
-            warnings.append(f"⚠️  No GPU detected in ChromaDB container: {gpu_info['reason']}")
-            recommendations.append("🔧 Consider configuring GPU access for ChromaDB container")
+            warnings.append(f"No GPU detected in ChromaDB container: {gpu_info['reason']}")
+            recommendations.append(
+                "If high throughput is required, run ChromaDB on a GPU-enabled Linux host."
+            )
 
-        # Performance-based recommendations (only if conditions are met)
-        if performance_est["tokens_per_second"] < 1000 and should_show_warnings:
+        # Concurrency & batching optimization tips (always relevant)
+        recommendations.append(
+            "Tune LLM_EMBEDDING_BATCH_SIZE for larger batches (trade memory for throughput)."
+        )
+        recommendations.append(
+            "Adjust EMBEDDING_MAX_CONCURRENT to avoid CPU contention (start 2-4 on CPU)."
+        )
+        recommendations.append(
+            "Warm the embedding cache at startup for popular system prompts or frequent phrases."
+        )
+        recommendations.append(
+            "Monitor average embedding latency; if outliers grow, reduce concurrency."
+        )
+
+        if legacy_external_detected:
             warnings.append(
-                f"⚠️  Estimated performance: {performance_est['tokens_per_second']} tokens/sec (slow)"
+                "Legacy external embedding environment variables detected (ignored by current system)."
             )
             recommendations.append(
-                "🚀 Strongly recommend external embedding API for production use"
+                "Remove deprecated LLM_EMBEDDING_API_URL / USE_EXTERNAL_EMBEDDINGS vars from your .env."
             )
 
         return {
@@ -292,10 +313,8 @@ class ChromaDBPerformanceMonitor:
             "performance_estimate": performance_est,
             "warnings": warnings,
             "recommendations": recommendations,
-            "external_embedding_recommended": len(warnings) > 0
-            or performance_est["tokens_per_second"] < 1000,
+            "legacy_external_vars_detected": legacy_external_detected,
             "running_in_container": running_in_container,
-            "external_embedding_configured": external_embedding_configured,
             "chromadb_container_running": chromadb_container_running,
             "should_show_warnings": should_show_warnings,
         }
