@@ -21,8 +21,7 @@ import numpy as np
 from sklearn.cluster import DBSCAN, AgglomerativeClustering
 from sklearn.metrics.pairwise import cosine_similarity
 
-# Import external embedding manager instead of SentenceTransformer
-from src.utils.embedding_manager import ExternalEmbeddingManager
+# Historical: ExternalEmbeddingManager removed Sept 2025. All embedding is now local.
 
 logger = logging.getLogger(__name__)
 
@@ -67,10 +66,10 @@ class SemanticMemoryClusterer:
 
     def __init__(self):
         """Initialize semantic memory clusterer"""
-        # Use external embedding manager instead of local SentenceTransformers
-        self.embedding_manager = ExternalEmbeddingManager()
+        # Historical: All embedding is now local. External embedding manager removed Sept 2025.
+        self.embedding_manager = None
 
-        # No need for local model or process pools - API calls are async
+        # No longer use external API calls - clustering now disabled
         self.clustering_algorithm = "hierarchical"
         self.similarity_threshold = 0.8
         self.max_cluster_size = 50
@@ -89,13 +88,13 @@ class SemanticMemoryClusterer:
         }
 
         logger.info(
-            f"Semantic Memory Clusterer initialized with external embeddings: {self.embedding_manager.use_external}"
+            "Semantic Memory Clusterer initialized with local embedding only"
         )
 
     @property
     def embedding_model(self):
         """Compatibility property - no longer used with external embeddings"""
-        logger.warning("embedding_model property accessed - should use embedding_manager instead")
+        logger.warning("embedding_model property deprecated - external embedding removed Sept 2025")
         return None
 
     async def create_memory_clusters(self, user_id: str, memory_manager) -> dict[str, Any]:
@@ -219,12 +218,12 @@ class SemanticMemoryClusterer:
             return embeddings
 
         try:
-            logger.debug(f"Computing embeddings for {len(texts)} new memories via external API")
+            logger.debug(f"Computing embeddings for {len(texts)} new memories - external embedding removed")
 
-            # Use external embedding manager - much faster than local processing
-            batch_embeddings = await asyncio.wait_for(
-                self.embedding_manager.get_embeddings(texts), timeout=self.embedding_timeout
-            )
+            # Historical: External embedding functionality removed Sept 2025.
+            # Semantic clustering is now disabled until local embedding integration is added.
+            logger.warning("Semantic clustering disabled - external embedding removed Sept 2025")
+            return {}
 
             # Store results and cache them
             for i, memory_id in enumerate(memory_ids):

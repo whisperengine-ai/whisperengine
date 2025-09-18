@@ -4,7 +4,7 @@ Complete Graph Database Integration Example with LLM Support
 This example demonstrates the full integrated system with:
 - Proper environment loading via env_manager
 - LLM client initialization for emotion analysis
-- External embeddings support
+- Local embeddings (single unified model)
 - Neo4j graph database integration
 - Memory system integration
 """
@@ -40,33 +40,20 @@ class CompleteIntegratedBot:
         """Initialize bot with full system integration"""
 
         # Initialize LLM client (like main.py does)
-        try:
-            base_llm_client = LLMClient()
-            safe_llm_client = ConcurrentLLMManager(base_llm_client)
+        base_llm_client = LLMClient()
+        safe_llm_client = ConcurrentLLMManager(base_llm_client)
+        # Test connection (network/IO issues simply result in disabled LLM mode)
+        self.llm_client = safe_llm_client if base_llm_client.check_connection() else None
 
-            # Test connection
-            if base_llm_client.check_connection():
-                self.llm_client = safe_llm_client
-            else:
-                self.llm_client = None
-        except Exception:
-            self.llm_client = None
-
-        # Initialize memory manager with external embeddings support
-        try:
-            self.memory_manager = UserMemoryManager(
-                enable_auto_facts=True, enable_global_facts=False, llm_client=self.llm_client
-            )
-        except Exception:
-            raise
+        # Initialize memory manager (embeddings are always local now)
+        self.memory_manager = UserMemoryManager(
+            enable_auto_facts=True, enable_global_facts=False, llm_client=self.llm_client
+        )
 
         # Initialize graph-integrated emotion manager
-        try:
-            self.emotion_manager = GraphIntegratedEmotionManager(
-                llm_client=self.llm_client, memory_manager=self.memory_manager
-            )
-        except Exception:
-            raise
+        self.emotion_manager = GraphIntegratedEmotionManager(
+            llm_client=self.llm_client, memory_manager=self.memory_manager
+        )
 
     async def process_message(
         self, user_id: str, message: str, display_name: str | None = None
@@ -109,8 +96,8 @@ class CompleteIntegratedBot:
                 "context_quality": context.get("quality_score", 0.0),
             }
 
-        except Exception as e:
-            logger.error(f"Error processing message: {e}")
+        except Exception as e:  # Broad catch to return safe error response
+            logger.error("Error processing message: %s", e)
             return {
                 "response": "I apologize, but I encountered an error processing your message.",
                 "error": str(e),
@@ -130,8 +117,8 @@ class CompleteIntegratedBot:
                 context["sections"]["emotion"] = emotion_context
                 context["active_systems"].append("emotion_system")
                 context["quality_score"] += 0.3
-        except Exception as e:
-            logger.warning(f"Failed to get emotion context: {e}")
+        except Exception as e:  # Non-critical
+            logger.warning("Failed to get emotion context: %s", e)
 
         # Get memory context
         try:
@@ -139,12 +126,12 @@ class CompleteIntegratedBot:
                 user_id, message, limit=5
             )
             if relevant_memories:
-                memory_text = "\\n".join([f"• {mem['content']}" for mem in relevant_memories])
-                context["sections"]["memories"] = f"Relevant memories:\\n{memory_text}"
+                memory_text = "\n".join([f"• {mem['content']}" for mem in relevant_memories])
+                context["sections"]["memories"] = f"Relevant memories:\n{memory_text}"
                 context["active_systems"].append("memory_system")
                 context["quality_score"] += 0.2
-        except Exception as e:
-            logger.warning(f"Failed to get memory context: {e}")
+        except Exception as e:  # Non-critical
+            logger.warning("Failed to get memory context: %s", e)
 
         # Get graph-based contextual insights
         try:
@@ -156,20 +143,35 @@ class CompleteIntegratedBot:
                     context["sections"]["graph_insights"] = graph_insights
                     context["active_systems"].append("graph_database")
                     context["quality_score"] += 0.4
-        except Exception as e:
-            logger.warning(f"Failed to get graph insights: {e}")
+        except Exception as e:  # Non-critical
+            logger.warning("Failed to get graph insights: %s", e)
 
         # Get user facts if available
         try:
-            if hasattr(self.memory_manager, "get_user_facts"):
-                user_facts = self.memory_manager.get_user_facts(user_id, limit=3)
-                if user_facts:
-                    facts_text = "\\n".join([f"• {fact['content']}" for fact in user_facts])
-                    context["sections"]["facts"] = f"Known facts about user:\\n{facts_text}"
-                    context["active_systems"].append("fact_system")
-                    context["quality_score"] += 0.1
-        except Exception as e:
-            logger.warning(f"Failed to get user facts: {e}")
+            potential = getattr(self.memory_manager, "get_user_facts", None)
+            if callable(potential):
+                user_facts_raw = potential(user_id, limit=3)
+                user_facts_list = []
+                if isinstance(user_facts_raw, dict):
+                    user_facts_list = [user_facts_raw]
+                elif isinstance(user_facts_raw, (list, tuple, set)):
+                    user_facts_list = list(user_facts_raw)
+                # else: unsupported type or None -> skip
+                if user_facts_list:
+                    facts_text_parts = []
+                    for fact in user_facts_list:
+                        if isinstance(fact, dict):
+                            content = fact.get("content") or fact.get("text") or str(fact)
+                            facts_text_parts.append(f"• {content}")
+                        else:
+                            facts_text_parts.append(f"• {str(fact)}")
+                    if facts_text_parts:
+                        facts_text = "\n".join(facts_text_parts)
+                        context["sections"]["facts"] = f"Known facts about user:\n{facts_text}"
+                        context["active_systems"].append("fact_system")
+                        context["quality_score"] += 0.1
+        except Exception as e:  # Non-critical
+            logger.warning("Failed to get user facts: %s", e)
 
         return context
 
@@ -197,7 +199,7 @@ class CompleteIntegratedBot:
             return response
 
         except Exception as e:
-            logger.error(f"LLM response generation failed: {e}")
+            logger.error("LLM response generation failed: %s", e)
             return self._generate_fallback_response(message, context)
 
     def _build_system_prompt(self, context: dict) -> str:
@@ -210,23 +212,23 @@ class CompleteIntegratedBot:
 
         # Add context sections
         for section_name, section_content in context.get("sections", {}).items():
-            prompt_parts.append(f"\\n=== {section_name.upper()} ===")
+            prompt_parts.append(f"\n=== {section_name.upper()} ===")
             prompt_parts.append(section_content)
 
         # Add quality indicator
         quality = context.get("quality_score", 0.0)
         if quality > 0.7:
-            prompt_parts.append("\\n=== INSTRUCTION ===")
+            prompt_parts.append("\n=== INSTRUCTION ===")
             prompt_parts.append(
                 "You have rich context about this user. Use it to provide a personalized, emotionally aware response."
             )
         elif quality > 0.3:
-            prompt_parts.append("\\n=== INSTRUCTION ===")
+            prompt_parts.append("\n=== INSTRUCTION ===")
             prompt_parts.append(
                 "You have some context about this user. Use it to provide a more personalized response."
             )
 
-        return "\\n".join(prompt_parts)
+        return "\n".join(prompt_parts)
 
     def _generate_fallback_response(self, message: str, context: dict) -> str:
         """Generate fallback response without LLM"""
@@ -242,7 +244,7 @@ class CompleteIntegratedBot:
         else:
             tone = "helpful and friendly"
 
-        return f'[{tone} response - no LLM] I understand your message: "{message[:100]}..."'
+        return f'[tone: {tone}] I understand your message: "{message[:100]}..."'
 
     async def get_system_status(self) -> dict:
         """Get comprehensive system status"""
@@ -273,7 +275,7 @@ class CompleteIntegratedBot:
             self.memory_manager.retrieve_relevant_memories("test_user", "test", limit=1)
             status["components"]["memory_manager"] = {
                 "status": "healthy",
-                "external_embeddings": os.getenv("USE_EXTERNAL_EMBEDDINGS", "false"),
+                "embedding_model": os.getenv("LLM_LOCAL_EMBEDDING_MODEL", "unknown"),
             }
         except Exception as e:
             status["components"]["memory_manager"] = {"status": "error", "error": str(e)}
@@ -306,20 +308,8 @@ async def demonstrate_complete_integration():
     # System status check
     status = await bot.get_system_status()
 
-    for _component, details in status["components"].items():
-        {
-            "healthy": "✅",
-            "connected": "✅",
-            "disconnected": "⚠️",
-            "error": "❌",
-            "not_initialized": "⚠️",
-            "limited": "⚠️",
-        }.get(details.get("status"), "❓")
-
-        if details.get("endpoint"):
-            pass
-        if details.get("external_embeddings"):
-            pass
+    for _component, _details in status["components"].items():
+        pass
 
     # Conversation demonstration
 
@@ -337,14 +327,11 @@ async def demonstrate_complete_integration():
         # Process through complete system
         result = await bot.process_message(user_id, message, "Alex")
 
-        # Show detailed analysis
         if "error" in result:
             pass
         else:
-
             if result["user_profile"]["trust_indicators"] > 0:
                 pass
-
             if result["user_profile"]["escalation_count"] > 0:
                 pass
 
@@ -360,7 +347,7 @@ async def demonstrate_complete_integration():
     if "emotion_manager" in status["components"]:
         capabilities.append("✅ Enhanced emotion analysis")
     if "memory_manager" in status["components"]:
-        capabilities.append("✅ Persistent memory with external embeddings")
+        capabilities.append("✅ Persistent memory with local embeddings")
     if os.getenv("ENABLE_GRAPH_DATABASE", "false").lower() == "true":
         capabilities.append("✅ Graph database relationship tracking")
 

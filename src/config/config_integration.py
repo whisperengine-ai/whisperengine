@@ -77,7 +77,7 @@ class WhisperEngineConfigIntegrator:
         features = self.config_manager.config.features
 
         return {
-            "use_external_embeddings": not perf_config.enable_local_ai,
+            # Historical: use_external_embeddings was deprecated in September 2025. Local embedding is always used.
             "enable_semantic_clustering": perf_config.enable_semantic_clustering,
             "cpu_threads": perf_config.cpu_threads,
             "memory_limit_gb": perf_config.memory_limit_gb,

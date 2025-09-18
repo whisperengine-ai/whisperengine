@@ -19,18 +19,20 @@ services:
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
       - ENV_MODE=production
       
-      # LLM Configuration - Local LM Studio defaults (override in .env)
-      - LLM_CHAT_API_URL=http://host.docker.internal:1234/v1
-      - LLM_CHAT_MODEL=mistralai/mistral-nemo-instruct-2407
+      # LLM Configuration - OPTIMIZED (Single API endpoint)
+      - LLM_CHAT_API_URL=https://openrouter.ai/api/v1
+      - LLM_MODEL_NAME=openai/gpt-4o
+      - LLM_CHAT_MODEL=openai/gpt-4o
       
-      - LLM_FACTS_API_URL=http://host.docker.internal:1234/v1
-      - LLM_FACTS_MODEL=google/gemma-3n-e4b
+      # Local AI Systems - No additional APIs needed
+      - USE_LOCAL_EMOTION_ANALYSIS=true
+      - USE_LOCAL_FACT_EXTRACTION=true
+      - DISABLE_EXTERNAL_EMOTION_API=true
+      - DISABLE_REDUNDANT_FACT_EXTRACTION=true
       
-      - LLM_EMOTION_API_URL=http://host.docker.internal:1234/v1
-      - LLM_EMOTION_MODEL=mistralai/mistral-nemo-instruct-2407
+      # Single embedding model (local)
+      - LLM_LOCAL_EMBEDDING_MODEL=all-MiniLM-L6-v2
       
-      - LLM_EMBEDDING_API_URL=http://host.docker.internal:1234/v1
-      - LLM_EMBEDDING_MODEL=text-embedding-nomic-embed-text-v1.5
       - DEBUG_MODE=false
       - PYTHONUNBUFFERED=1
       

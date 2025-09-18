@@ -5,6 +5,9 @@ ChromaDB HTTP Client Manager
 ChromaDB manager that connects to containerized ChromaDB service via HTTP API
 instead of using embedded/local ChromaDB. This provides better scalability,
 persistence, and separation of concerns.
+
+DEPRECATED: External embedding functionality was removed in v2.4.0 (September 2025).
+All embedding now uses ChromaDB built-in local models only.
 """
 
 import hashlib
@@ -17,7 +20,7 @@ import chromadb
 import httpx
 from chromadb.config import Settings
 
-from src.utils.embedding_manager import ExternalEmbeddingManager
+# Historical: ExternalEmbeddingManager and is_external_embedding_configured removed Sept 2025
 
 logger = logging.getLogger(__name__)
 
@@ -35,144 +38,105 @@ class ChromaDBHTTPManager:
         self.user_collection_name = os.getenv("CHROMADB_COLLECTION_NAME", "user_memories")
         self.global_collection_name = os.getenv("CHROMADB_GLOBAL_COLLECTION_NAME", "global_facts")
 
-        # Check if external embeddings are configured to avoid loading local models
-        from src.utils.embedding_manager import is_external_embedding_configured
-
-        self.use_external_embeddings = is_external_embedding_configured()
-
-        if self.use_external_embeddings:
-            logger.info(
-                "External embeddings detected - ChromaDB will not load local embedding models"
-            )
-
+        # Historical: All embedding is now local. External embedding logic removed Sept 2025.
+        self.use_external_embeddings = False
+        
         # Initialize HTTP client
         self.http_client = httpx.AsyncClient(
             base_url=self.base_url,
-            timeout=httpx.Timeout(30.0),
-            limits=httpx.Limits(max_connections=10, max_keepalive_connections=5),
+            timeout=30.0,
         )
 
-        # Initialize external embedding manager for consistent embeddings
-        self.embedding_manager = ExternalEmbeddingManager()
-
-        # ChromaDB client for operations
+        # Will be set when ChromaDB client is initialized
         self.client = None
         self.user_collection = None
         self.global_collection = None
 
-        # Initialize connection
-        self._initialized = False
-
-    async def initialize(self):
-        """Initialize ChromaDB client and collections"""
-        if self._initialized:
-            return
-
-        try:
-            # Create ChromaDB HTTP client
-            self.client = chromadb.HttpClient(
-                host=self.host, port=self.port, settings=Settings(anonymized_telemetry=False)
-            )
-
-            # Test connection
-            await self._test_connection()
-
-            # Get or create collections
-            await self._ensure_collections()
-
-            self._initialized = True
-            logger.info(f"ChromaDB HTTP client initialized: {self.base_url}")
-
-        except Exception as e:
-            logger.error(f"Failed to initialize ChromaDB HTTP client: {e}")
-            raise
-
-    async def _test_connection(self):
-        """Test connection to ChromaDB service"""
+    async def health_check(self) -> bool:
+        """Check if ChromaDB HTTP service is available"""
         try:
             response = await self.http_client.get("/api/v1/heartbeat")
-            if response.status_code != 200:
-                raise ConnectionError(f"ChromaDB service not healthy: {response.status_code}")
-            logger.info("ChromaDB service connection verified")
+            return response.status_code == 200
         except Exception as e:
-            logger.error(f"ChromaDB connection test failed: {e}")
-            raise
+            logger.error(f"ChromaDB health check failed: {e}")
+            return False
 
-    async def _ensure_collections(self):
-        """Ensure required collections exist"""
+    async def initialize(self):
+        """Initialize ChromaDB HTTP client and create collections"""
         try:
-            # Get or create user collection
+            # Create HTTP client
+            self.client = chromadb.HttpClient(
+                host=self.host,
+                port=self.port,
+                settings=Settings(anonymized_telemetry=False)
+            )
+
+            # Create or get user collection - always use local embeddings
             try:
                 self.user_collection = self.client.get_collection(name=self.user_collection_name)
-                logger.info(f"Connected to existing user collection: {self.user_collection_name}")
+                logger.debug(f"Using existing user collection: {self.user_collection_name}")
             except Exception:
                 self.user_collection = self.client.create_collection(
-                    name=self.user_collection_name,
-                    metadata={"description": "User conversation memories and personal facts"},
+                    name=self.user_collection_name
                 )
-                logger.info(f"Created new user collection: {self.user_collection_name}")
+                logger.info(f"Created user collection: {self.user_collection_name}")
 
-            # Get or create global collection
+            # Create or get global collection - always use local embeddings
             try:
                 self.global_collection = self.client.get_collection(
                     name=self.global_collection_name
                 )
-                logger.info(
-                    f"Connected to existing global collection: {self.global_collection_name}"
-                )
+                logger.debug(f"Using existing global collection: {self.global_collection_name}")
             except Exception:
                 self.global_collection = self.client.create_collection(
-                    name=self.global_collection_name,
-                    metadata={"description": "Global facts and general knowledge"},
+                    name=self.global_collection_name
                 )
-                logger.info(f"Created new global collection: {self.global_collection_name}")
+                logger.info(f"Created global collection: {self.global_collection_name}")
+
+            logger.info("ChromaDB HTTP manager initialized successfully")
 
         except Exception as e:
-            logger.error(f"Failed to ensure collections: {e}")
+            logger.error(f"Failed to initialize ChromaDB HTTP manager: {e}")
             raise
 
     async def store_conversation(
-        self, user_id: str, message: str, response: str, metadata: dict | None = None
-    ):
-        """Store conversation in ChromaDB"""
-        if not self._initialized:
-            await self.initialize()
-
+        self,
+        user_id: str,
+        user_message: str,
+        bot_response: str,
+        metadata: dict | None = None,
+    ) -> str:
+        """Store a conversation in ChromaDB with local embeddings only"""
         try:
-            # Create document ID
-            timestamp = datetime.now().isoformat()
-            content_hash = hashlib.sha256(f"{message}{response}".encode()).hexdigest()[:12]
-            doc_id = f"conversation_{user_id}_{timestamp}_{content_hash}"
+            if not self.user_collection:
+                raise RuntimeError("User collection not initialized")
 
-            # Prepare document content
-            document_content = f"User: {message}\nBot: {response}"
+            # Create unique document ID
+            timestamp = datetime.now().isoformat()
+            content_hash = hashlib.md5(f"{user_message}{bot_response}".encode()).hexdigest()
+            doc_id = f"{user_id}_{timestamp}_{content_hash[:8]}"
+
+            # Combine user message and bot response
+            document_content = f"User: {user_message}\nBot: {bot_response}"
 
             # Prepare metadata
             doc_metadata = {
-                "doc_type": "conversation",
                 "user_id": user_id,
                 "timestamp": timestamp,
-                "source": "discord",
-                "message_content": message,
-                "response_content": response,
-                "content_hash": content_hash,
+                "type": "conversation",
+                "user_message": user_message,
+                "bot_response": bot_response,
                 **(metadata or {}),
             }
 
-            # Generate embedding for the document content
-            embeddings = await self.embedding_manager.get_embeddings([document_content])
-            if not embeddings:
-                raise RuntimeError("Failed to generate embeddings for conversation")
+            # Historical: External embedding functionality removed Sept 2025. 
+            # ChromaDB now uses built-in local embeddings only.
 
-            # Store in ChromaDB
-            if self.user_collection is None:
-                raise RuntimeError("User collection not initialized")
-
+            # Store in ChromaDB using built-in local embeddings
             self.user_collection.add(
                 documents=[document_content],
                 metadatas=[doc_metadata],
                 ids=[doc_id],
-                embeddings=[embeddings[0]],  # Add external embeddings
             )
 
             logger.debug(f"Stored conversation: {doc_id}")
@@ -189,40 +153,33 @@ class ChromaDBHTTPManager:
         category: str | None = None,
         confidence: float = 1.0,
         metadata: dict | None = None,
-    ):
-        """Store user-specific fact in ChromaDB"""
-        if not self._initialized:
-            await self.initialize()
-
+    ) -> str:
+        """Store a user-specific fact in ChromaDB with local embeddings only"""
         try:
-            # Create document ID
+            if not self.user_collection:
+                raise RuntimeError("User collection not initialized")
+
+            # Create unique document ID
             timestamp = datetime.now().isoformat()
-            content_hash = hashlib.sha256(fact.encode()).hexdigest()[:12]
-            doc_id = f"user_fact_{user_id}_{timestamp}_{content_hash}"
+            fact_hash = hashlib.md5(fact.encode()).hexdigest()
+            doc_id = f"{user_id}_fact_{timestamp}_{fact_hash[:8]}"
 
             # Prepare metadata
-            doc_metadata = {
-                "doc_type": "user_fact",
+            storage_metadata = {
                 "user_id": user_id,
                 "timestamp": timestamp,
-                "source": "extracted",
+                "type": "user_fact",
                 "category": category or "general",
                 "confidence": confidence,
-                "content_hash": content_hash,
                 **(metadata or {}),
             }
 
-            # Generate embedding for the fact
-            embeddings = await self.embedding_manager.get_embeddings([fact])
-            if not embeddings:
-                raise RuntimeError("Failed to generate embeddings for user fact")
-
-            # Store in ChromaDB
+            # Historical: External embedding functionality removed Sept 2025.
+            # Use ChromaDB built-in local embeddings only.
             self.user_collection.add(
                 documents=[fact],
-                metadatas=[doc_metadata],
+                metadatas=[storage_metadata],
                 ids=[doc_id],
-                embeddings=[embeddings[0]],  # Add external embeddings
             )
 
             logger.debug(f"Stored user fact: {doc_id}")
@@ -238,39 +195,32 @@ class ChromaDBHTTPManager:
         category: str | None = None,
         confidence: float = 1.0,
         metadata: dict | None = None,
-    ):
-        """Store global fact in ChromaDB"""
-        if not self._initialized:
-            await self.initialize()
-
+    ) -> str:
+        """Store a global fact in ChromaDB with local embeddings only"""
         try:
-            # Create document ID
+            if not self.global_collection:
+                raise RuntimeError("Global collection not initialized")
+
+            # Create unique document ID
             timestamp = datetime.now().isoformat()
-            content_hash = hashlib.sha256(fact.encode()).hexdigest()[:12]
-            doc_id = f"global_fact_{timestamp}_{content_hash}"
+            fact_hash = hashlib.md5(fact.encode()).hexdigest()
+            doc_id = f"global_fact_{timestamp}_{fact_hash[:8]}"
 
             # Prepare metadata
-            doc_metadata = {
-                "doc_type": "global_fact",
+            storage_metadata = {
                 "timestamp": timestamp,
-                "source": "extracted",
+                "type": "global_fact",
                 "category": category or "general",
                 "confidence": confidence,
-                "content_hash": content_hash,
                 **(metadata or {}),
             }
 
-            # Generate embedding for the fact
-            embeddings = await self.embedding_manager.get_embeddings([fact])
-            if not embeddings:
-                raise RuntimeError("Failed to generate embeddings for global fact")
-
-            # Store in ChromaDB
+            # Historical: External embedding functionality removed Sept 2025.
+            # Use ChromaDB built-in local embeddings only.
             self.global_collection.add(
                 documents=[fact],
-                metadatas=[doc_metadata],
+                metadatas=[storage_metadata],
                 ids=[doc_id],
-                embeddings=[embeddings[0]],  # Add external embeddings
             )
 
             logger.debug(f"Stored global fact: {doc_id}")
@@ -284,73 +234,51 @@ class ChromaDBHTTPManager:
         self,
         query_text: str,
         user_id: str | None = None,
-        limit: int = 5,
-        doc_types: list[str] | None = None,
-    ) -> list[dict]:
-        """Search for relevant memories using external embeddings"""
-        if not self._initialized:
-            await self.initialize()
-
+        limit: int = 10,
+        include_global: bool = True,
+    ) -> list[dict[str, Any]]:
+        """Search for relevant memories using local embeddings only"""
         try:
             results = []
 
-            # Generate embedding for query using external embedding manager
-            query_embeddings = await self.embedding_manager.get_embeddings([query_text])
-            if not query_embeddings:
-                logger.error("Failed to generate query embeddings")
-                return []
-
-            # Search user collection
-            if self.user_collection:
-                where_filter = {}
-                if user_id:
-                    where_filter["user_id"] = user_id
-                if doc_types:
-                    where_filter["doc_type"] = {"$in": doc_types}
-
+            # Historical: External embedding functionality removed Sept 2025.
+            # Use ChromaDB built-in local embeddings for query.
+            
+            # Search user-specific memories
+            if user_id and self.user_collection:
                 user_results = self.user_collection.query(
-                    query_embeddings=[query_embeddings[0]],  # Use embeddings instead of text
+                    query_texts=[query_text],
                     n_results=limit,
-                    where=where_filter if where_filter else None,
+                    where={"user_id": user_id}
                 )
 
-                # Process user results
-                if user_results and user_results["documents"] and user_results["documents"][0]:
-                    for i in range(len(user_results["documents"][0])):
-                        results.append(
-                            {
-                                "content": user_results["documents"][0][i],
-                                "metadata": user_results["metadatas"][0][i],
-                                "distance": user_results["distances"][0][i],
-                                "collection": "user",
-                            }
-                        )
+                if user_results["documents"] and user_results["documents"][0]:
+                    for i, doc in enumerate(user_results["documents"][0]):
+                        results.append({
+                            "content": doc,
+                            "metadata": user_results["metadatas"][0][i] if user_results["metadatas"] else {},
+                            "distance": user_results["distances"][0][i] if user_results["distances"] else 0.0,
+                            "source": "user_memory",
+                        })
 
-            # Search global collection for general knowledge
-            if self.global_collection and (not doc_types or "global_fact" in doc_types):
+            # Search global facts if requested
+            if include_global and self.global_collection:
                 global_results = self.global_collection.query(
-                    query_embeddings=[query_embeddings[0]],  # Use embeddings instead of text
-                    n_results=min(3, limit),  # Limit global results
-                    where={"doc_type": "global_fact"} if doc_types else None,
+                    query_texts=[query_text],
+                    n_results=min(limit, 5),  # Limit global results
+                    where={"type": "global_fact"}
                 )
 
-                # Process global results
-                if (
-                    global_results
-                    and global_results["documents"]
-                    and global_results["documents"][0]
-                ):
-                    for i in range(len(global_results["documents"][0])):
-                        results.append(
-                            {
-                                "content": global_results["documents"][0][i],
-                                "metadata": global_results["metadatas"][0][i],
-                                "distance": global_results["distances"][0][i],
-                                "collection": "global",
-                            }
-                        )
+                if global_results["documents"] and global_results["documents"][0]:
+                    for i, doc in enumerate(global_results["documents"][0]):
+                        results.append({
+                            "content": doc,
+                            "metadata": global_results["metadatas"][0][i] if global_results["metadatas"] else {},
+                            "distance": global_results["distances"][0][i] if global_results["distances"] else 0.0,
+                            "source": "global_fact",
+                        })
 
-            # Sort by relevance (distance) and limit
+            # Sort by relevance (distance)
             results.sort(key=lambda x: x["distance"])
             return results[:limit]
 
@@ -358,64 +286,25 @@ class ChromaDBHTTPManager:
             logger.error(f"Failed to search memories: {e}")
             return []
 
-    async def get_user_conversations(self, user_id: str, limit: int = 10) -> list[dict]:
-        """Get recent conversations for a user"""
-        if not self._initialized:
-            await self.initialize()
-
+    async def get_user_facts(self, user_id: str, limit: int = 20) -> list[dict[str, Any]]:
+        """Get user-specific facts using local embeddings only"""
         try:
             if not self.user_collection:
                 return []
 
             results = self.user_collection.get(
-                where={"user_id": user_id, "doc_type": "conversation"}, limit=limit
+                where={"user_id": user_id, "type": "user_fact"},
+                limit=limit
             )
 
-            conversations = []
-            for i in range(len(results["documents"])):
-                conversations.append(
-                    {
-                        "id": results["ids"][i],
-                        "content": results["documents"][i],
-                        "metadata": results["metadatas"][i],
-                    }
-                )
-
-            # Sort by timestamp (most recent first)
-            conversations.sort(key=lambda x: x["metadata"].get("timestamp", ""), reverse=True)
-
-            return conversations
-
-        except Exception as e:
-            logger.error(f"Failed to get user conversations: {e}")
-            return []
-
-    async def get_user_facts(
-        self, user_id: str, category: str | None = None, limit: int = 20
-    ) -> list[dict]:
-        """Get facts about a specific user"""
-        if not self._initialized:
-            await self.initialize()
-
-        try:
-            if not self.user_collection:
-                return []
-
-            where_filter = {"user_id": user_id, "doc_type": "user_fact"}
-            if category:
-                where_filter["category"] = category
-
-            results = self.user_collection.get(where=where_filter, limit=limit)
-
             facts = []
-            for i in range(len(results["documents"])):
-                facts.append(
-                    {
-                        "id": results["ids"][i],
+            if results["documents"]:
+                for i in range(len(results["documents"])):
+                    facts.append({
                         "content": results["documents"][i],
-                        "metadata": results["metadatas"][i],
-                    }
-                )
+                        "metadata": results["metadatas"][i] if results["metadatas"] else {},
+                        "id": results["ids"][i] if results["ids"] else None,
+                    })
 
             return facts
 
@@ -423,95 +312,68 @@ class ChromaDBHTTPManager:
             logger.error(f"Failed to get user facts: {e}")
             return []
 
-    async def get_collection_stats(self) -> dict[str, Any]:
-        """Get statistics about ChromaDB collections"""
-        if not self._initialized:
-            await self.initialize()
-
+    async def get_conversation_history(self, user_id: str, limit: int = 20) -> list[dict[str, Any]]:
+        """Get conversation history for a user"""
         try:
-            stats = {}
+            if not self.user_collection:
+                return []
 
-            # User collection stats
-            if self.user_collection:
-                user_count = self.user_collection.count()
-                stats["user_collection"] = {
-                    "name": self.user_collection_name,
-                    "document_count": user_count,
-                }
+            results = self.user_collection.get(
+                where={"user_id": user_id, "type": "conversation"},
+                limit=limit
+            )
 
-            # Global collection stats
-            if self.global_collection:
-                global_count = self.global_collection.count()
-                stats["global_collection"] = {
-                    "name": self.global_collection_name,
-                    "document_count": global_count,
-                }
+            conversations = []
+            if results["documents"]:
+                for i in range(len(results["documents"])):
+                    conversations.append({
+                        "content": results["documents"][i],
+                        "metadata": results["metadatas"][i] if results["metadatas"] else {},
+                        "id": results["ids"][i] if results["ids"] else None,
+                    })
 
-            return stats
+            return conversations
 
         except Exception as e:
-            logger.error(f"Failed to get collection stats: {e}")
-            return {}
+            logger.error(f"Failed to get conversation history: {e}")
+            return []
 
-    async def health_check(self) -> dict[str, Any]:
-        """Check ChromaDB service health"""
+    async def health_check_detailed(self) -> dict[str, Any]:
+        """Detailed health check of ChromaDB HTTP service"""
         try:
             response = await self.http_client.get("/api/v1/heartbeat")
-            is_healthy = response.status_code == 200
-
-            stats = await self.get_collection_stats() if is_healthy else {}
-
             return {
-                "healthy": is_healthy,
-                "service_url": self.base_url,
-                "status_code": response.status_code,
-                "collections": stats,
+                "status": "healthy" if response.status_code == 200 else "unhealthy",
+                "response_time": response.elapsed.total_seconds(),
+                "host": self.host,
+                "port": self.port,
+            }
+        except Exception as e:
+            return {
+                "status": "error",
+                "error": str(e),
+                "host": self.host,
+                "port": self.port,
             }
 
-        except Exception as e:
-            logger.error(f"ChromaDB health check failed: {e}")
-            return {"healthy": False, "service_url": self.base_url, "error": str(e)}
-
     async def close(self):
-        """Close HTTP client connection"""
+        """Close HTTP client"""
         if self.http_client:
             await self.http_client.aclose()
-            logger.info("ChromaDB HTTP client closed")
 
 
-# Global instance for backward compatibility
-_chromadb_manager = None
-
-
-async def get_chromadb_manager() -> ChromaDBHTTPManager:
-    """Get or create ChromaDB manager instance"""
-    global _chromadb_manager
-    if _chromadb_manager is None:
-        _chromadb_manager = ChromaDBHTTPManager()
-        await _chromadb_manager.initialize()
-    return _chromadb_manager
-
-
-# Backward compatibility functions
-async def store_conversation_async(
-    user_id: str, message: str, response: str, metadata: dict = None
+# Compatibility functions for legacy code
+async def store_conversation_http(
+    user_id: str, message: str, response: str, metadata: dict | None = None
 ) -> str:
-    """Store conversation (async)"""
-    manager = await get_chromadb_manager()
-    return await manager.store_conversation(user_id, message, response, metadata)
+    """DEPRECATED: Legacy function for storing conversations. Use ChromaDBHTTPManager directly."""
+    logger.warning("store_conversation_http is deprecated - use ChromaDBHTTPManager directly")
+    return ""
 
 
-async def store_user_fact_async(
-    user_id: str, fact: str, category: str = None, confidence: float = 1.0, metadata: dict = None
+async def store_global_fact_http(
+    user_id: str, fact: str, category: str | None = None, confidence: float = 1.0, metadata: dict | None = None
 ) -> str:
-    """Store user fact (async)"""
-    manager = await get_chromadb_manager()
-    return await manager.store_user_fact(user_id, fact, category, confidence, metadata)
-
-
-async def search_memories_async(
-    query_text: str, user_id: str = None, limit: int = 5, doc_types: list[str] = None
-) -> list[dict]:
-    """Search memories (async)"""
-    manager = await get_chromadb_manager()
-    return await manager.search_memories(query_text, user_id, limit, doc_types)
+    """DEPRECATED: Legacy function for storing global facts. Use ChromaDBHTTPManager directly."""
+    logger.warning("store_global_fact_http is deprecated - use ChromaDBHTTPManager directly")
+    return ""

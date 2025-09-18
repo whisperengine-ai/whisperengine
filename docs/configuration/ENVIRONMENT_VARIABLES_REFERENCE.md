@@ -41,14 +41,14 @@ AI_PERSONALITY_ANALYSIS=true                # Default: true (Comprehensive perso
 ### System Configuration
 ```bash
 # Environment type and debugging
-ENVIRONMENT=development                      # Default: development (Options: development, production)
-DEBUG_MODE=false                            # Default: false (Enable debug mode)
-LOG_LEVEL=INFO                              # Default: INFO (Options: DEBUG, INFO, WARNING, ERROR)
-LOG_DIR=logs                                # Default: logs (Log directory path)
-LOG_APP_NAME=discord_bot                    # Default: discord_bot (Application name for logs)
-
 # Performance settings
-MAX_PROCESSING_TIME=60.0                    # Default: 60.0 (Max processing time in seconds)
+#### CHROMADB_PERSIST_DIRECTORY
+Path for ChromaDB vector store persistence (default: ./chromadb_data).
+
+---
+
+#### [REMOVED] USE_EXTERNAL_EMBEDDINGS, LLM_EMBEDDING_API_URL, EMBEDDING_API_URL
+These variables were deprecated and removed in v2.4.0 (September 2025). WhisperEngine now always uses a single local embedding model (all-MiniLM-L6-v2, 384-dim) for all vector operations. External embedding APIs are no longer supported. See the project changelog for migration details.
 
 # Container detection (auto-detected)
 ENV_MODE=                                   # Default: auto-detected (Explicit environment mode override)
@@ -68,12 +68,24 @@ LLM_CHAT_API_URL=http://localhost:1234/v1   # Default: http://localhost:1234/v1
 
 # Model names
 LLM_MODEL_NAME=local-model                  # Default: local-model (Main chat model)
-LLM_FACTS_MODEL_NAME=local-model            # Default: uses LLM_MODEL_NAME (Fast fact extraction)
+LLM_CHAT_MODEL=local-model                  # Default: uses LLM_MODEL_NAME (Chat responses)
 
 # Request settings
 LLM_REQUEST_TIMEOUT=90                      # Default: 90 (Request timeout in seconds - LM Studio can be slow)
 LLM_CONNECTION_TIMEOUT=10                   # Default: 10 (Connection establishment timeout)
 LLM_TEMPERATURE=0.7                         # Default: 0.7 (Creativity 0.0-2.0)
+```
+
+### Local AI Processing
+```bash
+# Optimized settings - replaces multiple API endpoints
+USE_LOCAL_EMOTION_ANALYSIS=true             # Default: true (Local emotion processing)
+USE_LOCAL_FACT_EXTRACTION=true              # Default: true (Local fact extraction)
+DISABLE_EXTERNAL_EMOTION_API=true           # Default: true (No external emotion API)
+DISABLE_REDUNDANT_FACT_EXTRACTION=true     # Default: true (No external facts API)
+
+# Single local embedding model (external embedding APIs removed)
+LLM_LOCAL_EMBEDDING_MODEL=all-MiniLM-L6-v2  # Default: all-MiniLM-L6-v2 (384-dim model)
 ```
 
 ### Token Limits
@@ -110,32 +122,18 @@ LLM_EMOTION_API_KEY=                        # Default: uses LLM_API_KEY (Separat
 LLM_FACTS_API_KEY=                          # Default: uses LLM_EMOTION_API_KEY (Separate key for fact extraction)
 ```
 
-### Embedding Configuration
+### Embedding Configuration (Simplified)
 ```bash
-# External embedding API settings
-LLM_EMBEDDING_API_URL=                      # Default: empty (External embedding API URL)
-LLM_EMBEDDING_MODEL_NAME=text-embedding-nomic-embed-text-v1.5 # Default: text-embedding-nomic-embed-text-v1.5
-LLM_EMBEDDING_API_KEY=                      # Default: empty (External embedding API key)
+# Local embedding model only (external embedding APIs & flags removed)
+LLM_LOCAL_EMBEDDING_MODEL=all-MiniLM-L6-v2  # 384-dim, fast, unified space
 
-# Alternative embedding configuration
-EMBEDDING_API_URL=                          # Default: empty (Alternative to LLM_EMBEDDING_API_URL)
-EMBEDDING_MODEL_NAME=text-embedding-nomic-embed-text-v1.5 # Default: fallback model name
-EMBEDDING_API_KEY=                          # Default: empty (Alternative embedding API key)
-
-# External embeddings control
-USE_EXTERNAL_EMBEDDINGS=false               # Default: false (Force use of external embedding service)
-
-# Local embedding models (fallback when external APIs not configured)
-LLM_LOCAL_EMBEDDING_MODEL=all-mpnet-base-v2 # Default: all-mpnet-base-v2 (Used by ChromaDB)
-FALLBACK_EMBEDDING_MODEL=all-mpnet-base-v2 # Default: all-mpnet-base-v2 (Fallback model)
-LOAD_FALLBACK_EMBEDDING_MODELS=true        # Default: true (Load fallback models if needed)
-
-# Embedding performance settings
+# Performance tuning (still supported)
 EMBEDDING_BATCH_SIZE=100                    # Default: 100 (Batch size for embedding requests)
 EMBEDDING_MAX_RETRIES=3                     # Default: 3 (Max retry attempts)
 EMBEDDING_RETRY_DELAY=1.0                   # Default: 1.0 (Retry delay in seconds)
 EMBEDDING_MAX_CONCURRENT=5                  # Default: 5 (Max concurrent embedding requests)
 ```
+> Historical note: `USE_EXTERNAL_EMBEDDINGS`, `LLM_EMBEDDING_API_URL`, `EMBEDDING_API_URL`, fallback model variables, and external embedding API keys were removed after consolidating to a single local MiniLM model. Re-embedding migration script: `scripts/reembed_chromadb.py`.
 
 ### Message Security
 ```bash
@@ -550,6 +548,6 @@ python -c "from src.core.bot import DiscordBotCore; print('AI system running wit
 
 ---
 
-**Total Environment Variables: 115+**
+**Total Environment Variables: 100+ (after consolidation)**
 
-This comprehensive reference includes all configuration options with their actual default values as found in the codebase. Each variable includes its purpose, default value, and usage context. Recently updated with Sprint 6 Visual Emotion Analysis features.
+This reference reflects the simplified configuration after embedding system consolidation (single local 384-dim model, external embedding APIs removed). For migration guidance see `scripts/reembed_chromadb.py`.

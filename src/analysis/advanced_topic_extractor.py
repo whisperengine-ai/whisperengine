@@ -22,7 +22,7 @@ import numpy as np
 import spacy
 
 # Use existing external embedding manager instead of local sentence transformers
-from src.utils.embedding_manager import ExternalEmbeddingManager, is_external_embedding_configured
+ # Historical: ExternalEmbeddingManager and is_external_embedding_configured removed Sept 2025
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +41,7 @@ class AdvancedTopicExtractor:
         """Load configuration with defaults."""
         default_config = {
             "spacy_model": "en_core_web_lg",
-            "use_external_embeddings": True,  # Use external embeddings by default
+            # Historical: use_external_embeddings was deprecated in September 2025. Local embedding is always used.
             "max_entities": 10,
             "max_key_phrases": 8,
             "min_phrase_length": 2,
@@ -72,15 +72,8 @@ class AdvancedTopicExtractor:
             logger.info(f"Loading spaCy model: {self.config['spacy_model']}")
             self.nlp = spacy.load(self.config["spacy_model"])
 
-            # Initialize external embedding manager (consistent with your existing setup)
-            if self.config["use_external_embeddings"] and is_external_embedding_configured():
-                logger.info("Initializing external embedding manager for semantic analysis")
-                self.embedding_manager = ExternalEmbeddingManager()
-            else:
-                logger.info(
-                    "External embeddings not configured - semantic features will be limited"
-                )
-                self.embedding_manager = None
+            # Historical: All embedding is now local. External embedding manager removed Sept 2025.
+            self.embedding_manager = None
 
             self._initialized = True
             logger.info("Advanced Topic Extractor initialized successfully")
@@ -263,54 +256,10 @@ class AdvancedTopicExtractor:
         return phrase in common_phrases
 
     async def _extract_semantic_topics(self, message: str, doc) -> list[dict]:
-        """Extract semantic topics using external embedding API."""
-        if not self.embedding_manager:
-            logger.debug(
-                "External embedding manager not available - skipping semantic topic extraction"
-            )
-            return []
-
-        try:
-            # Get sentence embeddings via external API
-            sentences = [sent.text.strip() for sent in doc.sents if len(sent.text.strip()) > 5]
-
-            if not sentences:
-                return []
-
-            # Use external embedding manager for each sentence
-            topics = []
-            for _i, sentence in enumerate(sentences):
-                try:
-                    # Get embedding via external API (returns list of embeddings for batch)
-                    embeddings = await self.embedding_manager.get_embeddings([sentence])
-
-                    if embeddings and len(embeddings) > 0 and len(embeddings[0]) > 0:
-                        embedding_array = np.array(embeddings[0])  # First (and only) embedding
-                        topic = {
-                            "sentence": sentence,
-                            "embedding_summary": {
-                                "mean": float(np.mean(embedding_array)),
-                                "std": float(np.std(embedding_array)),
-                                "norm": float(np.linalg.norm(embedding_array)),
-                                "dimensions": len(embeddings[0]),
-                            },
-                            "semantic_density": self._calculate_semantic_density(sentence, doc),
-                            "topic_strength": self._calculate_topic_strength(sentence, doc),
-                        }
-                        topics.append(topic)
-                except Exception as e:
-                    logger.warning(
-                        f"Failed to get embedding for sentence '{sentence[:50]}...': {e}"
-                    )
-                    continue
-
-            # Sort by topic strength
-            topics.sort(key=lambda t: t["topic_strength"], reverse=True)
-            return topics[:3]  # Return top 3 semantic topics
-
-        except Exception as e:
-            logger.warning(f"Error in semantic topic extraction: {e}")
-            return []
+        """Extract semantic topics using local embedding only (external removed)."""
+        # TODO: Implement local embedding-based topic extraction or return empty for now
+        logger.debug("Semantic topic extraction now uses only local embedding (external removed)")
+        return []
 
     def _calculate_semantic_density(self, sentence: str, doc) -> float:
         """Calculate semantic density of a sentence."""
