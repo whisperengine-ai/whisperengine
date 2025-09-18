@@ -1,6 +1,6 @@
 """
-Conversation Thread Manager for WhisperEngine Desktop App
-Handles multiple conversation threads, persistence, and thread switching.
+Conversation Thread Manager for WhisperEngine
+Manages conversation threads and their storage in ChromaDB.
 """
 
 import asyncio
@@ -113,7 +113,7 @@ class ConversationThread:
 
 
 class ConversationThreadManager:
-    """Manages conversation threads for the desktop app"""
+    """Manages conversation threads"""
 
     def __init__(self, data_dir: Path | None = None):
         self.data_dir = data_dir or Path.home() / ".whisperengine" / "conversations"

@@ -25,7 +25,6 @@ class FirstRunDetector:
         self.config_files = [
             ".env",
             ".env.discord", 
-            ".env.desktop-app",
             ".env.docker",
             ".env.development"
         ]
@@ -210,7 +209,7 @@ class FirstRunDetector:
 
 📁 Configuration:
    • Discord Bot: Use .env.discord or set ENV_MODE=discord
-   • Desktop App: Use .env.desktop-app or set ENV_MODE=desktop-app  
+   • Discord Bot: Use .env.discord or set ENV_MODE=discord  
    • Development: Use .env.development or .env
 
 🤖 LLM Setup:

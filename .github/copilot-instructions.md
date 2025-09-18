@@ -2,11 +2,10 @@
 
 ## 🎭 Project Overview
 
-WhisperEngine is a privacy-first AI conversation platform that can run as both a Discord bot and a standalone desktop application. The system features sophisticated AI memory, emotional intelligence, and personality adaptation with configurable AI personalities.
+WhisperEngine is a privacy-first AI conversation platform that runs as a Discord bot. The system features sophisticated AI memory, emotional intelligence, and personality adaptation with configurable AI personalities.
 
 **Core Deployment Modes:**
 - **Discord Bot** (`python run.py`) - Full AI-powered Discord bot with advanced memory
-- **Desktop App** (`python universal_native_app.py`) - Native Qt-based standalone application with local privacy
 - **Docker Compose** - Multi-container deployment for teams and production
 
 ## 🏗️ Architecture Fundamentals
@@ -21,7 +20,7 @@ components = self.bot_core.get_components()  # Returns all initialized component
 
 **Key architectural patterns:**
 - **Modular handlers**: Commands split across `src/handlers/` with dependency injection
-- **Universal platform**: `src/platforms/universal_chat.py` abstracts Discord vs desktop
+- **Universal platform**: `src/platforms/universal_chat.py` abstracts Discord platform
 - **Adaptive configuration**: `src/config/adaptive_config.py` for environment-aware settings
 - **Database abstraction**: SQLite ↔ PostgreSQL switching via `src/database/`
 
@@ -45,8 +44,8 @@ ENABLE_PHASE3_MEMORY = os.getenv('ENABLE_PHASE3_MEMORY', 'true')
 
 ```bash
 # ✅ CORRECT - Always activate venv first
-# Native desktop app
-source .venv/bin/activate && python universal_native_app.py
+# Discord bot
+source .venv/bin/activate && python run.py
 pip install something
 ```
 
@@ -70,9 +69,6 @@ if not load_environment():
 # Discord bot (fully functional) - ALWAYS use venv
 source .venv/bin/activate && python run.py
 
-# Native desktop app (Qt-based) - ALWAYS use venv
-source .venv/bin/activate && python universal_native_app.py
-
 # Docker development (external containers provide dependencies)
 ./scripts/deployment/docker-dev.sh dev  # or docker-compose -f docker-compose.dev.yml up
 ```
@@ -84,9 +80,6 @@ source .venv/bin/activate && pytest tests/test_conversation_cache.py -v
 source .venv/bin/activate && pytest -m unit              # Mock-based unit tests
 source .venv/bin/activate && pytest -m integration       # Real LLM integration tests
 source .venv/bin/activate && pytest -m llm               # All LLM-related tests
-
-# Desktop app workflow testing - ALWAYS use venv
-source .venv/bin/activate && python test_desktop_llm_complete.py
 ```
 
 ## 🧠 Memory & Data Architecture
@@ -95,7 +88,7 @@ source .venv/bin/activate && python test_desktop_llm_complete.py
 - **ChromaDB**: Vector embeddings for semantic memory (`src/memory/`)
 - **Redis**: Conversation caching and session state (`USE_REDIS_CACHE=true`)
 - **PostgreSQL**: Persistent user data and relationships
-- **SQLite**: Local storage for desktop mode
+- **SQLite**: Local storage and development
 - **Neo4j**: Optional graph database for relationship mapping (`ENABLE_GRAPH_DATABASE=true`)
 
 ### Memory Security Pattern
@@ -109,16 +102,7 @@ from src.memory.thread_safe_manager import ThreadSafeMemoryManager
 safe_memory = ThreadSafeMemoryManager(context_memory_manager)
 ```
 
-## 🖥️ Desktop App Architecture 
 
-### Qt Native Application
-Desktop app is a Qt-based native application with full AI integration:
-```python
-# universal_native_app.py - Core desktop UI
-# Native Qt-based application with system tray, settings, and local privacy
-```
-
-**Universal chat**: Same AI components work in Discord and desktop modes
 
 ## 🔌 Integration Patterns
 
@@ -212,7 +196,7 @@ if not validation['valid']:
 - **Entry Point**: `run.py` → `src/main.py` → `ModularBotManager`
 - **Bot Core**: `src/core/bot.py` (DiscordBotCore - dependency injection hub)
 - **Command Handlers**: `src/handlers/*.py` (modular command implementations)
-- **Universal Platform**: `src/platforms/universal_chat.py` (Discord/Desktop abstraction)
+- **Universal Platform**: `src/platforms/universal_chat.py` (Discord platform abstraction)
 
 ### AI & Intelligence
 - **LLM Integration**: `src/llm/llm_client.py` (universal OpenAI-compatible client)
@@ -220,8 +204,7 @@ if not validation['valid']:
 - **Emotional AI**: `src/emotion/external_api_emotion_ai.py` (Phase 2 integration)
 - **Advanced Intelligence**: `src/intelligence/phase4_integration.py` (human-like adaptation)
 
-### Desktop & UI
-- **Desktop Entry**: `universal_native_app.py` (Qt-based native application)
+
 
 ### Configuration & Environment
 - **Environment Manager**: `env_manager.py` (centralized config loading)
@@ -238,17 +221,11 @@ if not validation['valid']:
 ### Optional Dependencies
 - **Voice features**: Require `PyNaCl` → Check `VOICE_AVAILABLE` flags before import
 - **Graph database**: Requires `neo4j` → Check `GRAPH_MEMORY_AVAILABLE` before import
-- **Desktop UI**: FastAPI optional → Graceful degradation when missing
 
 ### Memory Operations
 - **Always async**: Memory operations should use proper async patterns
 - **Context managers**: Use proper cleanup for database connections
 - **Thread safety**: Multi-user bots need `ThreadSafeMemoryManager` wrapper
-
-### Desktop App Development
-- **Static file caching**: Browser may cache old CSS/JS → Force refresh after changes
-- **Server restart required**: FastAPI static files don't hot-reload → Restart server
-- **WebSocket connections**: Remember to handle disconnections gracefully
 
 ### Testing Patterns
 - **Test markers**: Use `pytest -m unit` vs `pytest -m integration` for different test types

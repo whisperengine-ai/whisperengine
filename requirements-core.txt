@@ -1,5 +1,5 @@
 # WhisperEngine Core Dependencies
-# Shared across Discord Bot and Desktop App
+# Shared across Discord Bot integrations
 # All versions locked for reproducible builds
 
 # Core utilities and environment management

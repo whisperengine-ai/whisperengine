@@ -94,7 +94,6 @@ def print_build_matrix():
     """Print available build targets and platforms"""
 
     targets = [
-        ("native_desktop", "Native desktop app with embedded SQLite"),
         ("docker_single", "Single Docker container (all-in-one)"),
         ("docker_compose", "Multi-container Docker setup with databases"),
         ("kubernetes", "Kubernetes deployment manifests"),
@@ -138,14 +137,11 @@ async def interactive_build():
             pass
 
     # Configure based on target
-    if selected_target == DeploymentTarget.NATIVE_DESKTOP:
-        database_type = "sqlite"
-        include_discord = recommendations["include_discord"]
-    elif selected_target in [DeploymentTarget.DOCKER_COMPOSE, DeploymentTarget.KUBERNETES]:
+    if selected_target in [DeploymentTarget.DOCKER_COMPOSE, DeploymentTarget.KUBERNETES]:
         database_type = "postgresql"
         include_discord = True  # Assume production deployment wants Discord
     else:
-        database_type = recommendations.get("database_type", "sqlite")
+        database_type = recommendations.get("database_type", "postgresql")
         include_discord = recommendations["include_discord"]
 
     # Ask about Discord integration if not auto-detected
@@ -224,16 +220,7 @@ async def execute_build(config: BuildConfig) -> int:
 async def show_next_steps(config: BuildConfig, result):
     """Show next steps after successful build"""
 
-    if config.target == DeploymentTarget.NATIVE_DESKTOP:
-        if config.platform == Platform.MACOS:
-            pass
-        else:
-            pass
-
-        if config.include_discord and not os.environ.get("DISCORD_BOT_TOKEN"):
-            pass
-
-    elif config.target == DeploymentTarget.DOCKER_SINGLE:
+    if config.target == DeploymentTarget.DOCKER_SINGLE:
 
         if not os.environ.get("OPENROUTER_API_KEY"):
             pass
@@ -253,7 +240,6 @@ async def main():
         epilog="""
 Examples:
   python build.py                           # Interactive mode
-  python build.py native_desktop             # Build native app for current platform
   python build.py docker_single --optimize  # Build optimized Docker container
   python build.py --matrix                  # Show all available options
   python build.py --all                     # Build all targets
