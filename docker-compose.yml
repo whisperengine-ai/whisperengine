@@ -44,14 +44,14 @@ services:
       retries: 3
       start_period: 40s
     
-    # Persistent volumes
+    # Persistent volumes - Bot application data only
     volumes:
-      - bot_data:/app/chromadb_data
+      # Application-specific data (NOT datastore data)
       - bot_backups:/app/backups
       - bot_privacy:/app/privacy_data
       - bot_temp:/app/temp_images
       - bot_logs:/app/logs
-      # System prompt customization (mount prompts directory for flexible prompt management)
+      # Configuration files (read-only)
       - ./prompts:/app/prompts:ro
       - ./config:/app/config:ro
       
@@ -82,6 +82,8 @@ services:
       - "6379:6379"
     networks:
       - bot_network
+    # Security: Run as non-root user
+    user: "999:999"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -106,6 +108,18 @@ services:
       - "5432:5432"
     networks:
       - bot_network
+    # Security: Run as postgres user  
+    user: "postgres:postgres"
+    # Performance tuning for production
+    command: >
+      postgres
+      -c shared_buffers=256MB
+      -c max_connections=200
+      -c effective_cache_size=1GB
+      -c maintenance_work_mem=64MB
+      -c checkpoint_completion_target=0.9
+      -c wal_buffers=16MB
+      -c default_statistics_target=100
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-bot_user} -d ${POSTGRES_DB:-whisper_engine}"]
       interval: 10s
@@ -170,26 +184,36 @@ networks:
     driver: bridge
     name: whisperengine-network
 
-# Volumes
+# Volumes - Properly separated by service responsibility
 volumes:
-  bot_data:
-    name: whisperengine-data
+  # Bot application volumes (NOT datastore data)
   bot_backups:
     name: whisperengine-backups
+    driver: local
   bot_privacy:
     name: whisperengine-privacy
+    driver: local
   bot_temp:
     name: whisperengine-temp
+    driver: local
   bot_logs:
     name: whisperengine-logs
+    driver: local
+  
+  # Datastore volumes (managed by their respective services)
   redis_data:
     name: whisperengine-redis
+    driver: local
   postgres_data:
     name: whisperengine-postgres
+    driver: local
   chromadb_data:
     name: whisperengine-chromadb
+    driver: local
   neo4j_data:
     name: whisperengine-neo4j-data
+    driver: local
   neo4j_logs:
     name: whisperengine-neo4j-logs
+    driver: local
 

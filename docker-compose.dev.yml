@@ -26,6 +26,11 @@ services:
       - ./config:/app/config
       # Data directory for monitoring and runtime data
       - ./data:/app/data
+      # Application data volumes (persistent across restarts)
+      - bot_backups:/app/backups
+      - bot_privacy:/app/privacy_data
+      - bot_temp:/app/temp_images
+      - bot_logs:/app/logs
       
     # Expose health check port for development
     ports:
@@ -50,3 +55,18 @@ services:
     # Ensure container rebuilds when source changes
     labels:
       - "dev.mode=true"
+
+# Development-specific volumes (inherit from base but add explicit definitions)
+volumes:
+  bot_backups:
+    name: whisperengine-backups
+    driver: local
+  bot_privacy:
+    name: whisperengine-privacy
+    driver: local
+  bot_temp:
+    name: whisperengine-temp
+    driver: local
+  bot_logs:
+    name: whisperengine-logs
+    driver: local
