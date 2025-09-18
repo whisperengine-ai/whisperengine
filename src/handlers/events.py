@@ -519,34 +519,13 @@ class BotEventHandlers:
         comprehensive_context = None
         enhanced_system_prompt = None
 
+        # PERFORMANCE OPTIMIZATION: Process AI components in parallel instead of sequentially
         if not _minimal_context_mode_enabled():
-            # REMOVED: External API emotion analysis (redundant with Phase 2)
-            # Skip external_emotion_ai calls - Phase 2 already provides comprehensive emotion analysis
-            if os.getenv("DISABLE_EXTERNAL_EMOTION_API", "true").lower() == "true":
-                logger.debug("Skipping external emotion API (redundant with Phase 2)")
-                external_emotion_data = None
-            elif self.external_emotion_ai:
-                external_emotion_data = await self._analyze_external_emotion(
-                    message.content, user_id, conversation_context
-                )
-                
-            # Phase 2 emotional intelligence (primary emotion source)
-            if self.phase2_integration:
-                phase2_context, current_emotion_data = await self._analyze_phase2_emotion(
-                    user_id, message.content, message
-                )
-            # Dynamic personality
-            if self.dynamic_personality_profiler:
-                dynamic_personality_context = await self._analyze_dynamic_personality(
-                    user_id, message.content, message, recent_messages
-                )
-            # Phase 4 intelligence
-            if hasattr(self.memory_manager, "process_with_phase4_intelligence"):
-                phase4_context, comprehensive_context, enhanced_system_prompt = (
-                    await self._process_phase4_intelligence(
-                        user_id, message, recent_messages, external_emotion_data, phase2_context
-                    )
-                )
+            (external_emotion_data, phase2_context, current_emotion_data, 
+             dynamic_personality_context, phase4_context, comprehensive_context, 
+             enhanced_system_prompt) = await self._process_ai_components_parallel(
+                user_id, message.content, message, recent_messages, conversation_context
+            )
         else:
             logger.debug("[MINIMAL_CONTEXT_MODE] Skipping emotion/personality/phase4 enrichment for DM message.")
 
@@ -744,30 +723,13 @@ class BotEventHandlers:
         comprehensive_context = None
         enhanced_system_prompt = None
 
+        # PERFORMANCE OPTIMIZATION: Process AI components in parallel instead of sequentially
         if not _minimal_context_mode_enabled():
-            # REMOVED: External API emotion analysis (redundant with Phase 2)  
-            # Skip external_emotion_ai calls - Phase 2 already provides comprehensive emotion analysis
-            if os.getenv("DISABLE_EXTERNAL_EMOTION_API", "true").lower() == "true":
-                logger.debug("Skipping external emotion API for DM (redundant with Phase 2)")
-                external_emotion_data = None
-            elif self.external_emotion_ai:
-                external_emotion_data = await self._analyze_external_emotion(
-                    content, user_id, conversation_context
-                )
-            if self.phase2_integration:
-                phase2_context, current_emotion_data = await self._analyze_phase2_emotion(
-                    user_id, content, message, context_type="guild_message"
-                )
-            if self.dynamic_personality_profiler:
-                dynamic_personality_context = await self._analyze_dynamic_personality(
-                    user_id, content, message, recent_messages
-                )
-            if hasattr(self.memory_manager, "process_with_phase4_intelligence"):
-                phase4_context, comprehensive_context, enhanced_system_prompt = (
-                    await self._process_phase4_intelligence(
-                        user_id, message, recent_messages, external_emotion_data, phase2_context
-                    )
-                )
+            (external_emotion_data, phase2_context, current_emotion_data, 
+             dynamic_personality_context, phase4_context, comprehensive_context, 
+             enhanced_system_prompt) = await self._process_ai_components_parallel(
+                user_id, content, message, recent_messages, conversation_context
+            )
         else:
             logger.debug("[MINIMAL_CONTEXT_MODE] Skipping emotion/personality/phase4 enrichment for guild mention.")
 
