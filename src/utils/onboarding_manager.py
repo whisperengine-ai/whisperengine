@@ -37,14 +37,21 @@ class FirstRunDetector:
         if self.setup_markers_file.exists():
             return False
         
-        # Check if any configuration files exist with proper tokens/keys
-        for config_file in self.config_files:
-            config_path = self.project_root / config_file
-            if config_path.exists():
-                if self._has_valid_configuration(config_path):
-                    # Mark as setup complete if we find valid config
-                    self._mark_setup_complete()
-                    return False
+        # In container mode, check environment variables instead of files
+        if self._is_container_mode():
+            if self._has_valid_env_configuration():
+                # Mark as setup complete if we find valid environment config
+                self._mark_setup_complete()
+                return False
+        else:
+            # Check if any configuration files exist with proper tokens/keys
+            for config_file in self.config_files:
+                config_path = self.project_root / config_file
+                if config_path.exists():
+                    if self._has_valid_configuration(config_path):
+                        # Mark as setup complete if we find valid config
+                        self._mark_setup_complete()
+                        return False
         
         return True
     
@@ -82,6 +89,35 @@ class FirstRunDetector:
         except Exception as e:
             logger.debug(f"Could not create setup marker: {e}")
     
+    def _is_container_mode(self) -> bool:
+        """Check if running in a container (Docker/Podman/etc.)"""
+        return (
+            os.path.exists("/.dockerenv") or
+            bool(os.getenv("CONTAINER_MODE")) or
+            bool(os.getenv("DOCKER_ENV")) or
+            os.getenv("ENV_MODE") == "production"
+        )
+    
+    def _has_valid_env_configuration(self) -> bool:
+        """Check if environment variables contain valid configuration"""
+        # Check for Discord bot configuration
+        discord_token = os.getenv("DISCORD_BOT_TOKEN", "")
+        has_discord_token = bool(discord_token and not discord_token.startswith("your_"))
+        
+        # Check for LLM configuration
+        llm_url = os.getenv("LLM_CHAT_API_URL", "")
+        has_llm_url = bool(llm_url)
+        
+        # Check for API keys (either not needed for local, or present for cloud)
+        llm_api_key = os.getenv("LLM_CHAT_API_KEY", "")
+        has_valid_api_key = (
+            llm_api_key == "not-needed" or  # Local LLM
+            (llm_api_key and not llm_api_key.startswith("your_") and not llm_api_key == "sk-placeholder")  # Real API key
+        )
+        
+        # Consider config valid if it has basic LLM setup and Discord token
+        return has_llm_url and has_valid_api_key and has_discord_token
+    
     def get_missing_requirements(self) -> List[str]:
         """Get list of missing requirements that prevent running"""
         missing = []
@@ -91,13 +127,19 @@ class FirstRunDetector:
             missing.append(f"Python 3.9+ required (current: {sys.version_info.major}.{sys.version_info.minor})")
         
         # Check for essential configuration
-        has_any_config = any(
-            (self.project_root / config_file).exists() 
-            for config_file in self.config_files
-        )
-        
-        if not has_any_config:
-            missing.append("No configuration file found (.env, .env.discord, etc.)")
+        if self._is_container_mode():
+            # In container mode, check environment variables
+            if not self._has_valid_env_configuration():
+                missing.append("Missing required environment variables (DISCORD_BOT_TOKEN, LLM_CHAT_API_URL, etc.)")
+        else:
+            # In native mode, check for configuration files
+            has_any_config = any(
+                (self.project_root / config_file).exists() 
+                for config_file in self.config_files
+            )
+            
+            if not has_any_config:
+                missing.append("No configuration file found (.env, .env.discord, etc.)")
         
         # Check for requirements.txt dependencies (basic check)
         try:
