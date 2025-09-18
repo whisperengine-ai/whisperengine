@@ -3,8 +3,8 @@
 #
 # Core dependencies (shared):     requirements-core.txt
 # Platform optimizations:        requirements-platform.txt  
-# Discord bot specific:          discord-bot/requirements-discord.txt
-# Desktop app specific:          desktop-app/requirements-desktop.txt
+# Discord bot specific:          requirements-discord.txt
+# Desktop app specific:          requirements-desktop.txt
 #
 # Installation:
 #   Discord Bot: ./scripts/install-discord.sh (or .bat for Windows)
@@ -15,16 +15,20 @@
 # This file maintained for backward compatibility until migration complete
 
 # Minimal compatibility installation - use new structure instead
+# All versions locked for reproducible builds
 discord.py==2.6.3
 python-dotenv==1.1.1
-chromadb
-transformers>=4.30.0
+chromadb==1.0.20
+transformers==4.56.1
 requests==2.32.5
 aiohttp==3.12.15
+sentence-transformers==5.1.0
+numpy==2.3.2
+pytest==8.4.2
 
 # For new installations, use:
 # pip install -r requirements-core.txt
 # pip install -r requirements-platform.txt
-# pip install -r discord-bot/requirements-discord.txt  # For Discord bot
+# pip install -r requirements-discord.txt  # For Discord bot
 # OR
-# pip install -r desktop-app/requirements-desktop.txt  # For desktop app
+# pip install -r requirements-desktop.txt  # For desktop app

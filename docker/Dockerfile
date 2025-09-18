@@ -1,5 +1,8 @@
 # Discord Bot - Universal Dockerfile
-FROM python:3.13-slim
+FROM python:3.11-slim
+
+# Build arguments for flexible configuration
+ARG SYSTEM_PROMPT_SOURCE=prompts/default.md
 
 # Image metadata labels
 LABEL org.opencontainers.image.title="WhisperEngine Discord Bot" \
@@ -25,13 +28,12 @@ RUN apt-get update && apt-get install -y \
     && pip install --no-cache-dir --upgrade pip
 
 # Copy and install Python dependencies using new multi-tier structure
-COPY requirements-core.txt requirements-platform.txt ./
-COPY discord-bot/requirements-discord.txt ./discord-bot/
+COPY requirements-core.txt requirements-platform.txt requirements-discord.txt ./
 
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip install --no-cache-dir -r requirements-core.txt && \
     pip install --no-cache-dir -r requirements-platform.txt && \
-    pip install --no-cache-dir -r discord-bot/requirements-discord.txt
+    pip install --no-cache-dir -r requirements-discord.txt
 
 # Add spaCy model download with cache
 RUN --mount=type=cache,target=/root/.cache/pip \
@@ -40,9 +42,12 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 # Copy application code (will be overridden by volume mounts in development)
 COPY src/ ./src/
 COPY pyproject.toml validate_config.py env_manager.py run.py ./
+COPY prompts/ ./prompts/
+COPY config/ ./config/
+COPY data/ ./data/
 
-# Copy system prompt (default, can be overridden by volume mount)
-COPY system_prompt.md ./system_prompt.md
+# Copy system prompt from configurable source (default, can be overridden by volume mount)
+COPY ${SYSTEM_PROMPT_SOURCE} ./system_prompt.md
 
 # No .env files copied - configuration injected at runtime via Docker Compose
 

@@ -1,5 +1,8 @@
 # Multi-stage Dockerfile for production optimization
-FROM python:3.13-slim AS base
+FROM python:3.11-slim AS base
+
+# Build arguments for flexible configuration
+ARG SYSTEM_PROMPT_SOURCE=prompts/default.md
 
 # Environment variables
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -22,8 +25,7 @@ RUN apt-get update && apt-get install -y \
 FROM base AS development
 
 # Copy dependency files for better layer caching
-COPY requirements-core.txt requirements-platform.txt ./
-COPY discord-bot/requirements-discord.txt ./discord-bot/
+COPY requirements-core.txt requirements-platform.txt requirements-discord.txt ./
 COPY requirements-dev.txt* ./
 
 # Install dependencies with cache mount
@@ -65,6 +67,8 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 COPY src/ ./src/
 COPY pyproject.toml validate_config.py env_manager.py run.py ./
 COPY prompts/ ./prompts/
+COPY config/ ./config/
+COPY data/ ./data/
 
 # Create non-root user and directories
 RUN useradd --create-home --no-log-init appuser && \
@@ -86,7 +90,7 @@ CMD ["sh", "-c", "python validate_config.py && python run.py"]
 
 # ============================================================================
 # Minimal/End-user stage (even smaller)
-FROM python:3.13-alpine AS minimal
+FROM python:3.11-alpine AS minimal
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
@@ -101,19 +105,22 @@ RUN apk add --no-cache \
     pip install --upgrade pip
 
 # Copy dependency files for better layer caching
-COPY requirements-core.txt requirements-platform.txt ./
-COPY discord-bot/requirements-discord.txt ./discord-bot/
+COPY requirements-core.txt requirements-platform.txt requirements-discord.txt ./
 
 # Install dependencies in stages for better error tracking
 RUN pip install --no-cache-dir -r requirements-core.txt && \
     pip install --no-cache-dir -r requirements-platform.txt && \
-    pip install --no-cache-dir -r discord-bot/requirements-discord.txt && \
+    pip install --no-cache-dir -r requirements-discord.txt && \
     python -m spacy download en_core_web_sm && \
     apk del gcc musl-dev libffi-dev openssl-dev
 
 # Copy application
 COPY src/ ./src/
-COPY validate_config.py env_manager.py run.py system_prompt.md ./
+COPY validate_config.py env_manager.py run.py ./
+COPY prompts/ ./prompts/
+COPY config/ ./config/
+COPY data/ ./data/
+COPY ${SYSTEM_PROMPT_SOURCE} ./system_prompt.md
 
 # Create user
 RUN adduser -D -s /bin/sh appuser && \
