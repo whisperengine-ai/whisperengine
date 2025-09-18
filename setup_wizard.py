@@ -357,17 +357,15 @@ class InteractiveSetupWizard:
             "ENABLE_PERFORMANCE_MONITORING": "true",
         })
         
-        # Database Configuration
+        # Database Configuration - Always use HTTP mode for ChromaDB
         if self.profile.deployment_mode == DeploymentMode.DOCKER_COMPOSE:
             config.update({
-                "USE_CHROMADB_HTTP": "true",
                 "CHROMADB_HTTP_URL": "http://localhost:8000",
                 "USE_REDIS_CACHE": "true",
                 "REDIS_URL": "redis://localhost:6379"
             })
         else:
             config.update({
-                "USE_CHROMADB_HTTP": "false",
                 "USE_REDIS_CACHE": "false"
             })
         

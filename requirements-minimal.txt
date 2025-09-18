@@ -4,7 +4,7 @@
 
 # Core utilities and environment management
 python-dotenv==1.1.1
-psutil==6.1.0
+psutil==7.1.0  # Updated from 6.1.0
 aiofiles==24.1.0
 
 # HTTP Client Dependencies  
@@ -18,7 +18,7 @@ aiosqlite==0.21.0
 # MINIMAL AI/ML Stack (90% size reduction)
 # sentence-transformers for embeddings (pre-bundled models)
 sentence-transformers==5.1.0
-numpy==2.3.2
+numpy==2.3.3  # Updated from 2.3.2
 
 # Lightweight alternatives to full transformers
 tokenizers==0.22.0              # Tokenization only (~50MB vs 2.5GB)
@@ -36,9 +36,9 @@ scikit-learn==1.7.2
 faiss-cpu==1.9.0
 
 # Database and caching
-redis==5.2.1
+redis==6.4.0  # Updated from 5.2.1
 aioredis==2.1.1
-chromadb==1.0.20
+chromadb==1.1.0  # Updated from 1.0.20
 
 # Graph analysis (lightweight)
 networkx==3.5

@@ -145,7 +145,7 @@ class ModularBotManager:
         if "Failed to initialize memory system" in error_msg or "ChromaDB" in error_msg:
             logger.error("💥 Memory system initialization failed: %s", error)
             if "ChromaDB server is not available" in error_msg:
-                logger.error("💡 Solution: Start ChromaDB with 'docker compose up chromadb' or set USE_CHROMADB_HTTP=false")
+                logger.error("💡 Solution: Start ChromaDB with 'docker compose up chromadb'")
             elif "ChromaDB server connection test failed" in error_msg:
                 logger.error("💡 Solution: Ensure ChromaDB server is running and accessible")
             else:

@@ -23,54 +23,54 @@ classifiers = [
 
 dependencies = [
     # Core Discord Bot Dependencies
-    "discord.py==2.4.0",
-    "python-dotenv==1.0.1",
+    "discord.py==2.6.3",  # Updated from 2.4.0
+    "python-dotenv==1.1.1",  # Updated from 1.0.1
     
     # HTTP Client Dependencies  
-    "aiohttp==3.10.5",
-    "requests==2.32.3",
+    "aiohttp==3.12.15",  # Updated from 3.10.5
+    "requests==2.32.5",  # Updated from 2.32.3
     
     # AI/ML and Memory System Dependencies
-    "chromadb==0.5.15",
-    "sentence-transformers==3.1.1",
-    "numpy==2.1.1",
-    "redis==5.0.8",
-    "spacy==3.7.6",
+    "chromadb==1.1.0",  # Updated from 0.5.15
+    "sentence-transformers==5.1.0",  # Updated from 3.1.1
+    "numpy==2.3.3",  # Updated from 2.1.1
+    "redis==6.4.0",  # Updated from 5.0.8
+    "spacy==3.8.7",  # Updated from 3.7.6
     
     # Image Processing Dependencies
-    "Pillow==10.4.0",
+    "Pillow==11.3.0",  # Updated from 10.4.0
     
     # Async File I/O Dependencies
     "aiofiles==24.1.0",
     
     # Voice functionality dependencies (optional)
-    "PyNaCl==1.5.0",
+    "PyNaCl==1.6.0",  # Updated from 1.5.0
     "audioop-lts==0.2.2",
-    "elevenlabs==1.8.2",
+    "elevenlabs==2.16.0",  # Updated from 1.8.2
 ]
 
 [project.optional-dependencies]
 test = [
-    "pytest==8.3.3",
-    "pytest-asyncio==0.24.0",
+    "pytest==8.4.2",  # Updated from 8.3.3
+    "pytest-asyncio==1.2.0",  # Updated from 0.24.0
     "pytest-cov==5.0.0",
     "pytest-xdist==3.6.0",
-    "pytest-mock==3.14.0",
+    "pytest-mock==3.12.0",  # Updated from 3.14.0
     "pytest-benchmark==4.0.0",
     "pytest-timeout==2.3.1",
     "pytest-html==4.1.1",
     "coverage[toml]==7.6.0",
-    "psutil==6.0.0",  # For performance testing
+    "psutil==7.1.0",  # Updated from 6.0.0 - For performance testing
 ]
 dev = [
-    "black==24.8.0",
+    "black==25.1.0",  # Updated from 24.8.0
     "flake8==7.1.1",
-    "mypy==1.11.2",
+    "mypy==1.13.0",  # Updated from 1.11.2
     "pre-commit==3.8.0",
     "debugpy==1.8.6",
     "ipython==8.27.0",
     "jupyter==1.1.1",
-    "ruff==0.6.4",
+    "ruff==0.13.1",  # Updated from 0.6.4
 ]
 
 [project.urls]

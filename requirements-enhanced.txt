@@ -4,7 +4,7 @@
 
 # Core utilities and environment management
 python-dotenv==1.1.1
-psutil==6.1.0
+psutil==7.1.0  # Updated from 6.1.0
 aiofiles==24.1.0
 
 # HTTP Client Dependencies  
@@ -16,9 +16,9 @@ httpx==0.28.1
 aiosqlite==0.21.0
 
 # AI/ML and Memory System Dependencies (Core)
-chromadb==1.0.20
+chromadb==1.1.0  # Updated from 1.0.20
 sentence-transformers==5.1.0
-numpy==2.3.2
+numpy==2.3.3  # Updated from 2.3.2
 
 # ENHANCED: Advanced Scientific Computing
 scipy==1.16.2              # Scientific computing and optimization
@@ -39,7 +39,7 @@ vaderSentiment==3.3.2     # Real-time sentiment analysis
 transformers==4.56.1
 
 # ENHANCED: Async Redis and Caching
-redis==5.2.1
+redis==6.4.0  # Updated from 5.2.1
 aioredis==2.1.1          # Async Redis operations for better performance
 
 # ENHANCED: Monitoring and Metrics

@@ -1,5 +1,5 @@
 # Multi-stage Dockerfile for production optimization
-FROM python:3.12-slim AS base
+FROM python:3.13-slim AS base
 
 # Build arguments for flexible configuration
 ARG SYSTEM_PROMPT_SOURCE=prompts/default.md
@@ -98,7 +98,7 @@ CMD ["sh", "-c", "python validate_config.py && python run.py"]
 
 # ============================================================================
 # Minimal/End-user stage (even smaller)
-FROM python:3.12-slim AS minimal
+FROM python:3.13-slim AS minimal
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \

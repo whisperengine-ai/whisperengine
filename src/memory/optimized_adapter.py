@@ -255,7 +255,6 @@ class OptimizedMemoryAdapter:
             # Enable optimization in production or when explicitly configured
             return (
                 os.getenv("ENVIRONMENT", "").lower() in ["production", "prod"]
-                or os.getenv("USE_CHROMADB_HTTP", "false").lower() == "true"
                 or os.getenv("CHROMADB_HOST", "localhost") != "localhost"
             )
 
@@ -358,28 +357,18 @@ class OptimizedMemoryAdapter:
 # Utility functions for easy integration
 
 
-async def create_optimized_memory_manager(
-    chromadb_manager_type: str = "http",
-) -> OptimizedMemoryAdapter:
+async def create_optimized_memory_manager() -> OptimizedMemoryAdapter:
     """
-    Create an optimized memory manager instance
-
-    Args:
-        chromadb_manager_type: Type of ChromaDB manager ("http" or "simple")
+    Create an optimized memory manager instance using HTTP ChromaDB
 
     Returns:
         OptimizedMemoryAdapter instance
     """
-    # Import based on type
-    if chromadb_manager_type == "http":
-        from src.memory.chromadb_http_manager import ChromaDBHTTPManager
+    # Always use HTTP manager for containerized ChromaDB
+    from src.memory.chromadb_http_manager import ChromaDBHTTPManager
 
-        manager = ChromaDBHTTPManager()
-        await manager.initialize()
-    else:
-        from src.memory.chromadb_manager_simple import ChromaDBManagerSimple
-
-        manager = ChromaDBManagerSimple()
+    manager = ChromaDBHTTPManager()
+    await manager.initialize()
 
     # Create optimized adapter
     return OptimizedMemoryAdapter(manager)
@@ -393,7 +382,6 @@ def get_optimization_configuration() -> dict[str, Any]:
         "cache_size": os.getenv("MEMORY_CACHE_SIZE", "auto"),
         "monitoring_enabled": os.getenv("ENABLE_MEMORY_MONITORING", "auto"),
         "environment": os.getenv("ENVIRONMENT", "unknown"),
-        "chromadb_http": os.getenv("USE_CHROMADB_HTTP", "false"),
         "chromadb_host": os.getenv("CHROMADB_HOST", "localhost"),
     }
 
@@ -406,5 +394,5 @@ async def get_optimized_chromadb_manager() -> OptimizedMemoryAdapter:
     """Get or create optimized ChromaDB manager instance"""
     global _optimized_manager
     if _optimized_manager is None:
-        _optimized_manager = await create_optimized_memory_manager("http")
+        _optimized_manager = await create_optimized_memory_manager()
     return _optimized_manager

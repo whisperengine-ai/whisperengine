@@ -127,8 +127,9 @@ class LLMConfigValidator:
             return "OpenAI"
         elif "anthropic.com" in url_lower:
             return "Anthropic"
-        elif "mlx://" in url_lower:
-            return "MLX"
+        # MLX backend disabled until implementation is complete
+        # elif "mlx://" in url_lower:
+        #     return "MLX"
         elif "llamacpp://" in url_lower:
             return "llama-cpp-python"
         elif "local://" in url_lower:
@@ -141,8 +142,8 @@ class LLMConfigValidator:
         if not url:
             return False
 
-        # Special schemes
-        if url.startswith(("mlx://", "llamacpp://", "local://")):
+        # Special schemes (MLX disabled until backend implementation)
+        if url.startswith(("llamacpp://", "local://")):
             return True
 
         # HTTP/HTTPS URLs

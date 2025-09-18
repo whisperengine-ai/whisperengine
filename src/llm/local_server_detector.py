@@ -274,18 +274,21 @@ class LocalLLMDetector:
 
     def _detect_mlx_availability(self) -> bool:
         """Check if MLX is available on Apple Silicon"""
-        try:
-            # Only available on Apple Silicon
-            if platform.system() != "Darwin" or platform.machine() != "arm64":
-                return False
-
-            # Try to import MLX
-            import mlx.core  # type: ignore
-            from mlx_lm import load  # type: ignore
-
-            return True
-        except ImportError:
-            return False
+        # DISABLED: MLX backend not implemented
+        # TODO: Re-enable when MLX backend is implemented
+        return False
+        # try:
+        #     # Only available on Apple Silicon
+        #     if platform.system() != "Darwin" or platform.machine() != "arm64":
+        #         return False
+        # 
+        #     # Try to import MLX
+        #     import mlx.core  # type: ignore
+        #     from mlx_lm import load  # type: ignore
+        # 
+        #     return True
+        # except ImportError:
+        #     return False
 
     def _detect_gpu(self) -> bool:
         """Detect GPU availability"""
@@ -362,7 +365,8 @@ class LocalLLMDetector:
                     "3. Browse models and download Apple Silicon optimized models",
                     "4. Enable Metal GPU acceleration in settings",
                     "5. Start the local server (click 'Start Server' tab)",
-                    "6. Optional: Install MLX for even better performance: pip install mlx-lm",
+                    # MLX disabled until backend implementation is complete
+                    # "6. Optional: Install MLX for even better performance: pip install mlx-lm",
                 ],
             )
 

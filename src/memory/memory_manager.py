@@ -60,44 +60,30 @@ class UserMemoryManager:
             telemetry_enabled = os.getenv("ANONYMIZED_TELEMETRY", "false").lower() == "true"
             settings = Settings(anonymized_telemetry=telemetry_enabled)
 
-            # Check if we should use HTTP client or local file persistence
-            use_chromadb_http = os.getenv("USE_CHROMADB_HTTP", "true").lower() == "true"
-
-            if use_chromadb_http:
-                # Use HTTP client for containerized ChromaDB service
-                chromadb_host = os.getenv("CHROMADB_HOST", "localhost")
-                chromadb_port = int(os.getenv("CHROMADB_PORT", "8000"))
-                try:
-                    self.client = chromadb.HttpClient(
-                        host=chromadb_host, port=chromadb_port, settings=settings
+            # Always use HTTP client for containerized ChromaDB service
+            chromadb_host = os.getenv("CHROMADB_HOST", "localhost")
+            chromadb_port = int(os.getenv("CHROMADB_PORT", "8000"))
+            try:
+                self.client = chromadb.HttpClient(
+                    host=chromadb_host, port=chromadb_port, settings=settings
+                )
+                logger.info(f"Using ChromaDB HTTP client: {chromadb_host}:{chromadb_port}")
+            except Exception as e:
+                # Clean error message for ChromaDB connection failures
+                if "Could not connect to a Chroma server" in str(
+                    e
+                ) or "nodename nor servname provided" in str(e):
+                    error_msg = (
+                        f"ChromaDB server is not available at {chromadb_host}:{chromadb_port}"
                     )
-                    logger.info(f"Using ChromaDB HTTP client: {chromadb_host}:{chromadb_port}")
-                except Exception as e:
-                    # Clean error message for ChromaDB connection failures
-                    if "Could not connect to a Chroma server" in str(
-                        e
-                    ) or "nodename nor servname provided" in str(e):
-                        error_msg = (
-                            f"ChromaDB server is not available at {chromadb_host}:{chromadb_port}"
-                        )
-                        logger.error(error_msg)
-                        logger.info(
-                            "To fix: Start ChromaDB server or set USE_CHROMADB_HTTP=false for local storage"
-                        )
-                        raise MemoryError(error_msg)
-                    else:
-                        logger.error(f"ChromaDB HTTP client initialization failed: {e}")
-                        raise MemoryError(f"Failed to initialize ChromaDB HTTP client: {e}")
-            else:
-                # Use local file persistence for desktop mode
-                chromadb_path = os.path.expanduser(os.getenv("CHROMADB_PATH", persist_directory))
-                try:
-                    self.client = chromadb.PersistentClient(path=chromadb_path, settings=settings)
-                    logger.info(f"Using ChromaDB local file persistence: {chromadb_path}")
-                except Exception as e:
-                    error_msg = f"Failed to initialize local ChromaDB storage at {chromadb_path}"
-                    logger.error(f"{error_msg}: {e}")
+                    logger.error(error_msg)
+                    logger.info(
+                        "To fix: Start ChromaDB server with 'docker compose up chromadb'"
+                    )
                     raise MemoryError(error_msg)
+                else:
+                    logger.error(f"ChromaDB HTTP client initialization failed: {e}")
+                    raise MemoryError(f"Failed to initialize ChromaDB HTTP client: {e}")
 
             # Store the LLM client for emotion analysis
             self.llm_client = llm_client
