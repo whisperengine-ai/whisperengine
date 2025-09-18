@@ -97,10 +97,14 @@ class PersonalityFact:
             for key, value in self.context_metadata.items():
                 # Prefix context keys to avoid conflicts
                 flattened_key = f"context_{key}"
-                # Convert value to string if it's not a basic type
-                if isinstance(value, (str, int, float, bool)) or value is None:
+                # Convert value to proper ChromaDB-compatible types
+                if value is None:
+                    # Skip None values entirely as ChromaDB doesn't handle them well
+                    continue
+                elif isinstance(value, (str, int, float, bool)):
                     storage_dict[flattened_key] = value
                 else:
+                    # Convert all other types to string
                     storage_dict[flattened_key] = str(value)
 
         return storage_dict
