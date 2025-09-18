@@ -113,7 +113,7 @@ class StatusCommandHandlers:
         )
 
         if self.llm_client.check_connection():
-            logger.info("LLM status check: Connected")
+            logger.debug("LLM status check: Connected")
             embed.add_field(
                 name="Connection Status",
                 value="✅ **Connected** - Server is running and responding",
@@ -227,7 +227,7 @@ class StatusCommandHandlers:
                 inline=False,
             )
 
-            logger.info(f"Bot presence refreshed by {ctx.author.name}")
+            logger.debug(f"Bot presence refreshed by {ctx.author.name}")
 
         except Exception as e:
             embed.add_field(

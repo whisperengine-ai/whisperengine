@@ -120,6 +120,7 @@ class DiscordBotCore:
         self.conversation_cache = None
         self.image_processor = None
         self.health_monitor = None
+        self.monitoring_manager = None
         self.backup_manager = None
         self.voice_manager = None
         self.voice_support_enabled = False  # Will be set during voice initialization
@@ -678,6 +679,51 @@ class DiscordBotCore:
             self.logger.warning(f"Failed to initialize health monitor: {e}")
             self.health_monitor = None
 
+    def initialize_monitoring_system(self):
+        """Initialize the full monitoring system with dashboard support."""
+        self.logger.info("Initializing monitoring system")
+
+        try:
+            from src.monitoring import initialize_monitoring
+            
+            # Schedule async initialization but store the task for later awaiting
+            self.monitoring_init_task = asyncio.create_task(self._async_initialize_monitoring())
+            self.logger.info("Monitoring system initialization scheduled")
+
+        except Exception as e:
+            self.logger.warning(f"Failed to initialize monitoring system: {e}")
+
+    async def _async_initialize_monitoring(self):
+        """Async initialization of monitoring system."""
+        try:
+            from src.monitoring import initialize_monitoring
+            
+            # Initialize monitoring with environment-based config
+            self.monitoring_manager = await initialize_monitoring()
+            self.logger.info("✅ Monitoring system initialized successfully")
+            
+            # Log dashboard status
+            if self.monitoring_manager.enable_dashboard:
+                dashboard_url = self.monitoring_manager.get_dashboard_url()
+                if dashboard_url:
+                    self.logger.info(f"📊 Monitoring dashboard available at: {dashboard_url}")
+                else:
+                    self.logger.warning("Dashboard enabled but URL not available")
+            else:
+                self.logger.info("📊 Monitoring dashboard disabled")
+
+        except Exception as e:
+            self.logger.error(f"Failed to async initialize monitoring system: {e}")
+            # Create a minimal monitoring manager for compatibility
+            from src.monitoring import MonitoringManager
+            self.monitoring_manager = MonitoringManager()
+
+    async def ensure_monitoring_ready(self):
+        """Ensure monitoring system is fully initialized before proceeding."""
+        if hasattr(self, 'monitoring_init_task'):
+            await self.monitoring_init_task
+            self.logger.info("Monitoring system initialization completed")
+
     def initialize_image_processor(self):
         """Initialize the image processing system."""
         self.logger.info("Initializing image processor")
@@ -915,6 +961,7 @@ class DiscordBotCore:
         # Supporting systems
         self.initialize_conversation_cache()
         self.initialize_health_monitor()
+        self.initialize_monitoring_system()
         self.initialize_image_processor()
         self.initialize_supporting_systems()
 
@@ -998,6 +1045,7 @@ class DiscordBotCore:
             "conversation_cache": self.conversation_cache,
             "image_processor": self.image_processor,
             "health_monitor": self.health_monitor,
+            "monitoring_manager": self.monitoring_manager,
             "backup_manager": self.backup_manager,
             "voice_manager": self.voice_manager,
             "external_emotion_ai": self.external_emotion_ai,

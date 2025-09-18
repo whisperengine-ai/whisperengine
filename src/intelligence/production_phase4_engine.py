@@ -173,6 +173,8 @@ class OptimizedPhase4Engine:
     async def stop_engine(self):
         """Gracefully stop the engine and cleanup resources"""
         self.is_running = False
+        
+        self.logger.info("📊 Phase4 Performance Monitor: Stopped")
 
         # Cancel background tasks
         for task in self.background_tasks:
@@ -574,17 +576,33 @@ class OptimizedPhase4Engine:
 
     async def _start_performance_monitor(self):
         """Monitor and log performance statistics"""
+        startup_logged = False
+        
         while self.is_running:
             try:
                 current_stats = self.performance_stats.copy()
+                
+                # Only log once on startup to confirm monitoring is active
+                if not startup_logged:
+                    self.logger.info("📊 Phase4 Performance Monitor: Started (metrics available via dashboard)")
+                    startup_logged = True
+                
+                # Only log significant events (not regular stats - use dashboard instead)
+                # Log performance issues or major changes
+                if current_stats['concurrent_users'] > 0:
+                    # Check for performance issues worth logging
+                    if current_stats['avg_response_time_ms'] > 5000:  # > 5 seconds
+                        self.logger.warning(
+                            f"⚠️ Phase4 Performance Issue: {current_stats['avg_response_time_ms']:.0f}ms avg response time "
+                            f"with {current_stats['concurrent_users']} users"
+                        )
+                    elif current_stats['concurrent_users'] >= 50:  # High load
+                        self.logger.info(
+                            f"📊 Phase4 High Load: {current_stats['concurrent_users']} concurrent users, "
+                            f"{current_stats['avg_response_time_ms']:.1f}ms avg response"
+                        )
 
-                self.logger.info(
-                    f"📊 Performance: {current_stats['concurrent_users']} users, "
-                    f"{current_stats['avg_response_time_ms']:.1f}ms avg, "
-                    f"{current_stats['batch_efficiency']*100:.1f}% batch efficiency"
-                )
-
-                await asyncio.sleep(30)  # Log every 30 seconds
+                await asyncio.sleep(30)  # Check every 30 seconds
 
             except Exception as e:
                 self.logger.error(f"Performance monitor error: {e}")

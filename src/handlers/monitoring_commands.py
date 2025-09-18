@@ -29,7 +29,7 @@ class MonitoringCommands:
         # Check if user is admin (placeholder - integrate with actual admin check)
         self.is_admin = dependencies.get('is_admin', lambda ctx: False)
         
-        logger.info("Monitoring commands initialized")
+        # Monitoring commands initialized quietly
     
     def register_commands(self, bot_name_filter, is_admin):
         """Register monitoring commands."""
@@ -203,7 +203,7 @@ class MonitoringCommands:
                 logger.error("Error in errors command: %s", e)
                 await ctx.send(f"❌ Error getting error summary: {str(e)}")
         
-        @self.bot.command(name='engagement')
+        @self.bot.command(name='engagement', aliases=['metrics'])
         async def engagement_command(ctx):
             """Get user engagement metrics."""
             if not self.is_admin(ctx):
