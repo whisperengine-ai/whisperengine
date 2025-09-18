@@ -90,7 +90,7 @@ class VoiceCommandHandlers:
             Usage: !join [channel_name] or !join whisperengine [channel_name]
             If no channel specified, joins the user's current voice channel
             """
-            logger.info(f"Join voice command triggered by {ctx.author.name}")
+            logger.debug(f"Join voice command triggered by {ctx.author.name}")
 
             # Filter out bot name from channel_name if present
             bot_name = os.getenv("DISCORD_BOT_NAME", "whisperengine").lower()
@@ -190,7 +190,7 @@ class VoiceCommandHandlers:
     async def _join_voice_handler(self, ctx, channel_name: str | None = None):
         """Handle join voice channel command"""
         try:
-            self.logger.info(
+            self.logger.debug(
                 f"Join voice command called by {ctx.author.name} in {ctx.guild.name if ctx.guild else 'DM'}"
             )
 
@@ -217,7 +217,7 @@ class VoiceCommandHandlers:
                     return
             else:
                 # Use user's current voice channel
-                self.logger.info(f"User {ctx.author.name} voice state: {ctx.author.voice}")
+                self.logger.debug(f"User {ctx.author.name} voice state: {ctx.author.voice}")
                 if (
                     isinstance(ctx.author, discord.Member)
                     and ctx.author.voice
@@ -233,7 +233,7 @@ class VoiceCommandHandlers:
                     )
                     return
 
-            self.logger.info(f"Target channel: {target_channel.name}")
+            self.logger.debug(f"Target channel: {target_channel.name}")
 
             # Ensure we have a VoiceChannel
             if not isinstance(target_channel, discord.VoiceChannel):

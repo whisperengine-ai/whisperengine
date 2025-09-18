@@ -27,7 +27,7 @@ class OnboardingCommands:
         # Initialize onboarding detector
         self.detector = FirstRunDetector()
         
-        logger.info("🎓 Onboarding command handlers initialized")
+        # Onboarding command handlers initialized quietly
     
     def register_commands(self, bot_name_filter, is_admin):
         """Register onboarding and help commands"""

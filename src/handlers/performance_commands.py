@@ -26,7 +26,7 @@ class PerformanceCommands:
         
         # Start performance monitoring
         performance_monitor.start_monitoring()
-        logger.info("📊 Performance monitoring commands initialized")
+        # Performance monitoring commands initialized quietly
     
     def register_commands(self, bot_name_filter, is_admin):
         """Register performance monitoring commands"""
@@ -221,8 +221,8 @@ class PerformanceCommands:
         @self.bot.command(name='perf-reset', aliases=['clear-metrics'])
         async def reset_performance_metrics(ctx):
             """Reset all performance metrics (admin only)"""
-            if not is_admin(ctx.author.id):
-                await ctx.send("❌ This command is admin-only.")
+            if not is_admin(ctx):
+                await ctx.send("❌ This command requires administrator privileges.")
                 return
                 
             try:

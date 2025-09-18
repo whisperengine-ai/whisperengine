@@ -7,6 +7,7 @@ Provides unified access to health monitoring, engagement tracking, and error tra
 
 import asyncio
 import logging
+import os
 from datetime import datetime
 from typing import Dict, List, Optional, Any
 from pathlib import Path
@@ -19,11 +20,45 @@ from .error_tracker import get_error_tracker, track_error, ErrorSeverity, ErrorC
 logger = logging.getLogger(__name__)
 
 
+def _create_monitoring_config_from_env() -> Dict[str, Any]:
+    """Create monitoring configuration from environment variables."""
+    return {
+        'enable_health_monitoring': os.getenv('ENABLE_HEALTH_MONITORING', 'true').lower() == 'true',
+        'enable_engagement_tracking': os.getenv('ENABLE_ENGAGEMENT_TRACKING', 'true').lower() == 'true',
+        'enable_error_tracking': os.getenv('ENABLE_ERROR_TRACKING', 'true').lower() == 'true',
+        'enable_dashboard': os.getenv('ENABLE_MONITORING_DASHBOARD', 'false').lower() == 'true',
+        'dashboard': {
+            'host': os.getenv('DASHBOARD_HOST', '127.0.0.1'),
+            'port': int(os.getenv('DASHBOARD_PORT', '8080')),
+            'debug': os.getenv('DASHBOARD_DEBUG', 'false').lower() == 'true'
+        },
+        'health_monitor': {
+            'check_interval': int(os.getenv('HEALTH_CHECK_INTERVAL', '30')),
+            'full_check_interval': int(os.getenv('HEALTH_FULL_CHECK_INTERVAL', '300')),
+            'max_history': int(os.getenv('HEALTH_MAX_HISTORY', '100'))
+        },
+        'engagement_tracker': {
+            'data_dir': os.getenv('ENGAGEMENT_DATA_DIR', 'data/engagement'),
+            'session_timeout_minutes': int(os.getenv('ENGAGEMENT_SESSION_TIMEOUT', '30')),
+            'max_history_days': int(os.getenv('ENGAGEMENT_MAX_HISTORY_DAYS', '90'))
+        },
+        'error_tracker': {
+            'data_dir': os.getenv('ERROR_DATA_DIR', 'data/errors'),
+            'pattern_detection_threshold': int(os.getenv('ERROR_PATTERN_THRESHOLD', '5')),
+            'max_history_days': int(os.getenv('ERROR_MAX_HISTORY_DAYS', '30'))
+        }
+    }
+
+
 class MonitoringManager:
     """Centralized monitoring system manager."""
     
     def __init__(self, config: Optional[Dict[str, Any]] = None):
-        self.config = config or {}
+        # Use environment-based config if none provided
+        if config is None:
+            config = _create_monitoring_config_from_env()
+        
+        self.config = config
         self.initialized = False
         
         # Component instances
