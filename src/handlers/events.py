@@ -488,13 +488,10 @@ class BotEventHandlers:
         comprehensive_context = None
         enhanced_system_prompt = None
 
-        if not _minimal_context_mode_enabled():
-            # PERFORMANCE OPTIMIZATION: Process AI components in parallel instead of sequentially
-            await self._process_ai_components_parallel(
-                user_id, message.content, message, recent_messages, conversation_context
-            )
-        else:
-            logger.debug("[MINIMAL_CONTEXT_MODE] Skipping emotion/personality/phase4 enrichment for DM message.")
+        # PERFORMANCE OPTIMIZATION: Process AI components in parallel instead of sequentially
+        await self._process_ai_components_parallel(
+            user_id, message.content, message, recent_messages, conversation_context
+        )
 
         # Process message with images
         conversation_context = await process_message_with_images(
@@ -664,13 +661,10 @@ class BotEventHandlers:
         comprehensive_context = None
         enhanced_system_prompt = None
 
-        if not _minimal_context_mode_enabled():
-            # PERFORMANCE OPTIMIZATION: Process AI components in parallel instead of sequentially
-            await self._process_ai_components_parallel(
-                user_id, content, message, recent_messages, conversation_context
-            )
-        else:
-            logger.debug("[MINIMAL_CONTEXT_MODE] Skipping emotion/personality/phase4 enrichment for guild mention.")
+        # PERFORMANCE OPTIMIZATION: Process AI components in parallel instead of sequentially
+        await self._process_ai_components_parallel(
+            user_id, content, message, recent_messages, conversation_context
+        )
 
         # Process message with images (content with mentions removed)
         conversation_context = await process_message_with_images(
@@ -2035,7 +2029,8 @@ class BotEventHandlers:
             task_names.append("external_emotion_disabled")
             
         # Task 2: Phase 2 emotional intelligence (primary emotion source)
-        if self.phase2_integration:
+        if (os.getenv("DISABLE_PHASE2_EMOTION", "false").lower() != "true" 
+            and self.phase2_integration):
             context_type = "guild_message" if hasattr(message, 'guild') and message.guild else "dm"
             tasks.append(self._analyze_phase2_emotion(user_id, content, message, context_type))
             task_names.append("phase2_emotion")
@@ -2044,7 +2039,8 @@ class BotEventHandlers:
             task_names.append("phase2_emotion_disabled")
             
         # Task 3: Dynamic personality analysis
-        if self.dynamic_personality_profiler:
+        if (os.getenv("DISABLE_PERSONALITY_PROFILING", "false").lower() != "true"
+            and self.dynamic_personality_profiler):
             tasks.append(self._analyze_dynamic_personality(user_id, content, message, recent_messages))
             task_names.append("dynamic_personality")
         else:
@@ -2085,7 +2081,8 @@ class BotEventHandlers:
             comprehensive_context = None
             enhanced_system_prompt = None
             
-            if hasattr(self.memory_manager, "process_with_phase4_intelligence"):
+            if (os.getenv("DISABLE_PHASE4_INTELLIGENCE", "false").lower() != "true"
+                and hasattr(self.memory_manager, "process_with_phase4_intelligence")):
                 try:
                     phase4_context, comprehensive_context, enhanced_system_prompt = (
                         await self._process_phase4_intelligence(
@@ -2094,6 +2091,8 @@ class BotEventHandlers:
                     )
                 except Exception as e:
                     logger.warning(f"Phase 4 intelligence processing failed: {e}")
+            else:
+                logger.debug("Phase 4 intelligence processing disabled for performance")
                     
             # Store results in instance variables for use by response generation
             self._last_external_emotion_data = external_emotion_data
@@ -2121,3 +2120,13 @@ class BotEventHandlers:
     async def _create_none_result(self):
         """Helper method for disabled AI components in parallel processing."""
         return None
+
+    def _set_minimal_ai_results(self):
+        """Set minimal AI analysis results for maximum performance mode."""
+        self._last_external_emotion_data = None
+        self._last_phase2_context = None
+        self._last_current_emotion_data = None
+        self._last_dynamic_personality_context = None
+        self._last_phase4_context = None
+        self._last_comprehensive_context = None
+        self._last_enhanced_system_prompt = None

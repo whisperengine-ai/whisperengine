@@ -9,6 +9,7 @@ Phase 3: Multi-Dimensional Memory Networks
 """
 
 import logging
+import os
 import statistics
 from collections import Counter, defaultdict
 from dataclasses import asdict, dataclass
@@ -301,14 +302,16 @@ class CrossReferencePatternDetector:
                 timestamp = memory.get("timestamp", datetime.now(UTC))
                 if isinstance(timestamp, str):
                     timestamp = datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
+                elif not isinstance(timestamp, datetime):
+                    timestamp = datetime.now(UTC)
                 all_timestamps.append(timestamp)
 
         temporal_span = {
             "start_date": (
-                min(all_timestamps).isoformat() if all_timestamps else datetime.now(UTC).isoformat()
+                min(all_timestamps).isoformat() if all_timestamps and all(isinstance(ts, datetime) for ts in all_timestamps) else datetime.now(UTC).isoformat()
             ),
             "end_date": (
-                max(all_timestamps).isoformat() if all_timestamps else datetime.now(UTC).isoformat()
+                max(all_timestamps).isoformat() if all_timestamps and all(isinstance(ts, datetime) for ts in all_timestamps) else datetime.now(UTC).isoformat()
             ),
         }
 
