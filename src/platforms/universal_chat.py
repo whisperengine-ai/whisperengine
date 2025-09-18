@@ -1,6 +1,6 @@
 """
 Universal Chat Platform Architecture for WhisperEngine
-Abstracts conversation handling to support web UI, Discord, Slack, Teams, and other platforms.
+Abstracts conversation handling to support Discord, Slack, Teams, and other platforms.
 """
 
 import asyncio
@@ -21,7 +21,6 @@ from src.optimization.cost_optimizer import CostOptimizationEngine, RequestConte
 class ChatPlatform(Enum):
     """Supported chat platforms"""
 
-    WEB_UI = "web_ui"
     DISCORD = "discord"
     SLACK = "slack"
     TEAMS = "teams"
@@ -48,7 +47,7 @@ class User:
     user_id: str
     username: str
     display_name: str | None = None
-    platform: ChatPlatform = ChatPlatform.WEB_UI
+    platform: ChatPlatform = ChatPlatform.DISCORD
     platform_user_id: str | None = None  # Platform-specific ID
     preferences: dict[str, Any] | None = None
     created_at: datetime | None = None
@@ -68,7 +67,7 @@ class Message:
     user_id: str
     content: str
     message_type: MessageType = MessageType.TEXT
-    platform: ChatPlatform = ChatPlatform.WEB_UI
+    platform: ChatPlatform = ChatPlatform.DISCORD
     channel_id: str | None = None
     thread_id: str | None = None
     reply_to: str | None = None
@@ -177,83 +176,6 @@ class AbstractChatAdapter(ABC):
                 await handler(message)
             except Exception as e:
                 logging.error(f"Message handler error: {e}")
-
-
-class WebUIChatAdapter(AbstractChatAdapter):
-    """Web UI chat adapter for standalone usage"""
-
-    def __init__(self, config: dict[str, Any]):
-        super().__init__(ChatPlatform.WEB_UI, config)
-        self.active_sessions: dict[str, dict[str, Any]] = {}
-
-    async def connect(self) -> bool:
-        """Web UI is always connected"""
-        self.connected = True
-        return True
-
-    async def disconnect(self) -> None:
-        """Cleanup web UI sessions"""
-        self.active_sessions.clear()
-        self.connected = False
-
-    async def send_message(self, user_id: str, content: str, channel_id: str | None = None) -> bool:
-        """Send message via WebSocket or store for retrieval"""
-        try:
-            session_id = channel_id or f"web_{user_id}"
-
-            if session_id not in self.active_sessions:
-                self.active_sessions[session_id] = {
-                    "user_id": user_id,
-                    "messages": [],
-                    "websocket": None,
-                }
-
-            # Store message for web UI retrieval
-            message = {
-                "content": content,
-                "timestamp": datetime.now().isoformat(),
-                "type": "ai_response",
-            }
-
-            self.active_sessions[session_id]["messages"].append(message)
-
-            # Send via WebSocket if connected
-            websocket = self.active_sessions[session_id].get("websocket")
-            if websocket:
-                await websocket.send_text(json.dumps(message))
-
-            return True
-        except Exception as e:
-            logging.error(f"Failed to send web UI message: {e}")
-            return False
-
-    async def get_user_info(self, user_id: str) -> User | None:
-        """Create web UI user info"""
-        return User(
-            user_id=user_id,
-            username=f"web_user_{user_id[:8]}",
-            display_name="Web User",
-            platform=ChatPlatform.WEB_UI,
-            platform_user_id=user_id,
-        )
-
-    async def get_conversation_history(
-        self, conversation_id: str, limit: int = 50
-    ) -> list[Message]:
-        """Get web UI conversation history"""
-        # This would typically come from the database
-        return []
-
-    def register_websocket(self, session_id: str, websocket):
-        """Register WebSocket for real-time messaging"""
-        if session_id in self.active_sessions:
-            self.active_sessions[session_id]["websocket"] = websocket
-
-    def get_session_messages(self, session_id: str) -> list[dict[str, Any]]:
-        """Get messages for a web session"""
-        if session_id in self.active_sessions:
-            return self.active_sessions[session_id]["messages"]
-        return []
 
 
 class DiscordChatAdapter(AbstractChatAdapter):
@@ -525,7 +447,6 @@ class UniversalChatOrchestrator:
     def _load_platform_configs(self) -> dict[ChatPlatform, dict[str, Any]]:
         """Load platform-specific configurations"""
         return {
-            ChatPlatform.WEB_UI: {"enabled": True, "max_sessions": 1000, "session_timeout": 3600},
             ChatPlatform.DISCORD: {
                 "enabled": self._is_discord_enabled(),
                 "bot_token": self._get_env("DISCORD_BOT_TOKEN"),
@@ -560,12 +481,6 @@ class UniversalChatOrchestrator:
     async def initialize(self) -> bool:
         """Initialize all enabled chat platforms"""
         try:
-            # Always enable Web UI
-            web_adapter = WebUIChatAdapter(self.platform_configs[ChatPlatform.WEB_UI])
-            await web_adapter.connect()
-            web_adapter.add_message_handler(self.handle_message)
-            self.adapters[ChatPlatform.WEB_UI] = web_adapter
-
             # Enable Discord if configured
             if self.platform_configs[ChatPlatform.DISCORD]["enabled"]:
                 discord_adapter = DiscordChatAdapter(self.platform_configs[ChatPlatform.DISCORD])

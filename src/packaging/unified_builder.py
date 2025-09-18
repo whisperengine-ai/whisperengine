@@ -1,16 +1,12 @@
 """
 WhisperEngine Unified Packaging System
-Builds native apps, Docker containers, and cloud deployments from same codebase.
+Builds Discord bot containers and cloud deployments.
 
 Deployment Targets:
-- NATIVE_DESKTOP: PyInstaller-built native desktop app (no containers)
-- DISCORD_BOT: Discord bot optimized build
 - DOCKER_SINGLE: Single Docker container for Discord bot
 - DOCKER_COMPOSE: Multi-container Docker setup for Discord bot
 - WEB_DEPLOYMENT: Web-based deployment
 - CLOUD_DEPLOYMENT: Cloud platform deployment
-
-Note: Desktop apps are NEVER containerized - they're built as native executables.
 """
 
 import logging
@@ -30,7 +26,6 @@ import yaml
 class DeploymentTarget(Enum):
     """Supported deployment targets"""
 
-    NATIVE_DESKTOP = "native_desktop"  # Native app with embedded SQLite
     DOCKER_SINGLE = "docker_single"  # Single Docker container
     DOCKER_COMPOSE = "docker_compose"  # Multi-container Docker setup
     KUBERNETES = "kubernetes"  # Kubernetes deployment
@@ -227,88 +222,9 @@ class BaseBuildStrategy:
             raise
 
 
-class NativeDesktopBuilder(BaseBuildStrategy):
-    """Build native desktop applications"""
 
-    async def _execute_build(self) -> list[str]:
-        """Build native desktop app using PyInstaller"""
-        # Copy source files
-        source_dir = self._copy_source_files()
-
-        # Create entry point script
-        entry_script = await self._create_entry_script(source_dir)
-
-        # Generate environment config
-        env_config = self._generate_environment_config(
-            {
-                "WHISPERENGINE_DEPLOYMENT": "native_desktop",
-                "WHISPERENGINE_DATA_DIR": "~/.whisperengine",
-                "WEB_UI_HOST": "127.0.0.1",
-                "WEB_UI_PORT": "8080",
-            }
-        )
-
-        # Write environment config
-        env_file = source_dir / ".env"
-        env_file.write_text(env_config)
-
-        # Create PyInstaller spec file
-        spec_file = await self._create_pyinstaller_spec(source_dir, entry_script)
-
-        # Install dependencies in temp environment
-        await self._install_dependencies(source_dir)
-
-        # Run PyInstaller with just the spec file (options are in the spec)
-        self._run_command(
-            [
-                sys.executable,
-                "-m",
-                "PyInstaller",
-                "--clean",
-                "-y",  # Overwrite output directory without confirmation
-                str(spec_file),
-            ],
-            cwd=source_dir,
-        )
-
-        # Copy built application to output
-        dist_dir = source_dir / "dist"
-        app_name = self.config.app_name
-
-        if self.config.platform == Platform.MACOS:
-            app_bundle = dist_dir / f"{app_name}.app"
-            output_app = self.output_path / f"{app_name}.app"
-            if app_bundle.exists():
-                # Remove existing output if it exists
-                if output_app.exists():
-                    shutil.rmtree(output_app)
-                shutil.copytree(app_bundle, output_app)
-                return [f"{app_name}.app"]
-
-        # For Windows/Linux
-        if self.config.optimize_size:
-            # Single file executable
-            exe_suffix = ".exe" if self.config.platform == Platform.WINDOWS else ""
-            exe_file = dist_dir / f"{app_name}{exe_suffix}"
-            output_exe = self.output_path / f"{app_name}{exe_suffix}"
-            if exe_file.exists():
-                # Remove existing output if it exists
-                if output_exe.exists():
-                    output_exe.unlink()
-                shutil.copy2(exe_file, output_exe)
-                return [f"{app_name}{exe_suffix}"]
-        else:
-            # Directory with dependencies
-            app_dir = dist_dir / app_name
-            output_dir = self.output_path / app_name
-            if app_dir.exists():
-                # Remove existing output if it exists
-                if output_dir.exists():
-                    shutil.rmtree(output_dir)
-                shutil.copytree(app_dir, output_dir)
-                return [app_name]
-
-        raise Exception("Build output not found")
+class DockerBuilder(BaseBuildStrategy):
+    """Build Docker containers"""
 
     async def _create_entry_script(self, source_dir: Path) -> Path:
         """Create entry point script for native app"""
@@ -531,48 +447,6 @@ app = BUNDLE(
         spec_file = source_dir / f"{app_name}.spec"
         spec_file.write_text(spec_content)
         return spec_file
-
-    async def _install_dependencies(self, source_dir: Path):
-        """Install dependencies for build using new multi-tier dependency structure"""
-
-        # Install core dependencies (always needed)
-        self._run_command(
-            [sys.executable, "-m", "pip", "install", "-r", "requirements-core.txt"], cwd=source_dir
-        )
-
-        # Install platform-specific optimizations
-        self._run_command(
-            [sys.executable, "-m", "pip", "install", "-r", "requirements-platform.txt"],
-            cwd=source_dir,
-        )
-
-        # Install application-specific dependencies based on build target
-        if self.config.deployment_target == DeploymentTarget.DISCORD_BOT:
-            # Discord bot dependencies
-            self._run_command(
-                [sys.executable, "-m", "pip", "install", "-r", "requirements-discord.txt"],
-                cwd=source_dir,
-            )
-        elif self.config.deployment_target == DeploymentTarget.NATIVE_DESKTOP:
-            # Desktop app dependencies
-            self._run_command(
-                [sys.executable, "-m", "pip", "install", "-r", "requirements-desktop.txt"],
-                cwd=source_dir,
-            )
-        else:
-            # For other targets (Docker, web deployment), only install Discord bot dependencies
-            if self.config.include_discord:
-                self._run_command(
-                    [sys.executable, "-m", "pip", "install", "-r", "requirements-discord.txt"],
-                    cwd=source_dir,
-                )
-
-        # Install PyInstaller for native builds only
-        if self.config.deployment_target == DeploymentTarget.NATIVE_DESKTOP:
-            self._run_command(
-                [sys.executable, "-m", "pip", "install", "pyinstaller"], cwd=source_dir
-            )
-
 
 class DockerBuilder(BaseBuildStrategy):
     """Build Docker containers"""
@@ -893,7 +767,6 @@ class UnifiedPackagingSystem:
     def __init__(self, project_root: Path | None = None):
         self.project_root = project_root or Path.cwd()
         self.builders = {
-            DeploymentTarget.NATIVE_DESKTOP: NativeDesktopBuilder,
             DeploymentTarget.DOCKER_SINGLE: DockerBuilder,
             DeploymentTarget.DOCKER_COMPOSE: DockerBuilder,
             DeploymentTarget.KUBERNETES: KubernetesBuilder,
@@ -936,9 +809,7 @@ class UnifiedPackagingSystem:
                     include_discord=base_config.include_discord,
                     include_web_ui=base_config.include_web_ui,
                     include_api=base_config.include_api,
-                    database_type=(
-                        "sqlite" if target == DeploymentTarget.NATIVE_DESKTOP else "postgresql"
-                    ),
+                    database_type="postgresql",  # All remaining targets use PostgreSQL
                     enable_voice=base_config.enable_voice,
                     bundle_dependencies=base_config.bundle_dependencies,
                     optimize_size=base_config.optimize_size,

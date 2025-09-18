@@ -172,54 +172,6 @@ class DiscordBotCore:
 """
 
 
-# Example Desktop App Integration
-"""
-# In universal_native_app.py or similar desktop app file:
-
-class DesktopApp:
-    def __init__(self):
-        # ... existing initialization ...
-        
-        # Add monitoring (desktop mode)
-        self.monitoring = MonitoringIntegration(None)
-    
-    async def initialize(self):
-        # ... existing initialization ...
-        
-        # Initialize monitoring for desktop
-        config = {
-            'enable_health_monitoring': True,
-            'enable_engagement_tracking': True,  
-            'enable_error_tracking': True,
-            'enable_dashboard': False,  # Disable web dashboard for desktop
-        }
-        
-        await self.monitoring.initialize_monitoring()
-    
-    def track_user_action(self, action_type: str, details: dict = None):
-        '''Track user actions in desktop app.'''
-        try:
-            if action_type == 'chat_message':
-                self.monitoring.track_user_interaction(
-                    'desktop_user',
-                    'message',
-                    message_length=details.get('message_length', 0),
-                    response_time=details.get('response_time')
-                )
-            elif action_type == 'feature_use':
-                self.monitoring.track_user_interaction(
-                    'desktop_user',
-                    'command',
-                    command_name=details.get('feature_name'),
-                    response_time=details.get('response_time')
-                )
-                
-        except Exception as e:
-            self.monitoring.track_error(e)
-            logging.error(f"Error tracking user action: {e}")
-"""
-
-
 # Example Health Check Endpoint
 """
 # For web-based health checks or API endpoints:

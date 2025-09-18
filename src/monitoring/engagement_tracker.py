@@ -40,7 +40,7 @@ class UserExperienceLevel(Enum):
 class UserSession:
     """Individual user session data."""
     user_id: str
-    platform: str  # 'discord' or 'desktop'
+    platform: str  # 'discord' or 'api'
     start_time: datetime
     end_time: Optional[datetime] = None
     message_count: int = 0
@@ -463,8 +463,8 @@ class EngagementTracker:
         platform_breakdown = {}
         discord_users = [uid for uid in active_24h 
                         if self.active_sessions.get(uid, UserSession('', 'discord', now)).platform == 'discord']
-        desktop_users = [uid for uid in active_24h 
-                        if self.active_sessions.get(uid, UserSession('', 'desktop', now)).platform == 'desktop']
+        api_users = [uid for uid in active_24h 
+                        if self.active_sessions.get(uid, UserSession('', 'api', now)).platform == 'api']
         
         if discord_users:
             platform_breakdown['discord'] = PlatformMetrics(
@@ -474,12 +474,12 @@ class EngagementTracker:
                 active_users_month=len([uid for uid in discord_users if uid in active_30d])
             )
         
-        if desktop_users:
-            platform_breakdown['desktop'] = PlatformMetrics(
-                platform='desktop',
-                active_users_today=len([uid for uid in desktop_users if uid in active_24h]),
-                active_users_week=len([uid for uid in desktop_users if uid in active_7d]),
-                active_users_month=len([uid for uid in desktop_users if uid in active_30d])
+        if api_users:
+            platform_breakdown['api'] = PlatformMetrics(
+                platform='api',
+                active_users_today=len([uid for uid in api_users if uid in active_24h]),
+                active_users_week=len([uid for uid in api_users if uid in active_7d]),
+                active_users_month=len([uid for uid in api_users if uid in active_30d])
             )
         
         # Create summary

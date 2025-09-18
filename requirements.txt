@@ -4,11 +4,9 @@
 # Core dependencies (shared):     requirements-core.txt
 # Platform optimizations:        requirements-platform.txt  
 # Discord bot specific:          requirements-discord.txt
-# Desktop app specific:          requirements-desktop.txt
 #
 # Installation:
 #   Discord Bot: ./scripts/install-discord.sh (or .bat for Windows)
-#   Desktop App: ./scripts/install-desktop.sh (or .bat for Windows)
 #
 # See DEPENDENCY_MANAGEMENT.md for full migration guide
 #
@@ -28,7 +26,3 @@ pytest==8.4.2
 
 # For new installations, use:
 # pip install -r requirements-core.txt
-# pip install -r requirements-platform.txt
-# pip install -r requirements-discord.txt  # For Discord bot
-# OR
-# pip install -r requirements-desktop.txt  # For desktop app

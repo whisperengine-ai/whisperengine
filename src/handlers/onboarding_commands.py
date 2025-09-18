@@ -132,7 +132,6 @@ class OnboardingCommands:
                 embed.add_field(
                     name="📁 Configuration Files",
                     value="• `.env.discord` - Discord bot mode\n"
-                          "• `.env.desktop-app` - Desktop application mode\n"
                           "• `.env.development` - Development mode\n"
                           "• `.env` - Default configuration",
                     inline=False
