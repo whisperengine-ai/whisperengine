@@ -38,7 +38,11 @@ from src.memory.context_aware_memory_security import ContextAwareMemoryManager
 # MEMORY OPTIMIZATION INTEGRATION: Import optimized memory manager
 from src.memory.optimized_memory_manager import create_optimized_memory_manager
 from src.memory.redis_conversation_cache import RedisConversationCache
+from src.memory.redis_profile_memory_cache import RedisProfileAndMemoryCache
 from src.memory.thread_safe_memory import ThreadSafeMemoryManager
+
+# PERFORMANCE: Import ChromaDB batch adapter for reduced HTTP calls
+from src.memory.batched_memory_adapter import BatchedMemoryManager
 
 # Security and safety components
 from src.utils.async_enhancements import (
@@ -115,6 +119,7 @@ class DiscordBotCore:
         self.llm_client = None
         self.memory_manager = None
         self.safe_memory_manager = None
+        self.profile_memory_cache = None
         self.conversation_cache = None
         self.image_processor = None
         self.health_monitor = None
@@ -144,6 +149,10 @@ class DiscordBotCore:
         # Multi-Entity Relationship components
         self.multi_entity_manager = None
         self.ai_self_bridge = None
+
+        # Add properties for batch initialization
+        self._batched_memory_manager = None
+        self._needs_batch_init = False
 
     def initialize_bot(self):
         """Initialize the Discord bot instance with proper configuration."""
@@ -192,11 +201,8 @@ class DiscordBotCore:
         self.logger.info("LLM client wrapped with concurrent safety")
 
     def initialize_memory_system(self):
-        """Initialize the memory management system with all enhancements."""
-        self.logger.info("Initializing user memory manager")
-
-        if self.llm_client is None:
-            raise RuntimeError("LLM client must be initialized before memory system")
+        """Initialize memory management system with performance optimizations."""
+        self.logger.info("Initializing memory system...")
 
         try:
             # Check if graph database integration is enabled
@@ -240,7 +246,12 @@ class DiscordBotCore:
 
                 # Initialize context-aware memory manager
                 context_memory_manager = ContextAwareMemoryManager(integrated_memory_manager)
-                self.logger.info("✅ Graph-enhanced memory system initialized successfully")
+                
+                # Store reference to batch optimizer for later async initialization
+                self._batched_memory_manager = BatchedMemoryManager(integrated_memory_manager)
+                self._needs_batch_init = True
+                
+                self.logger.info("✅ Graph-enhanced memory system with batching initialized successfully")
 
             else:
                 if enable_graph_database and not GRAPH_MEMORY_AVAILABLE:
@@ -257,6 +268,10 @@ class DiscordBotCore:
 
                 # Initialize context-aware memory manager
                 context_memory_manager = ContextAwareMemoryManager(base_memory_manager)
+                
+                # Store reference to batch optimizer for later async initialization
+                self._batched_memory_manager = BatchedMemoryManager(base_memory_manager)
+                self._needs_batch_init = True
 
             # Wrap memory manager with thread safety
             safe_memory_manager = ThreadSafeMemoryManager(context_memory_manager)
@@ -278,6 +293,18 @@ class DiscordBotCore:
             self.memory_manager = UserMemoryManager(llm_client=self.llm_client)
             self.backup_manager = BackupManager()
             self.logger.warning("Using fallback memory manager")
+            
+    async def initialize_batch_optimizer(self):
+        """Initialize the ChromaDB batch optimizer asynchronously."""
+        if self._needs_batch_init and self._batched_memory_manager:
+            try:
+                await self._batched_memory_manager.initialize()
+                self.logger.info("✅ ChromaDB batch optimizer initialized")
+                self._needs_batch_init = False
+            except Exception as e:
+                self.logger.warning("Failed to initialize batch optimizer: %s", e)
+                # Continue without batching
+                self._needs_batch_init = False
 
     async def _update_emotional_context_dependencies(self):
         """Update emotional context engine with dependencies after they're initialized"""
@@ -610,6 +637,8 @@ class DiscordBotCore:
                     bootstrap_limit=bootstrap_limit,
                     max_local_messages=max_local_messages,
                 )
+                # Initialize RedisProfileAndMemoryCache for personality/memory caching
+                self.profile_memory_cache = RedisProfileAndMemoryCache(cache_timeout_minutes=cache_timeout)
                 self.logger.info(
                     "Redis conversation cache initialized (connection will be established on bot start)"
                 )
@@ -620,12 +649,14 @@ class DiscordBotCore:
                     bootstrap_limit=bootstrap_limit,
                     max_local_messages=max_local_messages,
                 )
+                self.profile_memory_cache = None
 
             self.logger.info("Conversation cache initialized successfully")
 
         except Exception as e:
             self.logger.error(f"Failed to initialize conversation cache: {e}")
             self.conversation_cache = None
+            self.profile_memory_cache = None
 
     def initialize_health_monitor(self):
         """Initialize the health monitoring system."""
@@ -879,6 +910,10 @@ class DiscordBotCore:
         self.initialize_bot()
         self.initialize_llm_client()
         self.initialize_memory_system()
+
+        # Schedule async initialization of batch optimizer
+        if self._needs_batch_init:
+            asyncio.create_task(self.initialize_batch_optimizer())
 
         # Supporting systems
         self.initialize_conversation_cache()

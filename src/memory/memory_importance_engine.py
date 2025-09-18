@@ -334,6 +334,12 @@ class MemoryImportanceEngine:
         Returns:
             Complete importance assessment
         """
+        # Check cache first to avoid redundant calculations
+        cache_key = f"{user_id}:{memory_id}"
+        if cache_key in self.importance_cache:
+            logger.debug(f"Retrieved cached importance for memory {memory_id}")
+            return self.importance_cache[cache_key]
+
         logger.debug(f"Calculating importance for memory {memory_id}")
 
         try:
@@ -380,8 +386,7 @@ class MemoryImportanceEngine:
                 boost_events=boost_events,
             )
 
-            # Cache the result
-            cache_key = f"{user_id}_{memory_id}"
+            # Cache the result for future use
             self.importance_cache[cache_key] = importance_score
 
             logger.debug(f"Importance calculated: {overall_score:.3f} for memory {memory_id}")

@@ -293,13 +293,21 @@ class Phase3MemoryNetworks:
         }
 
         try:
-            # Calculate importance for each memory
+            # Calculate importance for all memories in parallel (batch processing)
+            importance_tasks = []
             for memory in memories:
                 memory_id = memory["id"]
-                importance_score = await self.importance_engine.calculate_memory_importance(
+                task = self.importance_engine.calculate_memory_importance(
                     memory_id, user_id, memory, conversation_history, memory_manager
                 )
-                importance_results["memory_scores"].append(importance_score)
+                importance_tasks.append(task)
+            
+            # Execute all importance calculations in parallel
+            if importance_tasks:
+                importance_scores = await asyncio.gather(*importance_tasks)
+                importance_results["memory_scores"] = importance_scores
+            else:
+                importance_results["memory_scores"] = []
 
             # Identify core memories
             core_memories = await self.importance_engine.identify_core_memories(
