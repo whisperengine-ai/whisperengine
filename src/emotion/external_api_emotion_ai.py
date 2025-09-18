@@ -25,8 +25,8 @@ from typing import Any
 
 import aiohttp
 
-# Import embedding manager for external embedding-based emotion analysis
-from src.utils.embedding_manager import ExternalEmbeddingManager
+# Import local embedding manager for embedding-based emotion analysis
+from src.utils.embedding_manager import LocalEmbeddingManager
 
 # Graceful import for Phase 3
 try:
@@ -51,7 +51,7 @@ class EmotionConfig:
 
 class ExternalAPIEmotionAI:
     """
-    Cloud-optimized emotional intelligence using external APIs and embeddings
+    Cloud-optimized emotional intelligence using local embeddings and external APIs
     Designed for Docker deployment without local GPU dependencies
     """
 
@@ -81,8 +81,8 @@ class ExternalAPIEmotionAI:
         self.huggingface_api_key = huggingface_api_key or os.getenv("HUGGINGFACE_API_KEY")
         self.logger = logger
 
-        # Initialize external embedding manager for emotion analysis
-        self.embedding_manager = ExternalEmbeddingManager()
+        # Initialize local embedding manager for emotion analysis
+        self.embedding_manager = LocalEmbeddingManager()
 
         # Initialize session for HTTP requests
         self.session = None
@@ -112,7 +112,7 @@ class ExternalAPIEmotionAI:
         # Configuration for full capabilities emotion analysis
         self.config = EmotionConfig(
             tier="full",
-            description="Multiple API calls + external embedding analysis",
+            description="Multiple API calls + local embedding analysis",
             accuracy="96-98%",
             resource_usage="High",
             api_calls_per_analysis=3,
@@ -136,9 +136,7 @@ class ExternalAPIEmotionAI:
                     "🌐 External API Emotion AI initialized with direct HTTP (legacy mode)"
                 )
                 self.logger.info(f"🔗 LLM provider: {self.llm_api_url}")
-            self.logger.info(
-                f"🧠 External Embeddings: {'✅' if self.embedding_manager.use_external else '?'}"
-            )
+            self.logger.info("🧠 Local Embeddings: ✅ Enabled")
 
     async def initialize(self):
         """Initialize HTTP session and test API connectivity"""
@@ -469,7 +467,7 @@ Respond with ONLY a JSON object:
         return {"label": "UNKNOWN", "score": 0.5}
 
     async def _call_embedding_emotion_analysis(self, text: str) -> dict | None:
-        """Use external embeddings for emotion analysis via semantic similarity"""
+        """Use local embeddings for emotion analysis via semantic similarity"""
 
         try:
             # Define emotion reference texts for semantic comparison
@@ -507,7 +505,7 @@ Respond with ONLY a JSON object:
             }
 
             # Get embedding for the input text
-            # Note: We can use either external or local embeddings for emotion analysis
+            # Note: We use local embeddings for emotion analysis
             text_embedding = await self.embedding_manager.get_embeddings([text])
             if not text_embedding or len(text_embedding) == 0:
                 return None
@@ -651,7 +649,7 @@ Respond with ONLY a JSON object:
         # Source weights (can be adjusted based on reliability)
         source_weights = {
             "lm_studio": 0.4,
-            "embeddings": 0.4,  # External embedding-based analysis
+            "embeddings": 0.4,  # Local embedding-based analysis
             "keywords": 0.2,
         }
 
@@ -869,16 +867,16 @@ Respond with ONLY a JSON object:
                             self.logger.info("✅ LLM provider: Connected")
                     else:
                         if self.logger:
-                            # Downgrade to debug since it's optional when using external embeddings
+                            # Downgrade to debug since it's optional when using local embeddings
                             self.logger.debug(
-                                f"🔧 LLM provider: HTTP {response.status} (using external embeddings as primary)"
+                                f"🔧 LLM provider: HTTP {response.status} (using local embeddings as primary)"
                             )
         except Exception as e:
             if self.logger:
-                # Downgrade to debug since it's optional when using external embeddings
-                self.logger.debug(f"🔧 LLM provider: {e} (using external embeddings as primary)")
+                # Downgrade to debug since it's optional when using local embeddings
+                self.logger.debug(f"🔧 LLM provider: {e} (using local embeddings as primary)")
 
-        # Test Hugging Face API (legacy, now using external embeddings)
+        # Test Hugging Face API (legacy, now using local embeddings)
         if self.huggingface_api_key:
             try:
                 headers = {"Authorization": f"Bearer {self.huggingface_api_key}"}
@@ -893,18 +891,18 @@ Respond with ONLY a JSON object:
                         else:
                             if self.logger:
                                 self.logger.debug(
-                                    f"🔧 Hugging Face: HTTP {response.status} (using external embeddings as primary)"
+                                    f"🔧 Hugging Face: HTTP {response.status} (using local embeddings as primary)"
                                 )
             except Exception as e:
                 if self.logger:
                     self.logger.debug(
-                        f"🔧 Hugging Face: {e} (using external embeddings as primary)"
+                        f"🔧 Hugging Face: {e} (using local embeddings as primary)"
                     )
         else:
             if self.logger:
-                # Remove warning since Hugging Face is now optional (we use external embeddings)
+                # Remove warning since Hugging Face is now optional (we use local embeddings)
                 self.logger.debug(
-                    "🔧 Hugging Face: No API key provided (using external embeddings as primary)"
+                    "🔧 Hugging Face: No API key provided (using local embeddings as primary)"
                 )
 
     def build_cloud_emotional_prompt(
