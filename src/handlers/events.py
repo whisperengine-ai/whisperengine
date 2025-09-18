@@ -1,3 +1,4 @@
+from src.memory.redis_profile_memory_cache import RedisProfileAndMemoryCache
 """
 Event handlers for the Discord bot.
 
@@ -103,6 +104,7 @@ class BotEventHandlers:
         self.bot_core = bot_core
         self.bot = bot_core.bot
 
+
         # Component references for easier access
         self.postgres_pool = getattr(bot_core, "postgres_pool", None)
         self.memory_manager = getattr(bot_core, "memory_manager", None)
@@ -118,6 +120,8 @@ class BotEventHandlers:
         self.graph_personality_manager = getattr(bot_core, "graph_personality_manager", None)
         self.phase2_integration = getattr(bot_core, "phase2_integration", None)
         self.external_emotion_ai = getattr(bot_core, "external_emotion_ai", None)
+        # Redis profile/memory cache (if enabled)
+        self.profile_memory_cache = getattr(bot_core, "profile_memory_cache", None)
 
         # Configuration flags - unified AI system always enabled
         self.voice_support_enabled = getattr(bot_core, "voice_support_enabled", False)
@@ -447,21 +451,48 @@ class BotEventHandlers:
         phase4_context = None
         comprehensive_context = None
 
-        # Get relevant memories with context-aware filtering
+
+        # Get relevant memories with context-aware filtering, using Redis cache if available
+        relevant_memories = None
         try:
-            message_context = self.memory_manager.classify_discord_context(message)
-            logger.debug(
-                f"DM context classified: {message_context.context_type.value} (security: {message_context.security_level.value})"
-            )
+            if self.memory_manager is not None:
+                message_context = self.memory_manager.classify_discord_context(message)
+                logger.debug(
+                    f"DM context classified: {message_context.context_type.value} (security: {message_context.security_level.value})"
+                )
 
-            relevant_memories = self.memory_manager.retrieve_context_aware_memories(
-                user_id, message.content, message_context, limit=20
-            )
+                # Try Redis cache first
+                if self.profile_memory_cache:
+                    try:
+                        if not self.profile_memory_cache.redis:
+                            await self.profile_memory_cache.initialize()
+                        relevant_memories = await self.profile_memory_cache.get_memory_retrieval(user_id, message.content)
+                        if relevant_memories:
+                            logger.debug(f"[CACHE] Memory retrieval cache hit for user {user_id}")
+                    except Exception as e:
+                        logger.debug(f"Cache lookup failed, proceeding with DB: {e}")
+                        relevant_memories = None
+                if not relevant_memories:
+                    relevant_memories = self.memory_manager.retrieve_context_aware_memories(
+                        user_id, message.content, message_context, limit=20
+                    )
+                    # Store in cache for next time
+                    if self.profile_memory_cache and relevant_memories:
+                        try:
+                            if not self.profile_memory_cache.redis:
+                                await self.profile_memory_cache.initialize()
+                            await self.profile_memory_cache.set_memory_retrieval(user_id, message.content, relevant_memories)
+                        except Exception as e:
+                            logger.debug(f"Failed to cache memory retrieval: {e}")
 
-            # Get emotion context if available
-            emotion_context = ""
-            if hasattr(self.memory_manager, "get_emotion_context"):
-                emotion_context = self.memory_manager.get_emotion_context(user_id)
+                # Get emotion context if available
+                emotion_context = ""
+                if hasattr(self.memory_manager, "get_emotion_context"):
+                    emotion_context = self.memory_manager.get_emotion_context(user_id)
+            else:
+                logger.warning("memory_manager is not initialized; skipping memory retrieval.")
+                relevant_memories = []
+                emotion_context = ""
 
         except (MemoryRetrievalError, ValidationError) as e:
             logger.warning(f"Could not retrieve memories for user {user_id}: {e}")
@@ -620,20 +651,46 @@ class BotEventHandlers:
                 f"SECURITY: Input warnings for user {user_id} in server {message.guild.name}: {validation_result['warnings']}"
             )
 
-        # Get relevant memories with context-aware filtering
+        # Get relevant memories with context-aware filtering, using Redis cache if available
+        relevant_memories = None
         try:
-            message_context = self.memory_manager.classify_discord_context(message)
-            logger.debug(
-                f"Server context classified: {message_context.context_type.value} (security: {message_context.security_level.value}, server: {message.guild.name})"
-            )
+            if self.memory_manager is not None:
+                message_context = self.memory_manager.classify_discord_context(message)
+                logger.debug(
+                    f"Server context classified: {message_context.context_type.value} (security: {message_context.security_level.value}, server: {message.guild.name})"
+                )
 
-            relevant_memories = self.memory_manager.retrieve_context_aware_memories(
-                user_id, content, message_context, limit=20
-            )
+                # Try Redis cache first
+                if self.profile_memory_cache:
+                    try:
+                        if not self.profile_memory_cache.redis:
+                            await self.profile_memory_cache.initialize()
+                        relevant_memories = await self.profile_memory_cache.get_memory_retrieval(user_id, content)
+                        if relevant_memories:
+                            logger.debug(f"[CACHE] Memory retrieval cache hit for user {user_id}")
+                    except Exception as e:
+                        logger.debug(f"Cache lookup failed, proceeding with DB: {e}")
+                        relevant_memories = None
+                if not relevant_memories:
+                    relevant_memories = self.memory_manager.retrieve_context_aware_memories(
+                        user_id, content, message_context, limit=20
+                    )
+                    # Store in cache for next time
+                    if self.profile_memory_cache and relevant_memories:
+                        try:
+                            if not self.profile_memory_cache.redis:
+                                await self.profile_memory_cache.initialize()
+                            await self.profile_memory_cache.set_memory_retrieval(user_id, content, relevant_memories)
+                        except Exception as e:
+                            logger.debug(f"Failed to cache memory retrieval: {e}")
 
-            emotion_context = ""
-            if hasattr(self.memory_manager, "get_emotion_context"):
-                emotion_context = self.memory_manager.get_emotion_context(user_id)
+                emotion_context = ""
+                if hasattr(self.memory_manager, "get_emotion_context"):
+                    emotion_context = self.memory_manager.get_emotion_context(user_id)
+            else:
+                logger.warning("memory_manager is not initialized; skipping memory retrieval.")
+                relevant_memories = []
+                emotion_context = ""
 
         except (MemoryRetrievalError, ValidationError) as e:
             logger.warning(f"Could not retrieve memories for user {user_id}: {e}")

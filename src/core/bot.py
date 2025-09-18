@@ -38,6 +38,7 @@ from src.memory.context_aware_memory_security import ContextAwareMemoryManager
 # MEMORY OPTIMIZATION INTEGRATION: Import optimized memory manager
 from src.memory.optimized_memory_manager import create_optimized_memory_manager
 from src.memory.redis_conversation_cache import RedisConversationCache
+from src.memory.redis_profile_memory_cache import RedisProfileAndMemoryCache
 from src.memory.thread_safe_memory import ThreadSafeMemoryManager
 
 # PERFORMANCE: Import ChromaDB batch adapter for reduced HTTP calls
@@ -118,6 +119,7 @@ class DiscordBotCore:
         self.llm_client = None
         self.memory_manager = None
         self.safe_memory_manager = None
+        self.profile_memory_cache = None
         self.conversation_cache = None
         self.image_processor = None
         self.health_monitor = None
@@ -635,6 +637,8 @@ class DiscordBotCore:
                     bootstrap_limit=bootstrap_limit,
                     max_local_messages=max_local_messages,
                 )
+                # Initialize RedisProfileAndMemoryCache for personality/memory caching
+                self.profile_memory_cache = RedisProfileAndMemoryCache(cache_timeout_minutes=cache_timeout)
                 self.logger.info(
                     "Redis conversation cache initialized (connection will be established on bot start)"
                 )
@@ -645,12 +649,14 @@ class DiscordBotCore:
                     bootstrap_limit=bootstrap_limit,
                     max_local_messages=max_local_messages,
                 )
+                self.profile_memory_cache = None
 
             self.logger.info("Conversation cache initialized successfully")
 
         except Exception as e:
             self.logger.error(f"Failed to initialize conversation cache: {e}")
             self.conversation_cache = None
+            self.profile_memory_cache = None
 
     def initialize_health_monitor(self):
         """Initialize the health monitoring system."""
