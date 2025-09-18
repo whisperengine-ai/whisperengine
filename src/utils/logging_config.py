@@ -126,16 +126,27 @@ def setup_logging(
         Dict with logging configuration details
     """
 
-    # Determine log level from environment variable or parameters
+    # Determine file log level from environment variable or parameters
     log_level_str = os.getenv("LOG_LEVEL", "").upper()
     if log_level_str and hasattr(logging, log_level_str):
-        level = getattr(logging, log_level_str)
+        file_level = getattr(logging, log_level_str)
     elif debug:
-        level = logging.DEBUG
+        file_level = logging.DEBUG
     elif environment == "production":
-        level = logging.INFO
+        file_level = logging.INFO
     else:
-        level = logging.DEBUG if environment == "development" else logging.INFO
+        file_level = logging.DEBUG if environment == "development" else logging.INFO
+
+    # Determine console log level (can be different from file level)
+    console_log_level_str = os.getenv("CONSOLE_LOG_LEVEL", "").upper()
+    if console_log_level_str and hasattr(logging, console_log_level_str):
+        console_level = getattr(logging, console_log_level_str)
+    else:
+        # Default to same as file level if CONSOLE_LOG_LEVEL not set
+        console_level = file_level
+
+    # Root logger level should be the most permissive (lowest) of the two
+    root_level = min(file_level, console_level)
 
     # Create logs directory
     log_path = Path(log_dir)
@@ -144,7 +155,7 @@ def setup_logging(
     # Clear existing handlers to prevent duplicates
     root_logger = logging.getLogger()
     root_logger.handlers.clear()
-    root_logger.setLevel(level)
+    root_logger.setLevel(root_level)
 
     handlers = []
 
@@ -160,7 +171,7 @@ def setup_logging(
         console_formatter = StructuredFormatter()
 
     console_handler.setFormatter(console_formatter)
-    console_handler.setLevel(level)
+    console_handler.setLevel(console_level)
     handlers.append(console_handler)
 
     # File Handlers with Rotation
@@ -174,7 +185,7 @@ def setup_logging(
         )
         file_formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
         file_handler.setFormatter(file_formatter)
-        file_handler.setLevel(level)
+        file_handler.setLevel(file_level)
         handlers.append(file_handler)
 
     else:
@@ -187,7 +198,7 @@ def setup_logging(
             encoding="utf-8",
         )
         file_handler.setFormatter(StructuredFormatter())
-        file_handler.setLevel(level)
+        file_handler.setLevel(file_level)
         handlers.append(file_handler)
 
         # Error-only file for critical issues
@@ -232,7 +243,9 @@ def setup_logging(
 
     # Log the logging configuration
     config_info = {
-        "level": logging.getLevelName(level),
+        "file_level": logging.getLevelName(file_level),
+        "console_level": logging.getLevelName(console_level),
+        "root_level": logging.getLevelName(root_level),
         "environment": environment,
         "log_directory": str(log_path.absolute()),
         "handlers": [handler.__class__.__name__ for handler in handlers],
