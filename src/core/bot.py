@@ -215,7 +215,7 @@ class DiscordBotCore:
             ):
                 self.logger.info("🕸️ Initializing Graph-Enhanced Memory System...")
 
-                # Initialize base memory manager with external embeddings
+                # Initialize base memory manager with local embeddings
                 base_memory_manager = UserMemoryManager(
                     enable_auto_facts=True, enable_global_facts=True, llm_client=base_llm_client
                 )

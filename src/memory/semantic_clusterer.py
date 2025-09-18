@@ -21,8 +21,6 @@ import numpy as np
 from sklearn.cluster import DBSCAN, AgglomerativeClustering
 from sklearn.metrics.pairwise import cosine_similarity
 
-# Historical: ExternalEmbeddingManager removed Sept 2025. All embedding is now local.
-
 logger = logging.getLogger(__name__)
 
 
@@ -101,12 +99,6 @@ class SemanticMemoryClusterer:
             logger.info("Semantic Memory Clusterer initialized with local embedding support")
         else:
             logger.info("Semantic Memory Clusterer initialized with clustering disabled")
-
-    @property
-    def embedding_model(self):
-        """Compatibility property - no longer used with external embeddings"""
-        logger.warning("embedding_model property deprecated - external embedding removed Sept 2025")
-        return None
 
     async def create_memory_clusters(self, user_id: str, memory_manager) -> dict[str, Any]:
         """
@@ -264,7 +256,7 @@ class SemanticMemoryClusterer:
             logger.error(f"Embedding generation timed out after {self.embedding_timeout} seconds")
             return {}
         except Exception as e:
-            logger.error(f"Error generating embeddings via external API: {e}")
+            logger.error(f"Error generating embeddings via local embedding manager: {e}")
             return {}
 
     async def _cluster_by_topics(
