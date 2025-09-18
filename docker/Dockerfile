@@ -1,5 +1,5 @@
 # Discord Bot - Universal Dockerfile
-FROM python:3.11-slim
+FROM python:3.12-slim
 
 # Build arguments for flexible configuration
 ARG SYSTEM_PROMPT_SOURCE=prompts/default.md

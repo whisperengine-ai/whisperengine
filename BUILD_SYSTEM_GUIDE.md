@@ -84,7 +84,7 @@ docker-compose up -d
 
 ```bash
 # Prerequisites
-# - Python 3.11+
+# - Python 3.13+
 # - Git
 
 # Setup process

@@ -234,10 +234,10 @@ class InteractiveSetupWizard:
         
         # Check Python version
         python_version = sys.version_info
-        requirements["python"] = python_version >= (3, 9)
+        requirements["python"] = python_version >= (3, 13)
         status = "✅" if requirements["python"] else "❌"
         print(f"   {status} Python {python_version.major}.{python_version.minor} "
-              f"({'✅ Compatible' if requirements['python'] else '❌ Need 3.9+'})")
+              f"({'✅ Compatible' if requirements['python'] else '❌ Need 3.13+'})")
         
         # Check Git
         try:

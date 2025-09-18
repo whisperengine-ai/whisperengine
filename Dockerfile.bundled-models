@@ -2,7 +2,7 @@
 # Eliminates runtime model downloads and reduces network dependencies
 
 # Stage 1: Model Download & Bundle
-FROM python:3.11-slim as model-downloader
+FROM python:3.12-slim as model-downloader
 
 # Install model download dependencies
 RUN pip install --no-cache-dir \
@@ -27,7 +27,7 @@ RUN ls -la /app/models/ && \
     du -sh /app/models/* || echo "No models found"
 
 # Stage 2: Minimal Runtime (Production)
-FROM python:3.11-slim as production
+FROM python:3.12-slim as production
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
