@@ -47,7 +47,7 @@ Pillow==11.3.0
 
 # Discord Integration
 discord.py>=2.3.0
-python-multipart==0.0.6
+python-multipart==0.0.18
 
 # Development and testing
 pytest==8.4.2
