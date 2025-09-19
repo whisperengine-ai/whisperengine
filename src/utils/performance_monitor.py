@@ -76,7 +76,7 @@ class PerformanceMonitor:
         self.alert_thresholds = {
             'slow_operation_ms': 5000,
             'low_success_rate': 0.90,
-            'high_memory_mb': 800,  # Increased threshold for concurrent LLM processing
+            'high_memory_mb': 1200,  # Adjusted for AI workloads (LLMs need ~1GB+)
             'high_cpu_percent': 80
         }
         

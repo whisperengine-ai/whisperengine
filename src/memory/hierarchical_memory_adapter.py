@@ -116,9 +116,9 @@ class HierarchicalMemoryAdapter:
     
     async def retrieve_relevant_memories(
         self, 
-        query: str, 
         user_id: str, 
-        max_results: int = 5
+        query: str, 
+        limit: int = 5
     ) -> List[Dict[str, Any]]:
         """Retrieve memories relevant to query"""
         try:
@@ -131,7 +131,7 @@ class HierarchicalMemoryAdapter:
             memories = []
             
             # Add semantic matches (highest priority for query relevance)
-            for item in context.semantic_summaries[:max_results]:
+            for item in context.semantic_summaries[:limit]:
                 memories.append({
                     'content': item.get('summary', ''),
                     'relevance_score': item.get('relevance_score', 0.8),
@@ -140,7 +140,7 @@ class HierarchicalMemoryAdapter:
                 })
             
             # Add related topics
-            for topic in context.related_topics[:max_results]:
+            for topic in context.related_topics[:limit]:
                 memories.append({
                     'content': f"Topic: {topic.get('topic', '')}", 
                     'relevance_score': topic.get('relevance_score', 0.6),
@@ -148,7 +148,7 @@ class HierarchicalMemoryAdapter:
                     'memory_type': 'topical'
                 })
                 
-            return memories[:max_results]
+            return memories[:limit]
             
         except Exception as e:
             self.logger.error("Failed to retrieve relevant memories: %s", str(e))

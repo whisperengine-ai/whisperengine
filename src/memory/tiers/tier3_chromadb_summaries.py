@@ -15,9 +15,10 @@ class ChromaDBSemanticSummaries:
     Stores ~150 character summaries for efficient vector search
     """
     
-    def __init__(self, host: str = "localhost", port: int = 8000):
+    def __init__(self, host: str = "localhost", port: int = 8000, embedding_function=None):
         self.host = host
         self.port = port
+        self.embedding_function = embedding_function
         self.client = None
         self.summaries_collection = None
         self.topics_collection = None
@@ -36,7 +37,8 @@ class ChromaDBSemanticSummaries:
                     "description": "Semantic summaries of conversations for efficient search",
                     "version": "2.0",
                     "created": datetime.now().isoformat()
-                }
+                },
+                embedding_function=self.embedding_function
             )
             
             # Create or get topics collection for enhanced topical search
@@ -46,7 +48,8 @@ class ChromaDBSemanticSummaries:
                     "description": "Topic-based conversation indexing",
                     "version": "2.0",
                     "created": datetime.now().isoformat()
-                }
+                },
+                embedding_function=self.embedding_function
             )
             
             self.logger.info("ChromaDB semantic summaries tier initialized successfully")
@@ -507,9 +510,9 @@ class ChromaDBSemanticSummaries:
 
 # Utility functions
 
-async def create_chromadb_summaries(host: str = "localhost", port: int = 8000) -> ChromaDBSemanticSummaries:
+async def create_chromadb_summaries(host: str = "localhost", port: int = 8000, embedding_function=None) -> ChromaDBSemanticSummaries:
     """Create and initialize a ChromaDB summaries instance"""
-    summaries = ChromaDBSemanticSummaries(host, port)
+    summaries = ChromaDBSemanticSummaries(host, port, embedding_function)
     await summaries.initialize()
     return summaries
 
