@@ -138,6 +138,80 @@ class ConfigurationValidator:
                 'validator': self._validate_boolean,
                 'suggestion': 'Enable visual emotion analysis for image processing',
                 'format': 'true or false'
+            },
+            
+            # Phantom Feature Configuration
+            'ENABLE_LOCAL_EMOTION_ENGINE': {
+                'category': ConfigCategory.FEATURES,
+                'level': ValidationLevel.OPTIONAL,
+                'validator': self._validate_boolean,
+                'suggestion': 'Enable high-performance emotion analysis (recommended)',
+                'format': 'true or false'
+            },
+            'ENABLE_VECTORIZED_EMOTION_PROCESSOR': {
+                'category': ConfigCategory.FEATURES,
+                'level': ValidationLevel.OPTIONAL,
+                'validator': self._validate_boolean,
+                'suggestion': 'Enable batch emotion processing (resource intensive)',
+                'format': 'true or false'
+            },
+            'ENABLE_ADVANCED_EMOTION_DETECTOR': {
+                'category': ConfigCategory.FEATURES,
+                'level': ValidationLevel.OPTIONAL,
+                'validator': self._validate_boolean,
+                'suggestion': 'Enable multi-modal emotion detection',
+                'format': 'true or false'
+            },
+            'ENABLE_PROACTIVE_ENGAGEMENT_ENGINE': {
+                'category': ConfigCategory.FEATURES,
+                'level': ValidationLevel.OPTIONAL,
+                'validator': self._validate_boolean,
+                'suggestion': 'Enable AI-driven conversation initiation',
+                'format': 'true or false'
+            },
+            'ENABLE_ADVANCED_THREAD_MANAGER': {
+                'category': ConfigCategory.FEATURES,
+                'level': ValidationLevel.OPTIONAL,
+                'validator': self._validate_boolean,
+                'suggestion': 'Enable advanced conversation thread management',
+                'format': 'true or false'
+            },
+            'ENABLE_CONCURRENT_CONVERSATION_MANAGER': {
+                'category': ConfigCategory.FEATURES,
+                'level': ValidationLevel.OPTIONAL,
+                'validator': self._validate_boolean,
+                'suggestion': 'Enable parallel conversation handling',
+                'format': 'true or false'
+            },
+            'ENABLE_ADVANCED_TOPIC_EXTRACTOR': {
+                'category': ConfigCategory.FEATURES,
+                'level': ValidationLevel.OPTIONAL,
+                'validator': self._validate_boolean,
+                'suggestion': 'Enable sophisticated topic analysis',
+                'format': 'true or false'
+            },
+            
+            # Phantom Feature Performance Settings
+            'VECTORIZED_EMOTION_MAX_WORKERS': {
+                'category': ConfigCategory.PERFORMANCE,
+                'level': ValidationLevel.OPTIONAL,
+                'validator': self._validate_positive_integer,
+                'suggestion': 'Set worker count for emotion batch processing (1-16)',
+                'format': 'Positive integer, recommended: 2-8'
+            },
+            'THREAD_MANAGER_MAX_ACTIVE_THREADS': {
+                'category': ConfigCategory.PERFORMANCE,
+                'level': ValidationLevel.OPTIONAL,
+                'validator': self._validate_positive_integer,
+                'suggestion': 'Set maximum concurrent conversation threads (5-100)',
+                'format': 'Positive integer, recommended: 10-50'
+            },
+            'MAX_PHANTOM_FEATURE_MEMORY_MB': {
+                'category': ConfigCategory.PERFORMANCE,
+                'level': ValidationLevel.OPTIONAL,
+                'validator': self._validate_positive_integer,
+                'suggestion': 'Set memory limit for phantom features (512-4096 MB)',
+                'format': 'Positive integer in MB, recommended: 1024-2048'
             }
         }
     
@@ -351,6 +425,17 @@ class ConfigurationValidator:
             return True, f"✅ Boolean value '{value}' is valid"
         else:
             return False, f"❌ '{value}' is not a valid boolean (use 'true' or 'false')"
+    
+    async def _validate_positive_integer(self, value: str, test_connections: bool) -> Tuple[bool, str]:
+        """Validate positive integer value"""
+        try:
+            int_value = int(value)
+            if int_value > 0:
+                return True, f"✅ Positive integer '{value}' is valid"
+            else:
+                return False, f"❌ '{value}' must be a positive integer (greater than 0)"
+        except ValueError:
+            return False, f"❌ '{value}' is not a valid integer"
     
     def _check_common_issues(self):
         """Check for common configuration issues and patterns"""
