@@ -33,6 +33,12 @@ from src.utils.exceptions import (
     MemoryStorageError,
     ValidationError,
 )
+from src.utils.context_size_manager import (
+    truncate_context,
+    optimize_memory_context,
+    truncate_recent_messages,
+    count_context_tokens,
+)
 from src.utils.helpers import (
     add_debug_info_to_response,
     extract_text_for_memory_storage,
@@ -801,8 +807,11 @@ class BotEventHandlers:
         if self.conversation_cache:
             # Use cache with user-specific filtering
             recent_messages = await self.conversation_cache.get_user_conversation_context(
-                channel, user_id=int(user_id), limit=15, exclude_message_id=exclude_message_id
+                channel, user_id=int(user_id), limit=8, exclude_message_id=exclude_message_id  # Reduced from 15 to 8
             )
+            
+            # Apply additional message truncation to prevent context explosion
+            recent_messages = truncate_recent_messages(recent_messages, max_messages=8)
             
             # Standardize all message objects to dict format
             recent_messages = [_standardize_message_object(msg) for msg in recent_messages]
@@ -1020,6 +1029,9 @@ class BotEventHandlers:
                     {"role": "system", "content": f"User relationship and emotional context: {emotion_context}"}
                 )
             if relevant_memories:
+                # Optimize memory context to prevent context explosion
+                relevant_memories = optimize_memory_context(relevant_memories, max_memories=8)
+                
                 memory_context = "Previous conversation context:\n"
                 global_facts = [m for m in relevant_memories if m["metadata"].get("is_global", False)]
                 user_memories = [m for m in relevant_memories if not m["metadata"].get("is_global", False)]
@@ -1115,6 +1127,22 @@ class BotEventHandlers:
                     )
         except Exception as e:
             logger.warning(f"Failed to add image anti-analysis guard: {e}")
+
+        # Apply final context size management to prevent oversized requests
+        initial_token_count = count_context_tokens(conversation_context)
+        if initial_token_count > 8000:  # Warn about large contexts
+            logger.warning(
+                "Large context detected (%d tokens), applying truncation", 
+                initial_token_count
+            )
+        
+        conversation_context, tokens_removed = truncate_context(conversation_context, max_tokens=8000)
+        
+        if tokens_removed > 0:
+            logger.info(
+                "Context size optimized: removed %d tokens to prevent API issues", 
+                tokens_removed
+            )
 
         return conversation_context
 
@@ -1401,6 +1429,15 @@ class BotEventHandlers:
                         )
 
                         response = ai_response.content
+                        
+                        # Additional validation to prevent empty responses
+                        if not response or not response.strip():
+                            logger.warning(
+                                f"Universal Chat returned empty response for user {user_id}. "
+                                f"AI response object: content='{response}', model={ai_response.model_used}, "
+                                f"tokens={ai_response.tokens_used}"
+                            )
+                            response = "I apologize, but I'm having trouble generating a response right now. Please try again."
                         
                         logger.debug(f"Universal Chat response: {len(response)} characters")
                         logger.debug(
