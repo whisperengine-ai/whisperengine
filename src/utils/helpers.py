@@ -1137,6 +1137,43 @@ def get_contextualized_system_prompt(
             )
             memory_moments_context_text += f". Guidance: {guidance}"
 
+    # Phase 4.2: Advanced Thread Management context
+    thread_management_context = ""
+    if comprehensive_context and comprehensive_context.get("phase4_2_thread_analysis"):
+        thread_data = comprehensive_context["phase4_2_thread_analysis"]
+        thread_action = thread_data.get("thread_action", "unknown")
+        active_threads = thread_data.get("active_thread_count", 0)
+        current_thread = thread_data.get("current_thread_id", "none")
+        
+        thread_management_context = f"Thread Management: {thread_action} action"
+        if active_threads > 0:
+            thread_management_context += f", {active_threads} active threads"
+        if current_thread != "none":
+            thread_management_context += f", current thread: {current_thread}"
+            
+        # Add thread context if available
+        if thread_data.get("context_bridge"):
+            thread_management_context += f", context bridging: {thread_data['context_bridge'][:50]}..."
+        if thread_data.get("thread_priority"):
+            thread_management_context += f", priority: {thread_data['thread_priority']}"
+
+    # Phase 4.3: Proactive Engagement context
+    proactive_engagement_context = ""
+    if comprehensive_context and comprehensive_context.get("phase4_3_engagement_analysis"):
+        engagement_data = comprehensive_context["phase4_3_engagement_analysis"]
+        needs_intervention = engagement_data.get("needs_intervention", False)
+        intervention_type = engagement_data.get("intervention_type", "none")
+        
+        if needs_intervention:
+            proactive_engagement_context = f"Proactive Engagement: {intervention_type} intervention suggested"
+            if engagement_data.get("engagement_reason"):
+                proactive_engagement_context += f", reason: {engagement_data['engagement_reason']}"
+            if engagement_data.get("suggested_topics"):
+                topics = engagement_data["suggested_topics"][:2]  # Limit to 2 topics
+                proactive_engagement_context += f", suggested topics: {', '.join(topics)}"
+        else:
+            proactive_engagement_context = "Proactive Engagement: No intervention needed, conversation flowing naturally"
+
     # Combined emotional intelligence context
     emotional_intelligence_context = ""
     if emotional_state_context or emotional_prediction_context or external_emotion_context:
@@ -1180,6 +1217,12 @@ def get_contextualized_system_prompt(
     contextualized_prompt = contextualized_prompt.replace(
         "{MEMORY_MOMENTS_CONTEXT}", memory_moments_context_text
     )
+    contextualized_prompt = contextualized_prompt.replace(
+        "{THREAD_MANAGEMENT_CONTEXT}", thread_management_context
+    )
+    contextualized_prompt = contextualized_prompt.replace(
+        "{PROACTIVE_ENGAGEMENT_CONTEXT}", proactive_engagement_context
+    )
 
     # Remove any remaining template variables that weren't filled
     import re
@@ -1199,6 +1242,8 @@ def get_contextualized_system_prompt(
         r"\{EMOTIONAL_INTELLIGENCE_CONTEXT\}",
         r"\{AI_SYSTEM_CONTEXT\}",
         r"\{MEMORY_MOMENTS_CONTEXT\}",
+        r"\{THREAD_MANAGEMENT_CONTEXT\}",
+        r"\{PROACTIVE_ENGAGEMENT_CONTEXT\}",
         # Also remove any standalone context variable names
         r"\bMEMORY_NETWORK_CONTEXT\b",
         r"\bRELATIONSHIP_DEPTH_CONTEXT\b",
@@ -1211,6 +1256,8 @@ def get_contextualized_system_prompt(
         r"\bEMOTIONAL_INTELLIGENCE_CONTEXT\b",
         r"\bAI_SYSTEM_CONTEXT\b",
         r"\bMEMORY_MOMENTS_CONTEXT\b",
+        r"\bTHREAD_MANAGEMENT_CONTEXT\b",
+        r"\bPROACTIVE_ENGAGEMENT_CONTEXT\b",
     ]
 
     for pattern in context_variable_patterns:
