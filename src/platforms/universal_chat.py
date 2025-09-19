@@ -478,6 +478,84 @@ class UniversalChatOrchestrator:
 
         return os.environ.get(key)
 
+    def _is_error_response(self, response_text: str) -> bool:
+        """
+        Detect if the response appears to be an error message rather than actual AI response.
+        
+        Args:
+            response_text: The response text to check
+            
+        Returns:
+            True if this appears to be an error message
+        """
+        if not response_text or len(response_text.strip()) < 10:
+            return False
+            
+        # Common error patterns from various LLM providers
+        error_patterns = [
+            # OpenAI/OpenRouter errors
+            "context length exceeded",
+            "request too large", 
+            "invalid request",
+            "model capacity exceeded",
+            "rate limit exceeded",
+            "quota exceeded",
+            "timeout error",
+            "service unavailable",
+            "internal server error",
+            "bad request",
+            "unauthorized",
+            "forbidden",
+            "not found",
+            "too many requests",
+            
+            # Generic API errors
+            "error:",
+            "exception:",
+            "failed to",
+            "unable to process",
+            "request failed",
+            "connection error",
+            "network error",
+            "api error",
+            
+            # Model-specific errors
+            "maximum context length",
+            "token limit",
+            "input too long",
+            "prompt too large",
+            "sequence too long",
+            
+            # Short suspicious responses (likely errors)
+            "null",
+            "undefined",
+            "none",
+            "error",
+            "fail",
+            "{",  # JSON error fragments
+            "}",
+            "[",
+            "]",
+            "status:",
+            "code:",
+        ]
+        
+        response_lower = response_text.lower().strip()
+        
+        # Check for error patterns
+        for pattern in error_patterns:
+            if pattern in response_lower:
+                return True
+                
+        # Check for suspiciously short responses that are likely errors
+        # If response is very short and contains technical terms, it's likely an error
+        if len(response_text.strip()) < 50:
+            technical_terms = ["http", "json", "xml", "api", "server", "client", "request", "response"]
+            if any(term in response_lower for term in technical_terms):
+                return True
+                
+        return False
+
     async def initialize(self) -> bool:
         """Initialize all enabled chat platforms"""
         try:
@@ -1044,13 +1122,55 @@ class UniversalChatOrchestrator:
             conversation_context.append({"role": "user", "content": message.content})
 
             # Generate response using the Discord bot's LLM client (run in thread to avoid blocking)
-            response_text = await asyncio.to_thread(
+            response_data = await asyncio.to_thread(
                 llm_client.generate_chat_completion, conversation_context
             )
 
             # Extract the response content if it's in OpenAI format
-            if isinstance(response_text, dict) and "choices" in response_text:
-                response_text = response_text["choices"][0]["message"]["content"]
+            if isinstance(response_data, dict) and "choices" in response_data:
+                try:
+                    response_text = response_data["choices"][0]["message"]["content"]
+                    
+                    # Check for common error patterns in the response
+                    if response_text and self._is_error_response(response_text):
+                        logging.error(f"Detected error response from LLM: {response_text}")
+                        response_text = "I apologize, but I encountered an issue processing your request. Please try again with a shorter message."
+                    elif not response_text:
+                        logging.error(f"Empty content in LLM response: {response_data}")
+                        response_text = "I apologize, but I'm having trouble generating a response right now. Please try again."
+                except (KeyError, IndexError, TypeError) as e:
+                    logging.error(f"Error extracting content from LLM response: {e}")
+                    logging.error(f"Response structure: {response_data}")
+                    response_text = "I apologize, but I'm having trouble processing my response. Please try again."
+            else:
+                # If response is already a string or unexpected format
+                if isinstance(response_data, str):
+                    response_text = response_data
+                    # Check for error patterns in string responses too
+                    if self._is_error_response(response_text):
+                        logging.error(f"Detected error in string response: {response_text}")
+                        response_text = "I apologize, but I encountered an issue processing your request. Please try again."
+                else:
+                    logging.error(f"Unexpected LLM response format: {type(response_data)} - {response_data}")
+                    response_text = "I apologize, but I received an unexpected response format. Please try again."
+
+            # Ensure we have a valid response
+            if not response_text or not response_text.strip():
+                logging.error("Final response_text is empty or whitespace-only")
+                response_text = "I apologize, but I'm unable to generate a proper response right now. Please try again."
+            
+            # Additional check for suspiciously short responses compared to prompt size
+            prompt_size = len(str(conversation_context))
+            response_size = len(response_text)
+            
+            # If we sent a very large prompt but got a tiny response, it's likely an error
+            if prompt_size > 10000 and response_size < 100:
+                logging.warning(
+                    "Suspicious response: large prompt (%d chars) but tiny response (%d chars) - likely an error",
+                    prompt_size, response_size
+                )
+                logging.warning("Response content: %s", response_text[:200])
+                response_text = "I apologize, but I received an unusually short response that may indicate an error. Please try rephrasing your message or asking something simpler."
 
             end_time = datetime.now()
             generation_time_ms = int((end_time - start_time).total_seconds() * 1000)
@@ -1060,7 +1180,8 @@ class UniversalChatOrchestrator:
             estimated_cost = estimated_tokens * 0.00001
 
             logging.info(
-                f"✅ Generated full WhisperEngine AI response: {len(response_text)} chars, {generation_time_ms}ms"
+                "✅ Generated full WhisperEngine AI response: %d chars, %dms", 
+                len(response_text), generation_time_ms
             )
 
             return AIResponse(
