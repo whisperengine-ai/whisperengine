@@ -304,6 +304,47 @@ class DiscordBotCore:
                 # Continue without batching
                 self._needs_batch_init = False
 
+    async def initialize_phase4_components(self):
+        """Initialize Phase 4.2 and 4.3 components asynchronously."""
+        try:
+            # Initialize Phase 4.2: Advanced Thread Manager
+            if not hasattr(self, 'thread_manager') or self.thread_manager is None:
+                try:
+                    from src.conversation.advanced_thread_manager import create_advanced_conversation_thread_manager
+                    self.thread_manager = await create_advanced_conversation_thread_manager()
+                    self.logger.info("✅ Phase 4.2: Advanced Thread Manager initialized")
+                except Exception as e:
+                    self.logger.error(f"Failed to initialize Phase 4.2 thread manager: {e}")
+                    self.thread_manager = None
+
+            # Initialize Phase 4.3: Proactive Engagement Engine
+            if not hasattr(self, 'engagement_engine') or self.engagement_engine is None:
+                try:
+                    from src.conversation.proactive_engagement_engine import create_proactive_engagement_engine
+                    
+                    # Create with available integrations
+                    self.engagement_engine = await create_proactive_engagement_engine(
+                        thread_manager=getattr(self, 'thread_manager', None),
+                        memory_moments=getattr(self, 'memory_moments', None),
+                        emotional_engine=getattr(self.phase2_integration, 'emotional_context_engine', None) if hasattr(self, 'phase2_integration') else None,
+                        personality_profiler=getattr(self, 'dynamic_personality_profiler', None)
+                    )
+                    self.logger.info("✅ Phase 4.3: Proactive Engagement Engine initialized with full integration")
+                except Exception as e:
+                    self.logger.error(f"Failed to initialize Phase 4.3 engagement engine: {e}")
+                    self.engagement_engine = None
+
+            # Log Phase 4 integration status
+            if hasattr(self, 'memory_moments') and self.memory_moments:
+                self.logger.info("🎭 Phase 4.1: Memory-Triggered Moments - ACTIVE")
+            if hasattr(self, 'thread_manager') and self.thread_manager:
+                self.logger.info("🧵 Phase 4.2: Advanced Thread Manager - ACTIVE")
+            if hasattr(self, 'engagement_engine') and self.engagement_engine:
+                self.logger.info("⚡ Phase 4.3: Proactive Engagement Engine - ACTIVE")
+
+        except Exception as e:
+            self.logger.error(f"Error during Phase 4 component initialization: {e}")
+
     async def _update_emotional_context_dependencies(self):
         """Update emotional context engine with dependencies after they're initialized"""
         try:
@@ -525,6 +566,36 @@ class DiscordBotCore:
             self.logger.error(f"Failed to initialize Phase 4.1 memory moments: {e}")
             self.logger.warning("⚠️ Continuing without memory-triggered personality features")
             self.memory_moments = None
+
+        # Initialize Phase 4.2: Advanced Thread Manager
+        self.logger.info("🧵 Initializing Phase 4.2: Advanced Thread Manager...")
+        try:
+            from src.conversation.advanced_thread_manager import create_advanced_conversation_thread_manager
+            
+            # Initialize advanced thread manager asynchronously (will be awaited later)
+            self._thread_manager_task = None
+            self.thread_manager = None
+            self.logger.info("✅ Phase 4.2: Advanced Thread Manager scheduled for initialization")
+            
+        except Exception as e:
+            self.logger.error(f"Failed to initialize Phase 4.2 thread manager: {e}")
+            self.logger.warning("⚠️ Continuing without advanced thread management features")
+            self.thread_manager = None
+
+        # Initialize Phase 4.3: Proactive Engagement Engine
+        self.logger.info("⚡ Initializing Phase 4.3: Proactive Engagement Engine...")
+        try:
+            from src.conversation.proactive_engagement_engine import create_proactive_engagement_engine
+            
+            # Initialize proactive engagement engine asynchronously (will be awaited later)
+            self._engagement_engine_task = None
+            self.engagement_engine = None
+            self.logger.info("✅ Phase 4.3: Proactive Engagement Engine scheduled for initialization")
+            
+        except Exception as e:
+            self.logger.error(f"Failed to initialize Phase 4.3 engagement engine: {e}")
+            self.logger.warning("⚠️ Continuing without proactive engagement features")
+            self.engagement_engine = None
 
         # Initialize Phase 4 Human-Like Intelligence
         self.logger.info("🤖 Initializing Phase 4: Human-Like Conversation Intelligence...")
@@ -957,6 +1028,9 @@ class DiscordBotCore:
         # Schedule async initialization of batch optimizer
         if self._needs_batch_init:
             asyncio.create_task(self.initialize_batch_optimizer())
+
+        # Schedule async initialization of Phase 4 components
+        asyncio.create_task(self.initialize_phase4_components())
 
         # Supporting systems
         self.initialize_conversation_cache()

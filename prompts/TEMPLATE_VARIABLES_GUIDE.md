@@ -40,6 +40,18 @@ WhisperEngine uses a sophisticated template variable system that allows dynamic 
 **Example Output**: `"Memory-Triggered Moment: Reflective moment activated (based on 3 memory connections), triggered by contemplative emotion. Guidance: This echoes our previous discussion about finding balance - consider how your perspective has evolved"`  
 **Usage**: Enables authentic personality moments based on conversation patterns
 
+#### `{THREAD_MANAGEMENT_CONTEXT}` *(Phase 4.2)*
+**Purpose**: Advanced conversation thread management and context bridging  
+**Data Source**: `comprehensive_context['phase4_2_thread_analysis']`  
+**Example Output**: `"Thread Management: transition action, 3 active threads, current thread: work_stress_discussion, context bridging: building on previous career concerns..., priority: high"`  
+**Usage**: Enables sophisticated multi-thread conversation management and topic transitions
+
+#### `{PROACTIVE_ENGAGEMENT_CONTEXT}` *(Phase 4.3)*
+**Purpose**: Proactive conversation engagement opportunities and topic suggestions  
+**Data Source**: `comprehensive_context['phase4_3_engagement_analysis']`  
+**Example Output**: `"Proactive Engagement: topic_suggestion intervention suggested, reason: conversation stagnation detected, suggested topics: personal goals, weekend plans"`  
+**Usage**: Enables proactive conversation management and stagnation prevention
+
 #### `{RELATIONSHIP_CONTEXT}`
 **Purpose**: Basic user interaction context  
 **Data Source**: `user_id` parameter  
@@ -105,6 +117,8 @@ Add variables to your system prompt template file:
 **Emotional State**: {EMOTIONAL_STATE_CONTEXT}
 **Personality**: {PERSONALITY_CONTEXT}
 **Memory Moments**: {MEMORY_MOMENTS_CONTEXT}
+**Thread Management**: {THREAD_MANAGEMENT_CONTEXT}
+**Proactive Engagement**: {PROACTIVE_ENGAGEMENT_CONTEXT}
 **System Status**: {AI_SYSTEM_CONTEXT}
 ```
 
@@ -113,7 +127,7 @@ Add variables to your system prompt template file:
 ```python
 from src.utils.helpers import get_contextualized_system_prompt
 
-# Basic usage
+# Full Phase 4 usage with all context
 contextualized_prompt = get_contextualized_system_prompt(
     personality_metadata={
         'communication_style': 'analytical', 
@@ -142,7 +156,22 @@ contextualized_prompt = get_contextualized_system_prompt(
             'patterns': ['seeks guidance', 'values authenticity']
         },
         'relationship_level': 'developing',
-        'trust_indicators': ['shares personal details', 'asks for advice']
+        'trust_indicators': ['shares personal details', 'asks for advice'],
+        # NEW: Phase 4.2 Thread Management
+        'phase4_2_thread_analysis': {
+            'thread_action': 'transition',
+            'active_thread_count': 3,
+            'current_thread_id': 'work_stress_discussion',
+            'context_bridge': 'Building on previous career concerns',
+            'thread_priority': 'high'
+        },
+        # NEW: Phase 4.3 Proactive Engagement
+        'phase4_3_engagement_analysis': {
+            'needs_intervention': True,
+            'intervention_type': 'topic_suggestion',
+            'engagement_reason': 'conversation stagnation detected',
+            'suggested_topics': ['personal goals', 'weekend plans']
+        }
     },
     memory_moments_context={
         'moment': {
@@ -195,6 +224,32 @@ contextualized_prompt = get_contextualized_system_prompt(
 **Personality Profile**: {PERSONALITY_CONTEXT}
 
 *Adapt your communication style to their personality and the current depth of your relationship.*
+```
+
+### **Advanced Thread Management (Phase 4.2)**
+```markdown
+**Thread Context**: {THREAD_MANAGEMENT_CONTEXT}
+**Memory Networks**: {MEMORY_NETWORK_CONTEXT}
+
+*Use thread management insights to smoothly transition between topics while maintaining conversation continuity.*
+```
+
+### **Proactive Engagement (Phase 4.3)**
+```markdown
+**Engagement Analysis**: {PROACTIVE_ENGAGEMENT_CONTEXT}
+**Emotional State**: {EMOTIONAL_STATE_CONTEXT}
+
+*When proactive engagement is suggested, naturally introduce new topics or re-energize the conversation.*
+```
+
+### **Complete Phase 4 Intelligence Stack**
+```markdown
+**Memory Moments**: {MEMORY_MOMENTS_CONTEXT}
+**Thread Management**: {THREAD_MANAGEMENT_CONTEXT}
+**Proactive Engagement**: {PROACTIVE_ENGAGEMENT_CONTEXT}
+**Emotional Intelligence**: {EMOTIONAL_INTELLIGENCE_CONTEXT}
+
+*Leverage all Phase 4 systems for sophisticated, human-like conversation management.*
 ```
 
 ---

@@ -1314,6 +1314,57 @@ class BotEventHandlers:
                 discord_context=discord_context,
             )
 
+            # Phase 4.2: Advanced Thread Management
+            thread_manager_result = None
+            if (os.getenv("ENABLE_PHASE4_THREAD_MANAGER", "true").lower() == "true" and 
+                hasattr(self.bot, 'thread_manager') and self.bot.thread_manager):
+                try:
+                    logger.debug("Processing Phase 4.2: Advanced Thread Management...")
+                    thread_manager_result = await self.bot.thread_manager.process_user_message(
+                        user_id=user_id,
+                        message=message.content,
+                        context={
+                            "channel_id": discord_context["channel_id"],
+                            "guild_id": discord_context["guild_id"],
+                            "emotional_data": external_emotion_data,
+                            "phase2_context": phase2_context
+                        }
+                    )
+                    logger.debug(f"Phase 4.2 Thread processing: {thread_manager_result.get('thread_action', 'unknown')}")
+                except Exception as e:
+                    logger.warning(f"Phase 4.2 Advanced Thread Management failed: {e}")
+
+            # Phase 4.3: Proactive Engagement Engine
+            engagement_result = None
+            if (os.getenv("ENABLE_PHASE4_PROACTIVE_ENGAGEMENT", "true").lower() == "true" and 
+                hasattr(self.bot, 'engagement_engine') and self.bot.engagement_engine):
+                try:
+                    logger.debug("Processing Phase 4.3: Proactive Engagement Engine...")
+                    
+                    # Prepare recent messages in the expected format
+                    formatted_recent_messages = []
+                    for msg in recent_messages[-10:]:  # Last 10 messages
+                        if isinstance(msg, dict):
+                            formatted_recent_messages.append(msg)
+                        elif hasattr(msg, 'content') and hasattr(msg, 'author'):
+                            formatted_recent_messages.append({
+                                "content": msg.content,
+                                "user_id": str(msg.author.id),
+                                "timestamp": getattr(msg, 'created_at', None)
+                            })
+                    
+                    engagement_result = await self.bot.engagement_engine.analyze_conversation_engagement(
+                        user_id=user_id,
+                        context_id=discord_context["channel_id"],
+                        recent_messages=formatted_recent_messages,
+                        current_thread_info=thread_manager_result
+                    )
+                    
+                    if engagement_result and engagement_result.get('needs_intervention'):
+                        logger.debug(f"Phase 4.3 Proactive engagement suggested: {engagement_result.get('intervention_type', 'unknown')}")
+                except Exception as e:
+                    logger.warning(f"Phase 4.3 Proactive Engagement Engine failed: {e}")
+
             # Try human-like memory processing if available
             human_like_context = None
             conversation_analysis = None
@@ -1450,6 +1501,16 @@ class BotEventHandlers:
                     comprehensive_context["relationship_level"] = conversation_analysis["relationship_level"]
                 
                 logger.debug("Enhanced comprehensive context with human-like intelligence and conversation analysis")
+
+            # Merge Phase 4.2 and 4.3 results into comprehensive context
+            if comprehensive_context:
+                if thread_manager_result:
+                    comprehensive_context["phase4_2_thread_analysis"] = thread_manager_result
+                    logger.debug("Added Phase 4.2 Advanced Thread Management results to context")
+                
+                if engagement_result:
+                    comprehensive_context["phase4_3_engagement_analysis"] = engagement_result
+                    logger.debug("Added Phase 4.3 Proactive Engagement results to context")
 
             return phase4_context, comprehensive_context, enhanced_system_prompt
 
