@@ -21,6 +21,7 @@ services:
       - PYTHONUNBUFFERED=1
       - HEALTH_CHECK_PORT=9090
       - HEALTH_CHECK_HOST=0.0.0.0
+      - DISABLE_MEMORY_IMPORTANCE=${DISABLE_MEMORY_IMPORTANCE:-false}
       
     # Expose health check port for container orchestration
     ports:
