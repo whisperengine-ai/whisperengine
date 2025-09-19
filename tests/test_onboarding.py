@@ -28,7 +28,7 @@ class TestFirstRunDetector:
         
         # Clear onboarding-related environment variables
         onboarding_vars = [
-            'DISCORD_BOT_TOKEN', 'LLM_CHAT_API_URL', 'LLM_MODEL_NAME',
+            'DISCORD_BOT_TOKEN', 'LLM_CHAT_API_URL', 'LLM_CHAT_MODEL',
             'CI', 'SKIP_ONBOARDING', 'ENV_MODE'
         ]
         
@@ -288,7 +288,7 @@ class TestOnboardingIntegration:
             'DEBUG_MODE': 'true',
             'DISCORD_BOT_TOKEN': 'test_token_12345',
             'LLM_CHAT_API_URL': 'http://localhost:1234/v1',
-            'LLM_MODEL_NAME': 'test-model'
+            'LLM_CHAT_MODEL': 'test-model'
         }
 
     @pytest.mark.asyncio

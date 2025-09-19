@@ -16,14 +16,31 @@ def download_embedding_models():
     """Download sentence-transformers embedding models"""
     try:
         from sentence_transformers import SentenceTransformer
+        import torch
         
         models_dir = Path("/app/models/embeddings")
         models_dir.mkdir(parents=True, exist_ok=True)
         
         # Primary embedding model (single model approach)
         logger.info("📥 Downloading embedding model (MiniLM-L6-v2)...")
-        embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
-        embedding_model.save(str(models_dir / 'all-MiniLM-L6-v2'))
+        
+        # Set device to CPU and disable meta tensors for compatibility
+        torch.set_default_tensor_type(torch.FloatTensor)
+        
+        embedding_model = SentenceTransformer('all-MiniLM-L6-v2', device='cpu')
+        
+        # Ensure model is on CPU before saving
+        embedding_model = embedding_model.to('cpu')
+        
+        # Save with explicit device mapping
+        save_path = str(models_dir / 'all-MiniLM-L6-v2')
+        embedding_model.save(save_path)
+        
+        # Verify the saved model can be loaded
+        test_model = SentenceTransformer(save_path, device='cpu')
+        test_embedding = test_model.encode(["test sentence"])
+        logger.info(f"✅ Model verification successful. Embedding dimension: {len(test_embedding[0])}")
+        
         logger.info("✅ Embedding model saved to /app/models/embeddings/all-MiniLM-L6-v2")
         
         return True

@@ -141,7 +141,7 @@ class StatusCommandHandlers:
 
             embed.add_field(
                 name="😊 Emotion Analysis Service",
-                value=f"{emotion_info}\n• Model: **{self.llm_client.emotion_model_name}**\n• Max tokens (emotion): **{self.llm_client.max_tokens_emotion}**\n• Max tokens (trust): **{self.llm_client.max_tokens_trust_detection}**",
+                value=f"{emotion_info}\n• Model: **{self.llm_client.emotion_model_name}**\n• Max tokens (emotion): **{self.llm_client.max_tokens_emotion}**",
                 inline=False,
             )
 

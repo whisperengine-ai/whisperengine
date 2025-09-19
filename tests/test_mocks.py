@@ -13,7 +13,6 @@ class MockLMStudioClient:
         connection_works: bool = True,
         emotion_responses: dict[str, dict[str, Any]] | None = None,
         personal_info_responses: dict[str, dict[str, Any]] | None = None,
-        trust_responses: dict[str, dict[str, Any]] | None = None,
         user_facts_responses: dict[str, dict[str, Any]] | None = None,
     ):
         """
@@ -23,19 +22,16 @@ class MockLMStudioClient:
             connection_works: Whether check_connection() should return True
             emotion_responses: Dict mapping messages to emotion analysis responses
             personal_info_responses: Dict mapping messages to personal info responses
-            trust_responses: Dict mapping messages to trust indicator responses
             user_facts_responses: Dict mapping messages to user facts responses
         """
         self.connection_works = connection_works
         self.emotion_responses = emotion_responses or {}
         self.personal_info_responses = personal_info_responses or {}
-        self.trust_responses = trust_responses or {}
         self.user_facts_responses = user_facts_responses or {}
 
         # Track method calls for assertions
         self.analyze_emotion_calls = []
         self.extract_personal_info_calls = []
-        self.detect_trust_indicators_calls = []
         self.extract_user_facts_calls = []
 
     def check_connection(self) -> bool:
@@ -160,31 +156,6 @@ class MockLMStudioClient:
 
         return {"personal_info": personal_info}
 
-    def detect_trust_indicators(self, message: str) -> dict[str, Any]:
-        """Mock trust indicator detection"""
-        self.detect_trust_indicators_calls.append(message)
-
-        # Return configured response or default
-        if message in self.trust_responses:
-            return self.trust_responses[message]
-
-        # Default response based on trust patterns
-        trust_indicators = []
-
-        if any(word in message.lower() for word in ["thank you", "thanks", "grateful"]):
-            trust_indicators.append("expressing gratitude")
-
-        if any(word in message.lower() for word in ["help", "support", "assist"]):
-            trust_indicators.append("seeking help")
-
-        if "my name is" in message.lower():
-            trust_indicators.append("sharing personal name")
-
-        if any(word in message.lower() for word in ["work", "job", "family"]):
-            trust_indicators.append("sharing personal details")
-
-        return {"trust_indicators": trust_indicators}
-
     def extract_user_facts(self, message: str) -> dict[str, Any]:
         """Mock user facts extraction"""
         self.extract_user_facts_calls.append(message)
@@ -232,7 +203,6 @@ def create_mock_llm_client(
     connection_works: bool = True,
     emotion_responses: dict[str, dict[str, Any]] | None = None,
     personal_info_responses: dict[str, dict[str, Any]] | None = None,
-    trust_responses: dict[str, dict[str, Any]] | None = None,
     user_facts_responses: dict[str, dict[str, Any]] | None = None,
 ) -> MockLMStudioClient:
     """
@@ -242,7 +212,6 @@ def create_mock_llm_client(
         connection_works: Whether the mock should report connection success
         emotion_responses: Custom emotion analysis responses
         personal_info_responses: Custom personal info extraction responses
-        trust_responses: Custom trust indicator responses
         user_facts_responses: Custom user facts responses
 
     Returns:
@@ -252,7 +221,6 @@ def create_mock_llm_client(
         connection_works=connection_works,
         emotion_responses=emotion_responses,
         personal_info_responses=personal_info_responses,
-        trust_responses=trust_responses,
         user_facts_responses=user_facts_responses,
     )
 

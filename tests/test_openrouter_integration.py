@@ -15,7 +15,7 @@ def test_openrouter_config():
     # Check environment variables
     api_url = os.getenv("LLM_CHAT_API_URL")
     api_key = os.getenv("OPENROUTER_API_KEY")
-    model_name = os.getenv("LLM_MODEL_NAME", "local-llm")
+    model_name = os.getenv("LLM_CHAT_MODEL", "local-llm")
 
     # Check sentiment endpoint configuration
     sentiment_api_url = os.getenv("LLM_SENTIMENT_API_URL", api_url)

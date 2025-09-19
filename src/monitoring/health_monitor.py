@@ -501,7 +501,7 @@ class HealthMonitor:
             # For now, we'll check if the service is configured
             import os
             llm_url = os.getenv('LLM_CHAT_API_URL')
-            llm_model = os.getenv('LLM_MODEL_NAME')
+            llm_model = os.getenv('LLM_CHAT_MODEL')
             
             if llm_url and llm_model:
                 metrics.append(

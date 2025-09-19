@@ -49,7 +49,7 @@ def check_model_configuration():
 
     # Check environment variables
     llm_url = os.getenv("LLM_CHAT_API_URL", "not_set")
-    model_name = os.getenv("LLM_MODEL_NAME", "not_set")
+    model_name = os.getenv("LLM_CHAT_MODEL", "not_set")
     local_model = os.getenv("LOCAL_LLM_MODEL", "not_set")
     os.getenv("USE_LOCAL_LLM", "false")
 

@@ -20,7 +20,7 @@ def test_model_configuration():
     LMStudioClient()
 
     # Test with environment variables
-    os.environ["LLM_MODEL_NAME"] = "llama-2-13b-chat"
+    os.environ["LLM_CHAT_MODEL"] = "llama-2-13b-chat"
     os.environ["LLM_SENTIMENT_MODEL_NAME"] = "llama-2-7b-instruct"
 
     LMStudioClient()

@@ -20,6 +20,8 @@ chromadb>=1.1.0  # Updated from >=1.1.0 to allow latest
 sentence-transformers==5.1.0
 numpy==2.3.3  # Updated from 2.3.2
 vaderSentiment==3.3.2
+faiss-cpu==1.12.0  # Fast similarity search and clustering for production features (Python 3.13 compatible)
+pandas==2.3.0  # Efficient data manipulation for vectorized emotion engine
 
 # Advanced NLP Dependencies (Phase 1)
 spacy==3.8.7

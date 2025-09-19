@@ -1,8 +1,14 @@
 """
 Personality-Focused Fact Classification System
 
-This module replaces the global/user fact distinction with a personality-driven
-classification system that maximizes AI companion engagement and relationship building.
+⚠️ DEPRECATION NOTICE: This pattern-based classification system is being replaced 
+by the Phase 4 Dynamic Personality Profiler (src/intelligence/dynamic_personality_profiler.py)
+which provides far more sophisticated personality analysis and relationship tracking.
+
+New implementations should use Phase 4 directly for personality insights rather than
+these simple keyword/regex patterns.
+
+This module is maintained for backward compatibility with legacy fact storage methods.
 """
 
 import logging
@@ -325,6 +331,10 @@ class PersonalityFactClassifier:
         """
         Classify a fact for personality enhancement potential
 
+        ⚠️ DEPRECATION WARNING: This pattern-based classification is superseded by 
+        Phase 4 Dynamic Personality Profiler which provides far more sophisticated analysis.
+        Consider using Phase 4 directly for new implementations.
+
         Args:
             fact_content: The fact text to classify
             context_metadata: Context information about where fact was extracted
@@ -333,6 +343,10 @@ class PersonalityFactClassifier:
         Returns:
             PersonalityFact with classification and scoring
         """
+        logger.warning(
+            "Using deprecated pattern-based personality classification. "
+            "Consider Phase 4 Dynamic Personality Profiler for superior analysis."
+        )
         try:
             # Step 1: Analyze for PII and privacy
             pii_analysis = self.pii_detector.analyze_fact_for_pii(fact_content)

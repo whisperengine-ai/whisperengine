@@ -772,11 +772,40 @@ class BotEventHandlers:
 
     async def _get_recent_messages(self, channel, user_id, exclude_message_id):
         """Get recent conversation messages for context."""
+        
+        def _standardize_message_object(msg):
+            """Convert any message object to a standardized dict format."""
+            if isinstance(msg, dict):
+                return msg
+            # Handle Discord Message object
+            elif hasattr(msg, 'content') and hasattr(msg, 'author'):
+                return {
+                    "content": msg.content or "",
+                    "author_id": str(msg.author.id),
+                    "author_name": msg.author.display_name,
+                    "timestamp": msg.created_at.isoformat() if hasattr(msg, 'created_at') else "",
+                    "bot": msg.author.id == self.bot.user.id if self.bot.user else False,
+                    "from_discord": True,
+                }
+            else:
+                # Fallback for unknown object types
+                return {
+                    "content": str(msg),
+                    "author_id": "unknown",
+                    "author_name": "Unknown",
+                    "timestamp": "",
+                    "bot": False,
+                    "from_unknown": True,
+                }
+        
         if self.conversation_cache:
             # Use cache with user-specific filtering
             recent_messages = await self.conversation_cache.get_user_conversation_context(
                 channel, user_id=int(user_id), limit=15, exclude_message_id=exclude_message_id
             )
+            
+            # Standardize all message objects to dict format
+            recent_messages = [_standardize_message_object(msg) for msg in recent_messages]
 
             # Supplement with ChromaDB if insufficient
             if len(recent_messages) < 8:
@@ -1188,8 +1217,16 @@ class BotEventHandlers:
                 try:
                     logger.debug("Using Human-Like Memory System for enhanced processing...")
                     
-                    # Prepare conversation history
-                    conversation_history = [msg['content'] for msg in recent_messages[-5:] if 'content' in msg]
+                    # Prepare conversation history - handle both dict and Discord Message objects
+                    conversation_history = []
+                    for msg in recent_messages[-5:]:
+                        if isinstance(msg, dict):
+                            if 'content' in msg:
+                                conversation_history.append(msg['content'])
+                        else:
+                            # Handle Discord Message object
+                            if hasattr(msg, 'content') and msg.content:
+                                conversation_history.append(msg.content)
                     
                     # Build relationship context
                     relationship_context = {
@@ -1211,9 +1248,12 @@ class BotEventHandlers:
                     )
                     
                     # Use human-like memory search
+                    # Defensive check: ensure we're not passing Discord Message object
+                    message_content = message.content if hasattr(message, 'content') else str(message)
+                    
                     human_like_result = await self.memory_manager.human_like_system.search_like_human_friend(
                         user_id=user_id,
-                        message=message.content,
+                        message=message_content,
                         conversation_history=conversation_history,
                         relationship_context=relationship_context,
                         limit=20
@@ -1986,9 +2026,16 @@ class BotEventHandlers:
             # Get the last bot response for context
             bot_response = ""
             for msg in reversed(recent_messages):
-                if msg.get("bot", False):
-                    bot_response = msg.get("content", "")
-                    break
+                # Handle both dict and Discord Message objects
+                if isinstance(msg, dict):
+                    if msg.get("bot", False):
+                        bot_response = msg.get("content", "")
+                        break
+                else:
+                    # Handle Discord Message object
+                    if hasattr(msg, 'author') and msg.author.id == self.bot.user.id:
+                        bot_response = msg.content or ""
+                        break
 
             # Analyze the conversation for personality insights (using correct method signature)
             analysis = await self.dynamic_personality_profiler.analyze_conversation(

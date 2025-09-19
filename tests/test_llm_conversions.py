@@ -25,10 +25,10 @@ This script tests all the pattern-based code that was converted to use LLM:
 import logging
 
 from dotenv import load_dotenv
-from emotion_manager import EmotionManager, RelationshipManager
-from fact_extractor import FactExtractor
-from lmstudio_client import LMStudioClient
-from memory_manager import UserMemoryManager
+from src.utils.emotion_manager import EmotionManager, RelationshipManager
+from src.utils.fact_extractor import FactExtractor
+from src.llm.llm_client import LLMClient
+from src.memory.memory_manager import UserMemoryManager
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s - %(name)s - %(message)s")
 logger = logging.getLogger(__name__)
@@ -42,7 +42,7 @@ def test_llm_conversions():
 
     # Initialize LLM client
     try:
-        llm_client = LMStudioClient()
+        llm_client = LLMClient()
         logger.info("✅ LLM client initialized successfully")
     except Exception as e:
         logger.error(f"❌ Failed to initialize LLM client: {e}")

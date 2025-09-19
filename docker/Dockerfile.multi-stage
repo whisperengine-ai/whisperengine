@@ -64,8 +64,14 @@ COPY requirements-core.txt requirements-platform.txt requirements-discord.txt ./
         python -m spacy download en_core_web_sm
 
     # Copy model download script and download all models during build
-    COPY scripts/download_models.py ./
-    RUN python download_models.py
+    COPY scripts/download_models.py ./scripts/
+    RUN python scripts/download_models.py
+
+    # Set environment variables for offline model usage
+    ENV SENTENCE_TRANSFORMERS_HOME=/app/models \
+        TRANSFORMERS_CACHE=/app/models \
+        HF_HOME=/app/models \
+        TORCH_HOME=/app/models
 
     # Copy only necessary application files
     COPY src/ ./src/
@@ -73,10 +79,6 @@ COPY requirements-core.txt requirements-platform.txt requirements-discord.txt ./
     COPY prompts/ ./prompts/
     COPY config/ ./config/
     COPY data/ ./data/
-
-    # Pre-download and bundle AI models to eliminate runtime network dependencies
-    COPY scripts/download_models.py ./scripts/
-    RUN python scripts/download_models.py
 
     # Create non-root user and directories
 RUN useradd --create-home --no-log-init appuser && \
