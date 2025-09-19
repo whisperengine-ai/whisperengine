@@ -40,15 +40,15 @@ services:
     ports:
       - "9090:9090"  # Health check endpoint
       
-    # Resource limits
+    # Production-optimized resource limits for high-throughput multi-user scenarios
     deploy:
       resources:
         limits:
-          memory: 1G
-          cpus: '0.5'
+          memory: 4G          # Support for high concurrent user load and memory caching
+          cpus: '4.0'         # Adequate cores for 12 thread workers + 6 process workers
         reservations:
-          memory: 512M
-          cpus: '0.25'
+          memory: 2G          # Reliable baseline for production stability
+          cpus: '2.0'         # Ensure minimum cores always available
     
     # Health check - use the built-in health endpoint
     healthcheck:
@@ -89,6 +89,15 @@ services:
       - redis_data:/data
     networks:
       - bot_network
+    # Production resource limits for Redis
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+        reservations:
+          memory: 256M
+          cpus: '0.25'
 
   # PostgreSQL for persistent data
   postgres:
@@ -105,6 +114,15 @@ services:
       - ./scripts/init_postgres.sql:/docker-entrypoint-initdb.d/init.sql:ro
     networks:
       - bot_network
+    # Production resource limits for PostgreSQL
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1.0'
+        reservations:
+          memory: 512M
+          cpus: '0.5'
 
   # ChromaDB for vector storage
   chromadb:
@@ -120,6 +138,15 @@ services:
       - chromadb_data:/chroma/chroma
     networks:
       - bot_network
+    # Production resource limits for ChromaDB
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '0.5'
+        reservations:
+          memory: 512M
+          cpus: '0.25'
 
 
 

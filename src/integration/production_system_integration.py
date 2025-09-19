@@ -43,11 +43,18 @@ class ProductionSystemIntegrator:
         }
 
     def _load_default_config(self) -> dict[str, Any]:
-        """Load default production configuration"""
+        """Load default production configuration with environment-based scaling"""
+        import os
+        
+        # Dynamic worker scaling based on available CPU cores
+        cpu_count = os.cpu_count() or 4
+        max_threads = min(int(os.getenv("MAX_WORKER_THREADS", cpu_count * 2)), 16)
+        max_processes = min(int(os.getenv("MAX_WORKER_PROCESSES", cpu_count)), 8)
+        
         return {
             "production_engine": {
-                "max_workers_threads": 8,
-                "max_workers_processes": 4,
+                "max_workers_threads": max_threads,
+                "max_workers_processes": max_processes,
                 "batch_size": 32,
                 "enable_multiprocessing": True,
             },
@@ -69,8 +76,8 @@ class ProductionSystemIntegrator:
             },
             "conversation_manager": {
                 "max_concurrent_sessions": 1000,
-                "max_workers_threads": 12,
-                "max_workers_processes": 6,
+                "max_workers_threads": max_threads + 4,  # Extra threads for conversation handling
+                "max_workers_processes": max_processes + 2,  # Extra processes for heavy operations
                 "session_timeout_minutes": 30,
             },
         }
