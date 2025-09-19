@@ -15,7 +15,21 @@ logger = logging.getLogger(__name__)
 class ConcurrentLLMManager:
     """Thread-safe LLM client wrapper with proper async handling"""
 
-    def __init__(self, base_llm_client, max_workers=3):
+    def __init__(self, base_llm_client, max_workers: int | None = None):
+        """
+        Initialize concurrent LLM manager
+        
+        Args:
+            base_llm_client: The base LLM client to wrap
+            max_workers: Number of worker threads (auto-detected if None)
+        """
+        import os
+        
+        # Auto-detect optimal worker count if not specified
+        if max_workers is None:
+            cpu_count = os.cpu_count() or 4
+            max_workers = min(int(os.getenv("LLM_MAX_WORKERS", max(3, cpu_count // 2))), 8)
+            
         self.base_llm_client = base_llm_client
         self.max_workers = max_workers
 

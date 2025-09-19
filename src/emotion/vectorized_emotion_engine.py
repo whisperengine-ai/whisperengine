@@ -48,13 +48,20 @@ class BatchEmotionResult:
 class VectorizedEmotionProcessor:
     """High-performance emotion processing using pandas vectorization"""
 
-    def __init__(self, max_workers: int = 4):
+    def __init__(self, max_workers: int | None = None):
         """
-        Initialize vectorized emotion processor
+        Initialize emotion engine adapter
 
         Args:
-            max_workers: Number of worker threads for parallel processing
+            max_workers: Number of worker threads (auto-detected if None)
         """
+        import os
+        
+        # Auto-detect optimal worker count if not specified
+        if max_workers is None:
+            cpu_count = os.cpu_count() or 4
+            max_workers = min(int(os.getenv("EMOTION_MAX_WORKERS", cpu_count)), 8)
+            
         self.max_workers = max_workers
 
         # Initialize sentiment analyzer

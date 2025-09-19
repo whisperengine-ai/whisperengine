@@ -141,8 +141,8 @@ class ConcurrentConversationManager:
         memory_batcher=None,
         emotion_engine=None,
         max_concurrent_sessions: int = 1000,
-        max_workers_threads: int = 8,
-        max_workers_processes: int = 4,
+        max_workers_threads: int | None = None,
+        max_workers_processes: int | None = None,
         session_timeout_minutes: int = 30,
     ):
         """
@@ -153,10 +153,21 @@ class ConcurrentConversationManager:
             memory_batcher: Memory batching system
             emotion_engine: Emotion processing engine
             max_concurrent_sessions: Maximum concurrent conversation sessions
-            max_workers_threads: Thread pool size for I/O operations
-            max_workers_processes: Process pool size for CPU operations
+            max_workers_threads: Thread pool size for I/O operations (auto-detected if None)
+            max_workers_processes: Process pool size for CPU operations (auto-detected if None)
             session_timeout_minutes: Session timeout in minutes
         """
+        import os
+        
+        # Auto-detect CPU cores for optimal worker configuration
+        cpu_count = os.cpu_count() or 4
+        
+        # Use environment variables or auto-scale based on CPU cores
+        if max_workers_threads is None:
+            max_workers_threads = min(int(os.getenv("MAX_WORKER_THREADS", cpu_count * 2)), 16)
+        if max_workers_processes is None:
+            max_workers_processes = min(int(os.getenv("MAX_WORKER_PROCESSES", cpu_count)), 8)
+            
         self.advanced_thread_manager = advanced_thread_manager
         self.memory_batcher = memory_batcher
         self.emotion_engine = emotion_engine
