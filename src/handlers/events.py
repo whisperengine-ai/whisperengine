@@ -898,9 +898,15 @@ class BotEventHandlers:
                     f"Supplementing {len(recent_messages)} cached messages with ChromaDB history for user {user_id}"
                 )
                 try:
-                    chromadb_memories = self.safe_memory_manager.retrieve_relevant_memories(
-                        user_id, query="conversation history recent messages", limit=15
-                    )
+                    # Use safe_memory_manager if available, otherwise fall back to memory_manager
+                    memory_manager = self.safe_memory_manager or self.memory_manager
+                    if memory_manager:
+                        chromadb_memories = memory_manager.retrieve_relevant_memories(
+                            user_id, query="conversation history recent messages", limit=15
+                        )
+                    else:
+                        logger.warning("No memory manager available, skipping ChromaDB supplement")
+                        chromadb_memories = []
 
                     # CRITICAL DEBUG: Log what ChromaDB is returning
                     logger.error(f"[CHROMADB-DEBUG] Retrieved {len(chromadb_memories)} memories for user {user_id}")

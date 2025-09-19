@@ -93,9 +93,18 @@ class ThreadSafeMemoryManager:
                 try:
                     with user_lock:
                         with self._track_operation(operation_id):
-                            return self.base_memory_manager.store_conversation(
-                                user_id, user_message, bot_response, **kwargs
-                            )
+                            # Use full context storage for graph memory and emotion processing
+                            if hasattr(self.base_memory_manager, 'store_conversation_with_full_context'):
+                                # Pass display_name if available in kwargs for emotion processing
+                                display_name = kwargs.get('display_name', kwargs.get('author_name'))
+                                return self.base_memory_manager.store_conversation_with_full_context(
+                                    user_id, user_message, bot_response, display_name
+                                )
+                            else:
+                                # Fallback to basic storage if full context not available
+                                return self.base_memory_manager.store_conversation(
+                                    user_id, user_message, bot_response, **kwargs
+                                )
                 except Exception as e:
                     if attempt == max_retries - 1:
                         raise

@@ -461,8 +461,9 @@ class MemoryCommandHandlers:
                             base_memory_manager, "retrieve_relevant_memories"
                         ):
                             # Retrieve user's conversation history across ALL contexts for personality profiling
+                            # Note: retrieve_relevant_memories is automatically enhanced via memory patch system
                             cross_context_memories = base_memory_manager.retrieve_relevant_memories(
-                                user_id, query="conversation messages recent", limit=25
+                                user_id, query="conversation messages recent personality patterns", limit=25
                             )
 
                             # Extract user messages from memory
