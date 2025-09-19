@@ -95,7 +95,6 @@ LLM_MODEL_NAME=anthropic/claude-3.5-sonnet
 #### **Memory & Storage Settings**
 ```bash
 # Local file storage (default for desktop)
-USE_CHROMADB_HTTP=false
 DATABASE_URL=sqlite:///./whisperengine.db
 
 # Or use PostgreSQL for production

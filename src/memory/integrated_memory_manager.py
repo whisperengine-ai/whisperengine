@@ -375,6 +375,8 @@ class IntegratedMemoryManager:
         _start = _time.perf_counter()
         error_flag = False
         # Get standard ChromaDB memories (existing functionality)
+        # NOTE: Uses proxy to memory_manager.retrieve_relevant_memories() which is
+        # automatically enhanced via patch system in EnhancedMemoryManager
         chromadb_memories = self.retrieve_relevant_memories(user_id, query, limit)
 
         # Enhance with graph context if available
@@ -467,6 +469,9 @@ class IntegratedMemoryManager:
 
         try:
             # Get memory system context
+            # NOTE: Could potentially use retrieve_contextual_memories() for enhanced context,
+            # but that method is async and this method is sync. Uses basic retrieval with
+            # automatic enhancement via memory_manager patch system.
             recent_memories = self.retrieve_relevant_memories(
                 user_id, current_message or "recent conversation", limit=3
             )

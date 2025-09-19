@@ -246,8 +246,7 @@ POSTGRES_PRIVACY_MAX_CONNECTIONS=10         # Default: 10 (Max privacy manager c
 
 ### ChromaDB (Vector Database)
 ```bash
-# ChromaDB connection
-USE_CHROMADB_HTTP=true                      # Default: true (Use HTTP connection to ChromaDB)
+# ChromaDB connection (always uses HTTP client for containerized deployments)
 CHROMADB_HOST=localhost                     # Default: localhost (ChromaDB host)
 CHROMADB_PORT=8000                          # Default: 8000 (ChromaDB port)
 CHROMADB_PATH=./chromadb_data               # Default: ./chromadb_data (Local ChromaDB path)

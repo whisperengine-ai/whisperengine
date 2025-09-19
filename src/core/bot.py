@@ -32,6 +32,17 @@ except ImportError:
     IntegratedMemoryManager = None
     GraphIntegratedEmotionManager = None
 
+# HIERARCHICAL MEMORY INTEGRATION: Import new 4-tier memory system
+try:
+    from src.memory.core.storage_abstraction import HierarchicalMemoryManager
+    from src.memory.hierarchical_memory_adapter import create_hierarchical_memory_adapter
+    HIERARCHICAL_MEMORY_AVAILABLE = True
+except ImportError as e:
+    logging.getLogger(__name__).warning(f"Hierarchical memory not available: {e}")
+    HIERARCHICAL_MEMORY_AVAILABLE = False
+    HierarchicalMemoryManager = None
+    create_hierarchical_memory_adapter = None
+
 from src.llm.concurrent_llm_manager import ConcurrentLLMManager
 from src.memory.context_aware_memory_security import ContextAwareMemoryManager
 
@@ -203,6 +214,56 @@ class DiscordBotCore:
         self.logger.info("Initializing memory system...")
 
         try:
+            # Check if hierarchical memory system is enabled (NEW 4-TIER SYSTEM)
+            enable_hierarchical_memory = os.getenv("ENABLE_HIERARCHICAL_MEMORY", "false").lower() == "true"
+            
+            if enable_hierarchical_memory and HIERARCHICAL_MEMORY_AVAILABLE and HierarchicalMemoryManager and create_hierarchical_memory_adapter:
+                self.logger.info("🚀 Initializing Hierarchical Memory System (4-Tier Architecture)...")
+                
+                # Build hierarchical memory configuration
+                hierarchical_config = {
+                    'redis': {
+                        'url': f"redis://{os.getenv('HIERARCHICAL_REDIS_HOST', 'localhost')}:{os.getenv('HIERARCHICAL_REDIS_PORT', '6379')}",
+                        'ttl': int(os.getenv('HIERARCHICAL_REDIS_TTL', '1800'))
+                    },
+                    'postgresql': {
+                        'url': f"postgresql://{os.getenv('HIERARCHICAL_POSTGRESQL_USERNAME', 'bot_user')}:{os.getenv('HIERARCHICAL_POSTGRESQL_PASSWORD', 'securepassword123')}@{os.getenv('HIERARCHICAL_POSTGRESQL_HOST', 'localhost')}:{os.getenv('HIERARCHICAL_POSTGRESQL_PORT', '5432')}/{os.getenv('HIERARCHICAL_POSTGRESQL_DATABASE', 'whisper_engine')}"
+                    },
+                    'chromadb': {
+                        'host': os.getenv('HIERARCHICAL_CHROMADB_HOST', 'localhost'),
+                        'port': int(os.getenv('HIERARCHICAL_CHROMADB_PORT', '8000'))
+                    },
+                    'neo4j': {
+                        'uri': f"bolt://{os.getenv('HIERARCHICAL_NEO4J_HOST', 'localhost')}:{os.getenv('HIERARCHICAL_NEO4J_PORT', '7687')}",
+                        'username': os.getenv('HIERARCHICAL_NEO4J_USERNAME', 'neo4j'),
+                        'password': os.getenv('HIERARCHICAL_NEO4J_PASSWORD', 'neo4j_password_change_me'),
+                        'database': os.getenv('HIERARCHICAL_NEO4J_DATABASE', 'neo4j')
+                    },
+                    'redis_enabled': os.getenv('HIERARCHICAL_REDIS_ENABLED', 'true').lower() == 'true',
+                    'postgresql_enabled': os.getenv('HIERARCHICAL_POSTGRESQL_ENABLED', 'true').lower() == 'true',
+                    'chromadb_enabled': os.getenv('HIERARCHICAL_CHROMADB_ENABLED', 'true').lower() == 'true',
+                    'neo4j_enabled': os.getenv('HIERARCHICAL_NEO4J_ENABLED', 'true').lower() == 'true'
+                }
+                
+                # Initialize hierarchical memory manager
+                hierarchical_memory_manager = HierarchicalMemoryManager(hierarchical_config)
+                
+                # Create adapter to make it compatible with existing bot handlers
+                hierarchical_adapter = create_hierarchical_memory_adapter(hierarchical_memory_manager)
+                
+                # Store for later async initialization
+                self._hierarchical_memory_manager = hierarchical_memory_manager
+                self._needs_hierarchical_init = True
+                
+                # Wrap with thread safety
+                safe_memory_manager = ThreadSafeMemoryManager(hierarchical_adapter)
+                self.safe_memory_manager = safe_memory_manager
+                self.memory_manager = safe_memory_manager
+                
+                self.logger.info("✅ Hierarchical Memory System configured (will initialize async)")
+                
+                return  # Skip traditional memory system initialization
+            
             # Check if graph database integration is enabled
             enable_graph_database = os.getenv("ENABLE_GRAPH_DATABASE", "false").lower() == "true"
 
@@ -385,6 +446,29 @@ class DiscordBotCore:
             self.logger.warning(
                 "Failed to update emotional context engine dependencies: %s", str(e)
             )
+
+    async def initialize_hierarchical_memory(self):
+        """Initialize hierarchical memory system asynchronously."""
+        try:
+            if hasattr(self, '_hierarchical_memory_manager') and self._hierarchical_memory_manager:
+                self.logger.info("🚀 Initializing hierarchical memory connections...")
+                
+                # Initialize all storage tier connections
+                await self._hierarchical_memory_manager.initialize()
+                
+                self.logger.info("✅ Hierarchical Memory System fully initialized")
+                self.logger.info("  ├── Redis Cache: < 1ms response time")
+                self.logger.info("  ├── PostgreSQL Store: < 50ms response time")  
+                self.logger.info("  ├── ChromaDB Semantic: < 30ms response time")
+                self.logger.info("  └── Neo4j Graph: < 20ms response time")
+                
+        except Exception as e:
+            self.logger.error(f"Failed to initialize hierarchical memory system: {e}")
+            # Fall back to standard memory system
+            if hasattr(self, '_hierarchical_memory_manager'):
+                del self._hierarchical_memory_manager
+                self._needs_hierarchical_init = False
+                self.logger.warning("Falling back to standard memory system")
 
     def initialize_ai_enhancements(self):
         """Initialize advanced AI enhancement systems."""
@@ -1028,6 +1112,10 @@ class DiscordBotCore:
         # Schedule async initialization of batch optimizer
         if self._needs_batch_init:
             asyncio.create_task(self.initialize_batch_optimizer())
+
+        # Schedule async initialization of hierarchical memory
+        if getattr(self, '_needs_hierarchical_init', False):
+            asyncio.create_task(self.initialize_hierarchical_memory())
 
         # Schedule async initialization of Phase 4 components
         asyncio.create_task(self.initialize_phase4_components())

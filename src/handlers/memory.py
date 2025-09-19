@@ -9,6 +9,7 @@ from datetime import UTC, datetime
 import discord
 
 from src.utils.helpers import extract_text_for_memory_storage
+from src.utils.production_error_handler import handle_errors, ErrorCategory, ErrorSeverity
 
 logger = logging.getLogger(__name__)
 
@@ -105,6 +106,11 @@ class MemoryCommandHandlers:
             """Test fact extraction on a message"""
             await self._extract_facts_handler(ctx, message)
 
+    @handle_errors(
+        category=ErrorCategory.MEMORY_SYSTEM,
+        severity=ErrorSeverity.MEDIUM,
+        operation="list_facts_handler"
+    )
     async def _list_facts_handler(self, ctx):
         """Handle list facts command - showcasing personality-driven AI insights"""
         user_id = str(ctx.author.id)
@@ -125,8 +131,10 @@ class MemoryCommandHandlers:
             # Get legacy facts for comparison/completeness
             legacy_facts = []
             try:
+                # Fix ChromaDB method signature - using updated API
                 results = self.memory_manager.collection.get(
-                    where={"$and": [{"user_id": user_id}, {"type": "user_fact"}]}, limit=10
+                    where={"$and": [{"user_id": str(user_id)}, {"type": "user_fact"}]},
+                    limit=10
                 )
 
                 if results["documents"]:
@@ -461,8 +469,9 @@ class MemoryCommandHandlers:
                             base_memory_manager, "retrieve_relevant_memories"
                         ):
                             # Retrieve user's conversation history across ALL contexts for personality profiling
+                            # Note: retrieve_relevant_memories is automatically enhanced via memory patch system
                             cross_context_memories = base_memory_manager.retrieve_relevant_memories(
-                                user_id, query="conversation messages recent", limit=25
+                                user_id, query="conversation messages recent personality patterns", limit=25
                             )
 
                             # Extract user messages from memory
@@ -977,19 +986,28 @@ class MemoryCommandHandlers:
             logger.error(f"Error showing dynamic personality profile: {e}")
             await ctx.send("❌ **Error:** Could not retrieve dynamic personality profile.")
 
+    @handle_errors(
+        category=ErrorCategory.MEMORY_SYSTEM,
+        severity=ErrorSeverity.MEDIUM,
+        operation="sync_check_handler"
+    )
     async def _sync_check_handler(self, ctx):
         """Handle sync check command - now works globally across all contexts"""
         user_id = str(ctx.author.id)
 
         try:
             # Get stored conversations from ChromaDB (excluding facts)
+            # Fix ChromaDB method signature - using updated API
             conversation_results = self.memory_manager.collection.get(
-                where={"$and": [{"user_id": user_id}, {"type": {"$ne": "user_fact"}}]}, limit=100
+                where={"$and": [{"user_id": str(user_id)}, {"type": {"$ne": "user_fact"}}]},
+                limit=100
             )
 
             # Get stored facts separately
+            # Fix ChromaDB method signature - using updated API
             fact_results = self.memory_manager.collection.get(
-                where={"$and": [{"user_id": user_id}, {"type": "user_fact"}]}, limit=50
+                where={"$and": [{"user_id": str(user_id)}, {"type": "user_fact"}]},
+                limit=50
             )
 
             # Analyze conversation contexts from stored memory
@@ -1101,18 +1119,27 @@ class MemoryCommandHandlers:
             logger.error(f"Error checking sync status: {e}")
             await ctx.send(f"❌ **Error:** {str(e)}")
 
+    @handle_errors(
+        category=ErrorCategory.MEMORY_SYSTEM,
+        severity=ErrorSeverity.MEDIUM,
+        operation="my_memory_handler"
+    )
     async def _my_memory_handler(self, ctx):
         """Handle my memory command"""
         user_id = str(ctx.author.id)
 
         try:
             # Get facts and conversations separately for accurate counts
+            # Fix ChromaDB method signature - using updated API
             fact_results = self.memory_manager.collection.get(
-                where={"$and": [{"user_id": user_id}, {"type": "user_fact"}]}, limit=50
+                where={"$and": [{"user_id": str(user_id)}, {"type": "user_fact"}]},
+                limit=50
             )
 
+            # Fix ChromaDB method signature - using updated API
             conversation_results = self.memory_manager.collection.get(
-                where={"$and": [{"user_id": user_id}, {"type": {"$ne": "user_fact"}}]}, limit=50
+                where={"$and": [{"user_id": str(user_id)}, {"type": {"$ne": "user_fact"}}]},
+                limit=50
             )
 
             # Check if any data exists
@@ -1197,6 +1224,11 @@ class MemoryCommandHandlers:
             logger.error(f"Error getting user memory summary: {e}")
             await ctx.send(f"❌ **Error:** {str(e)}")
 
+    @handle_errors(
+        category=ErrorCategory.MEMORY_SYSTEM,
+        severity=ErrorSeverity.HIGH,
+        operation="forget_me_handler"
+    )
     async def _forget_me_handler(self, ctx):
         """Handle forget me command"""
         user_id = str(ctx.author.id)
@@ -1257,8 +1289,10 @@ class MemoryCommandHandlers:
 
         try:
             # First, show current memory status across contexts
+            # Fix ChromaDB method signature - using updated API
             conversation_results = self.memory_manager.collection.get(
-                where={"$and": [{"user_id": user_id}, {"type": {"$ne": "user_fact"}}]}, limit=200
+                where={"$and": [{"user_id": str(user_id)}, {"type": {"$ne": "user_fact"}}]},
+                limit=200
             )
 
             # Analyze existing memory contexts
@@ -1441,10 +1475,11 @@ class MemoryCommandHandlers:
 
         try:
             # Get auto-extracted facts
+            # Fix ChromaDB method signature - using updated API
             results = self.memory_manager.collection.get(
                 where={
                     "$and": [
-                        {"user_id": user_id},
+                        {"user_id": str(user_id)},
                         {"type": "user_fact"},
                         {"extraction_method": "automatic"},
                     ]

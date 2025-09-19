@@ -442,7 +442,7 @@ class HumanLikeMemorySearch:
 
             for query in human_result.primary_queries:
                 try:
-                    memories = self.base_memory_manager.retrieve_relevant_memories(
+                    memories = await self.base_memory_manager.retrieve_relevant_memories(
                         user_id,
                         query.query,
                         max(3, limit // len(human_result.primary_queries)),
@@ -567,7 +567,7 @@ class HumanLikeMemorySearch:
 
         try:
             # Simple but caring search
-            memories = self.base_memory_manager.retrieve_relevant_memories(
+            memories = await self.base_memory_manager.retrieve_relevant_memories(
                 user_id, message, limit
             )
 

@@ -95,21 +95,33 @@ class EnvironmentManager:
 
     def validate_required_vars(self) -> dict[str, Any]:
         """Validate required environment variables."""
+        # Core required variables (must be present for basic functionality)
         required_vars = {
             "DISCORD_BOT_TOKEN": "Discord bot token is required",
-            "LLM_CHAT_API_URL": "LLM API URL is required",
-            "REDIS_HOST": "Redis host is required",
-            "POSTGRES_HOST": "PostgreSQL host is required",
+            "LLM_CHAT_API_URL": "LLM API URL is required", 
         }
 
-        missing = []
+        # Recommended variables (infrastructure can use defaults but should be set for production)
+        recommended_vars = {
+            "REDIS_HOST": "Redis host is recommended for optimal caching",
+            "POSTGRES_HOST": "PostgreSQL host is recommended for persistent storage",
+        }
+
+        missing_required = []
+        missing_recommended = []
+        
         for var, description in required_vars.items():
             if not os.getenv(var):
-                missing.append(f"{var}: {description}")
+                missing_required.append(f"{var}: {description}")
+                
+        for var, description in recommended_vars.items():
+            if not os.getenv(var):
+                missing_recommended.append(f"{var}: {description}")
 
         return {
-            "valid": len(missing) == 0,
-            "missing": missing,
+            "valid": len(missing_required) == 0,
+            "missing": missing_required,
+            "warnings": missing_recommended,
             "mode": self._detect_environment_mode(),
             "loaded_files": self.loaded_files,
         }

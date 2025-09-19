@@ -170,7 +170,6 @@ LOCAL_LLM_MODEL=microsoft_DialoGPT-medium
 LLM_CHAT_API_URL=local://models
 
 # Database (local file)
-USE_CHROMADB_HTTP=false
 DATABASE_URL=sqlite:///./whisperengine.db
 
 # UI settings
@@ -187,7 +186,6 @@ LLM_MODEL_NAME=gpt-4o-mini
 
 # Database (PostgreSQL)
 DATABASE_URL=postgresql://user:pass@db:5432/whisperengine
-USE_CHROMADB_HTTP=true
 CHROMADB_HOST=chromadb
 CHROMADB_PORT=8000
 
@@ -205,7 +203,6 @@ HF_DATASETS_OFFLINE=1
 TRANSFORMERS_OFFLINE=1
 
 # Local storage only
-USE_CHROMADB_HTTP=false
 DATABASE_URL=sqlite:///./whisperengine.db
 USE_REDIS_CACHE=false
 ```
