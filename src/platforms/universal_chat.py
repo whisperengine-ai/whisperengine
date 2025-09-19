@@ -1159,18 +1159,9 @@ class UniversalChatOrchestrator:
                 logging.error("Final response_text is empty or whitespace-only")
                 response_text = "I apologize, but I'm unable to generate a proper response right now. Please try again."
             
-            # Additional check for suspiciously short responses compared to prompt size
-            prompt_size = len(str(conversation_context))
-            response_size = len(response_text)
-            
-            # If we sent a very large prompt but got a tiny response, it's likely an error
-            if prompt_size > 10000 and response_size < 100:
-                logging.warning(
-                    "Suspicious response: large prompt (%d chars) but tiny response (%d chars) - likely an error",
-                    prompt_size, response_size
-                )
-                logging.warning("Response content: %s", response_text[:200])
-                response_text = "I apologize, but I received an unusually short response that may indicate an error. Please try rephrasing your message or asking something simpler."
+            # Note: Removed overly aggressive prompt-to-response size comparison
+            # The _is_error_response() method above already handles actual error detection
+            # Short responses to short user messages are perfectly normal and valid
 
             end_time = datetime.now()
             generation_time_ms = int((end_time - start_time).total_seconds() * 1000)
