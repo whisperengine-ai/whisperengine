@@ -1,6 +1,8 @@
 services:
   whisperengine-bot:
-    build: .
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
     working_dir: /app
     environment:
       - ENV_MODE=discord
