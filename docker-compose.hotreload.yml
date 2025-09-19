@@ -30,7 +30,7 @@ services:
       sh -c "
         echo '🔥 Hot reload mode: watching for Python changes...' &&
         pip install watchdog &&
-        watchmedo auto-restart --patterns='*.py' --recursive -- python -u run.py
+        /home/appuser/.local/bin/watchmedo auto-restart --patterns='*.py' --recursive -- python -u run.py
       "
       
     labels:

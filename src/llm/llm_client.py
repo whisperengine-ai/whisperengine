@@ -326,6 +326,26 @@ class LLMClient:
         if hasattr(self, "session"):
             self.session.close()
 
+    def cleanup_memory(self):
+        """Cleanup memory resources"""
+        try:
+            # Clear local model cache if using local inference
+            if hasattr(self, 'local_model') and self.local_model is not None:
+                import gc
+                import torch
+                if torch.cuda.is_available():
+                    torch.cuda.empty_cache()
+                gc.collect()
+                
+            # Clear llamacpp cache if available
+            if hasattr(self, 'llamacpp_model') and self.llamacpp_model is not None:
+                import gc
+                gc.collect()
+                
+            self.logger.debug("🧹 LLM memory cleanup completed")
+        except Exception as e:
+            self.logger.warning(f"Memory cleanup failed: {e}")
+
     def _initialize_local_llm(self):
         """Initialize local LLM model for offline inference"""
         try:

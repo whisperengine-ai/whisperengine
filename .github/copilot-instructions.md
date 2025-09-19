@@ -1,145 +1,79 @@
 # WhisperEngine AI Coding Agent Instructions
 
-## Project Architecture Overview
+## Architecture Overview
 
-WhisperEngine is a modular Discord AI companion bot with advanced memory, emotion intelligence, and personality systems. The architecture follows a **handler-manager-core** pattern with strict separation of concerns.
+WhisperEngine is a modular, concurrent Discord AI bot with advanced memory, emotion, and personality systems. The architecture is built for high scalability and reliability, using a **handler-manager-core** pattern and a robust scatter-gather concurrency model.
 
-### Core Components
-- **`src/core/`** - Bot initialization and core Discord integration (`bot.py`, `bot_launcher.py`)
-- **`src/handlers/`** - Discord command handlers (events, admin, memory, voice, etc.)
-- **`src/memory/`** - Multi-layer memory system (conversation cache, user memories, graph database)
-- **`src/personality/`** - AI personality engine and character management
-- **`src/llm/`** - LLM client abstraction supporting multiple providers
-- **`src/conversation/`** - Context managers, thread handling, and boundary management
+### Major Components
+- **`src/core/`**: Bot entry, Discord integration, and main orchestration (`bot.py`, `bot_launcher.py`)
+- **`src/handlers/`**: Modular Discord command/event handlers (one per feature area)
+- **`src/memory/`**: Hierarchical memory system (cache, user, graph, emotion)
+- **`src/personality/`**: Personality engine, character definitions, and prompt templates
+- **`src/llm/`**: LLM abstraction layer (OpenAI, Claude, local, fallback chains)
+- **`src/conversation/`**: Concurrent conversation manager, thread/task workers, context boundaries
 
-## Key Development Patterns
+## Concurrency & Pipeline Patterns
 
-### Entry Points & Initialization
-- **Primary entry**: `run.py` → auto-detects environment → delegates to `src/main.py`
-- **Environment loading**: `env_manager.py` handles `.env` files with precedence rules
-- **Logging setup**: `src/utils/logging_config.py` configures before any imports
+- **Scatter-Gather**: All major AI pipeline phases (emotion, memory, personality, Phase 4) use `asyncio.gather()` or task workers for parallel execution. See `src/handlers/events.py` and `src/conversation/concurrent_conversation_manager.py`.
+- **Task Workers**: Background processors for conversation, session, metrics, and cache. ThreadPool/ProcessPool for CPU/IO scaling.
+- **ConcurrentConversationManager**: Centralizes high-throughput message processing, load balancing, and resource management.
 
-### Handler Architecture
-All Discord interactions use modular handlers inheriting from base patterns:
-```python
-class ExampleCommandHandlers:
-    def __init__(self, bot: DiscordBotCore):
-        self.bot = bot
-        
-    @commands.hybrid_command()
-    async def example_command(self, ctx):
-        # Pattern: validate → process → respond
-```
+## Docker & Development Workflow
 
-### Error Handling System
-Use production error decorators extensively:
-```python
-@handle_errors(
-    category=ErrorCategory.CONVERSATION,
-    severity=ErrorSeverity.MEDIUM,
-    graceful_degradation=GracefulDegradation.FALLBACK_RESPONSE
-)
-```
-
-### Memory Integration Pattern
-Always use the integrated memory manager for user data:
-```python
-# Get memory manager instance
-memory_manager = self.bot.memory_manager
-# Store/retrieve using user_id as key
-await memory_manager.store_memory(user_id, memory_data)
-```
-
-## Build & Test Workflows
-
-### Running Tests
-- **Quick test run**: `./scripts/run_tests.sh`
-- **Category-specific**: `./scripts/run_tests.sh unit` (unit|integration|llm|slow)
-- **With coverage**: Tests auto-generate reports to `test_report_TIMESTAMP.json`
-- **Framework**: pytest with asyncio support, markers: `@pytest.mark.unit`, `@pytest.mark.integration`
-
-### Docker Development
-- **Development**: `docker-compose -f docker-compose.dev.yml up`
-- **Production**: `docker-compose -f docker-compose.prod.yml up`
-- **With monitoring**: `docker-compose up` (includes health checks on port 9090)
-
-### Bot Management Script
-`./bot.sh` is the unified management interface:
-- `./bot.sh run` - Start development server
-- `./bot.sh build-push v1.0.0` - Build and push container images
-- `./bot.sh health` - Check system health
-- `./bot.sh logs` - Tail application logs
+- **Entry Point**: `run.py` → `src/main.py` (auto-detects environment, loads config, sets up logging)
+- **Bot Management**: Use `./bot.sh` for run, build, health, logs, and Docker orchestration
+- **Development Mode**: `./bot.sh start dev` (hot-reload, mounted code, debug logging)
+  - **Equivalent Docker Command**: `docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build`
+- **Testing**: `./scripts/run_tests.sh` (unit, integration, LLM, performance)
+- **Docker**: Compose files for dev/prod/monitoring; health server on port 9090
 
 ## Project-Specific Conventions
 
-### Module Organization
-- **Handlers**: `src/handlers/` - One handler per Discord feature area
-- **Managers**: Classes ending in `Manager` handle business logic and state
-- **Cores**: `*Core` classes provide foundational services
-- **Utils**: `src/utils/` - Cross-cutting concerns (logging, health, monitoring)
+- **Handlers**: One per Discord feature, inherit from base, register in `src/main.py`
+- **Managers**: `*Manager` classes for business logic/state
+- **Memory**: Always use the integrated memory manager (never direct DB calls)
+- **Error Handling**: Use `@handle_errors` decorator for all production code
+- **Config**: Use `env_manager.py` and `src/utils/configuration_validator.py` for environment and validation
 
-### Configuration Management
-- **Environment**: Auto-detection between development/production modes
-- **Multi-entity support**: Use `MULTI_ENTITY_MODE=true` for multiple character instances
-- **Config validation**: `src/utils/configuration_validator.py` validates startup config
+## Integration Points
 
-### Memory System Layers
-1. **Conversation Cache** (`src/memory/conversation_cache.py`) - Short-term context
-2. **User Memory Manager** (`src/memory/memory_manager.py`) - Long-term user data
-3. **Graph Memory** (`src/memory/integrated_memory_manager.py`) - Relationship mapping
-4. **Emotion Management** (`src/utils/emotion_manager.py`) - Emotional state tracking
+- **LLM**: `src/llm/llm_client.py` (multi-provider, fallback, local support)
+- **Memory**: Multi-layer (cache, user, graph, emotion) with strict API boundaries
+- **Personality**: `characters/` YAML, `prompts/`, and `src/characters/bridge.py`
+- **Voice**: ElevenLabs, PyNaCl, emotion-driven voice in `src/handlers/voice.py`
+- **Monitoring**: `src/monitoring/`, Discord admin commands, health server
 
-### Character & Personality System
-- **Character definitions**: `characters/` directory with YAML configurations
-- **Personality prompts**: `prompts/` directory with role-specific templates
-- **Character bridge**: `src/characters/bridge.py` integrates personality with memory
+## Examples & Patterns
 
-## Critical Integration Points
-
-### LLM Provider Abstraction
-`src/llm/llm_client.py` provides unified interface supporting:
-- OpenAI API
-- Anthropic Claude
-- Local models via llamacpp
-- Fallback chains for reliability
-
-### Health & Monitoring
-- **Health server**: Runs on port 9090, endpoint `/health`
-- **Monitoring integration**: `src/monitoring/` provides metrics collection
-- **Production monitoring**: `src/handlers/monitoring_commands.py` for Discord admin commands
-
-### Voice Integration
-- **Voice handlers**: `src/handlers/voice.py` with ElevenLabs integration
-- **Audio processing**: Uses PyNaCl for Discord voice channel support
-- **Voice personality**: Integrates with character emotion states
-
-## Development Guidelines
-
-### Adding New Features
-1. Create handler in `src/handlers/` following existing patterns
-2. Add business logic to appropriate manager class
-3. Update `src/main.py` ModularBotManager to register handler
-4. Add tests to `tests/` with appropriate markers
-5. Update configuration validation if new env vars added
-
-### Memory Operations
-Always use the integrated memory system - never direct database calls:
+**Parallel AI Component Processing** (scatter-gather):
 ```python
-# Correct pattern
-await self.bot.memory_manager.store_conversation_memory(user_id, message_data)
-
-# Avoid direct calls to
-# await chromadb.add(...)  # Wrong!
+results = await asyncio.gather(
+    self._analyze_emotion(...),
+    self._analyze_personality(...),
+    self._process_phase4(...),
+    ...
+)
 ```
 
-### Error Recovery
-Production deployments use graceful degradation. When adding error-prone operations, wrap with appropriate error handling and fallback strategies.
+**Memory Operations**:
+```python
+# Always use the memory manager
+await self.bot.memory_manager.store_conversation_memory(user_id, message_data)
+# Never call DB/Chroma/Neo4j directly
+```
 
-## Testing Approach
+**Handler Registration**:
+```python
+# In src/main.py
+bot_manager.register_handler(EventsHandler)
+```
 
-- **Unit tests**: Mock external dependencies, focus on business logic
-- **Integration tests**: Test component interactions with real services
-- **LLM tests**: Validate AI integration points (marked `@pytest.mark.llm`)
-- **Performance tests**: Located in `utilities/performance/`
+## Troubleshooting & Best Practices
 
-Use the test runner script which handles environment setup and parallel execution automatically.
+- Use the concurrent conversation manager for all message processing (not just sequential awaits)
+- Always wrap error-prone code with `@handle_errors` for graceful degradation
+- For new features, follow the handler-manager-core pattern and update config validation
+- Use Docker and scripts for consistent local/dev/prod workflows
+
+---
+If any section is unclear or incomplete, please provide feedback for further refinement.

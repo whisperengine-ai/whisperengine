@@ -190,7 +190,7 @@ class ProductionSystemIntegrator:
                     def __init__(self, memory_manager):
                         self.memory_manager = memory_manager
 
-                    def store_conversation(
+                    async def store_conversation(
                         self,
                         user_id: str,
                         message: str,
@@ -199,17 +199,22 @@ class ProductionSystemIntegrator:
                     ):
                         """Adapt to UserMemoryManager.store_conversation interface"""
                         try:
+                            # Merge channel_id into metadata for hierarchical memory compatibility
                             channel_id = (
                                 metadata.get("channel_id", "production")
                                 if metadata
                                 else "production"
                             )
-                            self.memory_manager.store_conversation(
+                            
+                            # Prepare metadata with channel_id included
+                            full_metadata = metadata or {}
+                            full_metadata['channel_id'] = channel_id
+                            
+                            await self.memory_manager.store_conversation(
                                 user_id=user_id,
                                 user_message=message,
                                 bot_response=response,
-                                channel_id=channel_id,
-                                metadata=metadata,
+                                metadata=full_metadata,
                             )
                             return True
                         except Exception as e:
@@ -219,7 +224,7 @@ class ProductionSystemIntegrator:
                     async def store_memories(self, memories):
                         """Batch store multiple memories"""
                         for memory in memories:
-                            self.store_conversation(**memory)
+                            await self.store_conversation(**memory)
                         return True
 
                     def retrieve_memories(self, query):
