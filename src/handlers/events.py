@@ -39,6 +39,7 @@ from src.utils.context_size_manager import (
     truncate_recent_messages,
     count_context_tokens,
 )
+from src.conversation.boundary_manager import ConversationBoundaryManager
 from src.utils.helpers import (
     add_debug_info_to_response,
     extract_text_for_memory_storage,
@@ -128,6 +129,11 @@ class BotEventHandlers:
         self.external_emotion_ai = getattr(bot_core, "external_emotion_ai", None)
         # Redis profile/memory cache (if enabled)
         self.profile_memory_cache = getattr(bot_core, "profile_memory_cache", None)
+        
+        # Initialize Conversation Boundary Manager for intelligent message summarization
+        self.boundary_manager = ConversationBoundaryManager(
+            summarization_threshold=8  # Start summarizing after 8 messages
+        )
 
         # Configuration flags - unified AI system always enabled
         self.voice_support_enabled = getattr(bot_core, "voice_support_enabled", False)
@@ -509,13 +515,33 @@ class BotEventHandlers:
             relevant_memories = []
             emotion_context = ""
 
-        # Get recent conversation history
-        recent_messages = await self._get_recent_messages(reply_channel, user_id, message.id)
+        # Get recent conversation history - try intelligent summarization first
+        conversation_summary = await self._get_intelligent_conversation_summary(reply_channel, user_id, message)
+        
+        if conversation_summary:
+            # Use intelligent summarization instead of full message history
+            logger.info(f"✅ Using intelligent conversation summary instead of message truncation for user {user_id}")
+            recent_messages = []  # Empty list since we have summary
+            # Add summary as a system context message
+            conversation_summary_context = [
+                {"role": "system", "content": f"Previous conversation summary: {conversation_summary}"}
+            ]
+        else:
+            # Fall back to traditional message loading
+            recent_messages = await self._get_recent_messages(reply_channel, user_id, message.id)
+            conversation_summary_context = []
 
         # Build conversation context
         conversation_context = await self._build_conversation_context(
             message, relevant_memories, emotion_context, recent_messages, enhanced_system_prompt
         )
+        
+        # Add intelligent conversation summary if available
+        if conversation_summary_context:
+            # Insert summary before user messages but after system prompts
+            # Find where to insert (after system messages, before user messages)
+            insert_pos = len([ctx for ctx in conversation_context if ctx["role"] == "system"])
+            conversation_context[insert_pos:insert_pos] = conversation_summary_context
 
         external_emotion_data = None
         phase2_context = None
@@ -724,13 +750,34 @@ class BotEventHandlers:
             relevant_memories = []
             emotion_context = ""
 
-        # Get recent conversation history (guild-specific)
-        recent_messages = await self._get_recent_messages(reply_channel, user_id, message.id)
+        # Get recent conversation history (guild-specific) - try intelligent summarization first
+        conversation_summary = await self._get_intelligent_conversation_summary(reply_channel, user_id, message)
+        
+        if conversation_summary:
+            # Use intelligent summarization instead of full message history
+            logger.info(f"✅ Using intelligent conversation summary for guild message from user {user_id}")
+            recent_messages = []  # Empty list since we have summary
+            # Add summary as a system context message
+            conversation_summary_context = [
+                {"role": "system", "content": f"Previous conversation summary: {conversation_summary}"}
+            ]
+        else:
+            # Fall back to traditional message loading
+            recent_messages = await self._get_recent_messages(reply_channel, user_id, message.id)
+            conversation_summary_context = []
 
         # Build conversation context
         conversation_context = await self._build_conversation_context(
             message, relevant_memories, emotion_context, recent_messages, None, content
         )
+        
+        # Add intelligent conversation summary if available
+        if conversation_summary_context:
+            # Insert summary before user messages but after system prompts
+            # Find where to insert (after system messages, before user messages)
+            insert_pos = len([ctx for ctx in conversation_context if ctx["role"] == "system"])
+            conversation_context[insert_pos:insert_pos] = conversation_summary_context
+            
         logger.info(f"[CONV-CTX] Built conversation context for message_id={message.id} user_id={user_id} context_type={type(conversation_context)} context_preview={str(conversation_context)[:120]}")
 
         external_emotion_data = None
@@ -775,6 +822,35 @@ class BotEventHandlers:
             getattr(self, '_last_dynamic_personality_context', None),
             content,
         )
+
+    async def _get_intelligent_conversation_summary(self, channel, user_id, message):
+        """Use boundary manager to create intelligent conversation summary instead of crude truncation."""
+        try:
+            # Convert timezone-aware datetime to timezone-naive for boundary manager compatibility
+            timestamp = message.created_at
+            if timestamp.tzinfo is not None:
+                timestamp = timestamp.replace(tzinfo=None)
+                
+            # Process the current message with boundary manager
+            session = await self.boundary_manager.process_message(
+                user_id=str(user_id),
+                channel_id=str(channel.id),
+                message_id=str(message.id),
+                message_content=message.content,
+                timestamp=timestamp
+            )
+            
+            # Check if we have a conversation summary from boundary manager
+            if session.context_summary and len(session.context_summary) > 20:
+                logger.info(f"🧠 Using intelligent conversation summary for user {user_id}: {len(session.context_summary)} chars")
+                return session.context_summary
+            
+            # If no summary yet, fall back to recent messages
+            return None
+            
+        except Exception as e:
+            logger.warning(f"Boundary manager summarization failed for user {user_id}: {e}")
+            return None
 
     async def _get_recent_messages(self, channel, user_id, exclude_message_id):
         """Get recent conversation messages for context."""
