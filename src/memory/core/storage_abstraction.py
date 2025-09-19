@@ -87,6 +87,34 @@ class HierarchicalMemoryManager:
         
         self.metrics = StorageMetrics(0, [], 0, 0.0, 0)
         self.initialized = False
+        
+        # Create embedding function using same logic as memory manager
+        self.embedding_function = self._create_embedding_function()
+    
+    def _create_embedding_function(self):
+        """Create embedding function for ChromaDB collections"""
+        import os
+        from chromadb.utils import embedding_functions
+        
+        use_local_models = os.getenv("USE_LOCAL_MODELS", "false").lower() == "true"
+        local_models_dir = os.getenv("LOCAL_MODELS_DIR", "./models")
+        embedding_model = os.getenv("LLM_LOCAL_EMBEDDING_MODEL", "all-MiniLM-L6-v2")
+
+        if use_local_models and os.path.exists(
+            os.path.join(local_models_dir, embedding_model)
+        ):
+            # Use bundled local model
+            model_path = os.path.join(local_models_dir, embedding_model)
+            logger.info(f"HierarchicalMemory: Using bundled local embedding model: {model_path}")
+            return embedding_functions.SentenceTransformerEmbeddingFunction(
+                model_name=model_path
+            )
+        else:
+            # Use online model (will download if not cached)
+            logger.info(f"HierarchicalMemory: Using online embedding model: {embedding_model}")
+            return embedding_functions.SentenceTransformerEmbeddingFunction(
+                model_name=embedding_model
+            )
     
     async def initialize(self):
         """Initialize all storage tiers"""
@@ -159,7 +187,8 @@ class HierarchicalMemoryManager:
             chroma_config = self.config.get('chromadb', {})
             self.tier3_semantic = ChromaDBSemanticSummaries(
                 host=chroma_config.get('host', 'localhost'),
-                port=chroma_config.get('port', 8000)
+                port=chroma_config.get('port', 8000),
+                embedding_function=self.embedding_function
             )
             await self.tier3_semantic.initialize()
             logger.info("✅ Tier 3 (ChromaDB semantic) initialized")
