@@ -161,8 +161,12 @@ def setup_logging(
 
     # Console Handler - Always enabled
     console_handler = logging.StreamHandler(sys.stdout)
-    if environment == "development":
-        # Use colored formatter for development
+    
+    # Allow override to force human-readable logs via environment variable
+    force_readable_logs = os.getenv("FORCE_READABLE_LOGS", "false").lower() == "true"
+    
+    if environment == "development" or force_readable_logs:
+        # Use colored formatter for development or when explicitly requested
         console_formatter = ColoredConsoleFormatter(
             "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
         )

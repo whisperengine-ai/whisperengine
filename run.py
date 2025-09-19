@@ -21,7 +21,8 @@ if not load_environment():  # Auto-detects development vs production mode
 from src.utils.logging_config import setup_logging
 
 debug_mode = os.getenv("DEBUG_MODE", "false").lower() == "true"
-environment = os.getenv("ENVIRONMENT", "development")
+# Check both ENVIRONMENT and ENV_MODE for compatibility
+environment = os.getenv("ENVIRONMENT") or os.getenv("ENV_MODE", "development")
 log_dir = os.getenv("LOG_DIR", "logs")
 app_name = os.getenv("LOG_APP_NAME", "discord_bot")
 
