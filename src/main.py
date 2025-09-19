@@ -35,7 +35,6 @@ from src.utils.production_error_handler import (
     ErrorCategory, ErrorSeverity, handle_errors, 
     error_handler, GracefulDegradation
 )
-from src.utils.configuration_validator import config_validator
 
 # Logging is already configured by the root launcher
 logger = logging.getLogger(__name__)

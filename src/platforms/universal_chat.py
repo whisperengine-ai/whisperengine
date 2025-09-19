@@ -800,7 +800,7 @@ class UniversalChatOrchestrator:
             template_context = {}
             if hasattr(memory_manager, "get_emotion_context"):
                 try:
-                    template_context["emotional_intelligence"] = memory_manager.get_emotion_context(
+                    template_context["emotional_intelligence"] = await memory_manager.get_emotion_context(
                         message.user_id
                     )
                 except Exception as e:
@@ -822,8 +822,11 @@ class UniversalChatOrchestrator:
             relevant_memories = []
             if hasattr(memory_manager, "retrieve_context_aware_memories"):
                 try:
-                    relevant_memories = memory_manager.retrieve_context_aware_memories(
-                        message.user_id, message.content, context=message_context
+                    relevant_memories = await memory_manager.retrieve_context_aware_memories(
+                        user_id=message.user_id, 
+                        current_query=message.content, 
+                        max_memories=10,
+                        context=message_context
                     )
                 except Exception as e:
                     logging.warning(f"Context-aware memory retrieval failed: {e}")
@@ -832,7 +835,7 @@ class UniversalChatOrchestrator:
             emotion_context = {}
             if hasattr(memory_manager, "get_emotion_context"):
                 try:
-                    emotion_context = memory_manager.get_emotion_context(message.user_id)
+                    emotion_context = await memory_manager.get_emotion_context(message.user_id)
                 except Exception as e:
                     logging.warning(f"Emotion context retrieval failed: {e}")
 
@@ -840,7 +843,7 @@ class UniversalChatOrchestrator:
             chromadb_memories = []
             if safe_memory_manager and hasattr(safe_memory_manager, "retrieve_relevant_memories"):
                 try:
-                    chromadb_memories = safe_memory_manager.retrieve_relevant_memories(
+                    chromadb_memories = await safe_memory_manager.retrieve_relevant_memories(
                         message.user_id, message.content, limit=5
                     )
 

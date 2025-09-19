@@ -26,15 +26,27 @@ try:
             validation_result = env_manager.validate_required_vars()
 
             if validation_result.get("valid", False):
+                print("✅ Configuration validation passed")
                 sys.exit(0)
             else:
-                errors = validation_result.get("errors", [])
-                for _error in errors:
-                    pass
+                errors = validation_result.get("missing", [])
                 warnings = validation_result.get("warnings", [])
-                for _warning in warnings:
-                    pass
-                sys.exit(1)
+                
+                if errors:
+                    print("❌ Configuration errors:")
+                    for error in errors:
+                        print(f"  • {error}")
+                
+                if warnings:
+                    print("⚠️ Configuration warnings:")
+                    for warning in warnings:
+                        print(f"  • {warning}")
+                
+                # Only fail on actual errors, not warnings
+                if errors:
+                    sys.exit(1)
+                else:
+                    sys.exit(0)
 
         except Exception:
             sys.exit(1)

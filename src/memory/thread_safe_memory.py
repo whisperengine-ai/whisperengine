@@ -87,33 +87,91 @@ class ThreadSafeMemoryManager:
         operation_id = f"store_{user_id}_{int(time.time() * 1000)}"
         user_lock = self._get_user_lock(user_id)
 
-        def _store_with_retry():
+        # Check if the base manager has async store_conversation
+        if hasattr(self.base_memory_manager, 'store_conversation') and asyncio.iscoroutinefunction(self.base_memory_manager.store_conversation):
+            # Async hierarchical memory manager - handle directly in async context
             max_retries = 3
             for attempt in range(max_retries):
                 try:
                     with user_lock:
                         with self._track_operation(operation_id):
-                            # Use full context storage for graph memory and emotion processing
-                            if hasattr(self.base_memory_manager, 'store_conversation_with_full_context'):
-                                # Pass display_name if available in kwargs for emotion processing
-                                display_name = kwargs.get('display_name', kwargs.get('author_name'))
-                                return self.base_memory_manager.store_conversation_with_full_context(
-                                    user_id, user_message, bot_response, display_name
+                            # Check if this is hierarchical memory manager that needs metadata format
+                            import inspect
+                            sig = inspect.signature(self.base_memory_manager.store_conversation)
+                            if 'metadata' in sig.parameters and 'channel_id' not in sig.parameters:
+                                # Hierarchical memory manager - move channel_id to metadata
+                                metadata = kwargs.get('metadata', {})
+                                if 'channel_id' in kwargs:
+                                    metadata['channel_id'] = kwargs['channel_id']
+                                if 'pre_analyzed_emotion_data' in kwargs:
+                                    metadata['emotion_data'] = kwargs['pre_analyzed_emotion_data']
+                                
+                                return await self.base_memory_manager.store_conversation(
+                                    user_id=user_id, 
+                                    user_message=user_message, 
+                                    bot_response=bot_response, 
+                                    metadata=metadata
                                 )
                             else:
-                                # Fallback to basic storage if full context not available
-                                return self.base_memory_manager.store_conversation(
+                                # Legacy async manager - pass all kwargs
+                                return await self.base_memory_manager.store_conversation(
                                     user_id, user_message, bot_response, **kwargs
                                 )
                 except Exception as e:
                     if attempt == max_retries - 1:
                         raise
                     logger.warning(f"Storage attempt {attempt + 1} failed: {e}")
-                    time.sleep(0.1 * (attempt + 1))  # Exponential backoff
+                    await asyncio.sleep(0.1 * (attempt + 1))  # Exponential backoff
             return False
+        else:
+            # Sync memory manager - use thread pool executor
+            def _store_with_retry():
+                max_retries = 3
+                for attempt in range(max_retries):
+                    try:
+                        with user_lock:
+                            with self._track_operation(operation_id):
+                                # Use full context storage for graph memory and emotion processing
+                                if hasattr(self.base_memory_manager, 'store_conversation_with_full_context'):
+                                    # Pass display_name if available in kwargs for emotion processing
+                                    display_name = kwargs.get('display_name', kwargs.get('author_name'))
+                                    return self.base_memory_manager.store_conversation_with_full_context(
+                                        user_id, user_message, bot_response, display_name
+                                    )
+                                else:
+                                    # Check if this is hierarchical memory manager that needs metadata format
+                                    if hasattr(self.base_memory_manager, 'store_conversation'):
+                                        import inspect
+                                        sig = inspect.signature(self.base_memory_manager.store_conversation)
+                                        if 'metadata' in sig.parameters and 'channel_id' not in sig.parameters:
+                                            # Hierarchical memory manager - move channel_id to metadata
+                                            metadata = kwargs.get('metadata', {})
+                                            if 'channel_id' in kwargs:
+                                                metadata['channel_id'] = kwargs['channel_id']
+                                            if 'pre_analyzed_emotion_data' in kwargs:
+                                                metadata['emotion_data'] = kwargs['pre_analyzed_emotion_data']
+                                            
+                                            # Sync hierarchical memory manager
+                                            return self.base_memory_manager.store_conversation(
+                                                user_id=user_id, 
+                                                user_message=user_message, 
+                                                bot_response=bot_response, 
+                                                metadata=metadata
+                                            )
+                                        else:
+                                            # Legacy memory manager - pass all kwargs
+                                            return self.base_memory_manager.store_conversation(
+                                                user_id, user_message, bot_response, **kwargs
+                                            )
+                    except Exception as e:
+                        if attempt == max_retries - 1:
+                            raise
+                        logger.warning(f"Storage attempt {attempt + 1} failed: {e}")
+                        time.sleep(0.1 * (attempt + 1))  # Exponential backoff
+                return False
 
-        # Run in thread pool to avoid blocking event loop
-        return await asyncio.get_event_loop().run_in_executor(self._executor, _store_with_retry)
+            # Run in thread pool to avoid blocking event loop
+            return await asyncio.get_event_loop().run_in_executor(self._executor, _store_with_retry)
 
     async def retrieve_memories_safe(self, user_id: str, query: str, limit: int = 10) -> list:
         """Thread-safe memory retrieval"""

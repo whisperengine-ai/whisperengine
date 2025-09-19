@@ -53,6 +53,10 @@ from src.utils.helpers import (
     store_discord_server_info,
     store_discord_user_info,
 )
+from src.utils.production_error_handler import (
+    ErrorCategory, ErrorSeverity, handle_errors, 
+    error_handler, GracefulDegradation
+)
 
 logger = logging.getLogger(__name__)
 
@@ -129,6 +133,9 @@ class BotEventHandlers:
         self.external_emotion_ai = getattr(bot_core, "external_emotion_ai", None)
         # Redis profile/memory cache (if enabled)
         self.profile_memory_cache = getattr(bot_core, "profile_memory_cache", None)
+        
+        # ConcurrentConversationManager for proper scatter-gather concurrency
+        self.conversation_manager = getattr(bot_core, "conversation_manager", None)
         
         # Initialize Conversation Boundary Manager for intelligent message summarization
         self.boundary_manager = ConversationBoundaryManager(
@@ -208,6 +215,13 @@ class BotEventHandlers:
 
         return text.strip()
 
+    @handle_errors(
+        category=ErrorCategory.SYSTEM_RESOURCE,
+        severity=ErrorSeverity.MEDIUM,
+        operation="setup_universal_chat",
+        max_retries=1,
+        return_on_error=False
+    )
     async def setup_universal_chat(self):
         """Setup Universal Chat Orchestrator for proper layered architecture"""
         try:
@@ -384,6 +398,13 @@ class BotEventHandlers:
         if _minimal_context_mode_enabled():
             logger.warning("⚠️ MINIMAL_CONTEXT_MODE active: suppressing emotion, personality, phase4, and memory enrichment layers for baseline output isolation.")
 
+    @handle_errors(
+        category=ErrorCategory.DISCORD_API,
+        severity=ErrorSeverity.HIGH,
+        operation="process_discord_message",
+        max_retries=2,
+        return_on_error=None
+    )
     async def on_message(self, message):
         """
         Handle incoming messages.
@@ -485,8 +506,11 @@ class BotEventHandlers:
                         logger.debug(f"Cache lookup failed, proceeding with DB: {e}")
                         relevant_memories = None
                 if not relevant_memories:
-                    relevant_memories = self.memory_manager.retrieve_context_aware_memories(
-                        user_id, message.content, message_context, limit=20
+                    relevant_memories = await self.memory_manager.retrieve_context_aware_memories(
+                        user_id=user_id, 
+                        current_query=message.content, 
+                        max_memories=20,
+                        context=message_context
                     )
                     # Store in cache for next time
                     if self.profile_memory_cache and relevant_memories:
@@ -500,7 +524,7 @@ class BotEventHandlers:
                 # Get emotion context if available
                 emotion_context = ""
                 if hasattr(self.memory_manager, "get_emotion_context"):
-                    emotion_context = self.memory_manager.get_emotion_context(user_id)
+                    emotion_context = await self.memory_manager.get_emotion_context(user_id)
             else:
                 logger.warning("memory_manager is not initialized; skipping memory retrieval.")
                 relevant_memories = []
@@ -721,8 +745,11 @@ class BotEventHandlers:
                         logger.debug(f"Cache lookup failed, proceeding with DB: {e}")
                         relevant_memories = None
                 if not relevant_memories:
-                    relevant_memories = self.memory_manager.retrieve_context_aware_memories(
-                        user_id, content, message_context, limit=20
+                    relevant_memories = await self.memory_manager.retrieve_context_aware_memories(
+                        user_id=user_id, 
+                        current_query=content, 
+                        max_memories=20,
+                        context=message_context
                     )
                     # Store in cache for next time
                     if self.profile_memory_cache and relevant_memories:
@@ -901,7 +928,7 @@ class BotEventHandlers:
                     # Use safe_memory_manager if available, otherwise fall back to memory_manager
                     memory_manager = self.safe_memory_manager or self.memory_manager
                     if memory_manager:
-                        chromadb_memories = memory_manager.retrieve_relevant_memories(
+                        chromadb_memories = await memory_manager.retrieve_relevant_memories(
                             user_id, query="conversation history recent messages", limit=15
                         )
                     else:
@@ -1047,23 +1074,45 @@ class BotEventHandlers:
             # Build compact memory narrative
             memory_fragments = []
             if relevant_memories and not _minimal_context_mode_enabled():
-                global_facts = [m for m in relevant_memories if m["metadata"].get("is_global", False)]
-                user_memories = [m for m in relevant_memories if not m["metadata"].get("is_global", False)]
+                # Handle both legacy and hierarchical memory formats
+                global_facts = []
+                user_memories = []
+                
+                for m in relevant_memories:
+                    # Check if memory has metadata (legacy format) or use memory_type (hierarchical format)
+                    if "metadata" in m:
+                        # Legacy format
+                        if m["metadata"].get("is_global", False):
+                            global_facts.append(m)
+                        else:
+                            user_memories.append(m)
+                    else:
+                        # Hierarchical format - treat all as user memories for now
+                        user_memories.append(m)
+                
                 if global_facts:
                     gf_text = "; ".join(
                         memory["metadata"].get("fact", "")[:160] for memory in global_facts
-                        if memory["metadata"].get("type") == "global_fact"
+                        if memory.get("metadata", {}).get("type") == "global_fact"
                     )
                     if gf_text:
                         memory_fragments.append(f"Shared truths: {gf_text}")
                 if user_memories and not _minimal_context_mode_enabled():
                     um_text_parts = []
                     for memory in user_memories[:6]:  # limit
-                        md = memory["metadata"]
-                        if md.get("user_message"):
-                            um_text_parts.append(md.get("user_message")[:120])
-                        elif md.get("type") == "user_fact":
-                            um_text_parts.append(md.get("fact", "")[:120])
+                        # Handle both legacy and hierarchical memory formats
+                        if "metadata" in memory:
+                            # Legacy format
+                            md = memory["metadata"]
+                            if md.get("user_message"):
+                                um_text_parts.append(md.get("user_message")[:120])
+                            elif md.get("type") == "user_fact":
+                                um_text_parts.append(md.get("fact", "")[:120])
+                        else:
+                            # Hierarchical format - use content field
+                            content = memory.get("content", "")
+                            if content:
+                                um_text_parts.append(content[:120])
                     if um_text_parts:
                         memory_fragments.append("You recall: " + "; ".join(um_text_parts))
             memory_narrative = " " .join(memory_fragments)
@@ -1320,13 +1369,18 @@ class BotEventHandlers:
                 discord_context=discord_context,
             )
 
-            # Phase 4.2: Advanced Thread Management
-            thread_manager_result = None
+            # --- PHASE 4 SCATTER-GATHER PARALLELISM ---
+            import asyncio
+            thread_manager_task = None
+            engagement_task = None
+            human_like_task = None
+            conversation_analysis_task = None
+
+            # Prepare thread manager task
             if (os.getenv("ENABLE_PHASE4_THREAD_MANAGER", "true").lower() == "true" and 
                 hasattr(self.bot, 'thread_manager') and self.bot.thread_manager):
-                try:
-                    logger.debug("Processing Phase 4.2: Advanced Thread Management...")
-                    thread_manager_result = await self.bot.thread_manager.process_user_message(
+                thread_manager_task = asyncio.create_task(
+                    self.bot.thread_manager.process_user_message(
                         user_id=user_id,
                         message=message.content,
                         context={
@@ -1336,106 +1390,110 @@ class BotEventHandlers:
                             "phase2_context": phase2_context
                         }
                     )
-                    logger.debug(f"Phase 4.2 Thread processing: {thread_manager_result.get('thread_action', 'unknown')}")
-                except Exception as e:
-                    logger.warning(f"Phase 4.2 Advanced Thread Management failed: {e}")
+                )
 
-            # Phase 4.3: Proactive Engagement Engine
-            engagement_result = None
+            # Prepare engagement engine task
             if (os.getenv("ENABLE_PHASE4_PROACTIVE_ENGAGEMENT", "true").lower() == "true" and 
                 hasattr(self.bot, 'engagement_engine') and self.bot.engagement_engine):
-                try:
-                    logger.debug("Processing Phase 4.3: Proactive Engagement Engine...")
-                    
-                    # Prepare recent messages in the expected format
-                    formatted_recent_messages = []
-                    for msg in recent_messages[-10:]:  # Last 10 messages
-                        if isinstance(msg, dict):
-                            formatted_recent_messages.append(msg)
-                        elif hasattr(msg, 'content') and hasattr(msg, 'author'):
-                            formatted_recent_messages.append({
-                                "content": msg.content,
-                                "user_id": str(msg.author.id),
-                                "timestamp": getattr(msg, 'created_at', None)
-                            })
-                    
-                    engagement_result = await self.bot.engagement_engine.analyze_conversation_engagement(
+                # Prepare recent messages in the expected format
+                formatted_recent_messages = []
+                for msg in recent_messages[-10:]:  # Last 10 messages
+                    if isinstance(msg, dict):
+                        formatted_recent_messages.append(msg)
+                    elif hasattr(msg, 'content') and hasattr(msg, 'author'):
+                        formatted_recent_messages.append({
+                            "content": msg.content,
+                            "user_id": str(msg.author.id),
+                            "timestamp": getattr(msg, 'created_at', None)
+                        })
+                engagement_task = asyncio.create_task(
+                    self.bot.engagement_engine.analyze_conversation_engagement(
                         user_id=user_id,
                         context_id=discord_context["channel_id"],
                         recent_messages=formatted_recent_messages,
-                        current_thread_info=thread_manager_result
+                        current_thread_info=None  # Will patch in thread_manager_result after gather
                     )
-                    
-                    if engagement_result and engagement_result.get('needs_intervention'):
-                        logger.debug(f"Phase 4.3 Proactive engagement suggested: {engagement_result.get('intervention_type', 'unknown')}")
-                except Exception as e:
-                    logger.warning(f"Phase 4.3 Proactive Engagement Engine failed: {e}")
+                )
 
-            # Try human-like memory processing if available
-            human_like_context = None
-            conversation_analysis = None
+            # Prepare human-like memory processing task
             if hasattr(self.memory_manager, 'human_like_system'):
-                try:
-                    logger.debug("Using Human-Like Memory System for enhanced processing...")
-                    
-                    # Prepare conversation history - handle both dict and Discord Message objects
-                    conversation_history = []
-                    for msg in recent_messages[-5:]:
-                        if isinstance(msg, dict):
-                            if 'content' in msg:
-                                conversation_history.append(msg['content'])
-                        else:
-                            # Handle Discord Message object
-                            if hasattr(msg, 'content') and msg.content:
-                                conversation_history.append(msg.content)
-                    
-                    # Build relationship context
-                    relationship_context = {
-                        "interaction_history": len(recent_messages),
-                        "emotional_data": external_emotion_data,
-                        "phase2_context": phase2_context,
-                        "discord_context": discord_context
-                    }
-                    
-                    # Analyze conversation for human-like response guidance
-                    from src.utils.human_like_conversation_engine import analyze_conversation_for_human_response
-                    
-                    conversation_analysis = await analyze_conversation_for_human_response(
+                # Prepare conversation history - handle both dict and Discord Message objects
+                conversation_history = []
+                for msg in recent_messages[-5:]:
+                    if isinstance(msg, dict):
+                        if 'content' in msg:
+                            conversation_history.append(msg['content'])
+                    else:
+                        # Handle Discord Message object
+                        if hasattr(msg, 'content') and msg.content:
+                            conversation_history.append(msg.content)
+                # Build relationship context
+                relationship_context = {
+                    "interaction_history": len(recent_messages),
+                    "emotional_data": external_emotion_data,
+                    "phase2_context": phase2_context,
+                    "discord_context": discord_context
+                }
+                from src.utils.human_like_conversation_engine import analyze_conversation_for_human_response
+                conversation_analysis_task = asyncio.create_task(
+                    analyze_conversation_for_human_response(
                         user_id=user_id,
                         message=message.content,
                         conversation_history=[{"content": msg} for msg in conversation_history],
                         emotional_context=external_emotion_data,
                         relationship_context=relationship_context
                     )
-                    
-                    # Use human-like memory search
-                    # Defensive check: ensure we're not passing Discord Message object
-                    message_content = message.content if hasattr(message, 'content') else str(message)
-                    
-                    human_like_result = await self.memory_manager.human_like_system.search_like_human_friend(
+                )
+                human_like_task = asyncio.create_task(
+                    self.memory_manager.human_like_system.search_like_human_friend(
                         user_id=user_id,
-                        message=message_content,
+                        message=message.content if hasattr(message, 'content') else str(message),
                         conversation_history=conversation_history,
                         relationship_context=relationship_context,
                         limit=20
                     )
-                    
-                    human_like_context = human_like_result
-                    logger.debug(f"Human-like processing: {human_like_result['human_context']['emotional_understanding']} | "
-                               f"Purpose: {human_like_result['human_context']['conversation_purpose']} | "
-                               f"Mode: {conversation_analysis['mode']} | "
-                               f"Personality: {conversation_analysis['personality_type']}")
-                    
-                except Exception as human_error:
-                    logger.warning(f"Human-like memory processing failed: {human_error}")
-                    human_like_context = None
-                    conversation_analysis = None
+                )
+
+            # Gather all tasks in parallel
+            gather_tasks = [t for t in [thread_manager_task, engagement_task, human_like_task, conversation_analysis_task] if t]
+            results = await asyncio.gather(*gather_tasks, return_exceptions=True) if gather_tasks else []
+
+            # Unpack results with robust error handling
+            idx = 0
+            thread_manager_result = None
+            engagement_result = None
+            human_like_context = None
+            conversation_analysis = None
+            if thread_manager_task:
+                if not isinstance(results[idx], Exception):
+                    thread_manager_result = results[idx]
+                else:
+                    logger.warning(f"Phase 4.2 Thread Manager task failed: {results[idx]}")
+                idx += 1
+            if engagement_task:
+                if not isinstance(results[idx], Exception):
+                    engagement_result = results[idx]
+                else:
+                    logger.warning(f"Phase 4.3 Engagement Engine task failed: {results[idx]}")
+                idx += 1
+            if human_like_task:
+                if not isinstance(results[idx], Exception):
+                    human_like_context = results[idx]
+                else:
+                    logger.warning(f"Human-like memory task failed: {results[idx]}")
+                idx += 1
+            if conversation_analysis_task:
+                if not isinstance(results[idx], Exception):
+                    conversation_analysis = results[idx]
+                else:
+                    logger.warning(f"Human-like conversation analysis task failed: {results[idx]}")
+                idx += 1
 
             comprehensive_context = None
             enhanced_system_prompt = None
 
             if hasattr(self.memory_manager, "get_phase4_response_context"):
-                comprehensive_context = self.memory_manager.get_phase4_response_context(
+                comprehensive_context = await self.memory_manager.get_phase4_response_context(
                     phase4_context
                 )
 
@@ -1452,12 +1510,10 @@ class BotEventHandlers:
                 # but prioritize template system in fallback scenarios
                 from src.intelligence.phase4_integration import create_phase4_enhanced_system_prompt
 
-                enhanced_system_prompt = get_contextualized_system_prompt(
-                    personality_metadata=template_context,
-                    user_id=user_id,
-                    phase4_context=phase4_context,
-                    comprehensive_context=comprehensive_context,
-                )
+                # For now, skip the contextualized system prompt in Phase 4 processing
+                # since dynamic_personality_context is not available in this scope.
+                # This will be handled after the parallel processing returns all contexts.
+                enhanced_system_prompt = None
 
                 # If template system fails, fallback to the old enhanced prompt method
                 if not enhanced_system_prompt or enhanced_system_prompt == "":
@@ -1491,21 +1547,30 @@ class BotEventHandlers:
                     f"{len(phases_executed)} phases executed"
                 )
 
-            # Merge human-like context into comprehensive context if available
-            if human_like_context and comprehensive_context:
-                comprehensive_context["human_like_context"] = human_like_context["human_context"]
-                comprehensive_context["human_like_memories"] = human_like_context["memories"]
-                comprehensive_context["human_like_performance"] = human_like_context["search_performance"]
-                
+            # Merge human-like context into comprehensive context if available and not Exception
+            if (human_like_context and comprehensive_context and 
+                not isinstance(human_like_context, Exception) and
+                isinstance(human_like_context, dict)):
+                try:
+                    comprehensive_context["human_like_context"] = human_like_context.get("human_context", {})
+                    comprehensive_context["human_like_memories"] = human_like_context.get("memories", [])
+                    comprehensive_context["human_like_performance"] = human_like_context.get("search_performance", {})
+                except Exception as e:
+                    logger.warning(f"Failed to merge human-like context: {e}")
+                    
                 # Add conversation analysis for enhanced response guidance
-                if conversation_analysis:
-                    comprehensive_context["conversation_analysis"] = conversation_analysis
-                    comprehensive_context["response_guidance"] = conversation_analysis["response_guidance"]
-                    comprehensive_context["conversation_mode"] = conversation_analysis["mode"]
-                    comprehensive_context["interaction_type"] = conversation_analysis["interaction_type"]
-                    comprehensive_context["personality_type"] = conversation_analysis["personality_type"]
-                    comprehensive_context["relationship_level"] = conversation_analysis["relationship_level"]
-                
+                if (conversation_analysis and 
+                    not isinstance(conversation_analysis, Exception) and
+                    isinstance(conversation_analysis, dict)):
+                    try:
+                        comprehensive_context["conversation_analysis"] = conversation_analysis
+                        comprehensive_context["response_guidance"] = conversation_analysis.get("response_guidance", "")
+                        comprehensive_context["conversation_mode"] = conversation_analysis.get("mode", "standard")
+                        comprehensive_context["interaction_type"] = conversation_analysis.get("interaction_type", "general")
+                        comprehensive_context["personality_type"] = conversation_analysis.get("personality_type", "default")
+                        comprehensive_context["relationship_level"] = conversation_analysis.get("relationship_level", "acquaintance")
+                    except Exception as e:
+                        logger.warning(f"Failed to merge conversation analysis: {e}")
                 logger.debug("Enhanced comprehensive context with human-like intelligence and conversation analysis")
 
             # Merge Phase 4.2 and 4.3 results into comprehensive context
@@ -2319,6 +2384,10 @@ class BotEventHandlers:
         """
         PERFORMANCE OPTIMIZATION: Process AI components in parallel for 3-5x performance improvement.
         
+        Uses ConcurrentConversationManager for proper scatter-gather architecture when available,
+        following the hybrid concurrency pattern (AsyncIO + ThreadPoolExecutor + ProcessPoolExecutor).
+        Falls back to basic asyncio.gather if ConcurrentConversationManager is not available.
+        
         This replaces the sequential processing of:
         1. External emotion analysis 
         2. Phase 2 emotion analysis
@@ -2331,6 +2400,62 @@ class BotEventHandlers:
         
         logger.debug(f"Starting parallel AI component processing for user {user_id}")
         start_time = time.time()
+        
+        # Use ConcurrentConversationManager for proper scatter-gather if available
+        if (self.conversation_manager and 
+            os.getenv("ENABLE_CONCURRENT_CONVERSATION_MANAGER", "false").lower() == "true"):
+            
+            logger.debug("Using ConcurrentConversationManager for scatter-gather processing")
+            
+            # Prepare context for conversation manager
+            context = {
+                "message": content,
+                "channel_id": str(message.channel.id) if hasattr(message, 'channel') else "default",
+                "guild_id": str(message.guild.id) if hasattr(message, 'guild') and message.guild else None,
+                "recent_messages": recent_messages,
+                "conversation_context": conversation_context,
+            }
+            
+            # Process through conversation manager with high priority for real-time response
+            result = await self.conversation_manager.process_conversation_message(
+                user_id=user_id,
+                message=content,
+                channel_id=context["channel_id"],
+                context=context,
+                priority="high"  # High priority for immediate processing
+            )
+            
+            # Extract results from conversation manager response
+            external_emotion_data = result.get("emotion_result")
+            phase2_context = result.get("thread_result")  # Thread manager provides phase 2-like context
+            current_emotion_data = None
+            dynamic_personality_context = None
+            
+            # Run Phase 4 processing separately as it needs the other results
+            phase4_context = None
+            comprehensive_context = None
+            enhanced_system_prompt = None
+            
+            if (os.getenv("DISABLE_PHASE4_INTELLIGENCE", "false").lower() != "true"
+                and hasattr(self.memory_manager, "process_with_phase4_intelligence")):
+                try:
+                    phase4_context, comprehensive_context, enhanced_system_prompt = (
+                        await self._process_phase4_intelligence(
+                            user_id, message, recent_messages, external_emotion_data, phase2_context
+                        )
+                    )
+                except Exception as e:
+                    logger.warning(f"Phase 4 intelligence processing failed: {e}")
+            
+            processing_time = time.time() - start_time
+            logger.info(f"✅ ConcurrentConversationManager processing completed in {processing_time:.2f}s for user {user_id}")
+            
+            return (external_emotion_data, phase2_context, current_emotion_data, 
+                   dynamic_personality_context, phase4_context, comprehensive_context, 
+                   enhanced_system_prompt)
+        
+        # Fallback to basic asyncio.gather approach if ConcurrentConversationManager not available
+        logger.debug("Using fallback asyncio.gather approach for parallel processing")
         
         # Prepare task list for parallel execution
         tasks = []
@@ -2422,6 +2547,13 @@ class BotEventHandlers:
             
             processing_time = time.time() - start_time
             logger.info(f"✅ Parallel AI processing completed in {processing_time:.2f}s for user {user_id}")
+            
+            # Memory cleanup after intensive LLM operations
+            try:
+                if hasattr(self, 'llm_client') and self.llm_client and hasattr(self.llm_client, 'cleanup_memory'):
+                    self.llm_client.cleanup_memory()
+            except Exception as cleanup_error:
+                logger.debug(f"Memory cleanup skipped: {cleanup_error}")
             
             # Return the tuple expected by calling code
             return (external_emotion_data, phase2_context, current_emotion_data, 

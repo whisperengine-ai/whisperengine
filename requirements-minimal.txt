@@ -33,11 +33,11 @@ spacy==3.8.7
 # Vector operations and scientific computing (keep essential)
 scipy==1.16.2
 scikit-learn==1.7.2
-faiss-cpu==1.9.0
+faiss-cpu==1.9.0.post1
 
 # Database and caching
 redis==6.4.0  # Updated from 5.2.1
-aioredis==2.1.1
+aioredis==2.0.1
 chromadb==1.1.0  # Updated from 1.0.20
 
 # Graph analysis (lightweight)

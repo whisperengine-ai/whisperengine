@@ -2,6 +2,10 @@
 """
 Configuration Validation and Setup Assistant
 Provides user-friendly configuration validation and setup guidance for WhisperEngine
+
+NOTE: This comprehensive validation system is available for advanced use cases, 
+but the main startup validation is handled by env_manager.py for simplicity.
+Use this for detailed configuration analysis and troubleshooting.
 """
 
 import os
