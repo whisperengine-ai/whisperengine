@@ -21,8 +21,10 @@ services:
     environment:
       # Development-specific settings
       - ENV_MODE=development
+      - ENVIRONMENT=development
       - DEBUG_MODE=true
       - LOG_LEVEL=DEBUG
+      - FORCE_READABLE_LOGS=true
       - PYTHONUNBUFFERED=1
       
       # Reduced worker counts for development

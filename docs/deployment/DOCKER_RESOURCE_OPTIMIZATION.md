@@ -100,6 +100,11 @@ MAX_WORKER_THREADS=12           # Override thread pool size
 MAX_WORKER_PROCESSES=6          # Override process pool size
 EMOTION_MAX_WORKERS=4           # Emotion processing workers
 LLM_MAX_WORKERS=3              # LLM API workers
+
+# Logging configuration
+FORCE_READABLE_LOGS=true        # Force human-readable logs (vs JSON)
+LOG_LEVEL=DEBUG                 # Set logging level
+ENVIRONMENT=development         # Set environment mode
 ```
 
 ## Benefits
