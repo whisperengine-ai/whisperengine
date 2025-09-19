@@ -769,24 +769,56 @@ class ProactiveConversationEngagementEngine:
         return suggestions
 
     def _identify_message_themes(self, content: str) -> list[str]:
-        """Identify themes in a message"""
-        content_lower = content.lower()
+        """
+        Identify themes in a message using Phase 4 topic analysis with pattern fallback
+        
+        This method integrates sophisticated Phase 4 topic analysis while maintaining
+        simple pattern matching as a reliable fallback for immediate theme detection.
+        """
         themes = []
-
+        
+        # Try Phase 4 topic analysis first for more sophisticated theme detection
+        if self.personality_profiler and PERSONALITY_PROFILER_AVAILABLE:
+            try:
+                import asyncio
+                # Run Phase 4 analysis for better topic detection
+                async def get_phase4_topics():
+                    analysis = await self.personality_profiler.analyze_conversation(
+                        "proactive_analysis", 
+                        "topic_extraction",
+                        content,
+                        ""  # No bot response for topic extraction
+                    )
+                    return analysis.topics_discussed
+                
+                # Get Phase 4 topics
+                phase4_topics = asyncio.run(get_phase4_topics())
+                if phase4_topics:
+                    themes.extend(phase4_topics)
+                    logger.debug(f"Phase 4 detected themes: {phase4_topics}")
+                    
+            except Exception as e:
+                logger.debug(f"Phase 4 topic analysis unavailable: {e}")
+        
+        # Fallback to pattern-based detection (always runs for completeness)
+        content_lower = content.lower()
+        
+        # Enhanced theme patterns (improved from simple keywords)
         theme_patterns = {
-            "work": ["work", "job", "career", "office", "meeting", "project"],
-            "technology": ["tech", "computer", "software", "ai", "programming"],
-            "health": ["health", "exercise", "fitness", "wellness", "medical"],
-            "learning": ["learn", "study", "education", "course", "skill"],
-            "entertainment": ["movie", "music", "game", "book", "show"],
-            "relationships": ["friend", "family", "partner", "social"],
-            "hobbies": ["hobby", "art", "craft", "sport", "photography"],
-            "travel": ["travel", "trip", "vacation", "visit", "explore"],
+            "work": ["work", "job", "career", "office", "meeting", "project", "colleagues", "boss", "workplace"],
+            "technology": ["tech", "computer", "software", "ai", "programming", "coding", "development", "digital"],
+            "health": ["health", "exercise", "fitness", "wellness", "medical", "nutrition", "workout", "mental health"],
+            "learning": ["learn", "study", "education", "course", "skill", "training", "knowledge", "research"],
+            "entertainment": ["movie", "music", "game", "book", "show", "series", "streaming", "reading"],
+            "relationships": ["friend", "family", "partner", "social", "dating", "marriage", "children", "parents"],
+            "hobbies": ["hobby", "art", "craft", "sport", "photography", "cooking", "gardening", "collecting"],
+            "travel": ["travel", "trip", "vacation", "visit", "explore", "journey", "adventure", "destination"],
         }
 
         for theme, keywords in theme_patterns.items():
             if any(keyword in content_lower for keyword in keywords):
-                themes.append(theme)
+                if theme not in themes:  # Avoid duplicates from Phase 4
+                    themes.append(theme)
 
         return themes
 

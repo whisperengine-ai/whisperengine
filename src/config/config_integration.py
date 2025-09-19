@@ -211,7 +211,7 @@ class WhisperEngineConfigIntegrator:
                 "# === Required Settings (Add your values) ===",
                 "DISCORD_BOT_TOKEN=your_token_here",
                 "LLM_CHAT_API_URL=http://localhost:1234/v1",
-                "LLM_MODEL_NAME=your_model_name",
+                "LLM_CHAT_MODEL=your_model_name",
             ]
         )
 

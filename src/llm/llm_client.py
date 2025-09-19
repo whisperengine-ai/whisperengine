@@ -207,7 +207,6 @@ class LLMClient:
         self.max_tokens_emotion = int(os.getenv("LLM_MAX_TOKENS_EMOTION", "200"))
         self.max_tokens_fact_extraction = int(os.getenv("LLM_MAX_TOKENS_FACT_EXTRACTION", "500"))
         self.max_tokens_personal_info = int(os.getenv("LLM_MAX_TOKENS_PERSONAL_INFO", "400"))
-        self.max_tokens_trust_detection = int(os.getenv("LLM_MAX_TOKENS_TRUST_DETECTION", "300"))
         self.max_tokens_user_facts = int(os.getenv("LLM_MAX_TOKENS_USER_FACTS", "400"))
 
         # Load model names from environment variables
@@ -297,7 +296,7 @@ class LLMClient:
             f"Token limits - Chat: {self.default_max_tokens_chat}, Completion: {self.default_max_tokens_completion}"
         )
         self.logger.debug(
-            f"Analysis token limits - Emotion: {self.max_tokens_emotion}, Facts: {self.max_tokens_fact_extraction}, Personal: {self.max_tokens_personal_info}, Trust: {self.max_tokens_trust_detection}, UserFacts: {self.max_tokens_user_facts}"
+            f"Analysis token limits - Emotion: {self.max_tokens_emotion}, Facts: {self.max_tokens_fact_extraction}, Personal: {self.max_tokens_personal_info}, UserFacts: {self.max_tokens_user_facts}"
         )
         self.logger.debug(
             f"Timeout settings - Request: {self.request_timeout}s, Connection: {self.connection_timeout}s"
@@ -1752,155 +1751,6 @@ Respond only with valid JSON, no other text.""",
         except Exception as e:
             self.logger.error(f"Error in LLM personal info extraction: {e}")
             raise LLMError(f"LLM personal info extraction failed: {e}")
-
-    def detect_trust_indicators(self, message: str) -> dict[str, Any]:
-        """
-        Use LLM to detect trust indicators in a message
-
-        Args:
-            message: The user message to analyze for trust indicators
-
-        Returns:
-            Dict containing trust analysis results
-        """
-        # Check if trust detection is disabled
-        if not os.getenv('ENABLE_LLM_TRUST_DETECTION', 'true').lower() in ['true', '1', 'yes']:
-            self.logger.debug("Trust detection disabled via ENABLE_LLM_TRUST_DETECTION environment variable")
-            return {
-                "trust_indicators": [],
-                "trust_level": "low",
-                "confidence": 0.0,
-                "reasoning": "Trust detection disabled"
-            }
-            
-        try:
-            messages = [
-                {
-                    "role": "system",
-                    "content": "You are a trust and relationship analysis expert. Detect indicators of trust, intimacy, and relationship building in messages.",
-                },
-                {
-                    "role": "user",
-                    "content": f"""Analyze this message for trust and relationship indicators. Look for:
-- Expressions of trust ("I trust you", "you understand me")
-- Sharing of personal/private information
-- Vulnerability indicators ("between you and me", "don't tell anyone")
-- Gratitude and appreciation ("thanks for listening", "you're helpful")
-- Comfort expressions ("I feel safe", "you make me comfortable")
-- Requests for confidentiality or personal advice
-
-Return only a JSON response with this exact structure:
-
-{{
-  "trust_indicators": ["list of detected trust indicators"],
-  "trust_level": "low|medium|high",
-  "confidence": 0.85,
-  "reasoning": "explanation of detected trust signals"
-}}
-
-If no trust indicators are found, return empty array and "low" trust level.
-
-Message to analyze: "{message}"
-
-Respond only with valid JSON, no other text.""",
-                },
-            ]
-
-            self.logger.debug("Sending trust detection request to emotion LLM...")
-            self.logger.debug(
-                f"Emotion LLM parameters - service: {self.emotion_service_name}, model: {self.default_model_name}, max_tokens: {self.max_tokens_trust_detection}, temperature: 0.1"
-            )
-            response = self.generate_emotion_chat_completion(
-                messages=messages,
-                model=self.default_model_name,
-                max_tokens=self.max_tokens_trust_detection,
-                temperature=0.1,
-            )
-
-            if (
-                isinstance(response, dict)
-                and "choices" in response
-                and len(response["choices"]) > 0
-            ):
-                response_text = response["choices"][0]["message"]["content"].strip()
-                self.logger.debug(
-                    f"Received LLM trust detection response: {len(response_text)} characters"
-                )
-            else:
-                raise ValueError("Invalid response format from LLM")
-
-            # Clean up markdown formatting
-            if response_text.startswith("```json"):
-                response_text = response_text[7:]
-                if response_text.endswith("```"):
-                    response_text = response_text[:-3]
-                response_text = response_text.strip()
-            elif response_text.startswith("```"):
-                lines = response_text.split("\n")
-                if len(lines) > 2:
-                    response_text = "\n".join(lines[1:-1])
-                response_text = response_text.strip()
-
-            # Remove JSON comments (// style comments) that some LLMs add
-            # Use negative lookbehind to avoid matching URLs (http:// or https://)
-            response_text = re.sub(r"(?<!http:)(?<!https:)//.*?(?=[\r\n]|$)", "", response_text)
-            response_text = re.sub(r"/\*.*?\*/", "", response_text, flags=re.DOTALL)
-
-            # Remove trailing commas that make JSON invalid
-            response_text = re.sub(r",(\s*[}\]])", r"\1", response_text)
-
-            response_text = response_text.strip()
-
-            # Extract first complete JSON object
-            json_start = response_text.find("{")
-            if json_start >= 0:
-                brace_count = 0
-                json_end = json_start
-                for i, char in enumerate(response_text[json_start:], json_start):
-                    if char == "{":
-                        brace_count += 1
-                    elif char == "}":
-                        brace_count -= 1
-                        if brace_count == 0:
-                            json_end = i + 1
-                            break
-
-                if json_end > json_start:
-                    response_text = response_text[json_start:json_end]
-
-            trust_data = json.loads(response_text)
-
-            # Validate and clean the response
-            if "trust_indicators" not in trust_data:
-                trust_data["trust_indicators"] = []
-            elif not isinstance(trust_data["trust_indicators"], list):
-                trust_data["trust_indicators"] = []
-
-            # Validate trust level
-            valid_levels = ["low", "medium", "high"]
-            if "trust_level" not in trust_data or trust_data["trust_level"] not in valid_levels:
-                trust_data["trust_level"] = "low"
-
-            # Ensure confidence exists and is valid
-            trust_data["confidence"] = max(0.0, min(1.0, float(trust_data.get("confidence", 0.5))))
-
-            if "reasoning" not in trust_data:
-                trust_data["reasoning"] = "LLM trust detection"
-
-            self.logger.debug(
-                f"LLM detected trust level: {trust_data['trust_level']} (confidence: {trust_data['confidence']:.2f})"
-            )
-
-            return trust_data
-
-        except json.JSONDecodeError as e:
-            self.logger.error(
-                f"Failed to parse LLM trust detection response as JSON: {response_text if 'response_text' in locals() else 'No response'} - Error: {e}"
-            )
-            raise LLMError(f"Invalid JSON response from LLM trust detection: {e}")
-        except Exception as e:
-            self.logger.error(f"Error in LLM trust detection: {e}")
-            raise LLMError(f"LLM trust detection failed: {e}")
 
     def extract_user_facts(self, message: str) -> dict[str, Any]:
         """

@@ -328,25 +328,25 @@ class InteractiveSetupWizard:
             config.update({
                 "LLM_CHAT_API_URL": "https://api.openai.com/v1",
                 "LLM_CHAT_API_KEY": "your_openai_api_key_here" if self.profile.has_openai_key else "sk-placeholder",
-                "LLM_MODEL_NAME": "gpt-4"
+                "LLM_CHAT_MODEL": "gpt-4"
             })
         elif self.profile.preferred_llm == "openrouter":
             config.update({
                 "LLM_CHAT_API_URL": "https://openrouter.ai/api/v1",
                 "LLM_CHAT_API_KEY": "your_openrouter_api_key_here",
-                "LLM_MODEL_NAME": "anthropic/claude-3-sonnet"
+                "LLM_CHAT_MODEL": "anthropic/claude-3-sonnet"
             })
         elif self.profile.preferred_llm == "lmstudio":
             config.update({
                 "LLM_CHAT_API_URL": "http://localhost:1234/v1",
                 "LLM_CHAT_API_KEY": "not-needed",
-                "LLM_MODEL_NAME": "local-model"
+                "LLM_CHAT_MODEL": "local-model"
             })
         elif self.profile.preferred_llm == "ollama":
             config.update({
                 "LLM_CHAT_API_URL": "http://localhost:11434/v1",
                 "LLM_CHAT_API_KEY": "not-needed",
-                "LLM_MODEL_NAME": "llama2"
+                "LLM_CHAT_MODEL": "llama2"
             })
         
         # Feature Configuration

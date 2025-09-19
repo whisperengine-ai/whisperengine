@@ -307,58 +307,14 @@ class RelationshipManager:
             raise e
 
     def detect_trust_indicators(self, message: str) -> list[str]:
-        """Detect trust indicators in a message using LLM"""
-        import os
+        """
+        DEPRECATED: Trust detection is now handled by Phase 4 Dynamic Personality Profiler
         
-        # Check if trust detection is disabled (for local LLM compatibility)
-        if os.getenv("ENABLE_LLM_TRUST_DETECTION", "true").lower() == "false":
-            logger.debug("LLM trust detection disabled via ENABLE_LLM_TRUST_DETECTION=false")
-            return []
-            
-        if not self.llm_client:
-            logger.warning("No LLM client available for trust detection")
-            return []
-
-        try:
-            logger.debug("Using LLM for trust indicator detection")
-            result = self.llm_client.detect_trust_indicators(message)
-
-            if not isinstance(result, dict) or "trust_indicators" not in result:
-                logger.warning("Invalid LLM response for trust detection")
-                return []
-
-            trust_indicators = result["trust_indicators"]
-
-            if not isinstance(trust_indicators, list):
-                logger.warning("LLM returned non-list trust indicators")
-                return []
-
-            # Filter out empty strings
-            filtered_indicators = [
-                indicator.strip()
-                for indicator in trust_indicators
-                if indicator and indicator.strip()
-            ]
-
-            if filtered_indicators:
-                logger.debug(f"LLM detected {len(filtered_indicators)} trust indicators")
-
-            return filtered_indicators
-
-        except (ConnectionError, TimeoutError, ConnectionRefusedError) as e:
-            logger.warning(f"LLM connection failed for trust detection, returning empty list: {e}")
-            return []
-        except AttributeError as e:
-            if "has no attribute" in str(e) and "detect_trust_indicators" in str(e):
-                logger.warning(f"LLM client missing detect_trust_indicators method: {e}")
-                return []
-            else:
-                logger.error(f"LLM trust detection failed with AttributeError: {e}")
-                raise e
-        except Exception as e:
-            # For other exceptions (API errors, rate limits, etc.), re-raise them
-            logger.error(f"Error in LLM trust detection: {e}")
-            raise e
+        This method returns empty list as trust analysis is done more comprehensively
+        in the personality profiler with relationship depth, conversation patterns,
+        and evidence-based trait tracking.
+        """
+        return []
 
     def should_progress_relationship(self, profile: UserProfile) -> bool:
         """Determine if relationship should progress to next level"""
@@ -965,8 +921,10 @@ class EmotionManager:
         if len(profile.emotion_history) > 50:
             profile.emotion_history = profile.emotion_history[-50:]
 
-        # Detect trust indicators (personal info extraction now handled by memory manager)
-        trust_indicators = self.relationship_manager.detect_trust_indicators(message)
+        # Note: Trust detection is now handled comprehensively by Phase 4 Dynamic Personality Profiler
+        # which tracks trust as a personality dimension with evidence-based confidence scoring
+        
+        # Ensure trust_indicators exists for backward compatibility but don't populate it
         if profile.trust_indicators is None:
             profile.trust_indicators = []
         elif not isinstance(profile.trust_indicators, list):
@@ -975,7 +933,7 @@ class EmotionManager:
                 f"trust_indicators for user {user_id} is not a list (type: {type(profile.trust_indicators)}), resetting to empty list"
             )
             profile.trust_indicators = []
-        profile.trust_indicators.extend(trust_indicators)
+        # Legacy trust_indicators no longer collected - Phase 4 personality profiler handles this
 
         # Check for relationship progression
         if self.relationship_manager.should_progress_relationship(profile):
@@ -1049,8 +1007,10 @@ class EmotionManager:
         if len(profile.emotion_history) > 50:
             profile.emotion_history = profile.emotion_history[-50:]
 
-        # Detect trust indicators (personal info extraction now handled by memory manager)
-        trust_indicators = self.relationship_manager.detect_trust_indicators(message)
+        # Note: Trust detection is now handled comprehensively by Phase 4 Dynamic Personality Profiler
+        # which tracks trust as a personality dimension with evidence-based confidence scoring
+        
+        # Ensure trust_indicators exists for backward compatibility but don't populate it
         if profile.trust_indicators is None:
             profile.trust_indicators = []
         elif not isinstance(profile.trust_indicators, list):
@@ -1059,7 +1019,7 @@ class EmotionManager:
                 f"trust_indicators for user {user_id} is not a list (type: {type(profile.trust_indicators)}), resetting to empty list"
             )
             profile.trust_indicators = []
-        profile.trust_indicators.extend(trust_indicators)
+        # Legacy trust_indicators no longer collected - Phase 4 personality profiler handles this
 
         # Check for relationship progression
         if self.relationship_manager.should_progress_relationship(profile):

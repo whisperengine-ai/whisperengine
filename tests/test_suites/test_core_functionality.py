@@ -60,7 +60,7 @@ class TestBotCoreInitialization:
         return {
             'DISCORD_BOT_TOKEN': 'test_token_123',
             'LLM_CHAT_API_URL': 'http://localhost:1234/v1',
-            'LLM_MODEL_NAME': 'test-model',
+            'LLM_CHAT_MODEL': 'test-model',
             'ENV_MODE': 'development'
         }
 

@@ -75,12 +75,29 @@ class LocalEmbeddingManager:
         """Load the sentence transformer model"""
         try:
             from sentence_transformers import SentenceTransformer
+            import torch
+            import os
 
             # Load in executor to avoid blocking
             loop = asyncio.get_event_loop()
-            self._model = await loop.run_in_executor(
-                None, SentenceTransformer, self.embedding_model_name
-            )
+            
+            def load_model_safely():
+                # Force CPU loading to avoid meta tensor issues
+                torch.set_default_tensor_type(torch.FloatTensor)
+                
+                # Check if this is a local model path
+                if os.path.exists(self.embedding_model_name):
+                    logger.info(f"Loading local model from: {self.embedding_model_name}")
+                    model = SentenceTransformer(self.embedding_model_name, device='cpu')
+                else:
+                    logger.info(f"Loading model: {self.embedding_model_name}")
+                    model = SentenceTransformer(self.embedding_model_name, device='cpu')
+                
+                # Ensure model is properly loaded on CPU
+                model = model.to('cpu')
+                return model
+            
+            self._model = await loop.run_in_executor(None, load_model_safely)
 
             # Test the model and get dimensions
             test_embedding = await self._encode_texts(["test"])

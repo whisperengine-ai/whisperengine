@@ -1,5 +1,19 @@
 """
-Automatic fact extraction system for Discord bot conversations
+⚠️ DEPRECATED: Automatic fact extraction system for Discord bot conversations
+
+This module is DEPRECATED and has been replaced by the Phase 4 Dynamic Personality Profiler 
+(src/intelligence/dynamic_personality_profiler.py) which provides far more sophisticated 
+conversation analysis, personality insights, and relationship tracking.
+
+The simple LLM-based fact extraction in this module has been superseded by:
+- Real-time personality trait tracking and evolution
+- Conversation pattern analysis for personality insights  
+- Emotional response adaptation based on user preferences
+- Relationship depth measurement and trust indicators
+- Contextual personality state management
+
+This module is maintained only for backward compatibility with test suites.
+New implementations should use Phase 4 Dynamic Personality Profiler directly.
 """
 
 import logging
@@ -10,10 +24,17 @@ logger = logging.getLogger(__name__)
 
 
 class GlobalFactExtractor:
-    """Extracts global facts about the world, relationships, and the bot itself using LLM"""
+    """⚠️ DEPRECATED: Extracts global facts about the world, relationships, and the bot itself using LLM
+    
+    This class is deprecated. Use Phase 4 Dynamic Personality Profiler instead for superior analysis.
+    """
 
     def __init__(self, llm_client=None):
         """Initialize the global fact extractor with LLM client for fact extraction"""
+        logger.warning(
+            "GlobalFactExtractor is deprecated. Use Phase 4 Dynamic Personality Profiler "
+            "for superior conversation analysis and personality insights."
+        )
         self.llm_client = llm_client
         if not llm_client:
             logger.warning(
@@ -226,7 +247,10 @@ class GlobalFactExtractor:
 
 
 class FactExtractor:
-    """Extract user-specific facts from text using LLM analysis"""
+    """⚠️ DEPRECATED: Extract user-specific facts from text using LLM analysis
+    
+    This class is deprecated. Use Phase 4 Dynamic Personality Profiler instead for superior analysis.
+    """
 
     def __init__(self, llm_client=None):
         """
@@ -235,6 +259,10 @@ class FactExtractor:
         Args:
             llm_client: LLMClient instance for LLM-based fact extraction
         """
+        logger.warning(
+            "FactExtractor is deprecated. Use Phase 4 Dynamic Personality Profiler "
+            "for superior conversation analysis and personality insights."
+        )
         self.logger = logging.getLogger(__name__)
         self.llm_client = llm_client
 

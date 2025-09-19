@@ -409,37 +409,59 @@ class UserMemoryManager:
                 "bot_response": bot_response,
             }
 
-            # Extract potential facts using our own pattern-based extraction (no LLM dependency)
-            potential_facts = self._extract_simple_personal_facts(user_message)
-
-            # Classify and store each potential fact using personality system
-            classifier = get_personality_fact_classifier()
-            facts_stored = 0
-
-            for fact in potential_facts:
-                try:
-                    # Classify the fact for personality enhancement potential
-                    personality_fact = classifier.classify_fact(fact, context_metadata, user_id)
-
-                    # Only store facts with meaningful personality relevance
-                    if personality_fact.relevance_score >= 0.3:  # Minimum relevance threshold
-                        # Store using the personality fact storage method
-                        self.store_personality_fact(user_id, fact, context_metadata)
-                        facts_stored += 1
-
-                        logger.info(
-                            f"Stored personality fact for user {user_id}: {personality_fact.fact_type.value} "
-                            f"(relevance: {personality_fact.relevance_score:.2f}) - {fact[:50]}..."
-                        )
-                    else:
-                        logger.debug(
-                            f"Skipped low-relevance fact: {fact[:50]}... (score: {personality_fact.relevance_score:.2f})"
-                        )
-
-                except Exception as e:
-                    logger.warning(
-                        f"Error classifying/storing personality fact '{fact[:30]}...': {e}"
+            # Use Phase 4 Dynamic Personality Profiler for sophisticated fact extraction
+            # This replaces simple pattern matching with advanced conversation analysis
+            from src.intelligence.dynamic_personality_profiler import DynamicPersonalityProfiler
+            import asyncio
+            
+            profiler = DynamicPersonalityProfiler()
+            try:
+                # Run the async Phase 4 analysis within this sync method
+                async def run_phase4_analysis():
+                    # Analyze the conversation for personality insights
+                    analysis = await profiler.analyze_conversation(
+                        user_id, 
+                        context_metadata.get("channel_id", "conversation"),
+                        user_message,
+                        bot_response
                     )
+                    
+                    # Update personality profile with sophisticated analysis
+                    personality_profile = await profiler.update_personality_profile(analysis)
+                    return analysis, personality_profile
+                
+                # Run the analysis
+                analysis, personality_profile = asyncio.run(run_phase4_analysis())
+                
+                # Extract meaningful facts from the analysis
+                facts_stored = 0
+                
+                # Store conversation insights as facts with proper relevance scoring
+                if analysis.conversation_depth > 0.2:  # Significant conversation
+                    fact_content = f"User engaged in {analysis.conversation_depth:.2f} depth conversation about {', '.join(analysis.topics_discussed)}"
+                    self._store_phase4_fact(user_id, fact_content, "conversation_depth", analysis.conversation_depth, context_metadata)
+                    facts_stored += 1
+                
+                # Store trust indicators
+                for trust_indicator in analysis.trust_indicators:
+                    fact_content = f"User demonstrated trust: {trust_indicator}"
+                    self._store_phase4_fact(user_id, fact_content, "trust_indicator", 0.9, context_metadata)
+                    facts_stored += 1
+                
+                # Store emotional openness insights
+                if analysis.emotional_openness > 0.3:
+                    fact_content = f"User showed {analysis.emotional_openness:.2f} emotional openness in conversation"
+                    self._store_phase4_fact(user_id, fact_content, "emotional_openness", analysis.emotional_openness, context_metadata)
+                    facts_stored += 1
+                
+                logger.info(
+                    f"Phase 4 analysis stored {facts_stored} sophisticated personality insights for user {user_id}"
+                )
+                
+            except Exception as e:
+                logger.warning(f"Error in Phase 4 personality analysis for user {user_id}: {e}")
+                # Fallback: skip fact extraction rather than using low-quality patterns
+                facts_stored = 0
 
             if facts_stored > 0:
                 logger.debug(
@@ -454,41 +476,43 @@ class UserMemoryManager:
             # Don't fail the conversation storage if fact extraction fails
             logger.warning(f"Error during personality fact extraction: {e}")
 
-    def _extract_simple_personal_facts(self, message: str) -> list[str]:
-        """Simple extraction of personal facts when legacy extractor is unavailable"""
-        facts = []
-        message_lower = message.lower()
-
-        # Look for personal statements that might be facts
-        personal_patterns = [
-            (r"i am (.+)", "User is {}"),
-            (r"i work as (.+)", "User works as {}"),
-            (r"i live in (.+)", "User lives in {}"),
-            (r"i like (.+)", "User likes {}"),
-            (r"i love (.+)", "User loves {}"),
-            (r"i have (.+)", "User has {}"),
-            (r"my favorite (.+) is (.+)", "User's favorite {} is {}"),
-            (r"i prefer (.+)", "User prefers {}"),
-            (r"i enjoy (.+)", "User enjoys {}"),
-            (r"i'm studying (.+)", "User is studying {}"),
-            (r"i feel (.+) when (.+)", "User feels {} when {}"),
-        ]
-
-        import re
-
-        for pattern, template in personal_patterns:
-            matches = re.findall(pattern, message_lower)
-            for match in matches:
-                if isinstance(match, tuple):
-                    fact = template.format(*match)
-                else:
-                    fact = template.format(match)
-
-                # Basic filtering for meaningful facts
-                if len(fact) > 10 and len(fact) < 200:
-                    facts.append(fact.strip())
-
-        return facts[:5]  # Limit to 5 facts per message to avoid spam
+    def _store_phase4_fact(self, user_id: str, fact_content: str, fact_type: str, relevance_score: float, context_metadata: dict):
+        """Store facts from Phase 4 analysis without redundant pattern classification"""
+        try:
+            from datetime import datetime
+            
+            # Create optimized storage metadata for Phase 4 facts
+            storage_metadata = {
+                "user_id": user_id,
+                "timestamp": context_metadata.get("timestamp", datetime.now().isoformat()),
+                "fact_type": fact_type,
+                "relevance_score": relevance_score,
+                "source": "phase4_dynamic_personality_profiler",
+                "version": "phase4_v1",
+                "channel_id": context_metadata.get("channel_id", "dm"),
+                "extraction_source": "phase4_analysis"
+            }
+            
+            # Create document content optimized for Phase 4
+            fact_text = f"Phase 4 insight [{fact_type}]: {fact_content}"
+            fact_text += f"\nRelevance: {relevance_score:.3f} (Phase 4 calculated)"
+            
+            # Generate document ID
+            doc_id = f"{user_id}_phase4_{datetime.now().isoformat()}_{hash(fact_content) % 10000}"
+            
+            # Store directly in ChromaDB without redundant classification
+            self.collection.add(
+                documents=[fact_text], 
+                metadatas=[storage_metadata], 
+                ids=[doc_id]
+            )
+            
+            logger.debug(
+                f"Stored Phase 4 fact for {user_id}: {fact_type} (relevance: {relevance_score:.3f})"
+            )
+            
+        except Exception as e:
+            logger.warning(f"Error storing Phase 4 fact for user {user_id}: {e}")
 
     def _determine_knowledge_domain(self, fact: str, context: str = "") -> str:
         """Determine the knowledge domain for a fact based on content analysis"""

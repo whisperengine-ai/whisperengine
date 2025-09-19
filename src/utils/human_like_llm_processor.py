@@ -77,6 +77,13 @@ class HumanLikeLLMProcessor:
         """
 
         try:
+            # Defensive coding: ensure message is a string
+            if not isinstance(message, str):
+                if hasattr(message, 'content'):
+                    message = message.content
+                else:
+                    message = str(message)
+            
             # Get human-like optimized prompts
             system_prompt, user_prompt = self.human_optimizer.optimize_for_human_conversation(
                 message=message,

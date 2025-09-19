@@ -75,8 +75,12 @@ class IntegratedMemoryManager:
 
     @property
     def fact_extractor(self):
-        """Proxy to memory manager's fact_extractor"""
-        return getattr(self.memory_manager, "fact_extractor", None)
+        """⚠️ DEPRECATED: Legacy fact extractor property - replaced by Phase 4 Dynamic Personality Profiler"""
+        logger.warning(
+            "fact_extractor property is deprecated. Phase 4 Dynamic Personality Profiler "
+            "now handles conversation analysis automatically in the memory manager."
+        )
+        return None  # Always return None since fact extraction is handled by Phase 4
 
     @property
     def enable_graph_memory(self):
@@ -140,16 +144,9 @@ class IntegratedMemoryManager:
             # Store in ChromaDB using existing functionality
             conversation_memory_id = self.store_conversation(user_id, message, response)
 
-            # Store user facts if enabled
-            if self.enable_auto_facts and self.fact_extractor:
-                try:
-                    # Extract and store facts (existing functionality)
-                    user_facts = self.fact_extractor.extract_facts(message)
-                    for fact in user_facts:
-                        self.store_user_fact(user_id, fact)
-                except (ValueError, RuntimeError) as e:
-                    logger.warning("Fact extraction failed: %s", e)
-
+            # Legacy fact extraction system has been replaced by Phase 4 Dynamic Personality Profiler
+            # which provides superior conversation analysis integrated into the memory manager
+            
             # Link memory to graph database if enabled
             if self.enable_graph_memory and conversation_memory_id:
                 asyncio.create_task(
@@ -594,21 +591,11 @@ class IntegratedMemoryManager:
                     "error": str(e),
                 }
 
-        # Check fact extraction
-        if self.enable_auto_facts and self.fact_extractor:
-            try:
-                self.fact_extractor.extract_facts("I am a test user")
-                health_status["components"]["fact_extraction"] = {"status": "healthy"}
-            except Exception as e:
-                health_status["components"]["fact_extraction"] = {
-                    "status": "error",
-                    "error": str(e),
-                }
-        elif self.enable_auto_facts:
-            health_status["components"]["fact_extraction"] = {
-                "status": "disabled",
-                "reason": "fact_extractor not available",
-            }
+        # Legacy fact extraction check - now replaced by Phase 4
+        health_status["components"]["fact_extraction"] = {
+            "status": "replaced",
+            "info": "Legacy fact extraction replaced by Phase 4 Dynamic Personality Profiler",
+        }
 
         # Overall status
         component_statuses = [
