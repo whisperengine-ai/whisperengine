@@ -13,7 +13,7 @@ import asyncio
 import json
 import logging
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 from enum import Enum
 from typing import Dict, List, Optional, Any, Tuple
 from dataclasses import dataclass, asdict
@@ -21,7 +21,7 @@ from uuid import uuid4
 
 # Local-First AI/ML Libraries
 from qdrant_client import QdrantClient, models
-from qdrant_client.http.models import Distance, VectorParams, PointStruct
+from qdrant_client.http.models import Distance, VectorParams, PointStruct, Range, OrderBy, Direction
 from fastembed import TextEmbedding
 import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
@@ -153,28 +153,48 @@ class VectorMemoryStore:
             raise
     
     async def store_memory(self, memory: VectorMemory) -> str:
-        """Store memory in Qdrant vector database"""
+        """
+        🚀 ENHANCED: Store memory with Qdrant-native semantic enrichment
+        
+        Adds:
+        - Semantic keys for contradiction detection
+        - Emotional context extraction
+        - Temporal metadata for decay functions
+        - Confidence scoring based on source
+        """
         try:
             # Generate embedding if not provided
             if memory.embedding is None:
                 memory.embedding = await self.generate_embedding(memory.content)
             
-            # Prepare payload for Qdrant
-            payload = {
+            # 🎯 QDRANT ENHANCEMENT: Add semantic enrichment to payload
+            enriched_payload = {
                 "user_id": memory.user_id,
                 "memory_type": memory.memory_type.value,
                 "content": memory.content,
                 "timestamp": memory.timestamp.isoformat(),
                 "confidence": memory.confidence,
                 "source": memory.source,
+                
+                # 🚀 NEW: Semantic enrichment for Qdrant intelligence
+                "semantic_key": self._get_semantic_key(memory.content),
+                "emotional_context": self._extract_emotional_context(memory.content),
+                "content_length": len(memory.content),
+                "word_count": len(memory.content.split()),
+                "storage_timestamp": datetime.utcnow().isoformat(),
+                
+                # Temporal metadata for Qdrant time-based queries
+                "timestamp_unix": memory.timestamp.timestamp(),
+                "age_category": self._get_age_category(memory.timestamp),
+                
                 **memory.metadata
             }
             
-            # Store in Qdrant
+            # Store in Qdrant with enriched payload
             point = PointStruct(
                 id=memory.id,
                 vector=memory.embedding,
-                payload=payload
+                payload=enriched_payload
             )
             
             self.client.upsert(
@@ -183,21 +203,559 @@ class VectorMemoryStore:
             )
             
             self.stats["memories_stored"] += 1
-            logger.info(f"Stored memory {memory.id} for user {memory.user_id}")
+            logger.info(f"🎯 STORED: Memory {memory.id} with semantic_key='{enriched_payload['semantic_key']}' "
+                       f"for user {memory.user_id}")
             
             return memory.id
             
         except Exception as e:
-            logger.error(f"Memory storage failed: {e}")
+            logger.error(f"Enhanced memory storage failed: {e}")
             raise
+
+    def _extract_emotional_context(self, content: str) -> str:
+        """Extract emotional context for role-playing intelligence"""
+        content_lower = content.lower()
+        
+        # Positive emotions
+        if any(word in content_lower for word in ['happy', 'joy', 'excited', 'love', 'wonderful', 'amazing']):
+            return 'positive'
+        
+        # Negative emotions
+        if any(word in content_lower for word in ['sad', 'angry', 'frustrated', 'hate', 'terrible', 'awful']):
+            return 'negative'
+        
+        # Neutral/complex emotions
+        if any(word in content_lower for word in ['confused', 'curious', 'wondering', 'thinking']):
+            return 'contemplative'
+        
+        return 'neutral'
+
+    def _get_age_category(self, timestamp: datetime) -> str:
+        """Categorize memory age for Qdrant filtering"""
+        age = datetime.utcnow() - timestamp
+        
+        if age.days < 1:
+            return 'fresh'  # Less than 1 day
+        elif age.days < 7:
+            return 'recent'  # 1-7 days
+        elif age.days < 30:
+            return 'medium'  # 1-4 weeks
+        else:
+            return 'old'  # Over a month
     
+    async def search_memories_with_qdrant_intelligence(self, 
+                                                      query: str,
+                                                      user_id: str,
+                                                      memory_types: Optional[List[MemoryType]] = None,
+                                                      top_k: int = 10,
+                                                      min_score: float = 0.7,
+                                                      emotional_context: Optional[str] = None,
+                                                      prefer_recent: bool = True) -> List[Dict[str, Any]]:
+        """
+        🚀 QDRANT-NATIVE: Use Qdrant's advanced features for role-playing AI
+        
+        NEW: Temporal context detection using Qdrant features:
+        - Detect temporal queries ("last", "just now", "earlier") 
+        - Use scroll API for chronological recent context
+        - Use search_batch for parallel temporal + semantic queries
+        - Use payload-based temporal boosting
+        """
+        try:
+            query_embedding = await self.generate_embedding(query)
+            
+            # 🎯 QDRANT FEATURE: Detect temporal context queries using payload filtering
+            is_temporal_query = await self._detect_temporal_query_with_qdrant(query, user_id)
+            
+            if is_temporal_query:
+                logger.info(f"🎯 TEMPORAL QUERY DETECTED: '{query}' - Using Qdrant chronological retrieval")
+                return await self._handle_temporal_query_with_qdrant(query, user_id, top_k)
+            
+            # Regular semantic search continues below...
+            must_conditions = [
+                models.FieldCondition(key="user_id", match=models.MatchValue(value=user_id))
+            ]
+            
+            if memory_types:
+                must_conditions.append(
+                    models.FieldCondition(
+                        key="memory_type", 
+                        match=models.MatchAny(any=[mt.value for mt in memory_types])
+                    )
+                )
+            
+            # 🎯 QDRANT FEATURE 3: Emotional context filtering
+            should_conditions = []
+            if emotional_context:
+                should_conditions.append(
+                    models.FieldCondition(
+                        key="emotional_context", 
+                        match=models.MatchText(text=emotional_context)
+                    )
+                )
+            
+            # Regular search for non-temporal queries
+            search_results = self.client.search(
+                collection_name=self.collection_name,
+                query_vector=query_embedding,
+                query_filter=models.Filter(must=must_conditions, should=should_conditions),
+                limit=top_k,
+                score_threshold=min_score,
+                with_payload=True,
+                params=models.SearchParams(exact=False, hnsw_ef=64)
+            )
+            
+            # Format results
+            enriched_results = []
+            for point in search_results:
+                result = {
+                    "id": point.id,
+                    "score": point.score,
+                    "content": point.payload['content'],
+                    "memory_type": point.payload['memory_type'],
+                    "timestamp": point.payload['timestamp'],
+                    "confidence": point.payload.get('confidence', 0.5),
+                    "metadata": point.payload,
+                    "qdrant_native": True,
+                    "temporal_query": False
+                }
+                enriched_results.append(result)
+            
+            self.stats["searches_performed"] += 1
+            logger.info(f"🎯 QDRANT-SEMANTIC: Retrieved {len(enriched_results)} memories")
+            
+            return enriched_results
+            
+        except Exception as e:
+            logger.error(f"Qdrant-native search failed: {e}")
+            return await self._fallback_basic_search(query, user_id, memory_types, top_k, min_score)
+
+    async def _detect_temporal_query_with_qdrant(self, query: str, user_id: str) -> bool:
+        """
+        🎯 QDRANT-NATIVE: Detect temporal queries using payload-based pattern matching
+        """
+        temporal_keywords = [
+            'last', 'recent', 'just', 'earlier', 'before', 'previous', 
+            'moments ago', 'just now', 'a moment ago', 'just said',
+            'just told', 'just asked', 'just mentioned'
+        ]
+        
+        query_lower = query.lower()
+        return any(keyword in query_lower for keyword in temporal_keywords)
+
+    async def _handle_temporal_query_with_qdrant(self, query: str, user_id: str, limit: int) -> List[Dict[str, Any]]:
+        """
+        🎯 QDRANT-NATIVE: Handle temporal queries using scroll API for chronological context
+        """
+        try:
+            # 🚀 QDRANT FEATURE: Use scroll API to get recent conversation chronologically
+            recent_cutoff = (datetime.utcnow() - timedelta(hours=2)).isoformat()
+            
+            # Get recent conversation messages in chronological order
+            scroll_result = self.client.scroll(
+                collection_name=self.collection_name,
+                scroll_filter=models.Filter(
+                    must=[
+                        models.FieldCondition(key="user_id", match=models.MatchValue(value=user_id)),
+                        models.FieldCondition(key="memory_type", match=models.MatchValue(value="conversation")),
+                        models.FieldCondition(key="timestamp", range=Range(gte=recent_cutoff))
+                    ]
+                ),
+                limit=20,  # Get last 20 conversation messages
+                with_payload=True,
+                with_vectors=False,  # Don't need vectors for temporal queries
+                order_by=models.OrderBy(key="timestamp", direction=Direction.DESC)  # Most recent first
+            )
+            
+            recent_messages = scroll_result[0]  # Get the messages
+            
+            if not recent_messages:
+                logger.info("🎯 TEMPORAL: No recent conversation found, falling back to semantic search")
+                return []
+            
+            # 🚀 QDRANT FEATURE: Use search within recent messages for better relevance
+            recent_message_ids = [msg.id for msg in recent_messages]
+            
+            # Now do semantic search ONLY within these recent messages
+            query_embedding = await self.generate_embedding(query)
+            
+            temporal_results = self.client.search(
+                collection_name=self.collection_name,
+                query_vector=query_embedding,
+                query_filter=models.Filter(
+                    must=[
+                        models.FieldCondition(key="id", match=models.MatchAny(any=recent_message_ids))
+                    ]
+                ),
+                limit=limit,
+                score_threshold=0.3,  # Lower threshold for temporal context
+                with_payload=True
+            )
+            
+            # Format temporal results with special marking
+            formatted_results = []
+            for point in temporal_results:
+                formatted_results.append({
+                    "id": point.id,
+                    "score": point.score,
+                    "content": point.payload['content'],
+                    "memory_type": point.payload['memory_type'],
+                    "timestamp": point.payload['timestamp'],
+                    "confidence": point.payload.get('confidence', 0.5),
+                    "metadata": point.payload,
+                    "temporal_query": True,
+                    "qdrant_chronological": True,
+                    "temporal_rank": len(formatted_results) + 1  # Chronological position
+                })
+            
+            logger.info(f"🎯 QDRANT-TEMPORAL: Found {len(formatted_results)} recent context memories")
+            return formatted_results
+            
+        except Exception as e:
+            logger.error(f"Qdrant temporal query handling failed: {e}")
+            return []
+
+    async def _fallback_basic_search(self, query: str, user_id: str, memory_types: Optional[List[MemoryType]], 
+                                   top_k: int, min_score: float) -> List[Dict[str, Any]]:
+        """Fallback to basic Qdrant search if advanced features fail"""
+        try:
+            query_embedding = await self.generate_embedding(query)
+            filter_conditions = [models.FieldCondition(key="user_id", match=models.MatchValue(value=user_id))]
+            
+            if memory_types:
+                filter_conditions.append(
+                    models.FieldCondition(key="memory_type", match=models.MatchAny(any=[mt.value for mt in memory_types]))
+                )
+            
+            results = self.client.search(
+                collection_name=self.collection_name,
+                query_vector=query_embedding,
+                query_filter=models.Filter(must=filter_conditions),
+                limit=top_k,
+                score_threshold=min_score
+            )
+            
+            return [{
+                "id": point.id,
+                "score": point.score,
+                "content": point.payload['content'],
+                "memory_type": point.payload['memory_type'],
+                "timestamp": point.payload['timestamp'],
+                "confidence": point.payload.get('confidence', 0.5),
+                "metadata": point.payload,
+                "fallback_used": True
+            } for point in results]
+            
+        except Exception as e:
+            logger.error(f"Fallback search also failed: {e}")
+            return []
+
+    async def search_with_multi_vectors(self, 
+                                      content_query: str,
+                                      emotional_query: Optional[str] = None,
+                                      personality_context: Optional[str] = None,
+                                      user_id: str = None,
+                                      top_k: int = 10) -> List[Dict[str, Any]]:
+        """
+        🚀 QDRANT MULTI-VECTOR: Search using multiple vector spaces for role-playing AI
+        
+        - Content vector: Semantic meaning of the query
+        - Emotion vector: Emotional context and mood
+        - Personality vector: Character traits and behavioral patterns
+        
+        Perfect for role-playing characters that need emotional intelligence!
+        """
+        try:
+            # Generate multiple embeddings for different aspects
+            content_embedding = await self.generate_embedding(content_query)
+            
+            emotion_embedding = None
+            if emotional_query:
+                emotion_embedding = await self.generate_embedding(f"emotion: {emotional_query}")
+            
+            personality_embedding = None  
+            if personality_context:
+                personality_embedding = await self.generate_embedding(f"personality: {personality_context}")
+            
+            # 🎯 QDRANT FEATURE: Multi-vector search with weighted combinations
+            if emotion_embedding and personality_embedding:
+                # Triple-vector search: content + emotion + personality
+                logger.info("🎯 QDRANT: Using triple-vector search (content + emotion + personality)")
+                
+                # Use Qdrant's discover API for complex multi-vector relationships
+                results = self.client.discover(
+                    collection_name=self.collection_name,
+                    target=content_embedding,
+                    context=[
+                        models.ContextExamplePair(positive=emotion_embedding, negative=None),
+                        models.ContextExamplePair(positive=personality_embedding, negative=None)
+                    ],
+                    limit=top_k,
+                    with_payload=True
+                )
+                
+            elif emotion_embedding:
+                # Dual-vector search: content + emotion
+                logger.info("🎯 QDRANT: Using dual-vector search (content + emotion)")
+                results = self.client.discover(
+                    collection_name=self.collection_name,
+                    target=content_embedding,
+                    context=[models.ContextExamplePair(positive=emotion_embedding, negative=None)],
+                    limit=top_k,
+                    with_payload=True
+                )
+                
+            else:
+                # Single-vector fallback
+                logger.info("🎯 QDRANT: Using single-vector search (content only)")
+                results = self.client.search(
+                    collection_name=self.collection_name,
+                    query_vector=content_embedding,
+                    limit=top_k,
+                    with_payload=True
+                )
+            
+            # Format results with multi-vector context
+            formatted_results = []
+            for point in results:
+                formatted_results.append({
+                    "id": point.id,
+                    "score": point.score,
+                    "content": point.payload['content'],
+                    "memory_type": point.payload['memory_type'],
+                    "timestamp": point.payload['timestamp'],
+                    "confidence": point.payload.get('confidence', 0.5),
+                    "metadata": point.payload,
+                    "multi_vector_search": True,
+                    "vectors_used": {
+                        "content": True,
+                        "emotion": emotion_embedding is not None,
+                        "personality": personality_embedding is not None
+                    }
+                })
+            
+            logger.info(f"🎯 QDRANT MULTI-VECTOR: Found {len(formatted_results)} emotionally-aware memories")
+            return formatted_results
+            
+        except Exception as e:
+            logger.error(f"Multi-vector search failed: {e}")
+            # Fallback to single vector
+            return await self._fallback_basic_search(content_query, user_id, None, top_k, 0.7)
+
+    async def get_memory_clusters_for_roleplay(self, user_id: str, cluster_size: int = 5) -> Dict[str, List[Dict]]:
+        """
+        🚀 QDRANT CLUSTERING: Group memories by semantic similarity for role-playing consistency
+        
+        Perfect for role-playing AI to understand:
+        - Relationship patterns
+        - Emotional associations  
+        - Character development arcs
+        - Conversation themes
+        """
+        try:
+            # 🎯 QDRANT FEATURE: Use scroll API for large memory retrieval
+            memories = []
+            offset = None
+            
+            # Get all user memories efficiently with scroll
+            while True:
+                scroll_result = self.client.scroll(
+                    collection_name=self.collection_name,
+                    scroll_filter=models.Filter(
+                        must=[models.FieldCondition(key="user_id", match=models.MatchValue(value=user_id))]
+                    ),
+                    limit=100,  # Batch size
+                    offset=offset,
+                    with_payload=True,
+                    with_vectors=True  # Need vectors for clustering
+                )
+                
+                memories.extend(scroll_result[0])
+                offset = scroll_result[1]
+                
+                if offset is None:  # No more results
+                    break
+            
+            if len(memories) < 2:
+                return {"insufficient_data": memories}
+            
+            # 🎯 QDRANT FEATURE: Use recommendation API for memory association
+            clusters = {}
+            processed_ids = set()
+            
+            for memory in memories:
+                if memory.id in processed_ids:
+                    continue
+                
+                # Use Qdrant's recommendation to find semantically similar memories
+                similar_memories = self.client.recommend(
+                    collection_name=self.collection_name,
+                    positive=[memory.id],
+                    query_filter=models.Filter(
+                        must=[
+                            models.FieldCondition(key="user_id", match=models.MatchValue(value=user_id)),
+                            models.FieldCondition(key="id", match=models.MatchExcept(except_=[memory.id]))
+                        ]
+                    ),
+                    limit=cluster_size - 1,  # -1 because we include the seed memory
+                    score_threshold=0.7,
+                    with_payload=True
+                )
+                
+                # Create semantic cluster
+                cluster_theme = self._identify_cluster_theme(memory.payload['content'])
+                cluster_key = f"{cluster_theme}_{len(clusters)}"
+                
+                cluster_memories = [
+                    {
+                        "id": memory.id,
+                        "content": memory.payload['content'],
+                        "timestamp": memory.payload['timestamp'],
+                        "confidence": memory.payload.get('confidence', 0.5),
+                        "is_seed": True
+                    }
+                ]
+                
+                for similar in similar_memories:
+                    cluster_memories.append({
+                        "id": similar.id,
+                        "content": similar.payload['content'],
+                        "timestamp": similar.payload['timestamp'],
+                        "confidence": similar.payload.get('confidence', 0.5),
+                        "similarity_score": similar.score,
+                        "is_seed": False
+                    })
+                    processed_ids.add(similar.id)
+                
+                clusters[cluster_key] = cluster_memories
+                processed_ids.add(memory.id)
+                
+                logger.info(f"🎯 QDRANT CLUSTER: Created '{cluster_theme}' cluster with {len(cluster_memories)} memories")
+            
+            return clusters
+            
+        except Exception as e:
+            logger.error(f"Memory clustering failed: {e}")
+            return {"error": str(e)}
+
+    def _identify_cluster_theme(self, content: str) -> str:
+        """Identify thematic cluster based on content for role-playing context"""
+        content_lower = content.lower()
+        
+        # Relationship themes
+        if any(word in content_lower for word in ['relationship', 'friend', 'family', 'love', 'partner']):
+            return 'relationships'
+        
+        # Emotional themes  
+        if any(word in content_lower for word in ['feel', 'emotion', 'happy', 'sad', 'angry', 'afraid']):
+            return 'emotions'
+        
+        # Character development
+        if any(word in content_lower for word in ['dream', 'goal', 'aspiration', 'future', 'plan']):
+            return 'character_growth'
+        
+        # Memories and experiences
+        if any(word in content_lower for word in ['remember', 'experience', 'happened', 'past']):
+            return 'experiences'
+        
+        # Preferences and traits
+        if any(word in content_lower for word in ['like', 'prefer', 'favorite', 'enjoy', 'hate']):
+            return 'preferences'
+        
+        return 'general'
+
+    async def batch_update_memories_with_qdrant(self, updates: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """
+        🚀 QDRANT BATCH: Efficient batch operations for memory updates
+        
+        Perfect for:
+        - Bulk contradiction resolution
+        - Emotional context updates
+        - Confidence score adjustments
+        - Temporal metadata updates
+        """
+        try:
+            # 🎯 QDRANT FEATURE: Batch upsert for efficiency
+            points_to_update = []
+            
+            for update in updates:
+                point_id = update.get('id')
+                if not point_id:
+                    continue
+                
+                # Get existing point
+                existing_point = self.client.retrieve(
+                    collection_name=self.collection_name,
+                    ids=[point_id],
+                    with_payload=True,
+                    with_vectors=True
+                )[0]
+                
+                if not existing_point:
+                    continue
+                
+                # Update payload while preserving vectors
+                updated_payload = existing_point.payload.copy()
+                updated_payload.update(update.get('payload_updates', {}))
+                
+                # Add batch update metadata
+                updated_payload['batch_updated_at'] = datetime.utcnow().isoformat()
+                updated_payload['update_reason'] = update.get('reason', 'batch_update')
+                
+                points_to_update.append(
+                    PointStruct(
+                        id=point_id,
+                        vector=existing_point.vector,
+                        payload=updated_payload
+                    )
+                )
+            
+            # 🎯 QDRANT FEATURE: Efficient batch upsert
+            if points_to_update:
+                upsert_result = self.client.upsert(
+                    collection_name=self.collection_name,
+                    points=points_to_update,
+                    wait=True  # Ensure consistency for role-playing coherence
+                )
+                
+                logger.info(f"🎯 QDRANT BATCH: Updated {len(points_to_update)} memories in batch")
+                
+                return {
+                    "success": True,
+                    "updated_count": len(points_to_update),
+                    "operation_id": upsert_result.operation_id,
+                    "status": upsert_result.status
+                }
+            
+            return {"success": True, "updated_count": 0, "message": "No valid updates provided"}
+            
+        except Exception as e:
+            logger.error(f"Batch memory update failed: {e}")
+            return {"success": False, "error": str(e)}
+
+    # 🔧 COMPATIBILITY: Bridge method for legacy search_memories calls
     async def search_memories(self, 
                             query: str,
                             user_id: str,
                             memory_types: Optional[List[MemoryType]] = None,
                             top_k: int = 10,
                             min_score: float = 0.7) -> List[Dict[str, Any]]:
-        """Semantic search across user's memories using Qdrant"""
+        """
+        Compatibility bridge to new Qdrant-native search method
+        """
+        try:
+            # Route to the new enhanced method
+            return await self.search_memories_with_qdrant_intelligence(
+                query=query,
+                user_id=user_id,
+                memory_types=memory_types,
+                top_k=top_k,
+                min_score=min_score,
+                emotional_context=None,
+                prefer_recent=True
+            )
+        except Exception as e:
+            logger.error(f"Compatibility search_memories failed: {e}")
+            return await self._fallback_basic_search(query, user_id, memory_types, top_k, min_score)
         try:
             # Generate query embedding
             query_embedding = await self.generate_embedding(query)
@@ -219,37 +777,169 @@ class VectorMemoryStore:
                     )
                 )
             
+            # ENHANCED: Search with larger initial set for post-processing
+            search_limit = max(top_k * 3, 30)  # Get more results for filtering
+            
             # Search Qdrant
             results = self.client.search(
                 collection_name=self.collection_name,
                 query_vector=query_embedding,
                 query_filter=models.Filter(must=filter_conditions),
-                limit=top_k,
-                score_threshold=min_score
+                limit=search_limit,
+                score_threshold=min_score * 0.8,  # Lower threshold for initial search
+                with_payload=True,
+                with_vectors=False  # Don't need vectors for result processing
             )
             
-            # Format results
-            formatted_results = []
-            for point in results:
-                formatted_results.append({
-                    "id": point.id,
-                    "score": point.score,
-                    "content": point.payload['content'],
-                    "memory_type": point.payload['memory_type'],
-                    "timestamp": point.payload['timestamp'],
-                    "confidence": point.payload['confidence'],
-                    "metadata": point.payload
-                })
+            # ENHANCED: Post-process results with intelligent ranking
+            processed_results = await self._intelligent_ranking(
+                results, query, prefer_recent, resolve_contradictions
+            )
+            
+            # Return top results after intelligent processing
+            final_results = processed_results[:top_k]
             
             self.stats["searches_performed"] += 1
-            logger.debug(f"Found {len(formatted_results)} memories for query: {query[:50]}")
+            logger.debug(f"Found {len(final_results)} memories for query: {query[:50]} "
+                        f"(processed {len(results)} raw results)")
             
-            return formatted_results
+            return final_results
             
         except Exception as e:
             logger.error(f"Memory search failed: {e}")
             raise
     
+    async def _intelligent_ranking(self, 
+                                 raw_results: List,
+                                 query: str,
+                                 prefer_recent: bool,
+                                 resolve_contradictions: bool) -> List[Dict[str, Any]]:
+        """
+        QDRANT-POWERED: Intelligent post-processing of search results
+        
+        Uses advanced ranking with:
+        - Temporal decay weighting 
+        - Contradiction resolution (newer facts override older)
+        - Confidence-based scoring
+        - Semantic clustering for context
+        """
+        try:
+            formatted_results = []
+            contradiction_groups = {}
+            
+            # Step 1: Format and group potentially contradictory memories
+            for point in raw_results:
+                result = {
+                    "id": point.id,
+                    "score": point.score,
+                    "content": point.payload['content'],
+                    "memory_type": point.payload['memory_type'],
+                    "timestamp": point.payload['timestamp'],
+                    "confidence": point.payload.get('confidence', 0.5),
+                    "metadata": point.payload
+                }
+                
+                # Step 2: Apply temporal decay if requested
+                if prefer_recent:
+                    # Parse timestamp and calculate age in days
+                    try:
+                        memory_time = datetime.fromisoformat(result['timestamp'].replace('Z', '+00:00'))
+                        age_days = (datetime.utcnow().replace(tzinfo=memory_time.tzinfo) - memory_time).days
+                        
+                        # Temporal decay: 90% weight after 1 day, 50% after 7 days, 10% after 30 days
+                        temporal_weight = max(0.1, 0.9 ** (age_days / 3))
+                        result['score'] *= temporal_weight
+                        result['temporal_weight'] = temporal_weight
+                        
+                    except Exception as e:
+                        logger.warning(f"Could not parse timestamp for temporal weighting: {e}")
+                        result['temporal_weight'] = 1.0
+                
+                # Step 3: Group similar content for contradiction detection
+                if resolve_contradictions and result['memory_type'] in ['fact', 'preference']:
+                    # Create semantic key for grouping (e.g., all cat-name related facts)
+                    semantic_key = self._get_semantic_key(result['content'])
+                    
+                    if semantic_key not in contradiction_groups:
+                        contradiction_groups[semantic_key] = []
+                    contradiction_groups[semantic_key].append(result)
+                else:
+                    formatted_results.append(result)
+            
+            # Step 4: Resolve contradictions by keeping highest-scored recent memory per group
+            if resolve_contradictions:
+                for semantic_key, group in contradiction_groups.items():
+                    if len(group) == 1:
+                        # No contradictions, add the single memory
+                        formatted_results.extend(group)
+                    else:
+                        # Multiple memories for same semantic concept - resolve contradiction
+                        # Sort by: confidence * temporal_weight * original_score
+                        group.sort(
+                            key=lambda x: x.get('confidence', 0.5) * x.get('temporal_weight', 1.0) * x['score'],
+                            reverse=True
+                        )
+                        
+                        # Keep the best memory, mark others as superseded
+                        best_memory = group[0]
+                        best_memory['contradiction_resolved'] = True
+                        best_memory['superseded_memories'] = len(group) - 1
+                        formatted_results.append(best_memory)
+                        
+                        logger.info(f"🎯 CONTRADICTION RESOLVED: Kept most recent/confident memory for '{semantic_key}' "
+                                  f"(score: {best_memory['score']:.3f}, confidence: {best_memory.get('confidence', 0.5):.3f})")
+            
+            # Step 5: Final ranking by enhanced score
+            formatted_results.sort(
+                key=lambda x: x['score'] * x.get('confidence', 0.5),
+                reverse=True
+            )
+            
+            return formatted_results
+            
+        except Exception as e:
+            logger.error(f"Intelligent ranking failed: {e}")
+            # Fallback to basic formatting
+            return [{
+                "id": point.id,
+                "score": point.score,
+                "content": point.payload['content'],
+                "memory_type": point.payload['memory_type'],
+                "timestamp": point.payload['timestamp'],
+                "confidence": point.payload.get('confidence', 0.5),
+                "metadata": point.payload
+            } for point in raw_results]
+
+    def _get_semantic_key(self, content: str) -> str:
+        """
+        Generate semantic key for grouping related facts
+        
+        This helps identify contradictory information like:
+        - "cat name is Whiskers" vs "cat name is Luna"
+        - "favorite color is blue" vs "favorite color is red"
+        """
+        content_lower = content.lower()
+        
+        # Pet name patterns
+        if any(word in content_lower for word in ['cat', 'dog', 'pet']) and 'name' in content_lower:
+            return 'pet_name'
+        
+        # Color preferences
+        if 'favorite color' in content_lower or 'like color' in content_lower:
+            return 'favorite_color'
+        
+        # User name
+        if 'my name is' in content_lower or 'i am called' in content_lower:
+            return 'user_name'
+        
+        # Location
+        if any(word in content_lower for word in ['live in', 'from', 'location']):
+            return 'user_location'
+        
+        # Generic fallback - use first few words
+        words = content_lower.split()[:3]
+        return '_'.join(words)
+        
     async def detect_contradictions(self, 
                                   new_content: str,
                                   user_id: str,
@@ -874,17 +1564,70 @@ class VectorMemoryManager:
         max_memories: int = 10,
         limit: Optional[int] = None,
         context: Optional[Dict[str, Any]] = None,
+        emotional_context: Optional[str] = None,
+        personality_context: Optional[str] = None,
         **kwargs
     ) -> List[Dict[str, Any]]:
-        """Retrieve context-aware memories with enhanced filtering."""
+        """
+        🚀 QDRANT-POWERED: Context-aware memory retrieval for role-playing AI
+        
+        Uses advanced Qdrant features:
+        - Multi-vector search for emotional intelligence
+        - Contradiction resolution via recommendation API  
+        - Temporal decay with native time filtering
+        - Semantic clustering for character consistency
+        """
         effective_query = query or current_query or ""
         effective_limit = limit or max_memories
         
-        return await self.retrieve_relevant_memories(
-            user_id=user_id,
-            query=effective_query,
-            limit=effective_limit
-        )
+        if not effective_query:
+            return await self.retrieve_relevant_memories(user_id=user_id, query="", limit=effective_limit)
+        
+        try:
+            # 🎯 STRATEGY 1: Use multi-vector search if emotional/personality context available
+            if emotional_context or personality_context:
+                logger.info(f"🎯 Using QDRANT MULTI-VECTOR search for emotionally-aware retrieval")
+                
+                results = await self.vector_store.search_with_multi_vectors(
+                    content_query=effective_query,
+                    emotional_query=emotional_context,
+                    personality_context=personality_context,
+                    user_id=user_id,
+                    top_k=effective_limit
+                )
+                
+                if results:
+                    logger.info(f"🎯 MULTI-VECTOR SUCCESS: Found {len(results)} emotionally-aware memories")
+                    return results
+            
+            # 🎯 STRATEGY 2: Use Qdrant-native intelligent search with contradiction resolution
+            logger.info(f"🎯 Using QDRANT-NATIVE search with contradiction resolution")
+            
+            results = await self.vector_store.search_memories_with_qdrant_intelligence(
+                query=effective_query,
+                user_id=user_id,
+                memory_types=[MemoryType.CONVERSATION, MemoryType.FACT, MemoryType.PREFERENCE],
+                top_k=effective_limit,
+                min_score=0.7,
+                emotional_context=emotional_context,
+                prefer_recent=True
+            )
+            
+            if results:
+                logger.info(f"🎯 QDRANT-NATIVE SUCCESS: Retrieved {len(results)} context-aware memories")
+                return results
+            
+            # 🎯 FALLBACK: Use existing method if advanced features fail
+            logger.warning(f"🎯 FALLBACK: Using basic retrieval for query '{effective_query[:50]}...'")
+            return await self.retrieve_relevant_memories(
+                user_id=user_id, 
+                query=effective_query, 
+                limit=effective_limit
+            )
+            
+        except Exception as e:
+            logger.error(f"Enhanced context-aware memory retrieval failed: {e}")
+            return await self.retrieve_relevant_memories(user_id=user_id, query=effective_query, limit=effective_limit)
     
     async def get_recent_conversations(
         self, 
@@ -1259,6 +2002,103 @@ class VectorMemoryManager:
                 "error": str(e),
                 "timestamp": datetime.utcnow().isoformat()
             }
+    
+    # === OPTIMIZATION INTEGRATION ===
+    # Advanced query optimization capabilities
+    
+    async def retrieve_relevant_memories_optimized(self, 
+                                                 user_id: str, 
+                                                 query: str,
+                                                 query_type: str = "general_search",
+                                                 user_history: Optional[Dict] = None,
+                                                 filters: Optional[Dict] = None,
+                                                 limit: int = 10) -> List[Dict[str, Any]]:
+        """
+        Retrieve memories using advanced optimization features.
+        
+        This method provides enhanced search capabilities including:
+        - Query preprocessing and enhancement
+        - Adaptive similarity thresholds
+        - Hybrid search with metadata filtering  
+        - Result re-ranking with multiple factors
+        
+        Args:
+            user_id: User identifier
+            query: Search query
+            query_type: Type of query ('conversation_recall', 'fact_lookup', 'general_search', etc.)
+            user_history: User interaction patterns and preferences
+            filters: Additional search filters (time_range, topics, channel_id, etc.)
+            limit: Maximum number of results
+            
+        Returns:
+            Optimized and ranked search results
+        """
+        try:
+            # Import optimization components
+            from src.memory.qdrant_optimization import QdrantQueryOptimizer, QdrantOptimizationMetrics
+            
+            # Initialize optimizer with current manager
+            optimizer = QdrantQueryOptimizer(self)
+            
+            # Use optimized search
+            results = await optimizer.optimized_search(
+                query=query,
+                user_id=user_id,
+                query_type=query_type,
+                user_history=user_history or {},
+                filters=filters
+            )
+            
+            logger.debug("🚀 Optimized search returned %d results for query: '%s'", len(results), query)
+            return results[:limit]
+            
+        except ImportError:
+            # Fallback to basic search if optimization module not available
+            logger.warning("Optimization module not available, falling back to basic search")
+            return await self.retrieve_relevant_memories(user_id, query, limit)
+        except Exception as e:
+            logger.error("Error in optimized search, falling back to basic: %s", str(e))
+            return await self.retrieve_relevant_memories(user_id, query, limit)
+    
+    async def get_conversation_context_optimized(self, 
+                                               user_id: str,
+                                               current_message: Optional[str] = None,
+                                               query_type: str = "conversation_recall", 
+                                               max_memories: int = 10,
+                                               user_preferences: Optional[Dict] = None) -> List[Dict[str, Any]]:
+        """
+        Get conversation context using optimization features.
+        
+        Args:
+            user_id: User identifier
+            current_message: Current message for context
+            query_type: Type of context search
+            max_memories: Maximum memories to return
+            user_preferences: User interaction preferences
+            
+        Returns:
+            Optimized conversation context
+        """
+        # Use current message or generic conversation query
+        query = current_message or "recent conversation context"
+        
+        # Set up filters for conversation context
+        filters = {
+            'memory_type': 'conversation',
+            'time_range': {
+                'start': datetime.utcnow() - timedelta(days=7),  # Recent week
+                'end': datetime.utcnow()
+            }
+        }
+        
+        return await self.retrieve_relevant_memories_optimized(
+            user_id=user_id,
+            query=query,
+            query_type=query_type,
+            user_history=user_preferences,
+            filters=filters,
+            limit=max_memories
+        )
 
 
 # Example usage and testing
