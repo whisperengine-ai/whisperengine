@@ -510,12 +510,22 @@ class BotEventHandlers:
                         logger.debug(f"Cache lookup failed, proceeding with DB: {e}")
                         relevant_memories = None
                 if not relevant_memories:
+                    logger.info(f"🔍 MEMORY DEBUG: Retrieving memories for user {user_id} with query: '{message.content[:50]}...'")
                     relevant_memories = await self.memory_manager.retrieve_context_aware_memories(
                         user_id=user_id, 
                         query=message.content, 
                         max_memories=20,
                         context=message_context
                     )
+                    logger.info(f"🔍 MEMORY DEBUG: Retrieved {len(relevant_memories) if relevant_memories else 0} memories")
+                    if relevant_memories:
+                        for i, memory in enumerate(relevant_memories[:3]):  # Log first 3 memories
+                            content = memory.get('content', '')[:100]
+                            score = memory.get('score', 'N/A')
+                            logger.info(f"🔍 MEMORY DEBUG: Memory {i+1}: (score: {score}) '{content}...'")
+                    else:
+                        logger.warning(f"🔍 MEMORY DEBUG: No memories retrieved for user {user_id}")
+                    
                     # Store in cache for next time
                     if self.profile_memory_cache and relevant_memories:
                         try:
@@ -1065,6 +1075,12 @@ class BotEventHandlers:
     ):
         """Build conversation context for LLM."""
         conversation_context = []
+        
+        # Debug memory input
+        user_id = str(message.author.id)
+        logger.info(f"🤖 LLM CONTEXT DEBUG: Building context for user {user_id}")
+        logger.info(f"🤖 LLM CONTEXT DEBUG: Memory input - {len(relevant_memories) if relevant_memories else 0} memories")
+        logger.info(f"🤖 LLM CONTEXT DEBUG: Recent messages - {len(recent_messages) if recent_messages else 0} messages")
 
         # Store Discord user information
         store_discord_user_info(message.author, self.memory_manager)
@@ -1111,11 +1127,13 @@ class BotEventHandlers:
             # Build compact memory narrative
             memory_fragments = []
             if relevant_memories and not _minimal_context_mode_enabled():
+                logger.info(f"🤖 LLM CONTEXT DEBUG: Processing {len(relevant_memories)} memories for context")
                 # Handle both legacy and hierarchical memory formats
                 global_facts = []
                 user_memories = []
                 
-                for m in relevant_memories:
+                for i, m in enumerate(relevant_memories):
+                    logger.info(f"🤖 LLM CONTEXT DEBUG: Memory {i+1} structure: {list(m.keys())}")
                     # Check if memory has metadata (legacy format) or use memory_type (hierarchical format)
                     if "metadata" in m:
                         # Legacy format
@@ -1127,6 +1145,8 @@ class BotEventHandlers:
                         # Hierarchical format - treat all as user memories for now
                         user_memories.append(m)
                 
+                logger.info(f"🤖 LLM CONTEXT DEBUG: Categorized - {len(global_facts)} global facts, {len(user_memories)} user memories")
+                
                 if global_facts:
                     gf_text = "; ".join(
                         memory["metadata"].get("fact", "")[:160] for memory in global_facts
@@ -1134,25 +1154,44 @@ class BotEventHandlers:
                     )
                     if gf_text:
                         memory_fragments.append(f"Shared truths: {gf_text}")
+                        logger.info(f"🤖 LLM CONTEXT DEBUG: Added global facts: {gf_text[:100]}...")
                 if user_memories and not _minimal_context_mode_enabled():
-                    um_text_parts = []
+                    conversation_memory_parts = []
                     for memory in user_memories[:6]:  # limit
                         # Handle both legacy and hierarchical memory formats
                         if "metadata" in memory:
-                            # Legacy format
+                            # Legacy format - properly format conversation turns
                             md = memory["metadata"]
-                            if md.get("user_message"):
-                                um_text_parts.append(md.get("user_message")[:120])
+                            if md.get("user_message") and md.get("bot_response"):
+                                # Format as a proper conversation turn
+                                user_msg = md.get("user_message")[:100]
+                                bot_msg = md.get("bot_response")[:100]
+                                conversation_memory_parts.append(f"[User said: \"{user_msg}\", You responded: \"{bot_msg}\"]")
+                            elif md.get("user_message"):
+                                # Just user message
+                                user_msg = md.get("user_message")[:120]
+                                conversation_memory_parts.append(f"[User said: \"{user_msg}\"]")
                             elif md.get("type") == "user_fact":
-                                um_text_parts.append(md.get("fact", "")[:120])
+                                conversation_memory_parts.append(f"[Fact: {md.get('fact', '')[:120]}]")
                         else:
-                            # Hierarchical format - use content field
+                            # Hierarchical format - use content field but clarify source
                             content = memory.get("content", "")
                             if content:
-                                um_text_parts.append(content[:120])
-                    if um_text_parts:
-                        memory_fragments.append("You recall: " + "; ".join(um_text_parts))
+                                # Try to parse if it contains conversation structure
+                                if "User:" in content and "Bot:" in content:
+                                    conversation_memory_parts.append(f"[Previous conversation: {content[:120]}]")
+                                else:
+                                    conversation_memory_parts.append(f"[Memory: {content[:120]}]")
+                    if conversation_memory_parts:
+                        memory_fragments.append("Previous conversation context: " + "; ".join(conversation_memory_parts))
+                        logger.info(f"🤖 LLM CONTEXT DEBUG: Added conversation memories: {conversation_memory_parts}")
+                    else:
+                        logger.warning(f"🤖 LLM CONTEXT DEBUG: No valid user memory content found")
+            else:
+                logger.info(f"🤖 LLM CONTEXT DEBUG: No memories to process (memories: {relevant_memories is not None}, minimal_mode: {_minimal_context_mode_enabled()})")
+            
             memory_narrative = " " .join(memory_fragments)
+            logger.info(f"🤖 LLM CONTEXT DEBUG: Final memory narrative: '{memory_narrative[:200]}...'")
 
             # Conversation summary (compressed)
             conversation_summary = None
@@ -1242,6 +1281,9 @@ class BotEventHandlers:
                                 # Use semantic classification instead of pattern matching
                                 fact_score = memory.get("score", 0.0)
                                 
+                                # DEBUG: Log what memories are being added to context
+                                logger.info(f"🔍 MEMORY DEBUG: Adding memory to context (score: {fact_score}): '{content[:100]}...'")
+                                
                                 # High semantic similarity + declarative statement = likely user fact
                                 if fact_score > 0.95:
                                     # Use spaCy-based classification instead of simple pattern matching
@@ -1260,16 +1302,21 @@ class BotEventHandlers:
                                         
                                         if is_user_statement and not is_question:
                                             memory_context += f"- IMPORTANT USER INFO: {content[:160]}\n"
+                                            logger.info(f"🎯 MEMORY DEBUG: Classified as IMPORTANT USER INFO: '{content[:100]}...'")
                                         elif is_question:
                                             memory_context += f"- Previous question: {content[:160]}\n"
+                                            logger.info(f"❓ MEMORY DEBUG: Classified as previous question: '{content[:100]}...'")
                                         else:
                                             memory_context += f"- Previous conversation: {content[:160]}\n"
+                                            logger.info(f"💬 MEMORY DEBUG: Classified as conversation: '{content[:100]}...'")
                                     except Exception:
                                         # Fallback to simple formatting
                                         memory_context += f"- Previous conversation: {content[:160]}\n"
+                                        logger.info(f"⚠️ MEMORY DEBUG: Used fallback formatting: '{content[:100]}...'")
                                 else:
                                     # Lower similarity, format as regular conversation
                                     memory_context += f"- Previous conversation: {content[:160]}\n"
+                                    logger.info(f"📝 MEMORY DEBUG: Low similarity conversation: '{content[:100]}...'")
                 
                 conversation_context.append({"role": "system", "content": memory_context})
             conversation_summary = generate_conversation_summary(
@@ -1327,6 +1374,16 @@ class BotEventHandlers:
         
         conversation_context.extend(fixed_history)
 
+        # CRITICAL: Add anti-hallucination system message
+        conversation_context.append({
+            "role": "system", 
+            "content": (
+                "IMPORTANT: Only reference information that was explicitly provided in this conversation or "
+                "in the memory context above. DO NOT make up facts, names, or details that were not mentioned. "
+                "If you don't have specific information, say so honestly instead of guessing or fabricating details."
+            )
+        })
+
         # If the triggering message contains attachments (e.g. images), add an explicit anti-analysis guard
         # to prevent the model from responding with coaching-style analytical breakdowns (observed regression
         # when images are included). This instruction is additive and limited in scope.
@@ -1368,6 +1425,13 @@ class BotEventHandlers:
                 "Context size optimized: removed %d tokens to prevent API issues", 
                 tokens_removed
             )
+
+        # DEBUG: Log the final conversation context being sent to LLM
+        logger.info(f"🤖 LLM CONTEXT DEBUG: Sending {len(conversation_context)} messages to LLM for user {user_id}")
+        for i, ctx_msg in enumerate(conversation_context):
+            role = ctx_msg.get('role', 'unknown')
+            content_preview = ctx_msg.get('content', '')[:200] + '...' if len(ctx_msg.get('content', '')) > 200 else ctx_msg.get('content', '')
+            logger.info(f"🤖 LLM CONTEXT {i+1}: [{role}] {content_preview}")
 
         return conversation_context
 
@@ -1450,7 +1514,10 @@ class BotEventHandlers:
     ):
         """Process Phase 4 human-like conversation intelligence."""
         try:
-            logger.debug("Running Phase 4: Human-Like Conversation Intelligence...")
+            logger.info(f"🧠 PHASE 4 DEBUG: Starting Phase 4 human-like conversation intelligence for user {user_id}")
+            logger.info(f"🧠 PHASE 4 DEBUG: Input message: '{message.content[:100]}...'")
+            logger.info(f"🧠 PHASE 4 DEBUG: External emotion data: {str(external_emotion_data)[:200] if external_emotion_data else 'None'}")
+            logger.info(f"🧠 PHASE 4 DEBUG: Phase 2 context: {str(phase2_context)[:200] if phase2_context else 'None'}")
 
             discord_context = {
                 "channel_id": str(message.channel.id),
@@ -1460,11 +1527,14 @@ class BotEventHandlers:
                 "external_emotion_data": external_emotion_data,
                 "phase2_results": phase2_context,
             }
+            
+            logger.info(f"🧠 PHASE 4 DEBUG: Discord context: {discord_context}")
 
             # Clean Phase 4 integration - call directly instead of through monkey-patched methods
             from src.intelligence.phase4_human_like_integration import Phase4HumanLikeIntegration
             
             # Create Phase 4 integration instance with clean architecture
+            logger.info("🧠 PHASE 4 DEBUG: Creating Phase4HumanLikeIntegration instance")
             phase4_integration = Phase4HumanLikeIntegration(
                 phase2_integration=getattr(self.bot, 'phase2_integration', None),
                 phase3_memory_networks=getattr(self.bot, 'phase3_memory_networks', None),
@@ -1476,12 +1546,15 @@ class BotEventHandlers:
             )
             
             # Process message with Phase 4 intelligence
+            logger.info("🧠 PHASE 4 DEBUG: Processing message with comprehensive intelligence")
             phase4_context = await phase4_integration.process_comprehensive_message(
                 user_id=user_id,
                 message=message.content,
                 conversation_context=recent_messages,
                 discord_context=discord_context,
             )
+            
+            logger.info(f"🧠 PHASE 4 DEBUG: Received Phase 4 context: {str(phase4_context)[:300] if phase4_context else 'None'}")
 
             # --- PHASE 4 SCATTER-GATHER PARALLELISM ---
             import asyncio
@@ -1573,7 +1646,9 @@ class BotEventHandlers:
 
             # Gather all tasks in parallel
             gather_tasks = [t for t in [thread_manager_task, engagement_task, human_like_task, conversation_analysis_task] if t]
+            logger.info(f"🧠 PHASE 4 DEBUG: Executing {len(gather_tasks)} Phase 4 scatter-gather tasks")
             results = await asyncio.gather(*gather_tasks, return_exceptions=True) if gather_tasks else []
+            logger.info(f"🧠 PHASE 4 DEBUG: Phase 4 scatter-gather completed with {len(results)} results")
 
             # Unpack results with robust error handling
             idx = 0
@@ -1584,8 +1659,9 @@ class BotEventHandlers:
             if thread_manager_task:
                 if not isinstance(results[idx], Exception):
                     thread_manager_result = results[idx]
+                    logger.info(f"🧠 PHASE 4 DEBUG: Thread manager result: {str(thread_manager_result)[:200] if thread_manager_result else 'None'}")
                 else:
-                    logger.warning(f"Phase 4.2 Thread Manager task failed: {results[idx]}")
+                    logger.warning(f"🧠 PHASE 4 DEBUG: Thread Manager task failed: {results[idx]}")
                 idx += 1
             if engagement_task:
                 if not isinstance(results[idx], Exception):
@@ -1611,9 +1687,11 @@ class BotEventHandlers:
 
             # Get comprehensive context directly from Phase 4 integration
             if phase4_context:
+                logger.info("🧠 PHASE 4 DEBUG: Getting comprehensive context from Phase 4 integration")
                 comprehensive_context = phase4_integration.get_comprehensive_context_for_response(
                     phase4_context
                 )
+                logger.info(f"🧠 PHASE 4 DEBUG: Comprehensive context keys: {list(comprehensive_context.keys()) if comprehensive_context else 'None'}")
 
                 # Prepare template context for enhanced response generation
                 template_context = {
@@ -1622,6 +1700,10 @@ class BotEventHandlers:
                     "interaction_type": getattr(phase4_context, "interaction_type", None),
                     "conversation_mode": getattr(phase4_context, "conversation_mode", None),
                 }
+                
+                logger.info(f"🧠 PHASE 4 DEBUG: Template context prepared with keys: {list(template_context.keys())}")
+                logger.info(f"🧠 PHASE 4 DEBUG: Interaction type: {getattr(phase4_context, 'interaction_type', 'None')}")
+                logger.info(f"🧠 PHASE 4 DEBUG: Conversation mode: {getattr(phase4_context, 'conversation_mode', 'None')}")
 
                 # System prompt enhancement handled by the LLM response generation
                 enhanced_system_prompt = None
@@ -1641,10 +1723,10 @@ class BotEventHandlers:
                 conversation_mode = getattr(phase4_context, "conversation_mode", None)
                 conversation_mode_str = conversation_mode.value if conversation_mode else "unknown"
 
-                logger.debug(
-                    f"Phase 4 analysis completed: {conversation_mode_str} mode, "
-                    f"{phase4_context.interaction_type.value} interaction, "
-                    f"{len(phases_executed)} phases executed"
+                logger.info(
+                    f"🧠 PHASE 4 DEBUG: Analysis summary - Mode: {conversation_mode_str}, "
+                    f"Interaction: {phase4_context.interaction_type.value if hasattr(phase4_context, 'interaction_type') else 'unknown'}, "
+                    f"Phases executed: {len(phases_executed)}"
                 )
 
             # Merge human-like context into comprehensive context if available and not Exception
@@ -1677,12 +1759,16 @@ class BotEventHandlers:
             if comprehensive_context:
                 if thread_manager_result:
                     comprehensive_context["phase4_2_thread_analysis"] = thread_manager_result
-                    logger.debug("Added Phase 4.2 Advanced Thread Management results to context")
+                    logger.info("🧠 PHASE 4 DEBUG: Added Phase 4.2 Advanced Thread Management results to context")
                 
                 if engagement_result:
                     comprehensive_context["phase4_3_engagement_analysis"] = engagement_result
-                    logger.debug("Added Phase 4.3 Proactive Engagement results to context")
+                    logger.info("🧠 PHASE 4 DEBUG: Added Phase 4.3 Proactive Engagement results to context")
+                    
+                logger.info(f"🧠 PHASE 4 DEBUG: Final comprehensive context size: {len(str(comprehensive_context))} chars")
+                logger.info(f"🧠 PHASE 4 DEBUG: Final comprehensive context keys: {list(comprehensive_context.keys())}")
 
+            logger.info(f"🧠 PHASE 4 DEBUG: Returning - Phase4 context: {'Yes' if phase4_context else 'No'}, Comprehensive: {'Yes' if comprehensive_context else 'No'}, Enhanced prompt: {'Yes' if enhanced_system_prompt else 'No'}")
             return phase4_context, comprehensive_context, enhanced_system_prompt
 
         except Exception as e:
@@ -1731,25 +1817,35 @@ class BotEventHandlers:
 
                         # 🔧 CRITICAL FIX: Use our hierarchical memory conversation_context directly
                         # instead of letting chat orchestrator ignore our memory system
-                        logger.info(f"[CONTEXT-FIX] Using hierarchical memory context with {len(conversation_context)} messages")
+                        logger.info(f"🎯 CONTEXT DEBUG: Using hierarchical memory context with {len(conversation_context)} messages")
                         
                         # DEBUG: Log environment variable affecting conversation processing
                         strict_mode = _strict_mode_enabled()
                         minimal_mode = _minimal_context_mode_enabled()
-                        logger.info(f"[DEBUG-ENV] STRICT_IMMERSIVE_MODE: {strict_mode}, MINIMAL_CONTEXT_MODE: {minimal_mode}")
+                        logger.info(f"🎯 CONTEXT DEBUG: STRICT_IMMERSIVE_MODE: {strict_mode}, MINIMAL_CONTEXT_MODE: {minimal_mode}")
                         
                         # Debug log the conversation context being sent to LLM
-                        for i, ctx_msg in enumerate(conversation_context[-8:]):  # Log last 8 messages
+                        logger.info(f"🎯 CONTEXT DEBUG: Full conversation context structure:")
+                        for i, ctx_msg in enumerate(conversation_context):
                             role = ctx_msg.get('role', 'unknown')
-                            content_preview = ctx_msg.get('content', '')[:100] + '...' if len(ctx_msg.get('content', '')) > 100 else ctx_msg.get('content', '')
-                            logger.info(f"[CONTEXT-FIX] Message {i}: {role} = '{content_preview}'")
+                            content = ctx_msg.get('content', '')
+                            content_preview = content[:200] + '...' if len(content) > 200 else content
+                            logger.info(f"🎯 CONTEXT DEBUG: Message {i+1}/{len(conversation_context)} [{role}]: '{content_preview}'")
+                            
+                            # Check for memory content specifically
+                            if 'memory' in content.lower() or 'recall' in content.lower() or 'luna' in content.lower():
+                                logger.info(f"🎯 CONTEXT DEBUG: *** MEMORY DETECTED in message {i+1} ***")
 
                         # Generate AI response using our conversation context directly
+                        logger.info(f"🎯 CONTEXT DEBUG: Sending {len(conversation_context)} messages to Universal Chat Orchestrator")
                         ai_response = await self.chat_orchestrator.generate_ai_response(
                             universal_message, conversation_context  # Use our hierarchical memory context!
                         )
 
                         response = ai_response.content
+                        
+                        logger.info(f"🎯 CONTEXT DEBUG: Received response from Universal Chat: {len(response)} chars")
+                        logger.info(f"🎯 CONTEXT DEBUG: Response preview: '{response[:200]}...'")
                         
                         # Additional validation to prevent empty responses
                         if not response or not response.strip():
@@ -1760,10 +1856,8 @@ class BotEventHandlers:
                             )
                             response = "I apologize, but I'm having trouble generating a response right now. Please try again."
                         
-                        logger.debug(f"Universal Chat response: {len(response)} characters")
-                        logger.debug(
-                            f"Model used: {ai_response.model_used}, Tokens: {ai_response.tokens_used}"
-                        )
+                        logger.info(f"🎯 CONTEXT DEBUG: Final response: {len(response)} characters")
+                        logger.info(f"🎯 CONTEXT DEBUG: Model used: {ai_response.model_used}, Tokens: {ai_response.tokens_used}")
 
                     else:
                         logger.warning(
@@ -1909,19 +2003,57 @@ class BotEventHandlers:
                     except Exception as cleanse_err:
                         logger.error(f"Minimal context cleansing error: {cleanse_err}")
 
-                # Store conversation in memory
-                await self._store_conversation_memory(
-                    message,
-                    user_id,
-                    response,
-                    current_emotion_data,
-                    external_emotion_data,
-                    phase2_context,
-                    phase4_context,
-                    comprehensive_context,
-                    dynamic_personality_context,
-                    original_content,
-                )
+                # CRITICAL FIX: Store conversation in memory BEFORE sending response
+                # This ensures memory is available for future context building
+                memory_stored = False
+                try:
+                    memory_stored = await self._store_conversation_memory(
+                        message,
+                        user_id,
+                        response,
+                        current_emotion_data,
+                        external_emotion_data,
+                        phase2_context,
+                        phase4_context,
+                        comprehensive_context,
+                        dynamic_personality_context,
+                        original_content,
+                    )
+                    if memory_stored:
+                        logger.info(f"✅ MEMORY: Successfully stored conversation for user {user_id}")
+                        
+                        # VERIFICATION: Quick check that memory was actually stored
+                        try:
+                            verification_memories = await self.memory_manager.retrieve_context_aware_memories(
+                                user_id=user_id, 
+                                query=message.content, 
+                                max_memories=1
+                            )
+                            if verification_memories:
+                                logger.info(f"✅ VERIFIED: Memory storage confirmed - {len(verification_memories)} memories found")
+                            else:
+                                logger.warning(f"⚠️ VERIFICATION: No memories found immediately after storage for user {user_id}")
+                        except Exception as verify_error:
+                            logger.warning(f"⚠️ VERIFICATION: Could not verify memory storage: {verify_error}")
+                    else:
+                        logger.error(f"❌ MEMORY: Failed to store conversation for user {user_id}")
+                except Exception as memory_error:
+                    logger.error(f"❌ CRITICAL: Memory storage exception for user {user_id}: {memory_error}")
+                    import traceback
+                    logger.error(f"❌ CRITICAL: Memory storage traceback: {traceback.format_exc()}")
+
+                # Add user message to cache after memory storage
+                if self.conversation_cache:
+                    if hasattr(self.conversation_cache, "add_message"):
+                        if asyncio.iscoroutinefunction(self.conversation_cache.add_message):
+                            await self.conversation_cache.add_message(
+                                str(reply_channel.id), message
+                            )
+                        else:
+                            self.conversation_cache.add_message(str(reply_channel.id), message)
+                    logger.debug(
+                        f"✅ CACHE: Added user message to conversation cache (memory_stored: {memory_stored})"
+                    )
 
                 # Add debug information if needed
                 response_with_debug = add_debug_info_to_response(
@@ -1933,19 +2065,6 @@ class BotEventHandlers:
 
                 # Send voice response if applicable
                 await self._send_voice_response(message, response)
-
-                # Add user message to cache after successful processing
-                if self.conversation_cache:
-                    if hasattr(self.conversation_cache, "add_message"):
-                        if asyncio.iscoroutinefunction(self.conversation_cache.add_message):
-                            await self.conversation_cache.add_message(
-                                str(reply_channel.id), message
-                            )
-                        else:
-                            self.conversation_cache.add_message(str(reply_channel.id), message)
-                    logger.debug(
-                        "Added user message to conversation cache after successful processing"
-                    )
 
             except LLMConnectionError:
                 logger.warning("LLM connection error")
@@ -2072,8 +2191,8 @@ class BotEventHandlers:
         try:
             # Validate response before storing
             if not response or not response.strip():
-                logger.warning("Attempted to store conversation with empty response for user %s", user_id)
-                return  # Skip storage for empty responses
+                logger.error(f"❌ CRITICAL: Attempted to store conversation with empty response for user {user_id}")
+                return False  # Return failure status
                 
             # Extract content for storage
             content_to_store = original_content if original_content else message.content
@@ -2081,11 +2200,11 @@ class BotEventHandlers:
 
             # Skip empty content
             if not storage_content or not storage_content.strip():
-                logger.warning(f"Empty storage content detected for user {user_id}")
-                logger.info("Skipping conversation storage due to empty content")
-                return
+                logger.error(f"❌ CRITICAL: Empty storage content detected for user {user_id}")
+                logger.error(f"❌ CRITICAL: Original content: '{content_to_store}', extracted: '{storage_content}'")
+                return False
 
-            logger.debug(f"Storage content length: {len(storage_content)} characters")
+            logger.info(f"💾 Storing conversation for user {user_id}: '{storage_content[:100]}...' → '{response[:100]}...'")
 
             # Prepare emotion metadata
             emotion_metadata = None
@@ -2209,6 +2328,11 @@ class BotEventHandlers:
                 metadata=storage_metadata,
             )
 
+            if storage_success:
+                logger.info(f"✅ Successfully stored conversation in memory for user {user_id}")
+            else:
+                logger.error(f"❌ CRITICAL: Memory storage returned False for user {user_id}")
+
             # Sync cache with storage result
             if self.conversation_cache and hasattr(self.conversation_cache, "sync_with_storage"):
                 import inspect
@@ -2222,12 +2346,17 @@ class BotEventHandlers:
                         str(message.channel.id), message, storage_success
                     )
 
-            logger.debug(f"Stored conversation for user {user_id} - original message only")
+            logger.debug(f"Memory storage complete for user {user_id} - success: {storage_success}")
+            return storage_success
 
         except (MemoryStorageError, ValidationError) as e:
-            logger.warning(f"Could not store conversation: {e}")
+            logger.error(f"❌ CRITICAL: Memory storage validation error for user {user_id}: {e}")
+            return False
         except Exception as e:
-            logger.error(f"Unexpected error storing conversation: {e}")
+            logger.error(f"❌ CRITICAL: Unexpected memory storage error for user {user_id}: {e}")
+            import traceback
+            logger.error(f"❌ CRITICAL: Memory storage traceback: {traceback.format_exc()}")
+            return False
 
     async def _analyze_personality_for_storage(self, user_id, storage_content, message):
         """Analyze personality for conversation storage."""
@@ -2517,14 +2646,17 @@ class BotEventHandlers:
         """
         import asyncio
         
-        logger.debug(f"Starting parallel AI component processing for user {user_id}")
+        logger.info(f"🚀 AI PIPELINE DEBUG: Starting parallel AI component processing for user {user_id}")
+        logger.info(f"🚀 AI PIPELINE DEBUG: Input message length: {len(content)} chars")
+        logger.info(f"🚀 AI PIPELINE DEBUG: Recent messages count: {len(recent_messages) if recent_messages else 0}")
+        logger.info(f"🚀 AI PIPELINE DEBUG: Conversation context messages: {len(conversation_context) if conversation_context else 0}")
         start_time = time.time()
         
         # Use ConcurrentConversationManager for proper scatter-gather if available
         if (self.conversation_manager and 
             os.getenv("ENABLE_CONCURRENT_CONVERSATION_MANAGER", "false").lower() == "true"):
             
-            logger.debug("Using ConcurrentConversationManager for scatter-gather processing")
+            logger.info("🚀 AI PIPELINE DEBUG: Using ConcurrentConversationManager for scatter-gather processing")
             
             # Prepare context for conversation manager
             context = {
@@ -2574,7 +2706,7 @@ class BotEventHandlers:
                    enhanced_system_prompt)
         
         # Fallback to basic asyncio.gather approach if ConcurrentConversationManager not available
-        logger.debug("Using fallback asyncio.gather approach for parallel processing")
+        logger.info("🚀 AI PIPELINE DEBUG: Using fallback asyncio.gather approach for parallel processing")
         
         # Prepare task list for parallel execution
         tasks = []
@@ -2583,9 +2715,11 @@ class BotEventHandlers:
         # Task 1: Local emotion analysis (replaces external API)
         if (os.getenv("DISABLE_LOCAL_EMOTION", "false").lower() != "true" 
             and self.local_emotion_engine):
+            logger.info("🚀 AI PIPELINE DEBUG: Adding local emotion analysis task")
             tasks.append(self._analyze_external_emotion(content, user_id, conversation_context))
             task_names.append("local_emotion")
         else:
+            logger.info("🚀 AI PIPELINE DEBUG: Local emotion analysis disabled or unavailable")
             tasks.append(asyncio.create_task(self._create_none_result()))
             task_names.append("local_emotion_disabled")
             
@@ -2593,24 +2727,28 @@ class BotEventHandlers:
         if (os.getenv("DISABLE_PHASE2_EMOTION", "false").lower() != "true" 
             and self.phase2_integration):
             context_type = "guild_message" if hasattr(message, 'guild') and message.guild else "dm"
+            logger.info(f"🚀 AI PIPELINE DEBUG: Adding Phase 2 emotion analysis task (context: {context_type})")
             tasks.append(self._analyze_phase2_emotion(user_id, content, message, context_type))
             task_names.append("phase2_emotion")
         else:
+            logger.info("🚀 AI PIPELINE DEBUG: Phase 2 emotion analysis disabled or unavailable")
             tasks.append(asyncio.create_task(self._create_none_result()))
             task_names.append("phase2_emotion_disabled")
             
         # Task 3: Dynamic personality analysis
         if (os.getenv("DISABLE_PERSONALITY_PROFILING", "false").lower() != "true"
             and self.dynamic_personality_profiler):
+            logger.info("🚀 AI PIPELINE DEBUG: Adding dynamic personality analysis task")
             tasks.append(self._analyze_dynamic_personality(user_id, content, message, recent_messages))
             task_names.append("dynamic_personality")
         else:
+            logger.info("🚀 AI PIPELINE DEBUG: Dynamic personality analysis disabled or unavailable")
             tasks.append(asyncio.create_task(self._create_none_result()))
             task_names.append("dynamic_personality_disabled")
             
         # Execute all tasks in parallel
         try:
-            logger.debug(f"Executing {len(tasks)} AI analysis tasks in parallel")
+            logger.info(f"🚀 AI PIPELINE DEBUG: Executing {len(tasks)} AI analysis tasks in parallel: {task_names}")
             results = await asyncio.gather(*tasks, return_exceptions=True)
             
             # Process results and handle any exceptions
@@ -2619,41 +2757,55 @@ class BotEventHandlers:
             current_emotion_data = None
             dynamic_personality_context = None
             
+            logger.info(f"🚀 AI PIPELINE DEBUG: Parallel tasks completed, processing {len(results)} results")
+            
             for i, result in enumerate(results):
                 task_name = task_names[i]
                 
                 if isinstance(result, Exception):
-                    logger.warning(f"Parallel task {task_name} failed: {result}")
+                    logger.warning(f"🚀 AI PIPELINE DEBUG: Parallel task {task_name} failed: {result}")
                     continue
                     
-                if task_name.startswith("external_emotion") and result is not None:
+                logger.info(f"🚀 AI PIPELINE DEBUG: Processing result for task {task_name}: {type(result)}")
+                    
+                if task_name.startswith("local_emotion") and result is not None:
                     external_emotion_data = result
+                    logger.info(f"🚀 AI PIPELINE DEBUG: Set external_emotion_data from {task_name}: {str(result)[:200]}")
                 elif task_name.startswith("phase2_emotion") and result is not None:
                     # Phase 2 returns a tuple (phase2_context, current_emotion_data)
                     if isinstance(result, tuple) and len(result) == 2:
                         phase2_context, current_emotion_data = result
+                        logger.info(f"🚀 AI PIPELINE DEBUG: Set phase2_context and current_emotion_data from {task_name}")
+                        logger.info(f"🚀 AI PIPELINE DEBUG: Phase2 context: {str(phase2_context)[:200] if phase2_context else 'None'}")
+                        logger.info(f"🚀 AI PIPELINE DEBUG: Current emotion: {str(current_emotion_data)[:200] if current_emotion_data else 'None'}")
                     else:
-                        logger.warning(f"Unexpected phase2 result format: {type(result)}")
+                        logger.warning(f"🚀 AI PIPELINE DEBUG: Unexpected phase2 result format: {type(result)}")
                 elif task_name.startswith("dynamic_personality") and result is not None:
                     dynamic_personality_context = result
+                    logger.info(f"🚀 AI PIPELINE DEBUG: Set dynamic_personality_context from {task_name}: {str(result)[:200]}")
                     
             # Task 4: Phase 4 intelligence (depends on results from above)
             phase4_context = None
             comprehensive_context = None
             enhanced_system_prompt = None
             
+            logger.info("🚀 AI PIPELINE DEBUG: Checking Phase 4 intelligence processing...")
+            
             if (os.getenv("DISABLE_PHASE4_INTELLIGENCE", "false").lower() != "true"
                 and hasattr(self.memory_manager, "process_with_phase4_intelligence")):
                 try:
+                    logger.info("🚀 AI PIPELINE DEBUG: Starting Phase 4 intelligence processing...")
                     phase4_context, comprehensive_context, enhanced_system_prompt = (
                         await self._process_phase4_intelligence(
                             user_id, message, recent_messages, external_emotion_data, phase2_context
                         )
                     )
+                    logger.info(f"🚀 AI PIPELINE DEBUG: Phase 4 completed - Context: {str(phase4_context)[:100] if phase4_context else 'None'}")
+                    logger.info(f"🚀 AI PIPELINE DEBUG: Enhanced prompt length: {len(enhanced_system_prompt) if enhanced_system_prompt else 0} chars")
                 except Exception as e:
-                    logger.warning(f"Phase 4 intelligence processing failed: {e}")
+                    logger.warning(f"🚀 AI PIPELINE DEBUG: Phase 4 intelligence processing failed: {e}")
             else:
-                logger.debug("Phase 4 intelligence processing disabled for performance")
+                logger.info("🚀 AI PIPELINE DEBUG: Phase 4 intelligence processing disabled or unavailable")
                     
             # Store results in instance variables for use by response generation
             self._last_external_emotion_data = external_emotion_data
