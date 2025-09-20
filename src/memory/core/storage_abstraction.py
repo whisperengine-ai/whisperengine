@@ -395,15 +395,26 @@ class HierarchicalMemoryManager:
             return []
     
     async def _generate_conversation_summary(self, user_message: str, bot_response: str) -> str:
-        """Generate summary for ChromaDB storage"""
-        # Simple summarization - can be enhanced with LLM later
+        """Generate enhanced summary for ChromaDB storage with instructional content preservation"""
         topics = self._extract_topics(user_message)
         intent = self._extract_intent(user_message)
         
-        topic_text = ", ".join(topics[:3]) if topics else "general conversation"
-        summary = f"User {intent} about {topic_text}. Bot provided assistance."
+        # Detect instructional/mentorship content
+        is_instructional = self._is_instructional_content(bot_response)
+        has_mentor_context = self._has_mentor_context(user_message, bot_response)
         
-        return summary[:150]  # Optimal length for semantic search
+        topic_text = ", ".join(topics[:3]) if topics else "general conversation"
+        
+        if is_instructional or has_mentor_context:
+            # Preserve more detail for instructional content
+            summary = self._create_detailed_summary(user_message, bot_response, topics, intent)
+            max_length = 300  # Allow longer summaries for instructional content
+        else:
+            # Standard summary for general conversations
+            summary = f"User {intent} about {topic_text}. Bot provided assistance."
+            max_length = 150
+        
+        return summary[:max_length]
     
     def _extract_topics(self, text: str) -> List[str]:
         """Simple topic extraction"""
@@ -421,6 +432,125 @@ class HierarchicalMemoryManager:
             return "requested help"
         else:
             return "discussed"
+    
+    def _is_instructional_content(self, bot_response: str) -> bool:
+        """Detect if bot response contains instructional/tutorial content"""
+        import re
+        response_lower = bot_response.lower()
+        
+        # Check for step-by-step patterns
+        step_patterns = [
+            r'step \d+', r'\d+\.\s', r'first[,\s]', r'second[,\s]', r'third[,\s]',
+            r'next[,\s]', r'then[,\s]', r'finally[,\s]'
+        ]
+        if any(re.search(pattern, response_lower) for pattern in step_patterns):
+            return True
+            
+        # Check for instructional keywords
+        instructional_keywords = [
+            'tutorial', 'guide', 'instruction', 'how to', 'pipeline', 'workflow',
+            'technique', 'method', 'approach', 'strategy', 'tips', 'advice',
+            'assignment', 'homework', 'practice', 'exercise'
+        ]
+        if any(keyword in response_lower for keyword in instructional_keywords):
+            return True
+            
+        # Check for long detailed responses (likely instructional)
+        return len(bot_response) > 500
+    
+    def _has_mentor_context(self, user_message: str, bot_response: str) -> bool:
+        """Detect mentorship/coaching context"""
+        combined_text = (user_message + " " + bot_response).lower()
+        
+        mentor_keywords = [
+            'mentor', 'tyler', 'teacher', 'instructor', 'coach', 'tutor',
+            'feedback', 'critique', 'review', 'session', 'lesson'
+        ]
+        return any(keyword in combined_text for keyword in mentor_keywords)
+    
+    def _create_detailed_summary(self, user_message: str, bot_response: str, topics: List[str], intent: str) -> str:
+        """Create detailed summary preserving instructional content"""
+        import re
+        
+        topic_text = ", ".join(topics[:3]) if topics else "general topic"
+        
+        # Extract key instructional elements
+        steps = self._extract_steps(bot_response)
+        techniques = self._extract_techniques(bot_response)
+        assignments = self._extract_assignments(bot_response)
+        
+        # Build rich summary
+        summary_parts = [f"User {intent} about {topic_text}."]
+        
+        if steps:
+            summary_parts.append(f"Bot provided {len(steps)}-step guide:")
+            summary_parts.append(" → ".join(steps[:3]))
+            if len(steps) > 3:
+                summary_parts.append("...")
+        
+        if techniques:
+            summary_parts.append(f"Techniques: {', '.join(techniques[:3])}")
+        
+        if assignments:
+            summary_parts.append(f"Assignment: {assignments[0]}")
+        
+        if not (steps or techniques or assignments):
+            summary_parts.append("Bot provided detailed assistance.")
+        
+        return " ".join(summary_parts)
+    
+    def _extract_steps(self, text: str) -> List[str]:
+        """Extract step-by-step instructions"""
+        import re
+        steps = []
+        
+        # Look for numbered steps
+        step_matches = re.findall(r'(?:step \d+|^\d+\.)\s*[–—-]?\s*([^.!?]+)', text.lower(), re.MULTILINE)
+        steps.extend([step.strip()[:50] for step in step_matches])
+        
+        # Look for bullet points or dashes
+        bullet_matches = re.findall(r'[•\-*]\s*([^.!?\n]+)', text)
+        steps.extend([step.strip()[:50] for step in bullet_matches])
+        
+        return steps[:5]  # Limit to 5 steps
+    
+    def _extract_techniques(self, text: str) -> List[str]:
+        """Extract mentioned techniques or methods"""
+        import re
+        text_lower = text.lower()
+        
+        technique_patterns = [
+            r'(gesture[^.!?]*)', r'(construction[^.!?]*)', r'(silhouette[^.!?]*)',
+            r'(perspective[^.!?]*)', r'(composition[^.!?]*)', r'(anatomy[^.!?]*)',
+            r'(shading[^.!?]*)', r'(rendering[^.!?]*)', r'(sketching[^.!?]*)'
+        ]
+        
+        techniques = []
+        for pattern in technique_patterns:
+            matches = re.findall(pattern, text_lower)
+            techniques.extend([match.strip()[:30] for match in matches])
+        
+        return list(set(techniques))[:3]  # Limit to 3 unique techniques
+    
+    def _extract_assignments(self, text: str) -> List[str]:
+        """Extract assignments or homework"""
+        import re
+        text_lower = text.lower()
+        
+        assignment_patterns = [
+            r'assignment[^.!?]*[.!?]',
+            r'homework[^.!?]*[.!?]',
+            r'for next time[^.!?]*[.!?]',
+            r'by sunday[^.!?]*[.!?]',
+            r'practice[^.!?]*[.!?]'
+        ]
+        
+        assignments = []
+        for pattern in assignment_patterns:
+            matches = re.findall(pattern, text_lower)
+            assignments.extend([match.strip()[:80] for match in matches])
+        
+        return assignments[:2]  # Limit to 2 assignments
     
     def _extract_relevant_conversation_ids(
         self, 
