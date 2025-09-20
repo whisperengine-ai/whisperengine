@@ -134,7 +134,25 @@ class HierarchicalMemoryAdapter:
         query: str, 
         limit: int = 5
     ) -> List[Dict[str, Any]]:
-        """Retrieve memories relevant to query"""
+        """Retrieve memories relevant to query - SEMANTIC SEARCH ONLY
+        
+        🚨 IMPORTANT: This method is for SEMANTIC SEARCH only!
+        For conversation history, use get_recent_conversations() instead.
+        """
+        
+        # HARD GUARD: Prevent conversation history abuse
+        conversation_keywords = [
+            'conversation', 'recent messages', 'chat history', 'message history',
+            'recent chat', 'conversation history', 'last messages', 'recent talk'
+        ]
+        
+        if any(keyword in query.lower() for keyword in conversation_keywords):
+            raise ValueError(
+                f"❌ DEPRECATED: retrieve_relevant_memories() called with conversation query: '{query}'\n"
+                f"🔄 Use get_recent_conversations(user_id, limit) for conversation history instead!\n"
+                f"💡 This method is for SEMANTIC SEARCH only - not conversation retrieval."
+            )
+        
         try:
             context = await self.hierarchical_memory_manager.get_conversation_context(
                 user_id=user_id,

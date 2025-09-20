@@ -1,0 +1,11 @@
+# WhisperEngine Vector-Native Memory System Requirements - LOCAL-FIRST
+# Local Docker deployment with no external API dependencies (except LLM endpoints)
+
+# Core Vector Database & Embeddings (LOCAL)
+qdrant-client==1.11.3            # Local vector database (Docker) - Python 3.13 compatible  
+
+# Note: sentence-transformers, numpy, scipy, scikit-learn, pydantic already in core requirements
+# Note: asyncpg, redis, pytest already in discord requirements  
+# This file only adds NEW dependencies not in core/discord/platform requirements
+# openai - embeddings replaced by sentence-transformers (LLM endpoints still configurable)
+# faiss-cpu - Qdrant handles high-performance vector search

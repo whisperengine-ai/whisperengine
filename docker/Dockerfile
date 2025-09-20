@@ -28,12 +28,13 @@ RUN apt-get update && apt-get install -y \
     && pip install --no-cache-dir --upgrade pip
 
 # Copy and install Python dependencies using new multi-tier structure
-COPY requirements-core.txt requirements-platform.txt requirements-discord.txt ./
+COPY requirements-core.txt requirements-platform.txt requirements-discord.txt requirements-vector-memory.txt ./
 
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip install --no-cache-dir -r requirements-core.txt && \
     pip install --no-cache-dir -r requirements-platform.txt && \
-    pip install --no-cache-dir -r requirements-discord.txt
+    pip install --no-cache-dir -r requirements-discord.txt && \
+    pip install --no-cache-dir -r requirements-vector-memory.txt
 
 # Add spaCy model download with cache
 RUN --mount=type=cache,target=/root/.cache/pip \

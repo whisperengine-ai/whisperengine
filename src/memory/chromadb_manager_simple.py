@@ -259,61 +259,23 @@ class ChromaDBManagerSimple:
             return {"exists": False, "error": str(e)}
 
     def query_conversations(self, user_id: str | None = None, limit: int = 50) -> list[dict]:
-        """Query conversation history"""
-        if not self.user_collection:
-            return []
-
-        try:
-            # Build where clause
-            where_conditions = {}
-            if user_id:
-                where_conditions["user_id"] = user_id
-
-            # Get documents
-            results = self.user_collection.get(
-                where=where_conditions if where_conditions else None,
-                limit=limit,
-                include=["documents", "metadatas"],
-            )
-
-            conversations = []
-
-            # Safe access to results
-            if (
-                results
-                and results.get("documents")
-                and results.get("metadatas")
-                and results.get("ids")
-            ):
-                documents = results["documents"]
-                metadatas = results["metadatas"]
-                ids = results["ids"]
-
-                for i in range(min(len(documents), len(metadatas), len(ids))):
-                    metadata = metadatas[i] if metadatas[i] else {}
-
-                    # Skip non-conversation entries (facts, etc.)
-                    if metadata.get("type") not in [None, "conversation"]:
-                        continue
-
-                    conversations.append(
-                        {
-                            "id": ids[i],
-                            "document": documents[i],
-                            "metadata": metadata,
-                            "user_message": self.safe_get_string(metadata.get("user_message", "")),
-                            "bot_response": self.safe_get_string(metadata.get("bot_response", "")),
-                            "timestamp": self.safe_get_string(metadata.get("timestamp", "")),
-                            "channel_id": self.safe_get_string(metadata.get("channel_id", "dm")),
-                            "user_id": self.safe_get_string(metadata.get("user_id", "unknown")),
-                        }
-                    )
-
-            return sorted(conversations, key=lambda x: x["timestamp"], reverse=True)
-
-        except Exception as e:
-            logger.error(f"Error querying conversations: {e}")
-            return []
+        """🚨 DEPRECATED: Direct ChromaDB conversation querying removed!
+        
+        This method has been intentionally removed as part of architectural migration.
+        Conversation history is now managed by the hierarchical memory system:
+        
+        ✅ Use: memory_manager.get_recent_conversations(user_id, limit)
+        ✅ Use: hierarchical_memory_manager.get_conversation_context(user_id)
+        
+        ❌ DO NOT query ChromaDB directly for conversations!
+        ChromaDB is now SEMANTIC SEARCH ONLY.
+        """
+        raise NotImplementedError(
+            "🔥 BURNED DOWN: query_conversations() removed by design!\n"
+            f"🔄 Use hierarchical memory: memory_manager.get_recent_conversations('{user_id}', {limit})\n"
+            f"📚 Conversation history now flows: Redis → PostgreSQL → ChromaDB (semantic only)\n"
+            f"🚨 ChromaDB direct conversation queries are DEPRECATED!"
+        )
 
     def query_user_facts(self, user_id: str, limit: int = 100) -> list[dict]:
         """Query user-specific facts"""

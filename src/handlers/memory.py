@@ -458,36 +458,39 @@ class MemoryCommandHandlers:
                     # Get recent messages for analysis - CROSS-CONTEXT for personality (user-scoped, not context-scoped)
                     recent_messages = []
 
-                    # For personality analysis, we need ALL user messages across contexts, not just current context
+                    # For personality analysis, get recent conversation history from hierarchical memory system
                     try:
-                        # Get messages from base memory manager without context filtering for personality analysis
+                        # Use hierarchical memory manager to get recent conversations (Redis → PostgreSQL → ChromaDB)
                         base_memory_manager = getattr(
                             self.safe_memory_manager, "base_memory_manager", self.memory_manager
                         )
 
                         if base_memory_manager and hasattr(
-                            base_memory_manager, "retrieve_relevant_memories"
+                            base_memory_manager, "get_recent_conversations"
                         ):
-                            # Retrieve user's conversation history across ALL contexts for personality profiling
-                            # Note: retrieve_relevant_memories is automatically enhanced via memory patch system
-                            cross_context_memories = await base_memory_manager.retrieve_relevant_memories(
-                                user_id, query="conversation messages recent personality patterns", limit=25
+                            # Get recent conversations from hierarchical memory (Redis/PostgreSQL first)
+                            hierarchical_conversations = await base_memory_manager.get_recent_conversations(
+                                user_id, limit=25
                             )
 
-                            # Extract user messages from memory
-                            for memory in cross_context_memories:
-                                metadata = memory.get("metadata", {})
-                                if metadata.get("user_message") and not metadata.get(
-                                    "user_message", ""
-                                ).startswith("!"):
-                                    recent_messages.append(metadata["user_message"])
+                            # Extract user messages from hierarchical conversation data
+                            for conversation in hierarchical_conversations:
+                                if isinstance(conversation, dict):
+                                    user_message = conversation.get("user_message", "")
+                                    if user_message and not user_message.startswith("!"):
+                                        recent_messages.append(user_message)
+                                else:
+                                    # Handle other conversation formats
+                                    user_content = str(conversation) if conversation else ""
+                                    if user_content and not user_content.startswith("!"):
+                                        recent_messages.append(user_content)
 
                             logger.debug(
-                                f"Retrieved {len(recent_messages)} cross-context messages for personality analysis"
+                                f"Retrieved {len(recent_messages)} hierarchical conversations for personality analysis"
                             )
                         else:
                             logger.debug(
-                                "Base memory manager not available for cross-context retrieval"
+                                "Hierarchical memory manager not available for conversation retrieval"
                             )
 
                         # If we don't have enough messages from ChromaDB, supplement with current context
