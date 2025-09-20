@@ -15,6 +15,8 @@ from typing import Any
 
 from src.config.adaptive_config import AdaptiveConfigManager
 from src.database.database_integration import DatabaseIntegrationManager
+from src.memory.core.consolidated_memory_manager import ConsolidatedMemoryManager
+from src.memory.core.memory_interface import MemoryContext
 from src.optimization.cost_optimizer import CostOptimizationEngine, RequestContext
 
 
@@ -740,6 +742,127 @@ class UniversalChatOrchestrator:
                 confidence=0.0,
             )
 
+    # === Memory Manager Helper Methods ===
+    def _is_unified_memory_manager(self, memory_manager) -> bool:
+        """Check if memory manager is the unified ConsolidatedMemoryManager."""
+        return isinstance(memory_manager, ConsolidatedMemoryManager)
+
+    async def _retrieve_memories_modern(self, memory_manager, user_id: str, query: str, limit: int = 10, context=None) -> list:
+        """Retrieve memories using unified async interface or legacy detection."""
+        if not memory_manager:
+            return []
+            
+        try:
+            if self._is_unified_memory_manager(memory_manager):
+                # Clean async interface with MemoryContext
+                memory_context = MemoryContext(
+                    user_id=user_id,
+                    channel_id='universal_chat',
+                    security_level='standard'
+                )
+                return await memory_manager.retrieve_memories(
+                    user_id=user_id,
+                    query=query,
+                    limit=limit,
+                    context=memory_context
+                )
+            else:
+                # Legacy retrieval with async/sync detection
+                if hasattr(memory_manager, "retrieve_context_aware_memories"):
+                    retrieve_method = getattr(memory_manager, "retrieve_context_aware_memories", None)
+                    if asyncio.iscoroutinefunction(retrieve_method):
+                        return await retrieve_method(
+                            user_id=user_id, 
+                            query=query, 
+                            max_memories=limit,
+                            context=context
+                        )
+                    else:
+                        loop = asyncio.get_running_loop()
+                        return await loop.run_in_executor(
+                            None, lambda: retrieve_method(
+                                user_id=user_id, 
+                                query=query, 
+                                max_memories=limit,
+                                context=context
+                            )
+                        )
+                elif hasattr(memory_manager, "retrieve_relevant_memories"):
+                    retrieve_method = getattr(memory_manager, "retrieve_relevant_memories", None)
+                    if asyncio.iscoroutinefunction(retrieve_method):
+                        return await retrieve_method(user_id, query, limit)
+                    else:
+                        loop = asyncio.get_running_loop()
+                        return await loop.run_in_executor(None, retrieve_method, user_id, query, limit)
+                return []
+        except Exception as e:
+            logging.warning(f"Could not retrieve memories for user {user_id}: {e}")
+            return []
+
+    async def _get_emotion_context_modern(self, memory_manager, user_id: str) -> str:
+        """Get emotion context using unified async interface or legacy detection."""
+        if not memory_manager:
+            return ""
+            
+        try:
+            if self._is_unified_memory_manager(memory_manager):
+                # Clean async interface - no detection needed
+                return await memory_manager.get_emotion_context(user_id)
+            else:
+                # Legacy async/sync detection
+                if hasattr(memory_manager, "get_emotion_context"):
+                    emotion_method = getattr(memory_manager, "get_emotion_context", None)
+                    if asyncio.iscoroutinefunction(emotion_method):
+                        return await emotion_method(user_id)
+                    else:
+                        loop = asyncio.get_running_loop()
+                        return await loop.run_in_executor(None, emotion_method, user_id)
+                return ""
+        except Exception as e:
+            logging.debug(f"Could not get emotion context: {e}")
+            return ""
+
+    async def _store_conversation_modern(self, memory_manager, safe_memory_manager, user_id: str, user_message: str, ai_response: str, channel_id: str = None) -> bool:
+        """Store conversation using unified async interface or legacy detection."""
+        try:
+            # Try unified memory manager first
+            if memory_manager and self._is_unified_memory_manager(memory_manager):
+                return await memory_manager.store_conversation(
+                    user_id=user_id,
+                    user_message=user_message,
+                    ai_response=ai_response,
+                    channel_id=channel_id or 'universal_chat'
+                )
+            
+            # Fallback to legacy methods
+            if safe_memory_manager and hasattr(safe_memory_manager, "store_conversation"):
+                if asyncio.iscoroutinefunction(safe_memory_manager.store_conversation):
+                    return await safe_memory_manager.store_conversation(
+                        user_id, user_message, ai_response, channel_id=channel_id
+                    )
+                else:
+                    loop = asyncio.get_running_loop()
+                    return await loop.run_in_executor(
+                        None, safe_memory_manager.store_conversation, 
+                        user_id, user_message, ai_response, channel_id
+                    )
+            elif memory_manager and hasattr(memory_manager, "store_conversation"):
+                if asyncio.iscoroutinefunction(memory_manager.store_conversation):
+                    return await memory_manager.store_conversation(
+                        user_id, user_message, ai_response, channel_id=channel_id
+                    )
+                else:
+                    loop = asyncio.get_running_loop()
+                    return await loop.run_in_executor(
+                        None, memory_manager.store_conversation, 
+                        user_id, user_message, ai_response, channel_id
+                    )
+            
+            return False
+        except Exception as e:
+            logging.warning(f"Could not store conversation for user {user_id}: {e}")
+            return False
+
     async def _generate_full_ai_response(
         self, message: Message, conversation_context: list[dict[str, str]]
     ) -> AIResponse:
@@ -820,65 +943,40 @@ class UniversalChatOrchestrator:
 
             # Retrieve relevant memories using the sophisticated memory system
             relevant_memories = []
-            if hasattr(memory_manager, "retrieve_context_aware_memories"):
+            if hasattr(memory_manager, "retrieve_context_aware_memories") or self._is_unified_memory_manager(memory_manager):
                 try:
-                    # Apply WhisperEngine async/sync detection pattern for memory retrieval
-                    retrieve_method = getattr(memory_manager, "retrieve_context_aware_memories", None)
-                    if asyncio.iscoroutinefunction(retrieve_method):
-                        relevant_memories = await retrieve_method(
-                            user_id=message.user_id, 
-                            query=message.content, 
-                            max_memories=10,
-                            context=message_context
-                        )
-                    else:
-                        # Use thread worker for sync methods in async context
-                        loop = asyncio.get_running_loop()
-                        relevant_memories = await loop.run_in_executor(
-                            None, lambda: retrieve_method(
-                                user_id=message.user_id, 
-                                query=message.content, 
-                                max_memories=10,
-                                context=message_context
-                            )
-                        )
+                    relevant_memories = await self._retrieve_memories_modern(
+                        memory_manager=memory_manager,
+                        user_id=message.user_id,
+                        query=message.content,
+                        limit=10,
+                        context=message_context
+                    )
                 except Exception as e:
                     logging.warning(f"Context-aware memory retrieval failed: {e}")
 
             # Get emotional context
             emotion_context = {}
-            if hasattr(memory_manager, "get_emotion_context"):
+            if hasattr(memory_manager, "get_emotion_context") or self._is_unified_memory_manager(memory_manager):
                 try:
-                    # Apply WhisperEngine async/sync detection pattern for emotion context
-                    emotion_method = getattr(memory_manager, "get_emotion_context", None)
-                    if asyncio.iscoroutinefunction(emotion_method):
-                        emotion_context = await emotion_method(message.user_id)
-                    else:
-                        # Use thread worker for sync methods in async context
-                        loop = asyncio.get_running_loop()
-                        emotion_context = await loop.run_in_executor(
-                            None, emotion_method, message.user_id
-                        )
+                    emotion_context = await self._get_emotion_context_modern(
+                        memory_manager=memory_manager,
+                        user_id=message.user_id
+                    )
                 except Exception as e:
                     logging.warning(f"Emotion context retrieval failed: {e}")
                     emotion_context = {}
 
             # Use ChromaDB for additional memory retrieval
             chromadb_memories = []
-            if safe_memory_manager and hasattr(safe_memory_manager, "retrieve_relevant_memories"):
+            if safe_memory_manager and (hasattr(safe_memory_manager, "retrieve_relevant_memories") or self._is_unified_memory_manager(safe_memory_manager)):
                 try:
-                    # Apply WhisperEngine async/sync detection pattern for memory retrieval
-                    retrieve_method = getattr(safe_memory_manager, "retrieve_relevant_memories", None)
-                    if asyncio.iscoroutinefunction(retrieve_method):
-                        chromadb_memories = await retrieve_method(
-                            message.user_id, message.content, limit=5
-                        )
-                    else:
-                        # Use thread worker for sync methods in async context
-                        loop = asyncio.get_running_loop()
-                        chromadb_memories = await loop.run_in_executor(
-                            None, lambda: retrieve_method(message.user_id, message.content, limit=5)
-                        )
+                    chromadb_memories = await self._retrieve_memories_modern(
+                        memory_manager=safe_memory_manager,
+                        user_id=message.user_id,
+                        query=message.content,
+                        limit=5
+                    )
 
                     # Enhanced: Add knowledge domain classification
                     if hasattr(memory_manager, "_determine_knowledge_domain"):
@@ -1625,72 +1723,25 @@ You adapt your responses based on the platform and conversation context. Be help
             )
 
             # Store using memory manager (primary method)
-            if self.bot_core and hasattr(self.bot_core, "memory_manager"):
-                memory_manager = self.bot_core.memory_manager
-                if memory_manager and hasattr(memory_manager, "store_conversation"):
+            if self.bot_core:
+                memory_manager = getattr(self.bot_core, "memory_manager", None)
+                safe_memory_manager = getattr(self.bot_core, "safe_memory_manager", None)
+                
+                if memory_manager:
                     try:
-                        # Check if it's an async method
-                        if asyncio.iscoroutinefunction(memory_manager.store_conversation):
-                            await memory_manager.store_conversation(
-                                user_id,
-                                user_message,
-                                assistant_response,
-                                metadata={
-                                    "channel_id": channel_id,
-                                    "platform": "universal_chat",
-                                    "timestamp": datetime.now().isoformat(),
-                                },
-                            )
-                        else:
-                            # Sync method
-                            memory_manager.store_conversation(
-                                user_id,
-                                user_message,
-                                assistant_response,
-                                metadata={
-                                    "channel_id": channel_id,
-                                    "platform": "universal_chat",
-                                    "timestamp": datetime.now().isoformat(),
-                                },
-                            )
+                        await self._store_conversation_modern(
+                            memory_manager=memory_manager,
+                            safe_memory_manager=safe_memory_manager,
+                            user_id=user_id,
+                            user_message=user_message,
+                            ai_response=assistant_response,
+                            channel_id=channel_id
+                        )
                         logging.info(
                             f"✅ Stored conversation pair in memory manager for user {user_id}"
                         )
                     except Exception as e:
                         logging.warning(f"Memory manager storage failed: {e}")
-
-            # Store using safe memory manager as fallback
-            if self.bot_core and hasattr(self.bot_core, "safe_memory_manager"):
-                safe_memory_manager = self.bot_core.safe_memory_manager
-                if safe_memory_manager and hasattr(safe_memory_manager, "store_conversation"):
-                    try:
-                        if asyncio.iscoroutinefunction(safe_memory_manager.store_conversation):
-                            await safe_memory_manager.store_conversation(
-                                user_id,
-                                user_message,
-                                assistant_response,
-                                metadata={
-                                    "channel_id": channel_id,
-                                    "platform": "universal_chat",
-                                    "timestamp": datetime.now().isoformat(),
-                                },
-                            )
-                        else:
-                            safe_memory_manager.store_conversation(
-                                user_id,
-                                user_message,
-                                assistant_response,
-                                metadata={
-                                    "channel_id": channel_id,
-                                    "platform": "universal_chat",
-                                    "timestamp": datetime.now().isoformat(),
-                                },
-                            )
-                        logging.info(
-                            f"✅ Stored conversation pair in safe memory manager for user {user_id}"
-                        )
-                    except Exception as e:
-                        logging.warning(f"Safe memory manager storage failed: {e}")
 
         except Exception as e:
             logging.error(f"Error storing conversation pair: {e}")
