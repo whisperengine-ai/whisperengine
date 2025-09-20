@@ -66,11 +66,11 @@ except ImportError:
     EXISTING_EMOTIONAL_ENGINE_AVAILABLE = False
 
 try:
-    from src.emotion.external_api_emotion_ai import ExternalAPIEmotionAI
+    from src.emotion.local_emotion_engine import LocalEmotionEngine
 
-    EXTERNAL_EMOTION_AI_AVAILABLE = True
+    LOCAL_EMOTION_ENGINE_AVAILABLE = True
 except ImportError:
-    EXTERNAL_EMOTION_AI_AVAILABLE = False
+    LOCAL_EMOTION_ENGINE_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
 

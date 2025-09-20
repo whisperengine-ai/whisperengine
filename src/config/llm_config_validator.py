@@ -63,41 +63,20 @@ class LLMConfigValidator:
                 recommendations.append("Set LLM_CHAT_MODEL environment variable")
 
         else:
-            # Try auto-detection
-            try:
-                from src.llm.smart_backend_selector import get_smart_backend_selector
-
-                selector = get_smart_backend_selector()
-                optimal_backend = selector.get_optimal_backend()
-
-                if optimal_backend:
-                    source = "auto_detected"
-                    backend_name = optimal_backend.name
-                    config = selector.get_backend_config(optimal_backend)
-                    effective_url = config.get("LLM_CHAT_API_URL")
-
-                    if not effective_url:
-                        issues.append("Auto-detection failed to provide valid URL")
-
-                else:
-                    source = "invalid"
-                    backend_name = "None Available"
-                    effective_url = None
-                    issues.append("No suitable LLM backend found")
-                    recommendations.extend(selector.get_setup_recommendations())
-
-            except ImportError as e:
-                source = "invalid"
-                backend_name = "Detection Failed"
-                effective_url = None
-                issues.append(f"Backend auto-detection not available: {str(e)}")
-                recommendations.append("Install smart backend selector dependencies")
-            except (AttributeError, RuntimeError, OSError) as e:
-                source = "invalid"
-                backend_name = "Detection Failed"
-                effective_url = None
-                issues.append(f"Backend auto-detection failed: {str(e)}")
-                recommendations.append("Manual configuration required")
+            # Use simple direct configuration check (no backend selector needed)
+            # WhisperEngine uses OpenRouter API directly
+            source = "direct_config"
+            backend_name = "OpenRouter/Direct API"
+            effective_url = os.getenv("LLM_CHAT_API_URL", "https://openrouter.ai/api/v1")
+            
+            if not effective_url:
+                issues.append("No LLM API URL configured")
+                recommendations.append("Set LLM_CHAT_API_URL environment variable")
+            
+            api_key = os.getenv("LLM_CHAT_API_KEY")
+            if not api_key:
+                issues.append("No LLM API key configured")
+                recommendations.append("Set LLM_CHAT_API_KEY environment variable")
 
         # Final validation
         is_valid = len(issues) == 0 and effective_url is not None

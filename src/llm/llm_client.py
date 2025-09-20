@@ -106,11 +106,17 @@ class LLMClient:
         # Determine service type based on URL
         self.is_openrouter = "openrouter.ai" in self.api_url
         self.is_ollama = "11434" in self.api_url or "ollama" in self.api_url.lower()
-        self.is_local_studio = self.api_url.startswith(
-            "http://localhost:1234"
-        ) or self.api_url.startswith("http://127.0.0.1:1234")
+        self.is_local_studio = self.api_url.startswith("http://localhost:1234") or self.api_url.startswith("http://127.0.0.1:1234")
+        
+        # WhisperEngine only supports remote APIs - reject local protocols
         self.is_local_llm = self.api_url.startswith("local://")
         self.is_llamacpp = self.api_url.startswith("llamacpp://")
+        
+        if self.is_local_llm or self.is_llamacpp:
+            raise ValueError(
+                f"Local model protocols not supported in WhisperEngine. "
+                f"Use remote APIs only. Got: {self.api_url}"
+            )
 
         # Determine service name for logging and display
         if self.is_openrouter:
@@ -174,19 +180,10 @@ class LLMClient:
             self.facts_is_local_studio = False
             self.facts_service_name = "Not Configured"
 
-        # Initialize logger early for use in local LLM initialization
+        # Initialize logger early
         self.logger = logging.getLogger(__name__)
 
-        # Initialize local LLM if using local:// protocol
-        self.local_model = None
-        self.local_tokenizer = None
-        if self.is_local_llm:
-            self._initialize_local_llm()
-
-        # Initialize llama-cpp-python if using llamacpp:// protocol
-        self.llamacpp_model = None
-        if self.is_llamacpp:
-            self._initialize_llamacpp_llm()
+        # WhisperEngine uses remote APIs only - no local model initialization
 
         self.chat_endpoint = f"{self.api_url}/chat/completions"
         self.completions_endpoint = f"{self.api_url}/completions"
@@ -349,8 +346,11 @@ class LLMClient:
     def _initialize_local_llm(self):
         """Initialize local LLM model for offline inference"""
         try:
-            import torch
-            from transformers import AutoModelForCausalLM, AutoTokenizer
+            # import torch  # REMOVED: WhisperEngine uses remote APIs only
+            # from transformers import AutoModelForCausalLM, AutoTokenizer  # REMOVED
+            
+            self.logger.warning("Local LLM initialization disabled - WhisperEngine uses remote APIs only")
+            return
 
             # Get model path from environment
             local_model_name = os.getenv("LOCAL_LLM_MODEL", "microsoft_Phi-3-mini-4k-instruct")

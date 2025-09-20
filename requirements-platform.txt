@@ -10,7 +10,18 @@
 # torch==2.8.0+rocm5.6; sys_platform == "linux"
 
 # Apple Metal acceleration (macOS)
-torch==2.8.0; sys_platform == "darwin"  # Already latest
+# Platform-specific optimizations
+
+# No longer need PyTorch - using lightweight TextBlob for emotion analysis
+# PyTorch removed to reduce dependencies and Docker image size
+# torch with CUDA support - uncomment if needed
+# torch==2.8.0+cu118; sys_platform != "darwin"
+
+# ROCm support for AMD GPUs - uncomment if needed 
+# torch==2.8.0+rocm5.6; sys_platform == "linux"
+
+# macOS PyTorch removed - using TextBlob for lightweight emotion analysis
+# torch==2.8.0; sys_platform == "darwin"  # No longer needed
 
 # MLX support removed - no backend implementation exists
 # TODO: Re-add when MLX backend is implemented:

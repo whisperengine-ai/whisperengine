@@ -35,11 +35,11 @@ from typing import Any
 
 # Import existing systems for integration
 try:
-    from src.emotion.external_api_emotion_ai import ExternalAPIEmotionAI
+    from src.emotion.local_emotion_engine import LocalEmotionEngine
 
-    EMOTIONAL_AI_AVAILABLE = True
+    LOCAL_EMOTION_ENGINE_AVAILABLE = True
 except ImportError:
-    EMOTIONAL_AI_AVAILABLE = False
+    LOCAL_EMOTION_ENGINE_AVAILABLE = False
 
 try:
     from src.intelligence.dynamic_personality_profiler import (
@@ -203,7 +203,7 @@ class EmotionalContextEngine:
 
     def __init__(
         self,
-        emotional_ai: ExternalAPIEmotionAI | None = None,
+        emotional_ai: LocalEmotionEngine | None = None,
         personality_profiler: DynamicPersonalityProfiler | None = None,
         personality_fact_classifier: PersonalityFactClassifier | None = None,
         emotional_memory_retention_days: int = 90,
@@ -269,12 +269,18 @@ class EmotionalContextEngine:
 
         # Get emotional analysis from existing system
         emotional_data = None
-        if self.emotional_ai and EMOTIONAL_AI_AVAILABLE:
+        if self.emotional_ai and LOCAL_EMOTION_ENGINE_AVAILABLE:
             try:
-                conv_history = [msg.get("content", "") for msg in (conversation_history or [])]
-                emotional_data = await self.emotional_ai.analyze_emotion_cloud(
-                    text=user_message, user_id=user_id, conversation_history=conv_history
-                )
+                # Use local emotion engine with simple text analysis
+                result = await self.emotional_ai.analyze_emotion(user_message, method="auto")
+                emotional_data = {
+                    "primary_emotion": result.primary_emotion,
+                    "confidence": result.confidence,
+                    "sentiment_score": result.sentiment_score,
+                    "all_emotions": result.emotions,
+                    "analysis_method": result.method,
+                    "analysis_time_ms": result.analysis_time_ms
+                }
             except (AttributeError, TypeError, ConnectionError) as e:
                 logger.warning("Emotional AI analysis failed: %s", str(e))
 
@@ -1125,7 +1131,7 @@ async def create_emotional_context_engine(
     Returns:
         EmotionalContextEngine ready for use
     """
-    if not EMOTIONAL_AI_AVAILABLE:
+    if not LOCAL_EMOTION_ENGINE_AVAILABLE:
         logger.warning("ExternalAPIEmotionAI not available - using fallback emotional analysis")
 
     if not PERSONALITY_PROFILER_AVAILABLE:

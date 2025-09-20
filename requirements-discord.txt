@@ -10,8 +10,8 @@ asyncpg==0.30.0  # For main connection pool and privacy manager
 psycopg[binary]==3.2.10  # Updated from 3.2.3
 psycopg2-binary==2.9.10  # Synchronous PostgreSQL driver for emotion manager
 
-# Neo4j Graph Database Dependencies (Optional)
-neo4j==5.28.2  # Updated from 5.15.0
+# Neo4j Graph Database Dependencies (REMOVED - Using vector memory system)
+# neo4j==5.28.2  # REMOVED - Using Qdrant for vector memory system
 networkx==3.5  # For graph analysis and visualization
 matplotlib==3.10.0  # For graph visualization and debugging
 

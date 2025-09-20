@@ -131,7 +131,7 @@ class BotEventHandlers:
         self.dynamic_personality_profiler = getattr(bot_core, "dynamic_personality_profiler", None)
         self.graph_personality_manager = getattr(bot_core, "graph_personality_manager", None)
         self.phase2_integration = getattr(bot_core, "phase2_integration", None)
-        self.external_emotion_ai = getattr(bot_core, "external_emotion_ai", None)
+        self.local_emotion_engine = getattr(bot_core, "local_emotion_engine", None)
         # Redis profile/memory cache (if enabled)
         self.profile_memory_cache = getattr(bot_core, "profile_memory_cache", None)
         
@@ -949,39 +949,33 @@ class BotEventHandlers:
             # Standardize all message objects to dict format
             recent_messages = [_standardize_message_object(msg) for msg in recent_messages]
 
-            # Supplement with Redis/PostgreSQL hierarchical memory if insufficient
+            # Supplement with vector memory if insufficient
             if len(recent_messages) < 8:
                 logger.debug(
-                    f"Supplementing {len(recent_messages)} cached messages with hierarchical memory for user {user_id}"
+                    f"Supplementing {len(recent_messages)} cached messages with vector memory for user {user_id}"
                 )
                 try:
-                    # Use memory manager to get recent conversation history
+                    # Use vector memory manager to get recent conversation history
                     memory_manager = self.memory_manager
                     if memory_manager and hasattr(memory_manager, 'get_recent_conversations'):
                         # Use the proper conversation history method
-                        hierarchical_conversations = await memory_manager.get_recent_conversations(
+                        vector_conversations = await memory_manager.get_recent_conversations(
                             user_id, limit=15
                         )
-                    elif memory_manager and hasattr(memory_manager, 'hierarchical_memory_manager'):
-                        # Direct access to hierarchical memory manager
-                        context = await memory_manager.hierarchical_memory_manager.get_conversation_context(
-                            user_id=user_id, current_query=""
-                        )
-                        hierarchical_conversations = context.recent_messages[:15] if hasattr(context, 'recent_messages') else []
                     else:
-                        logger.warning("No hierarchical memory manager available, skipping supplement")
-                        hierarchical_conversations = []
+                        logger.warning("No vector memory manager available, skipping supplement")
+                        vector_conversations = []
 
-                    # DEBUG: Log what hierarchical memory is returning
-                    logger.debug(f"[HIERARCHICAL-DEBUG] Retrieved {len(hierarchical_conversations)} conversations for user {user_id}")
-                    for i, conv in enumerate(hierarchical_conversations[:3]):  # Log first 3
+                    # DEBUG: Log what vector memory is returning
+                    logger.debug(f"[VECTOR-DEBUG] Retrieved {len(vector_conversations)} conversations for user {user_id}")
+                    for i, conv in enumerate(vector_conversations[:3]):  # Log first 3
                         user_msg = conv.get('user_message', 'N/A')[:100] if isinstance(conv, dict) else 'N/A'
                         bot_response = conv.get('bot_response', 'N/A')[:100] if isinstance(conv, dict) else 'N/A'
-                        logger.debug(f"[HIERARCHICAL-DEBUG] Conversation {i}: user_msg='{user_msg}...' bot_response='{bot_response}...'")
+                        logger.debug(f"[VECTOR-DEBUG] Conversation {i}: user_msg='{user_msg}...' bot_response='{bot_response}...'")
 
-                    # Process hierarchical memory conversations into message format
+                    # Process vector memory conversations into message format
                     conversation_count = 0
-                    for conversation in reversed(hierarchical_conversations):
+                    for conversation in reversed(vector_conversations):
                         if isinstance(conversation, dict):
                             user_content = conversation.get("user_message", "")[:500]
                             bot_content = conversation.get("bot_response", "")[:500]
@@ -992,7 +986,7 @@ class BotEventHandlers:
                         
                         if user_content:
                             # CONTEXT DEBUG: Log what's being added to conversation context
-                            logger.debug(f"[CONTEXT-DEBUG] Adding hierarchical conversation:")
+                            logger.debug(f"[CONTEXT-DEBUG] Adding vector conversation:")
                             logger.debug(f"[CONTEXT-DEBUG] User: '{user_content}'")
                             logger.debug(f"[CONTEXT-DEBUG] Bot: '{bot_content}'")
                             
@@ -1001,10 +995,10 @@ class BotEventHandlers:
                                 {
                                     "content": user_content,
                                     "author_id": user_id,
-                                    "author_name": "User",  # Simplified for hierarchical data
+                                    "author_name": "User",  # Simplified for vector data
                                     "timestamp": conversation.get("timestamp", "") if isinstance(conversation, dict) else "",
                                     "bot": False,
-                                    "from_hierarchical": True,
+                                    "from_vector": True,
                                 }
                             )
                             # Add bot response if available
@@ -1018,7 +1012,7 @@ class BotEventHandlers:
                                         ),
                                         "timestamp": conversation.get("timestamp", "") if isinstance(conversation, dict) else "",
                                         "bot": True,
-                                        "from_hierarchical": True,
+                                        "from_vector": True,
                                     }
                                 )
 
@@ -1029,11 +1023,11 @@ class BotEventHandlers:
                     if conversation_count > 0:
                         recent_messages = recent_messages[-20:]
                         logger.debug(
-                            f"Enhanced context with {conversation_count} hierarchical conversations: now have {len(recent_messages)} messages"
+                            f"Enhanced context with {conversation_count} vector conversations: now have {len(recent_messages)} messages"
                         )
 
                 except Exception as e:
-                    logger.warning(f"Could not supplement with ChromaDB conversations: {e}")
+                    logger.warning(f"Could not supplement with vector memory conversations: {e}")
 
             return recent_messages
         else:
@@ -1349,39 +1343,44 @@ class BotEventHandlers:
         return conversation_context
 
     async def _analyze_external_emotion(self, content, user_id, conversation_context):
-        """Analyze emotion using external API."""
+        """Analyze emotion using local emotion engine (replaces external API calls)."""
         try:
-            logger.debug("Running External API Emotion AI analysis (full capabilities)...")
+            logger.debug("Running Local Emotion Engine analysis...")
 
-            conversation_history = [
-                msg["content"] for msg in conversation_context[-10:] if msg["role"] == "user"
-            ]
+            if self.local_emotion_engine:
+                # Use local emotion engine for analysis
+                if not hasattr(self.local_emotion_engine, '_is_initialized') or not self.local_emotion_engine._is_initialized:
+                    await self.local_emotion_engine.initialize()
 
-            if (
-                not hasattr(self.external_emotion_ai, "session")
-                or self.external_emotion_ai.session is None
-            ):
-                await self.external_emotion_ai.initialize()
+                result = await self.local_emotion_engine.analyze_emotion(content, method="auto")
+                
+                emotion_data = {
+                    "primary_emotion": result.primary_emotion,
+                    "confidence": result.confidence,
+                    "sentiment_score": result.sentiment_score,
+                    "all_emotions": result.emotions,
+                    "analysis_method": result.method,
+                    "analysis_time_ms": result.analysis_time_ms,
+                    "api_calls_made": 0  # Local analysis uses no API calls
+                }
 
-            external_emotion_data = await self.external_emotion_ai.analyze_emotion_cloud(
-                text=content, user_id=user_id, conversation_history=conversation_history
-            )
-
-            logger.debug(
-                f"External emotion analysis completed: {external_emotion_data.get('primary_emotion', 'unknown')} "
-                f"(confidence: {external_emotion_data.get('confidence', 0):.2f})"
-            )
-
-            if external_emotion_data.get("analysis_time_ms"):
                 logger.debug(
-                    f"Emotion analysis took {external_emotion_data['analysis_time_ms']:.1f}ms "
-                    f"({external_emotion_data.get('api_calls_made', 0)} API calls)"
+                    f"Local emotion analysis completed: {emotion_data.get('primary_emotion', 'unknown')} "
+                    f"(confidence: {emotion_data.get('confidence', 0):.2f})"
                 )
 
-            return external_emotion_data
+                logger.debug(
+                    f"Emotion analysis took {emotion_data['analysis_time_ms']:.1f}ms "
+                    f"(local processing, no API calls)"
+                )
+
+                return emotion_data
+            else:
+                logger.debug("Local emotion engine not available, skipping emotion analysis")
+                return None
 
         except Exception as e:
-            logger.error(f"External API Emotion AI analysis failed: {e}")
+            logger.error(f"Local Emotion Engine analysis failed: {e}")
             return None
 
     async def _analyze_phase2_emotion(
@@ -2552,14 +2551,14 @@ class BotEventHandlers:
         tasks = []
         task_names = []
         
-        # Task 1: External emotion analysis (if enabled and available)
-        if (os.getenv("DISABLE_EXTERNAL_EMOTION_API", "true").lower() != "true" 
-            and self.external_emotion_ai):
+        # Task 1: Local emotion analysis (replaces external API)
+        if (os.getenv("DISABLE_LOCAL_EMOTION", "false").lower() != "true" 
+            and self.local_emotion_engine):
             tasks.append(self._analyze_external_emotion(content, user_id, conversation_context))
-            task_names.append("external_emotion")
+            task_names.append("local_emotion")
         else:
             tasks.append(asyncio.create_task(self._create_none_result()))
-            task_names.append("external_emotion_disabled")
+            task_names.append("local_emotion_disabled")
             
         # Task 2: Phase 2 emotional intelligence (primary emotion source)
         if (os.getenv("DISABLE_PHASE2_EMOTION", "false").lower() != "true" 

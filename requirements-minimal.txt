@@ -38,7 +38,7 @@ faiss-cpu==1.9.0.post1
 # Database and caching
 redis==6.4.0  # Updated from 5.2.1
 aioredis==2.0.1
-chromadb==1.1.0  # Updated from 1.0.20
+# chromadb==1.1.0  # REMOVED - Using Qdrant for vector memory system
 
 # Graph analysis (lightweight)
 networkx==3.5
@@ -64,8 +64,8 @@ prometheus-client==0.22.0
 # PostgreSQL (production)
 asyncpg==0.30.0
 
-# Neo4j (optional graph features)  
-neo4j==5.15.0
+# Neo4j (REMOVED - Using vector memory system)  
+# neo4j==5.15.0  # REMOVED - Using Qdrant for vector memory system
 
 # Voice processing (optional)
 PyNaCl==1.5.0

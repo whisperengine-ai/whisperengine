@@ -66,9 +66,7 @@ services:
         condition: service_healthy
       postgres:
         condition: service_healthy
-      chromadb:
-        condition: service_healthy  # Now ChromaDB has health check
-      neo4j:
+      qdrant:
         condition: service_healthy
 
   # Redis for caching
@@ -172,81 +170,13 @@ services:
           memory: 512M
           cpus: '0.25'
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:6333/health || exit 1"]
+      test: ["CMD-SHELL", "timeout 5 bash -c '</dev/tcp/localhost/6333' || exit 1"]
       interval: 15s
       timeout: 10s
       retries: 5
       start_period: 30s
 
-  # ChromaDB for vector storage (DEPRECATED - will be removed after migration)
-  chromadb:
-    image: chromadb/chroma:latest
-    container_name: whisperengine-chromadb
-    restart: unless-stopped
-    environment:
-      - CHROMA_SERVER_HOST=0.0.0.0
-      - CHROMA_SERVER_HTTP_PORT=8000
-      - CHROMA_SERVER_AUTH_CREDENTIALS_PROVIDER=${CHROMA_AUTH_PROVIDER:-}
-      - CHROMA_SERVER_AUTH_CREDENTIALS=${CHROMA_AUTH_TOKEN:-}
-    volumes:
-      - chromadb_data:/chroma/chroma
-    ports:
-      - "8000:8000"
-    networks:
-      - bot_network
-    # Resource limits for ChromaDB vector operations
-    deploy:
-      resources:
-        limits:
-          memory: 1G
-          cpus: '0.5'
-        reservations:
-          memory: 512M
-          cpus: '0.25'
-    healthcheck:
-      test: ["CMD-SHELL", "timeout 5 bash -c '</dev/tcp/localhost/8000' || exit 1"]
-      interval: 10s
-      timeout: 10s
-      retries: 5
-      start_period: 40s
-
   # Neo4j graph database
-  neo4j:
-    image: neo4j:5.15-community
-    container_name: whisperengine-neo4j
-    restart: unless-stopped
-    environment:
-      - NEO4J_AUTH=${NEO4J_USERNAME:-neo4j}/${NEO4J_PASSWORD:-neo4j_password_change_me}
-      - NEO4J_PLUGINS=["apoc"]
-      - NEO4J_dbms_security_procedures_unrestricted=apoc.*
-      - NEO4J_dbms_memory_heap_initial__size=512m
-      - NEO4J_dbms_memory_heap_max__size=2G
-    volumes:
-      - neo4j_data:/data
-      - neo4j_logs:/logs
-    ports:
-      - "7474:7474"  # HTTP
-      - "7687:7687"  # Bolt
-    networks:
-      - bot_network
-    # Resource limits for Neo4j graph operations
-    deploy:
-      resources:
-        limits:
-          memory: 3G
-          cpus: '1.0'
-        reservations:
-          memory: 1G
-          cpus: '0.5'
-    healthcheck:
-      test: ["CMD-SHELL", "wget --quiet --tries=1 --spider http://localhost:7474/ || exit 1"]
-      interval: 10s
-      timeout: 10s
-      retries: 5
-      start_period: 40s
-
-
-
 # Networks
 networks:
   bot_network:
@@ -278,14 +208,5 @@ volumes:
     driver: local
   qdrant_data:
     name: whisperengine-qdrant
-    driver: local
-  chromadb_data:
-    name: whisperengine-chromadb
-    driver: local
-  neo4j_data:
-    name: whisperengine-neo4j-data
-    driver: local
-  neo4j_logs:
-    name: whisperengine-neo4j-logs
     driver: local
 

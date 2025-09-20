@@ -1,6 +1,6 @@
 """
 Local Emotion Engine
-Ultra-fast local emotion analysis using VADER and RoBERTa hybrid approach.
+Ultra-fast local emotion analysis using VADER and TextBlob hybrid approach.
 Optimized for WhisperEngine's real-time conversation analysis.
 """
 
@@ -30,7 +30,7 @@ class EmotionResult:
 class LocalEmotionEngine:
     """
     High-performance local emotion analysis engine.
-    Uses VADER for ultra-fast real-time analysis and RoBERTa for detailed analysis.
+    Uses VADER for ultra-fast real-time analysis and TextBlob for detailed analysis.
     """
 
     def __init__(self):
@@ -38,10 +38,8 @@ class LocalEmotionEngine:
 
         # Model configuration
         self.use_vader = os.getenv("ENABLE_VADER_EMOTION", "true").lower() == "true"
-        self.use_roberta = os.getenv("ENABLE_ROBERTA_EMOTION", "true").lower() == "true"
-        self.roberta_model_name = os.getenv(
-            "ROBERTA_EMOTION_MODEL", "cardiffnlp/twitter-roberta-base-sentiment-latest"
-        )
+        self.use_roberta = os.getenv("ENABLE_TEXTBLOB_EMOTION", "true").lower() == "true"
+        self.textblob_model_name = "textblob"  # Simplified model name
 
         # Performance settings
         self.cache_size = int(os.getenv("EMOTION_CACHE_SIZE", "500"))
@@ -49,7 +47,7 @@ class LocalEmotionEngine:
 
         # Model instances
         self._vader_analyzer = None
-        self._roberta_pipeline = None
+        self._textblob_class = None
         self._is_initialized = False
         self._init_lock = asyncio.Lock()
 
@@ -102,29 +100,26 @@ class LocalEmotionEngine:
                 logger.error("❌ VADER loading failed: %s", e)
                 self.use_vader = False
 
-        # Load RoBERTa (high quality)
+        # Load TextBlob (lightweight sentiment analysis)
         if self.use_roberta:
             try:
 
-                def load_roberta():
-                    from transformers import pipeline
+                def load_textblob():
+                    from textblob import TextBlob
+                    # Test that it works
+                    test_blob = TextBlob("This is a test.")
+                    _ = test_blob.sentiment.polarity
+                    return TextBlob
 
-                    return pipeline(
-                        "sentiment-analysis",
-                        model=self.roberta_model_name,
-                        return_all_scores=False,  # Only return top score
-                        device=0 if os.getenv("USE_GPU", "false").lower() == "true" else -1,
-                    )
-
-                self._roberta_pipeline = await loop.run_in_executor(None, load_roberta)
-                logger.info("✅ RoBERTa emotion model loaded: %s", self.roberta_model_name)
+                self._textblob_class = await loop.run_in_executor(None, load_textblob)
+                logger.info("✅ TextBlob sentiment analyzer loaded (lightweight alternative to RoBERTa)")
             except ImportError:
                 logger.warning(
-                    "⚠️ transformers not available - install with: pip install transformers"
+                    "⚠️ textblob not available - install with: pip install textblob"
                 )
                 self.use_roberta = False
             except Exception as e:
-                logger.error("❌ RoBERTa loading failed: %s", e)
+                logger.error("❌ TextBlob loading failed: %s", e)
                 self.use_roberta = False
 
         if not self.use_vader and not self.use_roberta:
@@ -169,37 +164,49 @@ class LocalEmotionEngine:
             method="vader",
         )
 
-    async def _analyze_with_roberta(self, text: str) -> EmotionResult:
-        """Analyze emotion using RoBERTa (high quality)"""
+    async def _analyze_with_textblob(self, text: str) -> EmotionResult:
+        """Analyze emotion using TextBlob (lightweight alternative to RoBERTa)"""
         start_time = time.time()
 
-        # RoBERTa analysis (run in executor to avoid blocking)
+        # TextBlob analysis (run in executor to avoid blocking)
         loop = asyncio.get_event_loop()
-        result = await loop.run_in_executor(None, lambda: self._roberta_pipeline(text)[0])
+        
+        def analyze_text():
+            blob = self._textblob_class(text)
+            polarity = blob.sentiment.polarity  # -1 (negative) to 1 (positive)
+            subjectivity = blob.sentiment.subjectivity  # 0 (objective) to 1 (subjective)
+            return polarity, subjectivity
+        
+        polarity, subjectivity = await loop.run_in_executor(None, analyze_text)
 
-        # Convert RoBERTa results to standard format
-        primary_emotion = result["label"].lower()
-        confidence = result["score"]
-
-        # Map to sentiment score (-1 to 1)
-        if primary_emotion == "positive":
-            sentiment_score = confidence
-        elif primary_emotion == "negative":
-            sentiment_score = -confidence
+        # Convert TextBlob results to standard format
+        if polarity > 0.1:
+            primary_emotion = "positive"
+            confidence = min(polarity, 1.0)
+        elif polarity < -0.1:
+            primary_emotion = "negative"
+            confidence = min(abs(polarity), 1.0)
         else:
-            sentiment_score = 0.0
+            primary_emotion = "neutral"
+            confidence = 1.0 - abs(polarity)
 
-        emotions = {primary_emotion: confidence}
+        # Use subjectivity to adjust confidence (more subjective = more confident about emotion)
+        adjusted_confidence = confidence * (0.5 + subjectivity * 0.5)
+
+        emotions = {
+            primary_emotion: adjusted_confidence,
+            "neutral": 1.0 - abs(polarity)
+        }
 
         analysis_time = (time.time() - start_time) * 1000
 
         return EmotionResult(
             primary_emotion=primary_emotion,
-            confidence=confidence,
-            sentiment_score=sentiment_score,
+            confidence=adjusted_confidence,
+            sentiment_score=polarity,
             emotions=emotions,
             analysis_time_ms=analysis_time,
-            method="roberta",
+            method="textblob",
         )
 
     async def analyze_emotion(
@@ -242,27 +249,27 @@ class LocalEmotionEngine:
         if method == "vader" and self.use_vader:
             result = await self._analyze_with_vader(text)
         elif method == "roberta" and self.use_roberta:
-            result = await self._analyze_with_roberta(text)
+            result = await self._analyze_with_textblob(text)
         elif method == "hybrid" and self.use_vader and self.use_roberta:
-            # Hybrid: Use VADER for speed, RoBERTa for refinement
+            # Hybrid: Use VADER for speed, TextBlob for refinement
             vader_result = await self._analyze_with_vader(text)
 
-            # Use RoBERTa only if VADER is uncertain
+            # Use TextBlob only if VADER is uncertain
             if vader_result.confidence < 0.7:
-                roberta_result = await self._analyze_with_roberta(text)
+                textblob_result = await self._analyze_with_textblob(text)
 
                 # Combine results (weighted average)
                 combined_sentiment = (
-                    vader_result.sentiment_score * 0.3 + roberta_result.sentiment_score * 0.7
+                    vader_result.sentiment_score * 0.3 + textblob_result.sentiment_score * 0.7
                 )
 
                 result = EmotionResult(
-                    primary_emotion=roberta_result.primary_emotion,
-                    confidence=max(vader_result.confidence, roberta_result.confidence),
+                    primary_emotion=textblob_result.primary_emotion,
+                    confidence=max(vader_result.confidence, textblob_result.confidence),
                     sentiment_score=combined_sentiment,
-                    emotions={**vader_result.emotions, **roberta_result.emotions},
+                    emotions={**vader_result.emotions, **textblob_result.emotions},
                     analysis_time_ms=vader_result.analysis_time_ms
-                    + roberta_result.analysis_time_ms,
+                    + textblob_result.analysis_time_ms,
                     method="hybrid",
                 )
             else:
@@ -352,7 +359,7 @@ class LocalEmotionEngine:
         """Clean shutdown"""
         self._emotion_cache.clear()
         self._vader_analyzer = None
-        self._roberta_pipeline = None
+        self._textblob_class = None
         self._is_initialized = False
         logger.info("✅ LocalEmotionEngine shutdown complete")
 
