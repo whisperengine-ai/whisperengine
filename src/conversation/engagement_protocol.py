@@ -49,7 +49,7 @@ async def create_engagement_engine(
             
             # Thread Manager
             try:
-                from src.conversation.advanced_conversation_thread_manager import AdvancedConversationThreadManager
+                from src.conversation.advanced_thread_manager import AdvancedConversationThreadManager
                 components['thread_manager'] = thread_manager or AdvancedConversationThreadManager
                 logger.debug("Thread manager available for engagement engine")
             except ImportError:

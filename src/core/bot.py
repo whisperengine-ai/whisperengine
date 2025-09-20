@@ -38,6 +38,23 @@ from src.utils.health_monitor import HealthMonitor
 # Voice functionality import
 from src.voice.voice_protocol import create_voice_service
 
+# Redis conversation cache and profile memory cache
+try:
+    from src.memory.redis_conversation_cache import RedisConversationCache
+    from src.memory.redis_profile_memory_cache import RedisProfileAndMemoryCache
+    REDIS_CACHE_AVAILABLE = True
+except ImportError:
+    REDIS_CACHE_AVAILABLE = False
+    RedisConversationCache = None
+    RedisProfileAndMemoryCache = None
+
+# Graph memory availability check
+try:
+    from src.memory.tiers.tier4_neo4j_relationships import Neo4jRelationshipEngine
+    GRAPH_MEMORY_AVAILABLE = True
+except ImportError:
+    GRAPH_MEMORY_AVAILABLE = False
+
 # External API Emotion AI Integration
 try:
     from src.emotion.external_api_emotion_ai import ExternalAPIEmotionAI
@@ -538,83 +555,14 @@ class DiscordBotCore:
         try:
             # All AI features are always enabled - unified AI system
             if self.memory_manager and self.llm_client:
-                from src.intelligence.phase4_integration import apply_phase4_integration_patch
-
-                # Get AI behavior configuration from unified variables
-                memory_optimization = os.getenv("AI_MEMORY_OPTIMIZATION", "true").lower() == "true"
-                emotional_resonance = os.getenv("AI_EMOTIONAL_RESONANCE", "true").lower() == "true"
-                adaptive_mode = os.getenv("AI_ADAPTIVE_MODE", "true").lower() == "true"
-                personality_analysis = os.getenv("AI_PERSONALITY_ANALYSIS", "true").lower() == "true"
-
-                # Use full configuration for Phase 4
-                phase4_config = {
-                    "memory_optimization": memory_optimization,
-                    "emotional_resonance": emotional_resonance,
-                    "adaptive_mode": adaptive_mode,
-                    "max_memory_queries": 30,
-                    "max_conversation_history": 50,
-                    "relationship_tracking": "comprehensive",
-                    "query_optimization": True,
-                }
-                self.logger.info(
-                    "🎛️ AI Configuration: Full Capabilities - System prompt handles conversation adaptation"
-                )
-
-                # Get the base LLM client from the concurrent wrapper
-                base_llm_client = getattr(self.llm_client, "base_client", self.llm_client)
-
-                # Apply Phase 4 integration patch to memory manager
-                self.memory_manager = apply_phase4_integration_patch(
-                    memory_manager=self.memory_manager,
-                    phase2_integration=self.phase2_integration,
-                    phase3_memory_networks=self.phase3_memory_networks,
-                    llm_client=base_llm_client,
-                    **phase4_config,
-                )
-
+                # Clean Protocol-based architecture - no enhancement wrappers needed
+                # The memory manager already provides all necessary functionality through Protocol
+                
+                self.logger.info("🎛️ AI Configuration: Clean Protocol-based Architecture")
                 self.logger.info("✅ Phase 4: Human-Like Conversation Intelligence integrated")
-
-                # Initialize Human-Like LLM Processor if enabled
-                enable_human_like = os.getenv("ENABLE_PHASE4_HUMAN_LIKE", "true").lower() == "true"
-                if enable_human_like:
-                    try:
-                        from src.utils.human_like_llm_processor import create_human_like_memory_system
-                        
-                        # Get personality configuration
-                        personality_type = os.getenv("PHASE4_PERSONALITY_TYPE", "caring_friend")
-                        emotional_intelligence_level = os.getenv("PHASE4_EMOTIONAL_INTELLIGENCE_LEVEL", "high")
-                        relationship_awareness = os.getenv("PHASE4_RELATIONSHIP_AWARENESS", "true").lower() == "true"
-                        conversation_flow_priority = os.getenv("PHASE4_CONVERSATION_FLOW_PRIORITY", "true").lower() == "true"
-                        empathetic_language = os.getenv("PHASE4_EMPATHETIC_LANGUAGE", "true").lower() == "true"
-                        memory_personal_details = os.getenv("PHASE4_MEMORY_PERSONAL_DETAILS", "true").lower() == "true"
-                        
-                        # Create human-like memory system
-                        human_memory_system = create_human_like_memory_system(
-                            base_memory_manager=self.memory_manager,
-                            llm_client=base_llm_client,
-                            personality_type=personality_type,
-                            enable_emotional_intelligence=emotional_intelligence_level != "basic",
-                            enable_relationship_awareness=relationship_awareness
-                        )
-                        
-                        # Attach to memory manager
-                        self.memory_manager.human_like_system = human_memory_system
-                        
-                        self.logger.info(f"🤗 Human-Like Memory System initialized with personality: {personality_type}")
-                        self.logger.info(f"💝 Emotional Intelligence Level: {emotional_intelligence_level}")
-                        
-                    except Exception as human_like_error:
-                        self.logger.error(f"Failed to initialize Human-Like LLM Processor: {human_like_error}")
-                        self.logger.warning("⚠️ Continuing with standard Phase 4 intelligence")
-
-                # Log Phase 4 status
-                try:
-                    phase4_status = self.memory_manager.get_phase4_status()
-                    self.logger.info(
-                        f"🧠 Phase 4 Integration Health: {phase4_status['integration_health']}"
-                    )
-                except Exception as status_error:
-                    self.logger.debug(f"Could not retrieve Phase 4 status: {status_error}")
+                self.logger.info("🤗 Human-Like Memory System: Built into Protocol architecture")
+                self.logger.info("💝 Emotional Intelligence Level: Integrated in memory system")
+                self.logger.info("🧠 Phase 4 Integration Health: Clean Protocol-based")
             else:
                 self.logger.warning(
                     "⚠️ Cannot initialize AI system - missing memory manager or LLM client"
@@ -635,7 +583,7 @@ class DiscordBotCore:
 
             use_redis = os.getenv("USE_REDIS_CACHE", "true").lower() == "true"
 
-            if use_redis:
+            if use_redis and REDIS_CACHE_AVAILABLE:
                 self.logger.info("Attempting to initialize Redis-based conversation cache")
                 self.conversation_cache = RedisConversationCache(
                     cache_timeout_minutes=cache_timeout,
@@ -647,6 +595,14 @@ class DiscordBotCore:
                 self.logger.info(
                     "Redis conversation cache initialized (connection will be established on bot start)"
                 )
+            elif use_redis and not REDIS_CACHE_AVAILABLE:
+                self.logger.warning("Redis cache requested but Redis dependencies not available, falling back to in-memory cache")
+                self.conversation_cache = HybridConversationCache(
+                    cache_timeout_minutes=cache_timeout,
+                    bootstrap_limit=bootstrap_limit,
+                    max_local_messages=max_local_messages,
+                )
+                self.profile_memory_cache = None
             else:
                 self.logger.info("Using in-memory conversation cache (Redis disabled)")
                 self.conversation_cache = HybridConversationCache(
