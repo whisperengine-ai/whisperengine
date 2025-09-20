@@ -52,6 +52,17 @@ from src.memory.redis_conversation_cache import RedisConversationCache
 from src.memory.redis_profile_memory_cache import RedisProfileAndMemoryCache
 from src.memory.thread_safe_memory import ThreadSafeMemoryManager
 
+# UNIFIED MEMORY ARCHITECTURE: Import consolidated memory manager
+try:
+    from src.memory.core.consolidated_memory_manager import ConsolidatedMemoryManager
+    from src.memory.core.memory_factory import create_memory_manager
+    UNIFIED_MEMORY_AVAILABLE = True
+except ImportError as e:
+    logging.getLogger(__name__).warning(f"Unified memory manager not available: {e}")
+    UNIFIED_MEMORY_AVAILABLE = False
+    ConsolidatedMemoryManager = None
+    create_memory_manager = None
+
 # PERFORMANCE: Import ChromaDB batch adapter for reduced HTTP calls
 from src.memory.batched_memory_adapter import BatchedMemoryManager
 
@@ -211,9 +222,62 @@ class DiscordBotCore:
 
     def initialize_memory_system(self):
         """Initialize memory management system with performance optimizations."""
-        self.logger.info("Initializing memory system...")
-
         try:
+            self.logger.info("Initializing memory management system...")
+
+            # UNIFIED MEMORY ARCHITECTURE: Try ConsolidatedMemoryManager first
+            enable_unified_memory = os.getenv("ENABLE_UNIFIED_MEMORY_MANAGER", "true").lower() == "true"
+            
+            if enable_unified_memory and UNIFIED_MEMORY_AVAILABLE:
+                self.logger.info("🚀 Initializing Unified Memory Manager (ConsolidatedMemoryManager)...")
+                
+                # Get the base LLM client for the unified manager
+                base_llm_client = getattr(self.llm_client, "base_client", self.llm_client)
+                
+                # Create unified memory manager with all features built-in
+                try:
+                    unified_memory_manager = create_memory_manager(
+                        mode="unified",
+                        llm_client=base_llm_client,
+                        enable_enhanced_queries=True,
+                        enable_context_security=True,
+                        enable_thread_safety=True,
+                        enable_optimization=True,
+                        enable_graph_integration=os.getenv("ENABLE_GRAPH_DATABASE", "false").lower() == "true",
+                        max_workers=int(os.getenv("MEMORY_MAX_WORKERS", "4"))
+                    )
+                    
+                    # Set both memory manager references to the unified manager
+                    self.memory_manager = unified_memory_manager
+                    self.safe_memory_manager = unified_memory_manager
+                    
+                    # Store references for components that might need them
+                    self._unified_memory_manager = unified_memory_manager
+                    self._uses_unified_memory = True
+                    
+                    self.logger.info("✅ Unified Memory Manager initialized successfully")
+                    self.logger.info("   - All features (enhanced queries, context security, thread safety, optimization) built-in")
+                    self.logger.info("   - No wrapper chains needed - clean async interface")
+                    
+                    # Initialize backup manager
+                    self.backup_manager = BackupManager()
+                    self.logger.info("Memory and backup managers initialized successfully")
+                    return  # Skip legacy memory system initialization
+                    
+                except Exception as e:
+                    self.logger.error(f"Failed to initialize unified memory manager: {e}")
+                    self.logger.info("Falling back to legacy memory system...")
+                    self._uses_unified_memory = False
+            else:
+                if enable_unified_memory and not UNIFIED_MEMORY_AVAILABLE:
+                    self.logger.warning("⚠️ Unified memory manager enabled but not available, using legacy system")
+                else:
+                    self.logger.info("Using legacy memory system (ENABLE_UNIFIED_MEMORY_MANAGER=false)")
+                self._uses_unified_memory = False
+
+            # LEGACY MEMORY SYSTEM: Initialize wrapper chains (fallback)
+            self.logger.info("📚 Initializing Legacy Memory System with wrapper chains...")
+            
             # Check if hierarchical memory system is enabled (NEW 4-TIER SYSTEM)
             enable_hierarchical_memory = os.getenv("ENABLE_HIERARCHICAL_MEMORY", "false").lower() == "true"
             
