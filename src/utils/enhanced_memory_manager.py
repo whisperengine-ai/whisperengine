@@ -350,14 +350,29 @@ class EnhancedMemoryManager:
         return getattr(self.base_memory_manager, name)
 
     def retrieve_context_aware_memories(
-        self, user_id: str, message: str, context: Any, limit: int = 10
+        self, user_id: str, query: str = None, message: str = None, 
+        current_query: str = None, context: Any = None, limit: int = 10, 
+        max_memories: int = None, **kwargs
     ) -> list[dict]:
         """
-        Enhanced version of context-aware memory retrieval
-
+        Enhanced version of context-aware memory retrieval with flexible API compatibility
+        
+        Supports multiple parameter naming conventions:
+        - query: Standard parameter name
+        - message: Legacy parameter name  
+        - current_query: Hierarchical adapter parameter name
+        
         This replaces the original method with our enhanced query processing
         """
-        return self.retrieve_relevant_memories_enhanced(user_id, message, limit, context)
+        # Handle flexible parameter naming for API compatibility
+        actual_query = query or message or current_query
+        if not actual_query:
+            raise ValueError("Must provide either 'query', 'message', or 'current_query' parameter")
+            
+        # Use max_memories if provided, otherwise use limit
+        actual_limit = max_memories or limit
+        
+        return self.retrieve_relevant_memories_enhanced(user_id, actual_query, actual_limit, context)
 
     def retrieve_relevant_memories(self, user_id: str, message: str, limit: int = 10) -> list[dict]:
         """
