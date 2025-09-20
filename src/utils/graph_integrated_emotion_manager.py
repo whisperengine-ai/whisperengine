@@ -77,14 +77,59 @@ class GraphIntegratedEmotionManager(EmotionManager):
         # Sync to graph database if enabled and available
         if self.enable_graph_sync and self.graph_sync_mode != "disabled":
             if self.graph_sync_mode == "async":
-                # Non-blocking sync
-                asyncio.create_task(self._sync_to_graph_database(profile, emotion_profile, message))
-            elif self.graph_sync_mode == "sync":
-                # Blocking sync
+                # Non-blocking sync using thread worker pattern (WhisperEngine architecture)
                 try:
-                    asyncio.run(self._sync_to_graph_database(profile, emotion_profile, message))
-                except Exception as e:
-                    logger.warning(f"Synchronous graph sync failed: {e}")
+                    # Use run_in_executor consistent with scatter-gather architecture
+                    loop = asyncio.get_running_loop()
+                    # Use ThreadPoolExecutor for proper thread management
+                    loop.run_in_executor(
+                        None,  # Use default thread pool
+                        lambda: asyncio.run(self._sync_to_graph_database(profile, emotion_profile, message))
+                    )
+                except RuntimeError:
+                    # No running event loop - use thread executor pattern
+                    import threading
+                    def sync_in_thread():
+                        try:
+                            # Create new event loop for this thread
+                            new_loop = asyncio.new_event_loop()
+                            asyncio.set_event_loop(new_loop)
+                            new_loop.run_until_complete(
+                                self._sync_to_graph_database(profile, emotion_profile, message)
+                            )
+                        except Exception as e:
+                            logger.warning(f"Background graph sync failed: {e}")
+                        finally:
+                            new_loop.close()
+                    
+                    # Execute in background thread
+                    thread = threading.Thread(target=sync_in_thread, daemon=True)
+                    thread.start()
+                    
+            elif self.graph_sync_mode == "sync":
+                # Blocking sync using executor pattern for proper async context management
+                try:
+                    loop = asyncio.get_running_loop()
+                    # Use run_in_executor for sync context from async environment
+                    import concurrent.futures
+                    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+                        future = executor.submit(
+                            lambda: asyncio.run(self._sync_to_graph_database(profile, emotion_profile, message))
+                        )
+                        try:
+                            future.result(timeout=5.0)  # 5 second timeout for sync mode
+                        except concurrent.futures.TimeoutError:
+                            logger.warning("Synchronous graph sync timed out")
+                except RuntimeError:
+                    # No running event loop - direct execution
+                    try:
+                        loop = asyncio.new_event_loop()
+                        asyncio.set_event_loop(loop)
+                        loop.run_until_complete(self._sync_to_graph_database(profile, emotion_profile, message))
+                    except Exception as e:
+                        logger.warning(f"Synchronous graph sync failed: {e}")
+                    finally:
+                        loop.close()
 
         return profile, emotion_profile
 

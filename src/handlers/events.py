@@ -508,7 +508,7 @@ class BotEventHandlers:
                 if not relevant_memories:
                     relevant_memories = await self.memory_manager.retrieve_context_aware_memories(
                         user_id=user_id, 
-                        current_query=message.content, 
+                        query=message.content, 
                         max_memories=20,
                         context=message_context
                     )
@@ -747,7 +747,7 @@ class BotEventHandlers:
                 if not relevant_memories:
                     relevant_memories = await self.memory_manager.retrieve_context_aware_memories(
                         user_id=user_id, 
-                        current_query=content, 
+                        query=content, 
                         max_memories=20,
                         context=message_context
                     )

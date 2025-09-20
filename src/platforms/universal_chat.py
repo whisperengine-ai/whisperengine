@@ -824,7 +824,7 @@ class UniversalChatOrchestrator:
                 try:
                     relevant_memories = await memory_manager.retrieve_context_aware_memories(
                         user_id=message.user_id, 
-                        current_query=message.content, 
+                        query=message.content, 
                         max_memories=10,
                         context=message_context
                     )

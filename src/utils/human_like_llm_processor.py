@@ -9,6 +9,7 @@ optimiza            response = self.llm_client.generate_chat_completion(
             )specifically for chatbots that need to feel natural and emotionally intelligent.
 """
 
+import asyncio
 import json
 import logging
 from dataclasses import dataclass
@@ -442,7 +443,10 @@ class HumanLikeMemorySearch:
 
             for query in human_result.primary_queries:
                 try:
-                    memories = await self.base_memory_manager.retrieve_relevant_memories(
+                    # Use run_in_executor for sync memory manager method
+                    memories = await asyncio.get_event_loop().run_in_executor(
+                        None,  # Use default ThreadPoolExecutor
+                        self.base_memory_manager.retrieve_relevant_memories,
                         user_id,
                         query.query,
                         max(3, limit // len(human_result.primary_queries)),
@@ -566,9 +570,13 @@ class HumanLikeMemorySearch:
         """Caring fallback when human-like processing fails"""
 
         try:
-            # Simple but caring search
-            memories = await self.base_memory_manager.retrieve_relevant_memories(
-                user_id, message, limit
+            # Simple but caring search - use executor for sync method
+            memories = await asyncio.get_event_loop().run_in_executor(
+                None,  # Use default ThreadPoolExecutor
+                self.base_memory_manager.retrieve_relevant_memories,
+                user_id, 
+                message, 
+                limit
             )
 
             return {

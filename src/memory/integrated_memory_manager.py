@@ -149,16 +149,41 @@ class IntegratedMemoryManager:
             
             # Link memory to graph database if enabled
             if self.enable_graph_memory and conversation_memory_id:
-                asyncio.create_task(
-                    self._link_memory_to_graph(
-                        memory_id=str(conversation_memory_id),
-                        user_id=user_id,
-                        message=message,
-                        response=response,
-                        profile=profile,
-                        emotion_profile=emotion_profile or {},
-                    )
-                )
+                # Use thread worker pattern consistent with WhisperEngine architecture
+                try:
+                    import asyncio
+                    import threading
+                    
+                    def run_graph_link():
+                        """Run graph linking in background thread"""
+                        try:
+                            # Create new event loop for the thread
+                            loop = asyncio.new_event_loop()
+                            asyncio.set_event_loop(loop)
+                            
+                            # Run the async operation
+                            loop.run_until_complete(
+                                self._link_memory_to_graph(
+                                    memory_id=str(conversation_memory_id),
+                                    user_id=user_id,
+                                    message=message,
+                                    response=response,
+                                    profile=profile,
+                                    emotion_profile=emotion_profile or {},
+                                )
+                            )
+                        except Exception as e:
+                            logger.debug(f"Graph linking completed in background: {e}")
+                        finally:
+                            loop.close()
+                    
+                    # Schedule in background thread consistent with scatter-gather pattern
+                    thread = threading.Thread(target=run_graph_link, daemon=True)
+                    thread.start()
+                    
+                except Exception as e:
+                    logger.debug(f"Could not schedule graph linking: {e}")
+                    # Continue without graph linking to maintain functionality
 
             logger.debug("Stored conversation with full context for user %s", user_id)
             return str(conversation_memory_id) if conversation_memory_id else ""

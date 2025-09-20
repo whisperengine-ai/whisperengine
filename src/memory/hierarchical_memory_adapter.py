@@ -72,19 +72,25 @@ class HierarchicalMemoryAdapter:
     async def retrieve_context_aware_memories(
         self, 
         user_id: str, 
-        current_query: str, 
+        query: str = None,  # New parameter name
+        current_query: str = None,  # Legacy parameter name for compatibility
         max_memories: int = 10,
         limit: Optional[int] = None,  # Alternative parameter name for compatibility
         **kwargs  # Accept any additional parameters
     ) -> List[Dict[str, Any]]:
         """Retrieve contextually relevant memories"""
         try:
+            # Use the new 'query' parameter if provided, otherwise fall back to 'current_query'
+            actual_query = query if query is not None else current_query
+            if actual_query is None:
+                raise ValueError("Either 'query' or 'current_query' parameter must be provided")
+            
             # Use limit if provided, otherwise use max_memories
             actual_limit = limit if limit is not None else max_memories
             
             context = await self.hierarchical_memory_manager.get_conversation_context(
                 user_id=user_id,
-                current_query=current_query
+                current_query=actual_query
             )
             
             # Convert hierarchical context to expected format
