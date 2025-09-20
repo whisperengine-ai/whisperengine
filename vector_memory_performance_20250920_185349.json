@@ -1,0 +1,75 @@
+{
+  "timestamp": "2025-09-20T18:53:49.590148",
+  "test_config": {
+    "qdrant": {
+      "host": "qdrant",
+      "port": 6333,
+      "collection_name": "performance_test"
+    },
+    "embeddings": {
+      "model_name": "all-MiniLM-L6-v2"
+    }
+  },
+  "results": {
+    "embedding": {
+      "count": 5,
+      "min_ms": 4.277958000102444,
+      "max_ms": 9.989417000042522,
+      "avg_ms": 6.838650000099733,
+      "median_ms": 6.064042000161862,
+      "p95_ms": 9.989417000042522,
+      "target_200ms": true,
+      "under_200ms_percent": 100.0
+    },
+    "storage": {
+      "count": 5,
+      "min_ms": 4.980749999958789,
+      "max_ms": 7.550208000111525,
+      "avg_ms": 5.968016599990733,
+      "median_ms": 5.764167000052112,
+      "p95_ms": 7.550208000111525,
+      "target_200ms": true,
+      "under_200ms_percent": 100.0
+    },
+    "search": {
+      "count": 5,
+      "min_ms": 4.661458000100538,
+      "max_ms": 46.70666600009099,
+      "avg_ms": 13.453641400064953,
+      "median_ms": 5.2896250001595035,
+      "p95_ms": 46.70666600009099,
+      "target_200ms": true,
+      "under_200ms_percent": 100.0
+    },
+    "conversation_storage": {
+      "count": 5,
+      "min_ms": 8.901666999918234,
+      "max_ms": 10.33704199994645,
+      "avg_ms": 9.437458199954563,
+      "median_ms": 9.112333000075523,
+      "p95_ms": 10.33704199994645,
+      "target_200ms": true,
+      "under_200ms_percent": 100.0
+    },
+    "fact_storage": {
+      "count": 5,
+      "min_ms": 3.914083999916329,
+      "max_ms": 4.519375000199943,
+      "avg_ms": 4.108750400018835,
+      "median_ms": 4.066750999982105,
+      "p95_ms": 4.519375000199943,
+      "target_200ms": true,
+      "under_200ms_percent": 100.0
+    },
+    "recent_conversations": {
+      "count": 3,
+      "min_ms": 4.337208999913855,
+      "max_ms": 5.056208000041806,
+      "avg_ms": 4.627513999973114,
+      "median_ms": 4.489124999963678,
+      "p95_ms": 5.056208000041806,
+      "target_200ms": true,
+      "under_200ms_percent": 100.0
+    }
+  }
+}
