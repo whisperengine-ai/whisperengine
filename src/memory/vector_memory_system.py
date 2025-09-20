@@ -31,6 +31,13 @@ from pydantic import BaseModel, Field
 import asyncpg
 import redis.asyncio as redis
 
+# Import memory context classes for Discord context classification
+from src.memory.context_aware_memory_security import (
+    MemoryContext, 
+    MemoryContextType, 
+    ContextSecurity
+)
+
 logger = logging.getLogger(__name__)
 
 
@@ -871,6 +878,63 @@ class VectorMemoryManager:
             limit=effective_limit
         )
     
+    async def get_recent_conversations(
+        self, 
+        user_id: str, 
+        limit: int = 5,
+        context_filter: Optional[Any] = None
+    ) -> List[Dict[str, Any]]:
+        """Get recent conversation history for a user."""
+        try:
+            # Search for recent conversation memories
+            results = await self.vector_store.search_memories(
+                query="conversation user_message bot_response",
+                user_id=user_id,
+                memory_types=[MemoryType.CONVERSATION],
+                top_k=limit * 2  # Get more to filter properly
+            )
+            
+            conversations = []
+            seen_pairs = set()
+            
+            for result in results:
+                content = result.get("content", "")
+                metadata = result.get("metadata", {})
+                role = metadata.get("role", "")
+                
+                # Group user/bot message pairs
+                if role == "user":
+                    user_message = content
+                    # Look for corresponding bot response
+                    bot_response = ""
+                    for r in results:
+                        r_metadata = r.get("metadata", {})
+                        if (r_metadata.get("role") == "assistant" and 
+                            abs(r.get("timestamp", 0) - result.get("timestamp", 0)) < 60):  # Within 1 minute
+                            bot_response = r.get("content", "")
+                            break
+                    
+                    pair_key = (user_message[:50], bot_response[:50])  # Use truncated content as key
+                    if pair_key not in seen_pairs:
+                        conversations.append({
+                            'user_message': user_message,
+                            'bot_response': bot_response,
+                            'timestamp': result.get("timestamp", ""),
+                            'metadata': metadata
+                        })
+                        seen_pairs.add(pair_key)
+                        
+                        if len(conversations) >= limit:
+                            break
+            
+            # Sort by timestamp (most recent first)
+            conversations.sort(key=lambda x: x.get('timestamp', ''), reverse=True)
+            return conversations[:limit]
+            
+        except Exception as e:
+            logger.error(f"Failed to get recent conversations: {e}")
+            return []
+    
     async def store_fact(
         self,
         user_id: str,
@@ -1095,6 +1159,80 @@ class VectorMemoryManager:
     async def get_emotion_context(self, user_id: str) -> Dict[str, Any]:
         """Alias for get_emotional_context."""
         return await self.get_emotional_context(user_id)
+    
+    def classify_discord_context(self, message) -> MemoryContext:
+        """
+        Classify Discord message context for security boundaries.
+        
+        Args:
+            message: Discord message object
+
+        Returns:
+            MemoryContext object with security classification
+        """
+        try:
+            # DM Context
+            if message.guild is None:
+                return MemoryContext(
+                    context_type=MemoryContextType.DM,
+                    server_id=None,
+                    channel_id=str(message.channel.id),
+                    is_private=True,
+                    security_level=ContextSecurity.PRIVATE_DM,
+                )
+
+            # Server Context
+            server_id = str(message.guild.id)
+            channel_id = str(message.channel.id)
+
+            # Check if channel is private (permissions-based)
+            is_private_channel = self._is_private_channel(message.channel)
+
+            if is_private_channel:
+                return MemoryContext(
+                    context_type=MemoryContextType.PRIVATE_CHANNEL,
+                    server_id=server_id,
+                    channel_id=channel_id,
+                    is_private=True,
+                    security_level=ContextSecurity.PRIVATE_CHANNEL,
+                )
+            else:
+                return MemoryContext(
+                    context_type=MemoryContextType.PUBLIC_CHANNEL,
+                    server_id=server_id,
+                    channel_id=channel_id,
+                    is_private=False,
+                    security_level=ContextSecurity.PUBLIC_CHANNEL,
+                )
+
+        except Exception as e:
+            logger.error(f"Error classifying context: {e}")
+            # Default to most private for safety
+            return MemoryContext(
+                context_type=MemoryContextType.DM, 
+                security_level=ContextSecurity.PRIVATE_DM
+            )
+
+    def _is_private_channel(self, channel) -> bool:
+        """
+        Check if a Discord channel is private based on permissions.
+        """
+        try:
+            # Basic heuristic: if channel has specific permission overwrites 
+            # or is a thread/DM, consider it private
+            if hasattr(channel, 'overwrites') and len(channel.overwrites) > 0:
+                return True
+            
+            # Thread channels are typically more private
+            if hasattr(channel, 'parent') and channel.parent:
+                return True
+                
+            return False
+            
+        except Exception as e:
+            logger.error(f"Error checking channel privacy: {e}")
+            # Default to private for safety
+            return True
     
     async def health_check(self) -> Dict[str, Any]:
         """Get system health status."""
