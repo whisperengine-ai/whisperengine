@@ -40,7 +40,7 @@ from src.utils.context_size_manager import (
     count_context_tokens,
 )
 from src.conversation.boundary_manager import ConversationBoundaryManager
-from src.memory.fact_validator import FactValidator, initialize_fact_validation_tables
+
 from src.utils.helpers import (
     add_debug_info_to_response,
     extract_text_for_memory_storage,
@@ -142,9 +142,6 @@ class BotEventHandlers:
         self.boundary_manager = ConversationBoundaryManager(
             summarization_threshold=8  # Start summarizing after 8 messages
         )
-
-        # Initialize Fact Validator for memory integrity
-        self.fact_validator = FactValidator(storage_manager=self.postgres_pool)
 
         # Configuration flags - unified AI system always enabled
         self.voice_support_enabled = getattr(bot_core, "voice_support_enabled", False)
@@ -309,10 +306,6 @@ class BotEventHandlers:
                 # Database tables are automatically initialized by PostgreSQLUserDB.initialize()
                 logger.info("✅ Database tables initialized/verified")
 
-                # Initialize fact validation tables
-                await initialize_fact_validation_tables(self.postgres_pool)
-                logger.info("✅ Fact validation system initialized")
-
             except ConnectionError as e:
                 # Clean error message for PostgreSQL connection failures
                 logger.error(f"PostgreSQL connection failed: {e}")
@@ -428,6 +421,9 @@ class BotEventHandlers:
         Args:
             message: Discord message object
         """
+        # DEBUG: Explicit logging to see if this method is called
+        logger.info(f"🔥 DEBUG: on_message called for message from {message.author.name} ({message.author.id}): '{message.content[:50]}...'")
+        
         # Skip bot messages unless they're to be cached
         if message.author.bot:
             # Add bot messages to cache for conversation context
@@ -959,9 +955,8 @@ class BotEventHandlers:
                     f"Supplementing {len(recent_messages)} cached messages with hierarchical memory for user {user_id}"
                 )
                 try:
-                    # Use hierarchical memory manager to get recent conversation history
-                    # This will check Redis first, then PostgreSQL as source of truth
-                    memory_manager = self.safe_memory_manager or self.memory_manager
+                    # Use memory manager to get recent conversation history
+                    memory_manager = self.memory_manager
                     if memory_manager and hasattr(memory_manager, 'get_recent_conversations'):
                         # Use the proper conversation history method
                         hierarchical_conversations = await memory_manager.get_recent_conversations(
@@ -2064,37 +2059,6 @@ class BotEventHandlers:
 
             logger.debug(f"Storage content length: {len(storage_content)} characters")
 
-            # Fact validation - extract and validate facts from user message
-            if self.fact_validator:
-                try:
-                    # Process user message to extract facts and detect conflicts
-                    extracted_facts, conflicts = await self.fact_validator.process_message(storage_content, user_id)
-                    
-                    if extracted_facts:
-                        logger.debug(f"Extracted {len(extracted_facts)} facts from user message")
-                        
-                        # Log any conflicts detected
-                        if conflicts:
-                            logger.warning(f"Detected {len(conflicts)} fact conflicts for user {user_id}")
-                            for conflict in conflicts:
-                                logger.warning(f"Conflict: {conflict.old_fact.subject} {conflict.old_fact.predicate} {conflict.old_fact.object} vs {conflict.new_fact.object}")
-                    
-                    # Also process bot response for fact validation
-                    if response and response.strip():
-                        response_facts, response_conflicts = await self.fact_validator.process_message(response, user_id)
-                        if response_facts:
-                            logger.debug(f"Extracted {len(response_facts)} facts from bot response")
-                            
-                            # Log any conflicts in bot response
-                            if response_conflicts:
-                                logger.warning(f"Bot response contains {len(response_conflicts)} fact conflicts")
-                                for conflict in response_conflicts:
-                                    logger.warning(f"Bot conflict: {conflict.old_fact.subject} {conflict.old_fact.predicate} {conflict.old_fact.object} vs {conflict.new_fact.object}")
-                                    
-                except Exception as fact_validation_error:
-                    logger.warning(f"Fact validation failed for user {user_id}: {fact_validation_error}")
-                    # Continue with conversation storage even if fact validation fails
-
             # Prepare emotion metadata
             emotion_metadata = None
             if current_emotion_data:
@@ -2208,10 +2172,10 @@ class BotEventHandlers:
                 storage_metadata.update(emotional_simple)
 
             # Store with thread-safe operations
-            storage_success = await self.safe_memory_manager.store_conversation_safe(
-                user_id,
-                storage_content,
-                response,
+            storage_success = await self.memory_manager.store_conversation(
+                user_id=user_id,
+                user_message=storage_content,
+                bot_response=response,
                 channel_id=str(message.channel.id),
                 pre_analyzed_emotion_data=emotion_metadata,
                 metadata=storage_metadata,
@@ -2247,7 +2211,7 @@ class BotEventHandlers:
                 # Get additional recent messages for better analysis
                 try:
                     message_context = self.memory_manager.classify_discord_context(message)
-                    recent_context = await self.safe_memory_manager.get_recent_conversations(
+                    recent_context = await self.memory_manager.get_recent_conversations(
                         user_id, limit=10, context_filter=message_context
                     )
                     if recent_context and hasattr(recent_context, "conversations"):
