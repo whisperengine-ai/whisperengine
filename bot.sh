@@ -118,6 +118,9 @@ show_help() {
     echo "  logs [service]                   - View logs (default: whisperengine-bot)"
     echo "  status                           - Show container status"
     echo ""
+    echo "Data Import:"
+    echo "  import-chatgpt <file> <user-id> [options]  - Import ChatGPT conversations"
+    echo ""
     echo "Restart Commands (Data Preservation):"
     echo "  restart [prod|dev|infrastructure]     - Restart services"
     echo "  restart-all [prod|dev|infrastructure] - Restart all services, PRESERVE data"
@@ -143,6 +146,7 @@ show_help() {
     echo "  $0 start prod                     # Full production deployment"
     echo "  $0 start dev                      # Development with hot-reload (recommended for dev)"
     echo "  $0 start infrastructure           # Start databases only (for native Python development)"
+    echo "  $0 import-chatgpt conversations.json 672814231002939413  # Import ChatGPT history"
     echo "  $0 restart dev                    # Restart development services with code changes"
     echo "  $0 restart-all dev                # Restart all dev services, preserve data"
     echo "  $0 restart-clean dev              # Restart all, clear cache only"
@@ -949,6 +953,102 @@ case "${1:-help}" in
     "backup")
         shift  # Remove 'backup' from arguments
         handle_backup "$@"
+        ;;
+    "import-chatgpt")
+        if [[ $# -lt 3 ]]; then
+            print_error "Usage: $0 import-chatgpt <conversations.json> <discord-user-id> [options]"
+            echo ""
+            echo "Examples:"
+            echo "  $0 import-chatgpt ~/Downloads/conversations.json 672814231002939413"
+            echo "  $0 import-chatgpt conversations.json 672814231002939413 --verbose"
+            echo "  $0 import-chatgpt conversations.json 672814231002939413 --dry-run"
+            echo ""
+            echo "Options:"
+            echo "  --verbose     Show detailed progress"
+            echo "  --dry-run     Test without importing"
+            echo "  --start-date  Only import after date (YYYY-MM-DD)"
+            echo "  --end-date    Only import before date (YYYY-MM-DD)"
+            echo "  --min-messages Skip conversations shorter than N messages"
+            exit 1
+        fi
+        
+        local conversations_file="$2"
+        local user_id="$3"
+        shift 3  # Remove the command and required arguments
+        
+        # Validate file exists
+        if [[ ! -f "$conversations_file" ]]; then
+            print_error "File not found: $conversations_file"
+            echo "Make sure the path to your conversations.json file is correct."
+            exit 1
+        fi
+        
+        # Validate user ID format (Discord user IDs are 17-19 digits)
+        if [[ ! "$user_id" =~ ^[0-9]{17,19}$ ]]; then
+            print_error "Invalid Discord User ID format: $user_id"
+            echo "Discord User IDs should be 17-19 digit numbers."
+            echo "Get your ID: Discord Settings → Advanced → Developer Mode → Right-click username → Copy User ID"
+            exit 1
+        fi
+        
+        print_status "Starting ChatGPT import..."
+        echo "📁 File: $conversations_file"
+        echo "👤 User ID: $user_id"
+        echo "⚙️  Options: $*"
+        echo ""
+        
+        # Check if services are running, start if needed
+        check_docker
+        check_env
+        
+        # Detect mode and ensure services are running
+        local mode="auto"
+        if [[ -f "docker-compose.override.yml" ]]; then
+            mode="dev"
+        else
+            mode="prod"
+        fi
+        
+        # Ensure bot services are running
+        if ! $COMPOSE_CMD ps whisperengine-bot | grep -q "Up"; then
+            print_warning "WhisperEngine bot is not running. Starting services..."
+            start_bot "$mode"
+            sleep 10  # Give services time to fully start
+        fi
+        
+        # Run the import using Docker exec
+        print_status "Running ChatGPT import in container..."
+        
+        # Convert file path to absolute path for Docker mounting
+        local abs_conversations_file=$(realpath "$conversations_file")
+        local container_file="/tmp/conversations.json"
+        
+        # Copy file into container
+        docker cp "$abs_conversations_file" whisperengine-bot:"$container_file"
+        
+        # Run the import command with all passed options
+        if docker exec whisperengine-bot python scripts/chatgpt_import/import_chatgpt.py \
+            --file "$container_file" \
+            --user-id "$user_id" \
+            "$@"; then
+            print_status "ChatGPT import completed successfully!"
+            echo ""
+            echo "🧠 Your ChatGPT conversations are now part of WhisperEngine's memory."
+            echo "🔍 Test it: Ask WhisperEngine about something you discussed in ChatGPT."
+            echo "📊 Check stats with Discord commands like: !memory user stats"
+        else
+            print_error "ChatGPT import failed. Check the logs above for details."
+            echo ""
+            echo "💡 Troubleshooting tips:"
+            echo "  • Make sure the file is a valid ChatGPT export (conversations.json)"
+            echo "  • Verify your Discord User ID is correct"
+            echo "  • Check that WhisperEngine services are healthy: $0 status"
+            echo "  • Try a dry run first: $0 import-chatgpt file.json user-id --dry-run"
+            exit 1
+        fi
+        
+        # Clean up temporary file
+        docker exec whisperengine-bot rm -f "$container_file" 2>/dev/null || true
         ;;
     "build-push")
         shift  # Remove 'build-push' from arguments
