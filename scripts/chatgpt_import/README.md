@@ -41,7 +41,158 @@ This tool imports your ChatGPT conversations into WhisperEngine, allowing the AI
 - Docker must be **running on your computer**
 - The WhisperEngine database should be **set up and accessible**
 
-## 🚀 Step-by-Step Import Process
+## �️ Troubleshooting Common Issues
+
+### Problem: "File not found" Error
+**Solution:**
+1. **Check file path**: Make sure the path to `conversations.json` is correct
+2. **Use full path**: Try using the complete file path instead of relative paths
+3. **Check file name**: Ensure the file is named exactly `conversations.json`
+
+```bash
+# Check if file exists
+ls -la /path/to/conversations.json
+
+# If file exists, try full path
+./bot.sh import-chatgpt /full/path/to/conversations.json 672814231002939413
+```
+
+### Problem: "Permission denied" Error
+**Solution:**
+```bash
+# Make sure bot.sh is executable
+chmod +x bot.sh
+
+# Try with sudo if needed (be careful!)
+sudo ./bot.sh import-chatgpt /path/to/conversations.json 672814231002939413
+```
+
+### Problem: "Docker not running" Error
+**Solution:**
+1. **Start Docker**: Make sure Docker Desktop is running
+2. **Check services**: Verify WhisperEngine containers are up
+```bash
+# Check if Docker is running
+docker ps
+
+# Start WhisperEngine if needed
+docker compose up -d
+
+# Check service status
+docker compose ps
+```
+
+### Problem: "Invalid User ID" Error
+**Solution:**
+- **Double-check ID**: Discord User IDs are 17-19 digit numbers
+- **No quotes needed**: Use the number directly, without quotes
+- **Copy carefully**: Make sure you copied the complete ID
+
+### Problem: Import Seems Stuck
+**Solution:**
+1. **Be patient**: Large files can take time (1,000+ conversations = 10+ minutes)
+2. **Check progress**: Look for progress messages in the output
+3. **Interrupt safely**: Use `Ctrl+C` to stop if needed
+
+```bash
+# Check if import is still running
+docker compose logs whisperengine-bot --tail=50
+
+# If stuck, restart and try smaller batch
+docker compose restart whisperengine-bot
+```
+
+### Problem: "Database connection failed"
+**Solution:**
+1. **Check environment**: Make sure `.env` file is properly configured
+2. **Restart services**: Sometimes database connections timeout
+```bash
+# Restart all services
+docker compose down
+docker compose up -d
+
+# Wait for services to fully start (30-60 seconds)
+sleep 60
+
+# Try import again
+./bot.sh import-chatgpt /path/to/conversations.json 672814231002939413
+```
+
+### Problem: File Format Issues
+**Error messages like**: `Invalid JSON format`, `Unexpected file structure`
+
+**Solution:**
+1. **Check file size**: Make sure the file isn't corrupted (should be several MB for active users)
+2. **Verify format**: Open the file and check it starts with `[` and contains conversation objects
+3. **Re-download**: If file seems wrong, request a new export from ChatGPT
+
+## 💡 Tips for Success
+
+### Before Starting:
+- ✅ **Backup first**: WhisperEngine will create a backup, but be safe
+- ✅ **Free space**: Ensure you have enough disk space (exports can be large)
+- ✅ **Stable internet**: For Docker image downloads if needed
+- ✅ **Close ChatGPT**: Make sure you're not actively using ChatGPT during import
+
+### During Import:
+- ⏰ **Be patient**: Large files take time (plan for 30+ minutes for heavy users)
+- 👀 **Watch output**: Look for error messages or progress updates
+- 🔋 **Keep computer awake**: Don't let your computer sleep during import
+
+### After Import:
+- 🧪 **Test memory**: Ask WhisperEngine about something from your ChatGPT history
+- 📊 **Check counts**: Use Discord commands to verify conversation count
+- 🔍 **Search test**: Try searching for specific topics you discussed
+
+## 🔧 Advanced Options
+
+### Import Specific Date Range
+```bash
+# Only import conversations from 2024
+docker compose exec whisperengine-bot python scripts/chatgpt_import/import_chatgpt.py \
+  --file /path/to/conversations.json \
+  --user-id 672814231002939413 \
+  --start-date 2024-01-01 \
+  --end-date 2024-12-31
+```
+
+### Skip Certain Conversation Types
+```bash
+# Skip short conversations (less than 5 messages)
+docker compose exec whisperengine-bot python scripts/chatgpt_import/import_chatgpt.py \
+  --file /path/to/conversations.json \
+  --user-id 672814231002939413 \
+  --min-messages 5
+```
+
+### Batch Processing for Large Files
+```bash
+# Process in smaller chunks to avoid timeouts
+docker compose exec whisperengine-bot python scripts/chatgpt_import/import_chatgpt.py \
+  --file /path/to/conversations.json \
+  --user-id 672814231002939413 \
+  --batch-size 50 \
+  --verbose
+```
+
+## 📞 Getting Help
+
+If you're still having trouble:
+
+1. **Check logs**: Look at WhisperEngine logs for detailed error messages
+```bash
+docker compose logs whisperengine-bot --tail=100
+```
+
+2. **Join Discord**: Ask for help in the WhisperEngine support channels
+
+3. **Create issue**: Report bugs on the GitHub repository with:
+   - Your operating system
+   - Docker version (`docker --version`)
+   - Complete error message
+   - Size of your ChatGPT export file
+
+## Export Process
 
 ### Method 1: Simple One-Command Import (Easiest)
 
