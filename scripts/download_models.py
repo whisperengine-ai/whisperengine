@@ -13,35 +13,40 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 def download_embedding_models():
-    """Download sentence-transformers embedding models"""
+    """Download fastembed embedding models"""
     try:
-        from sentence_transformers import SentenceTransformer
-        import torch
+        from fastembed import TextEmbedding
+        import os
         
         models_dir = Path("/app/models/embeddings")
         models_dir.mkdir(parents=True, exist_ok=True)
         
-        # Primary embedding model (single model approach)
-        logger.info("📥 Downloading embedding model (MiniLM-L6-v2)...")
+        # Primary embedding model (fastembed approach)
+        model_name = "snowflake/snowflake-arctic-embed-xs"
+        logger.info(f"📥 Downloading embedding model ({model_name})...")
         
-        # Set device to CPU and disable meta tensors for compatibility
-        torch.set_default_tensor_type(torch.FloatTensor)
+        # Initialize fastembed model (this downloads it to cache)
+        embedding_model = TextEmbedding(model_name=model_name)
         
-        embedding_model = SentenceTransformer('all-MiniLM-L6-v2', device='cpu')
+        # Create a test embedding to ensure model works
+        test_embedding = list(embedding_model.embed(["test sentence"]))[0]
+        logger.info(f"✅ Model verification successful. Embedding dimension: {len(test_embedding)}")
         
-        # Ensure model is on CPU before saving
-        embedding_model = embedding_model.to('cpu')
+        # Save model path info (fastembed handles caching internally)
+        model_info = {
+            "model_name": model_name,
+            "embedding_dimension": len(test_embedding),
+            "cache_location": os.path.expanduser("~/.cache/fastembed"),
+            "model_type": "fastembed",
+            "verified": True
+        }
         
-        # Save with explicit device mapping
-        save_path = str(models_dir / 'all-MiniLM-L6-v2')
-        embedding_model.save(save_path)
+        import json
+        with open(models_dir / "model_info.json", 'w') as f:
+            json.dump(model_info, f, indent=2)
         
-        # Verify the saved model can be loaded
-        test_model = SentenceTransformer(save_path, device='cpu')
-        test_embedding = test_model.encode(["test sentence"])
-        logger.info(f"✅ Model verification successful. Embedding dimension: {len(test_embedding[0])}")
-        
-        logger.info("✅ Embedding model saved to /app/models/embeddings/all-MiniLM-L6-v2")
+        logger.info(f"✅ Embedding model cached and verified: {model_name}")
+        logger.info(f"📊 Embedding dimension: {len(test_embedding)}")
         
         return True
     except Exception as e:
@@ -96,7 +101,9 @@ def create_model_config():
     """Create configuration file for local model paths"""
     config = {
         "embedding_models": {
-            "primary": "/app/models/embeddings/all-MiniLM-L6-v2"
+            "primary": "snowflake/snowflake-arctic-embed-xs",
+            "type": "fastembed",
+            "cache_dir": "~/.cache/fastembed"
         },
         "emotion_models": {
             "roberta_sentiment": "/app/models/emotion/roberta-sentiment"
@@ -118,7 +125,7 @@ def create_model_config():
 def verify_downloads():
     """Verify all models were downloaded successfully"""
     required_paths = [
-        "/app/models/embeddings/all-MiniLM-L6-v2", 
+        "/app/models/embeddings/model_info.json",
         "/app/models/emotion/roberta-sentiment",
         "/app/models/model_config.json"
     ]
@@ -130,6 +137,14 @@ def verify_downloads():
             all_present = False
         else:
             logger.info(f"✅ Found: {path}")
+    
+    # Verify fastembed cache exists
+    import os
+    fastembed_cache = os.path.expanduser("~/.cache/fastembed")
+    if os.path.exists(fastembed_cache):
+        logger.info(f"✅ FastEmbed cache found: {fastembed_cache}")
+    else:
+        logger.warning(f"⚠️  FastEmbed cache not found: {fastembed_cache}")
     
     return all_present
 

@@ -188,7 +188,7 @@ def create_memory_manager(memory_type: str = "hierarchical", **config) -> Memory
         return MockMemoryManager()
     
     elif memory_type == "vector":
-        # Vector-native memory system using Qdrant + sentence-transformers
+        # Vector-native memory system using Qdrant + fastembed
         from src.memory.vector_memory_system import VectorMemoryManager
         
         # Create vector config from environment and overrides

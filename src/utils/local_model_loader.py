@@ -6,7 +6,7 @@ Loads pre-downloaded models from local directory
 import logging
 from pathlib import Path
 
-from sentence_transformers import SentenceTransformer
+from fastembed import TextEmbedding
 
 logger = logging.getLogger(__name__)
 
@@ -18,7 +18,7 @@ class LocalModelManager:
         self.models_dir = Path(models_dir)
         self.loaded_models = {}
 
-    def load_embedding_model(self, model_name: str = "all-mpnet-base-v2"):
+    def load_embedding_model(self, model_name: str = "snowflake/snowflake-arctic-embed-xs"):
         """Load local embedding model"""
         if model_name in self.loaded_models:
             return self.loaded_models[model_name]
@@ -27,12 +27,12 @@ class LocalModelManager:
 
         if model_path.exists():
             logger.info(f"Loading local embedding model: {model_path}")
-            model = SentenceTransformer(str(model_path))
+            model = TextEmbedding(model_name=model_name, cache_dir=str(model_path))
             self.loaded_models[model_name] = model
             return model
         else:
             logger.warning(f"Local model not found: {model_path}, falling back to online")
-            model = SentenceTransformer(model_name)
+            model = TextEmbedding(model_name=model_name)
             self.loaded_models[model_name] = model
             return model
 
