@@ -28,7 +28,7 @@ from dotenv import load_dotenv
 from src.utils.emotion_manager import EmotionManager, RelationshipManager
 from src.utils.fact_extractor import FactExtractor
 from src.llm.llm_client import LLMClient
-from src.memory.memory_manager import UserMemoryManager
+from src.memory.core.memory_factory import create_memory_manager
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s - %(name)s - %(message)s")
 logger = logging.getLogger(__name__)
@@ -109,7 +109,11 @@ def test_llm_conversions():
 
     # Test 4: Synthetic Message Detection
 
-    memory_manager = UserMemoryManager(enable_auto_facts=False, llm_client=llm_client)
+    memory_manager = create_memory_manager(
+        mode="unified", 
+        llm_client=llm_client,
+        enable_enhanced_queries=False
+    )
 
     synthetic_test_messages = [
         "[Context from previous conversations] The user mentioned liking pizza.",

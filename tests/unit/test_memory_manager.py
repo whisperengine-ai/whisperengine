@@ -10,7 +10,8 @@ from unittest.mock import Mock, patch, MagicMock, AsyncMock
 import json
 from datetime import datetime
 
-from src.memory.memory_manager import UserMemoryManager
+from src.memory.core.consolidated_memory_manager import ConsolidatedMemoryManager
+from src.memory.core.memory_factory import create_memory_manager
 from src.utils.exceptions import MemoryError, MemoryRetrievalError, MemoryStorageError, ValidationError
 
 
@@ -112,11 +113,11 @@ def memory_manager(mock_chromadb, mock_llm_client, mock_emotion_manager):
         # Make sure the embedding function mock returns our MockEmbeddingFunction instance
         mock_embedding_func.return_value = mock_chromadb['embedding_function']
 
-        manager = UserMemoryManager(
-            persist_directory="./test_chromadb",
-            enable_auto_facts=True,
-            enable_global_facts=True,
-            enable_emotions=True,
+        manager = create_memory_manager(
+            mode="unified",
+            enable_enhanced_queries=True,
+            enable_context_security=True,
+            enable_optimization=True,
             llm_client=mock_llm_client
         )
         yield manager
@@ -130,7 +131,7 @@ class TestUserMemoryManagerInitialization:
             'CHROMADB_HOST': 'localhost',
             'CHROMADB_PORT': '8000'
         }):
-            manager = UserMemoryManager()
+            manager = create_memory_manager(mode="unified")
             # Check actual attributes that exist in UserMemoryManager
             assert manager.enable_auto_facts is False  # Disabled in current implementation
             assert manager.enable_global_facts is True
@@ -147,11 +148,11 @@ class TestUserMemoryManagerInitialization:
             'CHROMADB_HOST': 'test_host',
             'CHROMADB_PORT': '9000'
         }):
-            manager = UserMemoryManager(
-                persist_directory='./custom_chromadb',
-                enable_auto_facts=False,
-                enable_global_facts=False,
-                enable_emotions=False,
+            manager = create_memory_manager(
+                mode="unified",
+                enable_enhanced_queries=False,
+                enable_context_security=False,
+                enable_optimization=False,
                 llm_client=mock_llm_client
             )
             assert manager.enable_auto_facts is False
@@ -171,11 +172,11 @@ class TestUserMemoryManagerInitialization:
             'CHROMADB_PORT': '8000'
         }):
             with pytest.raises(MemoryError, match="ChromaDB server connection test failed"):
-                UserMemoryManager()
+                create_memory_manager(mode="unified")
 
     def test_init_collections_created(self, mock_chromadb):
         """Test that collections are properly created during initialization."""
-        manager = UserMemoryManager()
+        manager = create_memory_manager(mode="unified")
         
         # Verify collections were created - should be 2: user_memories and global_facts
         assert mock_chromadb['client'].get_or_create_collection.call_count == 2

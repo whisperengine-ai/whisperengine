@@ -27,12 +27,13 @@ from pathlib import Path
 # Add the src directory to Python path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from src.memory.memory_manager import UserMemoryManager
+from src.memory.core.memory_factory import create_memory_manager
+from src.memory.core.memory_interface import MemoryManagerProtocol
 from src.utils.exceptions import MemoryStorageError, ValidationError
 
 
 def export_global_facts(
-    memory_manager: UserMemoryManager, output_file: str | None = None
+    memory_manager: MemoryManagerProtocol, output_file: str | None = None
 ) -> str | None:
     """
     Export all global facts to a JSON file.
@@ -90,7 +91,7 @@ def export_global_facts(
 
 
 def import_global_facts(
-    memory_manager: UserMemoryManager, input_file: str, confirm: bool = False
+    memory_manager: MemoryManagerProtocol, input_file: str, confirm: bool = False
 ) -> int:
     """
     Import global facts from a JSON file.
@@ -238,7 +239,7 @@ Examples:
         # Initialize memory manager
         try:
             db_path = getattr(args, "db_path", "./chromadb_data")
-            memory_manager = UserMemoryManager(persist_directory=db_path)
+            memory_manager = create_memory_manager(mode="unified")
         except Exception:
             return 1
 

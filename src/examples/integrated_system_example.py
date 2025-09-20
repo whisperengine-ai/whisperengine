@@ -25,7 +25,7 @@ from env_manager import load_environment
 if not load_environment():
     sys.exit(1)
 
-from src.memory.memory_manager import UserMemoryManager
+from src.memory.core.memory_factory import create_memory_manager
 from src.utils.graph_integrated_emotion_manager import GraphIntegratedEmotionManager
 
 # Import the integrated components
@@ -39,7 +39,13 @@ class EnhancedBot:
     def __init__(self, llm_client=None):
         """Initialize bot with integrated systems"""
         # Initialize memory manager (always uses unified local embedding model)
-        self.memory_manager = UserMemoryManager(llm_client=llm_client)
+        self.memory_manager = create_memory_manager(
+            mode="unified",
+            llm_client=llm_client,
+            enable_enhanced_queries=True,
+            enable_context_security=True,
+            enable_optimization=True
+        )
 
         # Initialize graph-integrated emotion manager (shares same memory manager)
         self.emotion_manager = GraphIntegratedEmotionManager(

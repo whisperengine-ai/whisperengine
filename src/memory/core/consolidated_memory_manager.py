@@ -222,9 +222,9 @@ class ConsolidatedMemoryManager(UnifiedMemoryManager):
                 processed_query = query
                 if self.enable_enhanced_queries and self.query_processor:
                     query_result = await self._run_sync(
-                        self.query_processor.process_query, query
+                        self.query_processor.process_message, query
                     )
-                    processed_query = query_result.optimized_query
+                    processed_query = query_result.fallback_query
                 
                 # Base retrieval (sync)
                 raw_memories = await self._run_sync(

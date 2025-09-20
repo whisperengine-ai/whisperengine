@@ -16,8 +16,8 @@ try:
     from src.intelligence import Phase2Integration
     print("✅ Phase2Integration import successful")
     
-    from src.memory import UserMemoryManager
-    print("✅ UserMemoryManager import successful")
+    from src.memory.core.memory_factory import create_memory_manager
+    print("✅ create_memory_manager import successful")
     
     # Test basic initialization
     print("\nTesting basic initialization...")
@@ -25,7 +25,7 @@ try:
     # This would normally require an LLM client, so we'll just check the class
     print(f"MemoryTriggeredMoments: {MemoryTriggeredMoments}")
     print(f"Phase2Integration: {Phase2Integration}")
-    print(f"UserMemoryManager: {UserMemoryManager}")
+    print(f"create_memory_manager: {create_memory_manager}")
     
     print("\n✅ All critical imports successful - Memory Moments should be working")
     

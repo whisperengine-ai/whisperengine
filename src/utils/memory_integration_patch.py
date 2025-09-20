@@ -25,9 +25,21 @@ def apply_memory_enhancement_patch(memory_manager):
         Enhanced memory manager with optimized query processing
     """
     try:
-        logger.info("Applying enhanced memory system patch...")
+        # Check if this is already a unified memory manager with built-in enhancements
+        from src.memory.core.consolidated_memory_manager import ConsolidatedMemoryManager
+        
+        if isinstance(memory_manager, ConsolidatedMemoryManager):
+            logger.info("✅ Unified memory manager detected - enhancements already built-in")
+            logger.info("🎯 Unified Manager Benefits:")
+            logger.info("  • Native enhanced query processing")
+            logger.info("  • Built-in context security and optimization")  
+            logger.info("  • Pure async interface with scatter-gather support")
+            logger.info("  • Integrated features - no wrapper overhead")
+            return memory_manager
+        
+        logger.info("Applying enhanced memory system patch to legacy manager...")
 
-        # Create enhanced wrapper
+        # Create enhanced wrapper for legacy managers
         enhanced_manager = create_enhanced_memory_manager(memory_manager)
 
         # Configure enhancement settings

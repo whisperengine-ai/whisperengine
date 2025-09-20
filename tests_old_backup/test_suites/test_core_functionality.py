@@ -20,7 +20,7 @@ from pathlib import Path
 from env_manager import load_environment, validate_environment
 from src.core.bot import DiscordBotCore
 from src.llm.llm_client import LLMClient
-from src.memory.context_aware_memory_security import ContextAwareMemoryManager
+from src.memory.core.memory_factory import create_memory_manager
 
 
 class TestEnvironmentManagement:

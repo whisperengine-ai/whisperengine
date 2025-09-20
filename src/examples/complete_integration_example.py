@@ -27,7 +27,8 @@ if not load_environment():
 # Import the integrated components
 from src.llm.concurrent_llm_manager import ConcurrentLLMManager
 from src.llm.llm_client import LLMClient
-from src.memory.memory_manager import UserMemoryManager
+from src.memory.core.memory_factory import create_memory_manager
+from src.memory.core.consolidated_memory_manager import ConsolidatedMemoryManager
 from src.utils.graph_integrated_emotion_manager import GraphIntegratedEmotionManager
 
 logger = logging.getLogger(__name__)
@@ -45,9 +46,14 @@ class CompleteIntegratedBot:
         # Test connection (network/IO issues simply result in disabled LLM mode)
         self.llm_client = safe_llm_client if base_llm_client.check_connection() else None
 
-        # Initialize memory manager (embeddings are always local now)
-        self.memory_manager = UserMemoryManager(
-            enable_auto_facts=True, enable_global_facts=False, llm_client=self.llm_client
+        # Initialize unified memory manager with all features enabled
+        self.memory_manager = create_memory_manager(
+            mode="unified",
+            llm_client=self.llm_client,
+            enable_enhanced_queries=True,
+            enable_context_security=True,
+            enable_optimization=True,
+            enable_graph_integration=True
         )
 
         # Initialize graph-integrated emotion manager

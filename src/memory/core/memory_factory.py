@@ -15,53 +15,65 @@ logger = logging.getLogger(__name__)
 
 
 def create_memory_manager(
+    mode: str = "unified",
+    llm_client: Optional[Any] = None,
     base_manager: Optional[UserMemoryManager] = None,
     emotion_manager: Optional[Any] = None,
     graph_manager: Optional[Any] = None,
     *,
     # Feature toggles for gradual migration
     use_legacy_mode: bool = False,
-    enable_all_features: bool = True,
+    enable_enhanced_queries: bool = True,
+    enable_context_security: bool = True,
+    enable_thread_safety: bool = True,
+    enable_optimization: bool = True,
+    enable_graph_integration: bool = False,
+    max_workers: int = 4,
     **kwargs
 ) -> MemoryManagerProtocol:
     """
     Factory function to create the appropriate memory manager.
     
-    This allows gradual migration from the old wrapper/decorator system
-    to the new unified async manager.
+    Creates either the new unified ConsolidatedMemoryManager (default) or 
+    legacy wrapper chains for backward compatibility during migration.
     
     Args:
-        base_manager: Base UserMemoryManager instance
+        mode: "unified" (default) or "legacy" for memory manager type
+        llm_client: LLM client instance for the manager
+        base_manager: Base UserMemoryManager instance (created if None)
         emotion_manager: Emotion manager instance  
         graph_manager: Graph manager instance
         use_legacy_mode: If True, returns legacy wrapped manager for compatibility
-        enable_all_features: If True, enables all consolidated features
+        enable_*: Feature toggles for the unified manager
+        max_workers: Thread pool workers for unified manager
         **kwargs: Additional configuration options
     
     Returns:
         MemoryManagerProtocol implementation
     """
     
-    if use_legacy_mode:
+    if use_legacy_mode or mode == "legacy":
         logger.warning(
             "Using legacy memory manager mode. "
             "Consider migrating to unified manager for better performance."
         )
         return _create_legacy_manager(base_manager, emotion_manager, graph_manager, **kwargs)
-    
+
     # Create new unified manager
+    if not base_manager:
+        base_manager = UserMemoryManager(llm_client=llm_client)
+        
     return ConsolidatedMemoryManager(
         base_memory_manager=base_manager,
         emotion_manager=emotion_manager,
         graph_manager=graph_manager,
-        enable_enhanced_queries=enable_all_features,
-        enable_context_security=enable_all_features,
-        enable_optimization=enable_all_features,
-        enable_graph_sync=enable_all_features and graph_manager is not None,
+        enable_enhanced_queries=enable_enhanced_queries,
+        enable_context_security=enable_context_security,
+        enable_optimization=enable_optimization,
+        enable_graph_sync=enable_graph_integration and graph_manager is not None,
+        max_workers=max_workers,
         **kwargs
     )
-
-
 def _create_legacy_manager(
     base_manager: Optional[UserMemoryManager],
     emotion_manager: Optional[Any],

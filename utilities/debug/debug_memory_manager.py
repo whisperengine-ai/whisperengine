@@ -3,7 +3,7 @@
 Debug script to check memory manager initialization
 """
 
-from src.memory.memory_manager import UserMemoryManager
+from src.memory.core.memory_factory import create_memory_manager
 
 
 def debug_memory_manager():
@@ -12,7 +12,7 @@ def debug_memory_manager():
 
     # Initialize memory manager
     try:
-        memory_manager = UserMemoryManager()
+        memory_manager = create_memory_manager(mode="unified")
 
         # Check the condition
         getattr(memory_manager, "use_external_embeddings", False) and getattr(

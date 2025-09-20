@@ -14,7 +14,7 @@ import json
 
 from src.characters.memory.self_memory import CharacterSelfMemoryManager, PersonalMemory, MemoryType, EmotionalWeight
 from src.characters.models.character import Character
-from src.memory.context_aware_memory_security import ContextAwareMemoryManager
+from src.memory.core.memory_interface import MemoryManagerProtocol
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +29,7 @@ class CharacterMemoryIntegrator:
     
     def __init__(self, 
                  character: Character,
-                 user_memory_manager: Optional[ContextAwareMemoryManager] = None):
+                 user_memory_manager: Optional[MemoryManagerProtocol] = None):
         self.character = character
         self.character_id = character.metadata.character_id
         self.logger = logging.getLogger(__name__)
