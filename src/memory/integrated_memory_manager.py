@@ -149,15 +149,16 @@ class IntegratedMemoryManager:
             
             # Link memory to graph database if enabled
             if self.enable_graph_memory and conversation_memory_id:
-                # Use thread worker pattern consistent with WhisperEngine architecture
+                # Use WhisperEngine thread worker pattern for async operations
                 try:
                     import asyncio
                     import threading
+                    from concurrent.futures import ThreadPoolExecutor
                     
-                    def run_graph_link():
-                        """Run graph linking in background thread"""
+                    def sync_graph_link():
+                        """Sync wrapper for graph linking"""
                         try:
-                            # Create new event loop for the thread
+                            # Create new event loop for this thread
                             loop = asyncio.new_event_loop()
                             asyncio.set_event_loop(loop)
                             
@@ -173,13 +174,24 @@ class IntegratedMemoryManager:
                                 )
                             )
                         except Exception as e:
-                            logger.debug(f"Graph linking completed in background: {e}")
+                            logger.debug(f"Graph linking completed: {e}")
                         finally:
-                            loop.close()
+                            try:
+                                loop.close()
+                            except Exception:
+                                pass
                     
-                    # Schedule in background thread consistent with scatter-gather pattern
-                    thread = threading.Thread(target=run_graph_link, daemon=True)
-                    thread.start()
+                    # Check if we're in an async context
+                    try:
+                        # If there's a running loop, use run_in_executor (WhisperEngine pattern)
+                        loop = asyncio.get_running_loop()
+                        # This is a sync method but called from async context
+                        # Don't await here, just schedule in executor
+                        loop.run_in_executor(None, sync_graph_link)
+                    except RuntimeError:
+                        # No running event loop - use background thread
+                        thread = threading.Thread(target=sync_graph_link, daemon=True)
+                        thread.start()
                     
                 except Exception as e:
                     logger.debug(f"Could not schedule graph linking: {e}")
@@ -190,6 +202,9 @@ class IntegratedMemoryManager:
 
         except (RuntimeError, ValueError) as e:
             logger.error("Error storing conversation with full context: %s", e)
+            # Check if this is an event loop issue
+            if "no running event loop" in str(e):
+                logger.debug("Event loop issue detected - this method should be called from sync context")
             # Fallback to basic storage
             fallback_result = self.store_conversation(user_id, message, response)
             return str(fallback_result) if fallback_result else ""
