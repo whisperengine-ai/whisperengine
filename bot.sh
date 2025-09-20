@@ -388,56 +388,50 @@ start_bot() {
                 print_warning "Some services may still be starting. Run '$0 status' to check."
             fi
             
-            # Check Python installation
-            if ! command -v python &> /dev/null && ! command -v python3 &> /dev/null; then
-                print_error "Python not found. Please install Python 3.13+ for native development."
-                exit 1
-            fi
-            
-            # Use python3 if python command doesn't exist
-            local python_cmd="python"
-            if ! command -v python &> /dev/null; then
-                python_cmd="python3"
-            fi
-            
-            # Check Python version
-            local python_version=$($python_cmd -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
-            if [[ $(echo "$python_version < 3.13" | bc -l 2>/dev/null || echo "1") -eq 1 ]]; then
-                print_warning "Python $python_version detected. Python 3.13+ recommended."
-            fi
-            
-            # Check for spaCy model
-            if ! $python_cmd -c "import spacy; spacy.load('en_core_web_sm')" &>/dev/null; then
-                echo "📦 Installing spaCy English language model..."
-                if ! $python_cmd -m spacy download en_core_web_sm; then
-                    print_error "Failed to install spaCy model. You may need to install it manually:"
-                    echo "   $python_cmd -m pip install spacy"
-                    echo "   $python_cmd -m spacy download en_core_web_sm"
-                else
-                    print_status "spaCy model installed!"
+            # Python dependency checks (optional for infrastructure-only mode)
+            # Only check if Python is available - don't force installation
+            if command -v python &> /dev/null || command -v python3 &> /dev/null; then
+                # Use python3 if python command doesn't exist
+                local python_cmd="python"
+                if ! command -v python &> /dev/null; then
+                    python_cmd="python3"
                 fi
+                
+                # Check Python version
+                local python_version=$($python_cmd -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')" 2>/dev/null || echo "unknown")
+                if [[ "$python_version" != "unknown" ]] && [[ $(echo "$python_version < 3.13" | bc -l 2>/dev/null || echo "1") -eq 1 ]]; then
+                    print_warning "Python $python_version detected. Python 3.13+ recommended for native development."
+                fi
+                
+                # Only show info about dependencies if they're missing (don't try to install)
+                if ! $python_cmd -c "import spacy; spacy.load('en_core_web_sm')" &>/dev/null 2>&1; then
+                    echo "ℹ️  Note: spaCy model not found (only needed for native development)"
+                fi
+                
+                # Check for required packages
+                if ! $python_cmd -c "import discord, asyncio" &>/dev/null 2>&1; then
+                    echo "ℹ️  Note: Some Python dependencies not found (only needed for native development)"
+                    echo "   If you plan to run the bot natively, install with:"
+                    echo "   $python_cmd -m pip install -r requirements-core.txt"
+                    echo "   $python_cmd -m pip install -r requirements-platform.txt"
+                    echo "   $python_cmd -m pip install -r requirements-discord.txt"
+                    echo "   Or use: ./scripts/install-discord.sh"
+                fi
+            else
+                echo "ℹ️  Note: Python not found (only needed for native development)"
             fi
             
-            # Check for required packages
-            if ! $python_cmd -c "import discord, asyncio" &>/dev/null; then
-                print_warning "Some Python dependencies may be missing. Install with new multi-tier system:"
-                echo "   # Core dependencies (always needed)"
-                echo "   $python_cmd -m pip install -r requirements-core.txt"
-                echo "   # Platform optimizations"
-                echo "   $python_cmd -m pip install -r requirements-platform.txt"
-                echo "   # Discord bot specific"
-                echo "   $python_cmd -m pip install -r requirements-discord.txt"
-                echo ""
-                echo "   Or use the automated installer:"
-                echo "   ./scripts/install-discord.sh"
-            fi
-            
-            print_status "Infrastructure ready! Now run your bot natively:"
+            print_status "Infrastructure ready!"
             echo ""
-            echo "💡 Recommended Development Workflow:"
-            echo "   source .venv/bin/activate     # Activate virtual environment"
-            echo "   $python_cmd run.py            # Discord bot"
-            echo "   $python_cmd universal_native_app.py   # Desktop app"
+            echo "💡 Next steps:"
+            echo "   # For Docker development:"
+            echo "   $0 start dev              # Start bot in Docker with hot-reload"
+            echo "   $0 start prod             # Start bot in Docker production mode"
+            echo ""
+            echo "   # For native development:"
+            echo "   source .venv/bin/activate # Activate virtual environment"
+            echo "   python3 run.py            # Discord bot"
+            echo "   python3 universal_native_app.py   # Desktop app"
             echo ""
             echo "📋 Infrastructure Status:"
             echo "   $0 status       # Check infrastructure health"
@@ -479,29 +473,36 @@ stop_bot() {
     
     case $mode in
         "prod")
-            echo "🛑 Stopping production services..."
-            # Graceful shutdown: Bot first, then datastores
-            echo "   🤖 Stopping bot..."
+            echo "🛑 Stopping production bot only..."
+            echo "   🤖 Stopping bot container..."
             $COMPOSE_CMD -f docker-compose.yml -f docker-compose.prod.yml stop whisperengine-bot 2>/dev/null || true
-            echo "   🗄️ Stopping datastores..."
-            $COMPOSE_CMD -f docker-compose.yml -f docker-compose.prod.yml down
+            echo "   🗄️ Infrastructure services remain running"
             ;;
         "dev")
-            echo "🛑 Stopping development services..."
-            # Graceful shutdown: Bot first, then datastores
-            echo "   🤖 Stopping development bot..."
+            echo "🛑 Stopping development bot only..."
+            echo "   🤖 Stopping development bot container..."
             $COMPOSE_CMD -f docker-compose.yml -f docker-compose.dev.yml stop whisperengine-bot 2>/dev/null || true
-            echo "   🗄️ Stopping datastores..."
-            $COMPOSE_CMD -f docker-compose.yml -f docker-compose.dev.yml down
+            echo "   🗄️ Infrastructure services remain running"
             ;;
         "infrastructure")
             echo "🛑 Stopping infrastructure services..."
             echo "   💡 Note: Your native Discord bot (if running) will continue running"
             $COMPOSE_CMD down
             ;;
+        "all")
+            echo "🛑 Stopping all services..."
+            # Graceful shutdown: Bot first, then datastores
+            echo "   🤖 Stopping bot..."
+            $COMPOSE_CMD -f docker-compose.yml -f docker-compose.prod.yml stop whisperengine-bot 2>/dev/null || true
+            $COMPOSE_CMD -f docker-compose.yml -f docker-compose.dev.yml stop whisperengine-bot 2>/dev/null || true
+            echo "   🗄️ Stopping datastores..."
+            $COMPOSE_CMD -f docker-compose.yml -f docker-compose.prod.yml down 2>/dev/null || true
+            $COMPOSE_CMD -f docker-compose.yml -f docker-compose.dev.yml down 2>/dev/null || true
+            $COMPOSE_CMD down 2>/dev/null || true
+            ;;
         *)
             print_error "Invalid mode: $mode"
-            echo "Valid modes: prod, dev, infrastructure"
+            echo "Valid modes: prod, dev, infrastructure, all"
             exit 1
             ;;
     esac

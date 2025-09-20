@@ -1057,7 +1057,8 @@ class BotEventHandlers:
 
                 # Use template system for contextualized prompt
                 system_prompt_content = get_contextualized_system_prompt(
-                    personality_metadata=personality_metadata, user_id=user_id
+                    personality_metadata=personality_metadata, 
+                    user_id=user_id
                 )
                 logger.debug("Using contextualized system prompt from template system")
 
@@ -1164,21 +1165,47 @@ class BotEventHandlers:
                 relevant_memories = optimize_memory_context(relevant_memories, max_memories=8)
                 
                 memory_context = "Previous conversation context:\n"
-                global_facts = [m for m in relevant_memories if m["metadata"].get("is_global", False)]
-                user_memories = [m for m in relevant_memories if not m["metadata"].get("is_global", False)]
+                
+                # Handle both legacy and hierarchical memory formats
+                global_facts = []
+                user_memories = []
+                
+                for m in relevant_memories:
+                    # Check if memory has metadata (legacy format) or use direct content (hierarchical format)
+                    if "metadata" in m:
+                        # Legacy format
+                        if m["metadata"].get("is_global", False):
+                            global_facts.append(m)
+                        else:
+                            user_memories.append(m)
+                    else:
+                        # Hierarchical format - treat all as user memories for conversation context
+                        user_memories.append(m)
+                
                 if global_facts:
                     memory_context += "\nGlobal Facts:\n"
                     for memory in global_facts:
                         if memory["metadata"].get("type") == "global_fact":
                             memory_context += f"- {memory['metadata']['fact']}\n"
+                            
                 if user_memories:
                     memory_context += "\nUser-specific information:\n"
                     for memory in user_memories:
-                        md = memory["metadata"]
-                        if md.get("user_message"):
-                            memory_context += f"- User said: {md.get('user_message')[:160]}\n"
-                        elif md.get("type") == "user_fact":
-                            memory_context += f"- Fact: {md.get('fact','')}\n"
+                        # Handle both legacy and hierarchical memory formats
+                        if "metadata" in memory:
+                            # Legacy format
+                            md = memory["metadata"]
+                            if md.get("user_message"):
+                                memory_context += f"- User said: {md.get('user_message')[:160]}\n"
+                            elif md.get("type") == "user_fact":
+                                memory_context += f"- Fact: {md.get('fact','')}\n"
+                        else:
+                            # Hierarchical format - use content field
+                            content = memory.get("content", "")
+                            if content:
+                                # Format the hierarchical memory content appropriately
+                                memory_context += f"- Previous conversation: {content[:160]}\n"
+                
                 conversation_context.append({"role": "system", "content": memory_context})
             conversation_summary = generate_conversation_summary(
                 recent_messages, str(message.author.id)
@@ -1493,7 +1520,7 @@ class BotEventHandlers:
             enhanced_system_prompt = None
 
             if hasattr(self.memory_manager, "get_phase4_response_context"):
-                comprehensive_context = await self.memory_manager.get_phase4_response_context(
+                comprehensive_context = self.memory_manager.get_phase4_response_context(
                     phase4_context
                 )
 
