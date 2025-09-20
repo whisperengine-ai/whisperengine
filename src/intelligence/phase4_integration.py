@@ -255,14 +255,14 @@ def apply_phase4_integration_patch(
         memory_manager.process_with_phase4_intelligence = process_with_phase4_intelligence
 
         # Add method to get comprehensive response context
-        def get_phase4_response_context(phase4_context: Phase4Context) -> dict[str, Any]:
+        async def get_phase4_response_context(phase4_context: Phase4Context) -> dict[str, Any]:
             """Get comprehensive context for response generation"""
             return phase4_integration.get_comprehensive_context_for_response(phase4_context)
 
         memory_manager.get_phase4_response_context = get_phase4_response_context
 
         # Add Phase 4 status method
-        def get_phase4_status() -> dict[str, Any]:
+        async def get_phase4_status() -> dict[str, Any]:
             """Get Phase 4 integration status"""
             return phase4_integration.get_integration_status()
 

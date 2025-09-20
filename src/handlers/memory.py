@@ -470,7 +470,7 @@ class MemoryCommandHandlers:
                         ):
                             # Retrieve user's conversation history across ALL contexts for personality profiling
                             # Note: retrieve_relevant_memories is automatically enhanced via memory patch system
-                            cross_context_memories = base_memory_manager.retrieve_relevant_memories(
+                            cross_context_memories = await base_memory_manager.retrieve_relevant_memories(
                                 user_id, query="conversation messages recent personality patterns", limit=25
                             )
 
@@ -498,7 +498,7 @@ class MemoryCommandHandlers:
                                 )
                                 recent_context = (
                                     await self.safe_memory_manager.get_recent_conversations(
-                                        user_id, limit=15, context=message_context
+                                        user_id, limit=15, context_filter=message_context
                                     )
                                 )
                                 if recent_context and hasattr(recent_context, "conversations"):

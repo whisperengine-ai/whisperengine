@@ -16,11 +16,27 @@ import sys
 project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
-from src.conversation.thread_manager import ConversationMessage
+from dataclasses import dataclass
 from src.memory.integrated_memory_manager import IntegratedMemoryManager
 from src.utils.logging_config import get_logger
 
 logger = get_logger(__name__)
+
+@dataclass
+class ConversationMessage:
+    """Individual message within a conversation"""
+    id: str
+    content: str
+    sender: str  # 'user' or 'assistant'
+    timestamp: str
+    metadata: dict[str, Any] | None = None
+    files: list[dict[str, Any]] | None = None
+
+    def __post_init__(self):
+        if self.metadata is None:
+            self.metadata = {}
+        if self.files is None:
+            self.files = []
 
 
 class ChatGPTImporter:

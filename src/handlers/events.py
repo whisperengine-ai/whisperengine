@@ -1425,7 +1425,22 @@ class BotEventHandlers:
                 "phase2_results": phase2_context,
             }
 
-            phase4_context = await self.memory_manager.process_with_phase4_intelligence(
+            # Clean Phase 4 integration - call directly instead of through monkey-patched methods
+            from src.intelligence.phase4_human_like_integration import Phase4HumanLikeIntegration
+            
+            # Create Phase 4 integration instance with clean architecture
+            phase4_integration = Phase4HumanLikeIntegration(
+                phase2_integration=getattr(self.bot, 'phase2_integration', None),
+                phase3_memory_networks=getattr(self.bot, 'phase3_memory_networks', None),
+                memory_manager=self.memory_manager,
+                llm_client=getattr(self.bot, 'llm_client', None),
+                enable_adaptive_mode=True,
+                memory_optimization=True,
+                emotional_resonance=True,
+            )
+            
+            # Process message with Phase 4 intelligence
+            phase4_context = await phase4_integration.process_comprehensive_message(
                 user_id=user_id,
                 message=message.content,
                 conversation_context=recent_messages,
@@ -1479,7 +1494,10 @@ class BotEventHandlers:
                 )
 
             # Prepare human-like memory processing task
-            if hasattr(self.memory_manager, 'human_like_system'):
+            # DISABLED: Legacy human-like system causes async/sync complexity
+            # Clean Protocol-based architecture provides the same intelligence without wrapper chaos
+            # if hasattr(self.memory_manager, 'human_like_system'):
+            if False:  # Permanently disabled legacy human-like enhancement system
                 # Prepare conversation history - handle both dict and Discord Message objects
                 conversation_history = []
                 for msg in recent_messages[-5:]:
@@ -1555,13 +1573,13 @@ class BotEventHandlers:
             comprehensive_context = None
             enhanced_system_prompt = None
 
-            if hasattr(self.memory_manager, "get_phase4_response_context"):
-                comprehensive_context = self.memory_manager.get_phase4_response_context(
+            # Get comprehensive context directly from Phase 4 integration
+            if phase4_context:
+                comprehensive_context = phase4_integration.get_comprehensive_context_for_response(
                     phase4_context
                 )
 
-                # Instead of creating an enhanced prompt, prepare template context
-                # that can be used by the template system in fallback scenarios
+                # Prepare template context for enhanced response generation
                 template_context = {
                     "phase4_context": phase4_context,
                     "comprehensive_context": comprehensive_context,
@@ -1569,25 +1587,8 @@ class BotEventHandlers:
                     "conversation_mode": getattr(phase4_context, "conversation_mode", None),
                 }
 
-                # Still create enhanced prompt for backward compatibility
-                # but prioritize template system in fallback scenarios
-                from src.intelligence.phase4_integration import create_phase4_enhanced_system_prompt
-
-                # For now, skip the contextualized system prompt in Phase 4 processing
-                # since dynamic_personality_context is not available in this scope.
-                # This will be handled after the parallel processing returns all contexts.
+                # System prompt enhancement handled by the LLM response generation
                 enhanced_system_prompt = None
-
-                # If template system fails, fallback to the old enhanced prompt method
-                if not enhanced_system_prompt or enhanced_system_prompt == "":
-                    logger.warning("Template system failed, using legacy Phase 4 enhanced prompt")
-                    from src.core.config import get_system_prompt
-
-                    enhanced_system_prompt = create_phase4_enhanced_system_prompt(
-                        phase4_context=phase4_context,
-                        base_system_prompt=get_system_prompt(),
-                        comprehensive_context=comprehensive_context,
-                    )
 
                 phases_executed = []
                 if hasattr(phase4_context, "processing_metadata"):
@@ -2184,7 +2185,7 @@ class BotEventHandlers:
                 try:
                     message_context = self.memory_manager.classify_discord_context(message)
                     recent_context = await self.safe_memory_manager.get_recent_conversations(
-                        user_id, limit=10, context=message_context
+                        user_id, limit=10, context_filter=message_context
                     )
                     if recent_context and hasattr(recent_context, "conversations"):
                         for conv in recent_context.conversations[-9:]:

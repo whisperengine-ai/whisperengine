@@ -173,17 +173,24 @@ class HierarchicalMemoryAdapter:
     async def get_recent_conversations(
         self, 
         user_id: str, 
-        limit: int = 5
+        limit: int = 5,
+        context_filter: str | None = None
     ) -> List[Dict[str, Any]]:
-        """Get recent conversation history"""
+        """Get recent conversation history
+        
+        Args:
+            user_id: User ID to get conversations for
+            limit: Maximum number of conversations to return
+            context_filter: Optional context filter (currently unused, for future filtering by context)
+        """
         try:
-            context = await self.hierarchical_memory_manager.get_conversation_context(
+            conversation_context = await self.hierarchical_memory_manager.get_conversation_context(
                 user_id=user_id,
                 current_query=""  # Empty query for just recent history
             )
             
             conversations = []
-            for msg in context.recent_messages[:limit]:
+            for msg in conversation_context.recent_messages[:limit]:
                 conversations.append({
                     'user_message': msg.get('user_message', ''),
                     'bot_response': msg.get('bot_response', ''),
