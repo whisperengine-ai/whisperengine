@@ -347,7 +347,9 @@ class VectorMemoryStore:
         """
         try:
             # 🚀 QDRANT FEATURE: Use scroll API to get recent conversation chronologically
-            recent_cutoff = (datetime.utcnow() - timedelta(hours=2)).isoformat()
+            # Convert to Unix timestamp for Qdrant numeric range filtering
+            recent_cutoff_dt = datetime.utcnow() - timedelta(hours=2)
+            recent_cutoff_timestamp = recent_cutoff_dt.timestamp()
             
             # Get recent conversation messages in chronological order
             scroll_result = self.client.scroll(
@@ -356,13 +358,13 @@ class VectorMemoryStore:
                     must=[
                         models.FieldCondition(key="user_id", match=models.MatchValue(value=user_id)),
                         models.FieldCondition(key="memory_type", match=models.MatchValue(value="conversation")),
-                        models.FieldCondition(key="timestamp", range=Range(gte=recent_cutoff))
+                        models.FieldCondition(key="timestamp_unix", range=Range(gte=recent_cutoff_timestamp))
                     ]
                 ),
                 limit=20,  # Get last 20 conversation messages
                 with_payload=True,
                 with_vectors=False,  # Don't need vectors for temporal queries
-                order_by=models.OrderBy(key="timestamp", direction=Direction.DESC)  # Most recent first
+                order_by=models.OrderBy(key="timestamp_unix", direction=Direction.DESC)  # Most recent first
             )
             
             recent_messages = scroll_result[0]  # Get the messages
