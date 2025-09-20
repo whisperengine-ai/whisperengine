@@ -8,6 +8,105 @@
 
 This guide documents all environment variables available for controlling WhisperEngine's phantom features - advanced AI capabilities that are implemented but can be enabled/disabled based on your needs and resource constraints.
 
+## Core Environment & Mode Configuration
+
+### 🎯 **Essential Runtime Configuration**
+
+These core environment variables control WhisperEngine's fundamental runtime behavior and should be configured first:
+
+#### `WHISPERENGINE_MODE` - Bot Architecture Mode
+- **Default:** `single_bot`
+- **Valid Options:**
+  - `single_bot` - Single Discord bot instance (recommended)
+  - `multi_bot` - Multi-bot scaling architecture for enterprise
+  - `desktop` - Desktop application mode
+- **Description:** Controls the fundamental architecture pattern
+- **Resource Impact:** Minimal
+- **Example:** `WHISPERENGINE_MODE=single_bot`
+
+#### `ENVIRONMENT` - Runtime Environment
+- **Default:** `development`
+- **Valid Options:**
+  - `development` - Development mode with debug features and detailed logging
+  - `production` - Production mode with optimizations and error handling
+  - `staging` - Staging environment for testing before production
+  - `test` - Testing environment for automated tests
+- **Description:** Controls logging levels, error handling, and performance optimizations
+- **Resource Impact:** Production mode uses 10-20% fewer resources
+- **Example:** `ENVIRONMENT=production`
+
+#### `CONTAINER_MODE` - Container Detection
+- **Default:** Auto-detected
+- **Valid Options:**
+  - `true` - Running in Docker container
+  - `false` - Running natively on host system
+- **Description:** Affects file paths, networking, and resource management
+- **Auto-Detection:** Automatically set based on container presence
+- **Example:** `CONTAINER_MODE=true`
+
+#### `DOCKER_ENV` - Docker Environment Detection
+- **Default:** Auto-detected  
+- **Valid Options:**
+  - `true` - Docker environment with container networking
+  - `false` - Non-Docker environment
+- **Description:** Controls networking configuration and service discovery
+- **Auto-Detection:** Set automatically by Docker Compose
+- **Example:** `DOCKER_ENV=true`
+
+#### `DEV_MODE` - Development Features
+- **Default:** `false`
+- **Valid Options:**
+  - `true` - Enable hot-reload, debug endpoints, extended logging
+  - `false` - Disable development features for performance
+- **Description:** Enables/disables development-specific features
+- **Resource Impact:** Dev mode uses 20-30% more memory for debugging
+- **Example:** `DEV_MODE=true`
+
+#### `MEMORY_SYSTEM_TYPE` - Memory Architecture ✨
+- **Default:** `hierarchical`
+- **Valid Options:**
+  - `hierarchical` - 4-tier hierarchical memory (Redis → PostgreSQL → ChromaDB → Neo4j)
+  - `experimental_v2` - Future experimental memory system (not implemented)
+  - `test_mock` - Mock memory for testing
+- **Description:** Controls which memory management system to use
+- **Resource Impact:** Hierarchical uses full database stack
+- **Recommendation:** Keep as `hierarchical` for best performance
+- **Example:** `MEMORY_SYSTEM_TYPE=hierarchical`
+
+### 🎯 **Recommended Configuration Presets**
+
+#### **🛠️ Development Configuration**
+```bash
+WHISPERENGINE_MODE=single_bot
+ENVIRONMENT=development
+CONTAINER_MODE=true
+DOCKER_ENV=true
+DEV_MODE=true
+MEMORY_SYSTEM_TYPE=hierarchical
+```
+
+#### **🚀 Production Configuration**
+```bash
+WHISPERENGINE_MODE=single_bot
+ENVIRONMENT=production
+CONTAINER_MODE=true
+DOCKER_ENV=true
+DEV_MODE=false
+MEMORY_SYSTEM_TYPE=hierarchical
+```
+
+#### **🏠 Local Development (Native)**
+```bash
+WHISPERENGINE_MODE=single_bot
+ENVIRONMENT=development
+CONTAINER_MODE=false
+DOCKER_ENV=false
+DEV_MODE=true
+MEMORY_SYSTEM_TYPE=hierarchical
+```
+
+---
+
 ## Quick Reference
 
 | Feature Category | Basic Setup | Production Setup | Resource Impact |

@@ -2,10 +2,13 @@
 """
 Hierarchical Memory Adapter for WhisperEngine Bot Handlers
 Bridges hierarchical memory system with existing bot handler interface
+
+This adapter implements the MemoryManagerProtocol to ensure consistent
+async interfaces across all memory operations.
 """
 
 import logging
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Union
 from datetime import datetime
 
 # Import memory context classes for Discord context classification
@@ -15,6 +18,9 @@ from src.memory.context_aware_memory_security import (
     ContextSecurity
 )
 
+# Import the standardized protocol
+from src.memory.memory_protocol import MemoryManagerProtocol
+
 logger = logging.getLogger(__name__)
 
 class HierarchicalMemoryAdapter:
@@ -22,6 +28,8 @@ class HierarchicalMemoryAdapter:
     Adapter that wraps HierarchicalMemoryManager to provide 
     the same interface as the original memory managers that 
     bot handlers expect.
+    
+    Implements MemoryManagerProtocol for consistent async interfaces.
     """
     
     def __init__(self, hierarchical_memory_manager):
@@ -72,8 +80,8 @@ class HierarchicalMemoryAdapter:
     async def retrieve_context_aware_memories(
         self, 
         user_id: str, 
-        query: str = None,  # New parameter name
-        current_query: str = None,  # Legacy parameter name for compatibility
+        query: Optional[str] = None,  # New parameter name
+        current_query: Optional[str] = None,  # Legacy parameter name for compatibility
         max_memories: int = 10,
         limit: Optional[int] = None,  # Alternative parameter name for compatibility
         **kwargs  # Accept any additional parameters
@@ -390,6 +398,37 @@ class HierarchicalMemoryAdapter:
         except Exception:
             # Default to private for safety
             return True
+    
+    # === STANDARDIZED INTERFACE METHODS ===
+    
+    async def store_conversation(
+        self, 
+        user_id: str, 
+        user_message: str, 
+        bot_response: str, 
+        channel_id: Optional[str] = None,
+        pre_analyzed_emotion_data: Optional[Dict[str, Any]] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+        **kwargs
+    ) -> bool:
+        """Standard store_conversation interface - delegates to store_conversation_safe"""
+        return await self.store_conversation_safe(
+            user_id=user_id,
+            user_message=user_message,
+            bot_response=bot_response,
+            channel_id=channel_id,
+            pre_analyzed_emotion_data=pre_analyzed_emotion_data,
+            metadata=metadata,
+            **kwargs
+        )
+    
+    async def get_conversation_history(
+        self, 
+        user_id: str, 
+        limit: int = 10
+    ) -> List[Dict[str, Any]]:
+        """Standard conversation history interface"""
+        return await self.get_recent_conversations(user_id=user_id, limit=limit)
     
     # === DELEGATION TO UNDERLYING MANAGER ===
     

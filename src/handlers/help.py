@@ -19,7 +19,6 @@ class HelpCommandHandlers:
         bot_name,
         voice_manager,
         voice_support_enabled,
-        VOICE_AVAILABLE,
         personality_profiler,
         is_demo_bot=False,
     ):
@@ -27,7 +26,6 @@ class HelpCommandHandlers:
         self.bot_name = bot_name
         self.voice_manager = voice_manager
         self.voice_support_enabled = voice_support_enabled
-        self.VOICE_AVAILABLE = VOICE_AVAILABLE
         self.personality_profiler = personality_profiler
         self.is_demo_bot = is_demo_bot
 
@@ -248,7 +246,7 @@ class HelpCommandHandlers:
 
             voice_text = "\n".join([f"`{cmd}` - {desc}" for cmd, desc in voice_commands])
             embed.add_field(name="🎤 Voice Commands", value=voice_text, inline=False)
-        elif self.VOICE_AVAILABLE and not self.voice_support_enabled:
+        elif self.voice_manager is not None and not self.voice_support_enabled:
             embed.add_field(
                 name="🎤 Voice Commands",
                 value="❌ **Disabled** - Set `VOICE_SUPPORT_ENABLED=true` in .env to enable voice features",

@@ -198,8 +198,6 @@ class ModularBotManager:
                 llm_client=components["llm_client"],
                 voice_manager=components.get("voice_manager"),
                 voice_support_enabled=getattr(self.bot_core, "voice_support_enabled", False),
-                VOICE_AVAILABLE=hasattr(self.bot_core, "voice_manager")
-                and components.get("voice_manager") is not None,
                 image_processor=components.get("image_processor"),
                 conversation_history=components.get("conversation_history"),
                 conversation_cache=components.get("conversation_cache"),
@@ -214,8 +212,6 @@ class ModularBotManager:
                 bot_name=os.getenv("DISCORD_BOT_NAME", ""),
                 voice_manager=components.get("voice_manager"),
                 voice_support_enabled=getattr(self.bot_core, "voice_support_enabled", False),
-                VOICE_AVAILABLE=hasattr(self.bot_core, "voice_manager")
-                and components.get("voice_manager") is not None,
                 personality_profiler=components.get("personality_profiler"),
                 is_demo_bot=os.getenv("DEMO_BOT", "false").lower() == "true",
             )
@@ -259,10 +255,7 @@ class ModularBotManager:
             if components.get("voice_manager") is not None:
                 self.command_handlers["voice"] = VoiceCommandHandlers(
                     bot=self.bot,
-                    voice_manager=components["voice_manager"],
-                    voice_support_enabled=getattr(self.bot_core, "voice_support_enabled", False),
-                    VOICE_AVAILABLE=hasattr(self.bot_core, "voice_manager")
-                    and components.get("voice_manager") is not None,
+                    voice_manager=components["voice_manager"]
                 )
                 self.command_handlers["voice"].register_commands()
                 logger.info("✅ Voice command handlers registered")
