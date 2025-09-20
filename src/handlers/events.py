@@ -524,7 +524,20 @@ class BotEventHandlers:
                 # Get emotion context if available
                 emotion_context = ""
                 if hasattr(self.memory_manager, "get_emotion_context"):
-                    emotion_context = await self.memory_manager.get_emotion_context(user_id)
+                    try:
+                        # Check if method is async or sync and handle accordingly (WhisperEngine architecture)
+                        import inspect
+                        if inspect.iscoroutinefunction(self.memory_manager.get_emotion_context):
+                            emotion_context = await self.memory_manager.get_emotion_context(user_id)
+                        else:
+                            # Use thread worker pattern for sync methods in async context
+                            loop = asyncio.get_running_loop()
+                            emotion_context = await loop.run_in_executor(
+                                None, self.memory_manager.get_emotion_context, user_id
+                            )
+                    except Exception as e:
+                        logger.debug(f"Could not get emotion context: {e}")
+                        emotion_context = ""
             else:
                 logger.warning("memory_manager is not initialized; skipping memory retrieval.")
                 relevant_memories = []
@@ -762,7 +775,20 @@ class BotEventHandlers:
 
                 emotion_context = ""
                 if hasattr(self.memory_manager, "get_emotion_context"):
-                    emotion_context = self.memory_manager.get_emotion_context(user_id)
+                    try:
+                        # Check if method is async or sync and handle accordingly (WhisperEngine architecture)
+                        import inspect
+                        if inspect.iscoroutinefunction(self.memory_manager.get_emotion_context):
+                            emotion_context = await self.memory_manager.get_emotion_context(user_id)
+                        else:
+                            # Use thread worker pattern for sync methods in async context
+                            loop = asyncio.get_running_loop()
+                            emotion_context = await loop.run_in_executor(
+                                None, self.memory_manager.get_emotion_context, user_id
+                            )
+                    except Exception as e:
+                        logger.debug(f"Could not get emotion context: {e}")
+                        emotion_context = ""
             else:
                 logger.warning("memory_manager is not initialized; skipping memory retrieval.")
                 relevant_memories = []
