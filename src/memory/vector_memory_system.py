@@ -300,8 +300,7 @@ class VectorMemoryStore:
                 query_filter=models.Filter(must=must_conditions, should=should_conditions),
                 limit=top_k,
                 score_threshold=min_score,
-                with_payload=True,
-                params=models.SearchParams(exact=False, hnsw_ef=64)
+                with_payload=True
             )
             
             # Format results
