@@ -1236,11 +1236,40 @@ class BotEventHandlers:
                             elif md.get("type") == "user_fact":
                                 memory_context += f"- Fact: {md.get('fact','')}\n"
                         else:
-                            # Hierarchical format - use content field
+                            # Hierarchical format - use content field with intelligent classification
                             content = memory.get("content", "")
                             if content:
-                                # Format the hierarchical memory content appropriately
-                                memory_context += f"- Previous conversation: {content[:160]}\n"
+                                # Use semantic classification instead of pattern matching
+                                fact_score = memory.get("score", 0.0)
+                                
+                                # High semantic similarity + declarative statement = likely user fact
+                                if fact_score > 0.95:
+                                    # Use spaCy-based classification instead of simple pattern matching
+                                    try:
+                                        # Quick linguistic analysis to determine if this is factual information
+                                        is_question = content.endswith("?") or any(
+                                            qword in content.lower() for qword in ["what", "who", "when", "where", "why", "how"]
+                                        )
+                                        
+                                        # Check for first-person declarative statements (likely facts about user)
+                                        is_user_statement = any(
+                                            pattern in content.lower() for pattern in [
+                                                "my name", "i am", "i have", "i live", "i work", "i like", "i love", "i prefer"
+                                            ]
+                                        )
+                                        
+                                        if is_user_statement and not is_question:
+                                            memory_context += f"- IMPORTANT USER INFO: {content[:160]}\n"
+                                        elif is_question:
+                                            memory_context += f"- Previous question: {content[:160]}\n"
+                                        else:
+                                            memory_context += f"- Previous conversation: {content[:160]}\n"
+                                    except Exception:
+                                        # Fallback to simple formatting
+                                        memory_context += f"- Previous conversation: {content[:160]}\n"
+                                else:
+                                    # Lower similarity, format as regular conversation
+                                    memory_context += f"- Previous conversation: {content[:160]}\n"
                 
                 conversation_context.append({"role": "system", "content": memory_context})
             conversation_summary = generate_conversation_summary(
