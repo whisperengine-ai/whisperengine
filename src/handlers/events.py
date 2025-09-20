@@ -506,12 +506,26 @@ class BotEventHandlers:
                         logger.debug(f"Cache lookup failed, proceeding with DB: {e}")
                         relevant_memories = None
                 if not relevant_memories:
-                    relevant_memories = await self.memory_manager.retrieve_context_aware_memories(
-                        user_id=user_id, 
-                        query=message.content, 
-                        max_memories=20,
-                        context=message_context
-                    )
+                    # Apply WhisperEngine async/sync detection pattern for memory retrieval
+                    retrieve_method = getattr(self.memory_manager, "retrieve_context_aware_memories", None)
+                    if asyncio.iscoroutinefunction(retrieve_method):
+                        relevant_memories = await retrieve_method(
+                            user_id=user_id, 
+                            query=message.content, 
+                            max_memories=20,
+                            context=message_context
+                        )
+                    else:
+                        # Use thread worker for sync methods in async context
+                        loop = asyncio.get_running_loop()
+                        relevant_memories = await loop.run_in_executor(
+                            None, lambda: retrieve_method(
+                                user_id=user_id, 
+                                query=message.content, 
+                                max_memories=20,
+                                context=message_context
+                            )
+                        )
                     # Store in cache for next time
                     if self.profile_memory_cache and relevant_memories:
                         try:
@@ -526,8 +540,7 @@ class BotEventHandlers:
                 if hasattr(self.memory_manager, "get_emotion_context"):
                     try:
                         # Check if method is async or sync and handle accordingly (WhisperEngine architecture)
-                        import inspect
-                        if inspect.iscoroutinefunction(self.memory_manager.get_emotion_context):
+                        if asyncio.iscoroutinefunction(self.memory_manager.get_emotion_context):
                             emotion_context = await self.memory_manager.get_emotion_context(user_id)
                         else:
                             # Use thread worker pattern for sync methods in async context
@@ -758,12 +771,26 @@ class BotEventHandlers:
                         logger.debug(f"Cache lookup failed, proceeding with DB: {e}")
                         relevant_memories = None
                 if not relevant_memories:
-                    relevant_memories = await self.memory_manager.retrieve_context_aware_memories(
-                        user_id=user_id, 
-                        query=content, 
-                        max_memories=20,
-                        context=message_context
-                    )
+                    # Apply WhisperEngine async/sync detection pattern for memory retrieval
+                    retrieve_method = getattr(self.memory_manager, "retrieve_context_aware_memories", None)
+                    if asyncio.iscoroutinefunction(retrieve_method):
+                        relevant_memories = await retrieve_method(
+                            user_id=user_id, 
+                            query=content, 
+                            max_memories=20,
+                            context=message_context
+                        )
+                    else:
+                        # Use thread worker for sync methods in async context
+                        loop = asyncio.get_running_loop()
+                        relevant_memories = await loop.run_in_executor(
+                            None, lambda: retrieve_method(
+                                user_id=user_id, 
+                                query=content, 
+                                max_memories=20,
+                                context=message_context
+                            )
+                        )
                     # Store in cache for next time
                     if self.profile_memory_cache and relevant_memories:
                         try:
@@ -777,8 +804,7 @@ class BotEventHandlers:
                 if hasattr(self.memory_manager, "get_emotion_context"):
                     try:
                         # Check if method is async or sync and handle accordingly (WhisperEngine architecture)
-                        import inspect
-                        if inspect.iscoroutinefunction(self.memory_manager.get_emotion_context):
+                        if asyncio.iscoroutinefunction(self.memory_manager.get_emotion_context):
                             emotion_context = await self.memory_manager.get_emotion_context(user_id)
                         else:
                             # Use thread worker pattern for sync methods in async context
@@ -954,9 +980,18 @@ class BotEventHandlers:
                     # Use safe_memory_manager if available, otherwise fall back to memory_manager
                     memory_manager = self.safe_memory_manager or self.memory_manager
                     if memory_manager:
-                        chromadb_memories = await memory_manager.retrieve_relevant_memories(
-                            user_id, query="conversation history recent messages", limit=15
-                        )
+                        # Apply WhisperEngine async/sync detection pattern for memory retrieval
+                        retrieve_method = getattr(memory_manager, "retrieve_relevant_memories", None)
+                        if asyncio.iscoroutinefunction(retrieve_method):
+                            chromadb_memories = await retrieve_method(
+                                user_id, query="conversation history recent messages", limit=15
+                            )
+                        else:
+                            # Use thread worker for sync methods in async context
+                            loop = asyncio.get_running_loop()
+                            chromadb_memories = await loop.run_in_executor(
+                                None, retrieve_method, user_id, "conversation history recent messages", 15
+                            )
                     else:
                         logger.warning("No memory manager available, skipping ChromaDB supplement")
                         chromadb_memories = []

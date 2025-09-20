@@ -822,12 +822,26 @@ class UniversalChatOrchestrator:
             relevant_memories = []
             if hasattr(memory_manager, "retrieve_context_aware_memories"):
                 try:
-                    relevant_memories = await memory_manager.retrieve_context_aware_memories(
-                        user_id=message.user_id, 
-                        query=message.content, 
-                        max_memories=10,
-                        context=message_context
-                    )
+                    # Apply WhisperEngine async/sync detection pattern for memory retrieval
+                    retrieve_method = getattr(memory_manager, "retrieve_context_aware_memories", None)
+                    if asyncio.iscoroutinefunction(retrieve_method):
+                        relevant_memories = await retrieve_method(
+                            user_id=message.user_id, 
+                            query=message.content, 
+                            max_memories=10,
+                            context=message_context
+                        )
+                    else:
+                        # Use thread worker for sync methods in async context
+                        loop = asyncio.get_running_loop()
+                        relevant_memories = await loop.run_in_executor(
+                            None, lambda: retrieve_method(
+                                user_id=message.user_id, 
+                                query=message.content, 
+                                max_memories=10,
+                                context=message_context
+                            )
+                        )
                 except Exception as e:
                     logging.warning(f"Context-aware memory retrieval failed: {e}")
 
@@ -835,17 +849,36 @@ class UniversalChatOrchestrator:
             emotion_context = {}
             if hasattr(memory_manager, "get_emotion_context"):
                 try:
-                    emotion_context = await memory_manager.get_emotion_context(message.user_id)
+                    # Apply WhisperEngine async/sync detection pattern for emotion context
+                    emotion_method = getattr(memory_manager, "get_emotion_context", None)
+                    if asyncio.iscoroutinefunction(emotion_method):
+                        emotion_context = await emotion_method(message.user_id)
+                    else:
+                        # Use thread worker for sync methods in async context
+                        loop = asyncio.get_running_loop()
+                        emotion_context = await loop.run_in_executor(
+                            None, emotion_method, message.user_id
+                        )
                 except Exception as e:
                     logging.warning(f"Emotion context retrieval failed: {e}")
+                    emotion_context = {}
 
             # Use ChromaDB for additional memory retrieval
             chromadb_memories = []
             if safe_memory_manager and hasattr(safe_memory_manager, "retrieve_relevant_memories"):
                 try:
-                    chromadb_memories = await safe_memory_manager.retrieve_relevant_memories(
-                        message.user_id, message.content, limit=5
-                    )
+                    # Apply WhisperEngine async/sync detection pattern for memory retrieval
+                    retrieve_method = getattr(safe_memory_manager, "retrieve_relevant_memories", None)
+                    if asyncio.iscoroutinefunction(retrieve_method):
+                        chromadb_memories = await retrieve_method(
+                            message.user_id, message.content, limit=5
+                        )
+                    else:
+                        # Use thread worker for sync methods in async context
+                        loop = asyncio.get_running_loop()
+                        chromadb_memories = await loop.run_in_executor(
+                            None, lambda: retrieve_method(message.user_id, message.content, limit=5)
+                        )
 
                     # Enhanced: Add knowledge domain classification
                     if hasattr(memory_manager, "_determine_knowledge_domain"):
