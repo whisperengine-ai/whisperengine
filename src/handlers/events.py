@@ -16,6 +16,8 @@ import discord
 from src.config.adaptive_config import AdaptiveConfigManager
 from src.database.database_integration import DatabaseIntegrationManager
 from src.memory.redis_profile_memory_cache import RedisProfileAndMemoryCache
+from src.memory.core.consolidated_memory_manager import ConsolidatedMemoryManager
+from src.memory.core.memory_interface import MemoryContext
 
 # Universal Chat Platform Integration
 from src.platforms.universal_chat import (
@@ -118,8 +120,18 @@ class BotEventHandlers:
 
         # Component references for easier access
         self.postgres_pool = getattr(bot_core, "postgres_pool", None)
+        
+        # Memory Manager - use unified interface if available, fallback to legacy
         self.memory_manager = getattr(bot_core, "memory_manager", None)
         self.safe_memory_manager = getattr(bot_core, "safe_memory_manager", None)
+        
+        # Check if we have the unified memory manager
+        self._use_unified_memory = isinstance(self.memory_manager, ConsolidatedMemoryManager)
+        if self._use_unified_memory:
+            logger.debug("Using ConsolidatedMemoryManager with unified async interface")
+        else:
+            logger.debug("Using legacy memory manager with async/sync detection")
+            
         self.llm_client = getattr(bot_core, "llm_client", None)
         self.conversation_cache = getattr(bot_core, "conversation_cache", None)
         self.job_scheduler = getattr(bot_core, "job_scheduler", None)
@@ -151,6 +163,104 @@ class BotEventHandlers:
 
         # Register event handlers
         self._register_events()
+
+    # === Memory Manager Helper Methods ===
+    async def _get_emotion_context_modern(self, user_id: str) -> str:
+        """Get emotion context using unified async interface or legacy detection."""
+        if not self.memory_manager:
+            return ""
+            
+        try:
+            if self._use_unified_memory:
+                # Clean async interface - no detection needed
+                return await self.memory_manager.get_emotion_context(user_id)
+            else:
+                # Legacy async/sync detection for backward compatibility
+                if hasattr(self.memory_manager, "get_emotion_context"):
+                    if asyncio.iscoroutinefunction(self.memory_manager.get_emotion_context):
+                        return await self.memory_manager.get_emotion_context(user_id)
+                    else:
+                        loop = asyncio.get_running_loop()
+                        return await loop.run_in_executor(
+                            None, self.memory_manager.get_emotion_context, user_id
+                        )
+                return ""
+        except Exception as e:
+            logger.debug(f"Could not get emotion context: {e}")
+            return ""
+
+    async def _retrieve_memories_modern(self, user_id: str, query: str, limit: int = 10) -> list:
+        """Retrieve memories using unified async interface or legacy detection."""
+        if not self.memory_manager:
+            return []
+            
+        try:
+            if self._use_unified_memory:
+                # Clean async interface with MemoryContext
+                context = MemoryContext(
+                    user_id=user_id,
+                    channel_id=getattr(self, '_current_channel_id', 'default'),
+                    security_level='standard'
+                )
+                return await self.memory_manager.retrieve_memories(
+                    user_id=user_id,
+                    query=query,
+                    limit=limit,
+                    context=context
+                )
+            else:
+                # Legacy retrieval method
+                retrieve_method = getattr(self.memory_manager, "retrieve_context_aware_memories", None)
+                if retrieve_method:
+                    if asyncio.iscoroutinefunction(retrieve_method):
+                        return await retrieve_method(user_id, query, limit)
+                    else:
+                        loop = asyncio.get_running_loop()
+                        return await loop.run_in_executor(None, retrieve_method, user_id, query, limit)
+                return []
+        except Exception as e:
+            logger.warning(f"Could not retrieve memories for user {user_id}: {e}")
+            return []
+
+    async def _store_conversation_modern(
+        self, 
+        user_id: str, 
+        user_message: str, 
+        ai_response: str, 
+        channel_id: str,
+        emotion_metadata: dict = None,
+        storage_metadata: dict = None
+    ) -> bool:
+        """Store conversation using unified async interface or legacy detection."""
+        if not self.memory_manager:
+            return False
+            
+        try:
+            if self._use_unified_memory:
+                # Clean async interface - use store_conversation
+                return await self.memory_manager.store_conversation(
+                    user_id=user_id,
+                    user_message=user_message,
+                    ai_response=ai_response,
+                    channel_id=channel_id,
+                    emotion_metadata=emotion_metadata,
+                    metadata=storage_metadata
+                )
+            else:
+                # Legacy safe storage method
+                if self.safe_memory_manager:
+                    return await self.safe_memory_manager.store_conversation_safe(
+                        user_id,
+                        user_message,
+                        ai_response,
+                        channel_id=channel_id,
+                        pre_analyzed_emotion_data=emotion_metadata,
+                        metadata=storage_metadata,
+                    )
+                return False
+        except Exception as e:
+            logger.warning(f"Could not store conversation for user {user_id}: {e}")
+            return False
 
     # === Minimal Context Mode Utilities ===
     def _apply_minimal_mode_cleanse(self, text: str) -> str:
@@ -506,26 +616,13 @@ class BotEventHandlers:
                         logger.debug(f"Cache lookup failed, proceeding with DB: {e}")
                         relevant_memories = None
                 if not relevant_memories:
-                    # Apply WhisperEngine async/sync detection pattern for memory retrieval
-                    retrieve_method = getattr(self.memory_manager, "retrieve_context_aware_memories", None)
-                    if asyncio.iscoroutinefunction(retrieve_method):
-                        relevant_memories = await retrieve_method(
-                            user_id=user_id, 
-                            query=message.content, 
-                            max_memories=20,
-                            context=message_context
-                        )
-                    else:
-                        # Use thread worker for sync methods in async context
-                        loop = asyncio.get_running_loop()
-                        relevant_memories = await loop.run_in_executor(
-                            None, lambda: retrieve_method(
-                                user_id=user_id, 
-                                query=message.content, 
-                                max_memories=20,
-                                context=message_context
-                            )
-                        )
+                    # Use modern memory retrieval with clean async interface
+                    self._current_channel_id = str(message.channel.id) if hasattr(message, 'channel') else 'default'
+                    relevant_memories = await self._retrieve_memories_modern(
+                        user_id=user_id,
+                        query=message.content,
+                        limit=20
+                    )
                     # Store in cache for next time
                     if self.profile_memory_cache and relevant_memories:
                         try:
@@ -538,19 +635,7 @@ class BotEventHandlers:
                 # Get emotion context if available
                 emotion_context = ""
                 if hasattr(self.memory_manager, "get_emotion_context"):
-                    try:
-                        # Check if method is async or sync and handle accordingly (WhisperEngine architecture)
-                        if asyncio.iscoroutinefunction(self.memory_manager.get_emotion_context):
-                            emotion_context = await self.memory_manager.get_emotion_context(user_id)
-                        else:
-                            # Use thread worker pattern for sync methods in async context
-                            loop = asyncio.get_running_loop()
-                            emotion_context = await loop.run_in_executor(
-                                None, self.memory_manager.get_emotion_context, user_id
-                            )
-                    except Exception as e:
-                        logger.debug(f"Could not get emotion context: {e}")
-                        emotion_context = ""
+                    emotion_context = await self._get_emotion_context_modern(user_id)
             else:
                 logger.warning("memory_manager is not initialized; skipping memory retrieval.")
                 relevant_memories = []
@@ -771,26 +856,13 @@ class BotEventHandlers:
                         logger.debug(f"Cache lookup failed, proceeding with DB: {e}")
                         relevant_memories = None
                 if not relevant_memories:
-                    # Apply WhisperEngine async/sync detection pattern for memory retrieval
-                    retrieve_method = getattr(self.memory_manager, "retrieve_context_aware_memories", None)
-                    if asyncio.iscoroutinefunction(retrieve_method):
-                        relevant_memories = await retrieve_method(
-                            user_id=user_id, 
-                            query=content, 
-                            max_memories=20,
-                            context=message_context
-                        )
-                    else:
-                        # Use thread worker for sync methods in async context
-                        loop = asyncio.get_running_loop()
-                        relevant_memories = await loop.run_in_executor(
-                            None, lambda: retrieve_method(
-                                user_id=user_id, 
-                                query=content, 
-                                max_memories=20,
-                                context=message_context
-                            )
-                        )
+                    # Use modern memory retrieval with clean async interface
+                    self._current_channel_id = str(message.channel.id) if hasattr(message, 'channel') else 'default'
+                    relevant_memories = await self._retrieve_memories_modern(
+                        user_id=user_id,
+                        query=content,
+                        limit=20
+                    )
                     # Store in cache for next time
                     if self.profile_memory_cache and relevant_memories:
                         try:
@@ -802,19 +874,7 @@ class BotEventHandlers:
 
                 emotion_context = ""
                 if hasattr(self.memory_manager, "get_emotion_context"):
-                    try:
-                        # Check if method is async or sync and handle accordingly (WhisperEngine architecture)
-                        if asyncio.iscoroutinefunction(self.memory_manager.get_emotion_context):
-                            emotion_context = await self.memory_manager.get_emotion_context(user_id)
-                        else:
-                            # Use thread worker pattern for sync methods in async context
-                            loop = asyncio.get_running_loop()
-                            emotion_context = await loop.run_in_executor(
-                                None, self.memory_manager.get_emotion_context, user_id
-                            )
-                    except Exception as e:
-                        logger.debug(f"Could not get emotion context: {e}")
-                        emotion_context = ""
+                    emotion_context = await self._get_emotion_context_modern(user_id)
             else:
                 logger.warning("memory_manager is not initialized; skipping memory retrieval.")
                 relevant_memories = []
@@ -980,18 +1040,13 @@ class BotEventHandlers:
                     # Use safe_memory_manager if available, otherwise fall back to memory_manager
                     memory_manager = self.safe_memory_manager or self.memory_manager
                     if memory_manager:
-                        # Apply WhisperEngine async/sync detection pattern for memory retrieval
-                        retrieve_method = getattr(memory_manager, "retrieve_relevant_memories", None)
-                        if asyncio.iscoroutinefunction(retrieve_method):
-                            chromadb_memories = await retrieve_method(
-                                user_id, query="conversation history recent messages", limit=15
-                            )
-                        else:
-                            # Use thread worker for sync methods in async context
-                            loop = asyncio.get_running_loop()
-                            chromadb_memories = await loop.run_in_executor(
-                                None, retrieve_method, user_id, "conversation history recent messages", 15
-                            )
+                        # Use modern memory retrieval with clean async interface
+                        self._current_channel_id = 'conversation_history'
+                        chromadb_memories = await self._retrieve_memories_modern(
+                            user_id=user_id,
+                            query="conversation history recent messages",
+                            limit=15
+                        )
                     else:
                         logger.warning("No memory manager available, skipping ChromaDB supplement")
                         chromadb_memories = []
@@ -2168,14 +2223,14 @@ class BotEventHandlers:
                             emotional_simple[f"emotional_{key}"] = str(value)
                 storage_metadata.update(emotional_simple)
 
-            # Store with thread-safe operations
-            storage_success = await self.safe_memory_manager.store_conversation_safe(
-                user_id,
-                storage_content,
-                response,
+            # Store with thread-safe operations using modern interface
+            storage_success = await self._store_conversation_modern(
+                user_id=user_id,
+                user_message=storage_content,
+                ai_response=response,
                 channel_id=str(message.channel.id),
-                pre_analyzed_emotion_data=emotion_metadata,
-                metadata=storage_metadata,
+                emotion_metadata=emotion_metadata,
+                storage_metadata=storage_metadata
             )
 
             # Sync cache with storage result
