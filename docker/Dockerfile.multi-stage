@@ -67,6 +67,8 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 
     # Copy model download script and download all models during build
     COPY scripts/download_models.py ./scripts/
+    # Use VADER-only emotion analysis (no PyTorch required)
+    ENV ENABLE_ROBERTA_EMOTION=false
     RUN python scripts/download_models.py
 
     # Set environment variables for offline model usage

@@ -54,28 +54,60 @@ def download_embedding_models():
         return False
 
 def download_emotion_models():
-    """Download transformers emotion analysis models"""
+    """Download emotion analysis models (TextBlob for lightweight analysis)"""
     try:
-        from transformers import AutoTokenizer, AutoModelForSequenceClassification
+        # Verify VADER is available
+        from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
+        analyzer = SentimentIntensityAnalyzer()
+        test_scores = analyzer.polarity_scores("This is a test message")
+        logger.info("✅ VADER emotion analysis verified")
         
+        # Initialize TextBlob and download its data
+        from textblob import TextBlob
+        import ssl
+        import nltk
+        
+        # Handle SSL certificate issues
+        try:
+            _create_unverified_https_context = ssl._create_unverified_context
+        except AttributeError:
+            pass
+        else:
+            ssl._create_default_https_context = _create_unverified_https_context
+        
+        # Download required NLTK data for TextBlob
+        logger.info("📥 Downloading TextBlob corpora...")
+        nltk.download('punkt', quiet=True)
+        nltk.download('brown', quiet=True)
+        
+        # Test TextBlob functionality
+        test_blob = TextBlob("This is a test message for sentiment analysis.")
+        test_sentiment = test_blob.sentiment
+        logger.info(f"✅ TextBlob verified - polarity: {test_sentiment.polarity:.3f}, subjectivity: {test_sentiment.subjectivity:.3f}")
+        
+        # Create models directory and save config
         models_dir = Path("/app/models/emotion")
         models_dir.mkdir(parents=True, exist_ok=True)
         
-        # RoBERTa emotion model
-        model_name = 'cardiffnlp/twitter-roberta-base-sentiment-latest'
-        logger.info(f"📥 Downloading emotion model: {model_name}")
+        model_info = {
+            "vader": {"available": True, "type": "rule_based"},
+            "textblob": {"available": True, "type": "statistical", "polarity_range": [-1, 1]},
+            "emotion_methods": ["vader", "textblob", "hybrid"],
+            "default_method": "auto"
+        }
         
-        tokenizer = AutoTokenizer.from_pretrained(model_name)
-        model = AutoModelForSequenceClassification.from_pretrained(model_name)
+        import json
+        with open(models_dir / "emotion_config.json", 'w') as f:
+            json.dump(model_info, f, indent=2)
         
-        # Save locally
-        tokenizer.save_pretrained(str(models_dir / 'roberta-sentiment'))
-        model.save_pretrained(str(models_dir / 'roberta-sentiment'))
+        logger.info("✅ Lightweight emotion analysis models configured (VADER + TextBlob)")
         
-        logger.info("✅ Emotion model saved to /app/models/emotion/roberta-sentiment")
         return True
+    except ImportError as e:
+        logger.error(f"❌ Failed to import emotion model dependencies: {e}")
+        return False
     except Exception as e:
-        logger.error(f"❌ Failed to download emotion models: {e}")
+        logger.error(f"❌ Failed to setup emotion models: {e}")
         return False
 
 def download_spacy_models():
@@ -106,7 +138,9 @@ def create_model_config():
             "cache_dir": "~/.cache/fastembed"
         },
         "emotion_models": {
-            "roberta_sentiment": "/app/models/emotion/roberta-sentiment"
+            "roberta_sentiment": "/app/models/emotion/roberta-sentiment",
+            "vader_available": True,
+            "method": "hybrid"
         },
         "spacy_models": {
             "english": "en_core_web_sm"
@@ -126,7 +160,7 @@ def verify_downloads():
     """Verify all models were downloaded successfully"""
     required_paths = [
         "/app/models/embeddings/model_info.json",
-        "/app/models/emotion/roberta-sentiment",
+        "/app/models/emotion/emotion_config.json",
         "/app/models/model_config.json"
     ]
     

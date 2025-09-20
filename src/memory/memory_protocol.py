@@ -87,14 +87,9 @@ class MemoryManagerProtocol(Protocol):
         ...
 
 
-def create_memory_manager(memory_type: str = "hierarchical", **config) -> MemoryManagerProtocol:
+def create_memory_manager(memory_type: str = "vector", **config) -> MemoryManagerProtocol:
     """
-    Factory function to create memory managers based on configuration.
-    
-    This enables easy A/B testing and system swapping:
-    - memory_type="hierarchical" -> HierarchicalMemoryAdapter (current default)
-    - memory_type="experimental_v2" -> Future implementation
-    - memory_type="test_mock" -> Test/mock implementation
+    Factory function to create memory manager instances of different types.
     
     Args:
         memory_type: Type of memory manager to create
@@ -104,41 +99,13 @@ def create_memory_manager(memory_type: str = "hierarchical", **config) -> Memory
         Memory manager implementing MemoryManagerProtocol
     """
     if memory_type == "hierarchical":
-        from src.memory.core.storage_abstraction import HierarchicalMemoryManager
-        from src.memory.hierarchical_memory_adapter import create_hierarchical_memory_adapter
-        
-        # Create hierarchical config from environment and overrides
-        import os
-        hierarchical_config = {
-            'redis': {
-                'url': f"redis://{os.getenv('HIERARCHICAL_REDIS_HOST', 'localhost')}:{os.getenv('HIERARCHICAL_REDIS_PORT', '6379')}",
-                'ttl': int(os.getenv('HIERARCHICAL_REDIS_TTL', '1800'))
-            },
-            'postgresql': {
-                'url': f"postgresql://{os.getenv('HIERARCHICAL_POSTGRESQL_USERNAME', 'bot_user')}:{os.getenv('HIERARCHICAL_POSTGRESQL_PASSWORD', 'securepassword123')}@{os.getenv('HIERARCHICAL_POSTGRESQL_HOST', 'localhost')}:{os.getenv('HIERARCHICAL_POSTGRESQL_PORT', '5432')}/{os.getenv('HIERARCHICAL_POSTGRESQL_DATABASE', 'whisper_engine')}"
-            },
-            'chromadb': {
-                'host': os.getenv('HIERARCHICAL_CHROMADB_HOST', 'localhost'),
-                'port': int(os.getenv('HIERARCHICAL_CHROMADB_PORT', '8000'))
-            },
-            'neo4j': {
-                'uri': f"bolt://{os.getenv('HIERARCHICAL_NEO4J_HOST', 'localhost')}:{os.getenv('HIERARCHICAL_NEO4J_PORT', '7687')}",
-                'username': os.getenv('HIERARCHICAL_NEO4J_USERNAME', 'neo4j'),
-                'password': os.getenv('HIERARCHICAL_NEO4J_PASSWORD', 'neo4j_password_change_me'),
-                'database': os.getenv('HIERARCHICAL_NEO4J_DATABASE', 'neo4j')
-            },
-            'redis_enabled': os.getenv('HIERARCHICAL_REDIS_ENABLED', 'true').lower() == 'true',
-            'postgresql_enabled': os.getenv('HIERARCHICAL_POSTGRESQL_ENABLED', 'true').lower() == 'true',
-            'chromadb_enabled': os.getenv('HIERARCHICAL_CHROMADB_ENABLED', 'true').lower() == 'true',
-            'neo4j_enabled': os.getenv('HIERARCHICAL_NEO4J_ENABLED', 'true').lower() == 'true'
-        }
-        
-        # Apply any config overrides
-        hierarchical_config.update(config)
-        
-        # Create and return the hierarchical memory manager
-        hierarchical_memory_manager = HierarchicalMemoryManager(hierarchical_config)
-        return create_hierarchical_memory_adapter(hierarchical_memory_manager)
+        # REMOVED: Hierarchical memory system has been replaced by vector-native memory
+        # as per MEMORY_ARCHITECTURE_V2.md
+        raise ValueError(
+            "Hierarchical memory system has been REMOVED and replaced by vector-native memory. "
+            "See MEMORY_ARCHITECTURE_V2.md for the new vector-native implementation. "
+            "Use memory_type='vector' instead."
+        )
     
     elif memory_type == "test_mock":
         # Mock implementation for testing
@@ -202,7 +169,7 @@ def create_memory_manager(memory_type: str = "hierarchical", **config) -> Memory
                 'vector_size': int(os.getenv('VECTOR_EMBEDDING_SIZE', '384'))
             },
             'embeddings': {
-                'model_name': os.getenv('VECTOR_EMBEDDING_MODEL', 'all-MiniLM-L6-v2'),
+                'model_name': os.getenv('VECTOR_EMBEDDING_MODEL', 'snowflake/snowflake-arctic-embed-xs'),
                 'device': os.getenv('VECTOR_EMBEDDING_DEVICE', 'cpu')
             },
             'postgresql': {
@@ -225,4 +192,4 @@ def create_memory_manager(memory_type: str = "hierarchical", **config) -> Memory
         raise NotImplementedError("Experimental V2 memory manager not yet implemented")
     
     else:
-        raise ValueError(f"Unknown memory_type: {memory_type}. Supported: 'hierarchical', 'test_mock', 'experimental_v2'")
+        raise ValueError(f"Unknown memory_type: {memory_type}. Supported: 'vector', 'test_mock', 'experimental_v2'")

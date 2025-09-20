@@ -540,9 +540,18 @@ class VectorMemoryManager:
         qdrant_port = qdrant_config.get('port', 6333)
         collection_name = qdrant_config.get('collection_name', 'whisperengine_memory')
         
-        # Extract embeddings configuration
-        embeddings_config = config.get('embeddings', {})
-        embedding_model = embeddings_config.get('model_name', 'all-MiniLM-L6-v2')
+        # Extract embeddings configuration - FAIL FAST if not provided
+        embeddings_config = config.get('embeddings')
+        if not embeddings_config:
+            raise ValueError("Missing 'embeddings' configuration in vector memory config")
+        
+        embedding_model = embeddings_config.get('model_name')
+        if not embedding_model:
+            raise ValueError("Missing 'model_name' in embeddings configuration")
+            
+        logger.info(f"[VECTOR-MEMORY-DEBUG] Using embedding model: {embedding_model}")
+        logger.info(f"[VECTOR-MEMORY-DEBUG] Full embeddings config: {embeddings_config}")
+        logger.info(f"[VECTOR-MEMORY-DEBUG] Full vector config: {config}")
         
         # Core vector store (single source of truth) - LOCAL IMPLEMENTATION
         self.vector_store = VectorMemoryStore(
@@ -1264,7 +1273,7 @@ async def test_vector_memory_system():
             'collection_name': 'whisperengine_memory'
         },
         'embeddings': {
-            'model_name': 'all-MiniLM-L6-v2'
+            'model_name': 'snowflake/snowflake-arctic-embed-xs'
         }
     }
     

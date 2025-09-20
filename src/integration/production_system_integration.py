@@ -94,7 +94,7 @@ class ProductionSystemIntegrator:
             await self._init_faiss_memory()
 
             # Initialize Vectorized Emotion Engine
-            await self._init_vectorized_emotion()
+            await self._init_local_emotion()
 
             # Initialize Advanced Memory Batcher
             await self._init_memory_batcher()
@@ -153,21 +153,22 @@ class ProductionSystemIntegrator:
             logger.error(f"❌ Failed to initialize Faiss memory: {e}")
             self.components["faiss_memory"] = None
 
-    async def _init_vectorized_emotion(self):
-        """Initialize vectorized emotion engine"""
+    async def _init_local_emotion(self):
+        """Initialize local emotion engine"""
         try:
-            from src.emotion.vectorized_emotion_engine import ProductionEmotionEngine
+            from src.emotion.local_emotion_engine import LocalEmotionEngine
 
-            # Use default parameters for the constructor
-            self.components["vectorized_emotion"] = ProductionEmotionEngine(enable_caching=True)
+            # Initialize local emotion engine
+            self.components["local_emotion"] = LocalEmotionEngine()
+            await self.components["local_emotion"].initialize()
 
-            logger.info("✅ Vectorized Emotion Engine initialized")
+            logger.info("✅ Local Emotion Engine initialized (VADER + TextBlob)")
 
         except (ImportError, FileNotFoundError):
-            logger.warning("⚠️ Vectorized Emotion Engine not available - using fallback")
-            self.components["vectorized_emotion"] = None
+            logger.warning("⚠️ Local Emotion Engine not available - using fallback")
+            self.components["local_emotion"] = None
         except Exception as e:
-            logger.error(f"❌ Failed to initialize vectorized emotion: {e}")
+            logger.error(f"❌ Failed to initialize local emotion: {e}")
             self.components["vectorized_emotion"] = None
 
     async def _init_memory_batcher(self):

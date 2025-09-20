@@ -15,12 +15,12 @@ from discord.ext import commands
 from env_manager import load_environment
 # LLM client system
 from src.llm.llm_protocol import create_llm_client
-from src.memory.backup_manager import BackupManager
+# from src.memory.backup_manager import BackupManager  # REMOVED - ChromaDB dependency
 from src.memory.conversation_cache import HybridConversationCache
 from src.utils.heartbeat_monitor import HeartbeatMonitor
 from src.utils.image_processor import ImageProcessor
 
-# HIERARCHICAL MEMORY: The ONE and ONLY memory system
+# VECTOR MEMORY: The vector-native memory system (replaces hierarchical)
 from src.memory.memory_protocol import create_memory_manager
 
 
@@ -48,21 +48,18 @@ except ImportError:
     RedisConversationCache = None
     RedisProfileAndMemoryCache = None
 
-# Graph memory availability check
-try:
-    from src.memory.tiers.tier4_neo4j_relationships import Neo4jRelationshipEngine
-    GRAPH_MEMORY_AVAILABLE = True
-except ImportError:
-    GRAPH_MEMORY_AVAILABLE = False
+# Graph memory availability check - REMOVED
+# Neo4j components have been replaced by vector semantic relationships
+GRAPH_MEMORY_AVAILABLE = False
 
-# External API Emotion AI Integration
+# Local Emotion Engine Integration (replaces external API emotion AI)
 try:
-    from src.emotion.external_api_emotion_ai import ExternalAPIEmotionAI
+    from src.emotion.local_emotion_engine import LocalEmotionEngine
 
-    EXTERNAL_EMOTION_AI_AVAILABLE = True
+    LOCAL_EMOTION_ENGINE_AVAILABLE = True
 except ImportError:
-    EXTERNAL_EMOTION_AI_AVAILABLE = False
-    ExternalAPIEmotionAI = None
+    LOCAL_EMOTION_ENGINE_AVAILABLE = False
+    LocalEmotionEngine = None
 
 # Production Optimization Integration
 try:
@@ -113,7 +110,7 @@ class DiscordBotCore:
         self.backup_manager = None
         self.voice_manager = None
         self.voice_support_enabled = False  # Will be set during voice initialization
-        self.external_emotion_ai = None
+        self.local_emotion_engine = None
         self.shutdown_manager = None
         self.heartbeat_monitor = None
         self.conversation_history = None
@@ -197,23 +194,20 @@ class DiscordBotCore:
         self.logger.info("🚀 Initializing Memory System...")
 
         try:
-            # Get memory system type from environment (default to hierarchical)
-            memory_type = os.getenv("MEMORY_SYSTEM_TYPE", "hierarchical")
+            # Get memory system type from environment (default to vector-native)
+            # Note: hierarchical memory has been REMOVED - use 'vector' instead
+            memory_type = os.getenv("MEMORY_SYSTEM_TYPE", "vector")
             
             # Create memory manager using factory pattern
             # This enables easy A/B testing: just change MEMORY_SYSTEM_TYPE
             memory_manager = create_memory_manager(memory_type)
             
-            # Store for later async initialization
-            if hasattr(memory_manager, '_hierarchical_memory_manager'):
-                self._hierarchical_memory_manager = memory_manager._hierarchical_memory_manager
-                self._needs_hierarchical_init = True
-
             # Set as THE memory manager (clean, simple)
             self.safe_memory_manager = memory_manager
             self.memory_manager = memory_manager
 
-            self.backup_manager = BackupManager()
+            # self.backup_manager = BackupManager()  # REMOVED - ChromaDB dependency
+            self.backup_manager = None  # Vector memory system handles persistence differently
             
             self.logger.info("✅ Memory System initialized with type: %s", memory_type)
 
@@ -221,17 +215,7 @@ class DiscordBotCore:
             self.logger.error("Memory system initialization failed: %s", str(e))
             raise
             
-    async def initialize_batch_optimizer(self):
-        """Initialize the ChromaDB batch optimizer asynchronously."""
-        if self._needs_batch_init and self._batched_memory_manager:
-            try:
-                await self._batched_memory_manager.initialize()
-                self.logger.info("✅ ChromaDB batch optimizer initialized")
-                self._needs_batch_init = False
-            except Exception as e:
-                self.logger.warning("Failed to initialize batch optimizer: %s", e)
-                # Continue without batching
-                self._needs_batch_init = False
+    # REMOVED: ChromaDB batch optimizer - replaced by vector-native memory system
 
     async def initialize_phase4_components(self):
         """Initialize Phase 4.2 and 4.3 components asynchronously."""
@@ -291,8 +275,8 @@ class DiscordBotCore:
                 engine = self.phase2_integration.emotional_context_engine
 
                 # Update emotional AI if available
-                if hasattr(self, "external_emotion_ai") and self.external_emotion_ai:
-                    engine.emotional_ai = self.external_emotion_ai
+                if hasattr(self, "local_emotion_engine") and self.local_emotion_engine:
+                    engine.emotional_ai = self.local_emotion_engine
                     self.logger.info(
                         "✅ Updated emotional context engine with External API Emotion AI"
                     )
@@ -316,59 +300,25 @@ class DiscordBotCore:
                 "Failed to update emotional context engine dependencies: %s", str(e)
             )
 
-    async def initialize_hierarchical_memory(self):
-        """Initialize hierarchical memory system asynchronously."""
-        try:
-            if hasattr(self, '_hierarchical_memory_manager') and self._hierarchical_memory_manager:
-                self.logger.info("🚀 Initializing hierarchical memory connections...")
-                
-                # Initialize all storage tier connections
-                await self._hierarchical_memory_manager.initialize()
-                
-                self.logger.info("✅ Hierarchical Memory System fully initialized")
-                self.logger.info("  ├── Redis Cache: < 1ms response time")
-                self.logger.info("  ├── PostgreSQL Store: < 50ms response time")  
-                self.logger.info("  ├── ChromaDB Semantic: < 30ms response time")
-                self.logger.info("  └── Neo4j Graph: < 20ms response time")
-                
-        except Exception as e:
-            self.logger.error(f"Failed to initialize hierarchical memory system: {e}")
-            # Fall back to standard memory system
-            if hasattr(self, '_hierarchical_memory_manager'):
-                del self._hierarchical_memory_manager
-                self._needs_hierarchical_init = False
-                self.logger.warning("Falling back to standard memory system")
-
     def initialize_ai_enhancements(self):
         """Initialize advanced AI enhancement systems."""
         # Initialize Personality Profiler
         self.logger.info("🧠 Initializing Advanced Personality Profiler...")
         try:
             # All AI features are always enabled - unified AI system
-            from src.analysis.graph_personality_manager import GraphPersonalityManager
             from src.analysis.personality_profiler import PersonalityProfiler
 
             self.personality_profiler = PersonalityProfiler()
             self.logger.info("✅ Personality profiler initialized (always active)")
 
-            # Initialize graph-enhanced personality manager if graph DB is available
-            enable_graph_database = os.getenv("ENABLE_GRAPH_DATABASE", "false").lower() == "true"
-            if enable_graph_database and GRAPH_MEMORY_AVAILABLE:
-                neo4j_uri = f"bolt://{os.getenv('NEO4J_HOST', 'localhost')}:{os.getenv('NEO4J_PORT', '7687')}"
-                neo4j_user = os.getenv("NEO4J_USERNAME", "neo4j")
-                neo4j_password = os.getenv("NEO4J_PASSWORD", "neo4j_password_change_me")
-
-                self.graph_personality_manager = GraphPersonalityManager(
-                    neo4j_uri, neo4j_user, neo4j_password
-                )
-                self.logger.info("✅ Graph-enhanced personality manager initialized")
-            else:
-                self.graph_personality_manager = None
-                self.logger.info("📊 Using standalone personality profiler (no graph database)")
+            # Graph-enhanced personality manager removed - replaced by vector semantic relationships
+            self.graph_personality_manager = None
+            self.logger.info("📊 Using standalone personality profiler (vector-native memory system)")
 
         except Exception as e:
             self.logger.error(f"Failed to initialize personality profiler: {e}")
             self.logger.warning("⚠️ Continuing without personality profiling features")
+            self.personality_profiler = None
 
         # Initialize Dynamic Personality Profiler
         self.logger.info("🎭 Initializing Dynamic Personality Profiler...")
@@ -444,24 +394,21 @@ class DiscordBotCore:
             self.logger.error(f"Failed to initialize emotional intelligence: {e}")
             self.logger.warning("⚠️ Continuing without emotional intelligence features")
 
-        # Initialize External API Emotion AI
-        self.logger.info("🌐 Initializing External API Emotion AI...")
+        # Initialize Local Emotion Engine (VADER + TextBlob)
+        self.logger.info("🌐 Initializing Local Emotion Engine...")
         try:
             # All AI features are always enabled - unified AI system
 
-            if EXTERNAL_EMOTION_AI_AVAILABLE and ExternalAPIEmotionAI is not None:
-                openai_api_key = os.getenv("OPENAI_API_KEY")
-                huggingface_api_key = os.getenv("HUGGINGFACE_API_KEY")
-
-                # Pass LLM client to enable proper emotion model configuration
-                self.external_emotion_ai = ExternalAPIEmotionAI(
-                    llm_client=self.llm_client,
-                    openai_api_key=openai_api_key,
-                    huggingface_api_key=huggingface_api_key,
-                    logger=self.logger,
-                )
-
-                self.logger.info("✅ External API Emotion AI initialized (full capabilities)")
+            if LOCAL_EMOTION_ENGINE_AVAILABLE and LocalEmotionEngine is not None:
+                # Initialize local emotion engine
+                self.local_emotion_engine = LocalEmotionEngine()
+                
+                # Initialize asynchronously
+                async def init_emotion_engine():
+                    await self.local_emotion_engine.initialize()
+                    self.logger.info("✅ Local Emotion Engine initialized (VADER + TextBlob)")
+                
+                asyncio.create_task(init_emotion_engine())
 
                 # Phase 3.1 Integration: Update emotional context engine with emotion AI
                 if hasattr(self, "phase2_integration") and self.phase2_integration:
@@ -920,10 +867,6 @@ class DiscordBotCore:
         if self._needs_batch_init:
             asyncio.create_task(self.initialize_batch_optimizer())
 
-        # Schedule async initialization of hierarchical memory
-        if getattr(self, '_needs_hierarchical_init', False):
-            asyncio.create_task(self.initialize_hierarchical_memory())
-
         # Schedule async initialization of Phase 4 components
         asyncio.create_task(self.initialize_phase4_components())
 
@@ -1017,7 +960,7 @@ class DiscordBotCore:
             "monitoring_manager": self.monitoring_manager,
             "backup_manager": self.backup_manager,
             "voice_manager": self.voice_manager,
-            "external_emotion_ai": self.external_emotion_ai,
+            "local_emotion_engine": self.local_emotion_engine,
             "shutdown_manager": self.shutdown_manager,
             "heartbeat_monitor": self.heartbeat_monitor,
             "conversation_history": self.conversation_history,

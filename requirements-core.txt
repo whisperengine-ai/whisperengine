@@ -16,16 +16,17 @@ httpx==0.28.1
 aiosqlite==0.21.0
 
 # AI/ML and Memory System Dependencies (Core)
-chromadb>=1.1.0  # Updated from >=1.1.0 to allow latest
+# chromadb>=1.1.0  # REMOVED - Using Qdrant for vector memory system
 fastembed>=0.7.0  # Fast, lightweight embeddings from Qdrant team (Python 3.13 compatible)
 numpy==2.3.3  # Updated from 2.3.2
 vaderSentiment==3.3.2
 faiss-cpu==1.12.0  # Fast similarity search and clustering for production features (Python 3.13 compatible)
 pandas==2.3.0  # Efficient data manipulation for vectorized emotion engine
+scikit-learn==1.7.2  # Machine learning algorithms for vector similarity and clustering
 
 # Advanced NLP Dependencies (Phase 1)
 spacy==3.8.7
-transformers==4.56.1  # Already latest
+textblob==0.18.0.post0  # Lightweight sentiment analysis (replaces RoBERTa/transformers)
 
 # Redis Dependencies
 redis==6.4.0  # Updated from 5.2.1
