@@ -420,6 +420,142 @@ Imported conversations integrate seamlessly with WhisperEngine:
 - Memory analysis runs automatically after import
 - Failed conversations are logged but don't stop the import
 
+## 📚 Technical Reference (For Advanced Users)
+
+### Available Command Line Options
+
+#### Required Parameters:
+- `--file` / `-f`: Path to your `conversations.json` file
+- `--user-id` / `-u`: Your Discord User ID (long number)
+
+#### Optional Parameters:
+- `--verbose` / `-v`: Show detailed progress messages
+- `--dry-run`: Test the import without saving anything
+- `--batch-size`: Process conversations in chunks (default: 100)
+
+#### Filtering Options:
+- `--start-date`: Only import after this date (format: YYYY-MM-DD)
+- `--end-date`: Only import before this date (format: YYYY-MM-DD)
+- `--min-messages`: Skip conversations shorter than X messages
+- `--max-messages`: Skip conversations longer than X messages
+
+### Full Command Examples:
+
+```bash
+# Import only 2024 conversations
+./bot.sh import-chatgpt conversations.json 672814231002939413 \
+  --start-date 2024-01-01 --end-date 2024-12-31
+
+# Skip very short conversations (less than 3 messages)
+./bot.sh import-chatgpt conversations.json 672814231002939413 \
+  --min-messages 3
+
+# Process in smaller batches (good for slow computers)
+./bot.sh import-chatgpt conversations.json 672814231002939413 \
+  --batch-size 25 --verbose
+```
+
+### Understanding the Process
+
+When you run the import, here's what happens:
+
+1. **File Validation**: Checks if your `conversations.json` file is valid
+2. **Conversation Parsing**: Reads through all your ChatGPT conversations
+3. **Filtering**: Applies any date/size filters you specified
+4. **Memory Integration**: Stores conversations in WhisperEngine's memory system
+5. **Embedding Generation**: Creates searchable representations of your conversations
+6. **Completion**: Provides summary of what was imported
+
+### Legacy Methods (Alternative Approaches)
+
+#### Method A: Direct Python Script
+```bash
+# Navigate to WhisperEngine folder
+cd /path/to/whisperengine
+
+# Run the Python script directly
+python scripts/chatgpt_import/import_chatgpt.py \
+  --file /path/to/conversations.json \
+  --user-id 672814231002939413 \
+  --verbose
+```
+
+#### Method B: Simple Bash Script
+```bash
+# Make script executable (one time only)
+chmod +x scripts/chatgpt_import/import_chatgpt.sh
+
+# Run the import
+./scripts/chatgpt_import/import_chatgpt.sh conversations.json 672814231002939413
+```
+
+#### Method C: Docker Wrapper Script
+```bash
+python scripts/chatgpt_import/docker_import.py \
+  --file /path/to/conversations.json \
+  --user-id 672814231002939413 \
+  --verbose
+```
+
+### Environment Variables (For Developers)
+
+These environment variables can customize the import behavior:
+
+- `OPENAI_API_KEY`: For enhanced conversation analysis
+- `DATABASE_URL`: Custom database connection
+- `CHROMA_PATH`: Vector database storage location
+- `LOG_LEVEL`: Control logging detail (DEBUG, INFO, WARNING, ERROR)
+
+## 🎉 After Import: What Next?
+
+### Test Your Import
+Once import is complete, test that it worked:
+
+1. **Start WhisperEngine**: Make sure the bot is running
+2. **Join Discord**: Go to your Discord server where WhisperEngine is active
+3. **Test Memory**: Ask about something you discussed in ChatGPT:
+   ```
+   @WhisperEngine do you remember when I asked about Python programming?
+   ```
+4. **Check Statistics**: Use admin commands to see conversation counts:
+   ```
+   !memory stats
+   ```
+
+### What You Can Do Now
+With your ChatGPT history imported, WhisperEngine can:
+
+- 🧠 **Remember your preferences**: Coding style, communication preferences, interests
+- 🔍 **Reference past topics**: "Like we discussed before about X..."
+- 🎯 **Provide personalized responses**: Based on your conversation patterns
+- 📈 **Learn your style**: How you ask questions and prefer answers
+
+### Managing Your Imported Data
+```bash
+# View memory statistics
+!memory user stats
+
+# Search your imported conversations
+!memory search "topic you discussed"
+
+# Clear specific conversations if needed (be careful!)
+!memory clear --confirm
+```
+
+---
+
+## 📝 Summary
+
+**The easiest way to import your ChatGPT history:**
+
+1. **Get your file**: Export from ChatGPT → download → unzip → find `conversations.json`
+2. **Get your Discord ID**: Discord Settings → Advanced → Developer Mode → Right-click username → Copy User ID
+3. **Run one command**: `./bot.sh import-chatgpt /path/to/conversations.json YOUR_DISCORD_ID`
+4. **Wait patiently**: Large files take time, but you'll see progress messages
+5. **Test it works**: Ask WhisperEngine about something from your ChatGPT history
+
+Need help? Check the troubleshooting section above or ask for support in Discord!
+
 ## Security Considerations
 
 - Conversations are stored locally in your WhisperEngine instance
