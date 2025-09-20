@@ -17,7 +17,7 @@ aiosqlite==0.21.0
 
 # AI/ML and Memory System Dependencies (Core)
 chromadb==1.1.0  # Updated from 1.0.20
-sentence-transformers==5.1.0
+fastembed>=0.7.0  # Fast, lightweight embeddings from Qdrant team (Python 3.13 compatible)
 numpy==2.3.3  # Updated from 2.3.2
 
 # ENHANCED: Advanced Scientific Computing

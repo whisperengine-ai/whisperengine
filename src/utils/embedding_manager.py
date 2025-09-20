@@ -1,6 +1,6 @@
 """
 Local Embedding Manager
-High-performance local embedding processing using sentence-transformers.
+High-performance local embedding processing using fastembed.
 Optimized for WhisperEngine with FAISS compatibility and ultra-fast processing.
 """
 
@@ -17,16 +17,16 @@ logger = logging.getLogger(__name__)
 class LocalEmbeddingManager:
     """
     Local-only embedding manager optimized for WhisperEngine.
-    Uses sentence-transformers for fast, high-quality embeddings.
+    Uses fastembed for fast, high-quality embeddings with fewer dependencies.
     """
 
     def __init__(self):
         """Initialize the local embedding manager with optimal models"""
 
-        # Model configuration - optimized for FAISS compatibility
+        # Model configuration - optimized for speed and quality
         self.embedding_model_name = os.getenv(
             "LLM_LOCAL_EMBEDDING_MODEL",
-            "all-MiniLM-L6-v2",  # 384-dim, 90 embed/sec, FAISS-compatible
+            "snowflake/snowflake-arctic-embed-xs",  # 384-dim, optimal for real-time chat
         )
 
         # Fallback model (same as primary for consistency)
@@ -72,29 +72,23 @@ class LocalEmbeddingManager:
                 raise
 
     async def _load_model(self):
-        """Load the sentence transformer model"""
+        """Load the fastembed model"""
         try:
-            from sentence_transformers import SentenceTransformer
-            import torch
+            from fastembed import TextEmbedding
             import os
 
             # Load in executor to avoid blocking
             loop = asyncio.get_event_loop()
             
             def load_model_safely():
-                # Force CPU loading to avoid meta tensor issues
-                torch.set_default_tensor_type(torch.FloatTensor)
-                
-                # Check if this is a local model path
+                # Initialize fastembed model
                 if os.path.exists(self.embedding_model_name):
                     logger.info(f"Loading local model from: {self.embedding_model_name}")
-                    model = SentenceTransformer(self.embedding_model_name, device='cpu')
+                    model = TextEmbedding(model_name=self.embedding_model_name, cache_dir=self.embedding_model_name)
                 else:
                     logger.info(f"Loading model: {self.embedding_model_name}")
-                    model = SentenceTransformer(self.embedding_model_name, device='cpu')
+                    model = TextEmbedding(model_name=self.embedding_model_name)
                 
-                # Ensure model is properly loaded on CPU
-                model = model.to('cpu')
                 return model
             
             self._model = await loop.run_in_executor(None, load_model_safely)
@@ -108,7 +102,7 @@ class LocalEmbeddingManager:
             logger.info(f"   Batch size: {self.batch_size}")
 
         except ImportError:
-            logger.error("❌ sentence-transformers not available")
+            logger.error("❌ fastembed not available")
             raise
         except Exception as e:
             logger.error(f"❌ Model loading failed: {e}")
@@ -120,21 +114,20 @@ class LocalEmbeddingManager:
         return f"embed_{hash(text)}"
 
     async def _encode_texts(self, texts: list[str]) -> list[list[float]]:
-        """Encode texts using the model"""
+        """Encode texts using fastembed"""
         if not self._model:
             await self.initialize()
 
         loop = asyncio.get_event_loop()
 
         # Run encoding in executor to avoid blocking
-        embeddings = await loop.run_in_executor(
-            None,
-            lambda: self._model.encode(
-                texts, batch_size=self.batch_size, show_progress_bar=False, convert_to_numpy=True
-            ),
-        )
+        def encode_with_fastembed():
+            # fastembed returns a generator, convert to list
+            embeddings = list(self._model.embed(texts))
+            return [embedding.tolist() for embedding in embeddings]
 
-        return embeddings.tolist()
+        embeddings = await loop.run_in_executor(None, encode_with_fastembed)
+        return embeddings
 
     async def get_embeddings(
         self, texts: str | list[str], use_cache: bool = True
@@ -196,7 +189,7 @@ class LocalEmbeddingManager:
                     self._embedding_cache[cache_key] = embedding
 
         # Combine cached and new embeddings in correct order
-        result_embeddings = [None] * len(texts)
+        result_embeddings: list[list[float]] = [[] for _ in texts]
 
         # Fill in cached embeddings
         for i, embedding in cached_embeddings:
@@ -296,12 +289,12 @@ async def test_local_embeddings():
     batch_texts = ["Hello", "World", "AI", "Embeddings"] * 5
     start_time = time.time()
     await manager.get_embeddings(batch_texts)
-    time.time() - start_time
+    batch_time = time.time() - start_time
 
     # Test caching
     start_time = time.time()
     await manager.get_embeddings(batch_texts)  # Should be cached
-    time.time() - start_time
+    cache_time = time.time() - start_time
 
     # Show stats
     stats = manager.get_performance_stats()

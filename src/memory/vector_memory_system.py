@@ -3,7 +3,7 @@ WhisperEngine Vector-Native Memory Implementation - Local-First
 
 Production-ready implementation using local Docker services:
 - Qdrant for vector storage (local container)
-- sentence-transformers for embeddings (local model)
+- fastembed for embeddings (local model)
 - No external API dependencies except LLM endpoints
 
 This supersedes all previous memory system implementations.
@@ -22,7 +22,7 @@ from uuid import uuid4
 # Local-First AI/ML Libraries
 from qdrant_client import QdrantClient, models
 from qdrant_client.http.models import Distance, VectorParams, PointStruct
-from sentence_transformers import SentenceTransformer
+from fastembed import TextEmbedding
 import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
 from pydantic import BaseModel, Field
@@ -73,7 +73,7 @@ class VectorMemory:
 
 class VectorMemoryStore:
     """
-    Production vector memory store using LOCAL Qdrant + sentence-transformers
+    Production vector memory store using LOCAL Qdrant + fastembed
     
     This is the single source of truth for all WhisperEngine memory.
     Replaces the problematic hierarchical Redis/PostgreSQL/ChromaDB system.
@@ -84,15 +84,17 @@ class VectorMemoryStore:
                  qdrant_host: str = "localhost",
                  qdrant_port: int = 6333,
                  collection_name: str = "whisperengine_memory",
-                 embedding_model: str = "all-MiniLM-L6-v2"):
+                 embedding_model: str = "snowflake/snowflake-arctic-embed-xs"):
         
         # Initialize Qdrant (Local Vector DB in Docker)
         self.client = QdrantClient(host=qdrant_host, port=qdrant_port)
         self.collection_name = collection_name
         
-        # Initialize sentence-transformers (Local embedding model)
-        self.embedder = SentenceTransformer(embedding_model)
-        self.embedding_dimension = self.embedder.get_sentence_embedding_dimension()
+        # Initialize fastembed (Local embedding model)
+        self.embedder = TextEmbedding(model_name=embedding_model)
+        # Get embedding dimension from the model
+        test_embedding = list(self.embedder.embed(["test"]))[0]
+        self.embedding_dimension = len(test_embedding)
         
         # Initialize collection if it doesn't exist
         self._ensure_collection_exists()
@@ -131,26 +133,23 @@ class VectorMemoryStore:
             raise
     
     async def generate_embedding(self, text: str) -> List[float]:
-        """Generate high-quality embedding using local sentence-transformers"""
+        """Generate high-quality embedding using local fastembed"""
         try:
             # Run embedding generation in thread pool to avoid blocking
             loop = asyncio.get_event_loop()
-            embedding = await loop.run_in_executor(
-                None, self.embedder.encode, text
-            )
+            
+            def encode_with_fastembed():
+                # fastembed returns a generator, get first item
+                embedding = list(self.embedder.embed([text]))[0]
+                return embedding.tolist()
+            
+            embedding = await loop.run_in_executor(None, encode_with_fastembed)
             
             self.stats["embeddings_generated"] += 1
-            return embedding.tolist()
+            return embedding
             
         except Exception as e:
             logger.error(f"Error generating embedding: {e}")
-            raise
-            
-            self.stats["embeddings_generated"] += 1
-            return response['data'][0]['embedding']
-            
-        except Exception as e:
-            logger.error(f"Embedding generation failed: {e}")
             raise
     
     async def store_memory(self, memory: VectorMemory) -> str:

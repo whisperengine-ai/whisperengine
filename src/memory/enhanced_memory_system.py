@@ -659,7 +659,7 @@ class EnhancedMemorySystem:
                     return np.array(embedding)
 
             # Fallback to basic embedding (random for testing - replace with actual model)
-            # In production, this should use sentence-transformers or similar
+            # In production, this should use fastembed or similar
             np.random.seed(hash(text) % 2**32)  # Deterministic for testing
             return np.random.randn(self.embedding_dim).astype(np.float32)
 

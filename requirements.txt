@@ -20,7 +20,7 @@ chromadb==1.1.0  # Updated from 1.0.20
 transformers==4.56.1
 requests==2.32.5
 aiohttp==3.12.15
-sentence-transformers==5.1.0
+fastembed>=0.7.0  # Fast, lightweight embeddings from Qdrant team (Python 3.13 compatible)
 numpy==2.3.3  # Updated from 2.3.2
 pytest==8.4.2
 

@@ -8,7 +8,7 @@
    - Usage: High-quality emotion classification
    - Download location: `transformers.pipeline("sentiment-analysis", model=...)`
 
-2. **Sentence-Transformers Embedding Model** (`all-MiniLM-L6-v2`)
+2. **FastEmbed Embedding Model** (`snowflake/snowflake-arctic-embed-xs`)
    - Size: ~90MB  
    - Usage: Text embeddings for semantic search
    - Download location: `SentenceTransformer(model_name)`
