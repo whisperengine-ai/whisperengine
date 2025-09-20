@@ -216,6 +216,30 @@ class BotEventHandlers:
 
         return text.strip()
 
+    def _clean_character_name_prefix(self, text: str) -> str:
+        """Remove character name prefix from responses.
+        
+        Some models prepend the character name (e.g., "Dream:") to responses
+        based on the system prompt. This function removes such prefixes.
+        """
+        import re
+        
+        # Get bot name from environment
+        bot_name = os.getenv("DISCORD_BOT_NAME", "").strip()
+        
+        if bot_name:
+            # Remove bot name prefix patterns like "Dream:", "**Dream:**", "*Dream:*"
+            patterns = [
+                rf"^\*\*{re.escape(bot_name)}\*\*:\s*",  # **Dream:**
+                rf"^\*{re.escape(bot_name)}\*:\s*",      # *Dream:*
+                rf"^{re.escape(bot_name)}:\s*",          # Dream:
+            ]
+            
+            for pattern in patterns:
+                text = re.sub(pattern, "", text, flags=re.IGNORECASE)
+        
+        return text.strip()
+
     @handle_errors(
         category=ErrorCategory.SYSTEM_RESOURCE,
         severity=ErrorSeverity.MEDIUM,
@@ -426,15 +450,22 @@ class BotEventHandlers:
         
         # Skip bot messages unless they're to be cached
         if message.author.bot:
+            logger.info(f"🔥 DEBUG: Bot message detected from {message.author.name}, bot={message.author.bot}")
             # Add bot messages to cache for conversation context
             if self.conversation_cache and message.author == self.bot.user:
+                logger.info(f"🔥 DEBUG: Caching own bot message and returning early")
                 # Handle both sync and async cache implementations
                 if hasattr(self.conversation_cache, "add_message"):
                     if asyncio.iscoroutinefunction(self.conversation_cache.add_message):
                         await self.conversation_cache.add_message(str(message.channel.id), message)
                     else:
                         self.conversation_cache.add_message(str(message.channel.id), message)
+            else:
+                logger.info(f"🔥 DEBUG: Bot message from different bot, ignoring")
+            logger.info(f"🔥 DEBUG: Returning early from bot message")
             return
+
+        logger.info(f"🔥 DEBUG: Processing user message from {message.author.name}")
 
         # Conditional elevated logging for debugging silent bot issues
         if os.getenv("DISCORD_MESSAGE_TRACE", "false").lower() == "true":
@@ -511,18 +542,67 @@ class BotEventHandlers:
                         relevant_memories = None
                 if not relevant_memories:
                     logger.info(f"🔍 MEMORY DEBUG: Retrieving memories for user {user_id} with query: '{message.content[:50]}...'")
-                    relevant_memories = await self.memory_manager.retrieve_context_aware_memories(
-                        user_id=user_id, 
-                        query=message.content, 
-                        max_memories=20,
-                        context=message_context
-                    )
+                    
+                    # Try optimized memory retrieval first if available
+                    if hasattr(self.memory_manager, 'retrieve_relevant_memories_optimized'):
+                        try:
+                            logger.info("🚀 MEMORY DEBUG: Using optimized memory retrieval")
+                            
+                            # Determine query type based on message content and context
+                            query_type = self._classify_query_type(message.content)
+                            
+                            # Build user preferences from context
+                            user_preferences = self._build_user_preferences(user_id, message_context)
+                            
+                            # Build filters from message context
+                            filters = self._build_memory_filters(message_context)
+                            
+                            relevant_memories = await self.memory_manager.retrieve_relevant_memories_optimized(
+                                user_id=user_id,
+                                query=message.content,
+                                query_type=query_type,
+                                user_history=user_preferences,
+                                filters=filters,
+                                limit=20
+                            )
+                            
+                            logger.info(f"🚀 MEMORY DEBUG: Optimized retrieval returned {len(relevant_memories) if relevant_memories else 0} memories")
+                            
+                            # Log optimization details for debugging
+                            if relevant_memories and len(relevant_memories) > 0:
+                                sample = relevant_memories[0]
+                                if 'reranked_score' in sample:
+                                    logger.info(f"🚀 MEMORY DEBUG: Re-ranking active - top reranked score: {sample['reranked_score']:.3f}")
+                                if 'scoring_breakdown' in sample:
+                                    breakdown = sample['scoring_breakdown']
+                                    logger.info(f"🚀 MEMORY DEBUG: Scoring breakdown - base: {breakdown.get('base_score', 0):.3f}, "
+                                              f"recency: {breakdown.get('recency_boost', 0):.3f}, "
+                                              f"preference: {breakdown.get('preference_boost', 0):.3f}")
+                            
+                        except Exception as e:
+                            logger.warning(f"🚀 MEMORY DEBUG: Optimized retrieval failed, falling back to basic: {e}")
+                            relevant_memories = None
+                    
+                    # Fallback to basic memory retrieval if optimization not available or failed
+                    if not relevant_memories:
+                        logger.info("🔍 MEMORY DEBUG: Using basic memory retrieval")
+                        relevant_memories = await self.memory_manager.retrieve_context_aware_memories(
+                            user_id=user_id, 
+                            query=message.content, 
+                            max_memories=20,
+                            context=message_context
+                        )
+                    
                     logger.info(f"🔍 MEMORY DEBUG: Retrieved {len(relevant_memories) if relevant_memories else 0} memories")
                     if relevant_memories:
                         for i, memory in enumerate(relevant_memories[:3]):  # Log first 3 memories
                             content = memory.get('content', '')[:100]
                             score = memory.get('score', 'N/A')
-                            logger.info(f"🔍 MEMORY DEBUG: Memory {i+1}: (score: {score}) '{content}...'")
+                            reranked = memory.get('reranked_score')
+                            score_text = f"score: {score}"
+                            if reranked:
+                                score_text += f", reranked: {reranked:.3f}"
+                            logger.info(f"🔍 MEMORY DEBUG: Memory {i+1}: ({score_text}) '{content}...'")
                     else:
                         logger.warning(f"🔍 MEMORY DEBUG: No memories retrieved for user {user_id}")
                     
@@ -948,16 +1028,28 @@ class BotEventHandlers:
                 }
         
         if self.conversation_cache:
+            logger.info(f"🔥 CACHE DEBUG: Getting conversation context for user {user_id} in channel {channel.id}")
             # Use cache with user-specific filtering
             recent_messages = await self.conversation_cache.get_user_conversation_context(
                 channel, user_id=int(user_id), limit=8, exclude_message_id=exclude_message_id  # Reduced from 15 to 8
             )
             
+            logger.info(f"🔥 CACHE DEBUG: Retrieved {len(recent_messages)} messages from cache")
+            for i, msg in enumerate(recent_messages):
+                author_name = msg.get('author_name', 'Unknown')
+                content = msg.get('content', '')[:100]
+                is_bot = msg.get('bot', False)
+                logger.info(f"🔥 CACHE DEBUG: Message {i+1}: [{author_name}] (bot={is_bot}): '{content}...'")
+            
             # Apply additional message truncation to prevent context explosion
             recent_messages = truncate_recent_messages(recent_messages, max_messages=8)
             
+            logger.info(f"🔥 CACHE DEBUG: After truncation: {len(recent_messages)} messages")
+            
             # Standardize all message objects to dict format
             recent_messages = [_standardize_message_object(msg) for msg in recent_messages]
+            
+            logger.info(f"🔥 CACHE DEBUG: After standardization: {len(recent_messages)} messages")
 
             # Supplement with vector memory if insufficient
             if len(recent_messages) < 8:
@@ -1332,6 +1424,13 @@ class BotEventHandlers:
         # FIX: Don't reverse again - recent_messages should already be in chronological order
         # Skip current message (last one) and keep chronological order
         filtered_messages = recent_messages[:-1] if recent_messages else []
+        
+        logger.info(f"🔥 CONTEXT DEBUG: Processing {len(filtered_messages)} recent messages for conversation context")
+        for i, msg in enumerate(filtered_messages):
+            author_name = msg.get('author_name', 'Unknown')
+            content = msg.get('content', '')[:100]
+            is_bot = msg.get('bot', False)
+            logger.info(f"🔥 CONTEXT DEBUG: Recent message {i+1}: [{author_name}] (bot={is_bot}): '{content}...'")
 
         # Strict or minimal context mode: remove prior assistant meta-analysis leaks from history
         if _strict_mode_enabled() or _minimal_context_mode_enabled():
@@ -1350,35 +1449,47 @@ class BotEventHandlers:
         skip_next_bot_response = False
         for msg in filtered_messages:
             msg_content = get_message_content(msg)
+            is_bot_msg = message_equals_bot_user(msg, self.bot.user)
+            
+            logger.info(f"🔥 CONTEXT DEBUG: Processing message - is_bot: {is_bot_msg}, content: '{msg_content[:100]}...'")
+            
             if msg_content.startswith("!"):
                 logger.debug(f"Skipping command from conversation history: {msg_content[:50]}...")
                 skip_next_bot_response = True
                 continue
 
-            if message_equals_bot_user(msg, self.bot.user) and skip_next_bot_response:
+            if is_bot_msg and skip_next_bot_response:
                 logger.debug(f"Skipping bot response to command: {msg_content[:50]}...")
                 skip_next_bot_response = False
                 continue
 
-            if not message_equals_bot_user(msg, self.bot.user):
+            if not is_bot_msg:
                 skip_next_bot_response = False
 
-            role = "assistant" if message_equals_bot_user(msg, self.bot.user) else "user"
+            role = "assistant" if is_bot_msg else "user"
             user_assistant_messages.append({"role": role, "content": msg_content})
+            logger.info(f"🔥 CONTEXT DEBUG: Added to conversation context as [{role}]: '{msg_content[:100]}...'")
 
+        logger.info(f"🔥 CONTEXT DEBUG: Before alternation fix: {len(user_assistant_messages)} messages")
         # Apply alternation fix
         fixed_history = fix_message_alternation(user_assistant_messages)
+        logger.info(f"🔥 CONTEXT DEBUG: After alternation fix: {len(fixed_history)} messages")
+        
         if _minimal_context_mode_enabled():
             # Keep only last 6 alternating turns for isolation
             fixed_history = fixed_history[-12:]
+            logger.info(f"🔥 CONTEXT DEBUG: After minimal mode truncation: {len(fixed_history)} messages")
         
         conversation_context.extend(fixed_history)
+        logger.info(f"🔥 CONTEXT DEBUG: Final conversation context has {len(conversation_context)} total messages")
 
-        # CRITICAL: Add anti-hallucination system message
+        # CRITICAL: Add anti-hallucination system message with conversation priority
         conversation_context.append({
             "role": "system", 
             "content": (
-                "IMPORTANT: Only reference information that was explicitly provided in this conversation or "
+                "IMPORTANT: Information in this IMMEDIATE CONVERSATION takes absolute priority over any memory context. "
+                "If there is a conflict between recent conversation messages and older memory, ALWAYS trust the "
+                "conversation messages. Only reference information that was explicitly provided in this conversation or "
                 "in the memory context above. DO NOT make up facts, names, or details that were not mentioned. "
                 "If you don't have specific information, say so honestly instead of guessing or fabricating details."
             )
@@ -1825,6 +1936,21 @@ class BotEventHandlers:
                         logger.info(f"🎯 CONTEXT DEBUG: STRICT_IMMERSIVE_MODE: {strict_mode}, MINIMAL_CONTEXT_MODE: {minimal_mode}")
                         
                         # Debug log the conversation context being sent to LLM
+                        logger.info(f"🔥 ORCHESTRATOR DEBUG: Full conversation context structure:")
+                        for i, ctx_msg in enumerate(conversation_context):
+                            role = ctx_msg.get('role', 'unknown')
+                            content = ctx_msg.get('content', '')
+                            content_preview = content[:200] + '...' if len(content) > 200 else content
+                            logger.info(f"🔥 ORCHESTRATOR DEBUG: Message {i+1}/{len(conversation_context)} [{role}]: '{content_preview}'")
+                            
+                            # Check for memory content specifically
+                            if 'memory' in content.lower() or 'recall' in content.lower() or 'luna' in content.lower():
+                                logger.info(f"🔥 ORCHESTRATOR DEBUG: *** MEMORY DETECTED in message {i+1} ***")
+
+                        # Check if we can see recent conversation pairs in the context
+                        user_messages = [msg for msg in conversation_context if msg.get('role') == 'user']
+                        assistant_messages = [msg for msg in conversation_context if msg.get('role') == 'assistant']
+                        logger.info(f"🔥 ORCHESTRATOR DEBUG: Context contains {len(user_messages)} user messages and {len(assistant_messages)} assistant messages")
                         logger.info(f"🎯 CONTEXT DEBUG: Full conversation context structure:")
                         for i, ctx_msg in enumerate(conversation_context):
                             role = ctx_msg.get('role', 'unknown')
@@ -1860,39 +1986,23 @@ class BotEventHandlers:
                         logger.info(f"🎯 CONTEXT DEBUG: Model used: {ai_response.model_used}, Tokens: {ai_response.tokens_used}")
 
                     else:
-                        logger.warning(
-                            "[DEBUG-TRACE] Discord adapter not found in orchestrator, falling back to direct LLM"
-                        )
-                        logger.warning(
-                            "Discord adapter not found in orchestrator, falling back to direct LLM"
-                        )
-                        response = await self._fallback_direct_llm_response(
-                            conversation_context,
-                            user_id,
-                            current_emotion_data,
-                            external_emotion_data,
-                            phase2_context,
-                            phase4_context,
-                            comprehensive_context,
-                            dynamic_personality_context,
+                        # Discord adapter not found - this is a configuration error
+                        logger.error("CRITICAL: Discord adapter not found in Universal Chat Orchestrator!")
+                        logger.error("The bot cannot function properly without the Discord adapter.")
+                        logger.error("This will result in loss of emotion, personality, and Phase 4 features.")
+                        raise RuntimeError(
+                            "Discord adapter missing from Universal Chat Orchestrator. "
+                            "Advanced AI features cannot function without proper adapter configuration."
                         )
 
                 else:
-                    logger.warning(
-                        "[DEBUG-TRACE] Universal Chat Orchestrator not available, falling back to direct LLM"
-                    )
-                    logger.warning(
-                        "Universal Chat Orchestrator not available, falling back to direct LLM"
-                    )
-                    response = await self._fallback_direct_llm_response(
-                        conversation_context,
-                        user_id,
-                        current_emotion_data,
-                        external_emotion_data,
-                        phase2_context,
-                        phase4_context,
-                        comprehensive_context,
-                        dynamic_personality_context,
+                    # Universal Chat Orchestrator not available - this is a critical system failure
+                    logger.error("CRITICAL: Universal Chat Orchestrator not initialized!")
+                    logger.error("The bot cannot provide advanced AI features without the orchestrator.")
+                    logger.error("Check system initialization logs for Universal Chat setup failures.")
+                    raise RuntimeError(
+                        "Universal Chat Orchestrator not available. "
+                        "Cannot provide emotion, personality, or Phase 4 intelligence features."
                     )
 
                 # Security scan for system leakage
@@ -2044,6 +2154,8 @@ class BotEventHandlers:
 
                 # Add user message to cache after memory storage
                 if self.conversation_cache:
+                    logger.info(f"🔥 CACHE DEBUG: Adding user message to cache - content: '{message.content[:100]}...'")
+                    logger.info(f"🔥 CACHE DEBUG: User message author: {message.author.name} (bot={message.author.bot})")
                     if hasattr(self.conversation_cache, "add_message"):
                         if asyncio.iscoroutinefunction(self.conversation_cache.add_message):
                             await self.conversation_cache.add_message(
@@ -2062,6 +2174,39 @@ class BotEventHandlers:
 
                 # Send response (chunked if too long)
                 await self._send_response_chunks(reply_channel, response_with_debug)
+
+                # CRITICAL FIX: Add bot response to conversation cache after sending
+                if self.conversation_cache:
+                    try:
+                        # Create a mock message object for the bot's response
+                        # Use the real bot.user object, not a fake one
+                        logger.info(f"🔥 DEBUG: Creating bot response message with real bot.user: {self.bot.user.name} (bot={self.bot.user.bot})")
+                        
+                        bot_response_message = type('BotMessage', (), {
+                            'id': f"bot_response_{message.id}",
+                            'content': response,
+                            'author': self.bot.user,  # Use real bot.user, not mock
+                            'created_at': discord.utils.utcnow(),
+                            'channel': reply_channel,
+                            'guild': message.guild,  # Add guild attribute for cache compatibility
+                            'attachments': [],  # Add empty attachments list
+                            'embeds': [],  # Add empty embeds list
+                            'mentions': []  # Add empty mentions list
+                        })()
+                        
+                        if hasattr(self.conversation_cache, "add_message"):
+                            logger.info(f"🔥 CACHE DEBUG: Adding bot response to cache - content: '{response[:100]}...'")
+                            if asyncio.iscoroutinefunction(self.conversation_cache.add_message):
+                                await self.conversation_cache.add_message(
+                                    str(reply_channel.id), bot_response_message
+                                )
+                            else:
+                                self.conversation_cache.add_message(str(reply_channel.id), bot_response_message)
+                        logger.debug(
+                            f"✅ CACHE: Added bot response to conversation cache: {response[:100]}..."
+                        )
+                    except Exception as cache_error:
+                        logger.warning(f"Failed to cache bot response: {cache_error}")
 
                 # Send voice response if applicable
                 await self._send_voice_response(message, response)
@@ -2091,88 +2236,6 @@ class BotEventHandlers:
                 await reply_channel.send(
                     "*Something stirs in the darkness beyond my understanding...* Perhaps we might try this exchange anew?"
                 )
-
-    async def _fallback_direct_llm_response(
-        self,
-        conversation_context,
-        user_id=None,
-        current_emotion_data=None,
-        external_emotion_data=None,
-        phase2_context=None,
-        phase4_context=None,
-        comprehensive_context=None,
-        dynamic_personality_context=None,
-    ):
-        """Fallback to direct LLM client when Universal Chat is unavailable, with full template support."""
-        if self.llm_client is None:
-            logger.error("LLM client is not initialized")
-            return "The threads of consciousness are not yet woven. My deeper mind remains unreachable for now."
-
-        # Check LLM connection
-        if not await self.llm_client.check_connection_async():
-            logger.warning("LLM connection unavailable when trying to respond")
-            return "⚠️ I can't connect to the LLM server right now. Make sure your LLM provider is running."
-
-        logger.debug("Sending request to LLM (fallback with template support)...")
-        logger.debug(f"Conversation context: {len(conversation_context)} messages")
-
-        try:
-            # Build template context from available AI analysis
-            template_context = {}
-
-            # Collect all available context for template variables
-            if current_emotion_data:
-                template_context["emotional_intelligence"] = current_emotion_data
-            if external_emotion_data:
-                template_context["external_emotion_data"] = external_emotion_data
-            if phase2_context:
-                template_context["phase2_context"] = phase2_context
-            if phase4_context:
-                template_context["phase4_context"] = phase4_context
-            if comprehensive_context:
-                template_context["comprehensive_context"] = comprehensive_context
-            if dynamic_personality_context:
-                template_context["personality_context"] = dynamic_personality_context
-
-            # Replace system message with contextualized version if we have template context
-            if template_context and user_id:
-                try:
-                    # Get contextualized system prompt
-                    contextualized_system_prompt = get_contextualized_system_prompt(
-                        personality_metadata=dynamic_personality_context,
-                        emotional_intelligence_results=current_emotion_data,
-                        user_id=user_id,
-                        phase4_context=phase4_context,
-                        comprehensive_context=comprehensive_context,
-                    )
-
-                    # Replace system message in conversation context
-                    updated_context = []
-                    for msg in conversation_context:
-                        if msg.get("role") == "system":
-                            updated_context.append(
-                                {"role": "system", "content": contextualized_system_prompt}
-                            )
-                            logger.debug(
-                                "Replaced system prompt with contextualized version in fallback"
-                            )
-                        else:
-                            updated_context.append(msg)
-
-                    conversation_context = updated_context
-
-                except Exception as e:
-                    logger.warning(f"Could not contextualize system prompt in fallback: {e}")
-                    logger.debug("Continuing with original system prompt")
-
-        except Exception as e:
-            logger.warning(f"Error building template context in fallback: {e}")
-
-        # Get response from LLM directly
-        response = await self.llm_client.generate_chat_completion_safe(conversation_context)
-        logger.debug(f"Received LLM response (fallback): {len(response)} characters")
-
-        return response
 
     async def _store_conversation_memory(
         self,
@@ -2858,3 +2921,101 @@ class BotEventHandlers:
         self._last_phase4_context = None
         self._last_comprehensive_context = None
         self._last_enhanced_system_prompt = None
+
+    # === OPTIMIZATION HELPER METHODS ===
+    
+    def _classify_query_type(self, message_content: str) -> str:
+        """
+        Classify the type of query for optimization purposes.
+        
+        Args:
+            message_content: The user's message content
+            
+        Returns:
+            Query type string for optimization
+        """
+        content_lower = message_content.lower()
+        
+        # Check for specific query patterns
+        if any(word in content_lower for word in ["remember", "said", "told", "mentioned", "conversation"]):
+            return "conversation_recall"
+        elif any(word in content_lower for word in ["what is", "who is", "when did", "where is", "how many"]):
+            return "fact_lookup"
+        elif any(word in content_lower for word in ["recent", "lately", "yesterday", "today", "last"]):
+            return "recent_context"
+        elif any(word in content_lower for word in ["name", "called", "known as"]):
+            return "entity_search"
+        else:
+            return "general_search"
+    
+    def _build_user_preferences(self, user_id: str, message_context: dict) -> dict:
+        """
+        Build user preferences for optimization based on interaction history.
+        
+        Args:
+            user_id: User identifier
+            message_context: Message context dictionary
+            
+        Returns:
+            User preferences dictionary
+        """
+        preferences = {}
+        
+        # Default conversational behavior for Discord bot
+        preferences['conversational_user'] = True
+        
+        # Check if user typically asks for recent information
+        if message_context and message_context.get('recent_messages'):
+            recent_messages = message_context['recent_messages']
+            recent_queries = [msg.get('content', '') for msg in recent_messages[-5:] if msg.get('content')]
+            
+            # Look for patterns indicating preference for recent info
+            recent_keywords = ['recent', 'lately', 'yesterday', 'today', 'now', 'current']
+            if any(any(keyword in query.lower() for keyword in recent_keywords) for query in recent_queries):
+                preferences['prefers_recent'] = True
+                
+            # Look for patterns indicating preference for precise answers
+            precise_keywords = ['exactly', 'specifically', 'precise', 'what is', 'define']
+            if any(any(keyword in query.lower() for keyword in precise_keywords) for query in recent_queries):
+                preferences['prefers_precise_answers'] = True
+                
+            # Look for exploratory behavior
+            explore_keywords = ['tell me about', 'more about', 'explain', 'describe']
+            if any(any(keyword in query.lower() for keyword in explore_keywords) for query in recent_queries):
+                preferences['exploration_mode'] = True
+        
+        # Extract favorite topics from context
+        if message_context and message_context.get('topics'):
+            preferences['favorite_topics'] = message_context['topics']
+        
+        return preferences
+    
+    def _build_memory_filters(self, message_context: dict) -> dict:
+        """
+        Build memory filters from message context.
+        
+        Args:
+            message_context: Message context dictionary
+            
+        Returns:
+            Filters dictionary for memory search
+        """
+        filters = {}
+        
+        # Add channel context if available
+        if message_context and message_context.get('channel_id'):
+            filters['channel_id'] = message_context['channel_id']
+        
+        # Add time-based filtering for recent queries
+        if message_context and message_context.get('is_recent_query'):
+            from datetime import datetime, timedelta
+            filters['time_range'] = {
+                'start': datetime.now() - timedelta(days=7),  # Last week
+                'end': datetime.now()
+            }
+        
+        # Add topic filtering if topics are identified
+        if message_context and message_context.get('topics'):
+            filters['topics'] = message_context['topics']
+        
+        return filters
