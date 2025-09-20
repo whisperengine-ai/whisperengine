@@ -13,47 +13,16 @@ from discord.ext import commands
 
 # Core imports
 from env_manager import load_environment
-from src.llm.llm_client import LLMClient
+# LLM client system
+from src.llm.llm_protocol import create_llm_client
 from src.memory.backup_manager import BackupManager
 from src.memory.conversation_cache import HybridConversationCache
-from src.memory.memory_manager import UserMemoryManager
 from src.utils.heartbeat_monitor import HeartbeatMonitor
 from src.utils.image_processor import ImageProcessor
-from src.utils.memory_integration_patch import apply_memory_enhancement_patch
 
-# GRAPH DATABASE INTEGRATION: Import enhanced memory components
-try:
-    from src.memory.integrated_memory_manager import IntegratedMemoryManager
-    from src.utils.graph_integrated_emotion_manager import GraphIntegratedEmotionManager
+# HIERARCHICAL MEMORY: The ONE and ONLY memory system
+from src.memory.memory_protocol import create_memory_manager
 
-    GRAPH_MEMORY_AVAILABLE = True
-except ImportError:
-    GRAPH_MEMORY_AVAILABLE = False
-    IntegratedMemoryManager = None
-    GraphIntegratedEmotionManager = None
-
-# HIERARCHICAL MEMORY INTEGRATION: Import new 4-tier memory system
-try:
-    from src.memory.core.storage_abstraction import HierarchicalMemoryManager
-    from src.memory.hierarchical_memory_adapter import create_hierarchical_memory_adapter
-    HIERARCHICAL_MEMORY_AVAILABLE = True
-except ImportError as e:
-    logging.getLogger(__name__).warning(f"Hierarchical memory not available: {e}")
-    HIERARCHICAL_MEMORY_AVAILABLE = False
-    HierarchicalMemoryManager = None
-    create_hierarchical_memory_adapter = None
-
-from src.llm.concurrent_llm_manager import ConcurrentLLMManager
-from src.memory.context_aware_memory_security import ContextAwareMemoryManager
-
-# MEMORY OPTIMIZATION INTEGRATION: Import optimized memory manager
-from src.memory.optimized_memory_manager import create_optimized_memory_manager
-from src.memory.redis_conversation_cache import RedisConversationCache
-from src.memory.redis_profile_memory_cache import RedisProfileAndMemoryCache
-from src.memory.thread_safe_memory import ThreadSafeMemoryManager
-
-# PERFORMANCE: Import ChromaDB batch adapter for reduced HTTP calls
-from src.memory.batched_memory_adapter import BatchedMemoryManager
 
 # Security and safety components
 from src.utils.async_enhancements import (
@@ -66,16 +35,8 @@ from src.utils.conversation import ConversationHistoryManager
 from src.utils.graceful_shutdown import GracefulShutdownManager
 from src.utils.health_monitor import HealthMonitor
 
-# Voice functionality imports
-try:
-    from src.llm.elevenlabs_client import ElevenLabsClient
-    from src.voice.voice_manager import DiscordVoiceManager
-
-    VOICE_AVAILABLE = True
-except ImportError:
-    VOICE_AVAILABLE = False
-    ElevenLabsClient = None
-    DiscordVoiceManager = None
+# Voice functionality import
+from src.voice.voice_protocol import create_voice_service
 
 # External API Emotion AI Integration
 try:
@@ -200,158 +161,48 @@ class DiscordBotCore:
         self.logger.info("Graceful shutdown manager initialized")
 
     def initialize_llm_client(self):
-        """Initialize the LLM client with concurrent safety."""
-        self.logger.info("Initializing LLM client")
-        base_llm_client = LLMClient()
-
-        # Wrap LLM client with concurrent safety
-        safe_llm_client = ConcurrentLLMManager(base_llm_client)
-        self.llm_client = safe_llm_client
-        self.logger.info("LLM client wrapped with concurrent safety")
+        """Initialize the LLM client using factory pattern."""
+        llm_client_type = os.getenv("LLM_CLIENT_TYPE", "openrouter")
+        
+        self.logger.info("Initializing LLM client: %s", llm_client_type)
+        
+        try:
+            self.llm_client = create_llm_client(llm_client_type=llm_client_type)
+            self.logger.info("✅ LLM client initialized successfully!")
+        except Exception as e:
+            self.logger.error("Failed to initialize LLM client: %s", e)
+            self.logger.warning("Bot will continue with disabled LLM features")
+            # Fallback to disabled service
+            self.llm_client = create_llm_client(llm_client_type="disabled")
 
     def initialize_memory_system(self):
-        """Initialize memory management system with performance optimizations."""
-        self.logger.info("Initializing memory system...")
+        """Initialize the memory management system using factory pattern."""
+        self.logger.info("🚀 Initializing Memory System...")
 
         try:
-            # Check if hierarchical memory system is enabled (NEW 4-TIER SYSTEM)
-            enable_hierarchical_memory = os.getenv("ENABLE_HIERARCHICAL_MEMORY", "false").lower() == "true"
+            # Get memory system type from environment (default to hierarchical)
+            memory_type = os.getenv("MEMORY_SYSTEM_TYPE", "hierarchical")
             
-            if enable_hierarchical_memory and HIERARCHICAL_MEMORY_AVAILABLE and HierarchicalMemoryManager and create_hierarchical_memory_adapter:
-                self.logger.info("🚀 Initializing Hierarchical Memory System (4-Tier Architecture)...")
-                
-                # Build hierarchical memory configuration
-                hierarchical_config = {
-                    'redis': {
-                        'url': f"redis://{os.getenv('HIERARCHICAL_REDIS_HOST', 'localhost')}:{os.getenv('HIERARCHICAL_REDIS_PORT', '6379')}",
-                        'ttl': int(os.getenv('HIERARCHICAL_REDIS_TTL', '1800'))
-                    },
-                    'postgresql': {
-                        'url': f"postgresql://{os.getenv('HIERARCHICAL_POSTGRESQL_USERNAME', 'bot_user')}:{os.getenv('HIERARCHICAL_POSTGRESQL_PASSWORD', 'securepassword123')}@{os.getenv('HIERARCHICAL_POSTGRESQL_HOST', 'localhost')}:{os.getenv('HIERARCHICAL_POSTGRESQL_PORT', '5432')}/{os.getenv('HIERARCHICAL_POSTGRESQL_DATABASE', 'whisper_engine')}"
-                    },
-                    'chromadb': {
-                        'host': os.getenv('HIERARCHICAL_CHROMADB_HOST', 'localhost'),
-                        'port': int(os.getenv('HIERARCHICAL_CHROMADB_PORT', '8000'))
-                    },
-                    'neo4j': {
-                        'uri': f"bolt://{os.getenv('HIERARCHICAL_NEO4J_HOST', 'localhost')}:{os.getenv('HIERARCHICAL_NEO4J_PORT', '7687')}",
-                        'username': os.getenv('HIERARCHICAL_NEO4J_USERNAME', 'neo4j'),
-                        'password': os.getenv('HIERARCHICAL_NEO4J_PASSWORD', 'neo4j_password_change_me'),
-                        'database': os.getenv('HIERARCHICAL_NEO4J_DATABASE', 'neo4j')
-                    },
-                    'redis_enabled': os.getenv('HIERARCHICAL_REDIS_ENABLED', 'true').lower() == 'true',
-                    'postgresql_enabled': os.getenv('HIERARCHICAL_POSTGRESQL_ENABLED', 'true').lower() == 'true',
-                    'chromadb_enabled': os.getenv('HIERARCHICAL_CHROMADB_ENABLED', 'true').lower() == 'true',
-                    'neo4j_enabled': os.getenv('HIERARCHICAL_NEO4J_ENABLED', 'true').lower() == 'true'
-                }
-                
-                # Initialize hierarchical memory manager
-                hierarchical_memory_manager = HierarchicalMemoryManager(hierarchical_config)
-                
-                # Create adapter to make it compatible with existing bot handlers
-                hierarchical_adapter = create_hierarchical_memory_adapter(hierarchical_memory_manager)
-                
-                # Store for later async initialization
-                self._hierarchical_memory_manager = hierarchical_memory_manager
+            # Create memory manager using factory pattern
+            # This enables easy A/B testing: just change MEMORY_SYSTEM_TYPE
+            memory_manager = create_memory_manager(memory_type)
+            
+            # Store for later async initialization
+            if hasattr(memory_manager, '_hierarchical_memory_manager'):
+                self._hierarchical_memory_manager = memory_manager._hierarchical_memory_manager
                 self._needs_hierarchical_init = True
-                
-                # Wrap with thread safety
-                safe_memory_manager = ThreadSafeMemoryManager(hierarchical_adapter)
-                self.safe_memory_manager = safe_memory_manager
-                self.memory_manager = safe_memory_manager
-                
-                self.logger.info("✅ Hierarchical Memory System configured (will initialize async)")
-                
-                return  # Skip traditional memory system initialization
-            
-            # Check if graph database integration is enabled
-            enable_graph_database = os.getenv("ENABLE_GRAPH_DATABASE", "false").lower() == "true"
 
-            # Get the base LLM client from the concurrent wrapper
-            base_llm_client = getattr(self.llm_client, "base_client", self.llm_client)
-
-            if (
-                enable_graph_database
-                and GRAPH_MEMORY_AVAILABLE
-                and IntegratedMemoryManager is not None
-            ):
-                self.logger.info("🕸️ Initializing Graph-Enhanced Memory System...")
-
-                # Initialize base memory manager with local embeddings
-                base_memory_manager = UserMemoryManager(
-                    enable_auto_facts=True, enable_global_facts=True, llm_client=base_llm_client
-                )
-
-                # Initialize graph-integrated emotion manager
-                # Note: phase2_integration will be set later in initialize_ai_enhancements
-                if GRAPH_MEMORY_AVAILABLE and GraphIntegratedEmotionManager is not None:
-                    graph_emotion_manager = GraphIntegratedEmotionManager(
-                        llm_client=base_llm_client,
-                        memory_manager=base_memory_manager,
-                        phase2_integration=None,  # Will be updated later
-                    )
-                    # Store reference to update later
-                    self.graph_emotion_manager = graph_emotion_manager
-                else:
-                    self.graph_emotion_manager = None
-
-                # Initialize integrated memory manager (bridges ChromaDB and Neo4j)
-                integrated_memory_manager = IntegratedMemoryManager(
-                    memory_manager=base_memory_manager,
-                    emotion_manager=graph_emotion_manager,
-                    enable_graph_sync=True,
-                    llm_client=base_llm_client,
-                )
-
-                # Initialize context-aware memory manager
-                context_memory_manager = ContextAwareMemoryManager(integrated_memory_manager)
-                
-                # Store reference to batch optimizer for later async initialization
-                self._batched_memory_manager = BatchedMemoryManager(integrated_memory_manager)
-                self._needs_batch_init = True
-                
-                self.logger.info("✅ Graph-enhanced memory system with batching initialized successfully")
-
-            else:
-                if enable_graph_database and not GRAPH_MEMORY_AVAILABLE:
-                    self.logger.warning(
-                        "⚠️ Graph database enabled but components not available, falling back to standard memory"
-                    )
-
-                self.logger.info("📚 Initializing Standard Memory System...")
-
-                # Standard memory manager initialization (fallback)
-                base_memory_manager = UserMemoryManager(
-                    enable_auto_facts=True, enable_global_facts=True, llm_client=base_llm_client
-                )
-
-                # Initialize context-aware memory manager
-                context_memory_manager = ContextAwareMemoryManager(base_memory_manager)
-                
-                # Store reference to batch optimizer for later async initialization
-                self._batched_memory_manager = BatchedMemoryManager(base_memory_manager)
-                self._needs_batch_init = True
-
-            # Wrap memory manager with thread safety
-            safe_memory_manager = ThreadSafeMemoryManager(context_memory_manager)
-            self.safe_memory_manager = safe_memory_manager
-            self.memory_manager = safe_memory_manager
-
-            # Apply optimization patch for better topic recall
-            self.memory_manager = apply_memory_enhancement_patch(self.memory_manager)
-
-            self.logger.info("Memory manager wrapped with thread safety and context-aware security")
-            self.logger.info("Enhanced memory system patch applied for improved topic recall")
+            # Set as THE memory manager (clean, simple)
+            self.safe_memory_manager = memory_manager
+            self.memory_manager = memory_manager
 
             self.backup_manager = BackupManager()
-            self.logger.info("Memory and backup managers initialized successfully")
+            
+            self.logger.info("✅ Memory System initialized with type: %s", memory_type)
 
         except Exception as e:
             self.logger.error("Memory system initialization failed: %s", str(e))
-            # Fallback to basic memory manager
-            self.memory_manager = UserMemoryManager(llm_client=self.llm_client)
-            self.backup_manager = BackupManager()
-            self.logger.warning("Using fallback memory manager")
+            raise
             
     async def initialize_batch_optimizer(self):
         """Initialize the ChromaDB batch optimizer asynchronously."""
@@ -381,18 +232,19 @@ class DiscordBotCore:
             # Initialize Phase 4.3: Proactive Engagement Engine
             if not hasattr(self, 'engagement_engine') or self.engagement_engine is None:
                 try:
-                    from src.conversation.proactive_engagement_engine import create_proactive_engagement_engine
+                    from src.conversation.engagement_protocol import create_engagement_engine
                     
-                    # Create with available integrations
-                    self.engagement_engine = await create_proactive_engagement_engine(
+                    # Create with available integrations using factory pattern
+                    self.engagement_engine = await create_engagement_engine(
+                        engagement_engine_type=os.getenv("ENGAGEMENT_ENGINE_TYPE", "full"),
                         thread_manager=getattr(self, 'thread_manager', None),
                         memory_moments=getattr(self, 'memory_moments', None),
                         emotional_engine=getattr(self.phase2_integration, 'emotional_context_engine', None) if hasattr(self, 'phase2_integration') else None,
                         personality_profiler=getattr(self, 'dynamic_personality_profiler', None)
                     )
-                    self.logger.info("✅ Phase 4.3: Proactive Engagement Engine initialized with full integration")
+                    self.logger.info("✅ Phase 4.3: Proactive Engagement Engine initialized with factory pattern")
                 except Exception as e:
-                    self.logger.error(f"Failed to initialize Phase 4.3 engagement engine: {e}")
+                    self.logger.error("Failed to initialize Phase 4.3 engagement engine: %s", e)
                     self.engagement_engine = None
 
             # Log Phase 4 integration status
@@ -669,7 +521,7 @@ class DiscordBotCore:
         # Initialize Phase 4.3: Proactive Engagement Engine
         self.logger.info("⚡ Initializing Phase 4.3: Proactive Engagement Engine...")
         try:
-            from src.conversation.proactive_engagement_engine import create_proactive_engagement_engine
+            from src.conversation.engagement_protocol import create_engagement_engine
             
             # Initialize proactive engagement engine asynchronously (will be awaited later)
             self._engagement_engine_task = None
@@ -677,7 +529,7 @@ class DiscordBotCore:
             self.logger.info("✅ Phase 4.3: Proactive Engagement Engine scheduled for initialization")
             
         except Exception as e:
-            self.logger.error(f"Failed to initialize Phase 4.3 engagement engine: {e}")
+            self.logger.error("Failed to initialize Phase 4.3 engagement engine: %s", e)
             self.logger.warning("⚠️ Continuing without proactive engagement features")
             self.engagement_engine = None
 
@@ -892,41 +744,40 @@ class DiscordBotCore:
             raise
 
     def initialize_voice_system(self):
-        """Initialize the voice functionality if available."""
-        self.voice_support_enabled = os.getenv("VOICE_SUPPORT_ENABLED", "true").lower() == "true"
-
-        if (
-            VOICE_AVAILABLE
-            and self.voice_support_enabled
-            and ElevenLabsClient is not None
-            and DiscordVoiceManager is not None
-            and self.bot is not None
-        ):
-            try:
-                self.logger.info("Initializing voice functionality...")
-
-                # Initialize ElevenLabs client
-                elevenlabs_client = ElevenLabsClient()
-                self.logger.info("ElevenLabs client initialized")
-
-                # Initialize voice manager
-                self.voice_manager = DiscordVoiceManager(
-                    self.bot, elevenlabs_client, self.llm_client, self.memory_manager
-                )
-                self.logger.info("Voice manager initialized")
-
-                self.logger.info("✅ Voice functionality initialized successfully!")
-
-            except Exception as e:
-                self.logger.error(f"Failed to initialize voice functionality: {e}")
-                self.logger.warning("Bot will continue without voice features")
-                self.voice_manager = None
-        elif VOICE_AVAILABLE and not self.voice_support_enabled:
-            self.logger.info(
-                "Voice functionality disabled by configuration (VOICE_SUPPORT_ENABLED=false)"
+        """Initialize voice functionality using the factory pattern."""
+        voice_service_type = os.getenv("VOICE_SERVICE_TYPE", "discord_elevenlabs")
+        
+        # Check if voice support is enabled
+        voice_support_enabled = os.getenv("VOICE_SUPPORT_ENABLED", "true").lower() == "true"
+        
+        if not voice_support_enabled:
+            voice_service_type = "disabled"
+            self.logger.info("Voice functionality disabled by configuration (VOICE_SUPPORT_ENABLED=false)")
+        
+        self.logger.info("Initializing voice service: %s", voice_service_type)
+        
+        try:
+            self.voice_manager = create_voice_service(
+                voice_service_type=voice_service_type,
+                bot=self.bot,
+                llm_client=self.llm_client,
+                memory_manager=self.memory_manager
             )
-        else:
-            self.logger.info("Voice functionality not available - missing dependencies")
+            
+            # Set voice support flag based on what we actually got
+            if hasattr(self.voice_manager, 'voice_response_enabled'):
+                self.voice_support_enabled = True
+                self.logger.info("✅ Voice functionality initialized successfully!")
+            else:
+                self.voice_support_enabled = False
+                self.logger.info("Voice functionality not available or disabled")
+                
+        except Exception as e:
+            self.logger.error("Failed to initialize voice functionality: %s", e)
+            self.logger.warning("Bot will continue without voice features")
+            # Fallback to disabled service
+            self.voice_manager = create_voice_service(voice_service_type="disabled")
+            self.voice_support_enabled = False
 
     def initialize_production_optimization(self):
         """Initialize the production optimization system if available."""

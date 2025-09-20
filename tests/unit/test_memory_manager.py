@@ -10,7 +10,7 @@ from unittest.mock import Mock, patch, MagicMock, AsyncMock
 import json
 from datetime import datetime
 
-from src.memory.memory_manager import UserMemoryManager
+from src.memory.memory_protocol import create_memory_manager
 from src.utils.exceptions import MemoryError, MemoryRetrievalError, MemoryStorageError, ValidationError
 
 
@@ -112,13 +112,7 @@ def memory_manager(mock_chromadb, mock_llm_client, mock_emotion_manager):
         # Make sure the embedding function mock returns our MockEmbeddingFunction instance
         mock_embedding_func.return_value = mock_chromadb['embedding_function']
 
-        manager = UserMemoryManager(
-            persist_directory="./test_chromadb",
-            enable_auto_facts=True,
-            enable_global_facts=True,
-            enable_emotions=True,
-            llm_client=mock_llm_client
-        )
+        manager = create_memory_manager("test_mock")
         yield manager
 class TestUserMemoryManagerInitialization:
     """Test memory manager initialization and configuration."""

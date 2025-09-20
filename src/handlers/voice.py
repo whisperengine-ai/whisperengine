@@ -68,11 +68,9 @@ def voice_bot_name_filter():
 class VoiceCommandHandlers:
     """Handles voice-related commands"""
 
-    def __init__(self, bot, voice_manager, voice_support_enabled, VOICE_AVAILABLE):
+    def __init__(self, bot, voice_manager):
         self.bot = bot
         self.voice_manager = voice_manager
-        self.voice_support_enabled = voice_support_enabled
-        self.VOICE_AVAILABLE = VOICE_AVAILABLE
         self.logger = logging.getLogger(__name__)
 
     def register_commands(self, bot_name_filter=None):

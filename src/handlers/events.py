@@ -954,9 +954,19 @@ class BotEventHandlers:
                     # Use safe_memory_manager if available, otherwise fall back to memory_manager
                     memory_manager = self.safe_memory_manager or self.memory_manager
                     if memory_manager:
-                        chromadb_memories = await memory_manager.retrieve_relevant_memories(
-                            user_id, query="conversation history recent messages", limit=15
-                        )
+                        # Check if method is async or sync and handle accordingly (WhisperEngine architecture)
+                        import inspect
+                        if inspect.iscoroutinefunction(memory_manager.retrieve_relevant_memories):
+                            chromadb_memories = await memory_manager.retrieve_relevant_memories(
+                                user_id, query="conversation history recent messages", limit=15
+                            )
+                        else:
+                            # Use thread worker pattern for sync methods in async context
+                            loop = asyncio.get_running_loop()
+                            chromadb_memories = await loop.run_in_executor(
+                                None, memory_manager.retrieve_relevant_memories,
+                                user_id, "conversation history recent messages", 15
+                            )
                     else:
                         logger.warning("No memory manager available, skipping ChromaDB supplement")
                         chromadb_memories = []

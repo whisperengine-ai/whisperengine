@@ -23,7 +23,6 @@ class StatusCommandHandlers:
         llm_client,
         voice_manager,
         voice_support_enabled,
-        VOICE_AVAILABLE,
         image_processor,
         conversation_history,
         conversation_cache,
@@ -34,7 +33,6 @@ class StatusCommandHandlers:
         self.llm_client = llm_client
         self.voice_manager = voice_manager
         self.voice_support_enabled = voice_support_enabled
-        self.VOICE_AVAILABLE = VOICE_AVAILABLE
         self.image_processor = image_processor
         self.conversation_history = conversation_history
         self.conversation_cache = conversation_cache
@@ -381,7 +379,7 @@ class StatusCommandHandlers:
         logger.debug(f"Voice status command called by {ctx.author.name}")
 
         # Determine voice support status
-        voice_available = self.VOICE_AVAILABLE
+        voice_available = self.voice_manager is not None
         voice_enabled = self.voice_support_enabled
         has_voice_manager = self.voice_manager is not None
 
@@ -582,7 +580,7 @@ class StatusCommandHandlers:
         )
 
         # Check voice support if available
-        if self.VOICE_AVAILABLE and self.voice_support_enabled:
+        if self.voice_manager is not None and self.voice_support_enabled:
             try:
                 # Simple voice support check
                 voice_status = "✅ **Available**"

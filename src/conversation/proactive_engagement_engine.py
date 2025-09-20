@@ -50,10 +50,9 @@ try:
         ConversationThreadAdvanced,
         ConversationThreadState,
     )
-
-    THREAD_MANAGER_AVAILABLE = True
 except ImportError:
-    THREAD_MANAGER_AVAILABLE = False
+    # Import failed - thread manager components not available
+    pass
 
 try:
     from src.personality.memory_moments import ConversationContext, MemoryTriggeredMoments
@@ -1124,7 +1123,11 @@ async def create_proactive_engagement_engine(
     Returns:
         ProactiveConversationEngagementEngine ready for use
     """
-    if not THREAD_MANAGER_AVAILABLE:
+    # Check if thread manager components are available
+    try:
+        from src.conversation.thread_management.conversation_thread_manager import ConversationThreadManager
+        logger.info("Thread manager components available for full integration")
+    except ImportError:
         logger.warning(
             "AdvancedConversationThreadManager not available - limited thread integration"
         )
