@@ -40,6 +40,7 @@ from src.utils.context_size_manager import (
     count_context_tokens,
 )
 from src.conversation.boundary_manager import ConversationBoundaryManager
+from src.memory.fact_validator import FactValidator, initialize_fact_validation_tables
 from src.utils.helpers import (
     add_debug_info_to_response,
     extract_text_for_memory_storage,
@@ -141,6 +142,9 @@ class BotEventHandlers:
         self.boundary_manager = ConversationBoundaryManager(
             summarization_threshold=8  # Start summarizing after 8 messages
         )
+
+        # Initialize Fact Validator for memory integrity
+        self.fact_validator = FactValidator(storage_manager=self.postgres_pool)
 
         # Configuration flags - unified AI system always enabled
         self.voice_support_enabled = getattr(bot_core, "voice_support_enabled", False)
@@ -304,6 +308,10 @@ class BotEventHandlers:
 
                 # Database tables are automatically initialized by PostgreSQLUserDB.initialize()
                 logger.info("✅ Database tables initialized/verified")
+
+                # Initialize fact validation tables
+                await initialize_fact_validation_tables(self.postgres_pool)
+                logger.info("✅ Fact validation system initialized")
 
             except ConnectionError as e:
                 # Clean error message for PostgreSQL connection failures
@@ -945,76 +953,79 @@ class BotEventHandlers:
             # Standardize all message objects to dict format
             recent_messages = [_standardize_message_object(msg) for msg in recent_messages]
 
-            # Supplement with ChromaDB if insufficient
+            # Supplement with Redis/PostgreSQL hierarchical memory if insufficient
             if len(recent_messages) < 8:
                 logger.debug(
-                    f"Supplementing {len(recent_messages)} cached messages with ChromaDB history for user {user_id}"
+                    f"Supplementing {len(recent_messages)} cached messages with hierarchical memory for user {user_id}"
                 )
                 try:
-                    # Use safe_memory_manager if available, otherwise fall back to memory_manager
+                    # Use hierarchical memory manager to get recent conversation history
+                    # This will check Redis first, then PostgreSQL as source of truth
                     memory_manager = self.safe_memory_manager or self.memory_manager
-                    if memory_manager:
-                        # Check if method is async or sync and handle accordingly (WhisperEngine architecture)
-                        import inspect
-                        if inspect.iscoroutinefunction(memory_manager.retrieve_relevant_memories):
-                            chromadb_memories = await memory_manager.retrieve_relevant_memories(
-                                user_id, query="conversation history recent messages", limit=15
-                            )
-                        else:
-                            # Use thread worker pattern for sync methods in async context
-                            loop = asyncio.get_running_loop()
-                            chromadb_memories = await loop.run_in_executor(
-                                None, memory_manager.retrieve_relevant_memories,
-                                user_id, "conversation history recent messages", 15
-                            )
+                    if memory_manager and hasattr(memory_manager, 'get_recent_conversations'):
+                        # Use the proper conversation history method
+                        hierarchical_conversations = await memory_manager.get_recent_conversations(
+                            user_id, limit=15
+                        )
+                    elif memory_manager and hasattr(memory_manager, 'hierarchical_memory_manager'):
+                        # Direct access to hierarchical memory manager
+                        context = await memory_manager.hierarchical_memory_manager.get_conversation_context(
+                            user_id=user_id, current_query=""
+                        )
+                        hierarchical_conversations = context.recent_messages[:15] if hasattr(context, 'recent_messages') else []
                     else:
-                        logger.warning("No memory manager available, skipping ChromaDB supplement")
-                        chromadb_memories = []
+                        logger.warning("No hierarchical memory manager available, skipping supplement")
+                        hierarchical_conversations = []
 
-                    # CRITICAL DEBUG: Log what ChromaDB is returning
-                    logger.error(f"[CHROMADB-DEBUG] Retrieved {len(chromadb_memories)} memories for user {user_id}")
-                    for i, memory in enumerate(chromadb_memories):
-                        metadata = memory.get("metadata", {})
-                        logger.error(f"[CHROMADB-DEBUG] Memory {i}: user_msg='{metadata.get('user_message', 'N/A')[:100]}...' bot_response='{metadata.get('bot_response', 'N/A')[:100]}...'")
+                    # DEBUG: Log what hierarchical memory is returning
+                    logger.debug(f"[HIERARCHICAL-DEBUG] Retrieved {len(hierarchical_conversations)} conversations for user {user_id}")
+                    for i, conv in enumerate(hierarchical_conversations[:3]):  # Log first 3
+                        user_msg = conv.get('user_message', 'N/A')[:100] if isinstance(conv, dict) else 'N/A'
+                        bot_response = conv.get('bot_response', 'N/A')[:100] if isinstance(conv, dict) else 'N/A'
+                        logger.debug(f"[HIERARCHICAL-DEBUG] Conversation {i}: user_msg='{user_msg}...' bot_response='{bot_response}...'")
 
-                    # Process ChromaDB memories into message format
+                    # Process hierarchical memory conversations into message format
                     conversation_count = 0
-                    for memory in reversed(chromadb_memories):
-                        metadata = memory.get("metadata", {})
-
-                        if "user_message" in metadata and "bot_response" in metadata:
-                            user_content = metadata["user_message"][:500]
-                            bot_content = metadata["bot_response"][:500]
-                            
-                            # CRITICAL DEBUG: Log what's being added to conversation context
-                            logger.error(f"[CONTEXT-DEBUG] Adding ChromaDB conversation:")
-                            logger.error(f"[CONTEXT-DEBUG] User: '{user_content}'")
-                            logger.error(f"[CONTEXT-DEBUG] Bot: '{bot_content}'")
+                    for conversation in reversed(hierarchical_conversations):
+                        if isinstance(conversation, dict):
+                            user_content = conversation.get("user_message", "")[:500]
+                            bot_content = conversation.get("bot_response", "")[:500]
+                        else:
+                            # Handle other conversation formats
+                            user_content = str(conversation)[:500] if conversation else ""
+                            bot_content = ""
+                        
+                        if user_content:
+                            # CONTEXT DEBUG: Log what's being added to conversation context
+                            logger.debug(f"[CONTEXT-DEBUG] Adding hierarchical conversation:")
+                            logger.debug(f"[CONTEXT-DEBUG] User: '{user_content}'")
+                            logger.debug(f"[CONTEXT-DEBUG] Bot: '{bot_content}'")
                             
                             # Add user message
                             recent_messages.append(
                                 {
                                     "content": user_content,
                                     "author_id": user_id,
-                                    "author_name": metadata.get("user_name", "User"),
-                                    "timestamp": metadata.get("timestamp", ""),
+                                    "author_name": "User",  # Simplified for hierarchical data
+                                    "timestamp": conversation.get("timestamp", "") if isinstance(conversation, dict) else "",
                                     "bot": False,
-                                    "from_chromadb": True,
+                                    "from_hierarchical": True,
                                 }
                             )
-                            # Add bot response
-                            recent_messages.append(
-                                {
-                                    "content": bot_content,
-                                    "author_id": str(self.bot.user.id) if self.bot.user else "bot",
-                                    "author_name": (
-                                        self.bot.user.display_name if self.bot.user else "Bot"
-                                    ),
-                                    "timestamp": metadata.get("timestamp", ""),
-                                    "bot": True,
-                                    "from_chromadb": True,
-                                }
-                            )
+                            # Add bot response if available
+                            if bot_content:
+                                recent_messages.append(
+                                    {
+                                        "content": bot_content,
+                                        "author_id": str(self.bot.user.id) if self.bot.user else "bot",
+                                        "author_name": (
+                                            self.bot.user.display_name if self.bot.user else "Bot"
+                                        ),
+                                        "timestamp": conversation.get("timestamp", "") if isinstance(conversation, dict) else "",
+                                        "bot": True,
+                                        "from_hierarchical": True,
+                                    }
+                                )
 
                             conversation_count += 1
                             if conversation_count >= 5:
@@ -1023,7 +1034,7 @@ class BotEventHandlers:
                     if conversation_count > 0:
                         recent_messages = recent_messages[-20:]
                         logger.debug(
-                            f"Enhanced context with {conversation_count} ChromaDB conversations: now have {len(recent_messages)} messages"
+                            f"Enhanced context with {conversation_count} hierarchical conversations: now have {len(recent_messages)} messages"
                         )
 
                 except Exception as e:
@@ -1253,7 +1264,9 @@ class BotEventHandlers:
 
         # Add recent messages with proper alternation
         user_assistant_messages = []
-        filtered_messages = list(reversed(recent_messages[1:]))  # Skip current message
+        # FIX: Don't reverse again - recent_messages should already be in chronological order
+        # Skip current message (last one) and keep chronological order
+        filtered_messages = recent_messages[:-1] if recent_messages else []
 
         # Strict or minimal context mode: remove prior assistant meta-analysis leaks from history
         if _strict_mode_enabled() or _minimal_context_mode_enabled():
@@ -1670,12 +1683,14 @@ class BotEventHandlers:
         """Generate AI response and send to channel using Universal Chat Architecture."""
         # Show typing indicator
         async with reply_channel.typing():
+            logger.info(f"[TRACE-START] Starting _generate_and_send_response for user {user_id}")
             logger.debug("Started typing indicator - simulating thinking and typing process")
             try:
                 logger.debug("Processing message through Universal Chat Orchestrator...")
 
                 # Use Universal Chat Orchestrator if available
                 if self.chat_orchestrator:
+                    logger.info("[DEBUG-TRACE] Chat orchestrator is available")
                     logger.debug(
                         "Using Universal Chat Orchestrator for proper layered architecture"
                     )
@@ -1685,19 +1700,30 @@ class BotEventHandlers:
                         hasattr(self.chat_orchestrator, "adapters")
                         and ChatPlatform.DISCORD in self.chat_orchestrator.adapters
                     ):
+                        logger.info("[DEBUG-TRACE] Discord adapter found, proceeding with context fix")
                         discord_adapter = self.chat_orchestrator.adapters[ChatPlatform.DISCORD]
                         universal_message = discord_adapter.discord_message_to_universal_message(
                             message
                         )
 
-                        # Get or create conversation
-                        conversation = await self.chat_orchestrator.get_or_create_conversation(
-                            universal_message
-                        )
+                        # 🔧 CRITICAL FIX: Use our hierarchical memory conversation_context directly
+                        # instead of letting chat orchestrator ignore our memory system
+                        logger.info(f"[CONTEXT-FIX] Using hierarchical memory context with {len(conversation_context)} messages")
+                        
+                        # DEBUG: Log environment variable affecting conversation processing
+                        strict_mode = _strict_mode_enabled()
+                        minimal_mode = _minimal_context_mode_enabled()
+                        logger.info(f"[DEBUG-ENV] STRICT_IMMERSIVE_MODE: {strict_mode}, MINIMAL_CONTEXT_MODE: {minimal_mode}")
+                        
+                        # Debug log the conversation context being sent to LLM
+                        for i, ctx_msg in enumerate(conversation_context[-8:]):  # Log last 8 messages
+                            role = ctx_msg.get('role', 'unknown')
+                            content_preview = ctx_msg.get('content', '')[:100] + '...' if len(ctx_msg.get('content', '')) > 100 else ctx_msg.get('content', '')
+                            logger.info(f"[CONTEXT-FIX] Message {i}: {role} = '{content_preview}'")
 
-                        # Generate AI response through orchestrator
+                        # Generate AI response using our conversation context directly
                         ai_response = await self.chat_orchestrator.generate_ai_response(
-                            universal_message, conversation
+                            universal_message, conversation_context  # Use our hierarchical memory context!
                         )
 
                         response = ai_response.content
@@ -1718,6 +1744,9 @@ class BotEventHandlers:
 
                     else:
                         logger.warning(
+                            "[DEBUG-TRACE] Discord adapter not found in orchestrator, falling back to direct LLM"
+                        )
+                        logger.warning(
                             "Discord adapter not found in orchestrator, falling back to direct LLM"
                         )
                         response = await self._fallback_direct_llm_response(
@@ -1732,6 +1761,9 @@ class BotEventHandlers:
                         )
 
                 else:
+                    logger.warning(
+                        "[DEBUG-TRACE] Universal Chat Orchestrator not available, falling back to direct LLM"
+                    )
                     logger.warning(
                         "Universal Chat Orchestrator not available, falling back to direct LLM"
                     )
@@ -2031,6 +2063,37 @@ class BotEventHandlers:
                 return
 
             logger.debug(f"Storage content length: {len(storage_content)} characters")
+
+            # Fact validation - extract and validate facts from user message
+            if self.fact_validator:
+                try:
+                    # Process user message to extract facts and detect conflicts
+                    extracted_facts, conflicts = await self.fact_validator.process_message(storage_content, user_id)
+                    
+                    if extracted_facts:
+                        logger.debug(f"Extracted {len(extracted_facts)} facts from user message")
+                        
+                        # Log any conflicts detected
+                        if conflicts:
+                            logger.warning(f"Detected {len(conflicts)} fact conflicts for user {user_id}")
+                            for conflict in conflicts:
+                                logger.warning(f"Conflict: {conflict.old_fact.subject} {conflict.old_fact.predicate} {conflict.old_fact.object} vs {conflict.new_fact.object}")
+                    
+                    # Also process bot response for fact validation
+                    if response and response.strip():
+                        response_facts, response_conflicts = await self.fact_validator.process_message(response, user_id)
+                        if response_facts:
+                            logger.debug(f"Extracted {len(response_facts)} facts from bot response")
+                            
+                            # Log any conflicts in bot response
+                            if response_conflicts:
+                                logger.warning(f"Bot response contains {len(response_conflicts)} fact conflicts")
+                                for conflict in response_conflicts:
+                                    logger.warning(f"Bot conflict: {conflict.old_fact.subject} {conflict.old_fact.predicate} {conflict.old_fact.object} vs {conflict.new_fact.object}")
+                                    
+                except Exception as fact_validation_error:
+                    logger.warning(f"Fact validation failed for user {user_id}: {fact_validation_error}")
+                    # Continue with conversation storage even if fact validation fails
 
             # Prepare emotion metadata
             emotion_metadata = None

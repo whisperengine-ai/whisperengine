@@ -25,7 +25,7 @@ RUN apt-get update && apt-get install -y \
 FROM base AS development
 
 # Copy dependency files for better layer caching
-COPY requirements-core.txt requirements-platform.txt requirements-discord.txt ./
+COPY requirements-core.txt requirements-platform.txt requirements-discord.txt requirements-vector-memory.txt ./
 COPY requirements-dev.txt* ./
 
 # Install dependencies with cache mount
@@ -33,6 +33,7 @@ RUN --mount=type=cache,target=/root/.cache/pip \
     pip install -r requirements-core.txt && \
     pip install -r requirements-platform.txt && \
     pip install -r requirements-discord.txt && \
+    pip install -r requirements-vector-memory.txt && \
     if [ -f requirements-dev.txt ]; then pip install -r requirements-dev.txt; fi && \
     python -m spacy download en_core_web_sm
 
@@ -54,14 +55,15 @@ CMD ["sh", "-c", "python validate_config.py && python run.py"]
 FROM base AS production
 
 # Copy dependency files for better layer caching
-COPY requirements-core.txt requirements-platform.txt requirements-discord.txt ./
+COPY requirements-core.txt requirements-platform.txt requirements-discord.txt requirements-vector-memory.txt ./
 
-    # Install Python dependencies with cache mount for faster builds
-    RUN --mount=type=cache,target=/root/.cache/pip \
-        pip install --no-cache-dir -r requirements-core.txt && \
-        pip install --no-cache-dir -r requirements-platform.txt && \
-        pip install --no-cache-dir -r requirements-discord.txt && \
-        python -m spacy download en_core_web_sm
+# Install Python dependencies with cache mount for faster builds
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install --no-cache-dir -r requirements-core.txt && \
+    pip install --no-cache-dir -r requirements-platform.txt && \
+    pip install --no-cache-dir -r requirements-discord.txt && \
+    pip install --no-cache-dir -r requirements-vector-memory.txt && \
+    python -m spacy download en_core_web_sm
 
     # Copy model download script and download all models during build
     COPY scripts/download_models.py ./scripts/

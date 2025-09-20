@@ -187,6 +187,39 @@ def create_memory_manager(memory_type: str = "hierarchical", **config) -> Memory
         
         return MockMemoryManager()
     
+    elif memory_type == "vector":
+        # Vector-native memory system using Qdrant + sentence-transformers
+        from src.memory.vector_memory_system import VectorMemoryManager
+        
+        # Create vector config from environment and overrides
+        import os
+        vector_config = {
+            'qdrant': {
+                'host': os.getenv('VECTOR_QDRANT_HOST', 'qdrant'),
+                'port': int(os.getenv('VECTOR_QDRANT_PORT', '6333')),
+                'grpc_port': int(os.getenv('VECTOR_QDRANT_GRPC_PORT', '6334')),
+                'collection_name': os.getenv('VECTOR_QDRANT_COLLECTION', 'whisperengine_memory'),
+                'vector_size': int(os.getenv('VECTOR_EMBEDDING_SIZE', '384'))
+            },
+            'embeddings': {
+                'model_name': os.getenv('VECTOR_EMBEDDING_MODEL', 'all-MiniLM-L6-v2'),
+                'device': os.getenv('VECTOR_EMBEDDING_DEVICE', 'cpu')
+            },
+            'postgresql': {
+                'url': f"postgresql://{os.getenv('POSTGRESQL_USERNAME', 'bot_user')}:{os.getenv('POSTGRESQL_PASSWORD', 'securepassword123')}@{os.getenv('POSTGRESQL_HOST', 'postgres')}:{os.getenv('POSTGRESQL_PORT', '5432')}/{os.getenv('POSTGRESQL_DATABASE', 'whisper_engine')}"
+            },
+            'redis': {
+                'url': f"redis://{os.getenv('REDIS_HOST', 'redis')}:{os.getenv('REDIS_PORT', '6379')}",
+                'ttl': int(os.getenv('REDIS_TTL', '1800'))
+            }
+        }
+        
+        # Apply any config overrides
+        vector_config.update(config)
+        
+        # Create and return the vector memory manager
+        return VectorMemoryManager(vector_config)
+    
     elif memory_type == "experimental_v2":
         # Future: Next-generation memory system
         raise NotImplementedError("Experimental V2 memory manager not yet implemented")

@@ -146,7 +146,39 @@ services:
       retries: 3
       start_period: 20s
 
-  # ChromaDB for vector storage
+  # Qdrant for vector storage (replaces ChromaDB)
+  qdrant:
+    image: qdrant/qdrant:v1.6.1
+    container_name: whisperengine-qdrant
+    restart: unless-stopped
+    environment:
+      - QDRANT__SERVICE__GRPC_PORT=6334
+      - QDRANT__SERVICE__HTTP_PORT=6333
+      - QDRANT__LOG_LEVEL=INFO
+    volumes:
+      - qdrant_data:/qdrant/storage
+    ports:
+      - "6333:6333"  # HTTP API
+      - "6334:6334"  # gRPC API
+    networks:
+      - bot_network
+    # Resource limits for Qdrant vector operations
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '0.5'
+        reservations:
+          memory: 512M
+          cpus: '0.25'
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:6333/health || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  # ChromaDB for vector storage (DEPRECATED - will be removed after migration)
   chromadb:
     image: chromadb/chroma:latest
     container_name: whisperengine-chromadb
@@ -243,6 +275,9 @@ volumes:
     driver: local
   postgres_data:
     name: whisperengine-postgres
+    driver: local
+  qdrant_data:
+    name: whisperengine-qdrant
     driver: local
   chromadb_data:
     name: whisperengine-chromadb

@@ -372,6 +372,28 @@ class PostgreSQLUserDB:
             logger.error(f"Error deleting user profile for {user_id}: {e}")
             raise
 
+    async def execute_query(self, query: str, params=None):
+        """Execute a raw SQL query that returns results - for use by fact validator and other components"""
+        if not self.pool:
+            raise ConnectionError("Database not initialized")
+        
+        async with self.pool.acquire() as connection:
+            if params:
+                return await connection.fetch(query, *params)
+            else:
+                return await connection.fetch(query)
+
+    async def execute_command(self, query: str, params=None):
+        """Execute a raw SQL command (INSERT/UPDATE/DELETE) without returning results"""
+        if not self.pool:
+            raise ConnectionError("Database not initialized")
+        
+        async with self.pool.acquire() as connection:
+            if params:
+                return await connection.execute(query, *params)
+            else:
+                return await connection.execute(query)
+
     async def close(self):
         """Close the database connection pool"""
         if self.pool:

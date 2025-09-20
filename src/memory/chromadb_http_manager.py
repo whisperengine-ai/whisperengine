@@ -313,30 +313,23 @@ class ChromaDBHTTPManager:
             return []
 
     async def get_conversation_history(self, user_id: str, limit: int = 20) -> list[dict[str, Any]]:
-        """Get conversation history for a user"""
-        try:
-            if not self.user_collection:
-                return []
-
-            results = self.user_collection.get(
-                where={"user_id": user_id, "type": "conversation"},
-                limit=limit
-            )
-
-            conversations = []
-            if results["documents"]:
-                for i in range(len(results["documents"])):
-                    conversations.append({
-                        "content": results["documents"][i],
-                        "metadata": results["metadatas"][i] if results["metadatas"] else {},
-                        "id": results["ids"][i] if results["ids"] else None,
-                    })
-
-            return conversations
-
-        except Exception as e:
-            logger.error(f"Failed to get conversation history: {e}")
-            return []
+        """🚨 DEPRECATED: Direct ChromaDB conversation history access removed!
+        
+        This method has been intentionally removed as part of architectural migration.
+        Conversation history is now managed by the hierarchical memory system:
+        
+        ✅ Use: memory_manager.get_recent_conversations(user_id, limit)
+        ✅ Use: hierarchical_memory_manager.get_conversation_context(user_id)
+        
+        ❌ DO NOT use ChromaDB directly for conversation history!
+        ChromaDB is now SEMANTIC SEARCH ONLY.
+        """
+        raise NotImplementedError(
+            "🔥 BURNED DOWN: get_conversation_history() removed by design!\n"
+            f"🔄 Use hierarchical memory: memory_manager.get_recent_conversations('{user_id}', {limit})\n"
+            f"📚 Conversation history now flows: Redis → PostgreSQL → ChromaDB (semantic only)\n"
+            f"🚨 ChromaDB direct access for conversations is DEPRECATED!"
+        )
 
     async def health_check_detailed(self) -> dict[str, Any]:
         """Detailed health check of ChromaDB HTTP service"""
