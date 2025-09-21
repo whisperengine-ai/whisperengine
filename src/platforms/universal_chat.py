@@ -864,38 +864,8 @@ class UniversalChatOrchestrator:
                 except Exception as e:
                     logging.warning(f"Emotion context retrieval failed: {e}")
 
-            # Use ChromaDB for additional memory retrieval
-            chromadb_memories = []
-            if safe_memory_manager and hasattr(safe_memory_manager, "retrieve_relevant_memories"):
-                try:
-                    chromadb_memories = await safe_memory_manager.retrieve_relevant_memories(
-                        message.user_id, message.content, limit=5
-                    )
-
-                    # Enhanced: Add knowledge domain classification
-                    if hasattr(memory_manager, "_determine_knowledge_domain"):
-                        try:
-                            domain = memory_manager._determine_knowledge_domain(message.content, "")
-                            if domain and domain != "general":
-                                # Get domain-specific facts if graph database is available
-                                if (
-                                    hasattr(memory_manager, "get_knowledge_domain_facts")
-                                    and hasattr(memory_manager, "enable_global_facts")
-                                    and memory_manager.enable_global_facts
-                                ):
-                                    domain_facts = memory_manager.get_knowledge_domain_facts(
-                                        domain, limit=3
-                                    )
-                                    if domain_facts:
-                                        chromadb_memories.extend(domain_facts)
-                                        logging.debug(
-                                            f"Added {len(domain_facts)} domain-specific facts for {domain}"
-                                        )
-                        except Exception as e:
-                            logging.debug(f"Knowledge domain enhancement failed: {e}")
-
-                except Exception as e:
-                    logging.warning(f"ChromaDB memory retrieval failed: {e}")
+            # Memory retrieval is handled by the vector memory system
+            additional_memories = []
 
             # Apply Phase 4 Intelligence if available
             if hasattr(memory_manager, "process_with_phase4_intelligence"):
@@ -956,12 +926,12 @@ class UniversalChatOrchestrator:
                     logging.warning(f"Phase 4.1 memory moments processing failed: {e}")
 
             # Add memory context to conversation with relevance assessment
-            if relevant_memories or chromadb_memories or emotion_context or memory_moments_context:
+            if relevant_memories or additional_memories or emotion_context or memory_moments_context:
                 context_parts = []
                 
                 # 🎯 MEMORY RELEVANCE ASSESSMENT
                 memory_confidence = self._assess_memory_relevance(
-                    message.content, relevant_memories, chromadb_memories
+                    message.content, relevant_memories, additional_memories
                 )
 
                 if relevant_memories:
@@ -1097,13 +1067,11 @@ class UniversalChatOrchestrator:
                         except Exception as e:
                             logging.debug(f"Emotional adaptation enhancement failed: {e}")
 
-                if chromadb_memories:
-                    context_parts.append("🧠 **Memory Networks:**")
-                    regular_memories = []
-                    domain_facts = []
-
-                    # Separate regular memories from domain-specific facts
-                    for memory in chromadb_memories[:5]:  # Show more memories
+                if additional_memories:
+                    context_parts.append("🧠 **Additional Context:**")
+                    
+                    # Process additional memories 
+                    for memory in additional_memories[:5]:  # Show more memories
                         memory_str = str(memory)
                         if (
                             "knowledge_domain" in str(memory).lower()
@@ -1740,7 +1708,7 @@ class UniversalChatOrchestrator:
         response_lower = response_text.lower()
         return any(indicator in response_lower for indicator in error_indicators)
 
-    def _assess_memory_relevance(self, query: str, relevant_memories: list, chromadb_memories: list) -> dict:
+    def _assess_memory_relevance(self, query: str, relevant_memories: list, additional_memories: list) -> dict:
         """
         🎯 HALLUCINATION PREVENTION: Assess if memories contain relevant information
         
@@ -1765,7 +1733,7 @@ class UniversalChatOrchestrator:
                 'has_relevant_info': True,
                 'confidence': 0.9,  # High confidence for conversational flow
                 'query_type': ['conversational_response'],
-                'memory_count': len((relevant_memories or []) + (chromadb_memories or []))
+                'memory_count': len((relevant_memories or []) + (additional_memories or []))
             }
         
         # Extract key query terms for fact-seeking questions
@@ -1778,13 +1746,13 @@ class UniversalChatOrchestrator:
             query_keywords.add('names')
             
         logging.info(f"🔍 ANTI-HALLUCINATION: Query keywords: {query_keywords}")
-        logging.info(f"🔍 ANTI-HALLUCINATION: Memory counts - relevant: {len(relevant_memories)}, chromadb: {len(chromadb_memories)}")
+        logging.info(f"🔍 ANTI-HALLUCINATION: Memory counts - relevant: {len(relevant_memories)}, additional: {len(additional_memories)}")
         
         # Assess memory content relevance
         memory_contains_info = False
         memory_confidence = 0.0
         
-        all_memories = (relevant_memories or []) + (chromadb_memories or [])
+        all_memories = (relevant_memories or []) + (additional_memories or [])
         
         for memory in all_memories:
             memory_str = str(memory).lower()

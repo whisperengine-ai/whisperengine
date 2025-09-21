@@ -79,7 +79,7 @@ class VectorMemoryStore:
     Production vector memory store using LOCAL Qdrant + fastembed
     
     This is the single source of truth for all WhisperEngine memory.
-    Replaces the problematic hierarchical Redis/PostgreSQL/ChromaDB system.
+    Replaces the problematic hierarchical Redis/PostgreSQL/legacy vector store system.
     Local-first deployment - no external API dependencies.
     """
     

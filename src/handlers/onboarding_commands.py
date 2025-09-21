@@ -153,7 +153,7 @@ class OnboardingCommands:
                 embed.add_field(
                     name="🔍 Troubleshooting",
                     value="• **Bot not responding**: Check `!status` for issues\n"
-                          "• **Memory issues**: Check ChromaDB connection\n"
+                          "• **Memory issues**: Check vector store connection\n"
                           "• **Performance slow**: Use `!perf` to diagnose\n"
                           "• **Setup errors**: Run validation with `--validate`",
                     inline=False
