@@ -46,7 +46,6 @@ from src.utils.helpers import (
     extract_text_for_memory_storage,
     fix_message_alternation,
     generate_conversation_summary,
-    get_contextualized_system_prompt,
     get_current_time_context,
     get_message_content,
     message_equals_bot_user,
@@ -58,6 +57,9 @@ from src.utils.production_error_handler import (
     ErrorCategory, ErrorSeverity, handle_errors, 
     error_handler, GracefulDegradation
 )
+
+# Vector-native prompt integration
+from src.prompts.final_integration import create_ai_pipeline_vector_native_prompt
 
 logger = logging.getLogger(__name__)
 
@@ -551,6 +553,10 @@ class BotEventHandlers:
                             # Build filters from message context
                             filters = self._build_memory_filters(message_context)
                             
+                            # Add recency boost for conversation continuity
+                            filters["prefer_recent_conversation"] = True
+                            filters["recency_hours"] = 2  # Prefer memories from last 2 hours
+                            
                             relevant_memories = await self.memory_manager.retrieve_relevant_memories_optimized(
                                 user_id=user_id,
                                 query=message.content,
@@ -579,13 +585,29 @@ class BotEventHandlers:
                     
                     # Fallback to basic memory retrieval if optimization not available or failed
                     if not relevant_memories:
-                        logger.info("🔍 MEMORY DEBUG: Using basic memory retrieval")
-                        relevant_memories = await self.memory_manager.retrieve_context_aware_memories(
-                            user_id=user_id, 
-                            query=message.content, 
-                            max_memories=20,
-                            context=message_context
-                        )
+                        logger.info("🔍 MEMORY DEBUG: Using basic memory retrieval with conversation priority")
+                        
+                        # Check if temporal/recent conversation query
+                        is_temporal = any(keyword in message.content.lower() 
+                                        for keyword in ['last', 'recent', 'just', 'earlier', 'before'])
+                        
+                        if is_temporal:
+                            # Use temporal query handling for better continuity
+                            relevant_memories = await self.memory_manager.retrieve_context_aware_memories(
+                                user_id=user_id, 
+                                query=message.content, 
+                                max_memories=20,
+                                context=message_context,
+                                emotional_context="recent conversation continuity"
+                            )
+                        else:
+                            # Regular retrieval but with conversation context prioritization
+                            relevant_memories = await self.memory_manager.retrieve_context_aware_memories(
+                                user_id=user_id, 
+                                query=message.content, 
+                                max_memories=20,
+                                context=message_context
+                            )
                     
                     logger.info(f"🔍 MEMORY DEBUG: Retrieved {len(relevant_memories) if relevant_memories else 0} memories")
                     if relevant_memories:
@@ -1175,32 +1197,17 @@ class BotEventHandlers:
             system_prompt_content = enhanced_system_prompt
             logger.debug("Using Phase 4 enhanced system prompt")
         else:
-            # Use template system with available context data
-            try:
-                # Build basic template context from available data
-                user_id = str(message.author.id)
-
-                # Create basic personality metadata from message context
-                personality_metadata = {
-                    "platform": "discord",
-                    "context_type": "guild" if message.guild else "dm",
-                    "user_id": user_id,
-                }
-
-                # Use template system for contextualized prompt
-                system_prompt_content = get_contextualized_system_prompt(
-                    personality_metadata=personality_metadata, 
-                    user_id=user_id
-                )
-                logger.debug("Using contextualized system prompt from template system")
-
-            except Exception as e:
-                logger.warning(f"Could not use template system: {e}")
-                # Fallback to basic system prompt
-                from src.core.config import get_system_prompt
-
-                system_prompt_content = get_system_prompt()
-                logger.debug("Falling back to basic system prompt")
+            # Use AI pipeline + vector memory system - NO FALLBACKS
+            user_id = str(message.author.id)
+            logger.info(f"🎭 Creating vector-native prompt for user {user_id}")
+            
+            system_prompt_content = await create_ai_pipeline_vector_native_prompt(
+                events_handler_instance=self,
+                message=message,
+                recent_messages=recent_messages,
+                emotional_context=getattr(self, '_current_emotional_context', None)
+            )
+            logger.debug("✅ Using AI pipeline + vector-native system prompt")
 
         # ALWAYS consolidate system messages into a single narrative instruction - NO FALLBACKS
         # Build compact memory narrative
@@ -1240,39 +1247,88 @@ class BotEventHandlers:
                     logger.info(f"🔍 USER MEMORIES DEBUG: Processing {len(user_memories)} user memories")
                     
                     conversation_memory_parts = []
+                    recent_conversation_parts = []  # Prioritize recent conversation context
+                    
                     for memory in user_memories[:6]:  # limit
                         # ALWAYS try content field first - no complex format detection
                         content = memory.get("content", "")
-                        logger.info(f"🔍 MEMORY DEBUG [{memory.get('id', 'unknown')}]: content='{content[:50]}...', has_metadata={'metadata' in memory}")
+                        timestamp = memory.get("timestamp", "")
+                        logger.info(f"🔍 MEMORY DEBUG [{memory.get('id', 'unknown')}]: content='{content[:50]}...', timestamp='{timestamp}', has_metadata={'metadata' in memory}")
+                        
+                        # Determine if this is recent conversation (last 2 hours)
+                        is_recent = False
+                        if timestamp:
+                            try:
+                                from datetime import datetime, timedelta
+                                if isinstance(timestamp, str):
+                                    # Parse timestamp
+                                    memory_time = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
+                                elif isinstance(timestamp, (int, float)):
+                                    memory_time = datetime.fromtimestamp(timestamp)
+                                else:
+                                    memory_time = timestamp
+                                
+                                # Check if within last 2 hours
+                                if (datetime.now(memory_time.tzinfo if memory_time.tzinfo else None) - memory_time) < timedelta(hours=2):
+                                    is_recent = True
+                            except Exception as e:
+                                logger.debug(f"Could not parse timestamp for recency check: {e}")
                         
                         if content and content.strip():
                             # Try to parse if it contains conversation structure
                             if "User:" in content and "Bot:" in content:
-                                conversation_memory_parts.append(f"[Previous conversation: {content[:120]}]")
+                                memory_text = f"[Previous conversation: {content[:120]}]"
                             else:
-                                conversation_memory_parts.append(f"[Memory: {content[:120]}]")
-                            logger.info(f"🔍 MEMORY DEBUG: ✅ Added memory content")
+                                memory_text = f"[Memory: {content[:120]}]"
+                            
+                            # Prioritize recent conversation
+                            if is_recent:
+                                recent_conversation_parts.append(memory_text)
+                                logger.info(f"🔍 MEMORY DEBUG: ✅ Added RECENT memory content")
+                            else:
+                                conversation_memory_parts.append(memory_text)
+                                logger.info(f"🔍 MEMORY DEBUG: ✅ Added older memory content")
                         else:
                             # Only try metadata if content is empty/missing
                             md = memory.get("metadata", {})
                             if md.get("user_message") and md.get("bot_response"):
                                 user_msg = md.get("user_message")[:100]
                                 bot_msg = md.get("bot_response")[:100]
-                                conversation_memory_parts.append(f"[User said: \"{user_msg}\", You responded: \"{bot_msg}\"]")
-                                logger.info(f"🔍 MEMORY DEBUG: ✅ Added from metadata conversation")
+                                memory_text = f"[User said: \"{user_msg}\", You responded: \"{bot_msg}\"]"
+                                
+                                if is_recent:
+                                    recent_conversation_parts.append(memory_text)
+                                    logger.info(f"🔍 MEMORY DEBUG: ✅ Added RECENT from metadata conversation")
+                                else:
+                                    conversation_memory_parts.append(memory_text)
+                                    logger.info(f"🔍 MEMORY DEBUG: ✅ Added older from metadata conversation")
                             elif md.get("user_message"):
                                 user_msg = md.get("user_message")[:120]
-                                conversation_memory_parts.append(f"[User said: \"{user_msg}\"]")
-                                logger.info(f"🔍 MEMORY DEBUG: ✅ Added from metadata user message")
+                                memory_text = f"[User said: \"{user_msg}\"]"
+                                
+                                if is_recent:
+                                    recent_conversation_parts.append(memory_text)
+                                    logger.info(f"🔍 MEMORY DEBUG: ✅ Added RECENT from metadata user message")
+                                else:
+                                    conversation_memory_parts.append(memory_text)
+                                    logger.info(f"🔍 MEMORY DEBUG: ✅ Added older from metadata user message")
                             elif md.get("type") == "user_fact":
-                                conversation_memory_parts.append(f"[Fact: {md.get('fact', '')[:120]}]")
+                                memory_text = f"[Fact: {md.get('fact', '')[:120]}]"
+                                conversation_memory_parts.append(memory_text)  # Facts are not time-sensitive
                                 logger.info(f"🔍 MEMORY DEBUG: ✅ Added from metadata fact")
                             else:
                                 logger.warning(f"🔍 MEMORY DEBUG: ❌ No valid content or metadata structure")
                     
+                    # Build memory narrative with recent conversation prioritized
+                    memory_parts = []
+                    if recent_conversation_parts:
+                        memory_parts.append("RECENT CONVERSATION CONTEXT: " + "; ".join(recent_conversation_parts))
                     if conversation_memory_parts:
-                        memory_fragments.append("IMPORTANT USER FACTS AND PREVIOUS INTERACTIONS: " + "; ".join(conversation_memory_parts))
-                        logger.info(f"🤖 LLM CONTEXT DEBUG: Added {len(conversation_memory_parts)} conversation memories")
+                        memory_parts.append("PREVIOUS INTERACTIONS AND FACTS: " + "; ".join(conversation_memory_parts))
+                    
+                    if memory_parts:
+                        memory_fragments.append(" ".join(memory_parts))
+                        logger.info(f"🤖 LLM CONTEXT DEBUG: Added {len(recent_conversation_parts)} recent + {len(conversation_memory_parts)} older memories")
                     else:
                         logger.error(f"🤖 LLM CONTEXT DEBUG: FAILED - No valid memory content found from {len(user_memories)} memories")
             else:
@@ -1380,15 +1436,17 @@ class BotEventHandlers:
         conversation_context.extend(fixed_history)
         logger.info(f"🔥 CONTEXT DEBUG: Final conversation context has {len(conversation_context)} total messages")
 
-        # CRITICAL: Add anti-hallucination system message with conversation priority
+        # CRITICAL: Add conversation continuity enhancement with proper context awareness
         conversation_context.append({
             "role": "system", 
             "content": (
-                "IMPORTANT: Information in this IMMEDIATE CONVERSATION takes absolute priority over any memory context. "
-                "If there is a conflict between recent conversation messages and older memory, ALWAYS trust the "
-                "conversation messages. Only reference information that was explicitly provided in this conversation or "
-                "in the memory context above. DO NOT make up facts, names, or details that were not mentioned. "
-                "If you don't have specific information, say so honestly instead of guessing or fabricating details."
+                "CONVERSATION CONTINUITY: You are in an ongoing conversation. Maintain natural continuity by: "
+                "1) Acknowledging and building upon what was just discussed in recent messages "
+                "2) Referencing specific details from this conversation appropriately "
+                "3) Avoiding repetitive greetings when already engaged in dialogue "
+                "4) Using 'Hello' type greetings ONLY when starting fresh conversations or after long gaps "
+                "5) If user just shared information about their cat, acknowledge that specific context "
+                "Be conversational and naturally responsive to the immediate context."
             )
         })
 
