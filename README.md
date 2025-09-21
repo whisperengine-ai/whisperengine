@@ -54,7 +54,7 @@ The setup wizard will:
 - **Complete Customization** - Create exactly the personality and relationship dynamic you want
 - **Always in Character** - Consistent, immersive experience that feels natural and real
 
-**[🎭 Browse Personality Library](prompts/)** | **[📖 Create Custom Companion](docs/personalities/CUSTOM_CREATION.md)** | **[💡 Community Examples](docs/personalities/COMMUNITY_SHOWCASE.md)**
+**[🎭 Browse Character Library](characters/)** | **[📖 Create Custom Character](docs/characters/CDL_CREATION_GUIDE.md)** | **[💡 Character Examples](characters/examples/)**
 
 ---
 
@@ -116,6 +116,28 @@ docker-compose -f docker-compose.yml up
 ```
 
 **[📖 Docker Deployment Guide](docs/deployment/DOCKER.md)** for enterprise setup
+
+## ⚙️ Configuration Made Simple
+
+WhisperEngine now uses **focused, use-case-specific** configuration files instead of massive 800+ line examples:
+
+| Configuration | Purpose | Lines | Use Case |
+|---------------|---------|-------|----------|
+| **Quick Start** | Get running in 5 minutes | 50 | New users, testing |
+| **Development** | Full dev features | 180+ | Building, debugging |
+| **Production** | Enterprise deployment | 150+ | Production servers |
+| **Local AI** | Privacy-focused | 120+ | Offline, no external APIs |
+| **Enterprise** | Advanced features | 200+ | Multi-entity, compliance |
+
+**Quick Setup:**
+```bash
+# Choose your configuration
+cp config/examples/.env.quick-start.example .env
+# Edit Discord token and LLM API key
+./bot.sh start dev
+```
+
+**[📖 Full Configuration Guide](config/examples/README.md)** for all setup options
 
 ---
 

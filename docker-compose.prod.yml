@@ -18,6 +18,8 @@ services:
       # Production overrides
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
       - ENV_MODE=production
+      # CDL Character Configuration
+      - CDL_DEFAULT_CHARACTER=${CDL_DEFAULT_CHARACTER:-characters/default_assistant.json}
       
       # LLM Configuration - OPTIMIZED (Single API endpoint)
       - LLM_CHAT_API_URL=https://openrouter.ai/api/v1
@@ -66,7 +68,7 @@ services:
       - bot_temp:/app/temp_images
       - bot_logs:/app/logs
       # Configuration files (read-only)
-      - ./prompts:/app/prompts:ro
+      - ./characters:/app/characters:ro
       - ./config:/app/config:ro
       
     # Network

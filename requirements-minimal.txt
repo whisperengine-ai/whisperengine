@@ -24,16 +24,16 @@ numpy==2.3.3  # Updated from 2.3.2
 tokenizers==0.22.0              # Tokenization only (~50MB vs 2.5GB)
 # transformers==4.56.1          # REMOVED: Use only for model download stage
 
-# Fast local emotion analysis  
-vaderSentiment==3.3.2
+# Fast local emotion analysis - REMOVED: Uses vector-native emotion analysis
+# REMOVED: vaderSentiment==3.3.2  # Only used in demos
 
-# Essential NLP (keep - production ready)
-spacy==3.8.7
+# Essential NLP - REMOVED: Replaced by vector-native approach  
+# REMOVED: spacy==3.8.7  # Superseded by vector-native memory system
 
-# Vector operations and scientific computing (keep essential)
-scipy==1.16.2
-scikit-learn==1.7.2
-faiss-cpu==1.9.0.post1
+# Vector operations and scientific computing - REMOVED: Not used in main bot
+# REMOVED: scipy==1.16.2  # Not used in main bot source code
+# REMOVED: scikit-learn==1.7.2  # Not used in main bot source code  
+# REMOVED: faiss-cpu==1.9.0.post1  # Optional with fallback
 
 # Database and caching
 redis==6.4.0  # Updated from 5.2.1

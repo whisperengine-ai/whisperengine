@@ -22,12 +22,14 @@ services:
       - LOG_LEVEL=DEBUG
       - FORCE_READABLE_LOGS=true
       - PYTHONUNBUFFERED=1
+      # CDL Character Configuration
+      - CDL_DEFAULT_CHARACTER=${CDL_DEFAULT_CHARACTER:-characters/default_assistant.json}
       
     volumes:
       # Override the copied source code with live mounting for development
       - ./src:/app/src
       - ./scripts:/app/scripts
-      - ./prompts:/app/prompts
+      - ./characters:/app/characters
       - ./characters:/app/characters
       - ./validate_config.py:/app/validate_config.py
       - ./run.py:/app/run.py

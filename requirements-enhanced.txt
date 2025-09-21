@@ -20,20 +20,20 @@ aiosqlite==0.21.0
 fastembed>=0.7.0  # Fast, lightweight embeddings from Qdrant team (Python 3.13 compatible)
 numpy==2.3.3  # Updated from 2.3.2
 
-# ENHANCED: Advanced Scientific Computing
-scipy==1.16.2              # Scientific computing and optimization
-pandas==2.3.0              # Efficient data manipulation and analysis
-scikit-learn==1.7.2        # Machine learning algorithms for clustering and classification
+# ENHANCED: Advanced Scientific Computing - REMOVED: Not used in main bot
+# REMOVED: scipy==1.16.2              # Scientific computing - not used in src/
+# REMOVED: pandas==2.3.0              # Data manipulation - not used in src/
+# REMOVED: scikit-learn==1.7.2        # ML algorithms - not used in src/
 
-# ENHANCED: Ultra-fast Vector Search and Graph Analysis
-faiss-cpu==1.9.0           # Fast similarity search and clustering (CPU version)
+# ENHANCED: Ultra-fast Vector Search - REMOVED: Optional with fallback
+# REMOVED: faiss-cpu==1.9.0           # Optional production optimization
 # faiss-gpu==1.9.0         # GPU version for production scaling (uncomment if needed)
-networkx==3.5              # Graph analysis for memory connections
+# REMOVED: networkx==3.5              # Graph analysis - not used in src/
 
-# ENHANCED: Advanced NLP and Topic Modeling
-spacy==3.8.7              # Advanced NLP (already included, version updated)
-gensim==4.3.3             # Topic modeling and document similarity
-vaderSentiment==3.3.2     # Real-time sentiment analysis
+# ENHANCED: Advanced NLP and Topic Modeling - REMOVED: Replaced by vector-native
+# REMOVED: spacy==3.8.7              # Superseded by vector-native memory system
+# REMOVED: gensim==4.3.3             # Topic modeling - not used in src/
+# REMOVED: vaderSentiment==3.3.2     # Only used in demos, uses vector-native emotion analysis
 
 # Advanced NLP Dependencies (Phase 1)
 textblob==0.18.0.post0  # Lightweight sentiment analysis (replaces RoBERTa/transformers)

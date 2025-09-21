@@ -6,7 +6,7 @@ services:
     volumes:
       # Mount source code for live editing
       - ./src:/app/src
-      - ./prompts:/app/prompts
+      - ./characters:/app/characters
       - ./config:/app/config
       - ./run.py:/app/run.py
       - ./env_manager.py:/app/env_manager.py

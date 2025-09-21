@@ -44,7 +44,7 @@ check_docker() {
     if command -v docker-compose &> /dev/null; then
         compose_cmd="docker-compose"
     elif docker compose version &> /dev/null; then
-        compose_cmd="docker"
+        compose_cmd="docker compose"
         export COMPOSE_SUBCMD="compose"
     else
         print_error "Docker Compose is not installed."

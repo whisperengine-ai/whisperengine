@@ -22,6 +22,8 @@ services:
       - HEALTH_CHECK_PORT=9090
       - HEALTH_CHECK_HOST=0.0.0.0
       - DISABLE_MEMORY_IMPORTANCE=${DISABLE_MEMORY_IMPORTANCE:-false}
+      # CDL Character Configuration
+      - CDL_DEFAULT_CHARACTER=${CDL_DEFAULT_CHARACTER:-characters/default_assistant.json}
       
     # Expose health check port for container orchestration
     ports:
@@ -53,7 +55,7 @@ services:
       - bot_temp:/app/temp_images
       - bot_logs:/app/logs
       # Configuration files (read-only)
-      - ./prompts:/app/prompts:ro
+      - ./characters:/app/characters:ro
       - ./config:/app/config:ro
       
     # Network

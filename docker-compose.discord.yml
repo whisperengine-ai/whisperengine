@@ -6,12 +6,14 @@ services:
     working_dir: /app
     environment:
       - ENV_MODE=discord
+      # CDL Character Configuration
+      - CDL_DEFAULT_CHARACTER=${CDL_DEFAULT_CHARACTER:-characters/default_assistant.json}
     env_file:
       - .env
     volumes:
       # Development code mounting (security risk - dev only)
       - ./src:/app/src:ro
-      - ./prompts:/app/prompts:ro
+      - ./characters:/app/characters:ro
       - ./config:/app/config:ro
       - ./run.py:/app/run.py:ro
       - ./env_manager.py:/app/env_manager.py:ro
