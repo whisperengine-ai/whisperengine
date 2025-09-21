@@ -9,7 +9,10 @@ RUN pip install --no-cache-dir \
     fastembed>=0.7.0 \
     transformers>=4.30.0 \
     numpy>=1.24.0 \
-    spacy>=3.8.0
+    spacy>=3.8.0 \
+    vaderSentiment>=3.3.0 \
+    textblob>=0.17.0 \
+    nltk>=3.8.0
 
 # Create models directory
 WORKDIR /app
@@ -26,7 +29,52 @@ RUN ls -la /app/models/ && \
     echo "📊 Model bundle contents:" && \
     du -sh /app/models/* || echo "No models found"
 
-# Stage 2: Minimal Runtime (Production)
+# Stage 2: Development Runtime
+FROM python:3.13-slim as development
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    gcc g++ git curl ffmpeg wget netcat-traditional procps \
+    libopus-dev libffi-dev libnacl-dev libssl-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy pre-downloaded models from builder stage
+COPY --from=model-downloader /app/models /app/models
+
+# Copy and install Python dependencies using multi-tier structure
+COPY requirements-core.txt requirements-platform.txt requirements-discord.txt requirements-dev.txt ./
+
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install --no-cache-dir -r requirements-core.txt && \
+    pip install --no-cache-dir -r requirements-platform.txt && \
+    pip install --no-cache-dir -r requirements-discord.txt && \
+    pip install --no-cache-dir -r requirements-dev.txt
+
+# Install spaCy model in runtime stage (spaCy package is already in requirements-core.txt)
+RUN --mount=type=cache,target=/root/.cache/pip \
+    python -m spacy download en_core_web_sm
+
+# Copy application code
+COPY . /app
+WORKDIR /app
+
+# Set environment for offline model usage
+ENV MODEL_CACHE_DIR=/app/models
+ENV TRANSFORMERS_OFFLINE=1
+ENV HF_DATASETS_OFFLINE=1
+ENV SENTENCE_TRANSFORMERS_HOME=/app/models
+
+# Create user and directories
+RUN useradd --create-home appuser && \
+    mkdir -p chromadb_data backups privacy_data temp_images logs && \
+    chown -R appuser:appuser /app
+
+USER appuser
+
+# Development command with hot-reload
+CMD ["python", "run.py"]
+
+# Stage 3: Minimal Runtime (Production)
 FROM python:3.13-slim as production
 
 # Install system dependencies

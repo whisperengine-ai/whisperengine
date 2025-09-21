@@ -4,6 +4,12 @@
 
 services:
   whisperengine-bot:
+    # Override build target for development
+    build:
+      context: .
+      dockerfile: Dockerfile.bundled-models
+      target: development
+    
     # Environment configuration for development
     env_file:
       - .env             # Local secrets and overrides
