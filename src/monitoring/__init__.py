@@ -81,7 +81,7 @@ class MonitoringManager:
     async def initialize(self):
         """Initialize all monitoring components."""
         if self.initialized:
-            logger.warning("Monitoring already initialized")
+            logger.debug("Monitoring already initialized - skipping duplicate initialization")
             return
         
         try:
