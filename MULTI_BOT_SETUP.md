@@ -8,10 +8,10 @@ WhisperEngine supports running multiple character bot containers that share the 
 
 ```
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   Elena Bot     │    │   Marcus Bot    │    │   Future Bot    │
+│   Elena Bot     │    │   Marcus Bot    │    │  Marcus Chen    │
 │  (Container)    │    │  (Container)    │    │  (Container)    │
 │                 │    │                 │    │                 │
-│ Token: Elena    │    │ Token: Marcus   │    │ Token: Other    │
+│ Token: Elena    │    │ Token: Marcus   │    │ Token: M.Chen   │
 │ Character: *.json│    │ Character: *.json│    │ Character: *.json│
 │ Port: 9091      │    │ Port: 9092      │    │ Port: 9093      │
 └─────────┬───────┘    └─────────┬───────┘    └─────────┬───────┘
@@ -43,9 +43,11 @@ WhisperEngine supports running multiple character bot containers that share the 
 - `docker-compose.multi-bot.yml` - Multi-bot container configuration
 - `multi-bot.sh` - Management script for all bot operations
 - `.env.elena` - Elena bot-specific environment variables
-- `.env.marcus` - Marcus bot-specific environment variables (example)
+- `.env.marcus` - Marcus bot-specific environment variables  
+- `.env.marcus-chen` - Marcus Chen bot-specific environment variables
 - `characters/examples/elena-rodriguez.json` - Elena's character definition
 - `characters/examples/marcus-thompson.json` - Marcus's character definition
+- `characters/examples/marcus-chen.json` - Marcus Chen's character definition
 
 ## 🔧 Setup Instructions
 
@@ -62,13 +64,13 @@ CDL_DEFAULT_CHARACTER=characters/examples/elena-rodriguez.json
 HEALTH_CHECK_PORT=9091
 ```
 
-#### For Additional Bots (`.env.marcus`, etc.):
+#### For Additional Bots (`.env.marcus`, `.env.marcus-chen`, etc.):
 ```bash
 # Create for each new bot
 DISCORD_BOT_TOKEN=your_other_bot_token_here
-DISCORD_BOT_NAME=Marcus  
-CDL_DEFAULT_CHARACTER=characters/examples/marcus-thompson.json
-HEALTH_CHECK_PORT=9092  # Increment for each bot
+DISCORD_BOT_NAME=Marcus  # or "Marcus Chen"
+CDL_DEFAULT_CHARACTER=characters/examples/marcus-thompson.json  # or marcus-chen.json
+HEALTH_CHECK_PORT=9092  # Increment for each bot (9093 for Marcus Chen)
 ```
 
 ### 2. Character Definitions
@@ -76,7 +78,10 @@ HEALTH_CHECK_PORT=9092  # Increment for each bot
 Create character JSON files in `characters/examples/` directory:
 - Define personality, expertise, communication style
 - Use the CDL (Character Definition Language) format
-- Examples: `elena-rodriguez.json`, `marcus-thompson.json`
+- Available characters: 
+  - `elena-rodriguez.json` - Marine Biologist (Elena)
+  - `marcus-thompson.json` - AI Researcher (Marcus)  
+  - `marcus-chen.json` - Indie Game Developer (Marcus Chen)
 
 ### 3. Discord Bot Tokens
 
@@ -97,6 +102,7 @@ You'll need separate Discord bot applications for each character:
 ```bash
 ./multi-bot.sh start elena
 ./multi-bot.sh start marcus
+./multi-bot.sh start marcus-chen
 ```
 
 ### Check Status
