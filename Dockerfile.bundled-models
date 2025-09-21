@@ -59,10 +59,9 @@ WORKDIR /app
 
 # Set environment for offline model usage
 ENV MODEL_CACHE_DIR=/app/models
-ENV TRANSFORMERS_OFFLINE=1
-ENV HF_DATASETS_OFFLINE=1
-ENV SENTENCE_TRANSFORMERS_HOME=/app/models
 ENV FASTEMBED_CACHE_PATH=/tmp/fastembed_cache
+# Note: Removed TRANSFORMERS_OFFLINE and HF_DATASETS_OFFLINE as they interfere with FastEmbed cache usage
+# FastEmbed will automatically use local cache when available
 
 # Create user and directories
 RUN useradd --create-home appuser && \
