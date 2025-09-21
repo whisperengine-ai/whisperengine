@@ -1,0 +1,76 @@
+Discord Bot Management Script
+
+🚀 For Development: Choose your preferred development style!
+   Containerized Development:  ./bot.sh start dev   # Hot-reload, mounted code
+   Native Development:         python run.py        # After starting infrastructure
+   Desktop App:                python universal_native_app.py
+
+🚀 New to WhisperEngine? Try our cross-platform quick-start scripts:
+   Linux/macOS:   curl -sSL https://raw.githubusercontent.com/WhisperEngine-AI/whisperengine/main/scripts/quick-start.sh | bash
+   Windows (PS):  iwr https://raw.githubusercontent.com/WhisperEngine-AI/whisperengine/main/scripts/quick-start.ps1 | iex
+   Windows (CMD): Download and run scripts/quick-start.bat
+
+Usage: ./bot.sh <command> [mode]
+
+Commands:
+  start [prod|dev|infrastructure]  - Start services (mode required)
+  stop [prod|dev|infrastructure]   - Stop services
+  logs [service]                   - View logs (default: whisperengine-bot)
+  status                           - Show container status
+
+Data Import:
+  import-chatgpt <file> <user-id> [options]  - Import ChatGPT conversations
+
+Restart Commands (Data Preservation):
+  restart [prod|dev|infrastructure]     - Restart services
+  restart-all [prod|dev|infrastructure] - Restart all services, PRESERVE data
+  restart-full [prod|dev|infrastructure] - Alias for restart-all (preserve data)
+  restart-clean [prod|dev|infrastructure] - Restart all services, CLEAR cache only
+
+Data Management:
+  clear-cache [prod|dev|infrastructure] - Clear Redis cache, keep persistent data
+  reset-data [prod|dev|infrastructure]  - ⚠️  DANGER: Clear ALL data volumes
+  cleanup                                - Remove orphaned containers and volumes
+  backup <create|list|restore|help>      - Data backup operations
+
+Development:
+  build-push [options]     - Build and push Docker image to Docker Hub
+
+Modes:
+  prod           - Full production deployment (Discord bot + all services in containers)
+  dev            - Full development deployment with hot-reload and mounted source code
+  infrastructure - Infrastructure services only (for developers running bot natively)
+
+
+Examples:
+  ./bot.sh start prod                     # Full production deployment
+  ./bot.sh start dev                      # Development with hot-reload (recommended for dev)
+  ./bot.sh start infrastructure           # Start databases only (for native Python development)
+  ./bot.sh import-chatgpt conversations.json 672814231002939413  # Import ChatGPT history
+  ./bot.sh restart dev                    # Restart development services with code changes
+  ./bot.sh restart-all dev                # Restart all dev services, preserve data
+  ./bot.sh restart-clean dev              # Restart all, clear cache only
+  ./bot.sh clear-cache dev                # Clear cache without restarting
+  ./bot.sh logs                           # View bot logs (auto-detects mode)
+  ./bot.sh logs redis                     # View redis logs
+  ./bot.sh stop                           # Stop (auto-detects mode)
+  ./bot.sh cleanup                        # Clean orphaned containers
+
+💡 Development Mode Benefits (dev):
+   • 🔄 Hot-reload: Code changes automatically restart the bot
+   • 📁 Local mounts: /src, /prompts, /config directories mounted from host
+   • 🐛 Debug logging: Detailed logs and error information
+   • 🏥 Health checks: Monitor bot status during development
+   • 🚀 Full stack: All services running in containers for consistency
+
+💡 Data Persistence Guide:
+   • restart         → Bot only, everything preserved
+   • restart-all     → All services, data preserved
+   • restart-clean   → All services, cache cleared, memories kept
+   • reset-data      → ⚠️  Nuclear option: ALL data destroyed
+
+💡 Backup & Build Commands:
+  ./bot.sh backup create        # Create data backup
+  ./bot.sh backup list          # List available backups
+  ./bot.sh build-push --help    # Show Docker build options
+  ./bot.sh build-push v1.0.0    # Build and push specific version

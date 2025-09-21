@@ -274,9 +274,8 @@ class VectorMemoryStore:
         - Automatic deduplication via content hashing
         - Contradiction detection preparation via semantic grouping
         """
-        # CRITICAL DEBUG: Log entry to this method
-        print(f"🔥 STORE_MEMORY CALLED: user_id={memory.user_id}, content={memory.content[:50]}...")
-        logger.error(f"🔥 STORE_MEMORY CALLED: user_id={memory.user_id}, content={memory.content[:50]}...")
+        # DEBUG: Log entry to this method for memory storage tracking
+        logger.debug(f"🔥 STORE_MEMORY CALLED: user_id={memory.user_id}, content={memory.content[:50]}...")
         
         try:
             # 🎯 QDRANT FEATURE: Generate multiple embeddings for named vectors
