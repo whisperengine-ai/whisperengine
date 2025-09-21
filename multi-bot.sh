@@ -44,6 +44,10 @@ check_env_files() {
         missing_files+=(".env.marcus")
     fi
     
+    if [[ ! -f ".env.marcus-chen" ]]; then
+        missing_files+=(".env.marcus-chen")
+    fi
+    
     if [[ ${#missing_files[@]} -gt 0 ]]; then
         print_warning "Missing environment files: ${missing_files[*]}"
         print_info "These files contain bot-specific Discord tokens and configuration"
@@ -66,8 +70,9 @@ show_status() {
     
     echo ""
     print_info "Health Check Endpoints:"
-    print_info "Elena Bot:  http://localhost:9091/health"
-    print_info "Marcus Bot: http://localhost:9092/health"
+    print_info "Elena Bot:       http://localhost:9091/health"
+    print_info "Marcus Bot:      http://localhost:9092/health"
+    print_info "Marcus Chen Bot: http://localhost:9093/health"
     echo ""
     print_info "Infrastructure Services:"
     print_info "PostgreSQL: localhost:5432"
@@ -97,7 +102,7 @@ start_bot() {
     local bot_name=$1
     
     if [[ -z "$bot_name" ]]; then
-        print_error "Bot name required. Available: elena, marcus"
+        print_error "Bot name required. Available: elena, marcus, marcus-chen"
         exit 1
     fi
     
@@ -118,8 +123,16 @@ start_bot() {
             print_status "Starting Marcus bot..."
             docker compose -f $COMPOSE_FILE -p $PROJECT_NAME up -d marcus-bot redis postgres qdrant
             ;;
+        "marcus-chen")
+            if [[ ! -f ".env.marcus-chen" ]]; then
+                print_error "Missing .env.marcus-chen file"
+                exit 1
+            fi
+            print_status "Starting Marcus Chen bot..."
+            docker compose -f $COMPOSE_FILE -p $PROJECT_NAME up -d marcus-chen-bot redis postgres qdrant
+            ;;
         *)
-            print_error "Unknown bot: $bot_name. Available: elena, marcus"
+            print_error "Unknown bot: $bot_name. Available: elena, marcus, marcus-chen"
             exit 1
             ;;
     esac
@@ -133,7 +146,7 @@ stop_bot() {
     local bot_name=$1
     
     if [[ -z "$bot_name" ]]; then
-        print_error "Bot name required. Available: elena, marcus"
+        print_error "Bot name required. Available: elena, marcus, marcus-chen"
         exit 1
     fi
     
@@ -146,8 +159,12 @@ stop_bot() {
             print_status "Stopping Marcus bot..."
             docker compose -f $COMPOSE_FILE -p $PROJECT_NAME stop marcus-bot
             ;;
+        "marcus-chen")
+            print_status "Stopping Marcus Chen bot..."
+            docker compose -f $COMPOSE_FILE -p $PROJECT_NAME stop marcus-chen-bot
+            ;;
         *)
-            print_error "Unknown bot: $bot_name. Available: elena, marcus"
+            print_error "Unknown bot: $bot_name. Available: elena, marcus, marcus-chen"
             exit 1
             ;;
     esac
@@ -165,9 +182,8 @@ show_logs() {
     local bot_name=$1
     
     if [[ -z "$bot_name" ]]; then
-        print_status "Showing logs for all services..."
-        docker compose -f $COMPOSE_FILE -p $PROJECT_NAME logs -f
-        return
+        print_error "Service name required. Available: elena, marcus, marcus-chen, infrastructure"
+        exit 1
     fi
     
     case $bot_name in
@@ -179,12 +195,16 @@ show_logs() {
             print_status "Showing Marcus bot logs..."
             docker compose -f $COMPOSE_FILE -p $PROJECT_NAME logs -f marcus-bot
             ;;
+        "marcus-chen")
+            print_status "Showing Marcus Chen bot logs..."
+            docker compose -f $COMPOSE_FILE -p $PROJECT_NAME logs -f marcus-chen-bot
+            ;;
         "infrastructure")
             print_status "Showing infrastructure logs..."
             docker compose -f $COMPOSE_FILE -p $PROJECT_NAME logs -f redis postgres qdrant
             ;;
         *)
-            print_error "Unknown service: $bot_name. Available: elena, marcus, infrastructure"
+            print_error "Unknown service: $bot_name. Available: elena, marcus, marcus-chen, infrastructure"
             exit 1
             ;;
     esac
@@ -215,17 +235,23 @@ show_help() {
     echo ""
     echo "Commands:"
     echo "  start                 - Start all character bots"
-    echo "  start <bot>          - Start specific bot (elena, marcus)"
+    echo "  start <bot>          - Start specific bot (elena, marcus, marcus-chen)"
     echo "  stop                 - Stop all bots and infrastructure"
     echo "  stop <bot>           - Stop specific bot"
     echo "  restart <bot>        - Restart specific bot"
     echo "  status               - Show status of all containers"
-    echo "  logs [bot]           - Show logs (all, elena, marcus, infrastructure)"
+    echo "  logs [bot]           - Show logs (all, elena, marcus, marcus-chen, infrastructure)"
     echo "  build                - Build/rebuild bot containers"
     echo "  help                 - Show this help"
     echo ""
+    echo "Available Bots:"
+    echo "  elena                - Elena Rodriguez (Marine Biologist)"
+    echo "  marcus               - Marcus Thompson (AI Researcher)"  
+    echo "  marcus-chen          - Marcus Chen (Indie Game Developer)"
+    echo ""
     echo "Examples:"
     echo "  $0 start elena       - Start just Elena bot with infrastructure"
+    echo "  $0 start marcus-chen - Start just Marcus Chen bot with infrastructure"
     echo "  $0 logs marcus       - Show Marcus bot logs"
     echo "  $0 restart elena     - Restart Elena bot"
     echo "  $0 status            - Show all container status"
@@ -251,7 +277,7 @@ case "${1:-}" in
         if [[ -n "${2:-}" ]]; then
             restart_bot "$2"
         else
-            print_error "Bot name required for restart. Available: elena, marcus"
+            print_error "Bot name required for restart. Available: elena, marcus, marcus-chen"
             exit 1
         fi
         ;;
