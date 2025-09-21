@@ -1,0 +1,70 @@
+{
+  "test_session": "fcf8fbb9-3846-46e7-a3c5-9849b58ad9ac",
+  "start_time": "2025-09-21T18:24:35.224868",
+  "three_tier_pipeline": {
+    "memories_created": 6,
+    "initial_tier_distribution": {
+      "short_term": 6,
+      "medium_term": 0,
+      "long_term": 0
+    },
+    "after_promotion_distribution": {
+      "short_term": 6,
+      "medium_term": 0,
+      "long_term": 0
+    },
+    "promotion_stats": {
+      "promoted": 0,
+      "demoted": 0,
+      "protected": 0,
+      "expired": 0
+    },
+    "errors": []
+  },
+  "memory_decay_integration": {
+    "decay_candidates_before": 6,
+    "memories_protected": 0,
+    "decay_stats": {
+      "processed": 6,
+      "decayed": 6,
+      "protected": 0,
+      "deleted": 0,
+      "errors": 0
+    },
+    "final_memory_count": 6,
+    "errors": []
+  },
+  "tier_promotion_mechanisms": {
+    "manual_promotions": 1,
+    "manual_demotions": 1,
+    "tier_validation": {
+      "short_term": 5,
+      "medium_term": 1,
+      "long_term": 0
+    },
+    "errors": []
+  },
+  "performance_baseline": {
+    "memory_creation_time": 0.145676,
+    "tier_management_time": 0.004389,
+    "decay_processing_time": 0.020747,
+    "query_times": {
+      "short_term": 0.001364,
+      "medium_term": 0.001016,
+      "long_term": 0.00129
+    },
+    "baseline_met": true,
+    "errors": []
+  },
+  "summary": {
+    "tests_completed": 4,
+    "tests_successful": 4,
+    "memories_processed": 6,
+    "tier_operations_working": true,
+    "decay_operations_working": true,
+    "performance_acceptable": true,
+    "overall_success": true
+  },
+  "errors": [],
+  "end_time": "2025-09-21T18:24:35.538169"
+}

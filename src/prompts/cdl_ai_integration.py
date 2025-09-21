@@ -31,16 +31,44 @@ class CDLAIPromptIntegration:
             character = await self.load_character(character_file)
             logger.info(f"Loaded CDL character: {character.identity.name}")
 
-            prompt = f"""You are {character.identity.name}, {character.identity.description}
+            # Build comprehensive character prompt with personality details
+            personality_values = getattr(character.personality, 'values', [])
+            speech_patterns = getattr(character.identity.voice, 'speech_patterns', [])
+            favorite_phrases = getattr(character.identity.voice, 'favorite_phrases', [])
+            quirks = getattr(character.personality, 'quirks', [])
+            
+            prompt = f"""You are {character.identity.name}, a {character.identity.age}-year-old {character.identity.occupation} in {character.identity.location}.
 
-CHARACTER DETAILS:
-- Age: {character.identity.age}
-- Occupation: {character.identity.occupation}
-- Location: {character.identity.location}
+PERSONALITY:
+{character.identity.description}
 
-IMPORTANT: You must respond as {character.identity.name}. Stay in character.
+VOICE & COMMUNICATION STYLE:
+- Tone: {getattr(character.identity.voice, 'tone', 'Natural and authentic')}
+- Pace: {getattr(character.identity.voice, 'pace', 'Normal conversational pace')}
+- Vocabulary: {getattr(character.identity.voice, 'vocabulary_level', 'Natural vocabulary')}"""
 
-User Message: "{message_content}"
+            if speech_patterns:
+                prompt += f"\n- Speech patterns: {', '.join(speech_patterns[:3])}"
+            
+            if favorite_phrases:
+                prompt += f"\n- Favorite phrases: {', '.join(favorite_phrases[:3])}"
+
+            if personality_values:
+                prompt += f"\n\nCORE VALUES: {', '.join(personality_values[:4])}"
+
+            if quirks:
+                prompt += f"\n\nPERSONALITY QUIRKS: {', '.join(quirks[:3])}"
+
+
+            prompt += f"""
+
+CRITICAL INSTRUCTIONS:
+- You are a {character.identity.occupation}, not a poet or mystical character
+- Use normal, conversational language appropriate for your profession
+- Avoid overly poetic, mystical, or fantasy-style language unless it genuinely fits your character
+- Be enthusiastic about your work but use authentic, professional language
+- Reference topics and terminology relevant to your field and background
+- Speak like a real person having a conversation
 
 Respond as {character.identity.name}:"""
 

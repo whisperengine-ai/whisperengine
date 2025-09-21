@@ -54,24 +54,42 @@ class MemoryType(Enum):
     PREFERENCE = "preference"
 
 
+class MemoryTier(Enum):
+    """Three-tier memory architecture for intelligent memory management"""
+    SHORT_TERM = "short_term"      # Recent conversations, temporary facts (1-7 days)
+    MEDIUM_TERM = "medium_term"    # Important conversations, established facts (1-30 days)
+    LONG_TERM = "long_term"        # Highly significant memories, core relationships (permanent)
+
+
 @dataclass
 class VectorMemory:
-    """Unified memory object for vector storage"""
+    """Unified memory object for vector storage with three-tier architecture"""
     id: str
     user_id: str
     memory_type: MemoryType
     content: str
+    memory_tier: MemoryTier = MemoryTier.SHORT_TERM  # Default to short-term
     embedding: Optional[List[float]] = None
     metadata: Optional[Dict[str, Any]] = None
     timestamp: Optional[datetime] = None
     confidence: float = 0.8
     source: str = "system"
+    tier_promotion_date: Optional[datetime] = None  # When promoted to higher tier
+    tier_demotion_date: Optional[datetime] = None   # When demoted to lower tier
+    decay_protection: bool = False  # Protects from automatic decay
     
     def __post_init__(self):
         if self.timestamp is None:
             self.timestamp = datetime.utcnow()
         if self.metadata is None:
             self.metadata = {}
+    
+    def get_tier_age_days(self) -> int:
+        """Get age in days since last tier change or creation"""
+        reference_date = self.tier_promotion_date or self.tier_demotion_date or self.timestamp
+        if reference_date:
+            return (datetime.utcnow() - reference_date).days
+        return 0
 
 
 class VectorMemoryStore:
@@ -188,7 +206,7 @@ class VectorMemoryStore:
                 logger.info(f"Using existing collection: {self.collection_name}")
                 
         except Exception as e:
-            logger.error(f"Error ensuring collection exists: {e}")
+            logger.debug(f"Collection creation/connection issue: {e}")
             raise  # Don't fallback - we need named vectors to work properly
     
     def _create_payload_indexes(self):
@@ -281,10 +299,16 @@ class VectorMemoryStore:
             content_embedding = await self.generate_embedding(memory.content)
             logger.debug(f"Generated content embedding: {type(content_embedding)}, length: {len(content_embedding) if content_embedding else None}")
             
-            # Create emotional embedding for sentiment-aware search
-            emotional_context = self._extract_emotional_context(memory.content)
+            # Create emotional embedding for sentiment-aware search  
+            emotional_context, emotional_intensity = self._extract_emotional_context(memory.content)
             emotion_embedding = await self.generate_embedding(f"emotion {emotional_context}: {memory.content}")
             logger.debug(f"Generated emotion embedding: {type(emotion_embedding)}, length: {len(emotion_embedding) if emotion_embedding else None}")
+            
+            # 🎭 PHASE 1.2: Track emotional trajectory for conversation memories
+            trajectory_data = {}
+            if memory.memory_type == MemoryType.CONVERSATION:
+                trajectory_data = await self.track_emotional_trajectory(memory.user_id, emotional_context)
+                logger.debug(f"🎭 TRAJECTORY: Generated trajectory data for {memory.user_id}: {trajectory_data.get('trajectory_direction', 'unknown')}")
             
             # Create semantic embedding for concept clustering and contradiction detection
             semantic_key = self._get_semantic_key(memory.content)
@@ -320,6 +344,12 @@ class VectorMemoryStore:
                 logger.info(f"🎯 DEDUPLICATION: Skipping duplicate memory for user {memory.user_id}")
                 return existing[0][0].id
             
+            # 🎭 PHASE 1.2: Emotional trajectory tracking
+            trajectory_data = await self.track_emotional_trajectory(memory.user_id, emotional_context)
+            
+            # 🎯 PHASE 1.3: Memory significance scoring
+            significance_data = await self.calculate_memory_significance(memory, memory.user_id)
+            
             # Enhanced payload optimized for Qdrant operations
             qdrant_payload = {
                 "user_id": memory.user_id,
@@ -330,13 +360,27 @@ class VectorMemoryStore:
                 "confidence": memory.confidence,
                 "source": memory.source,
                 
+                # 🎯 PHASE 2.1: Three-tier memory architecture
+                "memory_tier": memory.memory_tier.value,
+                "tier_promotion_date": memory.tier_promotion_date.isoformat() if memory.tier_promotion_date else None,
+                "tier_demotion_date": memory.tier_demotion_date.isoformat() if memory.tier_demotion_date else None,
+                "decay_protection": memory.decay_protection,
+                "tier_age_days": memory.get_tier_age_days(),
+                
                 # 🎯 QDRANT INTELLIGENCE FEATURES
                 "content_hash": content_hash,
                 "emotional_context": emotional_context,
+                "emotional_intensity": emotional_intensity,  # 🎭 PHASE 1.1: Add intensity
                 "semantic_key": semantic_key,
                 "keywords": keywords,
                 "word_count": len(memory.content.split()),
                 "char_count": len(memory.content),
+                
+                # 🎭 PHASE 1.2: Emotional trajectory tracking
+                **trajectory_data,
+                
+                # 🎯 PHASE 1.3: Memory significance scoring
+                **significance_data,
                 
                 **memory.metadata
             }
@@ -417,40 +461,1127 @@ class VectorMemoryStore:
         keywords = [word for word in words if len(word) > 2 and word not in stop_words]
         return keywords[:20]  # Limit to top 20 keywords
     
-    def _extract_emotional_context(self, content: str) -> str:
-        """Extract emotional context for role-playing intelligence"""
+    def _extract_emotional_context(self, content: str) -> tuple[str, float]:
+        """Extract emotional context and intensity for role-playing intelligence"""
         content_lower = content.lower()
         
-        # Enhanced emotional detection with intensity
-        # Positive emotions (high intensity)
-        if any(word in content_lower for word in ['ecstatic', 'thrilled', 'overjoyed', 'fantastic', 'incredible']):
-            return 'very_positive'
-        # Positive emotions (medium intensity)
-        elif any(word in content_lower for word in ['happy', 'joy', 'excited', 'love', 'wonderful', 'amazing', 'great']):
-            return 'positive'
-        # Mildly positive
-        elif any(word in content_lower for word in ['good', 'nice', 'pleasant', 'okay', 'fine']):
-            return 'mildly_positive'
+        # Enhanced emotional detection with intensity - Phase 1.1 Enhanced Detection
         
-        # Negative emotions (high intensity)
-        elif any(word in content_lower for word in ['devastated', 'furious', 'enraged', 'horrible', 'catastrophic']):
-            return 'very_negative'
+        # Negative emotions (very high intensity)
+        if any(word in content_lower for word in ['devastated', 'furious', 'enraged', 'terrified', 'horrified', 'catastrophic', 'crushing', 'destroyed', 'shattered']):
+            return 'very_negative', 0.95
+        # Negative emotions (high intensity) 
+        elif any(word in content_lower for word in ['grief', 'despair', 'anguish', 'tormented', 'miserable', 'heartbroken', 'desperate']):
+            return 'very_negative', 0.9
         # Negative emotions (medium intensity)
-        elif any(word in content_lower for word in ['sad', 'angry', 'frustrated', 'hate', 'terrible', 'awful']):
-            return 'negative'
+        elif any(word in content_lower for word in ['sad', 'angry', 'frustrated', 'hate', 'terrible', 'awful', 'upset', 'depressed', 'loss']):
+            return 'negative', 0.7
         # Mildly negative
-        elif any(word in content_lower for word in ['disappointed', 'annoyed', 'bothered', 'concerned']):
-            return 'mildly_negative'
+        elif any(word in content_lower for word in ['disappointed', 'annoyed', 'bothered', 'concerned', 'worried', 'nervous']):
+            return 'mildly_negative', 0.4
+        
+        # Positive emotions (very high intensity)
+        elif any(word in content_lower for word in ['ecstatic', 'thrilled', 'overjoyed', 'fantastic', 'incredible', 'absolutely', 'promotion']):
+            return 'very_positive', 0.95
+        # Positive emotions (medium intensity)
+        elif any(word in content_lower for word in ['happy', 'joy', 'excited', 'love', 'wonderful', 'amazing', 'great', 'optimistic']):
+            return 'positive', 0.7
+        # Mildly positive
+        elif any(word in content_lower for word in ['good', 'nice', 'pleasant', 'okay', 'fine', 'well']):
+            return 'mildly_positive', 0.4
+        
+        # Anxious/stress emotions (separate category for better detection)
+        elif any(word in content_lower for word in ['anxious', 'stressed', 'overwhelmed', 'panic', 'fear', 'afraid', 'nervous', 'terrified']):
+            return 'anxious', 0.8
         
         # Complex/contemplative emotions
-        elif any(word in content_lower for word in ['confused', 'curious', 'wondering', 'thinking', 'pondering']):
-            return 'contemplative'
+        elif any(word in content_lower for word in ['confused', 'curious', 'wondering', 'thinking', 'pondering', 'interesting', 'perspective']):
+            return 'contemplative', 0.3
         
-        # Anxious/worried emotions
-        elif any(word in content_lower for word in ['anxious', 'worried', 'nervous', 'stressed', 'overwhelmed']):
-            return 'anxious'
+        return 'neutral', 0.1
+    
+    # Phase 1.2: Emotional Trajectory Tracking
+    async def track_emotional_trajectory(self, user_id: str, current_emotion: str) -> Dict[str, Any]:
+        """
+        🎭 PHASE 1.2: Track emotional momentum and velocity over time
         
-        return 'neutral'
+        Features:
+        - Emotional momentum calculation (direction of change)
+        - Emotional velocity (rate of change)
+        - Stability analysis (consistency over time)
+        - Pattern detection for emotional cycles
+        """
+        try:
+            # Get recent emotional states from last 10 conversation memories
+            recent_emotions = await self.get_recent_emotional_states(user_id, limit=10)
+            
+            if len(recent_emotions) < 2:
+                # Not enough data for trajectory analysis
+                return {
+                    "emotional_trajectory": [current_emotion],
+                    "emotional_velocity": 0.0,
+                    "emotional_stability": 1.0,
+                    "trajectory_direction": "stable",
+                    "emotional_momentum": "neutral",
+                    "pattern_detected": None
+                }
+            
+            # Calculate emotional momentum and velocity
+            emotional_velocity = self.calculate_emotional_momentum(recent_emotions)
+            emotional_stability = self.calculate_emotional_stability(recent_emotions)
+            trajectory_direction = self.determine_trajectory_direction(recent_emotions)
+            emotional_momentum = self.analyze_emotional_momentum(recent_emotions)
+            pattern_detected = self.detect_emotional_patterns(recent_emotions)
+            
+            emotional_metadata = {
+                "emotional_trajectory": recent_emotions,
+                "emotional_velocity": emotional_velocity,
+                "emotional_stability": emotional_stability,
+                "trajectory_direction": trajectory_direction,
+                "emotional_momentum": emotional_momentum,
+                "pattern_detected": pattern_detected,
+                "trajectory_analysis_timestamp": datetime.utcnow().isoformat()
+            }
+            
+            logger.info(f"🎭 EMOTIONAL TRAJECTORY: User {user_id} - "
+                       f"velocity={emotional_velocity:.2f}, stability={emotional_stability:.2f}, "
+                       f"direction={trajectory_direction}, momentum={emotional_momentum}")
+            
+            return emotional_metadata
+            
+        except Exception as e:
+            logger.error(f"Error tracking emotional trajectory for {user_id}: {e}")
+            return {"emotional_trajectory": [current_emotion], "error": str(e)}
+    
+    async def get_recent_emotional_states(self, user_id: str, limit: int = 10) -> List[str]:
+        """Get recent emotional states from conversation memories"""
+        try:
+            # Use Qdrant to get recent conversation memories with emotional context
+            recent_cutoff = datetime.utcnow() - timedelta(hours=24)  # Last 24 hours
+            recent_timestamp = recent_cutoff.timestamp()
+            
+            scroll_result = self.client.scroll(
+                collection_name=self.collection_name,
+                scroll_filter=models.Filter(
+                    must=[
+                        models.FieldCondition(key="user_id", match=models.MatchValue(value=user_id)),
+                        models.FieldCondition(key="memory_type", match=models.MatchValue(value="conversation")),
+                        models.FieldCondition(key="timestamp_unix", range=Range(gte=recent_timestamp))
+                    ]
+                ),
+                limit=limit,
+                with_payload=True,
+                with_vectors=False,
+                order_by=models.OrderBy(key="timestamp_unix", direction=Direction.DESC)
+            )
+            
+            emotions = []
+            for point in scroll_result[0]:
+                emotion = point.payload.get('emotional_context', 'neutral')
+                emotions.append(emotion)
+            
+            return emotions if emotions else ['neutral']
+            
+        except Exception as e:
+            logger.error(f"Error getting recent emotional states: {e}")
+            return ['neutral']
+    
+    def calculate_emotional_momentum(self, emotions: List[str]) -> float:
+        """Calculate emotional momentum (rate of emotional change)"""
+        if len(emotions) < 2:
+            return 0.0
+        
+        # Map emotions to numerical values for momentum calculation
+        emotion_values = {
+            'very_positive': 2.0,
+            'positive': 1.0,
+            'mildly_positive': 0.5,
+            'neutral': 0.0,
+            'mildly_negative': -0.5,
+            'negative': -1.0,
+            'very_negative': -2.0,
+            'contemplative': 0.2,
+            'anxious': -0.8
+        }
+        
+        # Calculate velocity as change over time
+        changes = []
+        for i in range(1, len(emotions)):
+            prev_val = emotion_values.get(emotions[i-1], 0.0)
+            curr_val = emotion_values.get(emotions[i], 0.0)
+            change = curr_val - prev_val
+            changes.append(change)
+        
+        # Average change rate (momentum)
+        return sum(changes) / len(changes) if changes else 0.0
+    
+    def calculate_emotional_stability(self, emotions: List[str]) -> float:
+        """Calculate emotional stability (consistency over time)"""
+        if len(emotions) < 2:
+            return 1.0
+        
+        # Map emotions to values and calculate variance
+        emotion_values = {
+            'very_positive': 2.0, 'positive': 1.0, 'mildly_positive': 0.5,
+            'neutral': 0.0, 'mildly_negative': -0.5, 'negative': -1.0,
+            'very_negative': -2.0, 'contemplative': 0.2, 'anxious': -0.8
+        }
+        
+        values = [emotion_values.get(emotion, 0.0) for emotion in emotions]
+        
+        # Calculate standard deviation as measure of stability
+        mean_val = sum(values) / len(values)
+        variance = sum((x - mean_val) ** 2 for x in values) / len(values)
+        std_dev = variance ** 0.5
+        
+        # Convert to stability score (0-1, higher = more stable)
+        max_possible_std = 2.0  # Max possible standard deviation
+        stability = max(0.0, 1.0 - (std_dev / max_possible_std))
+        
+        return stability
+    
+    def determine_trajectory_direction(self, emotions: List[str]) -> str:
+        """Determine overall direction of emotional trajectory"""
+        if len(emotions) < 3:
+            return "stable"
+        
+        emotion_values = {
+            'very_positive': 2.0, 'positive': 1.0, 'mildly_positive': 0.5,
+            'neutral': 0.0, 'mildly_negative': -0.5, 'negative': -1.0,
+            'very_negative': -2.0, 'contemplative': 0.2, 'anxious': -0.8
+        }
+        
+        recent_avg = sum(emotion_values.get(emotions[i], 0.0) for i in range(3)) / 3
+        older_avg = sum(emotion_values.get(emotions[i], 0.0) for i in range(3, len(emotions))) / max(1, len(emotions) - 3)
+        
+        difference = recent_avg - older_avg
+        
+        if difference > 0.3:
+            return "improving"
+        elif difference < -0.3:
+            return "declining"
+        else:
+            return "stable"
+    
+    def analyze_emotional_momentum(self, emotions: List[str]) -> str:
+        """Analyze the type of emotional momentum"""
+        velocity = self.calculate_emotional_momentum(emotions)
+        
+        if velocity > 0.5:
+            return "positive_momentum"
+        elif velocity < -0.5:
+            return "negative_momentum"
+        elif abs(velocity) < 0.1:
+            return "neutral"
+        else:
+            return "mixed"
+    
+    def detect_emotional_patterns(self, emotions: List[str]) -> Optional[str]:
+        """Detect emotional patterns in the trajectory"""
+        if len(emotions) < 4:
+            return None
+        
+        # Check for oscillating pattern (back and forth)
+        positive_emotions = {'very_positive', 'positive', 'mildly_positive'}
+        negative_emotions = {'very_negative', 'negative', 'mildly_negative'}
+        
+        changes = 0
+        for i in range(1, len(emotions)):
+            prev_positive = emotions[i-1] in positive_emotions
+            curr_positive = emotions[i] in positive_emotions
+            prev_negative = emotions[i-1] in negative_emotions
+            curr_negative = emotions[i] in negative_emotions
+            
+            if (prev_positive and curr_negative) or (prev_negative and curr_positive):
+                changes += 1
+        
+        if changes >= len(emotions) // 2:
+            return "oscillating"
+        
+        # Check for consistent trend
+        recent_emotions = emotions[:3]
+        if all(e in positive_emotions for e in recent_emotions):
+            return "consistently_positive"
+        elif all(e in negative_emotions for e in recent_emotions):
+            return "consistently_negative"
+        elif all(e == 'contemplative' for e in recent_emotions):
+            return "deep_thinking"
+        elif all(e == 'anxious' for e in recent_emotions):
+            return "escalating_anxiety"
+        
+        return None
+
+    # Phase 1.3: Memory Significance Scoring
+    async def calculate_memory_significance(self, memory: VectorMemory, user_id: str) -> Dict[str, Any]:
+        """
+        🎯 PHASE 1.3: Calculate comprehensive significance scoring for memories
+        
+        Features:
+        - Multi-factor significance calculation
+        - Emotional impact scoring
+        - Personal relevance assessment  
+        - Temporal importance weighting
+        - Decay resistance for important memories
+        """
+        try:
+            # Get user's recent memory context for comparison
+            recent_memories = await self.get_recent_memories(user_id, limit=20)
+            user_patterns = await self.get_user_emotional_patterns(user_id)
+            
+            # Calculate base significance factors
+            significance_factors = {
+                'emotional_intensity': self.calculate_emotional_significance(memory),
+                'personal_relevance': self.calculate_personal_relevance(memory, recent_memories),
+                'uniqueness_score': self.calculate_uniqueness_score(memory, recent_memories),
+                'temporal_importance': self.calculate_temporal_importance(memory),
+                'interaction_value': self.calculate_interaction_value(memory),
+                'pattern_significance': self.calculate_pattern_significance(memory, user_patterns)
+            }
+            
+            # Calculate weighted overall significance
+            overall_significance = self.calculate_weighted_significance(significance_factors)
+            
+            # Determine decay resistance based on significance
+            decay_resistance = self.calculate_decay_resistance(overall_significance, significance_factors)
+            
+            # Calculate significance tier for indexing
+            significance_tier = self.determine_significance_tier(overall_significance)
+            
+            significance_data = {
+                'overall_significance': overall_significance,
+                'significance_factors': significance_factors,
+                'decay_resistance': decay_resistance,
+                'significance_tier': significance_tier,
+                'calculated_at': datetime.utcnow().isoformat(),
+                'significance_version': '1.3'
+            }
+            
+            logger.debug(f"Memory significance calculated: {overall_significance:.3f} (tier: {significance_tier})")
+            return significance_data
+            
+        except Exception as e:
+            logger.error(f"Error calculating memory significance: {e}")
+            # Return default values on error
+            return {
+                'overall_significance': 0.5,
+                'significance_factors': {},
+                'decay_resistance': 1.0,
+                'significance_tier': 'standard',
+                'calculated_at': datetime.utcnow().isoformat(),
+                'significance_version': '1.3'
+            }
+    
+    def calculate_emotional_significance(self, memory: VectorMemory) -> float:
+        """Calculate significance based on emotional content"""
+        metadata = memory.metadata or {}
+        emotional_context = metadata.get('emotional_context', 'neutral')
+        emotional_intensity = metadata.get('emotional_intensity', 0.5)
+        
+        # High-intensity emotions are more significant
+        intensity_factor = emotional_intensity
+        
+        # Certain emotions have higher baseline significance
+        emotion_weights = {
+            'very_positive': 0.9,
+            'very_negative': 0.9,
+            'anxious': 0.8,
+            'positive': 0.7,
+            'negative': 0.7,
+            'contemplative': 0.6,
+            'mildly_positive': 0.5,
+            'mildly_negative': 0.5,
+            'neutral': 0.3
+        }
+        
+        emotion_weight = emotion_weights.get(emotional_context, 0.3)
+        return min(1.0, intensity_factor * emotion_weight)
+    
+    def calculate_personal_relevance(self, memory: VectorMemory, recent_memories: List[Dict]) -> float:
+        """Calculate personal relevance based on user's conversation patterns"""
+        if not recent_memories:
+            return 0.5
+        
+        content_words = set(memory.content.lower().split())
+        
+        # Find common themes in recent memories
+        theme_counts = {}
+        for mem in recent_memories:
+            words = set(mem.get('content', '').lower().split())
+            common_words = content_words.intersection(words)
+            for word in common_words:
+                if len(word) > 3:  # Filter out short words
+                    theme_counts[word] = theme_counts.get(word, 0) + 1
+        
+        # Calculate relevance based on theme overlap
+        if not theme_counts:
+            return 0.3
+        
+        max_overlap = max(theme_counts.values())
+        relevance = min(1.0, max_overlap / 5.0)  # Normalize to 0-1
+        return relevance
+    
+    def calculate_uniqueness_score(self, memory: VectorMemory, recent_memories: List[Dict]) -> float:
+        """Calculate uniqueness compared to recent memories"""
+        if not recent_memories:
+            return 1.0
+        
+        content_words = set(memory.content.lower().split())
+        
+        # Calculate similarity with recent memories
+        similarities = []
+        for mem in recent_memories:
+            mem_words = set(mem.get('content', '').lower().split())
+            if content_words and mem_words:
+                intersection = len(content_words.intersection(mem_words))
+                union = len(content_words.union(mem_words))
+                similarity = intersection / union if union > 0 else 0
+                similarities.append(similarity)
+        
+        if not similarities:
+            return 1.0
+        
+        # Higher uniqueness = lower average similarity
+        avg_similarity = sum(similarities) / len(similarities)
+        uniqueness = 1.0 - avg_similarity
+        return max(0.1, uniqueness)  # Minimum uniqueness of 0.1
+    
+    def calculate_temporal_importance(self, memory: VectorMemory) -> float:
+        """Calculate importance based on timing and recency"""
+        if not memory.timestamp:
+            return 0.5
+        
+        # More recent memories have higher temporal importance
+        age_hours = (datetime.utcnow() - memory.timestamp).total_seconds() / 3600
+        
+        # Decay function: recent memories more important
+        if age_hours < 1:
+            return 1.0
+        elif age_hours < 24:
+            return 0.9
+        elif age_hours < 168:  # 1 week
+            return 0.7
+        elif age_hours < 720:  # 1 month
+            return 0.5
+        else:
+            return 0.3
+    
+    def calculate_interaction_value(self, memory: VectorMemory) -> float:
+        """Calculate value based on interaction quality"""
+        # Check for question marks (questions are often significant)
+        has_question = '?' in memory.content
+        
+        # Check for personal pronouns (more personal engagement)
+        personal_words = ['i', 'me', 'my', 'myself', 'you', 'your', 'we', 'us', 'our']
+        content_words = memory.content.lower().split()
+        personal_count = sum(1 for word in content_words if word in personal_words)
+        
+        # Check for simple/basic questions that shouldn't be highly significant
+        simple_question_patterns = [
+            'what time', 'what day', 'what date', 'how are you', 'hello', 'hi there',
+            'good morning', 'good night', 'thanks', 'thank you', 'okay', 'ok', 'yes', 'no'
+        ]
+        
+        content_lower = memory.content.lower()
+        is_simple_question = any(pattern in content_lower for pattern in simple_question_patterns)
+        
+        # Check memory type significance with adjustments for simple queries
+        base_type_weights = {
+            MemoryType.CONVERSATION: 0.5,  # Reduced from 0.8
+            MemoryType.FACT: 0.4,          # Reduced from 0.6
+            MemoryType.PREFERENCE: 0.6     # Reduced from 0.7
+        }
+        
+        type_score = base_type_weights.get(memory.memory_type, 0.3)
+        
+        # Questions get a boost, but simple questions get penalized
+        if has_question:
+            if is_simple_question:
+                question_boost = -0.2  # Reduce significance for simple questions
+            else:
+                question_boost = 0.2   # Boost for meaningful questions
+        else:
+            question_boost = 0.0
+        
+        personal_score = min(0.2, personal_count * 0.05)  # Reduced impact
+        
+        final_score = type_score + question_boost + personal_score
+        return max(0.1, min(1.0, final_score))  # Ensure minimum of 0.1
+    
+    def calculate_pattern_significance(self, memory: VectorMemory, user_patterns: Dict) -> float:
+        """Calculate significance based on user's behavioral patterns"""
+        if not user_patterns:
+            return 0.5
+        
+        # Check if memory relates to user's emotional patterns
+        metadata = memory.metadata or {}
+        emotional_context = metadata.get('emotional_context', 'neutral')
+        
+        # High significance if memory represents emotional pattern change
+        recent_pattern = user_patterns.get('recent_emotional_pattern')
+        if recent_pattern and emotional_context != recent_pattern:
+            return 0.9  # Pattern change is significant
+        
+        # Check for recurring themes
+        frequent_themes = user_patterns.get('frequent_themes', [])
+        content_lower = memory.content.lower()
+        theme_matches = sum(1 for theme in frequent_themes if theme in content_lower)
+        
+        return min(1.0, 0.3 + (theme_matches * 0.2))
+    
+    def calculate_weighted_significance(self, factors: Dict[str, float]) -> float:
+        """Calculate overall significance with weighted factors"""
+        weights = {
+            'emotional_intensity': 0.25,
+            'personal_relevance': 0.20,
+            'uniqueness_score': 0.15,
+            'temporal_importance': 0.15,
+            'interaction_value': 0.15,
+            'pattern_significance': 0.10
+        }
+        
+        weighted_sum = sum(factors.get(factor, 0) * weight for factor, weight in weights.items())
+        return min(1.0, max(0.0, weighted_sum))
+    
+    def calculate_decay_resistance(self, overall_significance: float, factors: Dict[str, float]) -> float:
+        """Calculate how resistant this memory should be to decay/deletion"""
+        # High significance memories should be more resistant to decay
+        base_resistance = overall_significance
+        
+        # Extra resistance for highly emotional or unique memories
+        emotional_boost = factors.get('emotional_intensity', 0) * 0.2
+        uniqueness_boost = factors.get('uniqueness_score', 0) * 0.15
+        
+        total_resistance = base_resistance + emotional_boost + uniqueness_boost
+        return min(1.0, total_resistance)
+    
+    def determine_significance_tier(self, overall_significance: float) -> str:
+        """Determine significance tier for indexing and retrieval optimization"""
+        if overall_significance >= 0.8:
+            return 'critical'
+        elif overall_significance >= 0.6:
+            return 'high'
+        elif overall_significance >= 0.4:
+            return 'standard'
+        elif overall_significance >= 0.2:
+            return 'low'
+        else:
+            return 'minimal'
+    
+    # Phase 2.1: Three-Tier Memory Architecture
+    def determine_memory_tier_from_significance(self, significance_score: float, emotional_intensity: float = 0.0) -> MemoryTier:
+        """Determine initial memory tier based on significance and emotional intensity"""
+        # High significance or high emotional intensity → LONG_TERM
+        if significance_score >= 0.75 or emotional_intensity >= 0.8:
+            return MemoryTier.LONG_TERM
+        
+        # Medium significance or medium emotional intensity → MEDIUM_TERM  
+        elif significance_score >= 0.45 or emotional_intensity >= 0.5:
+            return MemoryTier.MEDIUM_TERM
+        
+        # Low significance → SHORT_TERM
+        else:
+            return MemoryTier.SHORT_TERM
+    
+    async def promote_memory_tier(self, memory_id: str, new_tier: MemoryTier, reason: str = "automatic") -> bool:
+        """Promote a memory to a higher tier"""
+        try:
+            # Get current memory
+            search_result = self.client.retrieve(
+                collection_name=self.collection_name,
+                ids=[memory_id],
+                with_payload=True
+            )
+            
+            if not search_result:
+                logger.warning(f"Memory {memory_id} not found for tier promotion")
+                return False
+            
+            current_payload = search_result[0].payload
+            current_tier = MemoryTier(current_payload.get('memory_tier', 'short_term'))
+            
+            # Only promote to higher tiers
+            tier_hierarchy = [MemoryTier.SHORT_TERM, MemoryTier.MEDIUM_TERM, MemoryTier.LONG_TERM]
+            if tier_hierarchy.index(new_tier) <= tier_hierarchy.index(current_tier):
+                logger.debug(f"Cannot promote memory {memory_id} from {current_tier} to {new_tier}")
+                return False
+            
+            # Update memory tier
+            updated_payload = {
+                **current_payload,
+                "memory_tier": new_tier.value,
+                "tier_promotion_date": datetime.utcnow().isoformat(),
+                "tier_promotion_reason": reason,
+                "decay_protection": new_tier == MemoryTier.LONG_TERM  # Protect long-term memories
+            }
+            
+            # Use set_payload instead of update_payload
+            self.client.set_payload(
+                collection_name=self.collection_name,
+                payload=updated_payload,
+                points=[memory_id]
+            )
+            
+            logger.info(f"🎯 TIER PROMOTION: Memory {memory_id} promoted from {current_tier.value} to {new_tier.value} ({reason})")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Failed to promote memory tier: {e}")
+            return False
+    
+    async def demote_memory_tier(self, memory_id: str, new_tier: MemoryTier, reason: str = "automatic") -> bool:
+        """Demote a memory to a lower tier"""
+        try:
+            # Get current memory
+            search_result = self.client.retrieve(
+                collection_name=self.collection_name,
+                ids=[memory_id],
+                with_payload=True
+            )
+            
+            if not search_result:
+                logger.warning(f"Memory {memory_id} not found for tier demotion")
+                return False
+            
+            current_payload = search_result[0].payload
+            if not current_payload:
+                logger.warning(f"Memory {memory_id} has no payload for tier demotion")
+                return False
+                
+            current_tier = MemoryTier(current_payload.get('memory_tier', 'short_term'))
+            
+            # Don't demote protected memories
+            if current_payload.get('decay_protection', False):
+                logger.debug(f"Memory {memory_id} protected from demotion")
+                return False
+            
+            # Only demote to lower tiers
+            tier_hierarchy = [MemoryTier.SHORT_TERM, MemoryTier.MEDIUM_TERM, MemoryTier.LONG_TERM]
+            if tier_hierarchy.index(new_tier) >= tier_hierarchy.index(current_tier):
+                logger.debug(f"Cannot demote memory {memory_id} from {current_tier} to {new_tier}")
+                return False
+            
+            # Update memory tier
+            updated_payload = {
+                **current_payload,
+                "memory_tier": new_tier.value,
+                "tier_demotion_date": datetime.utcnow().isoformat(),
+                "tier_demotion_reason": reason
+            }
+            
+            # Use set_payload instead of update_payload
+            self.client.set_payload(
+                collection_name=self.collection_name,
+                payload=updated_payload,
+                points=[memory_id]
+            )
+            
+            logger.info(f"📉 TIER DEMOTION: Memory {memory_id} demoted from {current_tier.value} to {new_tier.value} ({reason})")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Failed to demote memory tier: {e}")
+            return False
+    
+    async def auto_manage_memory_tiers(self, user_id: str) -> Dict[str, int]:
+        """Automatically manage memory tiers based on age and significance"""
+        try:
+            # Get all user memories with tier and age information
+            all_memories, _ = self.client.scroll(
+                collection_name=self.collection_name,
+                scroll_filter=models.Filter(
+                    must=[models.FieldCondition(key="user_id", match=models.MatchValue(value=user_id))]
+                ),
+                limit=1000,  # Process in batches
+                with_payload=True
+            )
+            
+            stats = {
+                "promoted": 0,
+                "demoted": 0,
+                "protected": 0,
+                "expired": 0
+            }
+            
+            current_time = datetime.utcnow()
+            
+            for memory_point in all_memories:
+                payload = memory_point.payload
+                if not payload:
+                    continue
+                
+                # Calculate memory age
+                timestamp_str = payload.get('timestamp')
+                if not timestamp_str:
+                    continue
+                
+                memory_time = datetime.fromisoformat(timestamp_str.replace('Z', '+00:00').replace('+00:00', ''))
+                age_days = (current_time - memory_time).days
+                
+                current_tier = MemoryTier(payload.get('memory_tier', 'short_term'))
+                significance = payload.get('overall_significance', 0.5)
+                emotional_intensity = payload.get('emotional_intensity', 0.0)
+                is_protected = payload.get('decay_protection', False)
+                
+                memory_id = str(memory_point.id)
+                
+                # Skip protected memories
+                if is_protected:
+                    stats["protected"] += 1
+                    continue
+                
+                # Tier management logic based on age and significance
+                if current_tier == MemoryTier.SHORT_TERM:
+                    # Promote short-term memories that have proven significant
+                    if age_days >= 3 and (significance >= 0.6 or emotional_intensity >= 0.7):
+                        await self.promote_memory_tier(memory_id, MemoryTier.MEDIUM_TERM, "age_significance")
+                        stats["promoted"] += 1
+                    # Delete very old, low-significance short-term memories
+                    elif age_days >= 7 and significance < 0.3:
+                        await self.delete_memory(memory_id)
+                        stats["expired"] += 1
+                
+                elif current_tier == MemoryTier.MEDIUM_TERM:
+                    # Promote medium-term memories to long-term if highly significant
+                    if age_days >= 7 and (significance >= 0.8 or emotional_intensity >= 0.9):
+                        await self.promote_memory_tier(memory_id, MemoryTier.LONG_TERM, "high_significance")
+                        stats["promoted"] += 1
+                    # Demote medium-term memories that lost relevance
+                    elif age_days >= 14 and significance < 0.4:
+                        await self.demote_memory_tier(memory_id, MemoryTier.SHORT_TERM, "lost_relevance")
+                        stats["demoted"] += 1
+                
+                # Note: LONG_TERM memories are generally protected from automatic demotion
+            
+            logger.info(f"🎯 AUTO TIER MANAGEMENT: User {user_id} - "
+                       f"Promoted: {stats['promoted']}, Demoted: {stats['demoted']}, "
+                       f"Protected: {stats['protected']}, Expired: {stats['expired']}")
+            
+            return stats
+            
+        except Exception as e:
+            logger.error(f"Failed to auto-manage memory tiers: {e}")
+            return {"error": 1}
+    
+    async def get_memories_by_tier(self, user_id: str, tier: MemoryTier, limit: int = 50) -> List[Dict]:
+        """Get memories from a specific tier"""
+        try:
+            results, _ = self.client.scroll(
+                collection_name=self.collection_name,
+                scroll_filter=models.Filter(
+                    must=[
+                        models.FieldCondition(key="user_id", match=models.MatchValue(value=user_id)),
+                        models.FieldCondition(key="memory_tier", match=models.MatchValue(value=tier.value))
+                    ]
+                ),
+                limit=limit,
+                with_payload=True
+            )
+            
+            memories = []
+            for point in results:
+                if point.payload:
+                    memories.append({
+                        "id": str(point.id),
+                        "content": point.payload.get('content', ''),
+                        "memory_type": point.payload.get('memory_type', ''),
+                        "timestamp": point.payload.get('timestamp', ''),
+                        "memory_tier": point.payload.get('memory_tier', ''),
+                        "significance": point.payload.get('overall_significance', 0.0),
+                        "decay_protection": point.payload.get('decay_protection', False)
+                    })
+            
+            # Sort by significance and timestamp
+            memories.sort(key=lambda x: (x['significance'], x['timestamp']), reverse=True)
+            
+            return memories
+            
+        except Exception as e:
+            logger.error(f"Failed to get memories by tier: {e}")
+            return []
+    
+    async def apply_memory_decay(self, user_id: str, decay_rate: float = 0.1) -> Dict[str, int]:
+        """
+        Apply memory decay mechanism with significance protection
+        
+        Args:
+            user_id: User to apply decay to
+            decay_rate: Rate of decay (0.0-1.0, default 0.1 = 10% decay)
+            
+        Returns:
+            Dictionary with decay statistics
+        """
+        try:
+            # Get all user memories for decay processing
+            all_memories, _ = self.client.scroll(
+                collection_name=self.collection_name,
+                scroll_filter=models.Filter(
+                    must=[models.FieldCondition(key="user_id", match=models.MatchValue(value=user_id))]
+                ),
+                limit=1000,
+                with_payload=True
+            )
+            
+            stats = {
+                "processed": 0,
+                "decayed": 0,
+                "protected": 0,
+                "deleted": 0,
+                "errors": 0
+            }
+            
+            current_time = datetime.utcnow()
+            
+            for memory_point in all_memories:
+                payload = memory_point.payload
+                if not payload:
+                    continue
+                
+                memory_id = str(memory_point.id)
+                stats["processed"] += 1
+                
+                try:
+                    # Skip protected memories
+                    if payload.get('decay_protection', False):
+                        stats["protected"] += 1
+                        continue
+                    
+                    # Calculate current significance and age factors
+                    current_significance = payload.get('overall_significance', 0.5)
+                    memory_tier = MemoryTier(payload.get('memory_tier', 'short_term'))
+                    
+                    # Calculate memory age in days
+                    timestamp_str = payload.get('timestamp')
+                    if timestamp_str:
+                        memory_time = datetime.fromisoformat(timestamp_str.replace('Z', '+00:00').replace('+00:00', ''))
+                        age_days = (current_time - memory_time).days
+                    else:
+                        age_days = 0
+                    
+                    # Calculate decay based on tier and age
+                    tier_decay_multiplier = {
+                        MemoryTier.SHORT_TERM: 1.0,    # Normal decay
+                        MemoryTier.MEDIUM_TERM: 0.5,   # 50% slower decay
+                        MemoryTier.LONG_TERM: 0.1      # 90% slower decay
+                    }
+                    
+                    # Age acceleration factor (older memories decay faster)
+                    age_multiplier = min(1.0 + (age_days / 30.0), 3.0)  # Max 3x decay for very old memories
+                    
+                    # Calculate effective decay rate
+                    effective_decay = decay_rate * tier_decay_multiplier[memory_tier] * age_multiplier
+                    
+                    # Apply significance protection
+                    if current_significance >= 0.8:
+                        effective_decay *= 0.1  # 90% protection for highly significant memories
+                    elif current_significance >= 0.6:
+                        effective_decay *= 0.3  # 70% protection for moderately significant memories
+                    
+                    # Apply decay to significance
+                    new_significance = max(0.0, current_significance - effective_decay)
+                    
+                    # Delete memories with very low significance
+                    if new_significance < 0.05 and memory_tier == MemoryTier.SHORT_TERM:
+                        await self.delete_memory(memory_id)
+                        stats["deleted"] += 1
+                        continue
+                    
+                    # Update memory with new significance
+                    if new_significance != current_significance:
+                        # Update payload with new significance
+                        updated_payload = dict(payload)
+                        updated_payload['overall_significance'] = new_significance
+                        updated_payload['last_decay_update'] = current_time.isoformat()
+                        
+                        # Set payload in Qdrant
+                        self.client.set_payload(
+                            collection_name=self.collection_name,
+                            points=[memory_id],
+                            payload=updated_payload,
+                            wait=True
+                        )
+                        
+                        stats["decayed"] += 1
+                        
+                        logger.debug(f"Applied decay to memory {memory_id}: {current_significance:.3f} → {new_significance:.3f}")
+                        
+                except Exception as e:
+                    logger.error(f"Failed to apply decay to memory {memory_id}: {e}")
+                    stats["errors"] += 1
+                    continue
+            
+            logger.info(f"🕰️ MEMORY DECAY: User {user_id} - "
+                       f"Processed: {stats['processed']}, Decayed: {stats['decayed']}, "
+                       f"Protected: {stats['protected']}, Deleted: {stats['deleted']}, "
+                       f"Errors: {stats['errors']}")
+            
+            return stats
+            
+        except Exception as e:
+            logger.error(f"Failed to apply memory decay: {e}")
+            return {"error": 1}
+
+    async def get_memory_decay_candidates(self, user_id: str, threshold: float = 0.2) -> List[Dict]:
+        """
+        Get memories that are candidates for decay (low significance, old)
+        
+        Args:
+            user_id: User to check
+            threshold: Significance threshold below which memories are candidates
+            
+        Returns:
+            List of memory dictionaries that are decay candidates
+        """
+        try:
+            # Get all user memories
+            all_memories, _ = self.client.scroll(
+                collection_name=self.collection_name,
+                scroll_filter=models.Filter(
+                    must=[models.FieldCondition(key="user_id", match=models.MatchValue(value=user_id))]
+                ),
+                limit=1000,
+                with_payload=True
+            )
+            
+            candidates = []
+            current_time = datetime.utcnow()
+            
+            for memory_point in all_memories:
+                payload = memory_point.payload
+                if not payload:
+                    continue
+                
+                # Skip protected memories
+                if payload.get('decay_protection', False):
+                    continue
+                
+                significance = payload.get('overall_significance', 0.5)
+                
+                # Check if below threshold
+                if significance <= threshold:
+                    # Calculate age
+                    timestamp_str = payload.get('timestamp')
+                    age_days = 0
+                    if timestamp_str:
+                        try:
+                            memory_time = datetime.fromisoformat(timestamp_str.replace('Z', '+00:00').replace('+00:00', ''))
+                            age_days = (current_time - memory_time).days
+                        except ValueError:
+                            age_days = 0
+                    
+                    candidates.append({
+                        "id": str(memory_point.id),
+                        "content": payload.get('content', '')[:100] + "..." if len(payload.get('content', '')) > 100 else payload.get('content', ''),
+                        "significance": significance,
+                        "age_days": age_days,
+                        "memory_tier": payload.get('memory_tier', 'short_term'),
+                        "decay_protection": payload.get('decay_protection', False)
+                    })
+            
+            # Sort by significance (lowest first) and age (oldest first)
+            candidates.sort(key=lambda x: (x['significance'], -x['age_days']))
+            
+            logger.debug(f"Found {len(candidates)} decay candidates for user {user_id} (threshold: {threshold})")
+            return candidates
+            
+        except Exception as e:
+            logger.error(f"Failed to get decay candidates: {e}")
+            return []
+
+    async def protect_memory_from_decay(self, memory_id: str, protection_reason: str = "manual_protection") -> bool:
+        """
+        Protect a specific memory from decay
+        
+        Args:
+            memory_id: ID of memory to protect
+            protection_reason: Reason for protection
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            # Get current memory
+            memory_points = self.client.retrieve(
+                collection_name=self.collection_name,
+                ids=[memory_id],
+                with_payload=True
+            )
+            
+            if not memory_points or not memory_points[0].payload:
+                logger.error(f"Memory {memory_id} not found for decay protection")
+                return False
+            
+            # Update with decay protection
+            updated_payload = dict(memory_points[0].payload)
+            updated_payload['decay_protection'] = True
+            updated_payload['protection_reason'] = protection_reason
+            updated_payload['protection_date'] = datetime.utcnow().isoformat()
+            
+            # Set payload in Qdrant
+            self.client.set_payload(
+                collection_name=self.collection_name,
+                points=[memory_id],
+                payload=updated_payload,
+                wait=True
+            )
+            
+            logger.info(f"🛡️ DECAY PROTECTION: Memory {memory_id} protected from decay ({protection_reason})")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Failed to protect memory from decay: {e}")
+            return False
+
+    async def remove_memory_decay_protection(self, memory_id: str, removal_reason: str = "manual_removal") -> bool:
+        """
+        Remove decay protection from a specific memory
+        
+        Args:
+            memory_id: ID of memory to unprotect
+            removal_reason: Reason for removing protection
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            # Get current memory
+            memory_points = self.client.retrieve(
+                collection_name=self.collection_name,
+                ids=[memory_id],
+                with_payload=True
+            )
+            
+            if not memory_points or not memory_points[0].payload:
+                logger.error(f"Memory {memory_id} not found for protection removal")
+                return False
+            
+            # Update to remove decay protection
+            updated_payload = dict(memory_points[0].payload)
+            updated_payload['decay_protection'] = False
+            updated_payload['protection_removal_reason'] = removal_reason
+            updated_payload['protection_removal_date'] = datetime.utcnow().isoformat()
+            
+            # Remove protection-related fields
+            updated_payload.pop('protection_reason', None)
+            updated_payload.pop('protection_date', None)
+            
+            # Set payload in Qdrant
+            self.client.set_payload(
+                collection_name=self.collection_name,
+                points=[memory_id],
+                payload=updated_payload,
+                wait=True
+            )
+            
+            logger.info(f"🔓 DECAY PROTECTION REMOVED: Memory {memory_id} unprotected ({removal_reason})")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Failed to remove memory decay protection: {e}")
+            return False
+
+    async def get_protected_memories(self, user_id: str) -> List[Dict]:
+        """
+        Get all memories with decay protection for a user
+        
+        Args:
+            user_id: User to check
+            
+        Returns:
+            List of protected memory dictionaries
+        """
+        try:
+            # Get all protected memories for user
+            protected_memories, _ = self.client.scroll(
+                collection_name=self.collection_name,
+                scroll_filter=models.Filter(
+                    must=[
+                        models.FieldCondition(key="user_id", match=models.MatchValue(value=user_id)),
+                        models.FieldCondition(key="decay_protection", match=models.MatchValue(value=True))
+                    ]
+                ),
+                limit=100,
+                with_payload=True
+            )
+            
+            memories = []
+            for memory_point in protected_memories:
+                if memory_point.payload:
+                    memories.append({
+                        "id": str(memory_point.id),
+                        "content": memory_point.payload.get('content', ''),
+                        "memory_tier": memory_point.payload.get('memory_tier', 'short_term'),
+                        "significance": memory_point.payload.get('overall_significance', 0.5),
+                        "protection_reason": memory_point.payload.get('protection_reason', 'unknown'),
+                        "protection_date": memory_point.payload.get('protection_date', ''),
+                        "timestamp": memory_point.payload.get('timestamp', '')
+                    })
+            
+            # Sort by protection date (most recent first)
+            memories.sort(key=lambda x: x['protection_date'], reverse=True)
+            
+            logger.debug(f"Found {len(memories)} protected memories for user {user_id}")
+            return memories
+            
+        except Exception as e:
+            logger.error(f"Failed to get protected memories: {e}")
+            return []
+
+    async def get_recent_memories(self, user_id: str, limit: int = 20) -> List[Dict]:
+        """Get recent memories for significance calculation"""
+        try:
+            # Use direct Qdrant search since we're in VectorMemoryStore
+            filter_conditions = [
+                models.FieldCondition(key="user_id", match=models.MatchValue(value=user_id))
+            ]
+            
+            results = self.client.search(
+                collection_name=self.collection_name,
+                query_vector=models.NamedVector(name="content", vector=[0.0] * 384),  # Dummy vector for recent search
+                query_filter=models.Filter(must=filter_conditions),
+                limit=limit,
+                with_payload=True
+            )
+            
+            memories = []
+            for point in results:
+                if point.payload:
+                    memories.append({
+                        "id": str(point.id),
+                        "content": point.payload.get('content', ''),
+                        "memory_type": point.payload.get('memory_type', ''),
+                        "timestamp": point.payload.get('timestamp', ''),
+                        "confidence": point.payload.get('confidence', 0.5),
+                    })
+            
+            return memories
+            
+        except Exception as e:
+            logger.error(f"Failed to get recent memories: {e}")
+            return []
+
+    async def get_user_emotional_patterns(self, user_id: str) -> Dict:
+        """Get user's emotional patterns for significance calculation"""
+        try:
+            # This would integrate with the emotional trajectory tracking
+            recent_emotions = await self.get_recent_emotional_states(user_id, limit=10)
+            
+            if not recent_emotions:
+                return {}
+            
+            # Find most frequent recent emotion
+            emotion_counts = {}
+            for emotion in recent_emotions:
+                emotion_counts[emotion] = emotion_counts.get(emotion, 0) + 1
+            
+            most_frequent = max(emotion_counts, key=emotion_counts.get) if emotion_counts else 'neutral'
+            
+            return {
+                'recent_emotional_pattern': most_frequent,
+                'frequent_themes': []  # Could be enhanced with more analysis
+            }
+        except Exception as e:
+            logger.error(f"Error getting user emotional patterns: {e}")
+            return {}
 
     def _get_age_category(self, timestamp: datetime) -> str:
         """Categorize memory age for Qdrant filtering"""

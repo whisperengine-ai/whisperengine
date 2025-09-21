@@ -148,16 +148,16 @@ class ModularBotManager:
         
         # Provide specific guidance for common issues
         if "Failed to initialize memory system" in error_msg or "ChromaDB" in error_msg:
-            logger.error("💥 Memory system initialization failed: %s", error)
+            logger.debug("Memory system initialization issue: %s", error)
             if "ChromaDB server is not available" in error_msg:
-                logger.error("💡 Solution: Start ChromaDB with 'docker compose up chromadb'")
+                logger.debug("Solution: Start ChromaDB with 'docker compose up chromadb'")
             elif "ChromaDB server connection test failed" in error_msg:
-                logger.error("💡 Solution: Ensure ChromaDB server is running and accessible")
+                logger.debug("Solution: Ensure ChromaDB server is running and accessible")
             else:
-                logger.error("💡 Check your database configuration in .env file")
+                logger.debug("Check your database configuration in .env file")
         
         elif "Discord" in error_msg or "Bot" in error_msg:
-            logger.error("💥 Discord bot initialization failed: %s", error)
+            logger.debug("Discord bot initialization issue: %s", error)
             logger.error("💡 Check your DISCORD_BOT_TOKEN in .env file")
             logger.error("💡 Ensure your bot has proper permissions in Discord")
         
