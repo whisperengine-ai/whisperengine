@@ -18,15 +18,33 @@ from datetime import UTC, datetime, timedelta
 from enum import Enum
 from typing import Any, cast
 
-from .emotion_predictor import EmotionalPrediction, EmotionPredictor
-from .mood_detector import (
-    EmotionalAlert,
-    MoodAssessment,
-    MoodCategory,
-    MoodDetector,
-    StressAssessment,
-    StressLevel,
-)
+# Try to import spaCy-dependent components
+try:
+    from .emotion_predictor import EmotionalPrediction, EmotionPredictor
+    EMOTION_PREDICTOR_AVAILABLE = True
+except ImportError:
+    EMOTION_PREDICTOR_AVAILABLE = False
+    EmotionalPrediction = None
+    EmotionPredictor = None
+
+try:
+    from .mood_detector import (
+        EmotionalAlert,
+        MoodAssessment,
+        MoodCategory,
+        MoodDetector,
+        StressAssessment,
+        StressLevel,
+    )
+    MOOD_DETECTOR_AVAILABLE = True
+except ImportError:
+    MOOD_DETECTOR_AVAILABLE = False
+    EmotionalAlert = None
+    MoodAssessment = None
+    MoodCategory = None
+    MoodDetector = None
+    StressAssessment = None
+    StressLevel = None
 from .proactive_support import (
     ProactiveSupport,
     SupportIntervention,
@@ -107,9 +125,19 @@ class PredictiveEmotionalIntelligence:
         """Initialize the complete emotional intelligence system"""
         logger.info("Initializing Phase 2 Predictive Emotional Intelligence System")
 
-        # Core components
-        self.emotion_predictor = EmotionPredictor()
-        self.mood_detector = MoodDetector()
+        # Core components - initialize only if available
+        if EMOTION_PREDICTOR_AVAILABLE:
+            self.emotion_predictor = EmotionPredictor()
+        else:
+            self.emotion_predictor = None
+            logger.warning("Emotion predictor not available - spaCy dependency missing")
+
+        if MOOD_DETECTOR_AVAILABLE:
+            self.mood_detector = MoodDetector()
+        else:
+            self.mood_detector = None
+            logger.warning("Mood detector not available - spaCy dependency missing")
+
         self.proactive_support = ProactiveSupport()
 
         # External integrations

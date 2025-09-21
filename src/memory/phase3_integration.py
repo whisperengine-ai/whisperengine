@@ -17,7 +17,16 @@ from typing import Any
 
 from .memory_importance_engine import MemoryImportanceEngine
 from .pattern_detector import CrossReferencePatternDetector, DetectedPattern, PatternType
-from .semantic_clusterer import ClusterType, MemoryCluster, SemanticMemoryClusterer
+
+# Try to import semantic clusterer - component may not be implemented yet
+try:
+    from .semantic_clusterer import ClusterType, MemoryCluster, SemanticMemoryClusterer
+    SEMANTIC_CLUSTERER_AVAILABLE = True
+except ImportError:
+    SEMANTIC_CLUSTERER_AVAILABLE = False
+    ClusterType = None
+    MemoryCluster = None
+    SemanticMemoryClusterer = None
 
 logger = logging.getLogger(__name__)
 
@@ -54,7 +63,13 @@ class Phase3MemoryNetworks:
 
     def __init__(self):
         """Initialize Phase 3 memory networks system"""
-        self.semantic_clusterer = SemanticMemoryClusterer()
+        # Initialize semantic clusterer only if available
+        if SEMANTIC_CLUSTERER_AVAILABLE:
+            self.semantic_clusterer = SemanticMemoryClusterer()
+        else:
+            self.semantic_clusterer = None
+            logger.warning("Semantic clusterer not available - clustering features disabled")
+            
         self.importance_engine = MemoryImportanceEngine()
         self.pattern_detector = CrossReferencePatternDetector()
 
@@ -121,9 +136,14 @@ class Phase3MemoryNetworks:
                 return self._create_minimal_analysis_result(user_id)
 
             # Run all analysis components in parallel
-            clustering_task = self.semantic_clusterer.create_memory_clusters(
-                user_id, memory_manager
-            )
+            # Skip clustering if semantic clusterer not available
+            if self.semantic_clusterer:
+                clustering_task = self.semantic_clusterer.create_memory_clusters(
+                    user_id, memory_manager
+                )
+            else:
+                clustering_task = None
+                
             importance_task = self._analyze_memory_importance(
                 user_id, memories, conversation_history, memory_manager
             )
@@ -131,9 +151,19 @@ class Phase3MemoryNetworks:
                 user_id, memories, conversation_history
             )
 
-            clustering_results, importance_results, pattern_results = await asyncio.gather(
-                clustering_task, importance_task, pattern_task
-            )
+            # Wait for all analysis tasks to complete
+            tasks = [importance_task, pattern_task]
+            if clustering_task:
+                tasks.append(clustering_task)
+                
+            results = await asyncio.gather(*tasks)
+            
+            # Unpack results
+            if clustering_task:
+                importance_results, pattern_results, clustering_results = results
+            else:
+                importance_results, pattern_results = results
+                clustering_results = {"clusters": [], "statistics": {"total_clusters": 0}}
 
             # Generate cross-component insights
             insights = await self._generate_network_insights(

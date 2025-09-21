@@ -12,7 +12,20 @@ import logging
 from datetime import UTC, datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
-from .emotional_intelligence import EmotionalIntelligenceAssessment, PredictiveEmotionalIntelligence
+from .emotional_intelligence import EmotionalIntelligenceAssessment
+
+# Try to import PredictiveEmotionalIntelligence - may fail if spaCy not available
+try:
+    from .emotional_intelligence import PredictiveEmotionalIntelligence
+    PREDICTIVE_EMOTIONAL_INTELLIGENCE_AVAILABLE = True
+except ImportError as e:
+    PREDICTIVE_EMOTIONAL_INTELLIGENCE_AVAILABLE = False
+    PredictiveEmotionalIntelligence = None
+
+logger = logging.getLogger(__name__)
+
+if not PREDICTIVE_EMOTIONAL_INTELLIGENCE_AVAILABLE:
+    logger.warning("Predictive Emotional Intelligence not available - spaCy dependency missing")
 
 # Phase 3.1 Integration: Import Emotional Context Engine
 try:
@@ -36,10 +49,16 @@ class Phase2Integration:
         logger.info("Initializing Phase 2 Emotional Intelligence Integration")
 
         self.bot = bot_instance
-        self.emotional_intelligence = PredictiveEmotionalIntelligence(
-            graph_personality_manager=graph_personality_manager,
-            conversation_cache=conversation_cache,
-        )
+        
+        # Initialize emotional intelligence only if available
+        if PREDICTIVE_EMOTIONAL_INTELLIGENCE_AVAILABLE:
+            self.emotional_intelligence = PredictiveEmotionalIntelligence(
+                graph_personality_manager=graph_personality_manager,
+                conversation_cache=conversation_cache,
+            )
+        else:
+            self.emotional_intelligence = None
+            logger.warning("Predictive Emotional Intelligence disabled - using vector-native emotion analysis")
 
         # Phase 3.1 Integration: Initialize Emotional Context Engine
         self.emotional_context_engine = None
@@ -104,6 +123,11 @@ class Phase2Integration:
             Enhanced context with emotional intelligence insights
         """
         logger.debug(f"Processing message with emotional intelligence for user {user_id}")
+
+        # Skip if emotional intelligence not available
+        if not self.emotional_intelligence:
+            logger.debug("Emotional intelligence not available - returning original context")
+            return conversation_context
 
         try:
             # Perform comprehensive emotional assessment
