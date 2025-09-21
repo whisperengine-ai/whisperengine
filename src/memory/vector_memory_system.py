@@ -28,7 +28,6 @@ from qdrant_client.http.models import (
 )
 from fastembed import TextEmbedding
 import numpy as np
-from sklearn.metrics.pairwise import cosine_similarity
 from pydantic import BaseModel, Field
 
 # Performance & Async (PostgreSQL for system data, Redis for session cache)
@@ -1284,11 +1283,13 @@ class VectorMemoryStore:
                 # High semantic similarity but different content suggests contradiction
                 memory_embedding = await self.generate_embedding(memory['content'])
                 
-                # Calculate similarity using numpy arrays
-                content_similarity = cosine_similarity(
-                    np.array([new_embedding]),
-                    np.array([memory_embedding])
-                )[0][0]
+                # Calculate similarity using numpy dot product
+                def cosine_similarity_np(a, b):
+                    """Numpy-based cosine similarity calculation"""
+                    a, b = np.array(a), np.array(b)
+                    return np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b))
+                
+                content_similarity = cosine_similarity_np(new_embedding, memory_embedding)
                 
                 # If semantically similar but textually different = potential contradiction
                 if (content_similarity > similarity_threshold and 

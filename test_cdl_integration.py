@@ -46,7 +46,7 @@ CHARACTER DETAILS:
 - Occupation: {identity.get('occupation', 'Unknown')}
 - Location: {identity.get('location', 'Unknown')}
 
-IMPORTANT: You must respond as {identity.get('name', 'this character')}, not as Dream or any other character. Stay completely in character.
+IMPORTANT: You must respond as {identity.get('name', 'this character')}, not as any other character. Stay completely in character.
 
 User Message: "{message_content}"
 
@@ -54,7 +54,7 @@ Respond as {identity.get('name', 'this character')}:"""
     
     # Simulate conversation context enhancement
     original_context = [
-        {'role': 'system', 'content': 'You are Dream, a helpful AI assistant.'},
+        {'role': 'system', 'content': 'You are helpful AI assistant.'},
         {'role': 'user', 'content': message_content}
     ]
     

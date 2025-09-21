@@ -40,7 +40,7 @@ CHARACTER DETAILS:
 - Occupation: {identity.get('occupation', 'Unknown')}
 - Location: {identity.get('location', 'Unknown')}
 
-IMPORTANT: You must respond as {identity.get('name', 'this character')}, not as Dream or any other character. Stay completely in character.
+IMPORTANT: You must respond as {identity.get('name', 'this character')}, not as any other character. Stay completely in character.
 
 Test Message: "Hi Elena! How are you doing today?"
 

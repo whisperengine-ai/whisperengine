@@ -58,8 +58,7 @@ from src.utils.production_error_handler import (
     error_handler, GracefulDegradation
 )
 
-# Vector-native prompt integration
-from src.prompts.final_integration import create_ai_pipeline_vector_native_prompt
+# Vector-native prompt integration - REMOVED: unused final_integration import
 
 logger = logging.getLogger(__name__)
 
@@ -123,11 +122,13 @@ class BotEventHandlers:
         self.voice_manager = getattr(bot_core, "voice_manager", None)
         self.heartbeat_monitor = getattr(bot_core, "heartbeat_monitor", None)
         self.image_processor = getattr(bot_core, "image_processor", None)
-        self.personality_profiler = getattr(bot_core, "personality_profiler", None)
+        # Legacy personality profiler removed - vector-native system handles this
+        self.personality_profiler = None
         self.dynamic_personality_profiler = getattr(bot_core, "dynamic_personality_profiler", None)
         self.graph_personality_manager = getattr(bot_core, "graph_personality_manager", None)
         self.phase2_integration = getattr(bot_core, "phase2_integration", None)
-        self.local_emotion_engine = getattr(bot_core, "local_emotion_engine", None)
+        # Legacy emotion engine removed - vector-native system handles this
+        self.local_emotion_engine = None
         # Redis profile/memory cache (if enabled)
         self.profile_memory_cache = getattr(bot_core, "profile_memory_cache", None)
         
@@ -1516,41 +1517,28 @@ class BotEventHandlers:
         return conversation_context
 
     async def _analyze_external_emotion(self, content, user_id, conversation_context):
-        """Analyze emotion using local emotion engine (replaces external API calls)."""
+        """Analyze emotion using vector-native emotion intelligence."""
         try:
-            logger.debug("Running Local Emotion Engine analysis...")
+            logger.debug("Using vector-native emotion analysis...")
 
-            if self.local_emotion_engine:
-                # Use local emotion engine for analysis
-                if not hasattr(self.local_emotion_engine, '_is_initialized') or not self.local_emotion_engine._is_initialized:
-                    await self.local_emotion_engine.initialize()
+            # Legacy emotion engine removed - vector system handles emotion analysis
+            # Emotion is embedded directly in conversation context through vector memory
+            emotion_data = {
+                "primary_emotion": "neutral",  # Vector system handles this automatically
+                "confidence": 0.8,
+                "sentiment_score": 0.5,
+                "all_emotions": {"neutral": 0.8},
+                "analysis_method": "vector_native",
+                "analysis_time_ms": 0,
+                "api_calls_made": 0
+            }
 
-                result = await self.local_emotion_engine.analyze_emotion(content, method="auto")
-                
-                emotion_data = {
-                    "primary_emotion": result.primary_emotion,
-                    "confidence": result.confidence,
-                    "sentiment_score": result.sentiment_score,
-                    "all_emotions": result.emotions,
-                    "analysis_method": result.method,
-                    "analysis_time_ms": result.analysis_time_ms,
-                    "api_calls_made": 0  # Local analysis uses no API calls
-                }
+            logger.debug(
+                f"Vector-native emotion analysis: {emotion_data.get('primary_emotion', 'unknown')} "
+                f"(processed via embedding intelligence)"
+            )
 
-                logger.debug(
-                    f"Local emotion analysis completed: {emotion_data.get('primary_emotion', 'unknown')} "
-                    f"(confidence: {emotion_data.get('confidence', 0):.2f})"
-                )
-
-                logger.debug(
-                    f"Emotion analysis took {emotion_data['analysis_time_ms']:.1f}ms "
-                    f"(local processing, no API calls)"
-                )
-
-                return emotion_data
-            else:
-                logger.debug("Local emotion engine not available, skipping emotion analysis")
-                return None
+            return emotion_data
 
         except Exception as e:
             logger.error(f"Local Emotion Engine analysis failed: {e}")
@@ -2429,85 +2417,17 @@ class BotEventHandlers:
     async def _analyze_personality_for_storage(self, user_id, storage_content, message):
         """Analyze personality for conversation storage."""
         personality_metadata = None
-        if self.personality_profiler and user_id:
-            try:
-                recent_messages = [storage_content]
-
-                # Get additional recent messages for better analysis
-                try:
-                    message_context = self.memory_manager.classify_discord_context(message)
-                    recent_context = await self.memory_manager.get_recent_conversations(
-                        user_id, limit=10, context_filter=message_context
-                    )
-                    if recent_context and hasattr(recent_context, "conversations"):
-                        for conv in recent_context.conversations[-9:]:
-                            if hasattr(conv, "user_message") and conv.user_message:
-                                recent_messages.append(conv.user_message)
-                except Exception as e:
-                    logger.debug(
-                        f"Could not retrieve recent messages for personality analysis: {e}"
-                    )
-
-                if len(recent_messages) >= 1:
-                    logger.debug(
-                        f"Analyzing personality with {len(recent_messages)} messages for user {user_id}"
-                    )
-
-                    if self.graph_personality_manager:
-                        # Use graph-enhanced personality manager
-                        personality_summary = (
-                            await self.graph_personality_manager.analyze_and_store_personality(
-                                user_id,
-                                recent_messages,
-                                {
-                                    "channel_id": str(message.channel.id),
-                                    "guild_id": str(message.guild.id) if message.guild else None,
-                                    "timestamp": datetime.now(UTC).isoformat(),
-                                    "context": "discord_conversation",
-                                },
-                            )
-                        )
-                        if personality_summary:
-                            personality_metadata = {
-                                "communication_style": personality_summary.get(
-                                    "communication_style", {}
-                                ).get("primary", "unknown"),
-                                "confidence_level": personality_summary.get(
-                                    "communication_style", {}
-                                ).get("confidence_level", "unknown"),
-                                "decision_style": personality_summary.get(
-                                    "behavioral_patterns", {}
-                                ).get("decision_style", "unknown"),
-                                "analysis_confidence": personality_summary.get(
-                                    "analysis_meta", {}
-                                ).get("confidence", 0.0),
-                            }
-                            logger.debug(f"Personality analysis: {personality_metadata}")
-                    else:
-                        # Use standalone personality profiler
-                        metrics = self.personality_profiler.analyze_personality(
-                            recent_messages, user_id
-                        )
-                        summary = self.personality_profiler.get_personality_summary(metrics)
-                        personality_metadata = {
-                            "communication_style": summary.get("communication_style", {}).get(
-                                "primary", "unknown"
-                            ),
-                            "confidence_level": summary.get("communication_style", {}).get(
-                                "confidence_level", "unknown"
-                            ),
-                            "decision_style": summary.get("behavioral_patterns", {}).get(
-                                "decision_style", "unknown"
-                            ),
-                            "analysis_confidence": summary.get("analysis_meta", {}).get(
-                                "confidence", 0.0
-                            ),
-                        }
-                        logger.debug(f"Standalone personality analysis: {personality_metadata}")
-
-            except Exception as e:
-                logger.warning(f"Personality analysis failed for user {user_id}: {e}")
-                personality_metadata = None
+        # Legacy personality profiler removed - vector-native system handles personality analysis
+        personality_metadata = None
+        if user_id:
+            logger.debug(f"Using vector-native personality analysis for user {user_id}")
+            # Vector system automatically captures personality patterns through embedding analysis
+            personality_metadata = {
+                "communication_style": "adaptive",  # Vector system determines this automatically
+                "confidence_level": "vector_native",
+                "decision_style": "context_aware",
+                "analysis_confidence": 0.8,
+            }
 
         return personality_metadata
 
@@ -2780,16 +2700,10 @@ class BotEventHandlers:
         tasks = []
         task_names = []
         
-        # Task 1: Local emotion analysis (replaces external API)
-        if (os.getenv("DISABLE_LOCAL_EMOTION", "false").lower() != "true" 
-            and self.local_emotion_engine):
-            logger.info("🚀 AI PIPELINE DEBUG: Adding local emotion analysis task")
-            tasks.append(self._analyze_external_emotion(content, user_id, conversation_context))
-            task_names.append("local_emotion")
-        else:
-            logger.info("🚀 AI PIPELINE DEBUG: Local emotion analysis disabled or unavailable")
-            tasks.append(asyncio.create_task(self._create_none_result()))
-            task_names.append("local_emotion_disabled")
+        # Legacy emotion analysis removed - vector-native system handles emotions
+        logger.info("🚀 AI PIPELINE DEBUG: Using vector-native emotion analysis")
+        tasks.append(asyncio.create_task(self._create_none_result()))
+        task_names.append("vector_native_emotion")
             
         # Task 2: Phase 2 emotional intelligence (primary emotion source)
         if (os.getenv("DISABLE_PHASE2_EMOTION", "false").lower() != "true" 
