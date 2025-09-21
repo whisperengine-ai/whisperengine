@@ -183,6 +183,9 @@ networks:
   bot_network:
     driver: bridge
     name: whisperengine-network
+    driver_opts:
+      com.docker.network.enable_ipv6: "false"
+      com.docker.network.enable_ipv4: "true"
 
 # Volumes - Properly separated by service responsibility
 volumes:

@@ -30,7 +30,6 @@ services:
       - ./src:/app/src
       - ./scripts:/app/scripts
       - ./characters:/app/characters
-      - ./characters:/app/characters
       - ./validate_config.py:/app/validate_config.py
       - ./run.py:/app/run.py
       - ./env_manager.py:/app/env_manager.py
