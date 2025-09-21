@@ -18,6 +18,7 @@ import sys
 from src.core.bot import DiscordBotCore
 from src.core.bot_launcher import start_bot
 from src.handlers.admin import AdminCommandHandlers
+from src.handlers.cdl_test_commands import CDLTestCommands
 from src.handlers.events import BotEventHandlers
 from src.handlers.help import HelpCommandHandlers
 from src.handlers.memory import MemoryCommandHandlers
@@ -306,6 +307,11 @@ class ModularBotManager:
             self.command_handlers["onboarding"].register_commands(bot_name_filter, is_admin)
             logger.info("✅ Onboarding command handlers registered")
 
+            # CDL Character Test Commands  
+            self.command_handlers["cdl_test"] = CDLTestCommands(bot=self.bot)
+            self.command_handlers["cdl_test"].register_commands()
+            logger.info("✅ CDL character test command handlers registered")
+
             # Monitoring commands for system health and metrics
             self.command_handlers["monitoring"] = MonitoringCommands(
                 bot=self.bot,
@@ -313,6 +319,9 @@ class ModularBotManager:
             )
             self.command_handlers["monitoring"].register_commands(bot_name_filter, is_admin)
             logger.info("✅ Monitoring command handlers registered")
+            
+            # Store command handlers on bot instance for access by events handler
+            self.bot.command_handlers = self.command_handlers
 
         except Exception as e:
             logger.error(f"Failed to initialize command handlers: {e}")

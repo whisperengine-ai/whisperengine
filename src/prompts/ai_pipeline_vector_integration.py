@@ -185,7 +185,7 @@ class VectorAIPipelineIntegration:
                         'confidence': assessment.mood_assessment.confidence
                     },
                     'stress_level': assessment.stress_assessment.stress_level.value,
-                    'triggers': assessment.stress_assessment.stress_triggers[:3]
+                    'triggers': assessment.stress_assessment.immediate_stressors[:3]
                 }
             
             return {}
@@ -205,22 +205,20 @@ class VectorAIPipelineIntegration:
         try:
             # 🎯 VECTOR-NATIVE: Use vector memory instead of graph database
             # Search for relationship patterns using vector similarity
-            relationship_memories = await self.vector_memory.search_memories_with_qdrant_intelligence(
-                query="relationship conversation patterns interaction style",
+            relationship_memories = await self.vector_memory.search_memories(
                 user_id=user_id,
-                top_k=10,
-                prefer_recent=True
+                query="relationship conversation patterns interaction style",
+                limit=10
             )
             
             # Extract conversation patterns from vector results
             patterns = await self._extract_patterns_from_vector_memories(relationship_memories)
             
-            # Get key topics using vector clustering
-            topic_memories = await self.vector_memory.search_memories_with_qdrant_intelligence(
-                query=message_content,
+            # Get key topics using vector clustering  
+            topic_memories = await self.vector_memory.search_memories(
                 user_id=user_id,
-                top_k=15,
-                prefer_recent=False
+                query=message_content,
+                limit=15
             )
             
             topics = await self._extract_topics_from_vector_memories(topic_memories)
@@ -306,64 +304,58 @@ class VectorAIPipelineIntegration:
         try:
             # Store personality insights as vectors
             if result.personality_profile:
-                personality_content = f"User personality: {result.communication_style} communication style, traits: {', '.join(result.personality_traits or [])}"
-                await self.vector_memory.store_memory(
+                personality_content = f"User personality: {result.communication_style}, traits: {', '.join(result.personality_traits or [])}"
+                await self.vector_memory.store_fact(
                     user_id=result.user_id,
-                    content=personality_content,
-                    memory_type="personality_analysis",
+                    fact=personality_content,
+                    fact_type="personality",
                     metadata={
                         "source": "phase1_pipeline",
                         "communication_style": result.communication_style,
-                        "traits": result.personality_traits,
-                        "timestamp": result.timestamp.isoformat()
+                        "traits": result.personality_traits
                     }
                 )
             
             # Store emotional insights as vectors
             if result.emotional_state:
-                emotional_content = f"User emotional state: {result.emotional_state}, stress level: {result.stress_level}, triggers: {', '.join(result.emotional_triggers or [])}"
-                await self.vector_memory.store_memory(
+                emotional_content = f"User emotional state: {result.emotional_state}, stress level: {result.stress_level}"
+                await self.vector_memory.store_fact(
                     user_id=result.user_id,
-                    content=emotional_content,
-                    memory_type="emotional_analysis",
+                    fact=emotional_content,
+                    fact_type="emotional_analysis",
                     metadata={
                         "source": "phase2_pipeline",
                         "emotional_state": result.emotional_state,
-                        "stress_level": result.stress_level,
-                        "triggers": result.emotional_triggers,
-                        "timestamp": result.timestamp.isoformat()
+                        "stress_level": result.stress_level
                     }
                 )
             
             # Store relationship insights as vectors
             if result.relationship_depth:
                 relationship_content = f"User relationship: {result.relationship_depth} connection, patterns: {', '.join(result.conversation_patterns or [])}, topics: {', '.join(result.key_topics or [])}"
-                await self.vector_memory.store_memory(
+                await self.vector_memory.store_fact(
                     user_id=result.user_id,
-                    content=relationship_content,
-                    memory_type="relationship_analysis",
+                    fact=relationship_content,
+                    fact_type="relationship_analysis",
                     metadata={
                         "source": "phase3_pipeline",
                         "relationship_depth": result.relationship_depth,
                         "patterns": result.conversation_patterns,
-                        "topics": result.key_topics,
-                        "timestamp": result.timestamp.isoformat()
+                        "topics": result.key_topics
                     }
                 )
             
             # Store Phase 4 context as vectors
             if result.enhanced_context:
                 phase4_content = f"Conversation context: {result.interaction_type} interaction, {result.conversation_mode} mode"
-                await self.vector_memory.store_memory(
+                await self.vector_memory.store_fact(
                     user_id=result.user_id,
-                    content=phase4_content,
-                    memory_type="phase4_analysis",
+                    fact=phase4_content,
+                    fact_type="phase4_analysis",
                     metadata={
                         "source": "phase4_pipeline",
                         "interaction_type": result.interaction_type,
-                        "conversation_mode": result.conversation_mode,
-                        "enhanced_context": result.enhanced_context,
-                        "timestamp": result.timestamp.isoformat()
+                        "conversation_mode": result.conversation_mode
                     }
                 )
             
@@ -408,12 +400,11 @@ class VectorAIPipelineIntegration:
     async def _get_vector_context_for_phase4(self, user_id: str, message_content: str) -> Dict[str, Any]:
         """Get vector context to enhance Phase 4 processing."""
         try:
-            # Get relevant context from vector memory
-            context_memories = await self.vector_memory.search_memories_with_qdrant_intelligence(
+            # Get relevant context from vector memory using fixed method call
+            context_memories = await self.vector_memory.search_memories(
                 query=message_content,
                 user_id=user_id,
-                top_k=5,
-                prefer_recent=True
+                limit=5
             )
             
             return {
@@ -425,3 +416,208 @@ class VectorAIPipelineIntegration:
         except Exception as e:
             logger.error("❌ Failed to get vector context for Phase 4: %s", e)
             return {}
+
+    async def create_conversational_prompt_with_vector_enhancement(
+        self,
+        user_id: str,
+        message_content: str,
+        pipeline_result: VectorAIPipelineResult
+    ) -> str:
+        """
+        Create conversational prompt that preserves ALL AI intelligence while ensuring natural flow.
+        
+        This uses the FULL AI pipeline results (personality, emotional, etc.) but presents them
+        conversationally instead of as search results.
+        """
+        try:
+            # 1. BUILD RICH AI-ENHANCED CONVERSATIONAL BASE (using ALL pipeline intelligence)
+            base_prompt = await self._build_ai_enhanced_conversational_prompt(
+                user_id, message_content, pipeline_result
+            )
+            
+            # 2. ADD VECTOR MEMORY ENHANCEMENT (if available)
+            memory_enhancement = await self._get_conversational_memory_enhancement(
+                user_id, message_content
+            )
+            
+            # 3. COMBINE FOR NATURAL FLOW WITH FULL AI INTELLIGENCE
+            if memory_enhancement:
+                enhanced_prompt = f"{base_prompt}\n\n{memory_enhancement}"
+            else:
+                enhanced_prompt = base_prompt
+            
+            return enhanced_prompt
+            
+        except Exception as e:
+            logger.error("❌ AI-enhanced conversational prompt creation failed: %s", e)
+            # ALWAYS return conversational fallback that still uses available AI insights
+            return await self._create_ai_aware_conversational_fallback(user_id, message_content, pipeline_result)
+
+    async def _build_ai_enhanced_conversational_prompt(
+        self,
+        user_id: str, 
+        message_content: str,
+        pipeline_result: VectorAIPipelineResult
+    ) -> str:
+        """
+        Build conversational prompt that incorporates ALL AI pipeline intelligence naturally.
+        
+        This preserves sophisticated analysis while presenting it conversationally.
+        """
+        # Extract all AI intelligence from pipeline result
+        personality_insights = self._extract_personality_insights(pipeline_result)
+        emotional_insights = self._extract_emotional_insights(pipeline_result)
+        relationship_insights = self._extract_relationship_insights(pipeline_result)
+        interaction_insights = self._extract_interaction_insights(pipeline_result)
+        
+        # Build rich conversational prompt with AI intelligence
+        prompt_sections = []
+        
+        # Core conversational foundation - SIMPLIFIED
+        base_prompt = f"You are a helpful AI assistant. User said: \"{message_content}\""
+        
+        # Add only essential context - CONDENSED
+        context_parts = []
+        
+        if personality_insights and personality_insights.get('communication_style'):
+            context_parts.append(f"Communication: {personality_insights['communication_style']}")
+        
+        if emotional_insights and emotional_insights.get('emotional_state'):
+            context_parts.append(f"Mood: {emotional_insights['emotional_state']}")
+        
+        if relationship_insights and relationship_insights.get('depth'):
+            context_parts.append(f"Relationship: {relationship_insights['depth']}")
+        
+        # Combine into minimal prompt
+        if context_parts:
+            final_prompt = f"{base_prompt}. Context: {', '.join(context_parts)}. Respond naturally."
+        else:
+            final_prompt = f"{base_prompt}. Respond naturally and helpfully."
+        
+        # 🔍 DEBUG: Print final prompt before sending to LLM
+        logger.debug("🔍 AI PIPELINE PROMPT DEBUG for user %s:\n%s\n%s\n%s", 
+                    user_id, "-"*50, final_prompt, "-"*50)
+        
+        return final_prompt
+
+    def _extract_personality_insights(self, pipeline_result: VectorAIPipelineResult) -> Dict[str, Any]:
+        """Extract personality insights from pipeline result."""
+        if not pipeline_result.personality_profile:
+            return {}
+        
+        return {
+            'communication_style': pipeline_result.communication_style,
+            'traits': pipeline_result.personality_traits or [],
+            'profile': pipeline_result.personality_profile
+        }
+
+    def _extract_emotional_insights(self, pipeline_result: VectorAIPipelineResult) -> Dict[str, Any]:
+        """Extract emotional insights from pipeline result."""
+        if not pipeline_result.emotional_state:
+            return {}
+        
+        return {
+            'emotional_state': pipeline_result.emotional_state,
+            'mood_assessment': pipeline_result.mood_assessment,
+            'stress_level': pipeline_result.stress_level,
+            'triggers': pipeline_result.emotional_triggers or []
+        }
+
+    def _extract_relationship_insights(self, pipeline_result: VectorAIPipelineResult) -> Dict[str, Any]:
+        """Extract relationship insights from pipeline result."""
+        if not pipeline_result.relationship_depth:
+            return {}
+        
+        return {
+            'depth': pipeline_result.relationship_depth,
+            'patterns': pipeline_result.conversation_patterns or [],
+            'topics': pipeline_result.key_topics or []
+        }
+
+    def _extract_interaction_insights(self, pipeline_result: VectorAIPipelineResult) -> Dict[str, Any]:
+        """Extract interaction insights from pipeline result."""
+        if not pipeline_result.interaction_type:
+            return {}
+        
+        return {
+            'type': pipeline_result.interaction_type,
+            'mode': pipeline_result.conversation_mode,
+            'context': pipeline_result.enhanced_context
+        }
+
+    def _get_emotional_response_guidance(self, emotional_insights: Dict[str, Any]) -> str:
+        """Get specific guidance for responding to the user's emotional state."""
+        emotional_state = emotional_insights.get('emotional_state', '').lower()
+        
+        guidance_map = {
+            'excited': 'Match their enthusiasm and encourage their excitement',
+            'worried': 'Provide supportive understanding and gentle reassurance',
+            'confused': 'Offer clear, helpful explanations without being condescending',
+            'sad': 'Show empathetic care and emotional support',
+            'grateful': 'Warmly acknowledge their appreciation and maintain positive energy',
+            'frustrated': 'Acknowledge their frustration and offer patient understanding',
+            'curious': 'Engage their curiosity with thoughtful exploration',
+            'confident': 'Support their confidence while remaining approachable'
+        }
+        
+        return guidance_map.get(emotional_state, 'Respond with emotional awareness and genuine care')
+
+    async def _create_ai_aware_conversational_fallback(
+        self,
+        user_id: str,
+        message_content: str,
+        pipeline_result: VectorAIPipelineResult
+    ) -> str:
+        """
+        Emergency fallback that still uses any available AI insights conversationally.
+        """
+        # Extract minimal context
+        style = pipeline_result.communication_style or "helpful"
+        mood = pipeline_result.emotional_state or "engaged"
+        
+        return f"You are a helpful AI assistant. User said: \"{message_content}\". Be {style} and {mood}. Respond naturally."
+
+    async def _get_conversational_memory_enhancement(
+        self,
+        user_id: str,
+        message_content: str
+    ) -> Optional[str]:
+        """
+        Get memory enhancement for conversation WITHOUT breaking conversational flow.
+        
+        This enriches conversation but doesn't control it.
+        """
+        try:
+            # Search for relevant memories
+            memories = await self.vector_memory.search_memories(
+                message_content, user_id, limit=5
+            )
+            
+            if not memories or len(memories) == 0:
+                return None
+            
+            # Format memories as conversational enrichment
+            memory_context = "BACKGROUND CONTEXT (enhance conversation naturally):\n"
+            for memory in memories[:3]:  # Use top 3 memories
+                if isinstance(memory, dict):
+                    content = memory.get('content', '') or memory.get('fact', '')
+                    if content:
+                        memory_context += f"- {content[:100]}...\n"
+            
+            return memory_context
+            
+        except Exception as e:
+            logger.debug(f"Memory enhancement failed, continuing conversationally: {e}")
+            return None
+
+    async def _create_caring_conversational_fallback(
+        self,
+        user_id: str,
+        message_content: str
+    ) -> str:
+        """
+        Caring conversational fallback when everything else fails.
+        
+        This maintains relationship continuity even in error states.
+        """
+        return f"You are a helpful AI assistant. User said: \"{message_content}\". Respond naturally and helpfully."

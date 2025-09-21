@@ -327,19 +327,29 @@ class LLMMessageRoleSecurityProcessor:
         priority = 0.0
         content_lower = content.lower()
 
-        # Primary character/role definition gets highest priority
+        # Character-specific definitions get HIGHEST priority (characters override generic)
         if any(
             phrase in content_lower
             for phrase in [
-                "you are a helpful",
-                "you are an ai",
+                "you are elena",
+                "you are sarah",
+                "you are alex",
                 "your name is",
                 "you play the role",
                 "you embody",
                 "your character is",
             ]
         ):
-            priority += 10.0
+            priority += 15.0  # Higher than generic to ensure character overrides
+        # Generic AI assistant gets lower priority
+        elif any(
+            phrase in content_lower
+            for phrase in [
+                "you are a helpful",
+                "you are an ai",
+            ]
+        ):
+            priority += 5.0  # Lower priority than character-specific
 
         # Core personality/behavior instructions get high priority
         if any(

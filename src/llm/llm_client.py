@@ -1295,41 +1295,7 @@ class LLMClient:
         if not messages:
             return messages
 
-        # ENHANCED SECURITY: Apply comprehensive message role security processing
-        try:
-            from src.security.llm_message_role_security import secure_message_role_processing
-
-            secure_messages = secure_message_role_processing(messages)
-            self.logger.debug(
-                f"Applied secure message role processing: {len(messages)} -> {len(secure_messages)} messages"
-            )
-
-            # If security processing returned messages, use them and skip old logic
-            if secure_messages:
-                return secure_messages
-
-        except ImportError:
-            self.logger.warning(
-                "LLM message role security module not available - falling back to basic processing"
-            )
-        except Exception as e:
-            self.logger.error(
-                f"Error in secure message role processing: {e} - falling back to basic processing"
-            )
-
-        # FALLBACK: Legacy processing with basic security (if new security fails)
-        # SECURITY ENHANCEMENT: Import and apply system message security
-        try:
-            from src.security.system_message_security import sanitize_system_messages
-
-            messages = sanitize_system_messages(messages)
-            self.logger.debug("Applied system message sanitization (fallback)")
-        except ImportError:
-            self.logger.warning(
-                "System message security module not available - proceeding without sanitization"
-            )
-        except Exception as e:
-            self.logger.error(f"Error applying system message sanitization: {e}")
+        # SECURITY MODULE DISABLED: Let character prompts through unchanged
 
         result = []
         system_messages = []

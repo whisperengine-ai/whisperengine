@@ -1,11 +1,11 @@
 """
 Character Definition Language (CDL) Parser
 
-This module handles parsing and serialization of character definitions from/to YAML format
+This module handles parsing and serialization of character definitions from JSON format
 following the CDL specification.
 """
 
-import yaml
+import json
 import logging
 from pathlib import Path
 from datetime import datetime
@@ -38,7 +38,7 @@ class CDLParseError(Exception):
 
 
 class CDLParser:
-    """Character Definition Language parser for YAML format"""
+    """Character Definition Language parser for JSON/YAML format (JSON preferred)"""
     
     CDL_VERSION = "1.0"
     
@@ -47,10 +47,10 @@ class CDLParser:
     
     def parse_file(self, file_path: Union[str, Path]) -> Character:
         """
-        Parse a character definition from a YAML file.
+        Parse a character definition from a JSON file.
         
         Args:
-            file_path: Path to the CDL YAML file
+            file_path: Path to the CDL JSON file
             
         Returns:
             Character: Parsed character object
@@ -64,12 +64,13 @@ class CDLParser:
                 raise CDLParseError(f"Character file not found: {file_path}")
             
             with open(file_path, 'r', encoding='utf-8') as f:
-                data = yaml.safe_load(f)
+                data = json.load(f)
+                self.logger.info(f"Loading character from JSON: {file_path}")
             
             return self.parse_dict(data, source_file=str(file_path))
             
-        except yaml.YAMLError as e:
-            raise CDLParseError(f"YAML parsing error in {file_path}: {e}")
+        except json.JSONDecodeError as e:
+            raise CDLParseError(f"JSON parsing error in {file_path}: {e}")
         except Exception as e:
             raise CDLParseError(f"Error parsing character file {file_path}: {e}")
     
@@ -176,6 +177,9 @@ class CDLParser:
         # Parse appearance
         if 'appearance' in data:
             identity.appearance = self._parse_appearance(data['appearance'])
+            # Extract description from appearance for easy access
+            if identity.appearance and hasattr(identity.appearance, 'description'):
+                identity.description = identity.appearance.description
         
         # Parse voice
         if 'voice' in data:
@@ -423,7 +427,7 @@ class CDLParser:
         data = self.serialize_to_dict(character)
         
         with open(file_path, 'w', encoding='utf-8') as f:
-            yaml.dump(data, f, default_flow_style=False, allow_unicode=True, sort_keys=False)
+            json.dump(data, f, indent=2, ensure_ascii=False)
         
         self.logger.info(f"Character '{character.get_display_name()}' saved to {file_path}")
 

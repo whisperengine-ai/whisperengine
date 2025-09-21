@@ -13,6 +13,9 @@ logger = logging.getLogger(__name__)
 
 def get_system_prompt() -> str:
     """Get the current system prompt (reloads from file each time for hot-reload support).
+    
+    ⚠️ DEPRECATED: This function is being replaced by CDL character system.
+    Use CDL_DEFAULT_CHARACTER environment variable instead of BOT_SYSTEM_PROMPT_FILE.
 
     Returns:
         str: The system prompt content
@@ -23,6 +26,9 @@ def get_system_prompt() -> str:
 def load_system_prompt() -> str:
     """Load system prompt from file specified in environment variable.
     Automatically replaces {BOT_NAME} template variable with the actual bot name.
+    
+    ⚠️ DEPRECATED: This function is being replaced by CDL character system.
+    New systems should use CDL characters instead of MD prompt files.
 
     Returns:
         str: The system prompt content with bot name replaced

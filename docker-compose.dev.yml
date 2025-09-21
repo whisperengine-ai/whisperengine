@@ -27,6 +27,7 @@ services:
       # Override the copied source code with live mounting for development
       - ./src:/app/src
       - ./prompts:/app/prompts
+      - ./characters:/app/characters
       - ./validate_config.py:/app/validate_config.py
       - ./run.py:/app/run.py
       - ./env_manager.py:/app/env_manager.py

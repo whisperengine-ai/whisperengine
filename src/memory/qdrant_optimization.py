@@ -216,7 +216,25 @@ class QdrantQueryOptimizer:
             if 'memory_type' in filters:
                 if metadata.get('memory_type') != filters['memory_type']:
                     continue
-                    
+            
+            # 🎭 CHARACTER FILTERING: Filter by active character context
+            # This ensures Elena gets Elena's memories, not generic WhisperEngine ones
+            if 'active_character' in filters or 'has_character' in filters:
+                result_character = metadata.get('active_character')
+                result_has_character = metadata.get('has_character', False)
+                
+                # If we're looking for a specific character
+                if 'active_character' in filters:
+                    if result_character != filters['active_character']:
+                        logger.debug(f"🎭 FILTER: Skipping memory - expected character '{filters['active_character']}', got '{result_character}'")
+                        continue
+                
+                # If we're filtering by character presence
+                if 'has_character' in filters:
+                    if result_has_character != filters['has_character']:
+                        logger.debug(f"🎭 FILTER: Skipping memory - expected has_character={filters['has_character']}, got {result_has_character}")
+                        continue
+                        
             filtered_results.append(result)
             
         logger.debug("🎯 Hybrid search: %d results after filtering", len(filtered_results))
