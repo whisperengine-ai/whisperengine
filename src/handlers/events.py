@@ -86,16 +86,10 @@ META_ANALYSIS_PATTERNS = [
 def _strict_mode_enabled() -> bool:
     return os.getenv("STRICT_IMMERSIVE_MODE", "true").lower() in ("1", "true", "yes", "on")
 
+# FALLBACK FUNCTION REMOVED - NO GRACEFUL DEGRADATION ALLOWED
 def _minimal_context_mode_enabled() -> bool:
-    """Return True if MINIMAL_CONTEXT_MODE is enabled via environment.
-
-    When enabled we intentionally suppress enrichment layers (phase2 emotion, dynamic personality,
-    phase4 intelligence, external emotion API, and memory narrative) to obtain a clean baseline
-    model behavior. Only the consolidated core system prompt + last few raw user/assistant turns
-    are sent (attachments still guarded). This helps diagnose style contamination originating from
-    higher-level adaptive systems vs base model tendencies.
-    """
-    return os.getenv("MINIMAL_CONTEXT_MODE", "false").lower() in ("1", "true", "yes", "on")
+    """DISABLED FALLBACK: Always return False - no degraded mode allowed."""
+    return False
 
 
 class BotEventHandlers:
@@ -682,15 +676,12 @@ class BotEventHandlers:
         comprehensive_context = None
         enhanced_system_prompt = None
 
-        # PERFORMANCE OPTIMIZATION: Process AI components in parallel instead of sequentially
-        if not _minimal_context_mode_enabled():
-            (external_emotion_data, phase2_context, current_emotion_data, 
-             dynamic_personality_context, phase4_context, comprehensive_context, 
-             enhanced_system_prompt) = await self._process_ai_components_parallel(
-                user_id, message.content, message, recent_messages, conversation_context
-            )
-        else:
-            logger.debug("[MINIMAL_CONTEXT_MODE] Skipping emotion/personality/phase4 enrichment for DM message.")
+        # ALWAYS process AI components - NO CONDITIONAL FALLBACKS
+        (external_emotion_data, phase2_context, current_emotion_data, 
+         dynamic_personality_context, phase4_context, comprehensive_context, 
+         enhanced_system_prompt) = await self._process_ai_components_parallel(
+            user_id, message.content, message, recent_messages, conversation_context
+        )
 
         # Process message with images
         conversation_context = await process_message_with_images(
@@ -935,15 +926,12 @@ class BotEventHandlers:
         comprehensive_context = None
         enhanced_system_prompt = None
 
-        # PERFORMANCE OPTIMIZATION: Process AI components in parallel instead of sequentially
-        if not _minimal_context_mode_enabled():
-            (external_emotion_data, phase2_context, current_emotion_data, 
-             dynamic_personality_context, phase4_context, comprehensive_context, 
-             enhanced_system_prompt) = await self._process_ai_components_parallel(
-                user_id, content, message, recent_messages, conversation_context
-            )
-        else:
-            logger.debug("[MINIMAL_CONTEXT_MODE] Skipping emotion/personality/phase4 enrichment for guild mention.")
+        # ALWAYS process AI components - NO CONDITIONAL FALLBACKS
+        (external_emotion_data, phase2_context, current_emotion_data, 
+         dynamic_personality_context, phase4_context, comprehensive_context, 
+         enhanced_system_prompt) = await self._process_ai_components_parallel(
+            user_id, content, message, recent_messages, conversation_context
+        )
 
         # Process message with images (content with mentions removed)
         conversation_context = await process_message_with_images(
@@ -1214,100 +1202,108 @@ class BotEventHandlers:
                 system_prompt_content = get_system_prompt()
                 logger.debug("Falling back to basic system prompt")
 
-        # STRICT immersive mode OR minimal context mode: consolidate system messages into a single narrative instruction
-        if _strict_mode_enabled() or _minimal_context_mode_enabled():
-            # Build compact memory narrative
-            memory_fragments = []
-            if relevant_memories and not _minimal_context_mode_enabled():
-                logger.info(f"🤖 LLM CONTEXT DEBUG: Processing {len(relevant_memories)} memories for context")
-                # Handle both legacy and hierarchical memory formats
-                global_facts = []
-                user_memories = []
-                
-                for i, m in enumerate(relevant_memories):
-                    logger.info(f"🤖 LLM CONTEXT DEBUG: Memory {i+1} structure: {list(m.keys())}")
-                    # Check if memory has metadata (legacy format) or use memory_type (hierarchical format)
-                    if "metadata" in m:
-                        # Legacy format
-                        if m["metadata"].get("is_global", False):
-                            global_facts.append(m)
-                        else:
-                            user_memories.append(m)
+        # ALWAYS consolidate system messages into a single narrative instruction - NO FALLBACKS
+        # Build compact memory narrative
+        memory_fragments = []
+        if relevant_memories:
+            logger.info(f"🤖 LLM CONTEXT DEBUG: Processing {len(relevant_memories)} memories for context")
+            # Handle both legacy and hierarchical memory formats
+            global_facts = []
+            user_memories = []
+            
+            for i, m in enumerate(relevant_memories):
+                logger.info(f"🤖 LLM CONTEXT DEBUG: Memory {i+1} structure: {list(m.keys())}")
+                # Check if memory has metadata (legacy format) or use memory_type (hierarchical format)
+                if "metadata" in m:
+                    # Legacy format
+                    if m["metadata"].get("is_global", False):
+                        global_facts.append(m)
                     else:
-                        # Hierarchical format - treat all as user memories for now
                         user_memories.append(m)
-                
-                logger.info(f"🤖 LLM CONTEXT DEBUG: Categorized - {len(global_facts)} global facts, {len(user_memories)} user memories")
-                
-                if global_facts:
-                    gf_text = "; ".join(
-                        memory["metadata"].get("fact", "")[:160] for memory in global_facts
-                        if memory.get("metadata", {}).get("type") == "global_fact"
-                    )
-                    if gf_text:
-                        memory_fragments.append(f"Shared truths: {gf_text}")
-                        logger.info(f"🤖 LLM CONTEXT DEBUG: Added global facts: {gf_text[:100]}...")
-                if user_memories and not _minimal_context_mode_enabled():
+                else:
+                    # Hierarchical format - treat all as user memories for now
+                    user_memories.append(m)
+            
+            logger.info(f"🤖 LLM CONTEXT DEBUG: Categorized - {len(global_facts)} global facts, {len(user_memories)} user memories")
+            
+            logger.info(f"🔍 CONDITION DEBUG: user_memories={len(user_memories) if user_memories else 0}, minimal_mode={_minimal_context_mode_enabled()}")
+            
+            if global_facts:
+                gf_text = "; ".join(
+                    memory["metadata"].get("fact", "")[:160] for memory in global_facts
+                    if memory.get("metadata", {}).get("type") == "global_fact"
+                )
+                if gf_text:
+                    memory_fragments.append(f"Shared truths: {gf_text}")
+                    logger.info(f"🤖 LLM CONTEXT DEBUG: Added global facts: {gf_text[:100]}...")
+            if user_memories:
+                    logger.info(f"🔍 USER MEMORIES DEBUG: Processing {len(user_memories)} user memories")
+                    
                     conversation_memory_parts = []
                     for memory in user_memories[:6]:  # limit
-                        # Handle both legacy and hierarchical memory formats
-                        if "metadata" in memory:
-                            # Legacy format - properly format conversation turns
-                            md = memory["metadata"]
+                        # ALWAYS try content field first - no complex format detection
+                        content = memory.get("content", "")
+                        logger.info(f"🔍 MEMORY DEBUG [{memory.get('id', 'unknown')}]: content='{content[:50]}...', has_metadata={'metadata' in memory}")
+                        
+                        if content and content.strip():
+                            # Try to parse if it contains conversation structure
+                            if "User:" in content and "Bot:" in content:
+                                conversation_memory_parts.append(f"[Previous conversation: {content[:120]}]")
+                            else:
+                                conversation_memory_parts.append(f"[Memory: {content[:120]}]")
+                            logger.info(f"🔍 MEMORY DEBUG: ✅ Added memory content")
+                        else:
+                            # Only try metadata if content is empty/missing
+                            md = memory.get("metadata", {})
                             if md.get("user_message") and md.get("bot_response"):
-                                # Format as a proper conversation turn
                                 user_msg = md.get("user_message")[:100]
                                 bot_msg = md.get("bot_response")[:100]
                                 conversation_memory_parts.append(f"[User said: \"{user_msg}\", You responded: \"{bot_msg}\"]")
+                                logger.info(f"🔍 MEMORY DEBUG: ✅ Added from metadata conversation")
                             elif md.get("user_message"):
-                                # Just user message
                                 user_msg = md.get("user_message")[:120]
                                 conversation_memory_parts.append(f"[User said: \"{user_msg}\"]")
+                                logger.info(f"🔍 MEMORY DEBUG: ✅ Added from metadata user message")
                             elif md.get("type") == "user_fact":
                                 conversation_memory_parts.append(f"[Fact: {md.get('fact', '')[:120]}]")
-                        else:
-                            # Hierarchical format - use content field but clarify source
-                            content = memory.get("content", "")
-                            if content:
-                                # Try to parse if it contains conversation structure
-                                if "User:" in content and "Bot:" in content:
-                                    conversation_memory_parts.append(f"[Previous conversation: {content[:120]}]")
-                                else:
-                                    conversation_memory_parts.append(f"[Memory: {content[:120]}]")
+                                logger.info(f"🔍 MEMORY DEBUG: ✅ Added from metadata fact")
+                            else:
+                                logger.warning(f"🔍 MEMORY DEBUG: ❌ No valid content or metadata structure")
+                    
                     if conversation_memory_parts:
-                        memory_fragments.append("Previous conversation context: " + "; ".join(conversation_memory_parts))
-                        logger.info(f"🤖 LLM CONTEXT DEBUG: Added conversation memories: {conversation_memory_parts}")
+                        memory_fragments.append("IMPORTANT USER FACTS AND PREVIOUS INTERACTIONS: " + "; ".join(conversation_memory_parts))
+                        logger.info(f"🤖 LLM CONTEXT DEBUG: Added {len(conversation_memory_parts)} conversation memories")
                     else:
-                        logger.warning(f"🤖 LLM CONTEXT DEBUG: No valid user memory content found")
+                        logger.error(f"🤖 LLM CONTEXT DEBUG: FAILED - No valid memory content found from {len(user_memories)} memories")
             else:
                 logger.info(f"🤖 LLM CONTEXT DEBUG: No memories to process (memories: {relevant_memories is not None}, minimal_mode: {_minimal_context_mode_enabled()})")
             
             memory_narrative = " " .join(memory_fragments)
             logger.info(f"🤖 LLM CONTEXT DEBUG: Final memory narrative: '{memory_narrative[:200]}...'")
 
-            # Conversation summary (compressed)
-            conversation_summary = None
-            if not _minimal_context_mode_enabled():
-                conversation_summary = generate_conversation_summary(
-                    recent_messages, str(message.author.id)
-                )
-                if conversation_summary and len(conversation_summary) > 600:
-                    conversation_summary = conversation_summary[:600] + "..."
+            # ALWAYS generate conversation summary - NO CONDITIONAL FALLBACKS
+            conversation_summary = generate_conversation_summary(
+                recent_messages, str(message.author.id)
+            )
+            if conversation_summary and len(conversation_summary) > 600:
+                conversation_summary = conversation_summary[:600] + "..."
 
-            # Emotion context inline
+            # ALWAYS include emotion context - NO CONDITIONAL FALLBACKS
             emotion_inline = ""
-            if emotion_context and not _minimal_context_mode_enabled():
+            if emotion_context:
                 emotion_inline = f" Emotive context: {emotion_context}."
 
             # Attachment guard if needed
             attachment_guard = ""
             if getattr(message, "attachments", None) and len(message.attachments) > 0:
+                bot_name = os.getenv('DISCORD_BOT_NAME', 'Assistant')
                 attachment_guard = (
-                    " Image policy: respond only in-character (Dream), never output analysis sections, headings, scores, tables, coaching offers, or 'Would you like me to' prompts."
+                    f" Image policy: respond only in-character ({bot_name}), never output analysis sections, headings, scores, tables, coaching offers, or 'Would you like me to' prompts."
                 )
 
+            bot_name = os.getenv('DISCORD_BOT_NAME', 'Assistant')
             guidance_clause = (
-                " Invariant style: one immersive, poetic reply as Dream. No meta-analysis, no breakdowns, no bullet summaries, no section headings."
+                f" Invariant style: one immersive, poetic reply as {bot_name}. No meta-analysis, no breakdowns, no bullet summaries, no section headings."
             )
             if _minimal_context_mode_enabled():
                 guidance_clause += " Minimal baseline mode: do NOT fabricate context, just respond naturally in-character."
@@ -1319,105 +1315,6 @@ class BotEventHandlers:
                 + guidance_clause
             )
             conversation_context.append({"role": "system", "content": consolidated})
-        else:
-            # Fallback to original multi-system approach if strict mode disabled
-            conversation_context.append({"role": "system", "content": system_prompt_content})
-            conversation_context.append({"role": "system", "content": f"Current time: {time_context}"})
-            if emotion_context:
-                conversation_context.append(
-                    {"role": "system", "content": f"User relationship and emotional context: {emotion_context}"}
-                )
-            if relevant_memories:
-                # Optimize memory context to prevent context explosion
-                relevant_memories = optimize_memory_context(relevant_memories, max_memories=8)
-                
-                memory_context = "Previous conversation context:\n"
-                
-                # Handle both legacy and hierarchical memory formats
-                global_facts = []
-                user_memories = []
-                
-                for m in relevant_memories:
-                    # Check if memory has metadata (legacy format) or use direct content (hierarchical format)
-                    if "metadata" in m:
-                        # Legacy format
-                        if m["metadata"].get("is_global", False):
-                            global_facts.append(m)
-                        else:
-                            user_memories.append(m)
-                    else:
-                        # Hierarchical format - treat all as user memories for conversation context
-                        user_memories.append(m)
-                
-                if global_facts:
-                    memory_context += "\nGlobal Facts:\n"
-                    for memory in global_facts:
-                        if memory["metadata"].get("type") == "global_fact":
-                            memory_context += f"- {memory['metadata']['fact']}\n"
-                            
-                if user_memories:
-                    memory_context += "\nUser-specific information:\n"
-                    for memory in user_memories:
-                        # Handle both legacy and hierarchical memory formats
-                        if "metadata" in memory:
-                            # Legacy format
-                            md = memory["metadata"]
-                            if md.get("user_message"):
-                                memory_context += f"- User said: {md.get('user_message')[:160]}\n"
-                            elif md.get("type") == "user_fact":
-                                memory_context += f"- Fact: {md.get('fact','')}\n"
-                        else:
-                            # Hierarchical format - use content field with intelligent classification
-                            content = memory.get("content", "")
-                            if content:
-                                # Use semantic classification instead of pattern matching
-                                fact_score = memory.get("score", 0.0)
-                                
-                                # DEBUG: Log what memories are being added to context
-                                logger.info(f"🔍 MEMORY DEBUG: Adding memory to context (score: {fact_score}): '{content[:100]}...'")
-                                
-                                # High semantic similarity + declarative statement = likely user fact
-                                if fact_score > 0.95:
-                                    # Use spaCy-based classification instead of simple pattern matching
-                                    try:
-                                        # Quick linguistic analysis to determine if this is factual information
-                                        is_question = content.endswith("?") or any(
-                                            qword in content.lower() for qword in ["what", "who", "when", "where", "why", "how"]
-                                        )
-                                        
-                                        # Check for first-person declarative statements (likely facts about user)
-                                        is_user_statement = any(
-                                            pattern in content.lower() for pattern in [
-                                                "my name", "i am", "i have", "i live", "i work", "i like", "i love", "i prefer"
-                                            ]
-                                        )
-                                        
-                                        if is_user_statement and not is_question:
-                                            memory_context += f"- IMPORTANT USER INFO: {content[:160]}\n"
-                                            logger.info(f"🎯 MEMORY DEBUG: Classified as IMPORTANT USER INFO: '{content[:100]}...'")
-                                        elif is_question:
-                                            memory_context += f"- Previous question: {content[:160]}\n"
-                                            logger.info(f"❓ MEMORY DEBUG: Classified as previous question: '{content[:100]}...'")
-                                        else:
-                                            memory_context += f"- Previous conversation: {content[:160]}\n"
-                                            logger.info(f"💬 MEMORY DEBUG: Classified as conversation: '{content[:100]}...'")
-                                    except Exception:
-                                        # Fallback to simple formatting
-                                        memory_context += f"- Previous conversation: {content[:160]}\n"
-                                        logger.info(f"⚠️ MEMORY DEBUG: Used fallback formatting: '{content[:100]}...'")
-                                else:
-                                    # Lower similarity, format as regular conversation
-                                    memory_context += f"- Previous conversation: {content[:160]}\n"
-                                    logger.info(f"📝 MEMORY DEBUG: Low similarity conversation: '{content[:100]}...'")
-                
-                conversation_context.append({"role": "system", "content": memory_context})
-            conversation_summary = generate_conversation_summary(
-                recent_messages, str(message.author.id)
-            )
-            if conversation_summary:
-                conversation_context.append(
-                    {"role": "system", "content": f"Recent conversation summary: {conversation_summary}"}
-                )
 
         # Add recent messages with proper alternation
         user_assistant_messages = []
@@ -1501,12 +1398,13 @@ class BotEventHandlers:
         try:
             if getattr(message, "attachments", None):
                 if len(message.attachments) > 0:
+                    bot_name = os.getenv('DISCORD_BOT_NAME', 'Assistant')
                     conversation_context.append(
                         {
                             "role": "system",
                             "content": (
                                 "IMAGE RESPONSE POLICY: The user has shared one or more images. "
-                                "Respond ONLY with an in-character, natural reply consistent with the Dream persona. "
+                                f"Respond ONLY with an in-character, natural reply consistent with the {bot_name} persona. "
                                 "Describe or reference the visual/emotional/aesthetic qualities succinctly. DO NOT include: "
                                 "section headings (e.g. 'Core Conversation Analysis', 'Emotional Analysis', 'Technical Metadata', 'Overall Assessment'), "
                                 "numerical scores, personality trait tables, API success rates, relevance scores, or offers like 'Do you want me to:'. "
@@ -2074,9 +1972,10 @@ class BotEventHandlers:
                 if (_strict_mode_enabled() or _minimal_context_mode_enabled()) and any(p in response for p in META_ANALYSIS_PATTERNS):
                     logger.warning("Meta patterns still detected post-sanitization - invoking rewrite pass")
                     try:
+                        bot_name = os.getenv('DISCORD_BOT_NAME', 'Assistant')
                         rewrite_context = [
                             {"role": "system", "content": (
-                                "You are a style refiner. Rewrite the assistant content into a SINGLE immersive in-character reply as Dream of the Endless. Remove all analysis sections, headings, breakdowns, score talk, coaching offers, or meta commentary. Keep poetic tone, <=120 words."
+                                f"You are a style refiner. Rewrite the assistant content into a SINGLE immersive in-character reply as {bot_name}. Remove all analysis sections, headings, breakdowns, score talk, coaching offers, or meta commentary. Keep poetic tone, <=120 words."
                             )},
                             {"role": "user", "content": response[:4000]},
                         ]
@@ -2214,17 +2113,17 @@ class BotEventHandlers:
             except LLMConnectionError:
                 logger.warning("LLM connection error")
                 await reply_channel.send(
-                    "*The pathways between realms have grown dim...* I cannot reach the source of wisdom at this moment. Pray, try again shortly."
+                    "I'm having trouble connecting to my knowledge systems. Please try again in a moment."
                 )
             except LLMTimeoutError:
                 logger.warning("LLM timeout error")
                 await reply_channel.send(
-                    "*Time moves strangely in the realm of dreams...* Thy words have taken too long to reach me. Speak again, if thou wilt."
+                    "I apologize, but that took longer than expected to process. Could you please try again?"
                 )
             except LLMRateLimitError:
                 logger.warning("LLM rate limit error")
                 await reply_channel.send(
-                    "*The flow of dreams grows heavy with too many seekers...* Grant me a moment's respite, then we may speak once more."
+                    "I'm experiencing high demand right now. Please wait a moment before trying again."
                 )
             except LLMError as e:
                 logger.error(f"LLM error: {e}")

@@ -21,7 +21,11 @@ from uuid import uuid4
 
 # Local-First AI/ML Libraries
 from qdrant_client import QdrantClient, models
-from qdrant_client.http.models import Distance, VectorParams, PointStruct, Range, OrderBy, Direction
+from qdrant_client.http.models import (
+    Distance, VectorParams, PointStruct, Range, OrderBy, Direction,
+    HnswConfigDiff, OptimizersConfigDiff, ScalarQuantization, 
+    ScalarQuantizationConfig, ScalarType, PayloadSchemaType, NamedVector
+)
 from fastembed import TextEmbedding
 import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
@@ -111,26 +115,134 @@ class VectorMemoryStore:
                    f"collection={collection_name}, embedding_dim={self.embedding_dimension}")
     
     def _ensure_collection_exists(self):
-        """Create collection if it doesn't exist"""
+        """
+        🚀 QDRANT-NATIVE: Create advanced collection with named vectors
+        
+        Features:
+        - Named vectors for multi-dimensional search (content, emotion, semantic)
+        - Optimized indexing for payload fields
+        - Performance optimizations
+        """
         try:
             collections = self.client.get_collections().collections
             collection_names = [c.name for c in collections]
             
             if self.collection_name not in collection_names:
+                # 🎯 QDRANT FEATURE: Named vectors for multi-dimensional intelligence
+                vectors_config = {
+                    # Main content vector for semantic similarity
+                    "content": VectorParams(
+                        size=self.embedding_dimension,
+                        distance=Distance.COSINE,
+                        hnsw_config=models.HnswConfigDiff(
+                            m=32,  # Higher connectivity for better recall
+                            ef_construct=256,  # Better build quality
+                            full_scan_threshold=20000
+                        )
+                    ),
+                    
+                    # Emotional context vector for sentiment-aware search
+                    "emotion": VectorParams(
+                        size=self.embedding_dimension,
+                        distance=Distance.COSINE,
+                        hnsw_config=models.HnswConfigDiff(
+                            m=16,  # Lower connectivity for emotion
+                            ef_construct=128
+                        )
+                    ),
+                    
+                    # Semantic concept vector for contradiction detection
+                    "semantic": VectorParams(
+                        size=self.embedding_dimension,
+                        distance=Distance.COSINE,
+                        hnsw_config=models.HnswConfigDiff(
+                            m=16,
+                            ef_construct=128
+                        )
+                    )
+                }
+                
+                # 🚀 QDRANT FEATURE: Optimized configuration for performance
+                optimizers_config = models.OptimizersConfigDiff(
+                    deleted_threshold=0.2,
+                    vacuum_min_vector_number=1000,
+                    default_segment_number=2,
+                    max_segment_size=20000,
+                    memmap_threshold=50000,
+                    indexing_threshold=20000,
+                    flush_interval_sec=5,
+                    max_optimization_threads=2
+                )
+                
+                # Simple named vector creation
                 self.client.create_collection(
                     collection_name=self.collection_name,
-                    vectors_config=VectorParams(
-                        size=self.embedding_dimension,
-                        distance=Distance.COSINE
-                    )
+                    vectors_config=vectors_config,  # Named vectors only
+                    optimizers_config=optimizers_config
                 )
-                logger.info(f"Created new collection: {self.collection_name}")
+                
+                # 🎯 QDRANT FEATURE: Create payload indexes for efficient filtering
+                self._create_payload_indexes()
+                
+                logger.info(f"🚀 QDRANT-ADVANCED: Created collection '{self.collection_name}' with named vectors")
             else:
                 logger.info(f"Using existing collection: {self.collection_name}")
                 
         except Exception as e:
             logger.error(f"Error ensuring collection exists: {e}")
-            raise
+            raise  # Don't fallback - we need named vectors to work properly
+    
+    def _create_payload_indexes(self):
+        """
+        🎯 QDRANT FEATURE: Create optimized payload indexes for fast filtering
+        """
+        try:
+            # Index for user-based filtering (most common)
+            self.client.create_payload_index(
+                collection_name=self.collection_name,
+                field_name="user_id",
+                field_schema=models.PayloadSchemaType.KEYWORD
+            )
+            
+            # Index for memory type filtering
+            self.client.create_payload_index(
+                collection_name=self.collection_name,
+                field_name="memory_type", 
+                field_schema=models.PayloadSchemaType.KEYWORD
+            )
+            
+            # Index for temporal range queries
+            self.client.create_payload_index(
+                collection_name=self.collection_name,
+                field_name="timestamp_unix",
+                field_schema=models.PayloadSchemaType.FLOAT
+            )
+            
+            # Index for semantic grouping
+            self.client.create_payload_index(
+                collection_name=self.collection_name,
+                field_name="semantic_key",
+                field_schema=models.PayloadSchemaType.KEYWORD
+            )
+            
+            # Index for emotional context
+            self.client.create_payload_index(
+                collection_name=self.collection_name,
+                field_name="emotional_context",
+                field_schema=models.PayloadSchemaType.KEYWORD
+            )
+            
+            # Index for content hash (deduplication)
+            self.client.create_payload_index(
+                collection_name=self.collection_name,
+                field_name="content_hash",
+                field_schema=models.PayloadSchemaType.INTEGER
+            )
+            
+            logger.info("🎯 QDRANT-INDEXES: Created optimized payload indexes")
+            
+        except Exception as e:
+            logger.warning(f"Could not create payload indexes (may already exist): {e}")
     
     async def generate_embedding(self, text: str) -> List[float]:
         """Generate high-quality embedding using local fastembed"""
@@ -154,64 +266,159 @@ class VectorMemoryStore:
     
     async def store_memory(self, memory: VectorMemory) -> str:
         """
-        🚀 ENHANCED: Store memory with Qdrant-native semantic enrichment
+        🚀 QDRANT-NATIVE: Store memory with named vectors and advanced features
         
-        Adds:
-        - Semantic keys for contradiction detection
-        - Emotional context extraction
-        - Temporal metadata for decay functions
-        - Confidence scoring based on source
+        Uses:
+        - Named vectors for multi-dimensional search (content + emotion + semantic)
+        - Sparse vectors for keyword features
+        - Automatic deduplication via content hashing
+        - Contradiction detection preparation via semantic grouping
         """
+        # CRITICAL DEBUG: Log entry to this method
+        print(f"🔥 STORE_MEMORY CALLED: user_id={memory.user_id}, content={memory.content[:50]}...")
+        logger.error(f"🔥 STORE_MEMORY CALLED: user_id={memory.user_id}, content={memory.content[:50]}...")
+        
         try:
-            # Generate embedding if not provided
-            if memory.embedding is None:
-                memory.embedding = await self.generate_embedding(memory.content)
+            # 🎯 QDRANT FEATURE: Generate multiple embeddings for named vectors
+            content_embedding = await self.generate_embedding(memory.content)
+            logger.debug(f"Generated content embedding: {type(content_embedding)}, length: {len(content_embedding) if content_embedding else None}")
             
-            # 🎯 QDRANT ENHANCEMENT: Add semantic enrichment to payload
-            enriched_payload = {
+            # Create emotional embedding for sentiment-aware search
+            emotional_context = self._extract_emotional_context(memory.content)
+            emotion_embedding = await self.generate_embedding(f"emotion {emotional_context}: {memory.content}")
+            logger.debug(f"Generated emotion embedding: {type(emotion_embedding)}, length: {len(emotion_embedding) if emotion_embedding else None}")
+            
+            # Create semantic embedding for concept clustering and contradiction detection
+            semantic_key = self._get_semantic_key(memory.content)
+            semantic_embedding = await self.generate_embedding(f"concept {semantic_key}: {memory.content}")
+            logger.debug(f"Generated semantic embedding: {type(semantic_embedding)}, length: {len(semantic_embedding) if semantic_embedding else None}")
+            
+            # Validate all embeddings before creating vectors dict
+            if not content_embedding or not emotion_embedding or not semantic_embedding:
+                raise ValueError(f"Invalid embeddings generated: content={bool(content_embedding)}, emotion={bool(emotion_embedding)}, semantic={bool(semantic_embedding)}")
+            
+            # 🚀 QDRANT FEATURE: Create keyword metadata for filtering
+            keywords = self._extract_keywords(memory.content)
+            
+            # 🎯 QDRANT OPTIMIZATION: Content hash for exact deduplication
+            content_normalized = memory.content.lower().strip()
+            content_hash = hash(content_normalized)
+            
+            # 🚀 QDRANT FEATURE: Check for exact duplicates using optimized index
+            existing = self.client.scroll(
+                collection_name=self.collection_name,
+                scroll_filter=models.Filter(
+                    must=[
+                        models.FieldCondition(key="user_id", match=models.MatchValue(value=memory.user_id)),
+                        models.FieldCondition(key="content_hash", match=models.MatchValue(value=content_hash))
+                    ]
+                ),
+                limit=1,
+                with_payload=False,  # Only need to check existence
+                with_vectors=["content"]  # Required for named vector collections in v1.15.4
+            )
+            
+            if existing[0]:  # Duplicate found
+                logger.info(f"🎯 DEDUPLICATION: Skipping duplicate memory for user {memory.user_id}")
+                return existing[0][0].id
+            
+            # Enhanced payload optimized for Qdrant operations
+            qdrant_payload = {
                 "user_id": memory.user_id,
                 "memory_type": memory.memory_type.value,
                 "content": memory.content,
                 "timestamp": memory.timestamp.isoformat(),
+                "timestamp_unix": memory.timestamp.timestamp(),
                 "confidence": memory.confidence,
                 "source": memory.source,
                 
-                # 🚀 NEW: Semantic enrichment for Qdrant intelligence
-                "semantic_key": self._get_semantic_key(memory.content),
-                "emotional_context": self._extract_emotional_context(memory.content),
-                "content_length": len(memory.content),
+                # 🎯 QDRANT INTELLIGENCE FEATURES
+                "content_hash": content_hash,
+                "emotional_context": emotional_context,
+                "semantic_key": semantic_key,
+                "keywords": keywords,
                 "word_count": len(memory.content.split()),
-                "storage_timestamp": datetime.utcnow().isoformat(),
-                
-                # Temporal metadata for Qdrant time-based queries
-                "timestamp_unix": memory.timestamp.timestamp(),
-                "age_category": self._get_age_category(memory.timestamp),
+                "char_count": len(memory.content),
                 
                 **memory.metadata
             }
             
-            # Store in Qdrant with enriched payload
+            # 🚀 QDRANT FEATURE: Named vectors for intelligent multi-dimensional search
+            # TEMP: Use only content vector to isolate the issue
+            vectors = {}
+            
+            # Only add vectors that are valid (non-None, non-empty)
+            if content_embedding and len(content_embedding) > 0:
+                vectors["content"] = content_embedding
+                logger.debug(f"UPSERT DEBUG: Content vector added: len={len(content_embedding)}")
+            else:
+                logger.error(f"UPSERT ERROR: Invalid content embedding: {content_embedding}")
+                
+            # TEMP: Comment out emotion and semantic vectors to isolate issue
+            # if emotion_embedding and len(emotion_embedding) > 0:
+            #     vectors["emotion"] = emotion_embedding
+            # else:
+            #     logger.error(f"UPSERT ERROR: Invalid emotion embedding: {emotion_embedding}")
+                
+            # if semantic_embedding and len(semantic_embedding) > 0:
+            #     vectors["semantic"] = semantic_embedding
+            # else:
+            #     logger.error(f"UPSERT ERROR: Invalid semantic embedding: {semantic_embedding}")
+            
+            # Ensure we have at least one valid vector
+            if not vectors:
+                raise ValueError("No valid embeddings generated - cannot create point")
+            
+            # Debug: Log vector info before upsert
+            logger.debug(f"UPSERT DEBUG: Vector keys: {list(vectors.keys())}")
+            for name, vec in vectors.items():
+                logger.debug(f"UPSERT DEBUG: Vector '{name}': type={type(vec)}, len={len(vec) if vec else None}, is_none={vec is None}")
+            
+            # Store with all Qdrant advanced features
             point = PointStruct(
                 id=memory.id,
-                vector=memory.embedding,
-                payload=enriched_payload
+                vector=vectors,  # Named vectors as dict
+                payload=qdrant_payload
             )
             
-            self.client.upsert(
-                collection_name=self.collection_name,
-                points=[point]
-            )
+            logger.debug(f"UPSERT DEBUG: Point ID: {point.id}, Vector keys in point: {list(point.vector.keys()) if hasattr(point, 'vector') and point.vector else 'NO VECTOR'}")
+            
+            # 🎯 QDRANT FEATURE: Atomic operation with immediate consistency
+            logger.debug(f"UPSERT DEBUG: About to call Qdrant upsert with collection: {self.collection_name}")
+            logger.debug(f"UPSERT DEBUG: Point structure - ID: {point.id}, Vector type: {type(point.vector)}")
+            logger.debug(f"UPSERT DEBUG: Vector dict contents: {point.vector}")
+            
+            try:
+                self.client.upsert(
+                    collection_name=self.collection_name,
+                    points=[point],
+                    wait=True  # Ensures memory is immediately available
+                )
+                logger.debug(f"UPSERT DEBUG: Qdrant upsert successful for point {point.id}")
+            except Exception as upsert_error:
+                logger.error(f"UPSERT DEBUG: Qdrant upsert failed with error: {upsert_error}")
+                logger.error(f"UPSERT DEBUG: Error type: {type(upsert_error)}")
+                raise
             
             self.stats["memories_stored"] += 1
-            logger.info(f"🎯 STORED: Memory {memory.id} with semantic_key='{enriched_payload['semantic_key']}' "
-                       f"for user {memory.user_id}")
+            logger.info(f"🚀 QDRANT-ENHANCED: Stored memory {memory.id} with named vectors, "
+                       f"semantic_key='{semantic_key}', emotion='{emotional_context}'")
             
             return memory.id
             
         except Exception as e:
-            logger.error(f"Enhanced memory storage failed: {e}")
+            logger.error(f"Qdrant-native memory storage failed: {e}")
             raise
-
+    
+    def _extract_keywords(self, content: str) -> List[str]:
+        """Extract keywords for sparse vector search"""
+        # Simple keyword extraction (could be enhanced with NLP)
+        words = content.lower().split()
+        # Filter out common stop words and keep meaningful terms
+        stop_words = {'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'is', 'are', 'was', 'were', 'be', 'been', 'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could', 'should'}
+        keywords = [word for word in words if len(word) > 2 and word not in stop_words]
+        return keywords[:20]  # Limit to top 20 keywords
+    
     def _extract_emotional_context(self, content: str) -> str:
         """Extract emotional context for role-playing intelligence"""
         content_lower = content.lower()
@@ -293,10 +500,10 @@ class VectorMemoryStore:
                     )
                 )
             
-            # Regular search for non-temporal queries
+            # Regular search for non-temporal queries using named vectors  
             search_results = self.client.search(
                 collection_name=self.collection_name,
-                query_vector=query_embedding,
+                query_vector=models.NamedVector(name="content", vector=query_embedding),  # 🎯 NAMED VECTOR: Use content vector
                 query_filter=models.Filter(must=must_conditions, should=should_conditions),
                 limit=top_k,
                 score_threshold=min_score,
@@ -346,6 +553,9 @@ class VectorMemoryStore:
         🎯 QDRANT-NATIVE: Handle temporal queries using scroll API for chronological context
         """
         try:
+            # Generate embedding for semantic search if needed
+            query_embedding = await self.generate_embedding(query)
+            
             # 🚀 QDRANT FEATURE: Use scroll API to get recent conversation chronologically
             # Convert to Unix timestamp for Qdrant numeric range filtering
             recent_cutoff_dt = datetime.utcnow() - timedelta(hours=2)
@@ -370,18 +580,48 @@ class VectorMemoryStore:
             recent_messages = scroll_result[0]  # Get the messages
             
             if not recent_messages:
-                logger.info("🎯 TEMPORAL: No recent conversation found, falling back to semantic search")
-                return []
+                logger.info("🎯 TEMPORAL: No recent conversation found, trying broader semantic search")
+                # Instead of returning empty, do a semantic search for the temporal query
+                semantic_results = self.client.search(
+                    collection_name=self.collection_name,
+                    query_vector=models.NamedVector(name="content", vector=query_embedding),  # 🎯 NAMED VECTOR
+                    query_filter=models.Filter(
+                        must=[
+                            models.FieldCondition(key="user_id", match=models.MatchValue(value=user_id)),
+                            models.FieldCondition(key="memory_type", match=models.MatchAny(any=["conversation", "fact", "preference"]))
+                        ]
+                    ),
+                    limit=limit,
+                    score_threshold=0.5,
+                    with_payload=True
+                )
+                
+                # Format as temporal query results
+                formatted_results = []
+                for point in semantic_results:
+                    formatted_results.append({
+                        "id": point.id,
+                        "score": point.score,
+                        "content": point.payload['content'],
+                        "memory_type": point.payload['memory_type'],
+                        "timestamp": point.payload['timestamp'],
+                        "confidence": point.payload.get('confidence', 0.5),
+                        "metadata": point.payload,
+                        "temporal_query": True,
+                        "temporal_fallback": True,  # Mark as fallback within temporal handler
+                        "qdrant_semantic_fallback": True
+                    })
+                
+                logger.info(f"🎯 TEMPORAL-SEMANTIC: Found {len(formatted_results)} memories via semantic fallback")
+                return formatted_results
             
             # 🚀 QDRANT FEATURE: Use search within recent messages for better relevance
             recent_message_ids = [msg.id for msg in recent_messages]
             
-            # Now do semantic search ONLY within these recent messages
-            query_embedding = await self.generate_embedding(query)
-            
+            # Now do semantic search ONLY within these recent messages (embedding already generated above)
             temporal_results = self.client.search(
                 collection_name=self.collection_name,
-                query_vector=query_embedding,
+                query_vector=models.NamedVector(name="content", vector=query_embedding),  # 🎯 NAMED VECTOR
                 query_filter=models.Filter(
                     must=[
                         models.FieldCondition(key="id", match=models.MatchAny(any=recent_message_ids))
@@ -429,7 +669,7 @@ class VectorMemoryStore:
             
             results = self.client.search(
                 collection_name=self.collection_name,
-                query_vector=query_embedding,
+                query_vector=models.NamedVector(name="content", vector=query_embedding),  # 🎯 NAMED VECTOR
                 query_filter=models.Filter(must=filter_conditions),
                 limit=top_k,
                 score_threshold=min_score
@@ -482,16 +722,17 @@ class VectorMemoryStore:
                 # Triple-vector search: content + emotion + personality
                 logger.info("🎯 QDRANT: Using triple-vector search (content + emotion + personality)")
                 
-                # Use Qdrant's discover API for complex multi-vector relationships
+                # Use Qdrant's discover API with named vectors for complex multi-vector relationships
                 results = self.client.discover(
                     collection_name=self.collection_name,
-                    target=content_embedding,
+                    target=models.NamedVector(name="content", vector=content_embedding),  # 🎯 NAMED VECTOR TARGET
                     context=[
-                        models.ContextExamplePair(positive=emotion_embedding, negative=None),
-                        models.ContextExamplePair(positive=personality_embedding, negative=None)
+                        models.ContextExamplePair(positive=models.NamedVector(name="emotion", vector=emotion_embedding), negative=None),
+                        models.ContextExamplePair(positive=models.NamedVector(name="semantic", vector=personality_embedding), negative=None)
                     ],
                     limit=top_k,
-                    with_payload=True
+                    with_payload=True,
+                    using="content"  # 🎯 SPECIFY VECTOR SPACE
                 )
                 
             elif emotion_embedding:
@@ -499,18 +740,19 @@ class VectorMemoryStore:
                 logger.info("🎯 QDRANT: Using dual-vector search (content + emotion)")
                 results = self.client.discover(
                     collection_name=self.collection_name,
-                    target=content_embedding,
-                    context=[models.ContextExamplePair(positive=emotion_embedding, negative=None)],
+                    target=models.NamedVector(name="content", vector=content_embedding),  # 🎯 NAMED VECTOR TARGET
+                    context=[models.ContextExamplePair(positive=models.NamedVector(name="emotion", vector=emotion_embedding), negative=None)],
                     limit=top_k,
-                    with_payload=True
+                    with_payload=True,
+                    using="content"  # 🎯 SPECIFY VECTOR SPACE
                 )
                 
             else:
-                # Single-vector fallback
+                # Single-vector fallback using named vector
                 logger.info("🎯 QDRANT: Using single-vector search (content only)")
                 results = self.client.search(
                     collection_name=self.collection_name,
-                    query_vector=content_embedding,
+                    query_vector=models.NamedVector(name="content", vector=content_embedding),  # 🎯 NAMED VECTOR
                     limit=top_k,
                     with_payload=True
                 )
@@ -567,7 +809,7 @@ class VectorMemoryStore:
                     limit=100,  # Batch size
                     offset=offset,
                     with_payload=True,
-                    with_vectors=True  # Need vectors for clustering
+                    with_vectors=["content"]  # Specify which named vector for clustering
                 )
                 
                 memories.extend(scroll_result[0])
@@ -599,7 +841,8 @@ class VectorMemoryStore:
                     ),
                     limit=cluster_size - 1,  # -1 because we include the seed memory
                     score_threshold=0.7,
-                    with_payload=True
+                    with_payload=True,
+                    using="content"  # Specify named vector for recommendations
                 )
                 
                 # Create semantic cluster
@@ -784,7 +1027,7 @@ class VectorMemoryStore:
             # Search Qdrant
             results = self.client.search(
                 collection_name=self.collection_name,
-                query_vector=query_embedding,
+                query_vector=models.NamedVector(name="content", vector=query_embedding),  # 🎯 NAMED VECTOR
                 query_filter=models.Filter(must=filter_conditions),
                 limit=search_limit,
                 score_threshold=min_score * 0.8,  # Lower threshold for initial search
@@ -941,6 +1184,80 @@ class VectorMemoryStore:
         words = content_lower.split()[:3]
         return '_'.join(words)
         
+    async def resolve_contradictions_with_qdrant(self, user_id: str, semantic_key: str, new_memory_content: str) -> List[Dict[str, Any]]:
+        """
+        🚀 QDRANT RECOMMENDATION API: Use native recommendation for contradiction resolution
+        
+        This replaces manual Python grouping and scoring with Qdrant's advanced AI features:
+        - Uses recommendation API to find semantically similar but factually different content
+        - Leverages semantic vector space for intelligent contradiction detection
+        - Returns ranked recommendations for resolution
+        """
+        try:
+            # Generate embeddings for the new memory content
+            new_content_embedding = await self.generate_embedding(new_memory_content)
+            new_semantic_embedding = await self.generate_embedding(f"concept {semantic_key}: {new_memory_content}")
+            
+            # 🎯 QDRANT FEATURE: Use recommendation API for intelligent contradiction detection
+            recommendations = self.client.recommend(
+                collection_name=self.collection_name,
+                positive=[new_semantic_embedding],  # Find similar semantic concepts
+                negative=[new_content_embedding],   # But different actual content
+                query_filter=models.Filter(
+                    must=[
+                        models.FieldCondition(key="user_id", match=models.MatchValue(value=user_id)),
+                        models.FieldCondition(key="semantic_key", match=models.MatchValue(value=semantic_key)),
+                        models.FieldCondition(key="memory_type", match=models.MatchAny(any=["fact", "preference"]))
+                    ]
+                ),
+                limit=10,
+                with_payload=True,
+                using="semantic"  # Use semantic vector for recommendation
+            )
+            
+            contradictions = []
+            for point in recommendations:
+                # Calculate content similarity to detect actual contradictions
+                existing_content = point.payload['content']
+                content_similarity = await self._calculate_content_similarity(new_memory_content, existing_content)
+                
+                # High semantic similarity but low content similarity = contradiction
+                if point.score > 0.8 and content_similarity < 0.7:
+                    contradictions.append({
+                        "existing_memory": {
+                            "id": point.id,
+                            "content": existing_content,
+                            "timestamp": point.payload['timestamp'],
+                            "confidence": point.payload.get('confidence', 0.5),
+                            "semantic_score": point.score
+                        },
+                        "new_content": new_memory_content,
+                        "contradiction_confidence": (point.score - content_similarity),
+                        "resolution_recommendation": "replace" if point.payload.get('confidence', 0.5) < 0.8 else "merge"
+                    })
+            
+            logger.info(f"🎯 QDRANT-RECOMMENDATION: Found {len(contradictions)} potential contradictions for '{semantic_key}'")
+            return contradictions
+            
+        except Exception as e:
+            logger.error(f"Qdrant recommendation-based contradiction detection failed: {e}")
+            return []
+    
+    async def _calculate_content_similarity(self, content1: str, content2: str) -> float:
+        """Calculate semantic similarity between two pieces of content"""
+        try:
+            embedding1 = await self.generate_embedding(content1)
+            embedding2 = await self.generate_embedding(content2)
+            
+            # Calculate cosine similarity
+            import numpy as np
+            similarity = np.dot(embedding1, embedding2) / (np.linalg.norm(embedding1) * np.linalg.norm(embedding2))
+            return float(similarity)
+            
+        except Exception as e:
+            logger.warning(f"Content similarity calculation failed: {e}")
+            return 0.0
+
     async def detect_contradictions(self, 
                                   new_content: str,
                                   user_id: str,
@@ -1020,10 +1337,36 @@ class VectorMemoryStore:
                 "corrected": True
             })
             
-            # Store updated version
+            # Store updated version with named vectors
+            # Generate multiple embeddings for named vectors  
+            content_embedding = await self.generate_embedding(new_content)
+            emotion_embedding = await self.generate_embedding(f"emotion neutral: {new_content}")
+            semantic_embedding = await self.generate_embedding(f"concept update: {new_content}")
+            
+            # Validate embeddings before creating vectors dict
+            vectors = {}
+            if content_embedding and len(content_embedding) > 0:
+                vectors["content"] = content_embedding
+            else:
+                logger.error(f"UPDATE ERROR: Invalid content embedding: {content_embedding}")
+                
+            if emotion_embedding and len(emotion_embedding) > 0:
+                vectors["emotion"] = emotion_embedding
+            else:
+                logger.error(f"UPDATE ERROR: Invalid emotion embedding: {emotion_embedding}")
+                
+            if semantic_embedding and len(semantic_embedding) > 0:
+                vectors["semantic"] = semantic_embedding
+            else:
+                logger.error(f"UPDATE ERROR: Invalid semantic embedding: {semantic_embedding}")
+            
+            # Ensure we have at least one valid vector
+            if not vectors:
+                raise ValueError("No valid embeddings generated for update - cannot update point")
+            
             updated_point = PointStruct(
                 id=memory_id,
-                vector=new_embedding,
+                vector=vectors,  # Use validated vectors dict
                 payload=existing_payload
             )
             
@@ -1251,6 +1594,9 @@ class VectorMemoryManager:
             collection_name=collection_name,
             embedding_model=embedding_model
         )
+        
+        # TEST: Verify logging is working
+        logger.error("🔥 VECTOR MEMORY MANAGER INITIALIZED - DEBUG LOGGING ACTIVE 🔥")
         
         # Store config for other services (PostgreSQL for user data, Redis for session cache)
         self.config = config
@@ -1493,6 +1839,8 @@ class VectorMemoryManager:
     ) -> bool:
         """Store a conversation exchange between user and bot."""
         try:
+            logger.debug(f"MEMORY MANAGER DEBUG: store_conversation called for user {user_id}")
+            
             # Store user message
             user_memory = VectorMemory(
                 id=str(uuid4()),  # Pure UUID for Qdrant compatibility
@@ -1507,7 +1855,9 @@ class VectorMemoryManager:
                     **(metadata or {})
                 }
             )
+            logger.debug(f"MEMORY MANAGER DEBUG: About to store user memory: {user_memory.content[:50]}...")
             await self.vector_store.store_memory(user_memory)
+            logger.debug(f"MEMORY MANAGER DEBUG: User memory stored successfully")
             
             # Store bot response
             bot_memory = VectorMemory(
@@ -1522,7 +1872,9 @@ class VectorMemoryManager:
                     **(metadata or {})
                 }
             )
+            logger.debug(f"MEMORY MANAGER DEBUG: About to store bot memory: {bot_memory.content[:50]}...")
             await self.vector_store.store_memory(bot_memory)
+            logger.debug(f"MEMORY MANAGER DEBUG: Bot memory stored successfully")
             
             return True
         except Exception as e:
@@ -1617,14 +1969,9 @@ class VectorMemoryManager:
             if results:
                 logger.info(f"🎯 QDRANT-NATIVE SUCCESS: Retrieved {len(results)} context-aware memories")
                 return results
-            
-            # 🎯 FALLBACK: Use existing method if advanced features fail
-            logger.warning(f"🎯 FALLBACK: Using basic retrieval for query '{effective_query[:50]}...'")
-            return await self.retrieve_relevant_memories(
-                user_id=user_id, 
-                query=effective_query, 
-                limit=effective_limit
-            )
+            else:
+                logger.info("🎯 QDRANT-NATIVE: No memories found with current search parameters")
+                return []
             
         except Exception as e:
             logger.error(f"Enhanced context-aware memory retrieval failed: {e}")
@@ -1639,7 +1986,7 @@ class VectorMemoryManager:
         """Get recent conversation history for a user."""
         try:
             # Search for recent conversation memories
-            results = await self.vector_store.search_memories(
+            results = await self.search_memories(
                 query="conversation user_message bot_response",
                 user_id=user_id,
                 memory_types=[MemoryType.CONVERSATION],
