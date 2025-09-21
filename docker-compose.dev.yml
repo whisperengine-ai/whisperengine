@@ -26,6 +26,7 @@ services:
     volumes:
       # Override the copied source code with live mounting for development
       - ./src:/app/src
+      - ./scripts:/app/scripts
       - ./prompts:/app/prompts
       - ./characters:/app/characters
       - ./validate_config.py:/app/validate_config.py

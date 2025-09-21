@@ -274,7 +274,7 @@ class HelpCommandHandlers:
                 "Check if your DM conversation is in sync with stored memory",
             ),
             (f"!forget_me{name_suffix}", "Delete all stored memories about you"),
-            ("!import_history [limit]", "Import existing conversation history into ChromaDB"),
+            ("!import_history [limit]", "Import existing conversation history into vector memory"),
             (
                 f"!followup_settings{name_suffix} [on|off|status]",
                 "🧪 Experimental: Manage follow-up messages",

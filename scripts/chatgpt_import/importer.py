@@ -17,7 +17,7 @@ project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
 from dataclasses import dataclass
-from src.memory.integrated_memory_manager import IntegratedMemoryManager
+from src.memory.vector_memory_system import VectorMemoryManager
 from src.utils.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -40,7 +40,7 @@ class ConversationMessage:
 
 
 class ChatGPTImporter:
-    """Imports ChatGPT conversations into WhisperEngine memory system"""
+    """Imports ChatGPT conversations into WhisperEngine vector memory system"""
     
     def __init__(self, user_id: int, dry_run: bool = False, verbose: bool = False):
         self.user_id = user_id
@@ -51,12 +51,35 @@ class ChatGPTImporter:
         self.conversation_count = 0
         
     async def initialize(self):
-        """Initialize the memory manager (skip in dry run mode)"""
+        """Initialize the vector memory system (skip in dry run mode)"""
         if not self.dry_run:
-            self.memory_manager = IntegratedMemoryManager()
-            # Memory manager is auto-initialized in constructor
+            import os
+            
+            # Create vector memory config from environment variables
+            vector_config = {
+                'qdrant': {
+                    'host': os.getenv('VECTOR_QDRANT_HOST', 'qdrant'),
+                    'port': int(os.getenv('VECTOR_QDRANT_PORT', '6333')),
+                    'grpc_port': int(os.getenv('VECTOR_QDRANT_GRPC_PORT', '6334')),
+                    'collection_name': os.getenv('VECTOR_QDRANT_COLLECTION', 'whisperengine_memory'),
+                    'vector_size': int(os.getenv('VECTOR_EMBEDDING_SIZE', '384'))
+                },
+                'embeddings': {
+                    'model_name': os.getenv('VECTOR_EMBEDDING_MODEL', 'snowflake/snowflake-arctic-embed-xs'),
+                    'device': os.getenv('VECTOR_EMBEDDING_DEVICE', 'cpu')
+                },
+                'postgresql': {
+                    'url': f"postgresql://{os.getenv('POSTGRESQL_USERNAME', 'bot_user')}:{os.getenv('POSTGRESQL_PASSWORD', 'securepassword123')}@{os.getenv('POSTGRESQL_HOST', 'postgres')}:{os.getenv('POSTGRESQL_PORT', '5432')}/{os.getenv('POSTGRESQL_DATABASE', 'whisper_engine')}"
+                },
+                'redis': {
+                    'url': f"redis://{os.getenv('REDIS_HOST', 'redis')}:{os.getenv('REDIS_PORT', '6379')}",
+                    'ttl': int(os.getenv('REDIS_TTL', '1800'))
+                }
+            }
+            
+            self.memory_manager = VectorMemoryManager(vector_config)
         else:
-            logger.info("Dry run mode - skipping memory manager initialization")
+            logger.info("Dry run mode - skipping vector memory system initialization")
         
     async def import_conversations(self, file_path: str) -> Dict[str, int]:
         """Import conversations from ChatGPT export file"""
@@ -183,7 +206,7 @@ class ChatGPTImporter:
                     i += 1  # Skip just the user message
                     
                 # Store as conversation pair with metadata
-                self.memory_manager.store_conversation(
+                await self.memory_manager.store_conversation(
                     user_id=user_id,
                     user_message=user_message,
                     bot_response=assistant_response,
@@ -201,7 +224,7 @@ class ChatGPTImporter:
                 
             elif current_msg.sender == 'assistant':
                 # Standalone assistant message (less common)
-                self.memory_manager.store_conversation(
+                await self.memory_manager.store_conversation(
                     user_id=user_id,
                     user_message="[Previous conversation context]",
                     bot_response=current_msg.content,
@@ -587,11 +610,8 @@ class ChatGPTImporter:
         logger.info("Analyzing imported conversations for user %s", self.user_id)
         
         try:
-            # Trigger comprehensive analysis through the integrated memory manager
-            if hasattr(self.memory_manager, 'emotion_manager') and self.memory_manager.emotion_manager:
-                # Process emotional patterns from imported history
-                logger.info("Running emotion analysis on imported conversations")
-                # The emotion manager will analyze patterns when conversations are accessed
+            # Vector memory system handles analysis automatically through embeddings
+            logger.info("Vector memory system provides automatic semantic analysis of imported conversations")
                 
             # Store comprehensive import analysis
             analysis_data = {
@@ -605,7 +625,7 @@ class ChatGPTImporter:
             }
             
             # Store analysis using the conversation method to trigger full pipeline
-            self.memory_manager.store_conversation(
+            await self.memory_manager.store_conversation(
                 user_id=str(self.user_id),
                 user_message=f"ChatGPT import analysis: Successfully imported {self.processed_count} messages from {self.conversation_count} conversations with historical timestamps preserved",
                 bot_response="Your ChatGPT conversation history has been fully integrated into my memory system. I now have access to your historical interactions, preferences, and communication patterns. This will help me provide more personalized responses based on our complete conversation history.",

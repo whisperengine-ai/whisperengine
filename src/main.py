@@ -1,7 +1,12 @@
 #!/usr/bin/env python3
 """
 WhisperEngine Main Bot Module - Modular Architecture Implementation
-Discord Bot with AI capabilities and personality system
+Discord Bot with AI capabilities and personality         if "Failed to initialize memory system" in error_msg:
+            logger.error("💡 Memory system initialization failed")
+            if "vector store" in error_msg or "Qdrant" in error_msg:
+                logger.error("💡 Solution: Start Qdrant with 'docker compose up qdrant'")
+            elif "connection" in error_msg:
+                logger.error("💡 Solution: Ensure Qdrant server is running and accessible")
 
 This module serves as the main entry point using the new modular architecture.
 All components are properly organized and use dependency injection.
@@ -392,9 +397,9 @@ async def main():
 
     except Exception as e:
         error_msg = str(e)
-        if "Failed to initialize memory system" in error_msg or "ChromaDB" in error_msg:
+        if "Failed to initialize memory system" in error_msg:
             logger.error(f"Fatal error: {e}")
-            # Don't print full traceback for known ChromaDB configuration issues
+            # Don't print full traceback for known vector store configuration issues
         else:
             logger.error(f"Fatal error: {e}")
             import traceback

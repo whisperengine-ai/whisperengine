@@ -15,7 +15,7 @@ from discord.ext import commands
 from env_manager import load_environment
 # LLM client system
 from src.llm.llm_protocol import create_llm_client
-# from src.memory.backup_manager import BackupManager  # REMOVED - ChromaDB dependency
+# from src.memory.backup_manager import BackupManager  # REMOVED - Vector-native architecture
 from src.memory.conversation_cache import HybridConversationCache
 from src.utils.heartbeat_monitor import HeartbeatMonitor
 from src.utils.image_processor import ImageProcessor
@@ -49,7 +49,7 @@ except ImportError:
     RedisProfileAndMemoryCache = None
 
 # Graph memory availability check - REMOVED
-# Neo4j components have been replaced by vector semantic relationships
+# Vector-native components replace previous graph relationships
 GRAPH_MEMORY_AVAILABLE = False
 
 # Legacy emotion engine removed - vector-native system handles emotion analysis
@@ -199,7 +199,7 @@ class DiscordBotCore:
             self.safe_memory_manager = memory_manager
             self.memory_manager = memory_manager
 
-            # self.backup_manager = BackupManager()  # REMOVED - ChromaDB dependency
+            # self.backup_manager = BackupManager()  # REMOVED - Vector-native architecture
             self.backup_manager = None  # Vector memory system handles persistence differently
             
             self.logger.info("✅ Memory System initialized with type: %s", memory_type)
@@ -208,7 +208,7 @@ class DiscordBotCore:
             self.logger.error("Memory system initialization failed: %s", str(e))
             raise
             
-    # REMOVED: ChromaDB batch optimizer - replaced by vector-native memory system
+    # REMOVED: Legacy memory optimizer - replaced by vector-native memory system
 
     async def initialize_phase4_components(self):
         """Initialize Phase 4.2 and 4.3 components asynchronously."""

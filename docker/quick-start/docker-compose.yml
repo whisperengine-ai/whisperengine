@@ -35,8 +35,7 @@ services:
     depends_on:
       - redis
       - postgres
-      - chromadb
-      - neo4j
+      - qdrant
       
   # Minimal required services
   redis:
@@ -63,36 +62,20 @@ services:
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
       
-  chromadb:
-    image: chromadb/chroma:latest
-    container_name: whisperengine-chromadb
+  qdrant:
+    image: qdrant/qdrant:v1.8.1
+    container_name: whisperengine-qdrant
     restart: unless-stopped
     environment:
-      - CHROMA_SERVER_HOST=0.0.0.0
-      - CHROMA_SERVER_HTTP_PORT=${CHROMADB_PORT:-8000}
+      - QDRANT__SERVICE__HTTP_PORT=6333
+      - QDRANT__SERVICE__GRPC_PORT=6334
     volumes:
-      - chromadb_data:/chroma/chroma
+      - qdrant_data:/qdrant/storage
     ports:
-      - "8001:${CHROMADB_PORT:-8000}"  # Avoid conflict with potential host services
-      
-  neo4j:
-    image: neo4j:5-enterprise
-    container_name: whisperengine-neo4j
-    restart: unless-stopped
-    environment:
-      NEO4J_AUTH: ${NEO4J_USERNAME:-neo4j}/${NEO4J_PASSWORD:-neo4j_password_change_me}
-      NEO4J_ACCEPT_LICENSE_AGREEMENT: "yes"
-      NEO4J_dbms_security_procedures_unrestricted: "gds.*,apoc.*"
-    volumes:
-      - neo4j_data:/data
-      - neo4j_logs:/logs
-    ports:
-      - "7474:7474"  # HTTP
-      - "${NEO4J_PORT:-7687}:7687"  # Bolt
+      - "6333:6333"
+      - "6334:6334"
 
 volumes:
   redis_data:
   postgres_data:
-  chromadb_data:
-  neo4j_data:
-  neo4j_logs:
+  qdrant_data:

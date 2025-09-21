@@ -183,7 +183,7 @@ wait_for_services() {
     local attempt=0
     
     echo "⏳ Waiting for all services to be healthy..."
-    echo "📊 Services: PostgreSQL, Redis, ChromaDB, Neo4j, Bot"
+    echo "📊 Services: PostgreSQL, Redis, Qdrant, Bot"
     
     while [[ $attempt -lt $max_attempts ]]; do
         local healthy_count=0
@@ -204,18 +204,11 @@ wait_for_services() {
             status_line+="⏳Redis "
         fi
         
-        if $COMPOSE_CMD $compose_files ps chromadb | grep -q "healthy"; then 
+        if $COMPOSE_CMD $compose_files ps qdrant | grep -q "healthy"; then 
             ((healthy_count++))
             status_line+="✅Vector "
         else
             status_line+="⏳Vector "
-        fi
-        
-        if $COMPOSE_CMD $compose_files ps neo4j | grep -q "healthy"; then 
-            ((healthy_count++))
-            status_line+="✅Graph "
-        else
-            status_line+="⏳Graph "
         fi
         
         # Check bot health using our new health endpoint
@@ -346,15 +339,14 @@ start_bot() {
         "infrastructure")
             echo "🚀 Starting infrastructure services for native development..."
             
-            # Start all 4 core datastores (all required for native development)
+            # Start all 3 core datastores (all required for native development)
             echo "🔄 Starting all core datastore services..."
             echo "   📊 PostgreSQL (persistent data)"
             echo "   🔴 Redis (caching)"  
-            echo "   🗃️ ChromaDB (vector storage)"
-            echo "   🕸️ Neo4j (graph database)"
+            echo "   🗃️ Qdrant (vector storage)"
             
             # Use --remove-orphans to clean up any leftover containers from previous configurations
-            $COMPOSE_CMD up -d --remove-orphans postgres redis chromadb neo4j
+            $COMPOSE_CMD up -d --remove-orphans postgres redis qdrant
             
             echo "⏳ Waiting for all services to initialize..."
             
@@ -363,31 +355,29 @@ start_bot() {
             local attempt=0
             local services_ready=0
             
-            while [[ $attempt -lt $max_attempts && $services_ready -lt 4 ]]; do
+            while [[ $attempt -lt $max_attempts && $services_ready -lt 3 ]]; do
                 services_ready=0
                 
                 # Check each service individually (only count once per loop)
                 if $COMPOSE_CMD ps postgres | grep -q "healthy"; then ((services_ready++)); fi
                 if $COMPOSE_CMD ps redis | grep -q "healthy"; then ((services_ready++)); fi
-                if $COMPOSE_CMD ps chromadb | grep -q "Up"; then ((services_ready++)); fi
-                if $COMPOSE_CMD ps neo4j | grep -q "healthy"; then ((services_ready++)); fi
+                if $COMPOSE_CMD ps qdrant | grep -q "healthy"; then ((services_ready++)); fi
                 
-                if [[ $services_ready -eq 4 ]]; then
+                if [[ $services_ready -eq 3 ]]; then
                     echo "   ✅ All services ready!"
                     break
                 fi
                 
-                echo "   ⏳ Services ready: $services_ready/4 (attempt $((attempt+1))/$max_attempts)"
+                echo "   ⏳ Services ready: $services_ready/3 (attempt $((attempt+1))/$max_attempts)"
                 sleep 3
                 ((attempt++))
             done
             
-            if [[ $services_ready -eq 4 ]]; then
-                print_status "All 4 datastores are healthy and ready!"
+            if [[ $services_ready -eq 3 ]]; then
+                print_status "All 3 datastores are healthy and ready!"
                 echo "   📊 PostgreSQL: localhost:5432"
-                echo "   🔴 Redis: localhost:6379" 
-                echo "   🗃️ ChromaDB: localhost:8000"
-                echo "   🕸️ Neo4j: localhost:7474 (web) / localhost:7687 (bolt)"
+                echo "   🔴 Redis: localhost:6379"
+                echo "   🗃️ Qdrant: localhost:6333"
             else
                 print_warning "Some services may still be starting. Run '$0 status' to check."
             fi
@@ -590,18 +580,11 @@ show_status() {
         echo "   ❌ Redis: Not healthy"
     fi
     
-    if $COMPOSE_CMD -f docker-compose.yml -f docker-compose.dev.yml ps chromadb 2>/dev/null | grep -q "healthy" || $COMPOSE_CMD -f docker-compose.yml -f docker-compose.prod.yml ps chromadb 2>/dev/null | grep -q "healthy"; then 
-        echo "   ✅ ChromaDB: Healthy"
+    if $COMPOSE_CMD -f docker-compose.yml -f docker-compose.dev.yml ps qdrant 2>/dev/null | grep -q "healthy" || $COMPOSE_CMD -f docker-compose.yml -f docker-compose.prod.yml ps qdrant 2>/dev/null | grep -q "healthy"; then 
+        echo "   ✅ Qdrant: Healthy"
         ((healthy_count++))
     else
-        echo "   ❌ ChromaDB: Not healthy"
-    fi
-    
-    if $COMPOSE_CMD -f docker-compose.yml -f docker-compose.dev.yml ps neo4j 2>/dev/null | grep -q "healthy" || $COMPOSE_CMD -f docker-compose.yml -f docker-compose.prod.yml ps neo4j 2>/dev/null | grep -q "healthy"; then 
-        echo "   ✅ Neo4j: Healthy"
-        ((healthy_count++))
-    else
-        echo "   ❌ Neo4j: Not healthy"
+        echo "   ❌ Qdrant: Not healthy"
     fi
     
     # Check bot health using our health endpoint
@@ -696,7 +679,7 @@ restart_bot() {
             ;;
         "infrastructure")
             echo "🔄 Restarting infrastructure services..."
-            $COMPOSE_CMD restart postgres redis chromadb neo4j
+            $COMPOSE_CMD restart postgres redis qdrant
             
             echo "⏳ Waiting for services to restart..."
             sleep 5
@@ -843,8 +826,7 @@ reset_data() {
     echo "🗑️ Removing named volumes..."
     docker volume rm whisperengine-redis 2>/dev/null || true
     docker volume rm whisperengine-postgres 2>/dev/null || true
-    docker volume rm whisperengine-chromadb 2>/dev/null || true
-    docker volume rm whisperengine-neo4j-data 2>/dev/null || true
+    docker volume rm whisperengine-qdrant 2>/dev/null || true
     docker volume rm whisperengine-data 2>/dev/null || true
     docker volume rm whisperengine-backups 2>/dev/null || true
     
@@ -874,7 +856,7 @@ cleanup_containers() {
     docker system prune -f --volumes 2>/dev/null || true
     
     print_status "Cleanup completed!"
-    echo "💡 Note: Data volumes (postgres, redis, chromadb) are preserved"
+    echo "💡 Note: Data volumes (postgres, redis, qdrant) are preserved"
     echo "   To remove all data, use: docker volume prune"
 }
 
@@ -972,8 +954,8 @@ case "${1:-help}" in
             exit 1
         fi
         
-        local conversations_file="$2"
-        local user_id="$3"
+        conversations_file="$2"
+        user_id="$3"
         shift 3  # Remove the command and required arguments
         
         # Validate file exists
@@ -1002,7 +984,7 @@ case "${1:-help}" in
         check_env
         
         # Detect mode and ensure services are running
-        local mode="auto"
+        mode="auto"
         if [[ -f "docker-compose.override.yml" ]]; then
             mode="dev"
         else
@@ -1020,11 +1002,14 @@ case "${1:-help}" in
         print_status "Running ChatGPT import in container..."
         
         # Convert file path to absolute path for Docker mounting
-        local abs_conversations_file=$(realpath "$conversations_file")
-        local container_file="/tmp/conversations.json"
+        abs_conversations_file=$(realpath "$conversations_file")
+        container_file="/app/conversations_import.json"
         
-        # Copy file into container
+        # Copy file into container app directory (appuser should have access)
         docker cp "$abs_conversations_file" whisperengine-bot:"$container_file"
+        
+        # Change file permissions to be readable by appuser
+        docker exec --user root whisperengine-bot chmod 644 "$container_file"
         
         # Run the import command with all passed options
         if docker exec whisperengine-bot python scripts/chatgpt_import/import_chatgpt.py \

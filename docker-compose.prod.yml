@@ -124,7 +124,7 @@ services:
           memory: 512M
           cpus: '0.5'
 
-  # Qdrant for vector storage (replaces ChromaDB)
+  # Qdrant for vector storage
   qdrant:
     image: qdrant/qdrant:v1.15.4
     container_name: whisperengine-qdrant

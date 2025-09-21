@@ -88,7 +88,7 @@ class MemoryCommandHandlers:
 
         @self.bot.command(name="import_history")
         async def import_history(ctx, limit: int = 100):
-            """Import existing conversation history into ChromaDB"""
+            """Import existing conversation history into vector memory"""
             await self._import_history_handler(ctx, limit)
 
         @self.bot.command(name="auto_facts")
@@ -460,7 +460,7 @@ class MemoryCommandHandlers:
 
                     # For personality analysis, get recent conversation history from hierarchical memory system
                     try:
-                        # Use hierarchical memory manager to get recent conversations (Redis → PostgreSQL → ChromaDB)
+                        # Use memory manager to get recent conversations from vector store
                         base_memory_manager = getattr(
                             self.safe_memory_manager, "base_memory_manager", self.memory_manager
                         )
@@ -493,7 +493,7 @@ class MemoryCommandHandlers:
                                 "Hierarchical memory manager not available for conversation retrieval"
                             )
 
-                        # If we don't have enough messages from ChromaDB, supplement with current context
+                        # If we don't have enough messages from vector memory, supplement with current context
                         if len(recent_messages) < 10:
                             try:
                                 message_context = self.memory_manager.classify_discord_context(

@@ -25,7 +25,7 @@ services:
     depends_on:
       - redis
       - postgres
-      - chromadb
+      - qdrant
     restart: unless-stopped
     command: python run.py
 
@@ -49,17 +49,18 @@ services:
       - whisperengine-network
     restart: unless-stopped
 
-  chromadb:
-    image: ghcr.io/chroma-core/chroma:latest
+  qdrant:
+    image: qdrant/qdrant:v1.8.1
     volumes:
-      - chromadb_data:/chroma/chroma
+      - qdrant_data:/qdrant/storage
     environment:
-      - IS_PERSISTENT=TRUE
+      - QDRANT__SERVICE__HTTP_PORT=6333
+      - QDRANT__SERVICE__GRPC_PORT=6334
     networks:
       - whisperengine-network
     restart: unless-stopped
     ports:
-      - "8000:8000"
+      - "6333:6333"
 
 volumes:
   # Bot application volumes
@@ -83,8 +84,8 @@ volumes:
   postgres_data:
     name: whisperengine-postgres
     driver: local
-  chromadb_data:
-    name: whisperengine-chromadb
+  qdrant_data:
+    name: whisperengine-qdrant
     driver: local
 
 networks:

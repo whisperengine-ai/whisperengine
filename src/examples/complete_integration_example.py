@@ -5,7 +5,7 @@ This example demonstrates the full integrated system with:
 - Proper environment loading via env_manager
 - LLM client initialization for emotion analysis
 - Local embeddings (single unified model)
-- Neo4j graph database integration
+- Qdrant vector database integration
 - Memory system integration
 """
 
