@@ -24,18 +24,18 @@ async def create_vector_native_prompt(
     Replace legacy template variable system with vector-native prompt creation.
     
     This function replaces the entire helpers.py contextualize_system_prompt_with_context()
-    function with vector-native operations.
+    function with CDL character-aware operations.
     
     Args:
         vector_memory_system: The vector memory store instance
-        base_prompt_path: Path to the base prompt template (e.g., streamlined.md)
+        character_file: Path to the CDL character JSON file (e.g., characters/default_assistant.json)
         user_id: Discord user ID
         current_message: Current user message for context
-        emotional_context: Current emotional context if available
-        personality_engine: Personality engine instance (optional)
+        emotional_context: Current emotional context if available (unused currently)
+        personality_engine: Personality engine instance (optional, unused currently)
     
     Returns:
-        Fully contextualized prompt ready for LLM
+        Fully contextualized prompt ready for LLM using CDL character system
     """
     try:
         # Read the base prompt template
@@ -112,17 +112,18 @@ async def integrate_with_events_handler(
         
         vector_memory = events_handler_instance.memory_manager
         
-        # Get the base prompt path (currently streamlined.md)
-        base_prompt_path = "/Users/markcastillo/git/whisperengine/prompts/optimized/streamlined.md"
+        # Use CDL character system instead of .md files
+        from src.prompts.cdl_ai_integration import CDLAIPromptIntegration
+        import os
         
-        # Create vector-native prompt
-        return await create_vector_native_prompt(
-            vector_memory_system=vector_memory,
-            base_prompt_path=base_prompt_path,
+        cdl_integration = CDLAIPromptIntegration(vector_memory)
+        default_character = os.getenv('CDL_DEFAULT_CHARACTER', 'characters/default_assistant.json')
+        
+        # Create character-aware prompt using CDL
+        return await cdl_integration.create_character_aware_prompt(
+            character_file=default_character,
             user_id=user_id,
-            current_message=message_content,
-            emotional_context=emotional_context,
-            personality_engine=getattr(events_handler_instance, 'personality_engine', None)
+            message_content=message_content
         )
         
     except Exception as e:
@@ -132,9 +133,9 @@ async def integrate_with_events_handler(
 
 # Configuration for migration
 VECTOR_NATIVE_CONFIG = {
-    "enabled": True,  # Set to True to use vector-native prompts
-    "base_prompt_path": "/Users/markcastillo/git/whisperengine/prompts/optimized/streamlined.md",
-    "fallback_to_legacy": False,  # 🔥 NO FALLBACKS - fix vector system instead
+    "enabled": True,  # Set to True to use CDL character system
+    "use_cdl_characters": True,  # Use CDL JSON files instead of .md files
+    "fallback_to_legacy": False,  # 🔥 NO FALLBACKS - fix CDL system instead
     "log_prompt_creation": True,
     "validate_memory_access": True
 }

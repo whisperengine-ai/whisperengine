@@ -1,23 +1,31 @@
 #!/usr/bin/env python3
 """
-Optimized Prompt Manager for WhisperEngine
+DEPRECATED: This module is deprecated as of the CDL (Character Definition Language) migration.
 
-Automatically selects the most appropriate prompt template based on:
-- Available system resources
-- Model capabilities (Phi-3-Mini vs full models)
-- Performance requirements
-- User preferences
+All prompt management now uses the CDL character system with JSON files.
+This file only loads .md files which are no longer used.
 
-This ensures the best possible experience across all deployment scenarios.
+Use src/prompts/cdl_ai_integration.py instead.
+
+TODO: This file can be safely removed after confirming no external dependencies.
 """
 
 import logging
 import os
 import sys
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional, Union
 
 import psutil
+
+logger = logging.getLogger(__name__)
+
+
+class OptimizedPromptManager:
+    """
+    DEPRECATED: This class is deprecated as of the CDL migration.
+    Use src/prompts/cdl_ai_integration.py instead.
+    """
 
 
 class OptimizedPromptManager:
@@ -176,7 +184,7 @@ class OptimizedPromptManager:
 
         # Emergency fallback - use minimal template
         if prompt_type == "system":
-            fallback = self.quick_templates_dir / "dream_minimal.md"
+            fallback = self.quick_templates_dir / "assistant_minimal.md"
         else:
             fallback = self.quick_templates_dir / "companion_minimal.md"
 
