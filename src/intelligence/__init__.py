@@ -16,13 +16,14 @@ from .emotional_intelligence import EmotionalIntelligenceAssessment, PredictiveE
 
 # Phase 3.1 Integration: Import Emotional Context Engine
 try:
-    from .emotional_context_engine import EmotionalContextEngine, create_emotional_context_engine
+    from .emotional_context_engine import EmotionalContextEngine, EmotionalState, create_emotional_context_engine
 
     EMOTIONAL_CONTEXT_ENGINE_AVAILABLE = True
 except ImportError:
     EMOTIONAL_CONTEXT_ENGINE_AVAILABLE = False
     create_emotional_context_engine = None
     EmotionalContextEngine = None
+    EmotionalState = None
 
 logger = logging.getLogger(__name__)
 
