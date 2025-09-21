@@ -52,14 +52,7 @@ except ImportError:
 # Neo4j components have been replaced by vector semantic relationships
 GRAPH_MEMORY_AVAILABLE = False
 
-# Local Emotion Engine Integration (replaces external API emotion AI)
-try:
-    from src.emotion.local_emotion_engine import LocalEmotionEngine
-
-    LOCAL_EMOTION_ENGINE_AVAILABLE = True
-except ImportError:
-    LOCAL_EMOTION_ENGINE_AVAILABLE = False
-    LocalEmotionEngine = None
+# Legacy emotion engine removed - vector-native system handles emotion analysis
 
 # Production Optimization Integration
 try:
@@ -274,12 +267,7 @@ class DiscordBotCore:
 
                 engine = self.phase2_integration.emotional_context_engine
 
-                # Update emotional AI if available
-                if hasattr(self, "local_emotion_engine") and self.local_emotion_engine:
-                    engine.emotional_ai = self.local_emotion_engine
-                    self.logger.info(
-                        "✅ Updated emotional context engine with External API Emotion AI"
-                    )
+                # Legacy emotion engine removed - vector-native handles emotion analysis
 
                 # Update personality profiler if available
                 if (
@@ -302,23 +290,10 @@ class DiscordBotCore:
 
     def initialize_ai_enhancements(self):
         """Initialize advanced AI enhancement systems."""
-        # Initialize Personality Profiler
-        self.logger.info("🧠 Initializing Advanced Personality Profiler...")
-        try:
-            # All AI features are always enabled - unified AI system
-            from src.analysis.personality_profiler import PersonalityProfiler
-
-            self.personality_profiler = PersonalityProfiler()
-            self.logger.info("✅ Personality profiler initialized (always active)")
-
-            # Graph-enhanced personality manager removed - replaced by vector semantic relationships
-            self.graph_personality_manager = None
-            self.logger.info("📊 Using standalone personality profiler (vector-native memory system)")
-
-        except Exception as e:
-            self.logger.error(f"Failed to initialize personality profiler: {e}")
-            self.logger.warning("⚠️ Continuing without personality profiling features")
-            self.personality_profiler = None
+        # Legacy personality profiler removed - vector-native system handles personality analysis
+        self.personality_profiler = None
+        self.graph_personality_manager = None
+        self.logger.info("📊 Using vector-native personality analysis (CDL + embedding intelligence)")
 
         # Initialize Dynamic Personality Profiler
         self.logger.info("🎭 Initializing Dynamic Personality Profiler...")
@@ -394,33 +369,9 @@ class DiscordBotCore:
             self.logger.error(f"Failed to initialize emotional intelligence: {e}")
             self.logger.warning("⚠️ Continuing without emotional intelligence features")
 
-        # Initialize Local Emotion Engine (VADER + TextBlob)
-        self.logger.info("🌐 Initializing Local Emotion Engine...")
-        try:
-            # All AI features are always enabled - unified AI system
-
-            if LOCAL_EMOTION_ENGINE_AVAILABLE and LocalEmotionEngine is not None:
-                # Initialize local emotion engine
-                self.local_emotion_engine = LocalEmotionEngine()
-                
-                # Initialize asynchronously
-                async def init_emotion_engine():
-                    await self.local_emotion_engine.initialize()
-                    self.logger.info("✅ Local Emotion Engine initialized (VADER + TextBlob)")
-                
-                asyncio.create_task(init_emotion_engine())
-
-                # Phase 3.1 Integration: Update emotional context engine with emotion AI
-                if hasattr(self, "phase2_integration") and self.phase2_integration:
-                    # Give the emotional context engine time to initialize, then update dependencies
-                    asyncio.create_task(self._update_emotional_context_dependencies())
-
-            else:
-                self.logger.info("🌐 External API Emotion AI disabled or not available")
-
-        except Exception as e:
-            self.logger.error(f"Failed to initialize External API Emotion AI: {e}")
-            self.logger.warning("⚠️ Continuing without External API Emotion AI features")
+        # Legacy emotion engine removed - vector-native system handles emotion analysis
+        self.local_emotion_engine = None
+        self.logger.info("🌐 Using vector-native emotion analysis (embedding intelligence)")
 
         # Initialize Phase 3 Memory Networks
         self.logger.info("🕸️ Initializing Phase 3: Multi-Dimensional Memory Networks...")
@@ -960,7 +911,6 @@ class DiscordBotCore:
             "monitoring_manager": self.monitoring_manager,
             "backup_manager": self.backup_manager,
             "voice_manager": self.voice_manager,
-            "local_emotion_engine": self.local_emotion_engine,
             "shutdown_manager": self.shutdown_manager,
             "heartbeat_monitor": self.heartbeat_monitor,
             "conversation_history": self.conversation_history,

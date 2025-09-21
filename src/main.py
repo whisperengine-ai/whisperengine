@@ -213,7 +213,7 @@ class ModularBotManager:
                 bot_name=os.getenv("DISCORD_BOT_NAME", ""),
                 voice_manager=components.get("voice_manager"),
                 voice_support_enabled=getattr(self.bot_core, "voice_support_enabled", False),
-                personality_profiler=components.get("personality_profiler"),
+                personality_profiler=None,  # Legacy personality profiler removed
                 is_demo_bot=os.getenv("DEMO_BOT", "false").lower() == "true",
             )
             self.command_handlers["help"].register_commands(bot_name_filter, is_admin)
@@ -226,7 +226,7 @@ class ModularBotManager:
                 safe_memory_manager=getattr(self.bot_core, "safe_memory_manager", None),
                 context_memory_manager=getattr(self.bot_core, "context_memory_manager", None),
                 graph_personality_manager=components.get("graph_personality_manager"),
-                personality_profiler=components.get("personality_profiler"),
+                personality_profiler=None,  # Legacy personality profiler removed
                 dynamic_personality_profiler=components.get("dynamic_personality_profiler"),
             )
             self.command_handlers["memory"].register_commands(is_admin, bot_name_filter)
@@ -263,20 +263,8 @@ class ModularBotManager:
             else:
                 logger.info("⚠️ Voice command handlers skipped - voice functionality not available")
 
-            # Visual emotion commands (Sprint 6)
-            visual_emotion_enabled = os.getenv('ENABLE_VISUAL_EMOTION_ANALYSIS', 'true').lower() == 'true'
-            if visual_emotion_enabled:
-                from src.handlers.discord_visual_emotion_handler import create_discord_visual_emotion_handler
-                
-                self.command_handlers["visual_emotion"] = create_discord_visual_emotion_handler(
-                    bot=self.bot,
-                    llm_client=components["llm_client"],
-                    memory_manager=components["memory_manager"]
-                )
-                self.command_handlers["visual_emotion"].register_commands(bot_name_filter, is_admin)
-                logger.info("✅ Visual emotion command handlers registered")
-            else:
-                logger.info("⚠️ Visual emotion handlers skipped - feature disabled")
+            # Visual emotion commands - REMOVED: superseded by vector-native multimodal approach
+            logger.info("ℹ️ Visual emotion handlers removed - using vector-native multimodal approach")
 
             # Performance monitoring commands
             self.command_handlers["performance"] = create_performance_commands(
