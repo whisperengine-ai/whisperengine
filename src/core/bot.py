@@ -220,7 +220,8 @@ class DiscordBotCore:
                     self.thread_manager = await create_advanced_conversation_thread_manager()
                     self.logger.info("✅ Phase 4.2: Advanced Thread Manager initialized")
                 except Exception as e:
-                    self.logger.error(f"Failed to initialize Phase 4.2 thread manager: {e}")
+                    self.logger.warning(f"Phase 4.2 thread manager not available: {e}")
+                    self.logger.debug("Continuing without advanced thread management features")
                     self.thread_manager = None
 
             # Initialize Phase 4.3: Proactive Engagement Engine
@@ -238,7 +239,8 @@ class DiscordBotCore:
                     )
                     self.logger.info("✅ Phase 4.3: Proactive Engagement Engine initialized with factory pattern")
                 except Exception as e:
-                    self.logger.error("Failed to initialize Phase 4.3 engagement engine: %s", e)
+                    self.logger.warning("Phase 4.3 engagement engine not available: %s", e)
+                    self.logger.debug("Continuing without proactive engagement features")
                     self.engagement_engine = None
 
             # Log Phase 4 integration status
@@ -429,8 +431,8 @@ class DiscordBotCore:
             self.logger.info("✅ Phase 4.2: Advanced Thread Manager scheduled for initialization")
             
         except Exception as e:
-            self.logger.error(f"Failed to initialize Phase 4.2 thread manager: {e}")
-            self.logger.warning("⚠️ Continuing without advanced thread management features")
+            self.logger.warning(f"Phase 4.2 thread manager not available: {e}")
+            self.logger.debug("⚠️ Continuing without advanced thread management features")
             self.thread_manager = None
 
         # Initialize Phase 4.3: Proactive Engagement Engine
@@ -444,8 +446,8 @@ class DiscordBotCore:
             self.logger.info("✅ Phase 4.3: Proactive Engagement Engine scheduled for initialization")
             
         except Exception as e:
-            self.logger.error("Failed to initialize Phase 4.3 engagement engine: %s", e)
-            self.logger.warning("⚠️ Continuing without proactive engagement features")
+            self.logger.warning("Phase 4.3 engagement engine not available: %s", e)
+            self.logger.debug("⚠️ Continuing without proactive engagement features")
             self.engagement_engine = None
 
         # Initialize Phase 4 Human-Like Intelligence
