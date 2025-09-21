@@ -136,8 +136,14 @@ class BotEventHandlers:
         self.conversation_manager = getattr(bot_core, "conversation_manager", None)
         
         # Initialize Conversation Boundary Manager for intelligent message summarization
+        redis_client = None
+        if self.conversation_cache and hasattr(self.conversation_cache, 'redis'):
+            redis_client = self.conversation_cache.redis
+        
         self.boundary_manager = ConversationBoundaryManager(
-            summarization_threshold=8  # Start summarizing after 8 messages
+            summarization_threshold=8,  # Start summarizing after 8 messages
+            llm_client=self.llm_client,  # Pass LLM client for intelligent summarization
+            redis_client=redis_client    # Pass Redis client for session persistence
         )
 
         # Configuration flags - unified AI system always enabled
