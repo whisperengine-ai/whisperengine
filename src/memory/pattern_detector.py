@@ -16,7 +16,7 @@ from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from enum import Enum
 from itertools import combinations
-from typing import Any
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -384,7 +384,7 @@ class CrossReferencePatternDetector:
 
     async def _analyze_emotional_sequence(
         self, user_id: str, sequence: list[dict]
-    ) -> DetectedPattern | None:
+    ) -> Optional[DetectedPattern]:
         """Analyze emotional sequence for trigger patterns"""
 
         if len(sequence) < 2:

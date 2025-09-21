@@ -205,7 +205,7 @@ class DiscordBotCore:
             self.logger.info("✅ Memory System initialized with type: %s", memory_type)
 
         except Exception as e:
-            self.logger.error("Memory system initialization failed: %s", str(e))
+            self.logger.debug("Memory system initialization failed: %s", str(e))
             raise
             
     # REMOVED: Legacy memory optimizer - replaced by vector-native memory system
@@ -387,7 +387,9 @@ class DiscordBotCore:
             self.logger.info("✅ Phase 3: Multi-Dimensional Memory Networks initialized")
 
         except Exception as e:
+            import traceback
             self.logger.error(f"Failed to initialize Phase 3 memory networks: {e}")
+            self.logger.error(f"Full traceback: {traceback.format_exc()}")
             self.logger.warning("⚠️ Continuing without Phase 3 memory network features")
 
         # Initialize Phase 4.1: Memory-Triggered Personality Moments

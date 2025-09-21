@@ -13,7 +13,7 @@ import logging
 import os
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, Optional, Union
 
 from .memory_importance_engine import MemoryImportanceEngine
 from .pattern_detector import CrossReferencePatternDetector, DetectedPattern, PatternType
@@ -424,7 +424,7 @@ class Phase3MemoryNetworks:
 
     def _analyze_cluster_importance_correlation(
         self, clustering_results: dict, importance_results: dict
-    ) -> MemoryInsight | None:
+    ) -> Optional[MemoryInsight]:
         """Analyze correlation between cluster membership and memory importance"""
 
         try:
@@ -489,7 +489,7 @@ class Phase3MemoryNetworks:
 
     def _analyze_pattern_memory_relevance(
         self, pattern_results: dict, importance_results: dict
-    ) -> MemoryInsight | None:
+    ) -> Optional[MemoryInsight]:
         """Analyze how detected patterns relate to memory importance"""
 
         try:
@@ -558,7 +558,7 @@ class Phase3MemoryNetworks:
 
     def _analyze_emotional_pattern_clusters(
         self, clustering_results: dict, pattern_results: dict
-    ) -> MemoryInsight | None:
+    ) -> Optional[MemoryInsight]:
         """Analyze relationship between emotional clusters and emotional patterns"""
 
         try:
@@ -610,7 +610,7 @@ class Phase3MemoryNetworks:
 
     def _analyze_network_density(
         self, clustering_results: dict, pattern_results: dict, importance_results: dict
-    ) -> MemoryInsight | None:
+    ) -> Optional[MemoryInsight]:
         """Analyze overall network density and connectivity"""
 
         try:
@@ -677,7 +677,7 @@ class Phase3MemoryNetworks:
 
     def _analyze_temporal_memory_evolution(
         self, clustering_results: dict, pattern_results: dict, importance_results: dict
-    ) -> MemoryInsight | None:
+    ) -> Optional[MemoryInsight]:
         """Analyze how memory network has evolved over time"""
 
         try:
@@ -967,8 +967,8 @@ class Phase3MemoryNetworks:
     # Public API methods
 
     async def get_memory_clusters(
-        self, user_id: str, cluster_type: ClusterType | None = None, memory_manager=None
-    ) -> list[MemoryCluster]:
+        self, user_id: str, cluster_type: Optional[ClusterType] = None, memory_manager=None
+    ) -> list:
         """Get memory clusters for user, optionally filtered by type"""
         if cluster_type:
             return await self.semantic_clusterer.get_clusters_by_type(user_id, cluster_type)
@@ -987,7 +987,7 @@ class Phase3MemoryNetworks:
         return await self.importance_engine.identify_core_memories(user_id, limit, memory_manager)
 
     async def get_memory_patterns(
-        self, user_id: str, pattern_type: PatternType | None = None
+        self, user_id: str, pattern_type: Optional[PatternType] = None
     ) -> list[DetectedPattern]:
         """Get detected patterns for user, optionally filtered by type"""
         user_patterns = self.pattern_detector.detected_patterns.get(user_id, {})
@@ -1006,7 +1006,7 @@ class Phase3MemoryNetworks:
         """Get generated insights for user"""
         return self.insights_cache.get(user_id, [])
 
-    async def get_network_state(self, user_id: str) -> MemoryNetworkState | None:
+    async def get_network_state(self, user_id: str) -> Optional[MemoryNetworkState]:
         """Get current network state for user"""
         return self.network_states.get(user_id)
 

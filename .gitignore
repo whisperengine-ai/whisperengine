@@ -119,3 +119,9 @@ docker-data/
 
 # Data and runtime files
 /data/
+.env.elena
+.gitignore
+.env.template
+.env.marcus
+.gitignore
+.setup_complete

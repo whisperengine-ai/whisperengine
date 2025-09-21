@@ -2985,8 +2985,18 @@ class BotEventHandlers:
                 
             # Check if user has an active character
             character_file = cdl_handler.get_user_character(user_id)
+            
+            # Auto-assign Elena character if bot name is Elena and no character is set
             if not character_file:
-                return None
+                import os
+                bot_name = os.getenv("DISCORD_BOT_NAME", "").lower()
+                if bot_name == "elena":
+                    character_file = "characters/examples/elena-rodriguez.json"
+                    # Store this assignment in the handler
+                    cdl_handler.user_characters[user_id] = character_file
+                    logger.info(f"🎭 CDL CHARACTER: Auto-assigned Elena character to user {user_id}")
+                else:
+                    return None
             
             logger.info(f"🎭 CDL CHARACTER: User {user_id} has active character: {character_file}")
             

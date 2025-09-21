@@ -16,7 +16,7 @@ import statistics
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime, timedelta
 from enum import Enum
-from typing import Any
+from typing import Any, Dict, List, Optional
 
 import numpy as np
 
@@ -178,7 +178,7 @@ class MemoryImportanceEngine:
             if learned_weights:
                 self.importance_weights = original_weights
 
-    async def _get_user_learned_weights(self, user_id: str) -> dict | None:
+    async def _get_user_learned_weights(self, user_id: str) -> Optional[dict]:
         """Get user-specific learned importance weights"""
         user_stats = await self.load_user_memory_statistics(user_id)
         if not user_stats:
@@ -875,7 +875,7 @@ class MemoryImportanceEngine:
             logger.error(f"Failed to update memory importance: {e}")
 
     async def identify_core_memories(
-        self, user_id: str, limit: int | None = None, memory_manager=None
+        self, user_id: str, limit: Optional[int] = None, memory_manager=None
     ) -> list[dict]:
         """
         Identify most important memories for user
@@ -997,7 +997,7 @@ class MemoryImportanceEngine:
             factor: statistics.mean(values) if values else 0.0 for factor, values in factors.items()
         }
 
-    def clear_cache(self, user_id: str | None = None):
+    def clear_cache(self, user_id: Optional[str] = None):
         """Clear importance cache for user or all users"""
         if user_id:
             # Clear cache for specific user
@@ -1141,7 +1141,7 @@ class MemoryImportanceEngine:
         finally:
             connection.close()
 
-    async def load_user_memory_statistics(self, user_id: str) -> dict | None:
+    async def load_user_memory_statistics(self, user_id: str) -> Optional[dict]:
         """Load user memory statistics from database"""
         connection = self._get_db_connection()
         if not connection:
@@ -1230,7 +1230,7 @@ class MemoryImportanceEngine:
         finally:
             connection.close()
 
-    async def load_user_importance_patterns(self, user_id: str, pattern_type: str | None = None) -> list[dict]:
+    async def load_user_importance_patterns(self, user_id: str, pattern_type: Optional[str] = None) -> List[dict]:
         """Load importance patterns for a user"""
         connection = self._get_db_connection()
         if not connection:
