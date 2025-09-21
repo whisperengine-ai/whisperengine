@@ -211,8 +211,8 @@ class VectorNativePromptManager:
         CRITICAL: No template variables - directly inject context into prompt.
         """
         try:
-            # Extract Dream character prompt without template variables
-            clean_prompt = "You are Dream from The Sandman - eternal ruler of dreams and nightmares. You understand mortals intuitively through eons of experience."
+            # Use generic assistant prompt that supports character overrides
+            clean_prompt = "You are a helpful AI assistant. You communicate naturally and conversationally."
             
             # Build vector-native context sections
             context_sections = []
@@ -220,17 +220,17 @@ class VectorNativePromptManager:
             # Memory context
             if contexts['memory']:
                 memory = contexts['memory']
-                memory_text = f"You remember {memory['conversation_count']} interactions with this mortal"
+                memory_text = f"You have {memory['conversation_count']} previous interactions with this user"
                 if memory['key_topics']:
                     memory_text += f", particularly conversations about {', '.join(memory['key_topics'])}"
                 if memory['patterns']:
-                    memory_text += f". You recognize patterns of {', '.join(memory['patterns'])}"
+                    memory_text += f". You notice patterns of {', '.join(memory['patterns'])}"
                 context_sections.append(memory_text)
             
             # Relationship context
             if contexts['relationship']:
                 rel = contexts['relationship']
-                rel_text = f"Your relationship with this mortal is {rel['relationship_level']}"
+                rel_text = f"Your relationship with this user is {rel['relationship_level']}"
                 if rel['trust_indicators']:
                     rel_text += f", marked by {', '.join(rel['trust_indicators'])}"
                 rel_text += f". Connection status: {rel['intimacy_progression']}"
@@ -239,7 +239,7 @@ class VectorNativePromptManager:
             # Personality context
             if contexts['personality']:
                 pers = contexts['personality']
-                pers_text = f"You perceive their {pers['communication_style']} communication style"
+                pers_text = f"You notice their {pers['communication_style']} communication style"
                 if pers['decision_style']:
                     pers_text += f" and {pers['decision_style']} approach to decisions"
                 if pers['confidence_level']:
@@ -249,21 +249,24 @@ class VectorNativePromptManager:
             # Emotional context
             if contexts['emotional']:
                 emo = contexts['emotional']
-                emo_text = f"You sense their current emotional state: {emo['current_emotional_state']}"
+                emo_text = f"You notice their current emotional state: {emo['current_emotional_state']}"
                 if emo['emotional_prediction']:
-                    emo_text += f". You foresee they may experience {emo['emotional_prediction']}"
+                    emo_text += f". They may experience {emo['emotional_prediction']}"
                 if emo['proactive_support']:
-                    emo_text += f". Your wisdom suggests: {emo['proactive_support']}"
+                    emo_text += f". Consider: {emo['proactive_support']}"
                 context_sections.append(emo_text)
             
             # Combine all contexts
             if context_sections:
                 full_context = ". ".join(context_sections)
-                final_prompt = f"{clean_prompt}. {full_context}. Respond as the eternal Lord of Dreams with natural conversation - no technical formatting."
+                final_prompt = f"{clean_prompt}. {full_context}. Respond naturally and conversationally - no technical formatting."
             else:
-                final_prompt = f"{clean_prompt}. Respond as the eternal Lord of Dreams with natural conversation - no technical formatting."
+                final_prompt = f"{clean_prompt}. Respond naturally and conversationally - no technical formatting."
             
+            # 🔍 DEBUG: Print final prompt before sending to LLM
             logger.info(f"🎭 Vector-native prompt created for user {user_id}: {len(final_prompt)} characters")
+            logger.debug(f"🔍 FINAL PROMPT DEBUG for user {user_id}:\n{'-'*50}\n{final_prompt}\n{'-'*50}")
+            
             return final_prompt
             
         except Exception as e:
@@ -341,7 +344,7 @@ class VectorNativePromptManager:
     
     async def _generate_proactive_support_context(self, memories: List[Dict[str, Any]]) -> str:
         """Generate proactive support context."""
-        return "encourage their creative exploration while offering grounding wisdom"
+        return "encourage their creative exploration while providing helpful guidance"
     
     async def _assess_emotional_stability(self, memories: List[Dict[str, Any]]) -> str:
         """Assess emotional stability."""

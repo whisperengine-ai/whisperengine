@@ -6,6 +6,7 @@ Abstracts conversation handling to support Discord, Slack, Teams, and other plat
 import asyncio
 import json
 import logging
+import os
 from abc import ABC, abstractmethod
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -15,7 +16,13 @@ from typing import Any
 
 from src.config.adaptive_config import AdaptiveConfigManager
 from src.database.database_integration import DatabaseIntegrationManager
-from src.optimization.cost_optimizer import CostOptimizationEngine, RequestContext
+# Removed cost optimizer - not needed
+
+# Import character definition system
+try:
+    from src.prompts.cdl_ai_integration import CDLAIPromptIntegration
+except ImportError:
+    CDLAIPromptIntegration = None
 
 
 class ChatPlatform(Enum):
@@ -409,7 +416,7 @@ class UniversalChatOrchestrator:
     ):  # Add flag for enhanced core
         self.config_manager = config_manager
         self.db_manager = db_manager
-        self.cost_optimizer = CostOptimizationEngine(db_manager)
+        # Removed cost optimizer - not needed
 
         # Initialize enhanced bot core if requested and no bot_core provided
         if bot_core is None and use_enhanced_core:
@@ -437,12 +444,26 @@ class UniversalChatOrchestrator:
         self.active_conversations: dict[str, Conversation] = {}
         self.ai_engine = None  # Would integrate with existing AI system
 
+        # Initialize character system
+        self.character_system = None
+        if CDLAIPromptIntegration:
+            try:
+                self.character_system = CDLAIPromptIntegration()
+                logging.info("✅ Character Definition Language (CDL) system initialized")
+            except Exception as e:
+                logging.warning(f"Failed to initialize CDL character system: {e}")
+
         # Simple in-memory conversation history storage
         # Format: {user_id_channel_id: [{'user_message': str, 'assistant_response': str, 'timestamp': datetime}, ...]}
         self.conversation_history: dict[str, list[dict[str, Any]]] = {}
 
         # Load platform configurations
         self.platform_configs = self._load_platform_configs()
+
+    def set_bot_core(self, bot_instance):
+        """Set the bot instance to access command handlers for CDL character integration"""
+        self.bot_core = bot_instance
+        logging.info(f"🎭 UNIVERSAL CHAT: Bot core set, command handlers available: {list(getattr(bot_instance, 'command_handlers', {}).keys())}")
 
     def _load_platform_configs(self) -> dict[ChatPlatform, dict[str, Any]]:
         """Load platform-specific configurations"""
@@ -709,15 +730,9 @@ class UniversalChatOrchestrator:
             if self.bot_core and hasattr(self.bot_core, "memory_manager"):
                 return await self._generate_full_ai_response(message, conversation_context)
             else:
-                # Create basic conversation context for fallback
-                basic_context = [
-                    {
-                        "role": "system",
-                        "content": "You are WhisperEngine, an advanced AI assistant. Be helpful and engaging.",
-                    },
-                    {"role": "user", "content": message.content},
-                ]
-                return await self._generate_basic_ai_response(message, basic_context)
+                # Use the character-enhanced conversation context passed in
+                # Don't override with generic WhisperEngine prompt
+                return await self._generate_basic_ai_response(message, conversation_context)
 
         except Exception as e:
             logging.error(f"Error generating AI response: {e}")
@@ -793,22 +808,32 @@ class UniversalChatOrchestrator:
                 },
             )()
 
-            # Build conversation context like the Discord bot does
-            conversation_context = []
-
-            # Build template context data from available sources
-            template_context = {}
-            if hasattr(memory_manager, "get_emotion_context"):
-                try:
-                    template_context["emotional_intelligence"] = await memory_manager.get_emotion_context(
-                        message.user_id
-                    )
-                except Exception as e:
-                    logging.debug(f"Could not get emotion context: {e}")
-
-            # Add system prompt using proper config system with full template contextualization
-            system_prompt = await self._load_system_prompt(message.user_id, template_context)
-            conversation_context.append({"role": "system", "content": system_prompt})
+            # 🔥 FIX: Use the conversation context passed from events.py (includes character enhancement)
+            # DO NOT rebuild conversation_context - it already contains character-enhanced system prompts!
+            logging.info(f"🎭 UNIVERSAL CHAT: Using passed conversation context ({len(conversation_context)} messages)")
+            
+            # Log the system message for debugging
+            system_messages = [msg for msg in conversation_context if msg.get("role") == "system"]
+            if system_messages:
+                logging.info(f"🎭 UNIVERSAL CHAT: Found {len(system_messages)} system message(s)")
+                for i, sys_msg in enumerate(system_messages):
+                    content_preview = sys_msg.get("content", "")[:100]
+                    logging.info(f"🎭 UNIVERSAL CHAT: System message {i+1} preview: {content_preview}...")
+            else:
+                logging.warning(f"🎭 UNIVERSAL CHAT: No system messages found in passed context!")
+                
+                # Only add fallback system prompt if NO system message exists
+                template_context = {}
+                if hasattr(memory_manager, "get_emotion_context"):
+                    try:
+                        template_context["emotional_intelligence"] = await memory_manager.get_emotion_context(
+                            message.user_id
+                        )
+                    except Exception as e:
+                        logging.debug(f"Could not get emotion context: {e}")
+                
+                system_prompt = await self._load_system_prompt(message.user_id, template_context)
+                conversation_context.append({"role": "system", "content": system_prompt})
 
             # Use the Discord bot's memory classification
             message_context = None
@@ -1210,57 +1235,43 @@ class UniversalChatOrchestrator:
         self, user_id: str | None = None, template_context: dict | None = None
     ) -> str:
         """Load the system prompt using the proper config system with template contextualization"""
-        try:
-            from src.core.config import load_system_prompt
-
-            content = load_system_prompt()
-        except Exception as e:
-            logging.warning(f"Could not load system prompt via config: {e}")
-            # Try fallback to prompts/default.md
+        
+        logging.info(f"🎭 UNIVERSAL CHAT DEBUG: Loading system prompt for user {user_id}")
+        
+        # FIRST: Try to use character-aware prompt if character system is available
+        if self.character_system and user_id:
+            logging.info(f"🎭 UNIVERSAL CHAT DEBUG: Character system available, checking user character")
             try:
-                import os
-
-                prompt_path = os.path.join(
-                    os.path.dirname(__file__), "..", "..", "prompts", "default.md"
-                )
-                if os.path.exists(prompt_path):
-                    with open(prompt_path, encoding="utf-8") as f:
-                        content = f.read()
-                        # Replace {BOT_NAME} placeholder if present
-                        bot_name = os.getenv("DISCORD_BOT_NAME", "AI Assistant")
-                        content = content.replace("{BOT_NAME}", bot_name)
+                # Check if user has an active character
+                character_file = self._get_user_active_character(user_id)
+                if not character_file:
+                    # Fall back to environment-configured default character
+                    default_character = os.getenv("CDL_DEFAULT_CHARACTER", "characters/default_assistant.json")
+                    character_file = default_character
+                    logging.info(f"🎭 UNIVERSAL CHAT: User {user_id} has no active character, using default CDL: {character_file}")
                 else:
-                    content = None
-            except Exception as e2:
-                logging.warning(f"Could not load system prompt file: {e2}")
-                content = None
-
-        # If we still don't have content, use fallback
-        if content is None:
-            content = """You are an AI assistant and companion with advanced conversational abilities, emotional intelligence, and memory. You have a thoughtful, helpful personality and can adapt your communication style to match user preferences.
-
-Your core qualities:
-- You are knowledgeable, articulate, and genuinely interested in helping users
-- You have excellent memory and can build meaningful relationships over time
-- You can engage in both casual conversation and provide detailed assistance
-- You respect user privacy and maintain appropriate boundaries
-- You are emotionally intelligent and can provide support when needed
-
-Your communication style:
-- Be natural and conversational while maintaining professionalism
-- Adapt your tone and formality to match the user's communication style
-- Use clear, helpful language that's appropriate for the context
-- Show genuine interest in the user's thoughts, questions, and experiences
-
-You are here to be a helpful, reliable, and engaging AI companion."""
-
-        # Apply template context if provided
-        if template_context:
-            for key, value in template_context.items():
-                if isinstance(value, str):
-                    content = content.replace(f"{{{key.upper()}}}", value)
-
-        return content
+                    logging.info(f"🎭 UNIVERSAL CHAT: User {user_id} has active character: {character_file}")
+                    
+                character_prompt = await self.character_system.create_character_aware_prompt(
+                    character_file=character_file,
+                    user_id=user_id,
+                    current_message=""  # No current message in this context
+                )
+                if character_prompt:
+                    logging.info(f"✅ UNIVERSAL CHAT: Using character-aware prompt for user {user_id} ({len(character_prompt)} chars)")
+                    logging.info(f"🎭 UNIVERSAL CHAT DEBUG: Character prompt preview: {character_prompt[:200]}...")
+                    return character_prompt
+            except Exception as e:
+                logging.warning(f"Failed to generate character-aware prompt: {e}")
+        else:
+            if not self.character_system:
+                logging.warning(f"🎭 UNIVERSAL CHAT DEBUG: No character system available")
+            if not user_id:
+                logging.warning(f"🎭 UNIVERSAL CHAT DEBUG: No user_id provided")
+        
+        # 🔥 CDL-ONLY: No fallback to legacy prompt system!
+        logging.error(f"🎭 UNIVERSAL CHAT: CDL system failed for user {user_id} - system is CDL-only, no fallbacks!")
+        raise RuntimeError(f"CDL character system is required but failed for user {user_id}. Check CDL_DEFAULT_CHARACTER configuration.")
 
     async def _generate_basic_ai_response(
         self, message: Message, conversation_context: list[dict[str, str]]
@@ -1274,43 +1285,12 @@ You are here to be a helpful, reliable, and engaging AI companion."""
             if not hasattr(self, "llm_client"):
                 self.llm_client = LLMClient()
 
-            # Create request context for cost optimization
-            context_tokens = sum(
-                len(msg.get("content", "").split()) for msg in conversation_context
-            )
-            prompt_tokens = int(context_tokens * 1.3)  # Rough estimate
-
-            context = RequestContext(
-                user_id=message.user_id,
-                conversation_length=len(conversation_context),
-                prompt_tokens=prompt_tokens,
-                expected_output_tokens=200,
-                conversation_type="general",
-                priority="normal",
-            )
-
-            # Select optimal model
-            selected_model = await self.cost_optimizer.select_optimal_model(context)
+            # Use configured model from LLM client
+            selected_model = None  # Will use default from LLM client
 
             # Use the provided conversation context (which includes history and current message)
+            # Character-enhanced system prompts should already be included by events.py
             chat_messages = conversation_context.copy()
-
-            # Ensure we have a basic system prompt if not present
-            has_system_prompt = any(msg.get("role") == "system" for msg in chat_messages)
-            if not has_system_prompt:
-                system_prompt = {
-                    "role": "system",
-                    "content": """You are WhisperEngine, an advanced AI conversation platform with emotional intelligence and memory capabilities.
-
-You provide:
-- 🧠 Advanced conversation memory and context awareness
-- 💭 Emotional intelligence and empathy
-- 🔒 Privacy-focused interactions
-- ✨ Multi-platform support (Discord, Web, Slack, API)
-
-You adapt your responses based on the platform and conversation context. Be helpful, engaging, and demonstrate emotional intelligence in your responses.""",
-                }
-                chat_messages.insert(0, system_prompt)
 
             # Generate response using actual LLM (run in thread to avoid blocking)
             start_time = datetime.now()
@@ -1327,7 +1307,7 @@ You adapt your responses based on the platform and conversation context. Be help
 
             return AIResponse(
                 content=response_text,
-                model_used=selected_model,
+                model_used="openrouter/auto",  # Will use configured model
                 tokens_used=int(estimated_tokens),
                 cost=estimated_cost,
                 generation_time_ms=generation_time_ms,
@@ -1457,9 +1437,12 @@ You adapt your responses based on the platform and conversation context. Be help
         conversation_context = []
 
         try:
-            # Add system prompt first
-            system_prompt = self._get_basic_system_prompt()
-            conversation_context.append({"role": "system", "content": system_prompt})
+            # Add character-aware system prompt first (only if available)
+            system_prompt = self._get_basic_system_prompt(user_id, current_message)
+            if system_prompt:
+                conversation_context.append({"role": "system", "content": system_prompt})
+            else:
+                logging.info(f"🎭 UNIVERSAL CHAT: No system prompt available - using existing context as-is")
 
             # Get recent conversation pairs for context
             recent_pairs = self._get_recent_conversation_pairs(user_id, channel_id, limit=5)
@@ -1481,9 +1464,8 @@ You adapt your responses based on the platform and conversation context. Be help
 
         except Exception as e:
             logging.error(f"Error building conversation context: {e}")
-            # Return minimal context
+            # 🔥 NO FALLBACK CODE - Return minimal context without overriding character
             return [
-                {"role": "system", "content": self._get_basic_system_prompt()},
                 {"role": "user", "content": current_message},
             ]
 
@@ -1675,17 +1657,66 @@ You adapt your responses based on the platform and conversation context. Be help
             # Don't fail the whole conversation if storage fails
             pass
 
-    def _get_basic_system_prompt(self) -> str:
-        """Get basic system prompt for WhisperEngine"""
-        return """You are WhisperEngine, an advanced AI conversation platform with emotional intelligence and memory capabilities.
+    def _get_user_active_character(self, user_id: str) -> str | None:
+        """Get user's active character file if available"""
+        try:
+            logging.info(f"🎭 UNIVERSAL CHAT DEBUG: Checking active character for user {user_id}")
+            # Access the bot's CDL command handler to check active character
+            if (hasattr(self.bot_core, 'command_handlers') and 
+                'cdl_test' in getattr(self.bot_core, 'command_handlers', {})):
+                
+                cdl_handler = self.bot_core.command_handlers['cdl_test']
+                character_file = cdl_handler.get_user_character(user_id)
+                logging.info(f"🎭 UNIVERSAL CHAT DEBUG: User {user_id} active character: {character_file}")
+                return character_file
+            else:
+                logging.warning(f"🎭 UNIVERSAL CHAT DEBUG: CDL handler not found in bot_core.command_handlers")
+                logging.info(f"🎭 UNIVERSAL CHAT DEBUG: Available handlers: {list(getattr(self.bot_core, 'command_handlers', {}).keys())}")
+        except Exception as e:
+            logging.warning(f"Failed to get user active character: {e}")
+        return None
 
-You provide:
-- 🧠 Advanced conversation memory and context awareness
-- 💭 Emotional intelligence and empathy
-- 🔒 Privacy-focused interactions
-- ✨ Multi-platform support (Discord, Web, Slack, API)
-
-You adapt your responses based on the platform and conversation context. Be helpful, engaging, and demonstrate emotional intelligence in your responses."""
+    def _get_basic_system_prompt(self, user_id: str = None, current_message: str = "") -> str:
+        """Get system prompt - character-aware if CDL system is available"""
+        
+        logging.info(f"🎭 UNIVERSAL CHAT DEBUG: Getting system prompt for user {user_id}")
+        
+        # Try to use character-aware prompt if character system is available
+        if self.character_system and user_id:
+            logging.info(f"🎭 UNIVERSAL CHAT DEBUG: Character system available, checking user character")
+            try:
+                # Check if user has an active character
+                character_file = self._get_user_active_character(user_id)
+                if not character_file:
+                    # Fall back to environment-configured default character
+                    default_character = os.getenv("CDL_DEFAULT_CHARACTER", "characters/default_assistant.json")
+                    character_file = default_character
+                    logging.info(f"🎭 UNIVERSAL CHAT: User {user_id} has no active character, using default: {character_file}")
+                else:
+                    logging.info(f"🎭 UNIVERSAL CHAT: User {user_id} has active character: {character_file}")
+                
+                character_prompt = asyncio.run(
+                    self.character_system.create_character_aware_prompt(
+                        character_file=character_file,
+                        user_id=user_id,
+                        current_message=current_message
+                    )
+                )
+                if character_prompt:
+                    logging.info(f"✅ UNIVERSAL CHAT: Using character-aware prompt for user {user_id} ({len(character_prompt)} chars)")
+                    logging.info(f"🎭 UNIVERSAL CHAT DEBUG: Character prompt preview: {character_prompt[:200]}...")
+                    return character_prompt
+            except Exception as e:
+                logging.warning(f"Failed to generate character-aware prompt: {e}")
+        else:
+            if not self.character_system:
+                logging.warning(f"🎭 UNIVERSAL CHAT DEBUG: No character system available")
+            if not user_id:
+                logging.warning(f"🎭 UNIVERSAL CHAT DEBUG: No user_id provided")
+        
+        # 🔥 CDL-ONLY: No fallback to legacy prompt system!
+        logging.error(f"🎭 UNIVERSAL CHAT: CDL system failed for user {user_id} - system is CDL-only, no fallbacks!")
+        raise RuntimeError(f"CDL character system is required but failed for user {user_id}. Check CDL_DEFAULT_CHARACTER configuration.")
 
     async def cleanup(self):
         """Cleanup all platform connections"""
@@ -1718,7 +1749,26 @@ You adapt your responses based on the platform and conversation context. Be help
         query_lower = query.lower()
         logging.info(f"🔍 ANTI-HALLUCINATION: Assessing memory relevance for query: '{query}'")
         
-        # Extract key query terms
+        # 🔥 CONVERSATIONAL CONTEXT DETECTION: Check if this is a conversational response vs fact-seeking query
+        conversational_indicators = [
+            'haha', 'lol', 'yeah', 'maybe', 'perhaps', 'i guess', 'not sure', 'dunno',
+            'ok', 'alright', 'sure', 'yep', 'nope', 'hmm', 'oh', 'ah', 'well',
+            'right', 'exactly', 'true', 'definitely', 'absolutely', 'kinda', 'sorta'
+        ]
+        
+        is_conversational_response = any(indicator in query_lower for indicator in conversational_indicators)
+        is_short_response = len(query.split()) <= 6  # Short responses are usually conversational
+        
+        if is_conversational_response or is_short_response:
+            logging.info(f"🔍 ANTI-HALLUCINATION: CONVERSATIONAL RESPONSE detected - using high confidence")
+            return {
+                'has_relevant_info': True,
+                'confidence': 0.9,  # High confidence for conversational flow
+                'query_type': ['conversational_response'],
+                'memory_count': len((relevant_memories or []) + (chromadb_memories or []))
+            }
+        
+        # Extract key query terms for fact-seeking questions
         query_keywords = set()
         if any(word in query_lower for word in ['pet', 'pets', 'cat', 'dog', 'animal']):
             query_keywords.add('pets')

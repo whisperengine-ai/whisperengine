@@ -57,29 +57,23 @@ def truncate_context(
     max_tokens: int = MAX_CONTEXT_TOKENS
 ) -> Tuple[List[Dict[str, str]], int]:
     """
-    Truncate conversation context to fit within token limit.
+    DISABLED: Character prompt preservation.
     
-    Strategy:
-    1. Always keep system messages (first messages)
-    2. Truncate from oldest user/assistant messages
-    3. Preserve message alternation
+    This function was truncating Elena's character prompts when deemed "too large",
+    causing the bot to fall back to generic assistant behavior.
     
-    Args:
-        conversation_context: Original context
-        max_tokens: Maximum token limit
-        
     Returns:
-        Tuple of (truncated_context, tokens_removed)
+        Original context unchanged to preserve character integrity
     """
     if not conversation_context:
         return conversation_context, 0
     
-    # Count current tokens
+    # Count current tokens for logging only
     current_tokens = count_context_tokens(conversation_context)
     
-    if current_tokens <= max_tokens:
-        logger.debug(f"Context size OK: {current_tokens} tokens <= {max_tokens}")
-        return conversation_context, 0
+    # ALWAYS return original context - NO TRUNCATION
+    logger.debug(f"Context size: {current_tokens} tokens (truncation disabled)")
+    return conversation_context, 0
     
     logger.warning(f"Context too large: {current_tokens} tokens > {max_tokens}, truncating...")
     

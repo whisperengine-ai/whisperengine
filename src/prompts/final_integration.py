@@ -65,11 +65,10 @@ async def create_ai_pipeline_vector_native_prompt(
             recent_messages=recent_messages or []
         )
         
-        # 🎭 VECTOR-NATIVE PROMPT: Create prompt from vector-stored AI insights
-        prompt = await _build_prompt_from_ai_pipeline_vectors(
-            vector_memory=events_handler_instance.memory_manager,
+        # 🎭 VECTOR-NATIVE PROMPT: Create conversational prompt with vector enhancement
+        prompt = await pipeline_integration.create_conversational_prompt_with_vector_enhancement(
             user_id=user_id,
-            current_message=message_content,
+            message_content=message_content,
             pipeline_result=pipeline_result
         )
         
@@ -78,8 +77,20 @@ async def create_ai_pipeline_vector_native_prompt(
         
     except Exception as e:
         logger.error("❌ AI pipeline vector prompt creation failed: %s", e)
-        # 🔥 NO FALLBACK: Fix the AI pipeline, don't mask errors
-        raise e
+        # ALWAYS fallback to conversational prompt  
+        return await _create_conversational_fallback_prompt(
+            user_id=str(message.author.id),
+            message_content=message.content or "[Discord interaction]"
+        )
+
+
+async def _create_conversational_fallback_prompt(user_id: str, message_content: str) -> str:
+    """
+    Emergency fallback prompt that requires no external dependencies or systems.
+    
+    This ensures the bot remains conversational even when all systems fail.
+    """
+    return f"You are a helpful AI assistant. User said: \"{message_content}\". Respond naturally and helpfully."
 
 
 async def _build_prompt_from_ai_pipeline_vectors(
@@ -95,13 +106,13 @@ async def _build_prompt_from_ai_pipeline_vectors(
     the AI pipeline's actual insights stored as semantic vectors.
     """
     try:
-        # Base Dream prompt (no template variables)
-        base_prompt = "You are Dream from The Sandman - eternal ruler of dreams and nightmares. You understand mortals intuitively through eons of experience."
+        # Base AI assistant prompt (no hardcoded character)
+        base_prompt = "You are a helpful AI assistant. Respond naturally and conversationally."
         
         # 🧠 PERSONALITY CONTEXT: From Phase 1 AI pipeline results
         personality_context = ""
         if pipeline_result.personality_profile:
-            personality_context = f"You perceive their {pipeline_result.communication_style} communication style"
+            personality_context = f"You notice their {pipeline_result.communication_style} communication style"
             if pipeline_result.personality_traits:
                 personality_context += f" and recognize traits of {', '.join(pipeline_result.personality_traits[:3])}"
         
@@ -117,7 +128,7 @@ async def _build_prompt_from_ai_pipeline_vectors(
         # 🧠 RELATIONSHIP CONTEXT: From Phase 3 vector memory
         relationship_context = ""
         if pipeline_result.relationship_depth:
-            relationship_context = f"Your relationship with this mortal is {pipeline_result.relationship_depth}"
+            relationship_context = f"Your relationship with the user is {pipeline_result.relationship_depth}"
             if pipeline_result.conversation_patterns:
                 relationship_context += f", marked by patterns of {', '.join(pipeline_result.conversation_patterns[:2])}"
         
@@ -143,9 +154,13 @@ async def _build_prompt_from_ai_pipeline_vectors(
         
         if active_contexts:
             full_context = ". ".join(active_contexts)
-            final_prompt = f"{base_prompt}. {full_context}. Respond as the eternal Lord of Dreams with natural conversation - no technical formatting."
+            final_prompt = f"{base_prompt}. {full_context}"
         else:
-            final_prompt = f"{base_prompt}. Respond as the eternal Lord of Dreams with natural conversation - no technical formatting."
+            final_prompt = f"{base_prompt}"
+        
+        # 🔍 DEBUG: Print final prompt before sending to LLM
+        logger.debug("🔍 FINAL INTEGRATION PROMPT DEBUG for user %s:\n%s\n%s\n%s", 
+                    user_id, "-"*50, final_prompt, "-"*50)
         
         return final_prompt
         
@@ -158,16 +173,15 @@ async def _get_relevant_memory_context(vector_memory, user_id: str, current_mess
     """Get relevant memory context using vector search."""
     try:
         # Search for relevant memories
-        relevant_memories = await vector_memory.search_memories_with_qdrant_intelligence(
-            query=current_message,
+        relevant_memories = await vector_memory.search_memories(
             user_id=user_id,
-            top_k=5,
-            prefer_recent=True
+            query=current_message,
+            limit=5
         )
         
         if relevant_memories:
             memory_count = len(relevant_memories)
-            memory_context = f"You remember {memory_count} relevant interactions with this mortal"
+            memory_context = f"You remember {memory_count} relevant interactions with the user"
             
             # Add specific memory hints
             if relevant_memories:

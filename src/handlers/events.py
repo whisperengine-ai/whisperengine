@@ -264,6 +264,11 @@ class BotEventHandlers:
                 self.chat_orchestrator = None
                 return False
 
+            # Set bot instance for Universal Chat to access command handlers
+            if hasattr(self.chat_orchestrator, "set_bot_core"):
+                self.chat_orchestrator.set_bot_core(self.bot)
+                logger.info("✅ Universal Chat configured with bot instance for CDL character access")
+
             # Setup Discord adapter and set bot instance
             if (
                 hasattr(self.chat_orchestrator, "adapters")
@@ -556,6 +561,25 @@ class BotEventHandlers:
                             # Add recency boost for conversation continuity
                             filters["prefer_recent_conversation"] = True
                             filters["recency_hours"] = 2  # Prefer memories from last 2 hours
+                            
+                            # 🎭 CHARACTER FILTERING: Add character-aware memory filtering
+                            # This ensures Elena gets Elena's memories, not generic WhisperEngine ones
+                            if hasattr(self.bot_core, 'command_handlers') and 'cdl_test' in self.bot_core.command_handlers:
+                                cdl_handler = self.bot_core.command_handlers['cdl_test']
+                                if hasattr(cdl_handler, '_get_user_active_character'):
+                                    try:
+                                        active_character = cdl_handler._get_user_active_character(user_id)
+                                        if active_character:
+                                            character_name = active_character.replace('.json', '').replace('examples/', '')
+                                            filters["active_character"] = character_name
+                                            filters["has_character"] = True
+                                            logger.info(f"🎭 MEMORY SEARCH: Filtering for character: {character_name}")
+                                        else:
+                                            filters["has_character"] = False
+                                            logger.info(f"🎭 MEMORY SEARCH: Filtering for non-character conversations")
+                                    except Exception as e:
+                                        logger.warning(f"🎭 MEMORY SEARCH: Could not detect character for search: {e}")
+                                        # Don't add character filters if detection fails
                             
                             relevant_memories = await self.memory_manager.retrieve_relevant_memories_optimized(
                                 user_id=user_id,
@@ -1197,17 +1221,12 @@ class BotEventHandlers:
             system_prompt_content = enhanced_system_prompt
             logger.debug("Using Phase 4 enhanced system prompt")
         else:
-            # Use AI pipeline + vector memory system - NO FALLBACKS
+            # DISABLE AI PIPELINE PROMPT - Let character enhancement handle system messages
             user_id = str(message.author.id)
-            logger.info(f"🎭 Creating vector-native prompt for user {user_id}")
+            logger.info(f"🎭 Skipping AI pipeline prompt for user {user_id} - will use character enhancement instead")
             
-            system_prompt_content = await create_ai_pipeline_vector_native_prompt(
-                events_handler_instance=self,
-                message=message,
-                recent_messages=recent_messages,
-                emotional_context=getattr(self, '_current_emotional_context', None)
-            )
-            logger.debug("✅ Using AI pipeline + vector-native system prompt")
+            system_prompt_content = None  # Let character enhancement create the system message
+            logger.debug("✅ AI pipeline prompt disabled, deferring to character enhancement")
 
         # ALWAYS consolidate system messages into a single narrative instruction - NO FALLBACKS
         # Build compact memory narrative
@@ -1436,19 +1455,13 @@ class BotEventHandlers:
         conversation_context.extend(fixed_history)
         logger.info(f"🔥 CONTEXT DEBUG: Final conversation context has {len(conversation_context)} total messages")
 
-        # CRITICAL: Add conversation continuity enhancement with proper context awareness
-        conversation_context.append({
-            "role": "system", 
-            "content": (
-                "CONVERSATION CONTINUITY: You are in an ongoing conversation. Maintain natural continuity by: "
-                "1) Acknowledging and building upon what was just discussed in recent messages "
-                "2) Referencing specific details from this conversation appropriately "
-                "3) Avoiding repetitive greetings when already engaged in dialogue "
-                "4) Using 'Hello' type greetings ONLY when starting fresh conversations or after long gaps "
-                "5) If user just shared information about their cat, acknowledge that specific context "
-                "Be conversational and naturally responsive to the immediate context."
-            )
-        })
+        # 🎭 CONVERSATION CONTINUITY: Now handled by vector memory system
+        # The vector memory manager provides intelligent conversation continuity through:
+        # 1) Recent conversation cache (get_user_conversation_context)
+        # 2) Vector memory search (relevant memories + recent conversation detection)  
+        # 3) Character-aware memory integration (preserves Elena's personality context)
+        # Old generic "CONVERSATION CONTINUITY" system message removed to prevent conflicts
+        logger.info("🎭 CONTINUITY: Using vector memory system for conversation continuity (character-compatible)")
 
         # If the triggering message contains attachments (e.g. images), add an explicit anti-analysis guard
         # to prevent the model from responding with coaching-style analytical breakdowns (observed regression
@@ -1918,10 +1931,25 @@ class BotEventHandlers:
                             if 'memory' in content.lower() or 'recall' in content.lower() or 'luna' in content.lower():
                                 logger.info(f"🎯 CONTEXT DEBUG: *** MEMORY DETECTED in message {i+1} ***")
 
+                        # 🎭 CDL CHARACTER INTEGRATION: Check for active character and replace system prompt
+                        logger.info(f"🎭 DEBUG: About to call character enhancement for user {user_id}")
+                        enhanced_context = await self._apply_cdl_character_enhancement(user_id, conversation_context, message)
+                        logger.info(f"🎭 DEBUG: Character enhancement returned: {enhanced_context is not None}")
+                        final_context = enhanced_context if enhanced_context else conversation_context
+                        
+                        # Log system messages for debugging
+                        system_msgs = [msg for msg in final_context if msg.get("role") == "system"]
+                        if system_msgs:
+                            for i, sys_msg in enumerate(system_msgs):
+                                content_preview = sys_msg.get("content", "")[:150]
+                                logger.info(f"🎭 EVENTS DEBUG: System message {i+1}: {content_preview}...")
+                        else:
+                            logger.warning(f"🎭 EVENTS DEBUG: No system messages in final context!")
+                        
                         # Generate AI response using our conversation context directly
-                        logger.info(f"🎯 CONTEXT DEBUG: Sending {len(conversation_context)} messages to Universal Chat Orchestrator")
+                        logger.info(f"🎯 CONTEXT DEBUG: Sending {len(final_context)} messages to Universal Chat Orchestrator")
                         ai_response = await self.chat_orchestrator.generate_ai_response(
-                            universal_message, conversation_context  # Use our hierarchical memory context!
+                            universal_message, final_context  # Use character-enhanced context!
                         )
 
                         response = ai_response.content
@@ -2337,6 +2365,26 @@ class BotEventHandlers:
                         else:
                             emotional_simple[f"emotional_{key}"] = str(value)
                 storage_metadata.update(emotional_simple)
+
+            # 🎭 CHARACTER METADATA: Add active character context for proper filtering
+            # This prevents character-specific conversations from being mixed with generic ones
+            if hasattr(self.bot_core, 'command_handlers') and 'cdl_test' in self.bot_core.command_handlers:
+                cdl_handler = self.bot_core.command_handlers['cdl_test']
+                if hasattr(cdl_handler, '_get_user_active_character'):
+                    try:
+                        active_character = cdl_handler._get_user_active_character(user_id)
+                        if active_character:
+                            # Extract character name from filename (e.g., "elena-rodriguez.json" -> "elena-rodriguez")
+                            character_name = active_character.replace('.json', '').replace('examples/', '')
+                            storage_metadata['active_character'] = character_name
+                            storage_metadata['has_character'] = True
+                            logger.info(f"🎭 STORAGE: Adding character metadata - active_character: {character_name}")
+                        else:
+                            storage_metadata['has_character'] = False
+                            logger.info(f"🎭 STORAGE: No active character for user {user_id}")
+                    except Exception as e:
+                        logger.warning(f"🎭 STORAGE: Could not detect character for user {user_id}: {e}")
+                        storage_metadata['has_character'] = False
 
             # Store with thread-safe operations
             storage_success = await self.memory_manager.store_conversation(
@@ -2966,13 +3014,117 @@ class BotEventHandlers:
         # Add time-based filtering for recent queries
         if message_context and message_context.get('is_recent_query'):
             from datetime import datetime, timedelta
-            filters['time_range'] = {
-                'start': datetime.now() - timedelta(days=7),  # Last week
-                'end': datetime.now()
-            }
-        
-        # Add topic filtering if topics are identified
-        if message_context and message_context.get('topics'):
-            filters['topics'] = message_context['topics']
+            recent_cutoff = datetime.now() - timedelta(hours=24)
+            filters['timestamp'] = {'$gte': recent_cutoff}
         
         return filters
+
+    async def _apply_cdl_character_enhancement(
+        self,
+        user_id: str,
+        conversation_context: list,
+        message,
+        current_emotion_data=None,
+        external_emotion_data=None,
+        phase2_context=None,
+        phase4_context=None,
+        dynamic_personality_context=None
+    ):
+        """
+        🎭 CDL CHARACTER INTEGRATION 🎭
+        
+        Apply CDL character enhancement to conversation context if user has active character.
+        This injects character-aware prompts that combine:
+        - CDL character personality, backstory, and voice
+        - AI pipeline emotional analysis and memory networks  
+        - Real-time conversation context and relationship dynamics
+        """
+        try:
+            logger.info(f"🎭 CDL CHARACTER DEBUG: Starting enhancement for user {user_id}")
+            
+            # Check if CDL test commands are available
+            logger.info(f"🎭 CDL CHARACTER DEBUG: Bot has command_handlers attr: {hasattr(self.bot, 'command_handlers')}")
+            if hasattr(self.bot, 'command_handlers'):
+                logger.info(f"🎭 CDL CHARACTER DEBUG: Available handlers: {list(getattr(self.bot, 'command_handlers', {}).keys())}")
+            
+            if not hasattr(self.bot, 'command_handlers') or 'cdl_test' not in getattr(self.bot, 'command_handlers', {}):
+                logger.info(f"🎭 CDL CHARACTER DEBUG: CDL test handler not found, returning None")
+                return None
+            
+            # Get CDL test commands handler to check for active character
+            cdl_handler = None
+            # Access the CDL handler through the bot manager
+            for handler_name, handler in getattr(self.bot, 'command_handlers', {}).items():
+                if handler_name == 'cdl_test':
+                    cdl_handler = handler
+                    break
+            
+            if not cdl_handler:
+                logger.info(f"🎭 CDL CHARACTER DEBUG: CDL handler not found in loop, returning None")
+                return None
+                
+            # Check if user has an active character
+            character_file = cdl_handler.get_user_character(user_id)
+            if not character_file:
+                return None
+            
+            logger.info(f"🎭 CDL CHARACTER: User {user_id} has active character: {character_file}")
+            
+            # Import CDL integration modules
+            from src.prompts.cdl_ai_integration import CDLAIPromptIntegration
+            from src.prompts.ai_pipeline_vector_integration import VectorAIPipelineResult
+            from datetime import datetime
+            
+            # Create AI pipeline result from available context data
+            pipeline_result = VectorAIPipelineResult(
+                user_id=user_id,
+                message_content=message.content,
+                timestamp=datetime.now(),
+                # Map emotion data to emotional_state
+                emotional_state=str(external_emotion_data) if external_emotion_data else str(current_emotion_data) if current_emotion_data else None,
+                mood_assessment=external_emotion_data if isinstance(external_emotion_data, dict) else None,
+                # Map personality data 
+                personality_profile=dynamic_personality_context if isinstance(dynamic_personality_context, dict) else None,
+                # Map phase4 data
+                enhanced_context=phase4_context if isinstance(phase4_context, dict) else None
+            )
+            
+            # Create CDL integration and generate character-aware prompt
+            cdl_integration = CDLAIPromptIntegration(vector_memory_manager=self.memory_manager)
+            character_prompt = await cdl_integration.create_character_aware_prompt(
+                character_file=character_file,
+                user_id=user_id,
+                message_content=message.content,
+                pipeline_result=pipeline_result
+            )
+            
+            # Clone the conversation context and replace/enhance system message
+            enhanced_context = conversation_context.copy()
+            
+            # Find system message and replace with character-aware prompt
+            system_message_found = False
+            for i, msg in enumerate(enhanced_context):
+                if msg.get('role') == 'system':
+                    enhanced_context[i] = {
+                        'role': 'system',
+                        'content': character_prompt
+                    }
+                    system_message_found = True
+                    logger.info(f"🎭 CDL CHARACTER: Replaced system message with character prompt ({len(character_prompt)} chars)")
+                    break
+            
+            # If no system message found, add character prompt as first message
+            if not system_message_found:
+                enhanced_context.insert(0, {
+                    'role': 'system', 
+                    'content': character_prompt
+                })
+                logger.info(f"🎭 CDL CHARACTER: Added character prompt as new system message ({len(character_prompt)} chars)")
+            
+            logger.info(f"🎭 CDL CHARACTER: Enhanced conversation context with {character_file} personality")
+            return enhanced_context
+            
+        except Exception as e:
+            logger.error(f"🎭 CDL CHARACTER ERROR: Failed to apply character enhancement: {e}")
+            logger.error(f"🎭 CDL CHARACTER ERROR: Falling back to original conversation context")
+            return None

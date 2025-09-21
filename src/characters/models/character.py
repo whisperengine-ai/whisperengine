@@ -61,6 +61,7 @@ class Appearance:
     distinctive_features: List[str] = field(default_factory=list)
     clothing_style: str = ""
     accessories: List[str] = field(default_factory=list)
+    description: str = ""
 
 
 @dataclass
@@ -178,6 +179,7 @@ class CharacterIdentity:
     location: str = ""
     nickname: str = ""
     full_name: str = ""
+    description: str = ""
     appearance: Optional[Appearance] = None
     voice: Optional[Voice] = None
 

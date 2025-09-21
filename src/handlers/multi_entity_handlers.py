@@ -749,7 +749,7 @@ class MultiEntityCommandHandlers:
                             "age": 25,  # Default age
                             "gender": "prefer_not_to_say",
                             "occupation": target_character.get('personality_type', 'companion').title(),
-                            "location": "Digital Realm",
+                            "location": "Online",
                             "nickname": target_character.get('name', ''),
                             "full_name": target_character.get('name', '')
                         },
