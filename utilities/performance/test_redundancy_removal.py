@@ -29,24 +29,8 @@ print(f"   ENABLE_ROBERTA_EMOTION: {os.getenv('ENABLE_ROBERTA_EMOTION', 'NOT_SET
 
 # Test 2: Test local emotion engine
 print("\n2. Testing Local Emotion Engine:")
-try:
-    from src.emotion.local_emotion_engine import LocalEmotionEngine
-    
-    engine = LocalEmotionEngine()
-    print(f"   ✅ Local emotion engine initialized")
-    print(f"   - VADER enabled: {engine.use_vader}")
-    print(f"   - RoBERTa enabled: {engine.use_roberta}")
-    print(f"   - Model: {engine.roberta_model_name}")
-    
-    # Test emotion analysis
-    test_message = "I'm really excited about this new project!"
-    print(f"\n   Testing with: '{test_message}'")
-    
-    # Note: We can't actually run async analysis in this simple script
-    print("   ✅ Local emotion engine ready for testing")
-    
-except Exception as e:
-    print(f"   ❌ Local emotion engine failed: {e}")
+# LocalEmotionEngine has been removed - skipping test
+print("   ⚠️ Local emotion engine removed - skipping test")
 
 # Test 3: Test fact extractor with redundancy flag
 print("\n3. Testing Fact Extractor Redundancy Check:")

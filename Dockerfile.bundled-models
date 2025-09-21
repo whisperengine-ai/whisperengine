@@ -4,15 +4,10 @@
 # Stage 1: Model Download & Bundle
 FROM python:3.13-slim as model-downloader
 
-# Install model download dependencies
+# Install model download dependencies - Vector-native only
 RUN pip install --no-cache-dir \
     fastembed>=0.7.0 \
-    transformers>=4.30.0 \
-    numpy>=1.24.0 \
-    spacy>=3.8.0 \
-    vaderSentiment>=3.3.0 \
-    textblob>=0.17.0 \
-    nltk>=3.8.0
+    numpy>=1.24.0
 
 # Create models directory
 WORKDIR /app

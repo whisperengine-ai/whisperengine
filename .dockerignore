@@ -55,7 +55,6 @@ docker-compose*.yml
 
 # Documentation (except system_prompt.md which is needed)
 *.md
-!system_prompt.md
 docs/
 wiki/
 
@@ -68,3 +67,42 @@ logs/
 
 # Node modules if any
 node_modules/
+
+# Bundled applications and build artifacts
+dist/
+build/
+
+# Cache directories that might be large
+.cache/
+.ruff_cache/
+.pytest_cache/
+__pycache__/
+
+# Model cache directories (if any)
+models/
+.fastembed_cache/
+.transformers_cache/
+
+# Data files that may be large in development
+data/
+*.json
+*.log
+*.sqlite
+*.db
+
+# Runtime directories that should be volume-mounted
+logs/
+backups/
+temp_images/
+privacy_data/
+
+# Development and testing artifacts
+test_results/
+coverage/
+htmlcov/
+.coverage
+tests_old_backup/
+
+# Large build artifacts and documentation
+build/
+docs/

@@ -155,21 +155,9 @@ class ProductionSystemIntegrator:
 
     async def _init_local_emotion(self):
         """Initialize local emotion engine"""
-        try:
-            from src.emotion.local_emotion_engine import LocalEmotionEngine
-
-            # Initialize local emotion engine
-            self.components["local_emotion"] = LocalEmotionEngine()
-            await self.components["local_emotion"].initialize()
-
-            logger.info("✅ Local Emotion Engine initialized (VADER + TextBlob)")
-
-        except (ImportError, FileNotFoundError):
-            logger.warning("⚠️ Local Emotion Engine not available - using fallback")
-            self.components["local_emotion"] = None
-        except Exception as e:
-            logger.error(f"❌ Failed to initialize local emotion: {e}")
-            self.components["vectorized_emotion"] = None
+        # LocalEmotionEngine component has been removed - using fallback
+        logger.warning("⚠️ Local Emotion Engine not available - using fallback")
+        self.components["local_emotion"] = None
 
     async def _init_memory_batcher(self):
         """Initialize advanced memory batcher"""

@@ -17,7 +17,7 @@
 discord.py==2.6.3
 python-dotenv==1.1.1
 # chromadb==1.1.0  # REMOVED - Using Qdrant for vector memory system
-spacy==3.8.7
+# REMOVED: spacy==3.8.7  # Replaced by vector-native approach
 textblob==0.18.0.post0  # Lightweight sentiment analysis (replaces RoBERTa)
 redis==6.4.0
 requests==2.32.5

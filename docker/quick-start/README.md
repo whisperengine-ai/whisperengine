@@ -19,7 +19,7 @@ Your WhisperEngine instance includes:
 |------|---------|------------|
 | **`.env`** | Main configuration (used by Docker) | Hidden (use `ls -la`) |
 | **`env.example`** | Visible copy for reference | Visible |
-| **`prompts/`** | Bot personality prompts directory | Visible |
+| **`characters/`** | Bot character definitions directory | Visible |
 | **`docker-compose.yml`** | Service definitions | Visible |
 
 ## 🎯 Next Steps
@@ -58,7 +58,7 @@ WhisperEngine works best with a local LLM like:
 Uncomment one line in your `.env` file:
 ```bash
 # Choose one:
-BOT_SYSTEM_PROMPT_FILE=./prompts/empathetic_companion_template.md    # 💝 Supportive friend
+CDL_DEFAULT_CHARACTER=characters/examples/elena-rodriguez.json    # 💝 Supportive companion
 BOT_SYSTEM_PROMPT_FILE=./prompts/professional_ai_template.md        # 👔 Business assistant
 BOT_SYSTEM_PROMPT_FILE=./prompts/casual_friend_template.md          # 😊 Casual chat buddy
 ```

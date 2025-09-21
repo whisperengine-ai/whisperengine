@@ -34,12 +34,8 @@ from enum import Enum
 from typing import Any
 
 # Import existing systems for integration
-try:
-    from src.emotion.local_emotion_engine import LocalEmotionEngine
-
-    LOCAL_EMOTION_ENGINE_AVAILABLE = True
-except ImportError:
-    LOCAL_EMOTION_ENGINE_AVAILABLE = False
+# LocalEmotionEngine has been removed - using fallback systems
+LOCAL_EMOTION_ENGINE_AVAILABLE = False
 
 try:
     from src.intelligence.dynamic_personality_profiler import (
@@ -203,7 +199,7 @@ class EmotionalContextEngine:
 
     def __init__(
         self,
-        emotional_ai: LocalEmotionEngine | None = None,
+        emotional_ai: Any | None = None,  # Legacy parameter - LocalEmotionEngine removed
         personality_profiler: DynamicPersonalityProfiler | None = None,
         personality_fact_classifier: PersonalityFactClassifier | None = None,
         emotional_memory_retention_days: int = 90,
@@ -213,7 +209,7 @@ class EmotionalContextEngine:
         Initialize the emotional context engine.
 
         Args:
-            emotional_ai: External API emotion analysis system
+            emotional_ai: Legacy parameter - LocalEmotionEngine component removed
             personality_profiler: Dynamic personality profiling system
             personality_fact_classifier: Personality fact classification system
             emotional_memory_retention_days: Days to retain emotional memory clusters

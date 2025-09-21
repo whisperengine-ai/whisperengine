@@ -2,7 +2,7 @@
 FROM python:3.13-slim AS base
 
 # Build arguments for flexible configuration
-ARG SYSTEM_PROMPT_SOURCE=prompts/default.md
+ARG CDL_CHARACTER_SOURCE=characters/default_assistant.json
 
 # Environment variables
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -80,7 +80,7 @@ RUN --mount=type=cache,target=/root/.cache/pip \
     # Copy only necessary application files
     COPY src/ ./src/
     COPY pyproject.toml validate_config.py env_manager.py run.py ./
-    COPY prompts/ ./prompts/
+    COPY characters/ ./characters/
     COPY config/ ./config/
     COPY data/ ./data/
 
@@ -133,7 +133,7 @@ RUN pip install --no-cache-dir -r requirements-core.txt && \
 # Copy application
 COPY src/ ./src/
 COPY validate_config.py env_manager.py run.py ./
-COPY prompts/ ./prompts/
+COPY characters/ ./characters/
 COPY config/ ./config/
 COPY data/ ./data/
 COPY ${SYSTEM_PROMPT_SOURCE} ./system_prompt.md

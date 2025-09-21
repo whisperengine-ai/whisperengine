@@ -23,4 +23,4 @@ audioop-lts==0.2.2
 elevenlabs==2.16.0  # Updated from 2.15.0
 
 # Local AI processing for Discord bot
-vaderSentiment==3.3.2  # Fast local emotion analysis
+# REMOVED: vaderSentiment==3.3.2  # Only used in demos, not main bot - uses vector-native emotion analysis
