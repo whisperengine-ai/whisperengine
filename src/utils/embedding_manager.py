@@ -81,12 +81,23 @@ class LocalEmbeddingManager:
             loop = asyncio.get_event_loop()
             
             def load_model_safely():
-                # Initialize fastembed model
-                if os.path.exists(self.embedding_model_name):
-                    logger.info(f"Loading local model from: {self.embedding_model_name}")
+                # Check for pre-bundled models first (Docker environment)
+                model_cache_dir = os.getenv("MODEL_CACHE_DIR", "/app/models")
+                bundled_model_path = os.path.join(model_cache_dir, "embeddings")
+                
+                # Initialize fastembed model with proper cache configuration
+                if os.path.exists(bundled_model_path):
+                    logger.info("✅ Using pre-bundled models from: %s", bundled_model_path)
+                    # Use the bundled models directory as cache
+                    model = TextEmbedding(
+                        model_name=self.embedding_model_name,
+                        cache_dir=model_cache_dir
+                    )
+                elif os.path.exists(self.embedding_model_name):
+                    logger.info("Loading local model from: %s", self.embedding_model_name)
                     model = TextEmbedding(model_name=self.embedding_model_name, cache_dir=self.embedding_model_name)
                 else:
-                    logger.info(f"Loading model: {self.embedding_model_name}")
+                    logger.warning("⚠️  No pre-bundled models found, downloading at runtime: %s", self.embedding_model_name)
                     model = TextEmbedding(model_name=self.embedding_model_name)
                 
                 return model
@@ -97,15 +108,15 @@ class LocalEmbeddingManager:
             test_embedding = await self._encode_texts(["test"])
             self.embedding_dimension = len(test_embedding[0])
 
-            logger.info(f"✅ Model loaded: {self.embedding_model_name}")
-            logger.info(f"   Embedding dimension: {self.embedding_dimension}")
-            logger.info(f"   Batch size: {self.batch_size}")
+            logger.info("✅ Model loaded: %s", self.embedding_model_name)
+            logger.info("   Embedding dimension: %s", self.embedding_dimension)
+            logger.info("   Batch size: %s", self.batch_size)
 
         except ImportError:
             logger.error("❌ fastembed not available")
             raise
         except Exception as e:
-            logger.error(f"❌ Model loading failed: {e}")
+            logger.error("❌ Model loading failed: %s", e)
             raise
 
     @lru_cache(maxsize=1000)

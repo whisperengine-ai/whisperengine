@@ -27,7 +27,7 @@ py-spy==0.3.14
 
 # Security scanning
 bandit==1.7.5
-safety==3.3.2
+safety==3.6.1
 
 # Build and packaging
 build==1.0.3

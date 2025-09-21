@@ -157,18 +157,29 @@ def create_model_config():
     logger.info("✅ Model configuration saved to /app/models/model_config.json")
 
 def verify_downloads():
-    """Verify all models were downloaded successfully"""
+    """Verify critical models were downloaded successfully"""
+    # Only require the essential embedding model - others are optional
     required_paths = [
         "/app/models/embeddings/model_info.json",
-        "/app/models/emotion/emotion_config.json",
         "/app/models/model_config.json"
     ]
     
-    all_present = True
+    # Optional paths that won't fail the build
+    optional_paths = [
+        "/app/models/emotion/emotion_config.json"
+    ]
+    
+    all_required_present = True
     for path in required_paths:
         if not Path(path).exists():
-            logger.error(f"❌ Missing: {path}")
-            all_present = False
+            logger.error(f"❌ Missing required: {path}")
+            all_required_present = False
+        else:
+            logger.info(f"✅ Found: {path}")
+    
+    for path in optional_paths:
+        if not Path(path).exists():
+            logger.warning(f"⚠️  Missing optional: {path}")
         else:
             logger.info(f"✅ Found: {path}")
     
@@ -180,7 +191,7 @@ def verify_downloads():
     else:
         logger.warning(f"⚠️  FastEmbed cache not found: {fastembed_cache}")
     
-    return all_present
+    return all_required_present
 
 def main():
     """Main model download orchestrator"""
@@ -191,23 +202,32 @@ def main():
     
     success_count = 0
     
-    # Download each model type
+    # Download embedding models (required)
     if download_embedding_models():
         success_count += 1
+    else:
+        logger.error("❌ Failed to download critical embedding models")
+        return False
     
+    # Download emotion models (optional)
     if download_emotion_models():
         success_count += 1
+    else:
+        logger.warning("⚠️  Emotion models download failed, continuing without them")
     
+    # Download spaCy models (optional)
     if download_spacy_models():
         success_count += 1
+    else:
+        logger.warning("⚠️  spaCy models download failed, continuing without them")
     
     # Create configuration
     create_model_config()
     
-    # Verify everything downloaded
+    # Verify critical models are present
     if verify_downloads():
-        logger.info("🎉 All models downloaded successfully!")
-        logger.info("💾 Total models bundled: 3 (1 embedding + 1 emotion + 1 spaCy)")
+        logger.info("🎉 Critical models downloaded successfully!")
+        logger.info(f"💾 Models bundled: {success_count}/3 (1 required embedding + 2 optional)")
         
         # Calculate approximate sizes
         total_size = 0
@@ -221,7 +241,7 @@ def main():
         
         return True
     else:
-        logger.error("❌ Model download verification failed")
+        logger.error("❌ Critical model verification failed")
         return False
 
 if __name__ == "__main__":

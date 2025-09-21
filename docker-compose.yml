@@ -5,7 +5,7 @@ services:
   whisperengine-bot:
     build:
       context: .
-      dockerfile: docker/Dockerfile.multi-stage
+      dockerfile: Dockerfile.bundled-models
       target: production
     image: whisperengine-bot:${VERSION:-latest}
     container_name: whisperengine-bot
