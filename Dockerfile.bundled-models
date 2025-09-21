@@ -21,6 +21,9 @@ RUN mkdir -p /app/models
 # Copy model download script
 COPY scripts/download_models.py .
 
+# Set fastembed cache to persistent location
+ENV FASTEMBED_CACHE_PATH=/tmp/fastembed_cache
+
 # Download all models during build (network required only at build time)
 RUN python download_models.py
 
@@ -40,14 +43,16 @@ RUN apt-get update && apt-get install -y \
 
 # Copy pre-downloaded models from builder stage
 COPY --from=model-downloader /app/models /app/models
+COPY --from=model-downloader /tmp/fastembed_cache /tmp/fastembed_cache
 
 # Copy and install Python dependencies using multi-tier structure
-COPY requirements-core.txt requirements-platform.txt requirements-discord.txt requirements-dev.txt ./
+COPY requirements-core.txt requirements-platform.txt requirements-discord.txt requirements-vector-memory.txt requirements-dev.txt ./
 
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip install --no-cache-dir -r requirements-core.txt && \
     pip install --no-cache-dir -r requirements-platform.txt && \
     pip install --no-cache-dir -r requirements-discord.txt && \
+    pip install --no-cache-dir -r requirements-vector-memory.txt && \
     pip install --no-cache-dir -r requirements-dev.txt
 
 # Install spaCy model in runtime stage (spaCy package is already in requirements-core.txt)
@@ -63,11 +68,13 @@ ENV MODEL_CACHE_DIR=/app/models
 ENV TRANSFORMERS_OFFLINE=1
 ENV HF_DATASETS_OFFLINE=1
 ENV SENTENCE_TRANSFORMERS_HOME=/app/models
+ENV FASTEMBED_CACHE_PATH=/tmp/fastembed_cache
 
 # Create user and directories
 RUN useradd --create-home appuser && \
     mkdir -p chromadb_data backups privacy_data temp_images logs && \
-    chown -R appuser:appuser /app
+    chown -R appuser:appuser /app && \
+    chown -R appuser:appuser /tmp/fastembed_cache
 
 USER appuser
 
@@ -85,14 +92,16 @@ RUN apt-get update && apt-get install -y \
 
 # Copy pre-downloaded models from builder stage
 COPY --from=model-downloader /app/models /app/models
+COPY --from=model-downloader /tmp/fastembed_cache /tmp/fastembed_cache
 
 # Copy and install Python dependencies using multi-tier structure
-COPY requirements-core.txt requirements-platform.txt requirements-discord.txt ./
+COPY requirements-core.txt requirements-platform.txt requirements-discord.txt requirements-vector-memory.txt ./
 
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip install --no-cache-dir -r requirements-core.txt && \
     pip install --no-cache-dir -r requirements-platform.txt && \
-    pip install --no-cache-dir -r requirements-discord.txt
+    pip install --no-cache-dir -r requirements-discord.txt && \
+    pip install --no-cache-dir -r requirements-vector-memory.txt
 
 # Install spaCy model in runtime stage (spaCy package is already in requirements-core.txt)
 RUN --mount=type=cache,target=/root/.cache/pip \
@@ -107,6 +116,7 @@ ENV MODEL_CACHE_DIR=/app/models
 ENV TRANSFORMERS_OFFLINE=1
 ENV HF_DATASETS_OFFLINE=1
 ENV SENTENCE_TRANSFORMERS_HOME=/app/models
+ENV FASTEMBED_CACHE_PATH=/tmp/fastembed_cache
 
 # Verify models are accessible
 RUN python -c "\
