@@ -930,9 +930,14 @@ class UniversalChatOrchestrator:
                 except Exception as e:
                     logging.warning(f"Phase 4.1 memory moments processing failed: {e}")
 
-            # Add memory context to conversation
+            # Add memory context to conversation with relevance assessment
             if relevant_memories or chromadb_memories or emotion_context or memory_moments_context:
                 context_parts = []
+                
+                # 🎯 MEMORY RELEVANCE ASSESSMENT
+                memory_confidence = self._assess_memory_relevance(
+                    message.content, relevant_memories, chromadb_memories
+                )
 
                 if relevant_memories:
                     context_parts.append("📚 **Relevant Memories:**")
@@ -1113,11 +1118,17 @@ class UniversalChatOrchestrator:
                         )
 
                 if context_parts:
+                    # Include memory confidence assessment
+                    confidence_guidance = self._get_confidence_guidance(memory_confidence)
                     context_message = "\n".join(context_parts)
+                    
+                    # Add confidence indicator to help with hallucination prevention
+                    full_context = f"**Context for this conversation:**\n{context_message}\n\n{confidence_guidance}"
+                    
                     conversation_context.append(
                         {
                             "role": "system",
-                            "content": f"**Context for this conversation:**\n{context_message}",
+                            "content": full_context,
                         }
                     )
 
@@ -1685,6 +1696,110 @@ You adapt your responses based on the platform and conversation context. Be help
 
 
 # Factory function
+    def _is_error_response(self, response_text: str) -> bool:
+        """Check if the response indicates an error"""
+        error_indicators = [
+            "error occurred",
+            "failed to",
+            "unable to",
+            "something went wrong",
+            "try again",
+            "internal error",
+        ]
+        response_lower = response_text.lower()
+        return any(indicator in response_lower for indicator in error_indicators)
+
+    def _assess_memory_relevance(self, query: str, relevant_memories: list, chromadb_memories: list) -> dict:
+        """
+        🎯 HALLUCINATION PREVENTION: Assess if memories contain relevant information
+        
+        Returns confidence assessment for guiding LLM responses
+        """
+        query_lower = query.lower()
+        logging.info(f"🔍 ANTI-HALLUCINATION: Assessing memory relevance for query: '{query}'")
+        
+        # Extract key query terms
+        query_keywords = set()
+        if any(word in query_lower for word in ['pet', 'pets', 'cat', 'dog', 'animal']):
+            query_keywords.add('pets')
+        if any(word in query_lower for word in ['remember', 'recall', 'told', 'mentioned']):
+            query_keywords.add('memory_check')
+        if any(word in query_lower for word in ['name', 'named', 'called']):
+            query_keywords.add('names')
+            
+        logging.info(f"🔍 ANTI-HALLUCINATION: Query keywords: {query_keywords}")
+        logging.info(f"🔍 ANTI-HALLUCINATION: Memory counts - relevant: {len(relevant_memories)}, chromadb: {len(chromadb_memories)}")
+        
+        # Assess memory content relevance
+        memory_contains_info = False
+        memory_confidence = 0.0
+        
+        all_memories = (relevant_memories or []) + (chromadb_memories or [])
+        
+        for memory in all_memories:
+            memory_str = str(memory).lower()
+            logging.debug(f"🔍 ANTI-HALLUCINATION: Checking memory: {memory_str[:100]}...")
+            
+            # Check if memory contains relevant information
+            if 'pets' in query_keywords:
+                if any(word in memory_str for word in ['pet', 'cat', 'dog', 'animal', 'luna', 'max']):
+                    memory_contains_info = True
+                    memory_confidence += 0.3
+                    logging.info(f"🔍 ANTI-HALLUCINATION: Found pet-related content in memory")
+            
+            if 'names' in query_keywords:
+                # Look for actual names/proper nouns in memory
+                if any(word in memory_str for word in ['named', 'called', 'name is']):
+                    memory_contains_info = True
+                    memory_confidence += 0.4
+                    logging.info(f"🔍 ANTI-HALLUCINATION: Found name-related content in memory")
+        
+        memory_confidence = min(memory_confidence, 1.0)
+        
+        assessment_result = {
+            'has_relevant_info': memory_contains_info,
+            'confidence': memory_confidence,
+            'query_type': list(query_keywords),
+            'memory_count': len(all_memories)
+        }
+        
+        logging.info(f"🔍 ANTI-HALLUCINATION: Memory assessment result: {assessment_result}")
+        return assessment_result
+
+    def _get_confidence_guidance(self, memory_assessment: dict) -> str:
+        """
+        🎯 HALLUCINATION PREVENTION: Provide guidance based on memory confidence
+        """
+        logging.info(f"🔍 ANTI-HALLUCINATION: Generating confidence guidance for assessment: {memory_assessment}")
+        
+        if not memory_assessment['has_relevant_info'] or memory_assessment['confidence'] < 0.3:
+            guidance = (
+                "⚠️ **IMPORTANT MEMORY GUIDANCE:** "
+                "The retrieved memories do not contain specific information relevant to this question. "
+                "You should respond honestly that you don't have this information in your memory. "
+                "Do NOT fabricate details, names, or facts not found in the actual memory content above."
+            )
+            logging.info(f"🔍 ANTI-HALLUCINATION: Generated LOW confidence guidance")
+            return guidance
+        elif memory_assessment['confidence'] < 0.7:
+            guidance = (
+                "ℹ️ **MEMORY CONFIDENCE:** "
+                "Limited relevant information found in memories. "
+                "Base your response only on the specific details provided in the memory content above. "
+                "If asked for details not in the memories, be honest about not having that information."
+            )
+            logging.info(f"🔍 ANTI-HALLUCINATION: Generated MEDIUM confidence guidance")
+            return guidance
+        else:
+            guidance = (
+                "✅ **MEMORY CONFIDENCE:** "
+                "Good relevant information found in memories. "
+                "You can confidently respond based on the memory content provided above."
+            )
+            logging.info(f"🔍 ANTI-HALLUCINATION: Generated HIGH confidence guidance")
+            return guidance
+
+
 def create_universal_chat_platform(
     config_manager: AdaptiveConfigManager | None = None,
     db_manager: DatabaseIntegrationManager | None = None,
