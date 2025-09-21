@@ -18,8 +18,9 @@ Key improvements over the existing system:
 """
 
 import hashlib
+import json
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, asdict
 from datetime import datetime, timedelta
 from enum import Enum
 from typing import Any
@@ -139,6 +140,8 @@ class ConversationBoundaryManager:
         topic_transition_threshold: float = 0.6,
         max_context_messages: int = 100,
         summarization_threshold: int = 50,
+        llm_client=None,
+        redis_client=None,
     ):
         """
         Initialize conversation boundary manager
@@ -148,11 +151,15 @@ class ConversationBoundaryManager:
             topic_transition_threshold: Threshold for detecting topic changes (0-1)
             max_context_messages: Maximum messages to keep in active context
             summarization_threshold: Message count before triggering summarization
+            llm_client: LLM client for intelligent summarization (optional)
+            redis_client: Redis client for session persistence (optional)
         """
         self.session_timeout = timedelta(minutes=session_timeout_minutes)
         self.topic_transition_threshold = topic_transition_threshold
         self.max_context_messages = max_context_messages
         self.summarization_threshold = summarization_threshold
+        self.llm_client = llm_client
+        self.redis_client = redis_client
 
         # Active session storage
         self.active_sessions: dict[str, ConversationSession] = {}
@@ -195,6 +202,133 @@ class ConversationBoundaryManager:
             f"ConversationBoundaryManager initialized with {session_timeout_minutes}min timeout"
         )
 
+    def _get_session_redis_key(self, user_id: str, channel_id: str) -> str:
+        """Get Redis key for storing conversation session"""
+        return f"conversation_session:{user_id}:{channel_id}"
+
+    async def _save_session_to_redis(self, session: ConversationSession) -> None:
+        """Persist conversation session to Redis"""
+        if not self.redis_client:
+            return
+        
+        try:
+            # Prepare session data for serialization
+            session_data = {
+                'session_id': session.session_id,
+                'user_id': session.user_id,
+                'channel_id': session.channel_id,
+                'start_time': session.start_time.isoformat(),
+                'last_activity': session.last_activity.isoformat(),
+                'state': session.state.value,
+                'message_count': session.message_count,
+                'context_summary': session.context_summary,
+                'conversation_goal': session.conversation_goal,
+                'metadata': session.metadata,
+                'topic_history': []
+            }
+            
+            # Serialize topic history
+            for topic in session.topic_history:
+                topic_data = {
+                    'topic_id': topic.topic_id,
+                    'keywords': topic.keywords,
+                    'start_time': topic.start_time.isoformat(),
+                    'end_time': topic.end_time.isoformat() if topic.end_time else None,
+                    'message_count': topic.message_count,
+                    'emotional_tone': topic.emotional_tone,
+                    'resolution_status': topic.resolution_status
+                }
+                session_data['topic_history'].append(topic_data)
+            
+            # Store in Redis with 2-hour TTL (longer than session timeout for recovery)
+            redis_key = self._get_session_redis_key(session.user_id, session.channel_id)
+            await self.redis_client.setex(redis_key, 7200, json.dumps(session_data))
+            
+            logger.debug("Saved session %s to Redis", session.session_id)
+            
+        except Exception as e:
+            logger.warning("Failed to save session to Redis: %s", str(e))
+
+    async def _load_session_from_redis(self, user_id: str, channel_id: str) -> ConversationSession | None:
+        """Load conversation session from Redis"""
+        if not self.redis_client:
+            return None
+            
+        try:
+            redis_key = self._get_session_redis_key(user_id, channel_id)
+            session_data_str = await self.redis_client.get(redis_key)
+            
+            if not session_data_str:
+                return None
+                
+            session_data = json.loads(session_data_str)
+            
+            # Reconstruct topic history
+            topic_history = []
+            for topic_data in session_data.get('topic_history', []):
+                end_time = None
+                if topic_data.get('end_time'):
+                    end_time = datetime.fromisoformat(topic_data['end_time'])
+                    
+                topic = ConversationTopic(
+                    topic_id=topic_data['topic_id'],
+                    keywords=topic_data['keywords'],
+                    start_time=datetime.fromisoformat(topic_data['start_time']),
+                    end_time=end_time,
+                    message_count=topic_data['message_count'],
+                    emotional_tone=topic_data.get('emotional_tone'),
+                    resolution_status=topic_data.get('resolution_status')
+                )
+                topic_history.append(topic)
+            
+            # Reconstruct session
+            session = ConversationSession(
+                session_id=session_data['session_id'],
+                user_id=session_data['user_id'],
+                channel_id=session_data['channel_id'],
+                start_time=datetime.fromisoformat(session_data['start_time']),
+                last_activity=datetime.fromisoformat(session_data['last_activity']),
+                state=ConversationState(session_data['state']),
+                message_count=session_data['message_count'],
+                context_summary=session_data.get('context_summary', ''),
+                conversation_goal=session_data.get('conversation_goal'),
+                metadata=session_data.get('metadata', {}),
+                topic_history=topic_history,
+                current_topic=topic_history[-1] if topic_history else None
+            )
+            
+            logger.debug("Loaded session %s from Redis", session.session_id)
+            return session
+            
+        except Exception as e:
+            logger.warning("Failed to load session from Redis: %s", str(e))
+            return None
+
+    async def _try_recover_session(self, user_id: str, channel_id: str) -> ConversationSession | None:
+        """Try to recover session from Redis if not in memory"""
+        session_key = f"{user_id}:{channel_id}"
+        
+        # Check if already in memory
+        if session_key in self.active_sessions:
+            return self.active_sessions[session_key]
+        
+        # Try to load from Redis
+        session = await self._load_session_from_redis(user_id, channel_id)
+        
+        if session:
+            # Check if session is still valid (not too old)
+            time_since_activity = datetime.now() - session.last_activity
+            if time_since_activity <= self.session_timeout * 2:  # Give some buffer
+                # Restore to memory
+                self.active_sessions[session_key] = session
+                logger.info("Recovered conversation session for user %s from Redis", user_id)
+                return session
+            else:
+                # Session too old, don't restore
+                logger.debug("Found old session for user %s, not restoring", user_id)
+                
+        return None
+
     async def process_message(
         self,
         user_id: str,
@@ -219,7 +353,7 @@ class ConversationBoundaryManager:
         timestamp = timestamp or datetime.now()
         session_key = f"{user_id}:{channel_id}"
 
-        # Get or create conversation session
+        # Get or create conversation session (try recovery first)
         session = await self._get_or_create_session(user_id, channel_id, timestamp)
 
         # Update session activity
@@ -246,8 +380,9 @@ class ConversationBoundaryManager:
         if session.is_long_conversation(self.summarization_threshold):
             await self._update_conversation_summary(session)
 
-        # Store session updates
+        # Store session updates in memory and Redis
         self.active_sessions[session_key] = session
+        await self._save_session_to_redis(session)
 
         return session
 
@@ -475,10 +610,10 @@ class ConversationBoundaryManager:
     async def _get_or_create_session(
         self, user_id: str, channel_id: str, timestamp: datetime
     ) -> ConversationSession:
-        """Get existing session or create new one"""
+        """Get existing session, try recovery from Redis, or create new one"""
         session_key = f"{user_id}:{channel_id}"
 
-        # Check for existing active session
+        # Check for existing active session in memory
         if session_key in self.active_sessions:
             session = self.active_sessions[session_key]
 
@@ -488,6 +623,19 @@ class ConversationBoundaryManager:
                 logger.debug(f"Session timed out for user {user_id}, marking as paused")
 
             return session
+
+        # Try to recover session from Redis
+        recovered_session = await self._try_recover_session(user_id, channel_id)
+        if recovered_session:
+            # Update activity and check for timeout
+            if timestamp - recovered_session.last_activity > self.session_timeout:
+                recovered_session.state = ConversationState.RESUMED
+                logger.info("Recovered session for user %s, marked as RESUMED", user_id)
+            else:
+                logger.info("Recovered active session for user %s", user_id)
+            
+            recovered_session.update_activity()
+            return recovered_session
 
         # Create new session
         session_id = hashlib.md5(
@@ -500,6 +648,10 @@ class ConversationBoundaryManager:
             start_time=timestamp,
             last_activity=timestamp,
         )
+
+        # Add to active sessions and save to Redis
+        self.active_sessions[session_key] = session
+        await self._save_session_to_redis(session)
 
         logger.debug(f"Created new conversation session {session_id} for user {user_id}")
         return session
@@ -639,27 +791,74 @@ class ConversationBoundaryManager:
         return keywords[:10]  # Return top 10 keywords
 
     async def _update_conversation_summary(self, session: ConversationSession) -> None:
-        """Update conversation summary for long conversations"""
+        """Update conversation summary using LLM-based intelligent summarization"""
         if not session.topic_history:
             return
 
-        # Generate summary from topic history
-        topics_summary = []
-        for topic in session.topic_history:
-            if topic.message_count >= 3:  # Only include substantial topics
-                topic_summary = (
-                    f"Discussed {', '.join(topic.keywords[:3])} ({topic.message_count} messages)"
-                )
+        # Use LLM-based summarization if available, otherwise fall back to keyword-based
+        if self.llm_client:
+            session.context_summary = await self._generate_llm_conversation_summary(session)
+        else:
+            # Fallback to basic keyword summarization
+            topics_summary = []
+            for topic in session.topic_history:
+                if topic.message_count >= 3:  # Only include substantial topics
+                    topic_summary = (
+                        f"Discussed {', '.join(topic.keywords[:3])} ({topic.message_count} messages)"
+                    )
+                    if topic.resolution_status:
+                        topic_summary += f" - {topic.resolution_status}"
+                    topics_summary.append(topic_summary)
+
+            session.context_summary = (
+                f"Conversation spanning {session.get_duration_minutes():.1f} minutes with {session.message_count} messages. Topics: "
+                + "; ".join(topics_summary)
+            )
+
+        logger.debug("Updated conversation summary for session %s", session.session_id)
+
+    async def _generate_llm_conversation_summary(self, session: ConversationSession) -> str:
+        """Generate intelligent conversation summary using LLM"""
+        try:
+            # Extract conversation content from topic history
+            conversation_content = []
+            for topic in session.topic_history[-3:]:  # Last 3 topics
+                topic_desc = f"Discussed: {', '.join(topic.keywords[:5])}"
+                if topic.message_count > 1:
+                    topic_desc += f" ({topic.message_count} messages)"
                 if topic.resolution_status:
-                    topic_summary += f" - {topic.resolution_status}"
-                topics_summary.append(topic_summary)
+                    topic_desc += f" - {topic.resolution_status}"
+                conversation_content.append(topic_desc)
+            
+            if not conversation_content:
+                return f"Brief conversation with {session.message_count} messages over {session.get_duration_minutes():.1f} minutes"
+            
+            content_text = "; ".join(conversation_content)
+            
+            # Create summarization prompt
+            duration = session.get_duration_minutes()
+            summary_prompt = f"""Create a concise 2-3 sentence summary of this conversation focusing on the main topics and outcomes.
 
-        session.context_summary = (
-            f"Conversation spanning {session.get_duration_minutes():.1f} minutes with {session.message_count} messages. Topics: "
-            + "; ".join(topics_summary)
-        )
+Duration: {duration:.1f} minutes
+Messages: {session.message_count}
+Topics discussed: {content_text}
 
-        logger.debug(f"Updated conversation summary for session {session.session_id}")
+Summary:"""
+
+            # Generate summary using LLM
+            response = await self.llm_client.generate_chat_completion([
+                {"role": "user", "content": summary_prompt}
+            ], max_tokens=80, temperature=0.3)  # Low temperature for consistent summaries
+            
+            summary = response.strip()
+            
+            # Add basic stats prefix for context
+            return f"[{duration:.1f}min, {session.message_count} msgs] {summary}"
+            
+        except Exception as e:
+            logger.warning("LLM summarization failed: %s, falling back to basic summary", str(e))
+            # Fallback to basic summary
+            return f"Conversation spanning {session.get_duration_minutes():.1f} minutes with {session.message_count} messages"
 
     async def _identify_conversation_boundaries(
         self, session: ConversationSession, limit: int
