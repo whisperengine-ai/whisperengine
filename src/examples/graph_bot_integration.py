@@ -18,11 +18,26 @@ class GraphEnhancedBot:
         self._system_prompt_base = self._load_base_system_prompt()
 
     def _load_base_system_prompt(self) -> str:
-        """Load the base system prompt from file."""
+        """Load the base system prompt from CDL character system."""
         try:
-            with open("prompts/default.md") as f:
-                return f.read()
-        except FileNotFoundError:
+            # Use CDL character system instead of .md files
+            import os
+            from src.characters.cdl.parser import load_character
+            import asyncio
+            
+            def load_character_sync():
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                try:
+                    default_character = os.getenv('CDL_DEFAULT_CHARACTER', 'characters/default_assistant.json')
+                    character = loop.run_until_complete(load_character(default_character))
+                    return f"You are {character.identity.name}, {character.identity.description}"
+                finally:
+                    loop.close()
+                    
+            return load_character_sync()
+        except Exception as e:
+            # Fallback if CDL system fails
             return "You are a helpful AI assistant."
 
     async def process_message(self, user_id: str, message: str) -> dict[str, Any]:

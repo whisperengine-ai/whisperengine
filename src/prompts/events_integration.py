@@ -89,9 +89,9 @@ INTEGRATION STEPS for src/handlers/events.py:
    - Remove: helpers.contextualize_system_prompt_with_context calls
    - Remove: All template variable building logic
 
-4. Update the base prompt file:
-   - Use: /prompts/optimized/streamlined_vector_native.md
-   - Remove: All {CONTEXT_VARIABLE} placeholders
+4. Update the base prompt system:
+   - Use: CDL character system with JSON files (characters/default_assistant.json)
+   - Remove: All {CONTEXT_VARIABLE} placeholders from .md files
 
 This migration eliminates:
 - ❌ All template variable replacement ({MEMORY_NETWORK_CONTEXT}, etc.)

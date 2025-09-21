@@ -151,19 +151,27 @@ class AsyncSystemPromptLoader:
     """Async system prompt loading (optional optimization)"""
 
     @staticmethod
-    async def load_system_prompt(prompt_file: str | None = None) -> str:
-        """Async version of system prompt loading"""
+    async def load_system_prompt() -> str:
+        """Async version of system prompt loading using CDL character system"""
         import os
 
-        if prompt_file is None:
-            prompt_file = os.getenv("BOT_SYSTEM_PROMPT_FILE", "./prompts/default.md")
-
         try:
-            async with aiofiles.open(prompt_file, encoding="utf-8") as f:
-                content = await f.read()
-                return content.strip()
-        except FileNotFoundError:
-            logger.warning(f"System prompt file {prompt_file} not found, using default")
+            # Use CDL character system instead of .md files
+            from src.prompts.cdl_ai_integration import CDLAIPromptIntegration
+            
+            cdl_integration = CDLAIPromptIntegration()
+            default_character = os.getenv('CDL_DEFAULT_CHARACTER', 'characters/default_assistant.json')
+            
+            # Create a basic character-aware prompt
+            prompt = await cdl_integration.create_character_aware_prompt(
+                character_file=default_character,
+                user_id="system",
+                message_content="System initialization"
+            )
+            return prompt
+            
+        except (ImportError, FileNotFoundError, AttributeError) as e:
+            logger.warning("CDL character loading failed: %s, using fallback", e)
             return """You are a helpful and friendly Discord bot assistant. You have the following personality traits:
 
 - You are knowledgeable, helpful, and patient
