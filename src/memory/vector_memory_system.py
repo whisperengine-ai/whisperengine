@@ -421,17 +421,34 @@ class VectorMemoryStore:
         """Extract emotional context for role-playing intelligence"""
         content_lower = content.lower()
         
-        # Positive emotions
-        if any(word in content_lower for word in ['happy', 'joy', 'excited', 'love', 'wonderful', 'amazing']):
+        # Enhanced emotional detection with intensity
+        # Positive emotions (high intensity)
+        if any(word in content_lower for word in ['ecstatic', 'thrilled', 'overjoyed', 'fantastic', 'incredible']):
+            return 'very_positive'
+        # Positive emotions (medium intensity)
+        elif any(word in content_lower for word in ['happy', 'joy', 'excited', 'love', 'wonderful', 'amazing', 'great']):
             return 'positive'
+        # Mildly positive
+        elif any(word in content_lower for word in ['good', 'nice', 'pleasant', 'okay', 'fine']):
+            return 'mildly_positive'
         
-        # Negative emotions
-        if any(word in content_lower for word in ['sad', 'angry', 'frustrated', 'hate', 'terrible', 'awful']):
+        # Negative emotions (high intensity)
+        elif any(word in content_lower for word in ['devastated', 'furious', 'enraged', 'horrible', 'catastrophic']):
+            return 'very_negative'
+        # Negative emotions (medium intensity)
+        elif any(word in content_lower for word in ['sad', 'angry', 'frustrated', 'hate', 'terrible', 'awful']):
             return 'negative'
+        # Mildly negative
+        elif any(word in content_lower for word in ['disappointed', 'annoyed', 'bothered', 'concerned']):
+            return 'mildly_negative'
         
-        # Neutral/complex emotions
-        if any(word in content_lower for word in ['confused', 'curious', 'wondering', 'thinking']):
+        # Complex/contemplative emotions
+        elif any(word in content_lower for word in ['confused', 'curious', 'wondering', 'thinking', 'pondering']):
             return 'contemplative'
+        
+        # Anxious/worried emotions
+        elif any(word in content_lower for word in ['anxious', 'worried', 'nervous', 'stressed', 'overwhelmed']):
+            return 'anxious'
         
         return 'neutral'
 
