@@ -38,7 +38,7 @@ CHARACTER DETAILS:
 - Occupation: {character.identity.occupation}
 - Location: {character.identity.location}
 
-IMPORTANT: You must respond as {character.identity.name}, not as Dream. Stay in character.
+IMPORTANT: You must respond as {character.identity.name}. Stay in character.
 
 User Message: "{message_content}"
 
