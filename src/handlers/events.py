@@ -687,13 +687,13 @@ class BotEventHandlers:
             relevant_memories = []
             emotion_context = ""
 
-        # Get recent conversation history - try intelligent summarization first
+        # Get recent conversation history - Use HYBRID approach: summary + recent messages
         conversation_summary = await self._get_intelligent_conversation_summary(reply_channel, user_id, message)
         
         if conversation_summary:
-            # Use intelligent summarization instead of full message history
-            logger.info(f"✅ Using intelligent conversation summary instead of message truncation for user {user_id}")
-            recent_messages = []  # Empty list since we have summary
+            # Use HYBRID: intelligent summary for older context + recent messages for continuity
+            logger.info(f"✅ Using HYBRID approach: conversation summary + recent messages for user {user_id}")
+            recent_messages = await self._get_recent_messages(reply_channel, user_id, message.id)
             # Add summary as a system context message
             conversation_summary_context = [
                 {"role": "system", "content": f"Previous conversation summary: {conversation_summary}"}
@@ -935,13 +935,13 @@ class BotEventHandlers:
             relevant_memories = []
             emotion_context = ""
 
-        # Get recent conversation history (guild-specific) - try intelligent summarization first
+        # Get recent conversation history (guild-specific) - Use HYBRID approach: summary + recent messages
         conversation_summary = await self._get_intelligent_conversation_summary(reply_channel, user_id, message)
         
         if conversation_summary:
-            # Use intelligent summarization instead of full message history
-            logger.info(f"✅ Using intelligent conversation summary for guild message from user {user_id}")
-            recent_messages = []  # Empty list since we have summary
+            # Use HYBRID: intelligent summary for older context + recent messages for continuity
+            logger.info(f"✅ Using HYBRID approach: conversation summary + recent messages for guild user {user_id}")
+            recent_messages = await self._get_recent_messages(reply_channel, user_id, message.id)
             # Add summary as a system context message
             conversation_summary_context = [
                 {"role": "system", "content": f"Previous conversation summary: {conversation_summary}"}
@@ -1064,9 +1064,9 @@ class BotEventHandlers:
         
         if self.conversation_cache:
             logger.info(f"🔥 CACHE DEBUG: Getting conversation context for user {user_id} in channel {channel.id}")
-            # Use cache with user-specific filtering
+            # Use cache with user-specific filtering - RESTORE BETTER CONTINUITY
             recent_messages = await self.conversation_cache.get_user_conversation_context(
-                channel, user_id=int(user_id), limit=8, exclude_message_id=exclude_message_id  # Reduced from 15 to 8
+                channel, user_id=int(user_id), limit=15, exclude_message_id=exclude_message_id  # Increased back to 15 for better continuity
             )
             
             logger.info(f"🔥 CACHE DEBUG: Retrieved {len(recent_messages)} messages from cache")
@@ -1077,7 +1077,7 @@ class BotEventHandlers:
                 logger.info(f"🔥 CACHE DEBUG: Message {i+1}: [{author_name}] (bot={is_bot}): '{content}...'")
             
             # Apply additional message truncation to prevent context explosion
-            recent_messages = truncate_recent_messages(recent_messages, max_messages=8)
+            recent_messages = truncate_recent_messages(recent_messages, max_messages=15)
             
             logger.info(f"🔥 CACHE DEBUG: After truncation: {len(recent_messages)} messages")
             
@@ -1087,7 +1087,7 @@ class BotEventHandlers:
             logger.info(f"🔥 CACHE DEBUG: After standardization: {len(recent_messages)} messages")
 
             # Supplement with vector memory if insufficient
-            if len(recent_messages) < 8:
+            if len(recent_messages) < 15:
                 logger.debug(
                     f"Supplementing {len(recent_messages)} cached messages with vector memory for user {user_id}"
                 )
@@ -1449,8 +1449,8 @@ class BotEventHandlers:
         logger.info(f"🔥 CONTEXT DEBUG: After alternation fix: {len(fixed_history)} messages")
         
         if _minimal_context_mode_enabled():
-            # Keep only last 6 alternating turns for isolation
-            fixed_history = fixed_history[-12:]
+            # Keep more turns for better continuity - increased from 12 to 20
+            fixed_history = fixed_history[-20:]
             logger.info(f"🔥 CONTEXT DEBUG: After minimal mode truncation: {len(fixed_history)} messages")
         
         conversation_context.extend(fixed_history)
