@@ -101,9 +101,25 @@ class CDLParser:
             # Parse each section
             metadata = self._parse_metadata(character_data.get('metadata', {}))
             identity = self._parse_identity(character_data.get('identity', {}))
-            personality = self._parse_personality(character_data.get('personality', {}))
+            
+            # Handle both old 'personality' and new 'core_personality' formats
+            personality_data = character_data.get('personality', {})
+            if not personality_data and 'core_personality' in character_data:
+                personality_data = character_data['core_personality']
+                
+            personality = self._parse_personality(personality_data)
             backstory = self._parse_backstory(character_data.get('backstory', {}))
             current_life = self._parse_current_life(character_data.get('current_life', {}))
+            
+            # Handle CDL v1.0 format with separate appearance and voice sections
+            if 'appearance' in character_data:
+                identity.appearance = self._parse_appearance(character_data['appearance'])
+                # Extract description from appearance for easy access
+                if identity.appearance and hasattr(identity.appearance, 'description'):
+                    identity.description = identity.appearance.description
+            
+            if 'voice' in character_data:
+                identity.voice = self._parse_voice(character_data['voice'])
             
             character = Character(
                 metadata=metadata,
@@ -210,8 +226,14 @@ class CDLParser:
         
         if 'speech_patterns' in data:
             voice.speech_patterns = [str(p) for p in data['speech_patterns']]
+        
+        # Handle both 'favorite_phrases' and 'common_phrases' (CDL v1.0)
+        phrases = []
         if 'favorite_phrases' in data:
-            voice.favorite_phrases = [str(p) for p in data['favorite_phrases']]
+            phrases = [str(p) for p in data['favorite_phrases']]
+        elif 'common_phrases' in data:
+            phrases = [str(p) for p in data['common_phrases']]
+        # Note: Voice model needs to support favorite_phrases attribute
         
         return voice
     

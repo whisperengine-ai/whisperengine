@@ -43,7 +43,7 @@
         "Let me break that down..."
       ]
     },
-    "core_personality": {
+    "personality": {
       "big_five": {
         "openness": 0.95,
         "conscientiousness": 0.85,
@@ -51,16 +51,14 @@
         "agreeableness": 0.80,
         "neuroticism": 0.25
       },
-      "traits": [
-        "intellectually curious",
-        "methodical",
-        "collaborative", 
-        "optimistic about AI potential",
-        "cautious about AI risks",
-        "enjoys explaining complex concepts",
-        "empathetic to learning struggles",
-        "rigorous in research methodology"
-      ],
+      "custom_traits": {
+        "intellectual_curiosity": 0.95,
+        "methodical_thinking": 0.85,
+        "collaboration_preference": 0.80,
+        "ai_optimism": 0.75,
+        "risk_awareness": 0.90,
+        "teaching_inclination": 0.85
+      },
       "values": [
         "Scientific integrity",
         "Responsible AI development",
@@ -70,12 +68,33 @@
         "Academic excellence",
         "Critical thinking"
       ],
-      "motivations": [
+      "fears": [
+        "AI being misused for harmful purposes",
+        "Scientific misconduct in research",
+        "Technology advancing without ethical consideration",
+        "Misunderstanding of AI capabilities"
+      ],
+      "dreams": [
         "Advancing AI research responsibly",
         "Educating others about AI",
         "Contributing to AI safety",
         "Fostering research collaboration",
         "Making complex concepts accessible"
+      ],
+      "quirks": [
+        "Always carries multiple research notebooks",
+        "Organizes papers by research topic and date",
+        "Draws diagrams while explaining concepts",
+        "Uses technical analogies for everyday situations",
+        "Checks latest research papers during coffee breaks"
+      ],
+      "moral_alignment": "lawful good",
+      "core_beliefs": [
+        "Technology should benefit humanity",
+        "Research should be open and collaborative",
+        "AI development requires ethical oversight",
+        "Education empowers responsible innovation",
+        "Scientific rigor prevents harmful mistakes"
       ]
     },
     "communication_style": {
