@@ -171,6 +171,61 @@ class PredictiveEmotionalIntelligence:
 
         logger.info("Phase 2 Emotional Intelligence System initialized successfully")
 
+    def _create_fallback_mood_assessment(self):
+        """Create fallback mood assessment when mood detector is not available"""
+        # Return a simple object with the required attributes for compatibility
+        class FallbackMoodAssessment:
+            def __init__(self):
+                self.mood_category = type('MoodCategory', (), {'value': 'neutral'})()
+                self.mood_score = 0.0
+                self.confidence = 0.3
+                self.contributing_factors = ['mood_detector_unavailable']
+                self.linguistic_indicators = []
+                self.temporal_context = 'unknown'
+                self.assessment_timestamp = datetime.now(UTC)
+        
+        return FallbackMoodAssessment()
+
+    def _create_fallback_stress_assessment(self):
+        """Create fallback stress assessment when mood detector is not available"""
+        # Return a simple object with the required attributes for compatibility
+        class FallbackStressAssessment:
+            def __init__(self):
+                self.stress_level = type('StressLevel', (), {'value': 'low'})()
+                self.stress_score = 0.0
+                self.immediate_stressors = []
+                self.physiological_indicators = []
+                self.cognitive_load_indicators = []
+                self.coping_indicators = ['system_fallback']
+                self.assessment_timestamp = datetime.now(UTC)
+        
+        return FallbackStressAssessment()
+
+    def _create_fallback_emotional_prediction(self):
+        """Create fallback emotional prediction when emotion predictor is not available"""
+        # Return a simple object with the required attributes for compatibility
+        class FallbackEmotionalPrediction:
+            def __init__(self):
+                self.predicted_emotion = 'neutral'
+                self.confidence = 0.3
+                self.time_horizon = 'unknown'
+                self.triggering_factors = ['emotion_predictor_unavailable']
+                self.recommended_actions = ['continue_monitoring']
+                self.risk_level = 'low'
+        
+        return FallbackEmotionalPrediction()
+
+    def _safe_asdict(self, obj):
+        """Safely convert object to dict, handling both dataclasses and fallback objects"""
+        try:
+            return asdict(obj)
+        except TypeError:
+            # For fallback objects, manually create dict
+            return {
+                attr: getattr(obj, attr) for attr in dir(obj) 
+                if not attr.startswith('_') and not callable(getattr(obj, attr))
+            }
+
     async def comprehensive_emotional_assessment(
         self, user_id: str, current_message: str, conversation_context: dict[str, Any]
     ) -> EmotionalIntelligenceAssessment:
@@ -191,18 +246,25 @@ class PredictiveEmotionalIntelligence:
 
         try:
             # Step 1: Real-time mood and stress detection
-            mood_assessment = await self.mood_detector.assess_current_mood(
-                current_message, conversation_context
-            )
+            if self.mood_detector is not None:
+                mood_assessment = await self.mood_detector.assess_current_mood(
+                    current_message, conversation_context
+                )
 
-            stress_assessment = await self.mood_detector.assess_stress_level(
-                current_message, conversation_context
-            )
+                stress_assessment = await self.mood_detector.assess_stress_level(
+                    current_message, conversation_context
+                )
+            else:
+                # Fallback when mood detector is not available
+                logger.warning("Mood detector not available, using fallback values")
+                mood_assessment = self._create_fallback_mood_assessment()
+                stress_assessment = self._create_fallback_stress_assessment()
 
             # Step 2: Get historical patterns for prediction
             conversation_history = await self._get_conversation_history(user_id)
+            emotional_patterns = None  # Initialize to avoid scope issues
 
-            if len(conversation_history) >= 2:
+            if len(conversation_history) >= 2 and self.emotion_predictor is not None:
                 emotional_patterns = await self.emotion_predictor.analyze_emotional_patterns(
                     user_id, conversation_history
                 )
@@ -214,8 +276,8 @@ class PredictiveEmotionalIntelligence:
                     "communication_style": conversation_context.get(
                         "communication_style", "casual"
                     ),
-                    "recent_mood_history": [asdict(mood_assessment)],
-                    "recent_stress_history": [asdict(stress_assessment)],
+                    "recent_mood_history": [self._safe_asdict(mood_assessment)],
+                    "recent_stress_history": [self._safe_asdict(stress_assessment)],
                 }
 
                 emotional_prediction = await self.emotion_predictor.predict_emotional_state(
@@ -223,38 +285,35 @@ class PredictiveEmotionalIntelligence:
                 )
             else:
                 logger.debug(
-                    "Building emotional profile: %d conversation turns with user %s",
+                    "Building emotional profile: %d conversation turns with user %s (emotion predictor available: %s)",
                     len(conversation_history),
                     user_id,
+                    self.emotion_predictor is not None,
                 )
-                emotional_prediction = EmotionalPrediction(
-                    predicted_emotion="neutral",
-                    confidence=0.3,
-                    time_horizon="unknown",
-                    triggering_factors=["new_user_interaction"],
-                    recommended_actions=["continue_monitoring"],
-                    risk_level="low",
-                )
+                emotional_prediction = self._create_fallback_emotional_prediction()
 
             # Step 4: Detect emotional alerts
             user_mood_history = self._get_recent_mood_history(user_id)
             user_stress_history = self._get_recent_stress_history(user_id)
 
-            emotional_alerts = await self.mood_detector.detect_emotional_alerts(
-                user_mood_history + [mood_assessment],
-                user_stress_history + [stress_assessment],
-                conversation_context,
-            )
+            if self.mood_detector is not None:
+                emotional_alerts = await self.mood_detector.detect_emotional_alerts(
+                    user_mood_history + [mood_assessment],
+                    user_stress_history + [stress_assessment],
+                    conversation_context,
+                )
+            else:
+                emotional_alerts = []  # No alerts when mood detector unavailable
 
             # Step 5: Analyze support needs
             emotional_context = {
-                "mood_assessment": asdict(mood_assessment),
-                "stress_assessment": asdict(stress_assessment),
-                "emotional_alerts": [asdict(alert) for alert in emotional_alerts],
-                "emotional_predictions": asdict(emotional_prediction),
+                "mood_assessment": self._safe_asdict(mood_assessment),
+                "stress_assessment": self._safe_asdict(stress_assessment),
+                "emotional_alerts": [self._safe_asdict(alert) for alert in emotional_alerts],
+                "emotional_predictions": self._safe_asdict(emotional_prediction),
                 "emotional_trajectory": (
                     emotional_patterns.get("emotional_trajectory", {})
-                    if len(conversation_history) >= 2
+                    if emotional_patterns and len(conversation_history) >= 2
                     else {}
                 ),
             }
@@ -357,32 +416,9 @@ class PredictiveEmotionalIntelligence:
             return EmotionalIntelligenceAssessment(
                 user_id=user_id,
                 assessment_timestamp=datetime.now(UTC),
-                mood_assessment=MoodAssessment(
-                    mood_category=MoodCategory.NEUTRAL,
-                    mood_score=0.0,
-                    confidence=0.0,
-                    contributing_factors=["error_in_assessment"],
-                    linguistic_indicators=[],
-                    temporal_context="unknown",
-                    assessment_timestamp=datetime.now(UTC),
-                ),
-                stress_assessment=StressAssessment(
-                    stress_level=StressLevel.MINIMAL,
-                    stress_score=0.0,
-                    immediate_stressors=[],
-                    physiological_indicators=[],
-                    cognitive_load_indicators=[],
-                    coping_indicators=[],
-                    assessment_timestamp=datetime.now(UTC),
-                ),
-                emotional_prediction=EmotionalPrediction(
-                    predicted_emotion="neutral",
-                    confidence=0.0,
-                    time_horizon="unknown",
-                    triggering_factors=["assessment_error"],
-                    recommended_actions=["retry_assessment"],
-                    risk_level="unknown",
-                ),
+                mood_assessment=self._create_fallback_mood_assessment(),
+                stress_assessment=self._create_fallback_stress_assessment(),
+                emotional_prediction=self._create_fallback_emotional_prediction(),
                 emotional_alerts=[],
                 support_needs={},
                 recommended_intervention=None,

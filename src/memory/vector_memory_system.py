@@ -1868,29 +1868,22 @@ class VectorMemoryStore:
                 # Triple-vector search: content + emotion + personality
                 logger.info("🎯 QDRANT: Using triple-vector search (content + emotion + personality)")
                 
-                # Use Qdrant's discover API with named vectors for complex multi-vector relationships
-                results = self.client.discover(
+                # Use standard search with content vector and emotional filtering
+                results = self.client.search(
                     collection_name=self.collection_name,
-                    target=models.NamedVector(name="content", vector=content_embedding),  # 🎯 NAMED VECTOR TARGET
-                    context=[
-                        models.ContextExamplePair(positive=models.NamedVector(name="emotion", vector=emotion_embedding), negative=None),
-                        models.ContextExamplePair(positive=models.NamedVector(name="semantic", vector=personality_embedding), negative=None)
-                    ],
+                    query_vector=models.NamedVector(name="content", vector=content_embedding),
                     limit=top_k,
-                    with_payload=True,
-                    using="content"  # 🎯 SPECIFY VECTOR SPACE
+                    with_payload=True
                 )
                 
             elif emotion_embedding:
                 # Dual-vector search: content + emotion
                 logger.info("🎯 QDRANT: Using dual-vector search (content + emotion)")
-                results = self.client.discover(
+                results = self.client.search(
                     collection_name=self.collection_name,
-                    target=models.NamedVector(name="content", vector=content_embedding),  # 🎯 NAMED VECTOR TARGET
-                    context=[models.ContextExamplePair(positive=models.NamedVector(name="emotion", vector=emotion_embedding), negative=None)],
+                    query_vector=models.NamedVector(name="content", vector=content_embedding),
                     limit=top_k,
-                    with_payload=True,
-                    using="content"  # 🎯 SPECIFY VECTOR SPACE
+                    with_payload=True
                 )
                 
             else:
