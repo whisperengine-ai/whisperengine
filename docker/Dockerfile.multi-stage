@@ -42,7 +42,7 @@ COPY . .
 
 # Create user and directories
 RUN useradd --create-home appuser && \
-    mkdir -p chromadb_data backups privacy_data temp_images logs && \
+    mkdir -p chromadb_data backups privacy_data temp_images logs data && \
     chown -R appuser:appuser /app
 
 USER appuser
@@ -82,11 +82,10 @@ RUN --mount=type=cache,target=/root/.cache/pip \
     COPY pyproject.toml validate_config.py env_manager.py run.py ./
     COPY characters/ ./characters/
     COPY config/ ./config/
-    COPY data/ ./data/
 
     # Create non-root user and directories
 RUN useradd --create-home --no-log-init appuser && \
-    mkdir -p backups privacy_data temp_images logs && \
+    mkdir -p backups privacy_data temp_images logs data && \
     chown -R appuser:appuser /app && \
     # Remove unnecessary packages after installation (keep wget, netcat, and procps for health checks)
     apt-get autoremove -y gcc g++ git && \
@@ -135,12 +134,11 @@ COPY src/ ./src/
 COPY validate_config.py env_manager.py run.py ./
 COPY characters/ ./characters/
 COPY config/ ./config/
-COPY data/ ./data/
 COPY ${SYSTEM_PROMPT_SOURCE} ./system_prompt.md
 
 # Create user
 RUN adduser -D -s /bin/sh appuser && \
-    mkdir -p chromadb_data backups privacy_data temp_images logs && \
+    mkdir -p chromadb_data backups privacy_data temp_images logs data && \
     chown -R appuser:appuser /app
 
 USER appuser
