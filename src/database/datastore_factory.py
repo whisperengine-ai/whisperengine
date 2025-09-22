@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 class DeploymentMode(Enum):
     """Deployment mode enumeration"""
 
-    DESKTOP = "desktop"
+    CONTAINER = "container"
     DOCKER = "docker"
     CLOUD = "cloud"
 
@@ -39,13 +39,9 @@ class DeploymentInfo:
 
 
 # Import availability checks
-try:
-    from src.config.adaptive_config import AdaptiveConfigManager
-
-    ADAPTIVE_CONFIG_AVAILABLE = True
-except ImportError:
-    ADAPTIVE_CONFIG_AVAILABLE = False
-    AdaptiveConfigManager = None
+# Adaptive config is no longer used - simplified to Docker environment variables
+ADAPTIVE_CONFIG_AVAILABLE = False
+AdaptiveConfigManager = None
 
 try:
     from src.database.database_integration import DatabaseIntegrationManager
@@ -155,7 +151,7 @@ class DatastoreFactory:
 
         # Default to desktop mode
         return DeploymentInfo(
-            mode=DeploymentMode.DESKTOP, scale_tier="small", data_dir=Path("data")
+            mode=DeploymentMode.CONTAINER, scale_tier="small", data_dir=Path("data")
         )
 
     def create_database_manager(self) -> Any:
@@ -190,50 +186,18 @@ class DatastoreFactory:
         return FallbackDatabase()
 
     def create_conversation_cache(self) -> Any:
-        """Create conversation cache implementation based on deployment mode"""
+        """Create conversation cache implementation"""
         try:
-            if self.deployment_mode == DeploymentMode.DESKTOP:
-                # Use lightweight SQLite + memory cache for desktop
-                from src.memory.desktop_conversation_cache import create_desktop_conversation_cache
+            # Use fallback memory cache for all deployment modes
+            from src.memory.local_memory_cache import LocalMemoryCache
 
-                cache = create_desktop_conversation_cache(
-                    data_dir=self.data_dir / "cache",
-                    max_memory_conversations=50,
-                    max_messages_per_conversation=100,
-                    cache_ttl_hours=24,
-                )
-                logger.info("✅ Created desktop conversation cache (SQLite + memory)")
-                return cache
-
-            elif self.deployment_mode == DeploymentMode.DOCKER:
-                # Use Redis for production Docker deployment
-                try:
-                    from src.memory.hybrid_conversation_cache import HybridConversationCache
-
-                    cache = HybridConversationCache()
-                    logger.info("✅ Created hybrid conversation cache (Redis + fallback)")
-                    return cache
-                except ImportError:
-                    logger.warning(
-                        "HybridConversationCache not available, falling back to desktop cache"
-                    )
-                    from src.memory.desktop_conversation_cache import (
-                        create_desktop_conversation_cache,
-                    )
-
-                    return create_desktop_conversation_cache()
-
-            else:
-                # Default to memory-only cache
-                from src.memory.local_memory_cache import LocalMemoryCache
-
-                cache = LocalMemoryCache()
-                logger.info("✅ Created local memory cache")
-                return cache
-
-        except Exception as e:
-            logger.error(f"Failed to create conversation cache: {e}")
-            logger.info("Falling back to basic local memory cache")
+            cache = LocalMemoryCache()
+            logger.info("✅ Created fallback conversation cache")
+            return cache
+        except ImportError:
+            # Final fallback to simple in-memory cache
+            logger.warning("Using simple fallback conversation cache")
+            return None
 
             # Ultimate fallback - simple in-memory cache
             class BasicMemoryCache:

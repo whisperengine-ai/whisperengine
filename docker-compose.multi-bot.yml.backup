@@ -1,0 +1,565 @@
+# Multi-Bot Docker Compose Configuration  
+# Supports multiple character bot containers with isolated infrastructure
+# Each bot gets its own Discord token and character assignment
+# Uses separate infrastructure to avoid conflicts with single-bot system
+
+services:
+  # Elena Rodriguez - Marine Biologist Bot
+  elena-bot:
+    build:
+      context: .
+      dockerfile: Dockerfile.bundled-models
+      target: production
+    image: whisperengine-bot:${VERSION:-latest}
+    container_name: whisperengine-elena-bot
+    restart: unless-stopped
+    
+    # Elena-specific environment
+    env_file:
+      - .env.elena    # Elena-specific Discord token and configuration
+    environment:
+      # Bot identification
+      - DISCORD_BOT_NAME=Elena
+      - CDL_DEFAULT_CHARACTER=characters/examples/elena-rodriguez.json
+      - CONTAINER_NAME=elena-bot
+      # Shared infrastructure endpoints
+      - POSTGRES_HOST=postgres
+      - REDIS_HOST=redis
+      - QDRANT_HOST=qdrant
+      # Model configuration (pre-downloaded)
+      - MODEL_CACHE_DIR=/app/models
+      - DISABLE_MODEL_DOWNLOAD=true
+      - HF_HUB_OFFLINE=false  # Allow model downloads if pre-downloaded models not found
+      - TRANSFORMERS_OFFLINE=0
+      # Production defaults
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - DEBUG_MODE=false
+      - PYTHONUNBUFFERED=1
+      - HEALTH_CHECK_PORT=9091
+      - HEALTH_CHECK_HOST=0.0.0.0
+      
+    ports:
+      - "9091:9091"  # Elena health check endpoint
+      
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+          cpus: '4.0'
+        reservations:
+          memory: 2G
+          cpus: '2.0'
+    
+    # Health check
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9091/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    
+    # Shared volumes with bot-specific subdirectories
+    volumes:
+      - elena_backups:/app/backups
+      - elena_privacy:/app/privacy_data
+      - elena_temp:/app/temp_images
+      - elena_logs:/app/logs
+      # Shared configuration (read-only)
+      - ./characters:/app/characters:ro
+      - ./config:/app/config:ro
+      # Shared pre-downloaded models (read-only)
+      - shared_models:/app/models:ro
+      
+    networks:
+      - bot_network
+      
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+
+  # Gabriel Bot
+  gabriel-bot:
+    build:
+      context: .
+      dockerfile: Dockerfile.bundled-models
+      target: production
+    image: whisperengine-bot:${VERSION:-latest}
+    container_name: whisperengine-gabriel-bot
+    restart: unless-stopped
+    
+    # Gabriel-specific environment
+    env_file:
+      - .env.gabriel    # Gabriel-specific Discord token and configuration
+    environment:
+      # Bot identification
+      - DISCORD_BOT_NAME=Gabriel
+      - CDL_DEFAULT_CHARACTER=characters/examples/gabriel.json
+      - CONTAINER_NAME=gabriel-bot
+      # Shared infrastructure endpoints
+      - POSTGRES_HOST=postgres
+      - REDIS_HOST=redis
+      - QDRANT_HOST=qdrant
+      # Model configuration (pre-downloaded)
+      - MODEL_CACHE_DIR=/app/models
+      - DISABLE_MODEL_DOWNLOAD=true
+      - HF_HUB_OFFLINE=false  # Allow model downloads if pre-downloaded models not found
+      - TRANSFORMERS_OFFLINE=0
+      # Production defaults
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - DEBUG_MODE=false
+      - PYTHONUNBUFFERED=1
+      - HEALTH_CHECK_PORT=9095
+      - HEALTH_CHECK_HOST=0.0.0.0
+      
+    ports:
+      - "9095:9095"  # Gabriel health check endpoint
+      
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+          cpus: '4.0'
+        reservations:
+          memory: 2G
+          cpus: '2.0'
+    
+    # Volumes for model caching and logs
+    volumes:
+      - type: volume
+        source: gabriel_logs
+        target: /app/logs
+        volume:
+          nocopy: true
+      # Model cache shared between all bot containers
+      - type: volume
+        source: shared_models
+        target: /app/models
+        volume:
+          nocopy: false
+      
+    networks:
+      - bot_network
+      
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+
+  # Marcus Thompson - AI Researcher Bot (Example second bot)
+  marcus-bot:
+    build:
+      context: .
+      dockerfile: Dockerfile.bundled-models
+      target: production
+    image: whisperengine-bot:${VERSION:-latest}
+    container_name: whisperengine-marcus-bot
+    restart: unless-stopped
+    
+    # Marcus-specific environment
+    env_file:
+      - .env.marcus   # Marcus-specific Discord token and configuration
+    environment:
+      # Bot identification
+      - DISCORD_BOT_NAME=Marcus
+      - CDL_DEFAULT_CHARACTER=characters/examples/marcus-thompson.json
+      - CONTAINER_NAME=marcus-bot
+      # Shared infrastructure endpoints  
+      - POSTGRES_HOST=postgres
+      - REDIS_HOST=redis
+      - QDRANT_HOST=qdrant
+      # Model configuration (pre-downloaded)
+      - MODEL_CACHE_DIR=/app/models
+      - DISABLE_MODEL_DOWNLOAD=true
+      - HF_HUB_OFFLINE=false  # Allow model downloads if pre-downloaded models not found
+      - TRANSFORMERS_OFFLINE=0
+      # Production defaults
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - DEBUG_MODE=false
+      - PYTHONUNBUFFERED=1
+      - HEALTH_CHECK_PORT=9092
+      - HEALTH_CHECK_HOST=0.0.0.0
+      
+    ports:
+      - "9092:9092"  # Marcus health check endpoint
+      
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+          cpus: '4.0'
+        reservations:
+          memory: 2G
+          cpus: '2.0'
+    
+    # Health check
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9092/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    
+    # Shared volumes with bot-specific subdirectories
+    volumes:
+      - marcus_backups:/app/backups
+      - marcus_privacy:/app/privacy_data
+      - marcus_temp:/app/temp_images
+      - marcus_logs:/app/logs
+      # Shared configuration (read-only)
+      - ./characters:/app/characters:ro
+      - ./config:/app/config:ro
+      # Shared pre-downloaded models (read-only)
+      - shared_models:/app/models:ro
+      
+    networks:
+      - bot_network
+      
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+
+  # Marcus Chen - Indie Game Developer Bot
+  marcus-chen-bot:
+    build:
+      context: .
+      dockerfile: Dockerfile.bundled-models
+      target: production
+    image: whisperengine-bot:${VERSION:-latest}
+    container_name: whisperengine-marcus-chen-bot
+    restart: unless-stopped
+    
+    # Marcus Chen-specific environment
+    env_file:
+      - .env.marcus-chen   # Marcus Chen-specific Discord token and configuration
+    environment:
+      # Bot identification
+      - DISCORD_BOT_NAME=Marcus Chen
+      - CDL_DEFAULT_CHARACTER=characters/examples/marcus-chen.json
+      - CONTAINER_NAME=marcus-chen-bot
+      # Shared infrastructure endpoints  
+      - POSTGRES_HOST=postgres
+      - REDIS_HOST=redis
+      - QDRANT_HOST=qdrant
+      # Model configuration (pre-downloaded)
+      - MODEL_CACHE_DIR=/app/models
+      - DISABLE_MODEL_DOWNLOAD=true
+      - HF_HUB_OFFLINE=false  # Allow model downloads if pre-downloaded models not found
+      - TRANSFORMERS_OFFLINE=0
+      # Production defaults
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - DEBUG_MODE=false
+      - PYTHONUNBUFFERED=1
+      - HEALTH_CHECK_PORT=9093
+      - HEALTH_CHECK_HOST=0.0.0.0
+      
+    ports:
+      - "9093:9093"  # Marcus Chen health check endpoint
+      
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+          cpus: '4.0'
+        reservations:
+          memory: 2G
+          cpus: '2.0'
+    
+    # Health check
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9093/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    
+    # Shared volumes with bot-specific subdirectories
+    volumes:
+      - marcus_chen_backups:/app/backups
+      - marcus_chen_privacy:/app/privacy_data
+      - marcus_chen_temp:/app/temp_images
+      - marcus_chen_logs:/app/logs
+      # Shared configuration (read-only)
+      - ./characters:/app/characters:ro
+      - ./config:/app/config:ro
+      # Shared pre-downloaded models (read-only)
+      - shared_models:/app/models:ro
+      
+    networks:
+      - bot_network
+      
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+
+  # Dream of the Endless - Character Bot
+  dream-bot:
+    build:
+      context: .
+      dockerfile: Dockerfile.bundled-models
+      target: production
+    image: whisperengine-bot:${VERSION:-latest}
+    container_name: whisperengine-dream-bot
+    restart: unless-stopped
+    
+    # Dream-specific environment
+    env_file:
+      - .env.dream   # Dream-specific Discord token and configuration
+    environment:
+      # Bot identification
+      - DISCORD_BOT_NAME=Dream
+      - CDL_DEFAULT_CHARACTER=characters/examples/dream_of_the_endless.json
+      - CONTAINER_NAME=dream-bot
+      # Shared infrastructure endpoints  
+      - POSTGRES_HOST=postgres
+      - REDIS_HOST=redis
+      - QDRANT_HOST=qdrant
+      # Model configuration (pre-downloaded)
+      - MODEL_CACHE_DIR=/app/models
+      - DISABLE_MODEL_DOWNLOAD=true
+      - HF_HUB_OFFLINE=false  # Allow model downloads if pre-downloaded models not found
+      - TRANSFORMERS_OFFLINE=0
+      # Production defaults
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - DEBUG_MODE=false
+      - PYTHONUNBUFFERED=1
+      - HEALTH_CHECK_PORT=9094
+      - HEALTH_CHECK_HOST=0.0.0.0
+      
+    ports:
+      - "9094:9094"  # Dream health check endpoint
+      
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+          cpus: '4.0'
+        reservations:
+          memory: 2G
+          cpus: '2.0'
+    
+    # Health check
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9094/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    
+    # Shared volumes with bot-specific subdirectories
+    volumes:
+      - dream_backups:/app/backups
+      - dream_privacy:/app/privacy_data
+      - dream_temp:/app/temp_images
+      - dream_logs:/app/logs
+      # Shared configuration (read-only)
+      - ./characters:/app/characters:ro
+      - ./config:/app/config:ro
+      # Shared pre-downloaded models (read-only)
+      - shared_models:/app/models:ro
+      
+    networks:
+      - bot_network
+      
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+
+  # === SHARED INFRASTRUCTURE ===
+  # All bot containers share these services
+  
+  # Redis for caching (shared by all bots)
+  redis:
+    image: redis:7-alpine
+    container_name: whisperengine-multi-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
+    volumes:
+      - multi_redis_data:/data
+    ports:
+      - "6380:6379"  # Different port for multi-bot Redis
+    networks:
+      - bot_network
+    deploy:
+      resources:
+        limits:
+          memory: 1G      # Increased for multiple bots
+          cpus: '1.0'
+        reservations:
+          memory: 512M
+          cpus: '0.5'
+    user: "999:999"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # PostgreSQL for persistent data (shared by all bots)
+  postgres:
+    image: postgres:16-alpine
+    container_name: whisperengine-multi-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-whisper_engine}
+      POSTGRES_USER: ${POSTGRES_USER:-bot_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_INITDB_ARGS: "--auth-host=scram-sha-256"
+    volumes:
+      - multi_postgres_data:/var/lib/postgresql/data
+      - ./scripts/init_postgres.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ports:
+      - "5433:5432"  # Different port for multi-bot PostgreSQL
+    networks:
+      - bot_network
+    deploy:
+      resources:
+        limits:
+          memory: 2G      # Increased for multiple bots
+          cpus: '2.0'
+        reservations:
+          memory: 1G
+          cpus: '1.0'
+    user: "postgres:postgres"
+    command: >
+      postgres
+      -c shared_buffers=512MB
+      -c max_connections=400
+      -c effective_cache_size=2GB
+      -c maintenance_work_mem=128MB
+      -c checkpoint_completion_target=0.9
+      -c wal_buffers=32MB
+      -c default_statistics_target=100
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-bot_user} -d ${POSTGRES_DB:-whisper_engine}"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  # Qdrant for vector storage (shared by all bots)
+  qdrant:
+    image: qdrant/qdrant:v1.7.4
+    container_name: whisperengine-multi-qdrant
+    restart: unless-stopped
+    ports:
+      - "6335:6333"  # Different ports for multi-bot Qdrant
+      - "6336:6334"  # gRPC API
+    volumes:
+      - multi_qdrant_data:/qdrant/storage
+    networks:
+      - bot_network
+    deploy:
+      resources:
+        limits:
+          memory: 4G      # Increased for multiple bots
+          cpus: '2.0'
+        reservations:
+          memory: 2G
+          cpus: '1.0'
+    environment:
+      - QDRANT__SERVICE__HTTP_PORT=6333
+      - QDRANT__SERVICE__GRPC_PORT=6334
+      - QDRANT__LOG_LEVEL=INFO
+    healthcheck:
+      test: ["CMD-SHELL", "timeout 5 bash -c '</dev/tcp/localhost/6333' || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+# === VOLUMES ===
+volumes:
+  # Elena bot-specific volumes
+  elena_backups:
+    driver: local
+  elena_privacy:
+    driver: local
+  elena_temp:
+    driver: local
+  elena_logs:
+    driver: local
+    
+  # Gabriel bot-specific volumes
+  gabriel_backups:
+    driver: local
+  gabriel_privacy:
+    driver: local
+  gabriel_temp:
+    driver: local
+  gabriel_logs:
+    driver: local
+    
+  # Marcus bot-specific volumes
+  marcus_backups:
+    driver: local
+  marcus_privacy:
+    driver: local
+  marcus_temp:
+    driver: local
+  marcus_logs:
+    driver: local
+    
+  # Marcus Chen (Indie Game Developer) volumes
+  marcus_chen_backups:
+    driver: local
+  marcus_chen_privacy:
+    driver: local
+  marcus_chen_temp:
+    driver: local
+  marcus_chen_logs:
+    driver: local
+    
+  # Dream of the Endless volumes
+  dream_backups:
+    driver: local
+  dream_privacy:
+    driver: local
+  dream_temp:
+    driver: local
+  dream_logs:
+    driver: local
+    
+  # Shared infrastructure volumes (prefixed for multi-bot)
+  multi_redis_data:
+    driver: local
+  multi_postgres_data:
+    driver: local
+  multi_qdrant_data:
+    driver: local
+  
+  # Shared models volume (pre-downloaded AI models)
+  shared_models:
+    driver: local
+
+# === NETWORK ===
+networks:
+  bot_network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

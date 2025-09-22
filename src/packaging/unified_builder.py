@@ -255,24 +255,19 @@ async def main():
     try:
         # Import after path setup
         from src.platforms.universal_chat import UniversalChatOrchestrator
-        from src.config.adaptive_config import AdaptiveConfigManager, EnvironmentDetector
         from src.database.database_integration import DatabaseIntegrationManager
 
         print("🤖 Starting WhisperEngine Desktop...")
 
-        # Detect environment first
-        environment = EnvironmentDetector.detect_environment()
-        print(f"🔍 Detected environment: {environment}")
+        # Simplified environment detection
+        print("🔍 Environment: Docker container mode")
 
-        # Initialize configuration
-        config_manager = AdaptiveConfigManager()
-
-        # Initialize database
-        db_manager = DatabaseIntegrationManager(config_manager)
+        # Initialize database with simplified configuration
+        db_manager = DatabaseIntegrationManager()
         await db_manager.initialize()
 
         # Create universal chat platform
-        chat_platform = create_universal_chat_platform(config_manager, db_manager)
+        chat_platform = create_universal_chat_platform(db_manager)
 
         # Initialize chat platforms (Web UI + any configured platforms)
         if await chat_platform.initialize():
@@ -282,7 +277,7 @@ async def main():
             return 1
 
         # Start web UI
-        web_ui = WhisperEngineWebUI(db_manager, config_manager)
+        web_ui = WhisperEngineWebUI(db_manager)
 
         print("🌐 Starting web interface at http://localhost:8080")
         print("📱 Check your system tray for WhisperEngine icon")

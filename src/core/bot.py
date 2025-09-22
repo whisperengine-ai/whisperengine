@@ -379,22 +379,11 @@ class DiscordBotCore:
         self.local_emotion_engine = None
         self.logger.info("🌐 Using vector-native emotion analysis (embedding intelligence)")
 
-        # Initialize Phase 3 Memory Networks
-        self.logger.info("🕸️ Initializing Phase 3: Multi-Dimensional Memory Networks...")
-        try:
-            # All AI features are always enabled - unified AI system
-            from src.memory.phase3_integration import Phase3MemoryNetworks
-
-            self.logger.info("🕸️ Memory Network Mode: Full Capabilities Always Active")
-
-            self.phase3_memory_networks = Phase3MemoryNetworks()
-            self.logger.info("✅ Phase 3: Multi-Dimensional Memory Networks initialized")
-
-        except Exception as e:
-            import traceback
-            self.logger.error(f"Failed to initialize Phase 3 memory networks: {e}")
-            self.logger.error(f"Full traceback: {traceback.format_exc()}")
-            self.logger.warning("⚠️ Continuing without Phase 3 memory network features")
+        # Phase 3 Memory Networks now handled natively by Qdrant vector store
+        # Use memory_manager.vector_store.get_memory_clusters_for_roleplay() for clustering
+        # Semantic search provides superior pattern detection and relevance scoring
+        self.logger.info("🕸️ Memory Networks: Using Vector-Native Qdrant Intelligence")
+        self.phase3_memory_networks = None  # Obsolete - Qdrant handles this natively
 
         # Initialize Phase 3 Advanced Intelligence Components
         self.logger.info("🧠 Initializing Phase 3: Advanced Intelligence Components...")

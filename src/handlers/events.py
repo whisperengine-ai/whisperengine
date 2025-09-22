@@ -13,7 +13,6 @@ from datetime import UTC, datetime
 
 import discord
 
-from src.config.adaptive_config import AdaptiveConfigManager
 from src.database.database_integration import DatabaseIntegrationManager
 from src.memory.redis_profile_memory_cache import RedisProfileAndMemoryCache
 
@@ -268,13 +267,12 @@ class BotEventHandlers:
         try:
             logger.info("🌐 Setting up Universal Chat Orchestrator for Discord integration...")
 
-            # Create configuration and database managers
-            config_manager = AdaptiveConfigManager()
-            db_manager = DatabaseIntegrationManager(config_manager)
+            # Create database manager without adaptive config (using simple environment variables)
+            db_manager = DatabaseIntegrationManager(adaptive_config_manager=None)
 
-            # Create universal chat orchestrator
+            # Create universal chat orchestrator (no adaptive config needed with Docker env vars)
             self.chat_orchestrator = UniversalChatOrchestrator(
-                config_manager=config_manager, db_manager=db_manager
+                config_manager=None, db_manager=db_manager
             )
 
             # Initialize the orchestrator

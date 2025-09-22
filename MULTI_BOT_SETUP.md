@@ -1,10 +1,21 @@
 # WhisperEngine Multi-Bot Setup Guide
 
+> **📚 Documentation Structure**: This is the primary multi-bot setup guide. See also:
+> - `MULTI_BOT_MEMORY_ARCHITECTURE.md` - Memory system architecture details
+> - `MULTI_BOT_IMPLEMENTATION_GUIDE.md` - Technical implementation reference
+
 ## 🚀 Overview
 
-WhisperEngine supports running multiple character bot containers that share the same infrastructure! This allows you to have different Discord bots with unique personalities (Elena the marine biologist, Marcus the AI researcher, etc.) all powered by the same backend services.
+WhisperEngine supports running multiple character bot containers that share the same infrastructure using a **template-based architecture**! This allows you to have different Discord bots with unique personalities (Elena the marine biologist, Marcus the AI researcher, etc.) all powered by the same backend services with pinned, stable versions.
 
-## 🏗️ Architecture
+## 🏗️ Template-Based Architecture
+
+**Key Innovation**: Instead of programmatically generating Docker Compose files (which can break), WhisperEngine uses a template approach that fills in discovered bot configurations safely.
+
+**Pinned Infrastructure Versions** (No more "latest" surprises!):
+- **PostgreSQL**: `postgres:16.4-alpine` 
+- **Redis**: `redis:7.4-alpine`
+- **Qdrant**: `qdrant/qdrant:v1.15.4`
 
 ```
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
@@ -20,15 +31,26 @@ WhisperEngine supports running multiple character bot containers that share the 
                                  │
     ┌─────────────────────────────┼─────────────────────────────┐
     │                             │                             │
-    │           SHARED INFRASTRUCTURE                           │
+    │     SHARED INFRASTRUCTURE (PINNED VERSIONS)              │
     │                             │                             │
     │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐    │
     │  │ PostgreSQL   │  │    Redis     │  │   Qdrant     │    │
-    │  │ (Database)   │  │  (Cache)     │  │ (Vectors)    │    │
-    │  │ Port: 5432   │  │ Port: 6379   │  │ Port: 6333   │    │
+    │  │16.4-alpine   │  │ 7.4-alpine   │  │  v1.15.4     │    │
+    │  │ Port: 5433   │  │ Port: 6380   │  │ Port: 6335   │    │
     │  └──────────────┘  └──────────────┘  └──────────────┘    │
     └─────────────────────────────────────────────────────────┘
 ```
+
+## 🔧 Template System Files
+
+**SAFE TO EDIT**:
+- `docker-compose.multi-bot.template.yml` - Infrastructure template with pinned versions
+- `.env.{bot_name}` - Individual bot configurations  
+- `characters/examples/*.json` - Character personality definitions
+
+**AUTO-GENERATED (NEVER EDIT)**:
+- `docker-compose.multi-bot.yml` - Generated from template + discovered bots
+- `multi-bot.sh` - Generated management script with all discovered bots
 
 ### Key Benefits
 
@@ -158,28 +180,52 @@ Example:
 
 This creates a cohesive experience where your "AI assistant team" knows you across all personalities!
 
-## 🎯 Adding New Bots
+## 🎯 Adding New Bots (Template-Based)
 
-### 1. Create Character Definition
+### 1. Create Environment File
+```bash
+# Copy template and customize
+cp .env.template .env.newbot
+# Edit with your bot-specific settings:
+# - DISCORD_BOT_TOKEN (unique token from Discord Developer Portal)
+# - DISCORD_BOT_NAME (display name)
+# - HEALTH_CHECK_PORT (unique port, e.g., 9096)
+```
+
+### 2. Create Character Definition (Optional)
 ```bash
 # Create new character file
-cp characters/examples/elena-rodriguez.json characters/examples/new-character.json
-# Edit to define new personality
+cp characters/examples/elena-rodriguez.json characters/examples/newbot.json
+# Edit personality traits, communication style, background, etc.
 ```
 
-### 2. Create Environment File
+### 3. Generate Configuration (Automatic)
 ```bash
-# Copy and customize environment
-cp .env.elena .env.newcharacter
-# Update Discord token, bot name, character file, and health port
+# Always use virtual environment
+source .venv/bin/activate
+
+# Template-based generation discovers your bot automatically
+python scripts/generate_multi_bot_config.py
 ```
 
-### 3. Add to Docker Compose
-Edit `docker-compose.multi-bot.yml`:
-```yaml
-  newcharacter-bot:
-    # Copy elena-bot section and modify:
-    env_file:
+### 4. Start Your Bot
+```bash
+# List discovered bots (including your new one)
+./multi-bot.sh list
+
+# Start your new bot
+./multi-bot.sh start newbot
+
+# Check status
+./multi-bot.sh status
+./multi-bot.sh health
+```
+
+**That's it!** No manual Docker Compose editing required. The template system:
+- Auto-discovers your `.env.newbot` file
+- Finds matching character file using smart naming patterns
+- Generates safe Docker Compose configuration
+- Creates management script with your bot included
       - .env.newcharacter
     environment:
       - DISCORD_BOT_NAME=NewCharacter

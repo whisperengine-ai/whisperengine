@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 class DeploymentMode(Enum):
     """Deployment mode enumeration"""
 
-    DESKTOP = "desktop"
+    CONTAINER = "container"
     DOCKER = "docker"
     CLOUD = "cloud"
 
@@ -44,33 +44,16 @@ class SimpleDatastoreFactory:
         elif os.environ.get("CLOUD_PROVIDER") or os.environ.get("KUBERNETES_SERVICE_HOST"):
             return DeploymentMode.CLOUD
         else:
-            return DeploymentMode.DESKTOP
+            return DeploymentMode.CONTAINER
 
     def create_conversation_cache(self) -> Any:
-        """Create conversation cache for desktop mode"""
+        """Create conversation cache"""
         try:
-            if self.deployment_mode == DeploymentMode.DESKTOP:
-                # Use our desktop conversation cache
-                from src.memory.desktop_conversation_cache import create_desktop_conversation_cache
-
-                cache = create_desktop_conversation_cache(
-                    data_dir=str(self.data_dir / "cache"),
-                    max_memory_conversations=50,
-                    max_messages_per_conversation=100,
-                    cache_ttl_hours=24,
-                )
-                logger.info("✅ Created desktop conversation cache (SQLite + memory)")
-                return cache
-            else:
-                # Try to use existing caches for non-desktop modes
-                try:
-                    # Try to import if available, otherwise use fallback
-                    logger.warning("Non-desktop mode detected, using fallback cache")
-                    return self._create_fallback_cache()
-                except Exception:
-                    return self._create_fallback_cache()
+            # Use fallback cache for all container deployments
+            logger.info("Using fallback conversation cache")
+            return self._create_fallback_cache()
         except Exception as e:
-            logger.error(f"Failed to create conversation cache: {e}")
+            logger.error("Failed to create conversation cache: %s", e)
             return self._create_fallback_cache()
 
     def _create_fallback_cache(self) -> Any:
@@ -143,29 +126,18 @@ class SimpleDatastoreFactory:
         return SimpleFallbackCache()
 
     def create_vector_storage(self, **kwargs) -> Any:
-        """Create vector storage for desktop mode"""
+        """Create vector storage"""
         try:
-            if self.deployment_mode == DeploymentMode.DESKTOP:
-                # Use local vector storage
-                from src.memory.local_vector_storage import LocalVectorStorageAdapter
+            # Try ChromaDB for production
+            try:
+                from src.memory.chromadb_manager_simple import ChromaDBManagerSimple
 
-                storage = LocalVectorStorageAdapter(
-                    storage_dir=Path(self.data_dir / "vectors"),
-                    embedding_dim=kwargs.get("embedding_dim", 384),
-                )
-                logger.info("✅ Created local vector storage")
-                return storage
-            else:
-                # Try ChromaDB for production
-                try:
-                    from src.memory.chromadb_manager_simple import ChromaDBManagerSimple
-
-                    return ChromaDBManagerSimple()
-                except ImportError:
-                    logger.warning("ChromaDB not available, using fallback vector storage")
-                    return self._create_fallback_vector_storage(**kwargs)
+                return ChromaDBManagerSimple()
+            except ImportError:
+                logger.warning("ChromaDB not available, using fallback vector storage")
+                return self._create_fallback_vector_storage(**kwargs)
         except Exception as e:
-            logger.error(f"Failed to create vector storage: {e}")
+            logger.error("Failed to create vector storage: %s", e)
             return self._create_fallback_vector_storage(**kwargs)
 
     def _create_fallback_vector_storage(self, **kwargs) -> Any:
@@ -233,11 +205,9 @@ class SimpleDatastoreFactory:
         """Create database manager for desktop mode"""
         try:
             # Try to use existing database integration
-            from src.config.adaptive_config import AdaptiveConfigManager
             from src.database.database_integration import DatabaseIntegrationManager
 
-            config = AdaptiveConfigManager()
-            return DatabaseIntegrationManager(config)
+            return DatabaseIntegrationManager()
         except ImportError as e:
             logger.warning(f"Database integration not available: {e}")
             return self._create_fallback_database()
@@ -327,12 +297,12 @@ class SimpleDatastoreFactory:
             "deployment_mode": self.deployment_mode.value,
             "data_dir": str(self.data_dir),
             "conversation_cache": (
-                "desktop_sqlite" if self.deployment_mode == DeploymentMode.DESKTOP else "fallback"
+                "container_sqlite" if self.deployment_mode == DeploymentMode.CONTAINER else "fallback"
             ),
             "vector_storage": (
-                "local_files" if self.deployment_mode == DeploymentMode.DESKTOP else "fallback"
+                "local_files" if self.deployment_mode == DeploymentMode.CONTAINER else "fallback"
             ),
-            "database": "sqlite" if self.deployment_mode == DeploymentMode.DESKTOP else "fallback",
+            "database": "sqlite" if self.deployment_mode == DeploymentMode.CONTAINER else "fallback",
             "graph_storage": "simple_memory",
         }
 

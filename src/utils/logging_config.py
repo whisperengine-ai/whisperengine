@@ -178,44 +178,47 @@ def setup_logging(
     console_handler.setLevel(console_level)
     handlers.append(console_handler)
 
-    # File Handlers with Rotation
-    if environment == "development":
-        # Development: Simple rotating file handler
-        file_handler = logging.handlers.RotatingFileHandler(
-            filename=log_path / f"{app_name}.log",
-            maxBytes=10 * 1024 * 1024,  # 10MB
-            backupCount=5,
-            encoding="utf-8",
-        )
-        file_formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
-        file_handler.setFormatter(file_formatter)
-        file_handler.setLevel(file_level)
-        handlers.append(file_handler)
+    # File Handlers with Rotation (optional via environment variable)
+    enable_file_logging = os.getenv("LOG_TO_FILE", "true").lower() == "true"
+    
+    if enable_file_logging:
+        if environment == "development":
+            # Development: Simple rotating file handler
+            file_handler = logging.handlers.RotatingFileHandler(
+                filename=log_path / f"{app_name}.log",
+                maxBytes=10 * 1024 * 1024,  # 10MB
+                backupCount=5,
+                encoding="utf-8",
+            )
+            file_formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+            file_handler.setFormatter(file_formatter)
+            file_handler.setLevel(file_level)
+            handlers.append(file_handler)
 
-    else:
-        # Production: Structured JSON logs with time-based rotation
-        file_handler = logging.handlers.TimedRotatingFileHandler(
-            filename=log_path / f"{app_name}.jsonl",
-            when="midnight",
-            interval=1,
-            backupCount=30,  # Keep 30 days
-            encoding="utf-8",
-        )
-        file_handler.setFormatter(StructuredFormatter())
-        file_handler.setLevel(file_level)
-        handlers.append(file_handler)
+        else:
+            # Production: Structured JSON logs with time-based rotation
+            file_handler = logging.handlers.TimedRotatingFileHandler(
+                filename=log_path / f"{app_name}.jsonl",
+                when="midnight",
+                interval=1,
+                backupCount=30,  # Keep 30 days
+                encoding="utf-8",
+            )
+            file_handler.setFormatter(StructuredFormatter())
+            file_handler.setLevel(file_level)
+            handlers.append(file_handler)
 
-        # Error-only file for critical issues
-        error_handler = logging.handlers.TimedRotatingFileHandler(
-            filename=log_path / f"{app_name}_errors.jsonl",
-            when="midnight",
-            interval=1,
-            backupCount=90,  # Keep errors longer
-            encoding="utf-8",
-        )
-        error_handler.setFormatter(StructuredFormatter())
-        error_handler.setLevel(logging.ERROR)
-        handlers.append(error_handler)
+            # Error-only file for critical issues
+            error_handler = logging.handlers.TimedRotatingFileHandler(
+                filename=log_path / f"{app_name}_errors.jsonl",
+                when="midnight",
+                interval=1,
+                backupCount=90,  # Keep errors longer
+                encoding="utf-8",
+            )
+            error_handler.setFormatter(StructuredFormatter())
+            error_handler.setLevel(logging.ERROR)
+            handlers.append(error_handler)
 
     # Add all handlers to root logger
     for handler in handlers:

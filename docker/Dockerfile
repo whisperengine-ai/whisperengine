@@ -42,6 +42,7 @@ COPY config/ ./config/
 
 # Create directories and non-root user in one layer
 RUN mkdir -p backups privacy_data temp_images logs data \
+    && mkdir -p logs/elena logs/marcus logs/gabriel logs/dream logs/marcus-chen \
     && useradd --create-home --shell /bin/bash --uid 1001 appuser \
     && chown -R appuser:appuser /app \
     && chmod -R 755 /app

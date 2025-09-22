@@ -29,7 +29,6 @@ class UserExperienceLevel(Enum):
 class DeploymentMode(Enum):
     """Available deployment modes"""
     DISCORD_BOT = "discord"
-    DESKTOP_APP = "desktop"
     DOCKER_COMPOSE = "docker"
     DEVELOPMENT = "development"
 
@@ -109,9 +108,8 @@ class InteractiveSetupWizard:
         
         options = {
             "1": ("🤖 Discord Bot", "Run as a Discord bot in your server"),
-            "2": ("🖥️  Desktop App", "Local desktop application with privacy"),
-            "3": ("🐳 Docker Setup", "Professional deployment with containers"),
-            "4": ("🛠️  Development", "Development environment for contributing")
+            "2": (" Docker Setup", "Professional deployment with containers"),
+            "3": ("🛠️  Development", "Development environment for contributing")
         }
         
         for key, (title, desc) in options.items():
@@ -119,14 +117,12 @@ class InteractiveSetupWizard:
             print(f"      {desc}")
         
         while True:
-            choice = input("\nSelect deployment mode (1-4): ").strip()
+            choice = input("\nSelect deployment mode (1-3): ").strip()
             if choice == "1":
                 return DeploymentMode.DISCORD_BOT
             elif choice == "2":
-                return DeploymentMode.DESKTOP_APP
-            elif choice == "3":
                 return DeploymentMode.DOCKER_COMPOSE
-            elif choice == "4":
+            elif choice == "3":
                 return DeploymentMode.DEVELOPMENT
             else:
                 print("❌ Please enter 1, 2, 3, or 4")
@@ -380,8 +376,6 @@ class InteractiveSetupWizard:
         # Determine filename based on deployment mode
         if self.profile.deployment_mode == DeploymentMode.DISCORD_BOT:
             filename = ".env.discord"
-        elif self.profile.deployment_mode == DeploymentMode.DESKTOP_APP:
-            filename = ".env.desktop-app"
         elif self.profile.deployment_mode == DeploymentMode.DOCKER_COMPOSE:
             filename = ".env.docker"
         else:
@@ -429,8 +423,6 @@ class InteractiveSetupWizard:
         print("   2️⃣ Install dependencies:")
         if self.profile.deployment_mode == DeploymentMode.DISCORD_BOT:
             print("      pip install -r requirements-discord.txt")
-        elif self.profile.deployment_mode == DeploymentMode.DESKTOP_APP:
-            print("      pip install -r requirements-desktop.txt")
         else:
             print("      pip install -r requirements.txt")
         print()
@@ -472,12 +464,10 @@ class InteractiveSetupWizard:
         print("   🎯 Start WhisperEngine:")
         if self.profile.deployment_mode == DeploymentMode.DISCORD_BOT:
             print("      python run.py")
-        elif self.profile.deployment_mode == DeploymentMode.DESKTOP_APP:
-            print("      python universal_native_app.py")
         elif self.profile.deployment_mode == DeploymentMode.DOCKER_COMPOSE:
             print("      docker-compose up")
         else:
-            print("      python run.py  # or python universal_native_app.py")
+            print("      python run.py")
         print()
         
         # Experience-specific tips

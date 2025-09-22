@@ -74,7 +74,6 @@ class PhaseIntegrationOptimizer:
     def __init__(
         self,
         phase2_integration=None,
-        phase3_memory_networks=None,
         memory_manager=None,
         llm_client=None,
         optimization_level: OptimizationLevel = OptimizationLevel.BALANCED,
@@ -87,8 +86,7 @@ class PhaseIntegrationOptimizer:
 
         Args:
             phase2_integration: Phase 2 emotional intelligence integration
-            phase3_memory_networks: Phase 3 memory networks
-            memory_manager: Memory manager for storage operations
+            memory_manager: Memory manager for storage operations (includes vector-native clustering)
             llm_client: LLM client for AI operations
             optimization_level: Level of optimization to apply
             execution_strategy: Strategy for executing phases
@@ -96,7 +94,9 @@ class PhaseIntegrationOptimizer:
             cache_ttl_seconds: Time-to-live for cached results
         """
         self.phase2_integration = phase2_integration
-        self.phase3_memory_networks = phase3_memory_networks
+        # Phase 3 memory networks are now handled natively by Qdrant vector store
+        # Use memory_manager.vector_store.get_memory_clusters_for_roleplay() instead
+        self.phase3_memory_networks = None  # Obsolete - vector store provides clustering
         self.memory_manager = memory_manager
         self.llm_client = llm_client
 
@@ -217,8 +217,8 @@ class PhaseIntegrationOptimizer:
         if self.phase2_integration:
             base_phases.append("phase2")
 
-        # Include Phase 3 based on optimization level
-        if self.phase3_memory_networks:
+        # Phase 3 now uses vector-native clustering, always available if memory manager exists
+        if self.memory_manager:
             if self.optimization_level == OptimizationLevel.MINIMAL:
                 # Only run Phase 3 for complex queries
                 if len(message.split()) > 10 or any(
@@ -369,10 +369,10 @@ class PhaseIntegrationOptimizer:
     async def _execute_phase3(
         self, context: IntegratedPhaseContext, start_time: float
     ) -> PhaseResult:
-        """Execute Phase 3 (Memory Networks)"""
+        """Execute Phase 3 (Memory Networks) - now using vector-native Qdrant clustering"""
 
-        if not self.phase3_memory_networks or not self.memory_manager:
-            raise ValueError("Phase 3 components not available")
+        if not self.memory_manager:
+            raise ValueError("Memory manager not available for vector-native clustering")
 
         # Use Phase 2 results for enhanced context if available
         enhanced_context = {}
@@ -380,15 +380,41 @@ class PhaseIntegrationOptimizer:
             phase2_data = context.phase_results["phase2"].data
             enhanced_context["emotional_context"] = phase2_data.get("emotional_intelligence", {})
 
-        # Execute Phase 3 with optimization
-        if self.optimization_level == OptimizationLevel.AGGRESSIVE:
-            # Use background processing for aggressive optimization
-            results = await self._execute_phase3_optimized(context, enhanced_context)
-        else:
-            # Standard Phase 3 execution
-            results = await self.phase3_memory_networks.analyze_complete_memory_network(
-                user_id=context.user_id, memory_manager=self.memory_manager
-            )
+        # Execute vector-native memory clustering using Qdrant
+        try:
+            # Use Qdrant's native clustering capabilities instead of Phase3 integration
+            # This provides superior semantic clustering and relevance scoring
+            if hasattr(self.memory_manager, 'vector_store'):
+                cluster_data = await self.memory_manager.vector_store.get_memory_clusters_for_roleplay(
+                    user_id=context.user_id, 
+                    query=context.message,  # Use message from context
+                    limit=20
+                )
+                
+                results = {
+                    "user_id": context.user_id,
+                    "memory_clusters": cluster_data,
+                    "clustering_method": "qdrant_vector_native",
+                    "enhanced_context": enhanced_context
+                }
+            else:
+                # Fallback if vector store not available
+                results = {
+                    "user_id": context.user_id, 
+                    "memory_clusters": [],
+                    "clustering_method": "fallback_none",
+                    "enhanced_context": enhanced_context
+                }
+                
+        except Exception as e:
+            logger.warning(f"Vector-native clustering failed, using fallback: {e}")
+            results = {
+                "user_id": context.user_id,
+                "memory_clusters": [],
+                "clustering_method": "error_fallback",
+                "error": str(e),
+                "enhanced_context": enhanced_context
+            }
 
         processing_time = time.time() - start_time
 
@@ -397,7 +423,7 @@ class PhaseIntegrationOptimizer:
             success=True,
             data=results,
             processing_time=processing_time,
-            metadata={"enhanced_context_used": bool(enhanced_context)},
+            metadata={"enhanced_context_used": bool(enhanced_context), "method": "vector_native"},
         )
 
     async def _execute_memory_optimization(
@@ -468,13 +494,15 @@ class PhaseIntegrationOptimizer:
             }
 
         except Exception as e:
-            logger.warning(f"Optimized Phase 3 execution failed, falling back to standard: {e}")
-            if self.phase3_memory_networks:
-                return await self.phase3_memory_networks.analyze_complete_memory_network(
-                    user_id=context.user_id, memory_manager=self.memory_manager
-                )
-            else:
-                raise ValueError("Phase 3 memory networks not available for fallback")
+            logger.warning("Optimized Phase 3 execution failed, using minimal fallback: %s", e)
+            # Fallback to minimal response since Phase3 integration is obsolete
+            return {
+                "user_id": context.user_id,
+                "memory_clusters": [],
+                "clustering_method": "minimal_fallback",
+                "error": "Phase 3 components unavailable",
+                "enhanced_context": enhanced_context,
+            }
 
     def _group_phases_by_dependencies(self, phases: list[str]) -> list[list[str]]:
         """Group phases by dependency levels for parallel execution"""

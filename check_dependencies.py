@@ -33,15 +33,6 @@ class DependencyChecker:
         "PyNaCl": "Voice support",
     }
 
-    # Desktop app dependencies (requirements-desktop.txt)
-    DESKTOP_DEPENDENCIES = {
-        "PySide6": "Cross-platform GUI framework",
-        "fastapi": "Web framework for local UI",
-        "uvicorn": "ASGI server for FastAPI",
-        "aiosqlite": "SQLite async support",
-        "pystray": "System tray integration",
-    }
-
     # Platform-specific optimizations (requirements-platform.txt)
     PLATFORM_DEPENDENCIES = {
         "mlx": "Apple Silicon optimization (macOS ARM64 only)",
@@ -57,7 +48,6 @@ class DependencyChecker:
     def __init__(self):
         self.missing_core = []
         self.missing_discord = []
-        self.missing_desktop = []
         self.missing_platform = []
         self.missing_optional = []
 
@@ -89,11 +79,6 @@ class DependencyChecker:
                 if not self.check_dependency(package):
                     self.missing_discord.append((package, description))
 
-        if deployment_type in ["desktop", "all"]:
-            for package, description in self.DESKTOP_DEPENDENCIES.items():
-                if not self.check_dependency(package):
-                    self.missing_desktop.append((package, description))
-
         # Check platform-specific dependencies
         for package, description in self.PLATFORM_DEPENDENCIES.items():
             if not self.check_dependency(package):
@@ -107,7 +92,6 @@ class DependencyChecker:
         return {
             "core": self.missing_core,
             "discord": self.missing_discord,
-            "desktop": self.missing_desktop,
             "platform": self.missing_platform,
             "optional": self.missing_optional,
         }
@@ -120,11 +104,9 @@ class DependencyChecker:
         commands["core"] = "pip install -r requirements-core.txt"
         commands["platform"] = "pip install -r requirements-platform.txt"
         commands["discord"] = "pip install -r requirements-discord.txt"
-        commands["desktop"] = "pip install -r requirements-desktop.txt"
 
         # Automated installers
         commands["auto_discord"] = "./scripts/install-discord.sh  # or .bat for Windows"
-        commands["auto_desktop"] = "./scripts/install-desktop.sh  # or .bat for Windows"
 
         return commands
 

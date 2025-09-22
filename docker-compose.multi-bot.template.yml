@@ -1,0 +1,76 @@
+# Multi-Bot Docker Compose Template
+# This file is a template that gets populated by scripts/generate_multi_bot_config.py
+# DO NOT EDIT: Generated sections will be overwritten
+
+services:
+  # ===== INFRASTRUCTURE SERVICES =====
+  postgres:
+    image: postgres:16.4-alpine
+    container_name: whisperengine-multi-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: whisperengine
+      POSTGRES_USER: whisperengine
+      POSTGRES_PASSWORD: whisperengine_password
+      POSTGRES_HOST_AUTH_METHOD: trust
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - bot_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U whisperengine -d whisperengine"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  redis:
+    image: redis:7.4-alpine
+    container_name: whisperengine-multi-redis
+    restart: unless-stopped
+    ports:
+      - "6380:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - bot_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  qdrant:
+    image: qdrant/qdrant:v1.15.4
+    container_name: whisperengine-multi-qdrant
+    restart: unless-stopped
+    ports:
+      - "6335:6333"
+    volumes:
+      - qdrant_data:/qdrant/storage
+    networks:
+      - bot_network
+
+  # ===== BOT SERVICES =====
+  # This section will be populated dynamically by the configuration script
+  
+  # BOT_SERVICES_PLACEHOLDER
+
+# ===== NETWORKS =====
+networks:
+  bot_network:
+    name: whisperengine-multi_bot_network
+    driver: bridge
+
+# ===== VOLUMES =====
+volumes:
+  postgres_data:
+    name: whisperengine-multi_postgres_data
+  redis_data:
+    name: whisperengine-multi_redis_data
+  qdrant_data:
+    name: whisperengine-multi_qdrant_data
+  
+  # Bot-specific volumes (populated dynamically)
+  # BOT_VOLUMES_PLACEHOLDER

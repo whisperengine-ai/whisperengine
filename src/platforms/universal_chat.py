@@ -14,7 +14,6 @@ from datetime import datetime
 from enum import Enum
 from typing import Any
 
-from src.config.adaptive_config import AdaptiveConfigManager
 from src.database.database_integration import DatabaseIntegrationManager
 # Removed cost optimizer - not needed
 
@@ -409,12 +408,11 @@ class UniversalChatOrchestrator:
 
     def __init__(
         self,
-        config_manager: AdaptiveConfigManager,
         db_manager: DatabaseIntegrationManager,
         bot_core=None,
         use_enhanced_core: bool = True,
     ):  # Add flag for enhanced core
-        self.config_manager = config_manager
+        self.config_manager = None  # No longer using adaptive config
         self.db_manager = db_manager
         # Removed cost optimizer - not needed
 
@@ -1862,16 +1860,13 @@ class UniversalChatOrchestrator:
 
 
 def create_universal_chat_platform(
-    config_manager: AdaptiveConfigManager | None = None,
     db_manager: DatabaseIntegrationManager | None = None,
 ) -> UniversalChatOrchestrator:
     """Factory function to create universal chat platform"""
-    if config_manager is None:
-        config_manager = AdaptiveConfigManager()
     if db_manager is None:
-        db_manager = DatabaseIntegrationManager(config_manager)
+        db_manager = DatabaseIntegrationManager()
 
-    return UniversalChatOrchestrator(config_manager, db_manager)
+    return UniversalChatOrchestrator(db_manager)
 
 
 # Example usage

@@ -18,15 +18,8 @@ from typing import Any, Optional, Union
 from .memory_importance_engine import MemoryImportanceEngine
 from .pattern_detector import CrossReferencePatternDetector, DetectedPattern, PatternType
 
-# Try to import semantic clusterer - component may not be implemented yet
-try:
-    from .semantic_clusterer import ClusterType, MemoryCluster, SemanticMemoryClusterer
-    SEMANTIC_CLUSTERER_AVAILABLE = True
-except ImportError:
-    SEMANTIC_CLUSTERER_AVAILABLE = False
-    ClusterType = None
-    MemoryCluster = None
-    SemanticMemoryClusterer = None
+# Semantic clustering now handled by Qdrant vector store natively
+# Removed obsolete SemanticMemoryClusterer in favor of VectorMemoryStore.get_memory_clusters_for_roleplay()
 
 logger = logging.getLogger(__name__)
 
@@ -63,13 +56,8 @@ class Phase3MemoryNetworks:
 
     def __init__(self):
         """Initialize Phase 3 memory networks system"""
-        # Initialize semantic clusterer only if available
-        if SEMANTIC_CLUSTERER_AVAILABLE:
-            self.semantic_clusterer = SemanticMemoryClusterer()
-        else:
-            self.semantic_clusterer = None
-            logger.warning("Semantic clusterer not available - clustering features disabled")
-            
+        # Semantic clustering now handled natively by Qdrant vector store
+        # Use VectorMemoryStore.get_memory_clusters_for_roleplay() instead
         self.importance_engine = MemoryImportanceEngine()
         self.pattern_detector = CrossReferencePatternDetector()
 
@@ -136,13 +124,8 @@ class Phase3MemoryNetworks:
                 return self._create_minimal_analysis_result(user_id)
 
             # Run all analysis components in parallel
-            # Skip clustering if semantic clusterer not available
-            if self.semantic_clusterer:
-                clustering_task = self.semantic_clusterer.create_memory_clusters(
-                    user_id, memory_manager
-                )
-            else:
-                clustering_task = None
+            # Note: Semantic clustering now handled by Qdrant vector store natively
+            # Use memory_manager.vector_store.get_memory_clusters_for_roleplay() for clustering
                 
             importance_task = self._analyze_memory_importance(
                 user_id, memories, conversation_history, memory_manager
@@ -153,17 +136,12 @@ class Phase3MemoryNetworks:
 
             # Wait for all analysis tasks to complete
             tasks = [importance_task, pattern_task]
-            if clustering_task:
-                tasks.append(clustering_task)
                 
             results = await asyncio.gather(*tasks)
             
-            # Unpack results
-            if clustering_task:
-                importance_results, pattern_results, clustering_results = results
-            else:
-                importance_results, pattern_results = results
-                clustering_results = {"clusters": [], "statistics": {"total_clusters": 0}}
+            # Unpack results (no clustering task since Qdrant handles clustering natively)
+            importance_results, pattern_results = results
+            clustering_results = {"clusters": [], "statistics": {"total_clusters": 0}}
 
             # Generate cross-component insights
             insights = await self._generate_network_insights(

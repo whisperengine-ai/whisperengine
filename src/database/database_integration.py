@@ -1,6 +1,6 @@
 """
 Database Integration for WhisperEngine
-Connects the database abstraction layer to the adaptive configuration system.
+Simple database integration using Docker environment variables.
 """
 
 import asyncio
@@ -8,33 +8,29 @@ import os
 from pathlib import Path
 from typing import Any
 
-from src.config.adaptive_config import AdaptiveConfigManager
 from src.database.abstract_database import DatabaseManager, create_database_manager
 
 
 class WhisperEngineDatabaseConfig:
-    """Database configuration for WhisperEngine based on adaptive configuration"""
+    """Database configuration for WhisperEngine using environment variables"""
 
-    def __init__(self, adaptive_config_manager: AdaptiveConfigManager):
-        self.config_manager = adaptive_config_manager
-        self.deployment_info = adaptive_config_manager.get_deployment_info()
-        self.db_config = adaptive_config_manager.config.database
+    def __init__(self):
+        """Initialize with simple environment variable configuration"""
+        self.deployment_info = self._get_simple_deployment_info()
+
+    def _get_simple_deployment_info(self) -> dict[str, Any]:
+        """Get basic deployment info from environment variables"""
+        return {
+            "deployment_mode": os.environ.get("DEPLOYMENT_MODE", "container"),
+            "use_postgresql": os.environ.get("USE_POSTGRESQL", "false").lower() == "true",
+            "use_redis": os.environ.get("USE_REDIS_CACHE", "false").lower() == "true",
+        }
 
     def get_database_connection_string(self) -> str:
-        """Generate database connection string based on deployment mode"""
+        """Generate database connection string based on environment variables"""
 
-        # Check for environment override
-        db_type_override = os.environ.get("WHISPERENGINE_DATABASE_TYPE")
-        if db_type_override == "sqlite":
-            db_path = Path.home() / ".whisperengine" / "database.db"
-            return f"sqlite:///{db_path}"
-
-        if self.db_config.primary_type == "sqlite":
-            # Desktop SQLite configuration
-            db_path = Path.home() / ".whisperengine" / "database.db"
-            return f"sqlite:///{db_path}"
-
-        elif self.db_config.primary_type == "postgresql":
+        # Check if PostgreSQL is enabled via environment variable
+        if os.environ.get("USE_POSTGRESQL", "false").lower() == "true":
             # PostgreSQL configuration from environment
             host = os.environ.get("POSTGRES_HOST", "localhost")
             port = os.environ.get("POSTGRES_PORT", "5432")
@@ -46,40 +42,38 @@ class WhisperEngineDatabaseConfig:
                 return f"postgresql://{username}:{password}@{host}:{port}/{database}"
             else:
                 return f"postgresql://{username}@{host}:{port}/{database}"
-
         else:
-            raise ValueError(f"Unsupported database type: {self.db_config.primary_type}")
+            # Default to SQLite
+            db_path = Path.home() / ".whisperengine" / "database.db"
+            return f"sqlite:///{db_path}"
 
-    def get_database_manager(self) -> DatabaseManager:
-        """Create and configure database manager"""
-        connection_string = self.get_database_connection_string()
-
-        # Check for database type override
-        db_type_override = os.environ.get(
-            "WHISPERENGINE_DATABASE_TYPE", self.db_config.primary_type
-        )
-
-        return create_database_manager(
-            database_type=db_type_override,
-            connection_string=connection_string,
-            pool_size=self.db_config.connection_pool_size,
-            timeout=30,
-            backup_enabled=self.db_config.backup_enabled,
-        )
+    def get_config_info(self) -> dict:
+        """Get database configuration information using environment variables"""
+        return {
+            "deployment_mode": os.environ.get("DEPLOYMENT_MODE", "development"),
+            "scale_tier": "docker",  # Simple Docker deployment
+        }
 
     def get_backup_configuration(self) -> dict[str, Any]:
-        """Get backup configuration for the database"""
-        base_backup_dir = Path.home() / ".whisperengine" / "backups"
+        """Get backup configuration from environment variables"""
+        backup_enabled = os.environ.get("BACKUP_ENABLED", "false").lower() == "true"
 
         return {
-            "enabled": self.db_config.backup_enabled,
-            "backup_directory": str(base_backup_dir),
-            "automatic_backups": True,
-            "backup_interval_hours": 24,
-            "max_backups_to_keep": 7,
-            "backup_on_startup": True,
-            "compress_backups": True,
+            "enabled": backup_enabled,
+            "directory": os.environ.get("BACKUP_DIRECTORY", "./data/backups") if backup_enabled else None,
+            "max_files": int(os.environ.get("BACKUP_MAX_FILES", "5")) if backup_enabled else 0,
+            "compression": os.environ.get("BACKUP_COMPRESSION", "true").lower() == "true" if backup_enabled else False,
         }
+
+    def get_database_manager(self) -> DatabaseManager:
+        """Create and return a database manager based on environment configuration"""
+        connection_string = self.get_database_connection_string()
+        use_postgresql = os.environ.get("USE_POSTGRESQL", "false").lower() == "true"
+        
+        if use_postgresql:
+            return create_database_manager("postgresql", connection_string)
+        else:
+            return create_database_manager("in_memory", connection_string)
 
 
 class WhisperEngineSchema:
@@ -237,12 +231,10 @@ class WhisperEngineSchema:
 class DatabaseIntegrationManager:
     """Main integration manager for WhisperEngine database operations"""
 
-    def __init__(self, adaptive_config_manager: AdaptiveConfigManager | None = None):
-        if adaptive_config_manager is None:
-            adaptive_config_manager = AdaptiveConfigManager()
-
-        self.config_manager = adaptive_config_manager
-        self.db_config = WhisperEngineDatabaseConfig(adaptive_config_manager)
+    def __init__(self):
+        """Initialize with simple environment variable configuration"""
+        self.config_manager = None
+        self.db_config = WhisperEngineDatabaseConfig()
         self.database_manager: DatabaseManager | None = None
         self.initialized = False
 
@@ -274,7 +266,8 @@ class DatabaseIntegrationManager:
             self.initialized = True
             return True
 
-        except Exception:
+        except (ImportError, ConnectionError, OSError) as e:
+            print(f"Failed to initialize database: {e}")
             return False
 
     async def cleanup(self) -> None:
@@ -321,8 +314,8 @@ class DatabaseIntegrationManager:
 
             await self.database_manager.backup(str(backup_path))
 
-        except Exception:
-            pass
+        except (OSError, ConnectionError) as e:
+            print(f"Backup failed: {e}")  # Log backup failure but don't crash initialization
 
     def get_database_manager(self) -> DatabaseManager:
         """Get the database manager instance"""
@@ -330,25 +323,22 @@ class DatabaseIntegrationManager:
             raise RuntimeError("Database not initialized. Call initialize() first.")
         return self.database_manager
 
-    def get_deployment_info(self) -> dict[str, Any]:
-        """Get database deployment information"""
+    def get_detailed_info(self) -> dict:
+        """Get detailed database configuration information using environment variables"""
         return {
-            "database_type": self.db_config.db_config.primary_type,
-            "connection_pool_size": self.db_config.db_config.connection_pool_size,
-            "backup_enabled": self.db_config.db_config.backup_enabled,
-            "cache_type": self.db_config.db_config.cache_type,
-            "deployment_mode": self.config_manager.config.deployment_mode,
-            "scale_tier": self.config_manager.config.scale_tier,
-            "initialized": self.initialized,
+            "database_type": "postgresql" if os.environ.get("USE_POSTGRESQL", "false").lower() == "true" else "in_memory",
+            "connection_pool_size": int(os.environ.get("DB_POOL_SIZE", "10")),
+            "backup_enabled": os.environ.get("BACKUP_ENABLED", "false").lower() == "true",
+            "cache_type": "redis" if os.environ.get("USE_REDIS_CACHE", "false").lower() == "true" else "in_memory",
+            "deployment_mode": os.environ.get("DEPLOYMENT_MODE", "development"),
+            "scale_tier": "docker",  # Simple Docker deployment
         }
 
 
 # Factory function for easy integration
-def create_database_integration(
-    adaptive_config_manager: AdaptiveConfigManager | None = None,
-) -> DatabaseIntegrationManager:
+def create_database_integration() -> DatabaseIntegrationManager:
     """Factory function to create database integration"""
-    return DatabaseIntegrationManager(adaptive_config_manager)
+    return DatabaseIntegrationManager()
 
 
 # Example usage
@@ -373,8 +363,8 @@ async def main():
             # Query users
             await db_manager.query("SELECT * FROM users LIMIT 5")
 
-            # Show deployment info
-            db_integration.get_deployment_info()
+            # Show configuration info
+            print("Database configuration:", db_integration.get_detailed_info())
 
         else:
             pass

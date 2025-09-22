@@ -465,11 +465,8 @@ def create_cost_optimizer(db_manager: DatabaseIntegrationManager) -> CostOptimiz
 # Example usage and testing
 async def main():
     """Example usage of cost optimization engine"""
-    from src.config.adaptive_config import AdaptiveConfigManager
-
-    # Create components
-    config_manager = AdaptiveConfigManager()
-    db_manager = DatabaseIntegrationManager(config_manager)
+    # Create components with simplified configuration
+    db_manager = DatabaseIntegrationManager()
     await db_manager.initialize()
 
     cost_optimizer = create_cost_optimizer(db_manager)

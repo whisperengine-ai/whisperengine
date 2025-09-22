@@ -64,7 +64,6 @@ hidden_imports = [
     'torch',
     'numpy',
     'sklearn',
-    'src.utils.local_model_loader',
     'src.utils.embedding_manager',
     # Local LLM support
     'transformers.models.gpt2', 'transformers.tokenization_utils_base',
@@ -72,7 +71,7 @@ hidden_imports = [
 ]
 
 a = Analysis(
-    ['desktop_app.py'],
+    ['run.py'],
     pathex=[str(app_path)],
     binaries=[],
     datas=data_files,

@@ -231,8 +231,8 @@ class OnboardingCommands:
                 embed.add_field(
                     name="✨ Deployment Options",
                     value="• Discord bot mode\n"
-                          "• Desktop application\n"
                           "• Docker containers\n"
+                          "• Multi-bot support\n"
                           "• Cross-platform support",
                     inline=True
                 )

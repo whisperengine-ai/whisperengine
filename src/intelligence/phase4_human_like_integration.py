@@ -17,7 +17,8 @@ from datetime import UTC, datetime
 from enum import Enum
 from typing import Any
 
-from ..memory.phase3_integration import Phase3MemoryNetworks
+# Phase3MemoryNetworks removed - functionality now handled by Qdrant vector store natively
+# Use memory_manager.vector_store.get_memory_clusters_for_roleplay() for clustering
 from ..utils.enhanced_query_processor import EnhancedQueryProcessor
 from ..utils.human_like_llm_processor import HumanLikeLLMProcessor
 
@@ -76,7 +77,7 @@ class Phase4HumanLikeIntegration:
     def __init__(
         self,
         simplified_emotion_manager: SimplifiedEmotionManager | None = None,
-        phase3_memory_networks: Phase3MemoryNetworks | None = None,
+        phase3_memory_networks=None,  # Obsolete - kept for compatibility, always None
         memory_manager=None,
         llm_client=None,
         enable_adaptive_mode: bool = True,
@@ -92,9 +93,9 @@ class Phase4HumanLikeIntegration:
         Initialize Phase 4 integration
 
         Args:
-            phase2_integration: Phase 2 emotional intelligence system
-            phase3_memory_networks: Phase 3 memory networks system
-            memory_manager: Base memory manager
+            simplified_emotion_manager: Phase 2 emotional intelligence system
+            phase3_memory_networks: Obsolete - memory clustering now handled by Qdrant natively
+            memory_manager: Base memory manager (includes vector-native clustering)
             llm_client: LLM client for processing
             enable_adaptive_mode: Whether to use adaptive conversation modes
             conversation_mode: Default conversation mode for Phase 4
@@ -106,7 +107,8 @@ class Phase4HumanLikeIntegration:
             query_optimization: Enable query optimization
         """
         self.simplified_emotion_manager = simplified_emotion_manager
-        self.phase3_memory_networks = phase3_memory_networks
+        # Phase 3 memory networks are obsolete - Qdrant provides clustering natively
+        self.phase3_memory_networks = None  # Always None - use vector store instead
         self.memory_manager = memory_manager
         self.llm_client = llm_client
         self.enable_adaptive_mode = enable_adaptive_mode
@@ -226,15 +228,31 @@ class Phase4HumanLikeIntegration:
             # Step 3: Execute Phase 3 (Memory Networks) if available
             if self.phase3_memory_networks and self.memory_manager:
                 try:
-                    logger.debug("Executing Phase 3: Memory Networks Analysis")
+                    logger.debug("Executing Phase 3: Vector-Native Memory Clustering")
                     phase3_start = datetime.now(UTC)
 
-                    # Trigger memory network analysis for user
-                    phase3_results = (
-                        await self.phase3_memory_networks.analyze_complete_memory_network(
-                            user_id=user_id, memory_manager=self.memory_manager
+                    # Use Qdrant's native clustering instead of obsolete Phase3MemoryNetworks
+                    if hasattr(self.memory_manager, 'vector_store'):
+                        cluster_data = await self.memory_manager.vector_store.get_memory_clusters_for_roleplay(
+                            user_id=user_id, 
+                            query=message,  # Use the message parameter
+                            limit=20
                         )
-                    )
+                        
+                        phase3_results = {
+                            "user_id": user_id,
+                            "memory_clusters": cluster_data,
+                            "clustering_method": "qdrant_vector_native",
+                            "analysis_timestamp": datetime.now(UTC)
+                        }
+                    else:
+                        # Fallback if vector store not available
+                        phase3_results = {
+                            "user_id": user_id,
+                            "memory_clusters": [],
+                            "clustering_method": "unavailable_fallback",
+                            "analysis_timestamp": datetime.now(UTC)
+                        }
 
                     phase4_context.phase3_results = phase3_results
                     phase4_context.processing_metadata["phases_executed"].append("phase3")
@@ -242,10 +260,10 @@ class Phase4HumanLikeIntegration:
                         datetime.now(UTC) - phase3_start
                     ).total_seconds()
 
-                    logger.debug("✅ Phase 3 analysis completed")
+                    logger.debug("✅ Phase 3 vector-native clustering completed")
 
                 except Exception as e:
-                    logger.error(f"Phase 3 processing failed: {e}")
+                    logger.error("Phase 3 processing failed: %s", e)
                     phase4_context.phase3_results = None
 
             # Step 4: Execute Human-Like Processing

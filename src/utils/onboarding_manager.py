@@ -217,8 +217,8 @@ class FirstRunDetector:
    • Cloud (Paid): OpenAI (api.openai.com) or OpenRouter (openrouter.ai)
 
 ✨ Quick Commands:
-   • Discord Bot: python run.py
-   • Desktop App: python universal_native_app.py
+   • Discord Bot: ./multi-bot.sh start [bot_name]
+   • Single Bot: python run.py  
    • Setup Wizard: python setup_wizard.py
    • Validate Config: python env_manager.py --validate
 

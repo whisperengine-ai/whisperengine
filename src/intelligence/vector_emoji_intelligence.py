@@ -18,6 +18,7 @@ Architecture:
 
 import asyncio
 import logging
+import os
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Any, Tuple, Union
@@ -84,6 +85,12 @@ class VectorEmojiIntelligence:
         self.memory_manager = memory_manager
         self.emoji_mapper = emoji_mapper or EmojiEmotionMapper()
         
+        # Read emoji configuration from environment
+        self.emoji_enabled = os.getenv("EMOJI_ENABLED", "true").lower() == "true"
+        self.base_threshold = float(os.getenv("EMOJI_BASE_THRESHOLD", "0.4"))
+        self.new_user_threshold = float(os.getenv("EMOJI_NEW_USER_THRESHOLD", "0.3"))
+        self.visual_reaction_enabled = os.getenv("VISUAL_REACTION_ENABLED", "true").lower() == "true"
+        
         # Character-specific emoji sets
         self.character_emoji_sets = {
             "mystical": {
@@ -110,6 +117,8 @@ class VectorEmojiIntelligence:
         }
         
         logger.info("🧠 VectorEmojiIntelligence initialized with character-aware emoji sets")
+        logger.info("🎯 Emoji config: enabled=%s, base_threshold=%.2f, new_user_threshold=%.2f", 
+                   self.emoji_enabled, self.base_threshold, self.new_user_threshold)
     
     async def should_respond_with_emoji(
         self,
@@ -874,7 +883,13 @@ class VectorEmojiIntelligence:
         )
         
         # Enhanced context-aware threshold
-        base_threshold = 0.55
+        # Use configurable thresholds instead of hardcoded values
+        if personality_context.get("interaction_count", 0) <= 3:
+            # New user - use lower threshold for better engagement
+            base_threshold = self.new_user_threshold
+        else:
+            # Established user - use normal threshold
+            base_threshold = self.base_threshold
         
         # Adjust threshold based on user's emoji comfort
         if emoji_comfort > 0.8:

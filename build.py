@@ -15,7 +15,6 @@ from typing import Any
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
-from src.config.adaptive_config import AdaptiveConfigManager
 from src.packaging.unified_builder import (
     BuildConfig,
     DeploymentTarget,
@@ -54,12 +53,8 @@ def detect_platform() -> Platform:
 
 def get_recommended_config() -> dict[str, Any]:
     """Get recommended configuration based on environment"""
-    # Try to detect environment info, fallback to defaults
-    try:
-        AdaptiveConfigManager()
-        env_info = {"scale_tier": "tier_1"}  # Default fallback
-    except:
-        env_info = {"scale_tier": "tier_1"}
+    # Simplified environment detection - no longer using adaptive config
+    env_info = {"scale_tier": "docker"}  # Simple Docker-based deployment
 
     recommendations = {
         "platform": detect_platform(),

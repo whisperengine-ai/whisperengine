@@ -2,66 +2,197 @@
 
 ## 🚨 CRITICAL DEVELOPMENT CONTEXT 🚨
 
-**ALPHA/DEV PHASE**: WhisperEngine is in active development/alpha. Prioritize working features over production optimization. No production users yet - we can freely iterate and change.
+**ALPHA/DEV PHASE**: WhisperEngine is in active development. Prioritize working features over production optimization. No production users yet - we can freely iterate and change.
 
-**VECTOR MEMORY PRIMACY**: Qdrant vector memory system (`src/memory/vector_memory_system.py`) is THE PRIMARY memory implementation. Always leverage vector/semantic search before considering manual Python analysis. Default: `MEMORY_SYSTEM_TYPE=vector`.
+**DOCKER-FIRST DEVELOPMENT**: Container-based development is the PRIMARY workflow. Use `./multi-bot.sh` for all operations (auto-generated, don't edit manually).
 
-**FEATURE FLAG DEFAULTS**: Feature flags MUST default to **"true"** in dev/alpha to prevent feature blindness. Only use "false" defaults for genuinely dangerous features.
+**PYTHON VIRTUAL ENVIRONMENT**: Always use `.venv/bin/activate` for Python commands:
+```bash
+source .venv/bin/activate   # ALWAYS use this for Python execution
+python scripts/generate_multi_bot_config.py  # Example: configuration generation
+```
 
-**NO PHANTOM FEATURES**: Every implemented feature MUST be integrated into the main application flow. Features marked "done" must actually work in the bot, not just exist in isolated files.
+**VECTOR MEMORY PRIMACY**: Qdrant vector memory system (`src/memory/vector_memory_system.py`) is THE PRIMARY memory implementation. Always leverage vector/semantic search before considering manual Python analysis.
 
-## Anti-Phantom Feature Guidelines
-
-1. **Integration-First Development**: Before marking any feature "complete":
-   - ✅ Verify it's imported and called in main application flow
-   - ✅ Check feature flags default to "enabled" for dev/alpha
-   - ✅ Test the feature actually works via Discord commands
-   - ✅ Document the integration points in handlers/main.py
-
-2. **Feature Flag Audit**: These flags currently default to "false" and cause feature blindness:
-   ```bash
-   ENABLE_GRAPH_DATABASE=false          # Graph features invisible  
-   VISION_SUMMARIZER_ENABLED=false      # Vision features disabled
-   VOICE_AUTO_JOIN=false                # Voice features hidden
-   ENABLE_MONITORING_DASHBOARD=false    # Monitoring invisible
-   ENABLE_AB_TESTING=false              # A/B testing disabled
-   DISCORD_MESSAGE_TRACE=false          # Debug tracing off
-   REQUIRE_DISCORD_MENTION=false        # Mention requirement hidden
-   ```
-   **ACTION REQUIRED**: Change these to default "true" for development.
-
-3. **Vector-First Analysis**: Before writing manual analysis code:
-   - ✅ Check if vector memory can provide the insights via semantic search
-   - ✅ Use `search_memories_with_qdrant_intelligence()` for pattern detection
-   - ✅ Leverage fastembed embeddings for similarity analysis
-   - ✅ Only write manual Python if vector approach is insufficient
+**DYNAMIC MULTI-BOT SYSTEM**: Bot configurations are auto-discovered from `.env.*` files. No hardcoded bot names - everything is generated dynamically by `scripts/generate_multi_bot_config.py`.
 
 ## Architecture Overview
 
-WhisperEngine is an **alpha-stage** Discord AI companion bot with **multi-bot architecture**, vector-native memory, and CDL (Character Definition Language) personality systems. The architecture follows a **factory pattern** with **protocol-based dependency injection** for A/B testing and environment flexibility.
+WhisperEngine is a **multi-bot Discord AI companion system** with vector-native memory, CDL (Character Definition Language) personalities, and protocol-based dependency injection.
 
-### Core Architecture Patterns
-
-**Multi-Bot System**: Single infrastructure supports multiple character bots with isolated personalities:
-- `docker-compose.multi-bot.yml` - Multi-bot container orchestration
-- `./multi-bot.sh` - Management script for all bot operations
-- Individual `.env.{bot-name}` files for bot-specific configuration
-- Shared PostgreSQL, Redis, and Qdrant infrastructure
+### Core Patterns
 
 **Factory Pattern**: All major systems use `create_*()` factories in protocol files:
-- `src/llm/llm_protocol.py` → `create_llm_client(llm_client_type="openrouter")`
-- `src/memory/memory_protocol.py` → `create_memory_manager(memory_type="vector")`
-- `src/voice/voice_protocol.py` → `create_voice_service(voice_service_type="discord_elevenlabs")`
-- `src/conversation/engagement_protocol.py` → `create_engagement_engine(engagement_engine_type="full")`
+```python
+# Memory system (vector-native)
+from src.memory.memory_protocol import create_memory_manager
+memory_manager = create_memory_manager(memory_type="vector")
 
-**Configuration**: Environment-driven with TYPE-based selection:
-```bash
-# .env examples
-LLM_CLIENT_TYPE=openrouter|local|disabled|mock
-MEMORY_SYSTEM_TYPE=vector|hierarchical|test_mock
-VOICE_SERVICE_TYPE=discord_elevenlabs|disabled|mock
-ENGAGEMENT_ENGINE_TYPE=full|basic|disabled|mock
+# Multi-bot querying
+from src.memory.memory_protocol import create_multi_bot_querier
+querier = create_multi_bot_querier()
+
+# LLM client
+from src.llm.llm_protocol import create_llm_client
+llm_client = create_llm_client(llm_client_type="openrouter")
 ```
+
+**Multi-Bot Architecture**: Single infrastructure supports multiple character bots:
+- Individual `.env.{bot-name}` files for bot-specific configuration
+- Shared PostgreSQL, Redis, and Qdrant infrastructure
+- Dynamic discovery and configuration generation
+- Isolated personalities but shared memory intelligence
+
+### Entry Points
+
+**Main Application**: `src/main.py` → `ModularBotManager` class
+- Dependency injection with protocol-based factories
+- Graceful error handling with production patterns
+- Health check integration for container orchestration
+
+**Bot Core**: `src/core/bot.py` → `DiscordBotCore` class
+- All component initialization in `initialize_all()`
+- Factory-based component creation
+- Async initialization for heavy components
+
+## Development Workflow
+
+### Multi-Bot Management
+
+**Template-Based Architecture**: WhisperEngine uses a template-based multi-bot system that fills in environment-specific values from a stable Docker Compose template.
+
+```bash
+# NEVER edit multi-bot.sh or docker-compose.multi-bot.yml manually
+# They are auto-generated from docker-compose.multi-bot.template.yml
+
+# List available bots
+./multi-bot.sh list
+
+# Start specific bot or all bots
+./multi-bot.sh start elena
+./multi-bot.sh start all
+
+# View logs, stop, restart
+./multi-bot.sh logs marcus
+./multi-bot.sh stop elena
+./multi-bot.sh restart
+```
+
+**Infrastructure Versions (Pinned)**:
+- PostgreSQL: `postgres:16.4-alpine` (pinned for stability)
+- Redis: `redis:7.4-alpine` (pinned for stability)  
+- Qdrant: `qdrant/qdrant:v1.15.4` (pinned for vector stability)
+
+### Adding New Bots
+```bash
+# 1. Copy template and customize
+cp .env.template .env.newbot
+# Edit .env.newbot with unique Discord token, bot name, character file
+
+# 2. Create character file (optional - will use default if not found)
+# Add characters/examples/newbot.json or similar
+
+# 3. Regenerate template-based configuration
+source .venv/bin/activate
+python scripts/generate_multi_bot_config.py
+
+# 4. Start your new bot
+./multi-bot.sh start newbot
+```
+
+**Template System**: 
+- Base template: `docker-compose.multi-bot.template.yml` (SAFE TO EDIT)
+- Generated output: `docker-compose.multi-bot.yml` (AUTO-GENERATED)
+- Management script: `multi-bot.sh` (AUTO-GENERATED)
+
+### Key Development Commands
+```bash
+# Health and status
+./multi-bot.sh status              # Container status
+./multi-bot.sh logs [bot_name]     # View logs
+
+# Development workflow
+source .venv/bin/activate          # Always use venv
+python scripts/generate_multi_bot_config.py  # Regenerate config
+
+# Testing (use container-based for consistency)
+docker exec whisperengine-elena-bot python -m pytest tests/unit/
+```
+
+## Memory System (Critical)
+
+**Vector-Native Architecture**: Qdrant vector memory with fastembed is THE PRIMARY memory system:
+```python
+# ALWAYS use vector/semantic search before manual Python analysis
+memories = await memory_manager.retrieve_relevant_memories(
+    user_id=user_id, query=message, limit=10
+)
+
+# Store with emotional context for future retrieval  
+await memory_manager.store_conversation(
+    user_id=user_id, 
+    user_message=user_message, 
+    bot_response=bot_response,
+    pre_analyzed_emotion_data=emotion_data
+)
+```
+
+**Multi-Bot Memory Intelligence**:
+```python
+# Query across all bots (admin/debugging)
+querier = create_multi_bot_querier()
+all_results = await querier.query_all_bots("user preferences", "user123")
+
+# Cross-bot analysis and insights
+analysis = await querier.cross_bot_analysis("user123", "conversation style")
+```
+
+## Character System
+
+**CDL Integration**: JSON-based character personalities:
+```python
+from src.prompts.cdl_ai_integration import CDLAIPromptIntegration
+cdl_integration = CDLAIPromptIntegration()
+prompt = await cdl_integration.create_character_aware_prompt(
+    character_file='characters/examples/elena-rodriguez.json',
+    user_id=user_id,
+    message_content=message
+)
+```
+
+## Anti-Phantom Feature Guidelines
+
+**Integration-First Development**: Before marking any feature "complete":
+- ✅ Verify it's imported and called in main application flow (`src/main.py`)
+- ✅ Check feature flags default to "enabled" for dev/alpha
+- ✅ Test the feature actually works via Discord commands
+- ✅ Document integration points in handler classes
+
+**Vector-First Analysis**: Before writing manual analysis code:
+- ✅ Check if vector memory can provide insights via semantic search
+- ✅ Use `search_memories_with_qdrant_intelligence()` for pattern detection
+- ✅ Only write manual Python if vector approach is insufficient
+
+## Key Directories
+
+- `src/core/` - Bot initialization (`DiscordBotCore`, `ModularBotManager`)
+- `src/memory/` - Vector-native memory system with multi-bot querying
+- `src/handlers/` - Discord command handlers (modular architecture)
+- `src/prompts/` - CDL integration and prompt management
+- `characters/examples/` - CDL character definitions (JSON)
+- `scripts/` - Configuration generation and utilities
+- `.env.*` files - Bot-specific configurations (auto-discovered)
+
+## Configuration Files
+
+**NEVER EDIT MANUALLY**:
+- `docker-compose.multi-bot.yml` - Auto-generated by discovery script
+- `multi-bot.sh` - Auto-generated management script
+
+**EDIT THESE**:
+- `.env.{bot_name}` - Bot-specific environment configuration
+- `characters/examples/*.json` - Character personality definitions
+- `scripts/generate_multi_bot_config.py` - Configuration generator
 
 ## AI Conversation Intelligence
 
@@ -297,6 +428,8 @@ memories = await memory_manager.retrieve_relevant_memories(
 - `src/prompts/` - CDL integration and prompt management
 
 ## Recent Major Changes
+
+**Template-Based Multi-Bot System** (Complete): Migrated from programmatic Docker Compose generation to safe template-based approach. Infrastructure versions now pinned (PostgreSQL 16.4, Redis 7.4, Qdrant v1.15.4) to prevent breaking updates.
 
 **Multi-Bot Architecture** (Complete): Introduced shared infrastructure supporting multiple character bots with isolated personalities. See `MULTI_BOT_SETUP.md`.
 
