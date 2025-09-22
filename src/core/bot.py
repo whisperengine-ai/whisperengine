@@ -118,6 +118,8 @@ class DiscordBotCore:
         self.graph_personality_manager = None
         self.phase2_integration = None
         self.phase3_memory_networks = None
+        self.context_switch_detector = None  # Phase 3 Advanced Intelligence
+        self.empathy_calibrator = None  # Phase 3 Advanced Intelligence
         self.graph_emotion_manager = None  # Reference to update later with external emotion AI
 
         # Production optimization components
@@ -391,6 +393,34 @@ class DiscordBotCore:
             self.logger.error(f"Failed to initialize Phase 3 memory networks: {e}")
             self.logger.error(f"Full traceback: {traceback.format_exc()}")
             self.logger.warning("⚠️ Continuing without Phase 3 memory network features")
+
+        # Initialize Phase 3 Advanced Intelligence Components
+        self.logger.info("🧠 Initializing Phase 3: Advanced Intelligence Components...")
+        try:
+            from src.intelligence.context_switch_detector import ContextSwitchDetector
+            from src.intelligence.empathy_calibrator import EmpathyCalibrator
+
+            # Initialize ContextSwitchDetector
+            if hasattr(self, 'memory_manager') and self.memory_manager:
+                self.context_switch_detector = ContextSwitchDetector(vector_memory_store=self.memory_manager)
+                self.logger.info("✅ Phase 3: ContextSwitchDetector initialized")
+            else:
+                self.context_switch_detector = None
+                self.logger.warning("⚠️ Cannot initialize ContextSwitchDetector - missing memory manager")
+
+            # Initialize EmpathyCalibrator
+            if hasattr(self, 'memory_manager') and self.memory_manager:
+                self.empathy_calibrator = EmpathyCalibrator(vector_memory_store=self.memory_manager)
+                self.logger.info("✅ Phase 3: EmpathyCalibrator initialized")
+            else:
+                self.empathy_calibrator = None
+                self.logger.warning("⚠️ Cannot initialize EmpathyCalibrator - missing memory manager")
+
+        except Exception as e:
+            self.logger.error(f"Failed to initialize Phase 3 advanced intelligence components: {e}")
+            self.logger.warning("⚠️ Continuing without Phase 3 advanced intelligence features")
+            self.context_switch_detector = None
+            self.empathy_calibrator = None
 
         # Initialize Phase 4.1: Memory-Triggered Personality Moments
         self.logger.info("💭 Initializing Phase 4.1: Memory-Triggered Personality Moments...")
@@ -924,6 +954,8 @@ class DiscordBotCore:
             "graph_personality_manager": self.graph_personality_manager,
             "phase2_integration": self.phase2_integration,
             "phase3_memory_networks": self.phase3_memory_networks,
+            "context_switch_detector": getattr(self, "context_switch_detector", None),
+            "empathy_calibrator": getattr(self, "empathy_calibrator", None),
             "memory_moments": getattr(self, "memory_moments", None),
             "production_adapter": self.production_adapter,
             "multi_entity_manager": self.multi_entity_manager,

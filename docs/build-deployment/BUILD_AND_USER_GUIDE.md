@@ -2,16 +2,16 @@
 
 ## 🚀 Quick Start for End Users
 
-### **Option 1: Ready-to-Run Desktop App (Recommended)**
+### **Option 1: Ready-to-Run Web UI App (Recommended)**
 
-If you have a pre-built WhisperEngine executable:
+If you have a pre-built WhisperEngine web application:
 
 ```bash
 # 1. Download and extract WhisperEngine
-# 2. Run the desktop app
-./WhisperEngine  # macOS/Linux
+# 2. Run the web UI app
+./start-web-ui.sh  # macOS/Linux
 # or
-WhisperEngine.exe  # Windows
+start-web-ui.bat  # Windows
 
 # 3. Open your browser to http://localhost:8501
 # 4. Start chatting immediately with the bundled AI!
@@ -36,7 +36,7 @@ pip install -r requirements.txt
 # 4. Download AI models (3GB total)
 python download_models.py
 
-# 5. Run the desktop app
+# 5. Run the web-UI application
 python universal_native_app.py
 ```
 
@@ -106,8 +106,8 @@ DATABASE_URL=postgresql://user:pass@localhost/whisperengine
 # Change web interface port
 WEBUI_PORT=8501
 
-# Enable system tray (macOS/Windows)
-ENABLE_SYSTEM_TRAY=true
+# Enable browser auto-launch on startup
+AUTO_LAUNCH_BROWSER=true
 ```
 
 #### **Performance Tuning**
@@ -162,22 +162,24 @@ python universal_native_app.py
 python build_with_models.py
 ```
 
-#### **Method 2: Manual Build Process**
+#### **Method 2: Web-UI Application Build**
 ```bash
 # 1. Download models first
 python download_models.py
 
-# 2. Build platform-specific executable
-pyinstaller whisperengine-macos.spec     # macOS
-pyinstaller whisperengine-linux.spec     # Linux  
-pyinstaller whisperengine-windows.spec   # Windows
+# 2. Build optimized web application bundle
+python build.py web_application
 
-# 3. Find executable in dist/ folder
+# 3. Launch web application
+python universal_native_app.py
+# Access at http://localhost:8501
 ```
 
-#### **Method 3: Cross-Platform Build**
+#### **Method 3: Cross-Platform Web Deployment**
 ```bash
-# Build for all platforms (requires Docker)
+# Build for web deployment (requires Docker)
+python build.py docker_single
+```
 python build_cross_platform.py
 ```
 
@@ -212,16 +214,16 @@ dist/
 
 ## 📱 Usage Modes
 
-### **1. Desktop App Mode**
+### **1. Web-UI Application Mode**
 ```bash
-python desktop_app.py
+python universal_native_app.py
 # OR
-./WhisperEngine  # Built executable
+python desktop_app.py
 ```
 - Web interface at `http://localhost:8501`
 - Complete AI conversation system
 - Local file storage
-- System tray integration
+- Cross-platform browser access
 
 ### **2. Discord Bot Mode**
 ```bash
