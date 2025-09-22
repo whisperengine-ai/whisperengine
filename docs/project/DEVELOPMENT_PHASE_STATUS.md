@@ -32,7 +32,7 @@ Since we're in the development phase with no real users, our priorities are:
 ## 🎯 **Revised Development Roadmap**
 
 ### **Phase 1: Core Validation** (Current - Next 1-2 weeks)
-- [ ] **Manual Testing** - Validate desktop app and Docker deployments work
+- [ ] **Manual Testing** - Validate web UI and Docker deployments work
 - [ ] **Fix Test Suite** - Resolve compilation errors in platform tests  
 - [ ] **LLM Integration** - Implement auto-detection and setup guidance
 - [ ] **Architecture Proof** - Demonstrate unified scaling actually works
@@ -56,7 +56,7 @@ Since we're in the development phase with no real users, our priorities are:
 ### **Current Testing Needs:**
 ```bash
 # Focus on these development tests
-1. Desktop app starts and works locally
+1. Web UI starts and works locally
 2. Docker services start and communicate  
 3. Universal platform abstraction functions
 4. Database schemas are consistent
@@ -90,7 +90,7 @@ Since we're in the development phase with no real users, our priorities are:
 - **SQLite for development** is perfectly fine
 
 ### **Deployment Testing:**
-- **Local development first** - desktop app and local Docker
+- **Local development first** - web-UI application and local Docker
 - **Cloud deployment later** - when we need real infrastructure
 - **Focus on concepts** not production deployment patterns
 
@@ -100,7 +100,7 @@ Since we're in the development phase with no real users, our priorities are:
 
 ### **Milestone 1: Architecture Proof** 🎯
 **Goal**: Demonstrate unified scaling architecture works as designed
-- Desktop app runs with SQLite
+- Web-UI application runs with SQLite
 - Docker deployment runs with PostgreSQL  
 - Same AI engine works in both modes
 - Data can move between storage backends

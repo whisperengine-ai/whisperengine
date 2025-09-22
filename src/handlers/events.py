@@ -732,7 +732,7 @@ class BotEventHandlers:
         # ALWAYS process AI components - NO CONDITIONAL FALLBACKS
         (external_emotion_data, phase2_context, current_emotion_data, 
          dynamic_personality_context, phase4_context, comprehensive_context, 
-         enhanced_system_prompt) = await self._process_ai_components_parallel(
+         enhanced_system_prompt, phase3_context_switches, phase3_empathy_calibration) = await self._process_ai_components_parallel(
             user_id, message.content, message, recent_messages, conversation_context
         )
 
@@ -757,6 +757,8 @@ class BotEventHandlers:
             getattr(self, '_last_phase4_context', None),
             getattr(self, '_last_comprehensive_context', None),
             getattr(self, '_last_dynamic_personality_context', None),
+            getattr(self, '_last_phase3_context_switches', None),
+            getattr(self, '_last_phase3_empathy_calibration', None),
         )
 
     async def _handle_guild_message(self, message):
@@ -982,7 +984,7 @@ class BotEventHandlers:
         # ALWAYS process AI components - NO CONDITIONAL FALLBACKS
         (external_emotion_data, phase2_context, current_emotion_data, 
          dynamic_personality_context, phase4_context, comprehensive_context, 
-         enhanced_system_prompt) = await self._process_ai_components_parallel(
+         enhanced_system_prompt, phase3_context_switches, phase3_empathy_calibration) = await self._process_ai_components_parallel(
             user_id, content, message, recent_messages, conversation_context
         )
 
@@ -1008,6 +1010,8 @@ class BotEventHandlers:
             None,
             None,
             getattr(self, '_last_dynamic_personality_context', None),
+            getattr(self, '_last_phase3_context_switches', None),
+            getattr(self, '_last_phase3_empathy_calibration', None),
             content,
         )
 
@@ -1583,8 +1587,69 @@ class BotEventHandlers:
             logger.error(f"Phase 2 emotional intelligence analysis failed: {e}")
             return None, None
 
+    async def _analyze_context_switches(self, user_id, content, message):
+        """Analyze context switches using Phase 3 ContextSwitchDetector."""
+        try:
+            logger.debug("Running Phase 3 context switch detection...")
+
+            if not hasattr(self.bot, 'context_switch_detector') or not self.bot.context_switch_detector:
+                logger.debug("Context switch detector not available")
+                return None
+
+            # Detect context switches
+            context_switches = await self.bot.context_switch_detector.detect_context_switches(
+                user_id=user_id,
+                new_message=content
+            )
+
+            logger.debug(f"Phase 3 context switch detection completed: {len(context_switches) if context_switches else 0} switches detected")
+            return context_switches
+
+        except Exception as e:
+            logger.error(f"Phase 3 context switch detection failed: {e}")
+            return None
+
+    async def _calibrate_empathy_response(self, user_id, content, message):
+        """Calibrate empathy response using Phase 3 EmpathyCalibrator."""
+        try:
+            logger.debug("Running Phase 3 empathy calibration...")
+
+            if not hasattr(self.bot, 'empathy_calibrator') or not self.bot.empathy_calibrator:
+                logger.debug("Empathy calibrator not available")
+                return None
+
+            # First detect emotion for empathy calibration (simplified for now)
+            from src.intelligence.empathy_calibrator import EmotionalResponseType
+            
+            # Use a simple emotion detection based on message content
+            # In production, this could be enhanced with more sophisticated emotion detection
+            detected_emotion = EmotionalResponseType.NEUTRAL
+            if any(word in content.lower() for word in ['sad', 'upset', 'angry', 'frustrated']):
+                detected_emotion = EmotionalResponseType.STRESS
+            elif any(word in content.lower() for word in ['happy', 'excited', 'joy', 'great']):
+                detected_emotion = EmotionalResponseType.JOY
+            elif any(word in content.lower() for word in ['worried', 'anxious', 'nervous']):
+                detected_emotion = EmotionalResponseType.ANXIETY
+            elif any(word in content.lower() for word in ['confused', 'lost', 'don\'t understand']):
+                detected_emotion = EmotionalResponseType.CONFUSION
+
+            # Calibrate empathy
+            empathy_calibration = await self.bot.empathy_calibrator.calibrate_empathy(
+                user_id=user_id,
+                detected_emotion=detected_emotion,
+                message_content=content
+            )
+
+            logger.debug(f"Phase 3 empathy calibration completed: {empathy_calibration.recommended_style.value if empathy_calibration else 'None'}")
+            return empathy_calibration
+
+        except Exception as e:
+            logger.error(f"Phase 3 empathy calibration failed: {e}")
+            return None
+
     async def _process_phase4_intelligence(
-        self, user_id, message, recent_messages, external_emotion_data, phase2_context
+        self, user_id, message, recent_messages, external_emotion_data, phase2_context,
+        phase3_context_switches=None, phase3_empathy_calibration=None
     ):
         """Process Phase 4 human-like conversation intelligence."""
         try:
@@ -1600,6 +1665,8 @@ class BotEventHandlers:
                 "user_display_name": message.author.display_name,
                 "external_emotion_data": external_emotion_data,
                 "phase2_results": phase2_context,
+                "phase3_context_switches": phase3_context_switches,
+                "phase3_empathy_calibration": phase3_empathy_calibration,
             }
             
             logger.info(f"🧠 PHASE 4 DEBUG: Discord context: {discord_context}")
@@ -1861,6 +1928,8 @@ class BotEventHandlers:
         phase4_context=None,
         comprehensive_context=None,
         dynamic_personality_context=None,
+        phase3_context_switches=None,
+        phase3_empathy_calibration=None,
         original_content=None,
     ):
         """Generate AI response and send to channel using Universal Chat Architecture."""
@@ -1939,6 +2008,22 @@ class BotEventHandlers:
                                 logger.info(f"🎭 EVENTS DEBUG: System message {i+1}: {content_preview}...")
                         else:
                             logger.warning(f"🎭 EVENTS DEBUG: No system messages in final context!")
+                        
+                        # Log Phase 3 intelligence data if available
+                        if phase3_context_switches:
+                            logger.info(f"🧠 PHASE3 DEBUG: Context switches detected: {len(phase3_context_switches)} switches")
+                            for i, switch in enumerate(phase3_context_switches[:3]):  # Log first 3
+                                logger.info(f"🧠 PHASE3 DEBUG: Switch {i+1}: {switch.get('type', 'unknown')} - {switch.get('description', 'no description')[:100]}")
+                        else:
+                            logger.debug("🧠 PHASE3 DEBUG: No context switches available")
+                            
+                        if phase3_empathy_calibration:
+                            logger.info(f"❤️ PHASE3 DEBUG: Empathy calibration data available: style={phase3_empathy_calibration.get('empathy_style', 'unknown')}, confidence={phase3_empathy_calibration.get('confidence', 0.0)}")
+                        else:
+                            logger.debug("❤️ PHASE3 DEBUG: No empathy calibration available")
+                            
+                        # TODO: Integrate Phase 3 parameters into Universal Chat Orchestrator
+                        # Current limitation: orchestrator doesn't accept Phase 3 intelligence data
                         
                         # Generate AI response using our conversation context directly
                         logger.info(f"🎯 CONTEXT DEBUG: Sending {len(final_context)} messages to Universal Chat Orchestrator")
@@ -2723,7 +2808,29 @@ class BotEventHandlers:
             tasks.append(asyncio.create_task(self._create_none_result()))
             task_names.append("phase2_emotion_disabled")
             
-        # Task 3: Dynamic personality analysis
+        # Task 3: Phase 3 Context Switch Detection
+        if (os.getenv("DISABLE_PHASE3_CONTEXT_DETECTION", "false").lower() != "true"
+            and hasattr(self.bot, 'context_switch_detector') and self.bot.context_switch_detector):
+            logger.info("🚀 AI PIPELINE DEBUG: Adding Phase 3 context switch detection task")
+            tasks.append(self._analyze_context_switches(user_id, content, message))
+            task_names.append("phase3_context_switches")
+        else:
+            logger.info("🚀 AI PIPELINE DEBUG: Phase 3 context switch detection disabled or unavailable")
+            tasks.append(asyncio.create_task(self._create_none_result()))
+            task_names.append("phase3_context_disabled")
+            
+        # Task 4: Phase 3 Empathy Calibration
+        if (os.getenv("DISABLE_PHASE3_EMPATHY_CALIBRATION", "false").lower() != "true"
+            and hasattr(self.bot, 'empathy_calibrator') and self.bot.empathy_calibrator):
+            logger.info("🚀 AI PIPELINE DEBUG: Adding Phase 3 empathy calibration task")
+            tasks.append(self._calibrate_empathy_response(user_id, content, message))
+            task_names.append("phase3_empathy_calibration")
+        else:
+            logger.info("🚀 AI PIPELINE DEBUG: Phase 3 empathy calibration disabled or unavailable")
+            tasks.append(asyncio.create_task(self._create_none_result()))
+            task_names.append("phase3_empathy_disabled")
+            
+        # Task 5: Dynamic personality analysis
         if (os.getenv("DISABLE_PERSONALITY_PROFILING", "false").lower() != "true"
             and self.dynamic_personality_profiler):
             logger.info("🚀 AI PIPELINE DEBUG: Adding dynamic personality analysis task")
@@ -2743,6 +2850,8 @@ class BotEventHandlers:
             external_emotion_data = None
             phase2_context = None
             current_emotion_data = None
+            phase3_context_switches = None
+            phase3_empathy_calibration = None
             dynamic_personality_context = None
             
             logger.info(f"🚀 AI PIPELINE DEBUG: Parallel tasks completed, processing {len(results)} results")
@@ -2768,6 +2877,12 @@ class BotEventHandlers:
                         logger.info(f"🚀 AI PIPELINE DEBUG: Current emotion: {str(current_emotion_data)[:200] if current_emotion_data else 'None'}")
                     else:
                         logger.warning(f"🚀 AI PIPELINE DEBUG: Unexpected phase2 result format: {type(result)}")
+                elif task_name.startswith("phase3_context") and result is not None:
+                    phase3_context_switches = result
+                    logger.info(f"🚀 AI PIPELINE DEBUG: Set phase3_context_switches from {task_name}: {len(result) if result else 0} switches")
+                elif task_name.startswith("phase3_empathy") and result is not None:
+                    phase3_empathy_calibration = result
+                    logger.info(f"🚀 AI PIPELINE DEBUG: Set phase3_empathy_calibration from {task_name}: {result.recommended_style.value if hasattr(result, 'recommended_style') else 'Unknown'}")
                 elif task_name.startswith("dynamic_personality") and result is not None:
                     dynamic_personality_context = result
                     logger.info(f"🚀 AI PIPELINE DEBUG: Set dynamic_personality_context from {task_name}: {str(result)[:200]}")
@@ -2785,7 +2900,8 @@ class BotEventHandlers:
                     logger.info("🚀 AI PIPELINE DEBUG: Starting Phase 4 intelligence processing...")
                     phase4_context, comprehensive_context, enhanced_system_prompt = (
                         await self._process_phase4_intelligence(
-                            user_id, message, recent_messages, external_emotion_data, phase2_context
+                            user_id, message, recent_messages, external_emotion_data, phase2_context,
+                            phase3_context_switches, phase3_empathy_calibration
                         )
                     )
                     logger.info(f"🚀 AI PIPELINE DEBUG: Phase 4 completed - Context: {str(phase4_context)[:100] if phase4_context else 'None'}")
@@ -2799,6 +2915,8 @@ class BotEventHandlers:
             self._last_external_emotion_data = external_emotion_data
             self._last_phase2_context = phase2_context
             self._last_current_emotion_data = current_emotion_data
+            self._last_phase3_context_switches = phase3_context_switches
+            self._last_phase3_empathy_calibration = phase3_empathy_calibration
             self._last_dynamic_personality_context = dynamic_personality_context
             self._last_phase4_context = phase4_context
             self._last_comprehensive_context = comprehensive_context
@@ -2814,10 +2932,10 @@ class BotEventHandlers:
             except Exception as cleanup_error:
                 logger.debug(f"Memory cleanup skipped: {cleanup_error}")
             
-            # Return the tuple expected by calling code
+            # Return the tuple expected by calling code (expanded for Phase 3)
             return (external_emotion_data, phase2_context, current_emotion_data, 
                    dynamic_personality_context, phase4_context, comprehensive_context, 
-                   enhanced_system_prompt)
+                   enhanced_system_prompt, phase3_context_switches, phase3_empathy_calibration)
             
         except Exception as e:
             logger.error(f"Parallel AI component processing failed: {e}")
@@ -2825,13 +2943,15 @@ class BotEventHandlers:
             self._last_external_emotion_data = None
             self._last_phase2_context = None
             self._last_current_emotion_data = None
+            self._last_phase3_context_switches = None
+            self._last_phase3_empathy_calibration = None
             self._last_dynamic_personality_context = None
             self._last_phase4_context = None
             self._last_comprehensive_context = None
             self._last_enhanced_system_prompt = None
             
-            # Return safe defaults tuple
-            return (None, None, None, None, None, None, None)
+            # Return safe defaults tuple (expanded for Phase 3)
+            return (None, None, None, None, None, None, None, None, None)
             
     async def _create_none_result(self):
         """Helper method for disabled AI components in parallel processing."""
@@ -2842,6 +2962,8 @@ class BotEventHandlers:
         self._last_external_emotion_data = None
         self._last_phase2_context = None
         self._last_current_emotion_data = None
+        self._last_phase3_context_switches = None
+        self._last_phase3_empathy_calibration = None
         self._last_dynamic_personality_context = None
         self._last_phase4_context = None
         self._last_comprehensive_context = None

@@ -1,0 +1,16 @@
+{
+  "test_session_id": "2c244b9a-089d-498b-82f7-a5d820d3283d",
+  "start_time": "2025-09-21T22:51:19.024854",
+  "initialization": {
+    "success": false
+  },
+  "conversation_scenarios": [],
+  "tier_promotion_pipeline": {},
+  "memory_decay_pipeline": {},
+  "memory_lifecycle": {},
+  "performance_characteristics": {},
+  "summary": {},
+  "errors": [
+    "System initialization failed"
+  ]
+}

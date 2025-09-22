@@ -48,7 +48,7 @@
 
 **Key Features:**
 - **Browser-Based UI**: FastAPI + WebSocket for real-time updates
-- **System Tray Integration**: Native desktop experience (when libraries available)
+- **Cross-Platform Access**: Web interface accessible on any device with browser
 - **Token Usage Tracking**: Detailed logging and analysis based on real OpenRouter data
 - **Cost Optimization**: Intelligent model selection based on context and budget
 - **Real-Time Monitoring**: WebSocket updates, performance metrics, budget alerts
@@ -115,7 +115,7 @@ Premium Usage:      Grok-4 ($0.085/request for special cases)
 
 ### **Phase 4: Unified Packaging System** *(In Progress)*
 Create build system that generates:
-- **Native Desktop Apps**: PyInstaller/py2app with embedded databases
+- **Web-UI Applications**: Optimized web interface with embedded databases
 - **Docker Containers**: Multi-stage builds with environment optimization
 - **Cloud Deployments**: Kubernetes manifests with horizontal scaling
 

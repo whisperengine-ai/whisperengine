@@ -2,7 +2,7 @@
 
 ## 🎯 Overview
 
-WhisperEngine implements a **unified scaling architecture** that enables the same AI engine to run across multiple deployment modes and platforms through **abstracted storage interfaces** and a **platform-agnostic AI pipeline**. This architecture allows seamless scaling from single-user desktop applications to enterprise cloud deployments.
+WhisperEngine implements a **unified scaling architecture** that enables the same AI engine to run across multiple deployment modes and platforms through **abstracted storage interfaces** and a **platform-agnostic AI pipeline**. This architecture allows seamless scaling from single-user web applications to enterprise cloud deployments.
 
 ## 🏗️ Core Design Principles
 
@@ -319,11 +319,11 @@ class SlackChatPlatform(UniversalChatPlatform):
 
 ## 🚀 Deployment Modes
 
-### **Mode 1: Desktop Application**
-- **Target**: Individual users, privacy-focused
+### **Mode 1: Web-UI Application**
+- **Target**: Individual users, browser-based access
 - **Storage**: SQLite + Local ChromaDB + Memory Cache
-- **Features**: Full AI capabilities, local data, offline support
-- **Packaging**: Native app bundle (PyInstaller)
+- **Features**: Full AI capabilities, local data, cross-platform access
+- **Packaging**: Web application (FastAPI + static files)
 
 ### **Mode 2: Docker Compose**
 - **Target**: Small teams, self-hosted
@@ -415,7 +415,7 @@ class EnvironmentDetector:
 - ✅ Storage abstraction layer implemented
 - ✅ Adaptive configuration system working
 - ✅ Universal chat platform interface defined
-- ✅ Desktop app with full AI capabilities
+- ✅ Web-UI application with full AI capabilities
 - ✅ Docker Compose deployment ready
 
 ### **Platform Adapters** 

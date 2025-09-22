@@ -107,10 +107,10 @@ class LocalLLMDetector:
             )
 ```
 
-#### **1.2 Enhanced Desktop App Integration**
+#### **1.2 Enhanced Web-UI Application Integration**
 ```python
-# desktop_app.py - Enhanced startup
-class WhisperEngineDesktopApp:
+# universal_native_app.py - Enhanced startup
+class WhisperEngineWebUIApp:
     def __init__(self):
         self.llm_detector = LocalLLMDetector()
         self.setup_assistant = LLMSetupAssistant()
@@ -325,7 +325,7 @@ class AdaptiveConfigManager:
 
 ### **Memory Usage Patterns**
 ```
-Desktop App Modes:
+Web-UI Application Modes:
 ├── HTTP API Mode (Recommended)
 │   ├── WhisperEngine App: ~200-500MB
 │   ├── LM Studio/Ollama: ~4-16GB (depending on model)
@@ -356,7 +356,7 @@ Direct Loading Mode (Future):
 
 ### **Phase 1: Enhanced HTTP API (Target: 2-3 weeks)**
 - [ ] **Week 1**: Auto-detection system and setup assistant
-- [ ] **Week 2**: Enhanced desktop app integration and fallback chains
+- [ ] **Week 2**: Enhanced web-UI application integration and fallback chains
 - [ ] **Week 3**: Web UI setup guidance and testing
 
 ### **Phase 2: Advanced Features (Target: Future releases)**
