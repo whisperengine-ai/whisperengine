@@ -62,8 +62,7 @@ RUN --mount=type=cache,target=/root/.cache/pip \
     pip install --no-cache-dir -r requirements-core.txt && \
     pip install --no-cache-dir -r requirements-platform.txt && \
     pip install --no-cache-dir -r requirements-discord.txt && \
-    pip install --no-cache-dir -r requirements-vector-memory.txt && \
-    python -m spacy download en_core_web_sm
+    pip install --no-cache-dir -r requirements-vector-memory.txt
 
     # Copy model download script and download all models during build
     COPY scripts/download_models.py ./scripts/
