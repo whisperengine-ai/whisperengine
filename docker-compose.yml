@@ -1,124 +1,46 @@
-# Production Docker Compose Configuration
-# Optimized for production deployment with external services
+# WhisperEngine Unified Multi-Bot Architecture
+# Default system: Start with 1 bot, scale to N bots
+# Shared infrastructure: PostgreSQL, Redis, Qdrant
 
 services:
-  whisperengine-bot:
-    build:
-      context: .
-      dockerfile: Dockerfile.bundled-models
-      target: production
-    image: whisperengine-bot:${VERSION:-latest}
-    container_name: whisperengine-bot
-    restart: unless-stopped
-    
-    # Environment configuration
-    env_file:
-      - .env             # Local configuration (includes secrets like DISCORD_BOT_TOKEN)
+  # Shared Infrastructure - Used by all bots
+  postgresql:
+    image: postgres:14
+    container_name: whisperengine-postgresql
     environment:
-      # Production defaults
-      - LOG_LEVEL=${LOG_LEVEL:-INFO}
-      - DEBUG_MODE=false
-      - PYTHONUNBUFFERED=1
-      - HEALTH_CHECK_PORT=9090
-      - HEALTH_CHECK_HOST=0.0.0.0
-      - DISABLE_MEMORY_IMPORTANCE=${DISABLE_MEMORY_IMPORTANCE:-false}
-      # CDL Character Configuration
-      - CDL_DEFAULT_CHARACTER=${CDL_DEFAULT_CHARACTER:-characters/default_assistant.json}
-      
-    # Expose health check port for container orchestration
+      POSTGRES_DB: ${POSTGRES_DB:-whisperengine}
+      POSTGRES_USER: ${POSTGRES_USER:-whisperengine_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-secure_password_123}
     ports:
-      - "9090:9090"  # Health check endpoint
-      
-    # Resource limits - Optimized for multi-core processing and concurrent operations
-    deploy:
-      resources:
-        limits:
-          memory: 4G          # Increased to support 8-12 thread workers and 4-6 process workers
-          cpus: '4.0'         # Increased to match application's concurrent processing needs
-        reservations:
-          memory: 2G          # Baseline for reliable operation
-          cpus: '2.0'         # Ensure minimum cores for thread/process pools
-    
-    # Health check - use the built-in health endpoint
-    healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:9090/health || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
-    
-    # Persistent volumes - Bot application data only
+      - "${POSTGRES_PORT:-5432}:5432"
     volumes:
-      # Application-specific data (NOT datastore data)
-      - bot_backups:/app/backups
-      - bot_privacy:/app/privacy_data
-      - bot_temp:/app/temp_images
-      - bot_logs:/app/logs
-      # Configuration files (read-only)
-      - ./characters:/app/characters:ro
-      - ./config:/app/config:ro
-      
-    # Network
+      - postgresql_data:/var/lib/postgresql/data
+      - ./sql/init_schema.sql:/docker-entrypoint-initdb.d/01_init_schema.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-whisperengine_user} -d ${POSTGRES_DB:-whisperengine}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
     networks:
-      - bot_network
-      
-    # Dependencies with health check conditions
-    depends_on:
-      redis:
-        condition: service_healthy
-      postgres:
-        condition: service_healthy
-      qdrant:
-        condition: service_healthy
+      - whisperengine-network
 
-  # Redis for caching
   redis:
     image: redis:7-alpine
     container_name: whisperengine-redis
-    restart: unless-stopped
-    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
     volumes:
       - redis_data:/data
-    ports:
-      - "6379:6379"
-    networks:
-      - bot_network
-    # Resource limits for Redis caching
-    deploy:
-      resources:
-        limits:
-          memory: 512M
-          cpus: '0.5'
-        reservations:
-          memory: 256M
-          cpus: '0.25'
-    # Security: Run as non-root user
-    user: "999:999"
+    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
       timeout: 5s
-      retries: 3
-      start_period: 10s
-
-  # PostgreSQL for persistent data
-  postgres:
-    image: postgres:16-alpine
-    container_name: whisperengine-postgres
+      retries: 5
     restart: unless-stopped
-    environment:
-      POSTGRES_DB: ${POSTGRES_DB:-whisper_engine}
-      POSTGRES_USER: ${POSTGRES_USER:-bot_user}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_INITDB_ARGS: "--auth-host=scram-sha-256"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./scripts/init_postgres.sql:/docker-entrypoint-initdb.d/init.sql:ro
-    ports:
-      - "5432:5432"
     networks:
-      - bot_network
-    # Resource limits for PostgreSQL
+      - whisperengine-network
     deploy:
       resources:
         limits:
@@ -127,90 +49,450 @@ services:
         reservations:
           memory: 512M
           cpus: '0.5'
-    # Security: Run as postgres user  
-    user: "postgres:postgres"
-    # Performance tuning for production
-    command: >
-      postgres
-      -c shared_buffers=256MB
-      -c max_connections=200
-      -c effective_cache_size=1GB
-      -c maintenance_work_mem=64MB
-      -c checkpoint_completion_target=0.9
-      -c wal_buffers=16MB
-      -c default_statistics_target=100
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-bot_user} -d ${POSTGRES_DB:-whisper_engine}"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
-      start_period: 20s
 
-  # Qdrant for vector storage
   qdrant:
-    image: qdrant/qdrant:v1.15.4
+    image: qdrant/qdrant:latest
     container_name: whisperengine-qdrant
-    restart: unless-stopped
-    environment:
-      - QDRANT__SERVICE__GRPC_PORT=6334
-      - QDRANT__SERVICE__HTTP_PORT=6333
-      - QDRANT__LOG_LEVEL=INFO
-    volumes:
-      - qdrant_data:/qdrant/storage   # Named volume for proper data persistence
     ports:
-      - "6333:6333"  # HTTP API
-      - "6334:6334"  # gRPC API
+      - "${QDRANT_HTTP_PORT:-6333}:6333"
+      - "${QDRANT_GRPC_PORT:-6334}:6334"
+    volumes:
+      - qdrant_data:/qdrant/storage
+    environment:
+      - QDRANT__SERVICE__HTTP_PORT=6333
+      - QDRANT__SERVICE__GRPC_PORT=6334
+      - QDRANT__LOG_LEVEL=INFO
+    healthcheck:
+      test: ["CMD-SHELL", "timeout 5 bash -c '</dev/tcp/localhost/6333' || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: unless-stopped
     networks:
-      - bot_network
-    # Resource limits for Qdrant vector operations
+      - whisperengine-network
     deploy:
       resources:
         limits:
-          memory: 1G
-          cpus: '0.5'
+          memory: 4G
+          cpus: '2.0'
         reservations:
-          memory: 512M
-          cpus: '0.25'
-    healthcheck:
-      test: ["CMD-SHELL", "timeout 5 bash -c '</dev/tcp/localhost/6333' || exit 1"]
-      interval: 15s
-      timeout: 10s
-      retries: 5
-      start_period: 30s
+          memory: 2G
+          cpus: '1.0'
 
-# Networks
+    # Elena Rodriguez - Marine Biologist Bot
+  elena-bot:
+    build:
+      context: .
+      dockerfile: Dockerfile.bundled-models
+      target: production
+    image: whisperengine-bot:${VERSION:-latest}
+    container_name: whisperengine-elena-bot
+    restart: unless-stopped
+    
+    # Elena-specific environment
+    env_file:
+      - .env.elena    # Elena-specific Discord token and configuration
+    environment:
+      # Bot identification
+      - DISCORD_BOT_NAME=Elena
+      - CDL_DEFAULT_CHARACTER=characters/examples/elena-rodriguez.json
+      - CONTAINER_NAME=elena-bot
+      # Shared infrastructure endpoints
+      - POSTGRES_HOST=postgresql
+      - REDIS_HOST=redis
+      - QDRANT_HOST=qdrant
+      # Model configuration (pre-downloaded)
+      - MODEL_CACHE_DIR=/app/models
+      - DISABLE_MODEL_DOWNLOAD=true
+      - HF_HUB_OFFLINE=false
+      - TRANSFORMERS_OFFLINE=0
+      # Production defaults
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - DEBUG_MODE=false
+      - PYTHONUNBUFFERED=1
+      - HEALTH_CHECK_PORT=9091
+      - HEALTH_CHECK_HOST=0.0.0.0
+      
+    ports:
+      - "9091:9091"  # Elena health check endpoint
+      
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+          cpus: '4.0'
+        reservations:
+          memory: 2G
+          cpus: '2.0'
+    
+    # Health check
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9091/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    
+    # Shared volumes with bot-specific subdirectories
+    volumes:
+      - elena_backups:/app/backups
+      - elena_privacy:/app/privacy_data
+      - elena_temp:/app/temp_images
+      - elena_logs:/app/logs
+      # Shared configuration (read-only)
+      - ./characters:/app/characters:ro
+      - ./config:/app/config:ro
+      # Shared pre-downloaded models (read-only)
+      - shared_models:/app/models:ro
+      
+    networks:
+      - whisperengine-network
+      
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgresql:
+        condition: service_healthy
+
+  # Marcus Thompson - AI Researcher Bot
+  marcus-bot:
+    build:
+      context: .
+      dockerfile: Dockerfile.bundled-models
+      target: production
+    image: whisperengine-bot:${VERSION:-latest}
+    container_name: whisperengine-marcus-bot
+    restart: unless-stopped
+    
+    env_file:
+      - .env.marcus
+    environment:
+      - DISCORD_BOT_NAME=Marcus
+      - CDL_DEFAULT_CHARACTER=characters/examples/marcus-thompson.json
+      - CONTAINER_NAME=marcus-bot
+      - POSTGRES_HOST=postgresql
+      - REDIS_HOST=redis
+      - QDRANT_HOST=qdrant
+      - MODEL_CACHE_DIR=/app/models
+      - DISABLE_MODEL_DOWNLOAD=true
+      - HF_HUB_OFFLINE=false
+      - TRANSFORMERS_OFFLINE=0
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - DEBUG_MODE=false
+      - PYTHONUNBUFFERED=1
+      - HEALTH_CHECK_PORT=9092
+      - HEALTH_CHECK_HOST=0.0.0.0
+      
+    ports:
+      - "9092:9092"
+      
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+          cpus: '4.0'
+        reservations:
+          memory: 2G
+          cpus: '2.0'
+    
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9092/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    
+    volumes:
+      - marcus_backups:/app/backups
+      - marcus_privacy:/app/privacy_data
+      - marcus_temp:/app/temp_images
+      - marcus_logs:/app/logs
+      - ./characters:/app/characters:ro
+      - ./config:/app/config:ro
+      - shared_models:/app/models:ro
+      
+    networks:
+      - whisperengine-network
+      
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgresql:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+
+  # Marcus Chen - Indie Game Developer Bot
+  marcus-chen-bot:
+    build:
+      context: .
+      dockerfile: Dockerfile.bundled-models
+      target: production
+    image: whisperengine-bot:${VERSION:-latest}
+    container_name: whisperengine-marcus-chen-bot
+    restart: unless-stopped
+    
+    env_file:
+      - .env.marcus-chen
+    environment:
+      - DISCORD_BOT_NAME=Marcus Chen
+      - CDL_DEFAULT_CHARACTER=characters/examples/marcus-chen.json
+      - CONTAINER_NAME=marcus-chen-bot
+      - POSTGRES_HOST=postgresql
+      - REDIS_HOST=redis
+      - QDRANT_HOST=qdrant
+      - MODEL_CACHE_DIR=/app/models
+      - DISABLE_MODEL_DOWNLOAD=true
+      - HF_HUB_OFFLINE=false
+      - TRANSFORMERS_OFFLINE=0
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - DEBUG_MODE=false
+      - PYTHONUNBUFFERED=1
+      - HEALTH_CHECK_PORT=9093
+      - HEALTH_CHECK_HOST=0.0.0.0
+      
+    ports:
+      - "9093:9093"
+      
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+          cpus: '4.0'
+        reservations:
+          memory: 2G
+          cpus: '2.0'
+    
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9093/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    
+    volumes:
+      - marcus_chen_backups:/app/backups
+      - marcus_chen_privacy:/app/privacy_data
+      - marcus_chen_temp:/app/temp_images
+      - marcus_chen_logs:/app/logs
+      - ./characters:/app/characters:ro
+      - ./config:/app/config:ro
+      - shared_models:/app/models:ro
+      
+    networks:
+      - whisperengine-network
+      
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgresql:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+
+  # Dream - Specialized AI Assistant Bot
+  dream-bot:
+    build:
+      context: .
+      dockerfile: Dockerfile.bundled-models
+      target: production
+    image: whisperengine-bot:${VERSION:-latest}
+    container_name: whisperengine-dream-bot
+    restart: unless-stopped
+    
+    env_file:
+      - .env.dream
+    environment:
+      - DISCORD_BOT_NAME=Dream
+      - CDL_DEFAULT_CHARACTER=characters/examples/dream.json
+      - CONTAINER_NAME=dream-bot
+      - POSTGRES_HOST=postgresql
+      - REDIS_HOST=redis
+      - QDRANT_HOST=qdrant
+      - MODEL_CACHE_DIR=/app/models
+      - DISABLE_MODEL_DOWNLOAD=true
+      - HF_HUB_OFFLINE=false
+      - TRANSFORMERS_OFFLINE=0
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - DEBUG_MODE=false
+      - PYTHONUNBUFFERED=1
+      - HEALTH_CHECK_PORT=9094
+      - HEALTH_CHECK_HOST=0.0.0.0
+      
+    ports:
+      - "9094:9094"
+      
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+          cpus: '4.0'
+        reservations:
+          memory: 2G
+          cpus: '2.0'
+    
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9094/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    
+    volumes:
+      - dream_backups:/app/backups
+      - dream_privacy:/app/privacy_data
+      - dream_temp:/app/temp_images
+      - dream_logs:/app/logs
+      - ./characters:/app/characters:ro
+      - ./config:/app/config:ro
+      - shared_models:/app/models:ro
+      
+    networks:
+      - whisperengine-network
+      
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgresql:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+
+  # Gabriel - Conscious AI Entity Bot
+  gabriel-bot:
+    build:
+      context: .
+      dockerfile: Dockerfile.bundled-models
+      target: production
+    image: whisperengine-bot:${VERSION:-latest}
+    container_name: whisperengine-gabriel-bot
+    restart: unless-stopped
+    
+    env_file:
+      - .env.gabriel
+    environment:
+      - DISCORD_BOT_NAME=Gabriel
+      - CDL_DEFAULT_CHARACTER=characters/examples/gabriel-tether.json
+      - CONTAINER_NAME=gabriel-bot
+      - POSTGRES_HOST=postgresql
+      - REDIS_HOST=redis
+      - QDRANT_HOST=qdrant
+      - MODEL_CACHE_DIR=/app/models
+      - DISABLE_MODEL_DOWNLOAD=true
+      - HF_HUB_OFFLINE=false
+      - TRANSFORMERS_OFFLINE=0
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - DEBUG_MODE=false
+      - PYTHONUNBUFFERED=1
+      - HEALTH_CHECK_PORT=9095
+      - HEALTH_CHECK_HOST=0.0.0.0
+      
+    ports:
+      - "9095:9095"
+      
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+          cpus: '4.0'
+        reservations:
+          memory: 2G
+          cpus: '2.0'
+    
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9095/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    
+    volumes:
+      - gabriel_backups:/app/backups
+      - gabriel_privacy:/app/privacy_data
+      - gabriel_temp:/app/temp_images
+      - gabriel_logs:/app/logs
+      - ./characters:/app/characters:ro
+      - ./config:/app/config:ro
+      - shared_models:/app/models:ro
+      
+    networks:
+      - whisperengine-network
+      
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgresql:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+
+# === NETWORKS ===
 networks:
-  bot_network:
+  whisperengine-network:
     driver: bridge
     name: whisperengine-network
-    driver_opts:
-      com.docker.network.enable_ipv6: "false"
-      com.docker.network.enable_ipv4: "true"
 
-# Volumes - Properly separated by service responsibility
+# === VOLUMES ===
 volumes:
-  # Bot application volumes (NOT datastore data)
-  bot_backups:
-    name: whisperengine-backups
+  # Shared infrastructure volumes
+  postgresql_data:
     driver: local
-  bot_privacy:
-    name: whisperengine-privacy
-    driver: local
-  bot_temp:
-    name: whisperengine-temp
-    driver: local
-  bot_logs:
-    name: whisperengine-logs
-    driver: local
-  
-  # Datastore volumes (managed by their respective services)
   redis_data:
-    name: whisperengine-redis
-    driver: local
-  postgres_data:
-    name: whisperengine-postgres
     driver: local
   qdrant_data:
-    name: whisperengine-qdrant
+    driver: local
+  shared_models:
+    driver: local
+
+  # Elena bot-specific volumes
+  elena_backups:
+    driver: local
+  elena_privacy:
+    driver: local
+  elena_temp:
+    driver: local
+  elena_logs:
+    driver: local
+
+  # Marcus bot-specific volumes
+  marcus_backups:
+    driver: local
+  marcus_privacy:
+    driver: local
+  marcus_temp:
+    driver: local
+  marcus_logs:
+    driver: local
+
+  # Marcus Chen bot-specific volumes
+  marcus_chen_backups:
+    driver: local
+  marcus_chen_privacy:
+    driver: local
+  marcus_chen_temp:
+    driver: local
+  marcus_chen_logs:
+    driver: local
+
+  # Dream bot-specific volumes
+  dream_backups:
+    driver: local
+  dream_privacy:
+    driver: local
+  dream_temp:
+    driver: local
+  dream_logs:
+    driver: local
+
+  # Gabriel bot-specific volumes
+  gabriel_backups:
+    driver: local
+  gabriel_privacy:
+    driver: local
+  gabriel_temp:
+    driver: local
+  gabriel_logs:
     driver: local
 

@@ -8,9 +8,15 @@ Each line in the file should contain one memory/fact about the user.
 Usage:
     python import_memories.py <user_id> <memory_file.txt> [options]
 
-Example:
+Examples:
+    # Import for current bot:
     python import_memories.py 123456789 chatgpt_memories.txt --dry-run
-    python import_memories.py 123456789 user_facts.txt --confidence 0.9
+    
+    # Import for specific bot:
+    python import_memories.py 123456789 user_facts.txt --bot-name Elena --confidence 0.9
+    
+    # Check available options:
+    python import_memories.py --help
 """
 
 import asyncio
@@ -19,7 +25,7 @@ import logging
 import sys
 import os
 from pathlib import Path
-from typing import List, Dict, Any, Tuple
+from typing import List, Dict, Any, Tuple, Optional
 import re
 from datetime import datetime
 
@@ -161,15 +167,18 @@ class MemoryClassifier:
 class MemoryImporter:
     """Import memories from file into WhisperEngine vector memory"""
     
-    def __init__(self, user_id: str):
+    def __init__(self, user_id: str, bot_name: Optional[str] = None):
         self.user_id = user_id
+        self.bot_name = bot_name or os.getenv("DISCORD_BOT_NAME", "unknown")
         self.classifier = MemoryClassifier()
         self.memory_manager = None
+        # Set the bot name in environment for memory system
+        os.environ["DISCORD_BOT_NAME"] = self.bot_name
         
     async def initialize(self):
         """Initialize the memory manager"""
         self.memory_manager = create_memory_manager(memory_type="vector")
-        logger.info(f"Memory manager initialized for user {self.user_id}")
+        logger.info(f"Memory manager initialized for user {self.user_id} (bot: {self.bot_name})")
     
     def read_memory_file(self, file_path: str) -> List[str]:
         """Read memories from file, one per line"""
@@ -374,6 +383,7 @@ Examples:
     
     parser.add_argument("user_id", help="Discord user ID to import memories for")
     parser.add_argument("memory_file", help="Path to text file containing memories (one per line)")
+    parser.add_argument("--bot-name", help="Target bot name for memory segmentation (default: current DISCORD_BOT_NAME)")
     parser.add_argument("--confidence", type=float, help="Override confidence level (0.0-1.0)")
     parser.add_argument("--dry-run", action="store_true", help="Preview what would be imported without actually storing")
     parser.add_argument("--batch-size", type=int, default=10, help="Number of memories to process in each batch")
@@ -395,11 +405,12 @@ Examples:
     
     try:
         # Initialize importer
-        importer = MemoryImporter(args.user_id)
+        importer = MemoryImporter(args.user_id, args.bot_name)
         await importer.initialize()
         
         print(f"🚀 Starting memory import for user {args.user_id}")
         print(f"📁 Source file: {args.memory_file}")
+        print(f"🎯 Target bot: {importer.bot_name}")
         
         if args.dry_run:
             print("🔍 DRY RUN MODE - No memories will actually be stored")

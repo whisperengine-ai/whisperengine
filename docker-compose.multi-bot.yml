@@ -1,6 +1,7 @@
-# Multi-Bot Docker Compose Configuration
-# Supports multiple character bot containers sharing the same infrastructure
+# Multi-Bot Docker Compose Configuration  
+# Supports multiple character bot containers with isolated infrastructure
 # Each bot gets its own Discord token and character assignment
+# Uses separate infrastructure to avoid conflicts with single-bot system
 
 services:
   # Elena Rodriguez - Marine Biologist Bot
@@ -321,13 +322,13 @@ services:
   # Redis for caching (shared by all bots)
   redis:
     image: redis:7-alpine
-    container_name: whisperengine-redis
+    container_name: whisperengine-multi-redis
     restart: unless-stopped
     command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
     volumes:
-      - redis_data:/data
+      - multi_redis_data:/data
     ports:
-      - "6379:6379"
+      - "6380:6379"  # Different port for multi-bot Redis
     networks:
       - bot_network
     deploy:
@@ -349,7 +350,7 @@ services:
   # PostgreSQL for persistent data (shared by all bots)
   postgres:
     image: postgres:16-alpine
-    container_name: whisperengine-postgres
+    container_name: whisperengine-multi-postgres
     restart: unless-stopped
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-whisper_engine}
@@ -357,10 +358,10 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_INITDB_ARGS: "--auth-host=scram-sha-256"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - multi_postgres_data:/var/lib/postgresql/data
       - ./scripts/init_postgres.sql:/docker-entrypoint-initdb.d/init.sql:ro
     ports:
-      - "5432:5432"
+      - "5433:5432"  # Different port for multi-bot PostgreSQL
     networks:
       - bot_network
     deploy:
@@ -391,13 +392,13 @@ services:
   # Qdrant for vector storage (shared by all bots)
   qdrant:
     image: qdrant/qdrant:v1.7.4
-    container_name: whisperengine-qdrant
+    container_name: whisperengine-multi-qdrant
     restart: unless-stopped
     ports:
-      - "6333:6333"  # HTTP API
-      - "6334:6334"  # gRPC API
+      - "6335:6333"  # Different ports for multi-bot Qdrant
+      - "6336:6334"  # gRPC API
     volumes:
-      - qdrant_data:/qdrant/storage
+      - multi_qdrant_data:/qdrant/storage
     networks:
       - bot_network
     deploy:
@@ -461,12 +462,12 @@ volumes:
   dream_logs:
     driver: local
     
-  # Shared infrastructure volumes
-  redis_data:
+  # Shared infrastructure volumes (prefixed for multi-bot)
+  multi_redis_data:
     driver: local
-  postgres_data:
+  multi_postgres_data:
     driver: local
-  qdrant_data:
+  multi_qdrant_data:
     driver: local
   
   # Shared models volume (pre-downloaded AI models)

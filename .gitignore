@@ -133,3 +133,4 @@ docker-data/
 .gitignore
 .setup_complete
 .env.marcus-chen
+.env.gabriel

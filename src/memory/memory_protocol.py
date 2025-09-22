@@ -6,7 +6,10 @@ This protocol enables A/B testing and future memory system innovations
 while maintaining consistent async interfaces.
 """
 
+import logging
 from typing import Protocol, List, Dict, Any, Optional, Union
+
+logger = logging.getLogger(__name__)
 
 
 class MemoryManagerProtocol(Protocol):
@@ -193,3 +196,27 @@ def create_memory_manager(memory_type: str = "vector", **config) -> MemoryManage
     
     else:
         raise ValueError(f"Unknown memory_type: {memory_type}. Supported: 'vector', 'test_mock', 'experimental_v2'")
+
+
+def create_multi_bot_querier(memory_manager=None):
+    """
+    Create a multi-bot memory querier for advanced cross-bot analysis
+    
+    Features:
+    - Query all bots (global search)
+    - Query specific bot subsets  
+    - Cross-bot memory analysis
+    - Bot memory statistics
+    
+    Args:
+        memory_manager: Optional existing memory manager to use
+        
+    Returns:
+        MultiBotMemoryQuerier instance
+    """
+    try:
+        from .multi_bot_memory_querier import MultiBotMemoryQuerier
+        return MultiBotMemoryQuerier(memory_manager=memory_manager)
+    except ImportError as e:
+        logger.warning(f"MultiBotMemoryQuerier not available: {e}")
+        return None

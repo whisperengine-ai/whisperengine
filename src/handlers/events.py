@@ -575,6 +575,15 @@ class BotEventHandlers:
         # Replace original message content with sanitized version
         message.content = sanitized_content
 
+        # Detect and store user name preferences
+        try:
+            from src.utils.user_preferences import detect_name_introduction
+            detected_name = await detect_name_introduction(message.content, user_id, self.memory_manager)
+            if detected_name:
+                logger.info(f"Detected name introduction from user {user_id}: {detected_name}")
+        except Exception as e:
+            logger.debug(f"Name detection failed: {e}")
+
         # Initialize variables early
         enhanced_system_prompt = None
         phase4_context = None
@@ -3295,11 +3304,16 @@ class BotEventHandlers:
             
             # Create CDL integration and generate character-aware prompt
             cdl_integration = CDLAIPromptIntegration(vector_memory_manager=self.memory_manager)
+            
+            # Get user's display name for better identification
+            user_display_name = getattr(message.author, 'display_name', None) or getattr(message.author, 'name', None)
+            
             character_prompt = await cdl_integration.create_character_aware_prompt(
                 character_file=character_file,
                 user_id=user_id,
                 message_content=message.content,
-                pipeline_result=pipeline_result
+                pipeline_result=pipeline_result,
+                user_name=user_display_name
             )
             
             # Clone the conversation context and replace/enhance system message

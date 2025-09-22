@@ -12,6 +12,7 @@ This supersedes all previous memory system implementations.
 import asyncio
 import json
 import logging
+import os
 import time
 from datetime import datetime, timedelta
 from enum import Enum
@@ -256,6 +257,13 @@ class VectorMemoryStore:
                 field_schema=models.PayloadSchemaType.INTEGER
             )
             
+            # Index for bot-specific memory isolation
+            self.client.create_payload_index(
+                collection_name=self.collection_name,
+                field_name="bot_name",
+                field_schema=models.PayloadSchemaType.KEYWORD
+            )
+            
             logger.info("🎯 QDRANT-INDEXES: Created optimized payload indexes")
             
         except Exception as e:
@@ -386,11 +394,13 @@ class VectorMemoryStore:
             content_hash = hash(content_normalized)
             
             # 🚀 QDRANT FEATURE: Check for exact duplicates using optimized index
+            current_bot_name = os.getenv("DISCORD_BOT_NAME", "unknown")
             existing = self.client.scroll(
                 collection_name=self.collection_name,
                 scroll_filter=models.Filter(
                     must=[
                         models.FieldCondition(key="user_id", match=models.MatchValue(value=memory.user_id)),
+                        models.FieldCondition(key="bot_name", match=models.MatchValue(value=current_bot_name)),
                         models.FieldCondition(key="content_hash", match=models.MatchValue(value=content_hash))
                     ]
                 ),
@@ -412,6 +422,7 @@ class VectorMemoryStore:
             # Enhanced payload optimized for Qdrant operations
             qdrant_payload = {
                 "user_id": memory.user_id,
+                "bot_name": os.getenv("DISCORD_BOT_NAME", "unknown"),  # 🎯 Bot-specific memory segmentation
                 "memory_type": memory.memory_type.value,
                 "content": memory.content,
                 "timestamp": memory.timestamp.isoformat(),
@@ -639,6 +650,7 @@ class VectorMemoryStore:
                 scroll_filter=models.Filter(
                     must=[
                         models.FieldCondition(key="user_id", match=models.MatchValue(value=user_id)),
+                        models.FieldCondition(key="bot_name", match=models.MatchValue(value=os.getenv("DISCORD_BOT_NAME", "unknown"))),  # 🎯 Bot-specific filtering
                         models.FieldCondition(key="memory_type", match=models.MatchValue(value="conversation")),
                         models.FieldCondition(key="timestamp_unix", range=Range(gte=recent_timestamp))
                     ]
@@ -1698,8 +1710,10 @@ class VectorMemoryStore:
                 return await self._handle_temporal_query_with_qdrant(query, user_id, top_k)
             
             # Regular semantic search continues below...
+            current_bot_name = os.getenv("DISCORD_BOT_NAME", "unknown")
             must_conditions = [
-                models.FieldCondition(key="user_id", match=models.MatchValue(value=user_id))
+                models.FieldCondition(key="user_id", match=models.MatchValue(value=user_id)),
+                models.FieldCondition(key="bot_name", match=models.MatchValue(value=current_bot_name))  # 🎯 Bot-specific filtering
             ]
             
             if memory_types:
@@ -1782,11 +1796,13 @@ class VectorMemoryStore:
             recent_cutoff_timestamp = recent_cutoff_dt.timestamp()
             
             # Get recent conversation messages in chronological order
+            current_bot_name = os.getenv("DISCORD_BOT_NAME", "unknown")
             scroll_result = self.client.scroll(
                 collection_name=self.collection_name,
                 scroll_filter=models.Filter(
                     must=[
                         models.FieldCondition(key="user_id", match=models.MatchValue(value=user_id)),
+                        models.FieldCondition(key="bot_name", match=models.MatchValue(value=current_bot_name)),  # 🎯 Bot-specific filtering
                         models.FieldCondition(key="memory_type", match=models.MatchValue(value="conversation")),
                         models.FieldCondition(key="timestamp_unix", range=Range(gte=recent_cutoff_timestamp))
                     ]
@@ -1808,6 +1824,7 @@ class VectorMemoryStore:
                     query_filter=models.Filter(
                         must=[
                             models.FieldCondition(key="user_id", match=models.MatchValue(value=user_id)),
+                            models.FieldCondition(key="bot_name", match=models.MatchValue(value=current_bot_name)),  # 🎯 Bot-specific filtering
                             models.FieldCondition(key="memory_type", match=models.MatchAny(any=["conversation", "fact", "preference"]))
                         ]
                     ),

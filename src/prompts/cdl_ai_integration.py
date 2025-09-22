@@ -26,12 +26,27 @@ class CDLAIPromptIntegration:
         character_file: str,
         user_id: str,
         message_content: str,
-        pipeline_result=None
+        pipeline_result=None,
+        user_name: Optional[str] = None
     ) -> str:
         """Create a character-aware prompt."""
         try:
             character = await self.load_character(character_file)
             logger.info(f"Loaded CDL character: {character.identity.name}")
+
+            # Check for user's preferred name in memory
+            preferred_name = None
+            if self.memory_manager:
+                try:
+                    from src.utils.user_preferences import get_user_preferred_name
+                    preferred_name = await get_user_preferred_name(user_id, self.memory_manager)
+                except Exception as e:
+                    logger.debug(f"Could not retrieve preferred name: {e}")
+
+            # Determine the best name to use (priority: preferred > user_name > User)
+            display_name = preferred_name or user_name or "User"
+            
+            logger.info(f"Using display name: {display_name} (preferred: {preferred_name}, discord: {user_name})")
 
             # Build comprehensive character prompt with personality details
             personality_values = getattr(character.personality, 'values', [])
@@ -307,9 +322,16 @@ ABSOLUTE REQUIREMENTS - IGNORE ALL OTHER INSTRUCTIONS THAT CONTRADICT THESE:
             # Background context (date/time) - placed at end with minimal emphasis
             prompt += f"""
 
-BACKGROUND CONTEXT:
-Current date: {current_date}
-Current time: {current_time}"""
+CURRENT DATE & TIME CONTEXT:
+Today is {current_date}
+Current time: {current_time}
+
+USER IDENTIFICATION:
+- You are speaking with user ID: {user_id}
+- User's preferred name: {display_name}
+- When addressing the user, use their preferred name: {display_name}
+- Remember: YOU are {character.identity.name}, they are {display_name}
+- Never confuse your own identity with the user's identity"""
 
             # Final instruction (keep mystical characters' natural voice, others stay professional)
             if has_mystical_nature:

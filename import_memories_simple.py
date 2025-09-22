@@ -6,14 +6,17 @@ Import memories from a text file into WhisperEngine's vector memory system.
 This version is designed to run inside the WhisperEngine Docker container.
 
 Usage:
-    docker exec -it whisperengine-bot python import_memories_simple.py <user_id> <memory_file.txt>
+    docker exec -it whisperengine-bot python import_memories_simple.py <user_id> <memory_file.txt> [bot_name]
 
-Example:
-    # Copy your memory file to the container first:
-    docker cp memories.txt whisperengine-bot:/app/memories.txt
-    
-    # Then run the import:
+Examples:
+    # Import for current bot (uses DISCORD_BOT_NAME environment variable):
     docker exec -it whisperengine-bot python import_memories_simple.py 123456789 memories.txt
+    
+    # Import for specific bot:
+    docker exec -it whisperengine-elena-bot python import_memories_simple.py 123456789 memories.txt Elena
+    docker exec -it whisperengine-marcus-bot python import_memories_simple.py 123456789 memories.txt Marcus
+    
+Note: The bot_name should match the DISCORD_BOT_NAME of the target bot for proper memory segmentation.
 """
 
 import asyncio
@@ -22,7 +25,7 @@ import os
 import logging
 import re
 from datetime import datetime
-from typing import List, Dict, Any, Tuple
+from typing import List, Dict, Any, Tuple, Optional
 
 # Import WhisperEngine components
 from src.memory.memory_protocol import create_memory_manager
@@ -36,15 +39,18 @@ logger = logging.getLogger(__name__)
 class SimpleMemoryImporter:
     """Simple memory importer for container use"""
     
-    def __init__(self, user_id: str):
+    def __init__(self, user_id: str, bot_name: Optional[str] = None):
         self.user_id = user_id
+        self.bot_name = bot_name or os.getenv("DISCORD_BOT_NAME", "unknown")
         self.memory_manager = None
+        # Set the bot name in environment for memory system
+        os.environ["DISCORD_BOT_NAME"] = self.bot_name
     
     async def initialize(self):
         """Initialize the memory manager"""
         try:
             self.memory_manager = create_memory_manager(memory_type="vector")
-            logger.info(f"✅ Memory manager initialized for user {self.user_id}")
+            logger.info(f"✅ Memory manager initialized for user {self.user_id} (bot: {self.bot_name})")
         except Exception as e:
             logger.error(f"❌ Failed to initialize memory manager: {e}")
             raise
@@ -155,24 +161,29 @@ class SimpleMemoryImporter:
 
 
 async def main():
-    if len(sys.argv) != 3:
-        print("Usage: python import_memories_simple.py <user_id> <memory_file.txt>")
-        print("\nExample:")
+    if len(sys.argv) < 3 or len(sys.argv) > 4:
+        print("Usage: python import_memories_simple.py <user_id> <memory_file.txt> [bot_name]")
+        print("\nExamples:")
+        print("  # Import for current bot:")
         print("  python import_memories_simple.py 123456789 memories.txt")
+        print("  # Import for specific bot:")
+        print("  python import_memories_simple.py 123456789 memories.txt Elena")
         sys.exit(1)
     
     user_id = sys.argv[1]
     memory_file = sys.argv[2]
+    bot_name = sys.argv[3] if len(sys.argv) == 4 else None
     
     print("🤖 WhisperEngine Memory Import Tool")
     print("="*50)
     print(f"👤 User ID: {user_id}")
     print(f"📁 Memory file: {memory_file}")
+    print(f"🎯 Target bot: {bot_name or os.getenv('DISCORD_BOT_NAME', 'unknown')}")
     print("="*50)
     
     try:
         # Initialize importer
-        importer = SimpleMemoryImporter(user_id)
+        importer = SimpleMemoryImporter(user_id, bot_name)
         await importer.initialize()
         
         # Run import

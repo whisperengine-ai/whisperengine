@@ -10,6 +10,7 @@ import json
 import logging
 import os
 from datetime import datetime
+from pathlib import Path
 
 import asyncpg
 
@@ -76,8 +77,8 @@ class PostgreSQLUserDB:
 
         try:
             self.pool = await asyncpg.create_pool(**self._connection_params)
-            await self._create_tables()
-            logger.info("PostgreSQL database initialized successfully")
+            await self._create_tables()  # Re-enable schema creation for dev
+            logger.info("PostgreSQL database initialized successfully with schema")
         except asyncpg.InvalidCatalogNameError as e:
             error_msg = (
                 f"PostgreSQL database '{self._connection_params['database']}' does not exist"
@@ -112,30 +113,26 @@ class PostgreSQLUserDB:
             raise ConnectionError(error_msg) from e
 
     async def _create_tables(self):
-        """Create the user profiles table if it doesn't exist"""
-        create_table_sql = """
-        CREATE TABLE IF NOT EXISTS user_profiles (
-            user_id VARCHAR(255) PRIMARY KEY,
-            name VARCHAR(255),
-            relationship_level INTEGER DEFAULT 1,
-            current_emotion VARCHAR(50) DEFAULT 'neutral',
-            interaction_count INTEGER DEFAULT 0,
-            first_interaction TIMESTAMP,
-            last_interaction TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            emotion_history JSONB DEFAULT '[]'::jsonb,
-            escalation_count INTEGER DEFAULT 0,
-            trust_indicators JSONB DEFAULT '[]'::jsonb
-        );
-
-        CREATE INDEX IF NOT EXISTS idx_user_profiles_last_interaction
-        ON user_profiles(last_interaction);
-
-        CREATE INDEX IF NOT EXISTS idx_user_profiles_relationship_level
-        ON user_profiles(relationship_level);
         """
-
-        async with self.pool.acquire() as connection:
-            await connection.execute(create_table_sql)
+        Initialize PostgreSQL schema from sql/init_schema.sql
+        Simple schema creation for development - no complex migrations needed
+        """
+        if not self.pool:
+            logger.error("Database pool not initialized")
+            return
+            
+        try:
+            schema_path = Path(__file__).parent.parent.parent / "sql" / "init_schema.sql"
+            if schema_path.exists():
+                async with self.pool.acquire() as connection:
+                    schema_sql = schema_path.read_text()
+                    await connection.execute(schema_sql)
+                    logger.info("PostgreSQL schema initialized from sql/init_schema.sql")
+            else:
+                logger.warning(f"Schema file not found: {schema_path}")
+        except Exception as e:
+            logger.error(f"Failed to initialize schema: {e}")
+            raise
 
     async def get_user_profile(self, user_id: str) -> UserProfile | None:
         """Get a user profile by user_id"""

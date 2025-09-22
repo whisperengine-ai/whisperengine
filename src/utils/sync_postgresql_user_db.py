@@ -88,44 +88,37 @@ class SyncPostgreSQLUserDB:
             self.pool = psycopg2.pool.ThreadedConnectionPool(
                 minconn=2, maxconn=10, **self._connection_params
             )
-            self._create_tables()
-            logger.info("Synchronous PostgreSQL database initialized successfully")
+            self._create_tables()  # Re-enable schema creation for dev
+            logger.info("Synchronous PostgreSQL database initialized successfully with schema")
         except Exception as e:
             logger.error(f"Failed to initialize synchronous PostgreSQL database: {e}")
             raise
 
     def _create_tables(self):
-        """Create the user profiles table if it doesn't exist"""
-        create_table_sql = """
-        CREATE TABLE IF NOT EXISTS user_profiles (
-            user_id VARCHAR(255) PRIMARY KEY,
-            name VARCHAR(255),
-            relationship_level INTEGER DEFAULT 1,
-            current_emotion VARCHAR(50) DEFAULT 'neutral',
-            interaction_count INTEGER DEFAULT 0,
-            first_interaction TIMESTAMP,
-            last_interaction TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            emotion_history JSONB DEFAULT '[]'::jsonb,
-            escalation_count INTEGER DEFAULT 0,
-            trust_indicators JSONB DEFAULT '[]'::jsonb
-        );
-
-        CREATE INDEX IF NOT EXISTS idx_user_profiles_last_interaction
-        ON user_profiles(last_interaction);
-
-        CREATE INDEX IF NOT EXISTS idx_user_profiles_relationship_level
-        ON user_profiles(relationship_level);
         """
-
-        connection = None
+        Initialize PostgreSQL schema from sql/init_schema.sql
+        Simple schema creation for development - no complex migrations needed  
+        """
         try:
-            connection = self.pool.getconn()
-            with connection.cursor() as cursor:
-                cursor.execute(create_table_sql)
-                connection.commit()
-        finally:
-            if connection:
-                self.pool.putconn(connection)
+            from pathlib import Path
+            schema_path = Path(__file__).parent.parent.parent / "sql" / "init_schema.sql"
+            if schema_path.exists():
+                connection = None
+                try:
+                    connection = self.pool.getconn()
+                    with connection.cursor() as cursor:
+                        schema_sql = schema_path.read_text()
+                        cursor.execute(schema_sql)
+                        connection.commit()
+                        logger.info("PostgreSQL schema initialized from sql/init_schema.sql")
+                finally:
+                    if connection:
+                        self.pool.putconn(connection)
+            else:
+                logger.warning(f"Schema file not found: {schema_path}")
+        except Exception as e:
+            logger.error(f"Failed to initialize schema: {e}")
+            raise
 
     def get_user_profile(self, user_id: str) -> UserProfile | None:
         """Get a user profile by user_id"""

@@ -1,725 +1,367 @@
 #!/bin/bash
-
 # =============================================================================
-# WhisperEngine Unified Bot Management Script
+# Discord Bot - Unified Management Script
 # =============================================================================
-# Multi-Bot Architecture: Start with 1 bot, scale to N bots
-# Shared infrastructure: PostgreSQL, Redis, Qdrant
-# Simple commands: ./bot.sh start, ./bot.sh stop, ./bot.sh logs
 
 set -euo pipefail  # Exit on any error, undefined variables, pipe failures
 IFS=$'\n\t'       # Secure Internal Field Separator
 
 # Cleanup function
 cleanup() {
-
     local exit_code=$?
-
-# Cleanup function    if [[ $exit_code -ne 0 ]]; then
-
-cleanup() {        print_warning "Script interrupted. Cleaning up..."
-
-    local exit_code=$?        # Kill any background processes if they exist
-
-    if [[ $exit_code -ne 0 ]]; then        jobs -p | xargs -r kill 2>/dev/null || true
-
-        print_warning "Script interrupted. Cleaning up..."    fi
-
-        jobs -p | xargs -r kill 2>/dev/null || true    exit $exit_code
-
-    fi}
-
+    if [[ $exit_code -ne 0 ]]; then
+        print_warning "Script interrupted. Cleaning up..."
+        # Kill any background processes if they exist
+        jobs -p | xargs -r kill 2>/dev/null || true
+    fi
     exit $exit_code
+}
 
-}# Set up signal handlers
-
+# Set up signal handlers
 trap cleanup EXIT
-
-trap cleanup EXITtrap 'cleanup' INT TERM
-
 trap 'cleanup' INT TERM
 
 # Colors
-
-# ColorsGREEN='\033[0;32m'
-
-GREEN='\033[0;32m'YELLOW='\033[1;33m'
-
-YELLOW='\033[1;33m'RED='\033[0;31m'
-
-RED='\033[0;31m'BLUE='\033[0;34m'
-
-BLUE='\033[0;34m'NC='\033[0m'
-
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+RED='\033[0;31m'
+BLUE='\033[0;34m'
 NC='\033[0m'
 
 # Helper functions
-
-# Helper functionsprint_status() { echo -e "${GREEN}✅ $1${NC}"; }
-
-print_status() { echo -e "${GREEN}✅ $1${NC}"; }print_warning() { echo -e "${YELLOW}⚠️  $1${NC}"; }
-
-print_warning() { echo -e "${YELLOW}⚠️  $1${NC}"; }print_error() { echo -e "${RED}❌ $1${NC}"; }
-
+print_status() { echo -e "${GREEN}✅ $1${NC}"; }
+print_warning() { echo -e "${YELLOW}⚠️  $1${NC}"; }
 print_error() { echo -e "${RED}❌ $1${NC}"; }
 
-print_info() { echo -e "${BLUE}ℹ️  $1${NC}"; }check_docker() {
-
+check_docker() {
     if ! docker info >/dev/null 2>&1; then
-
-# Configuration        print_error "Docker not running. Please start Docker first."
-
-PROJECT_NAME="whisperengine"        exit 1
-
-COMPOSE_FILE="docker-compose.yml"    fi
-
+        print_error "Docker not running. Please start Docker first."
+        exit 1
+    fi
     
-
-# Available bots configuration    # Check Docker Compose availability (v1 or v2)
-
-declare -A BOT_CONFIGS=(    local compose_cmd=""
-
-    ["elena"]="Elena Rodriguez - Marine Biologist|.env.elena|elena-rodriguez.json|9091"    if command -v docker-compose &> /dev/null; then
-
-    ["marcus"]="Marcus Thompson - AI Researcher|.env.marcus|marcus-thompson.json|9092"        compose_cmd="docker-compose"
-
-    ["marcus-chen"]="Marcus Chen - Indie Game Developer|.env.marcus-chen|marcus-chen.json|9093"    elif docker compose version &> /dev/null; then
-
-    ["dream"]="Dream of the Endless|.env.dream|dream_of_the_endless.json|9094"        compose_cmd="docker compose"
-
-)        export COMPOSE_SUBCMD="compose"
-
+    # Check Docker Compose availability (v1 or v2)
+    local compose_cmd=""
+    if command -v docker-compose &> /dev/null; then
+        compose_cmd="docker-compose"
+    elif docker compose version &> /dev/null; then
+        compose_cmd="docker compose"
+        export COMPOSE_SUBCMD="compose"
     else
-
-check_docker() {        print_error "Docker Compose is not installed."
-
-    if ! docker info >/dev/null 2>&1; then        echo "Install Docker Compose: https://docs.docker.com/compose/install/"
-
-        print_error "Docker not running. Please start Docker first."        exit 1
-
-        exit 1    fi
-
-    fi    
-
-        # Export compose command for use in other functions
-
-    if docker compose version &> /dev/null; then    export COMPOSE_CMD="$compose_cmd"
-
-        export COMPOSE_CMD="docker compose"    
-
-    elif command -v docker-compose &> /dev/null; then    # Check Docker Compose version for compatibility
-
-        export COMPOSE_CMD="docker-compose"    local compose_version=$($compose_cmd version --short 2>/dev/null | head -1 | cut -d'.' -f1-2)
-
-    else    if [[ -n "$compose_version" ]]; then
-
-        print_error "Docker Compose is not installed."        print_status "Using $compose_cmd (version $compose_version)"
-
-        exit 1    fi
-
-    fi}
-
+        print_error "Docker Compose is not installed."
+        echo "Install Docker Compose: https://docs.docker.com/compose/install/"
+        exit 1
+    fi
     
+    # Export compose command for use in other functions
+    export COMPOSE_CMD="$compose_cmd"
+    
+    # Check Docker Compose version for compatibility
+    local compose_version=$($compose_cmd version --short 2>/dev/null | head -1 | cut -d'.' -f1-2)
+    if [[ -n "$compose_version" ]]; then
+        print_status "Using $compose_cmd (version $compose_version)"
+    fi
+}
 
-    print_status "Using $COMPOSE_CMD ($(docker compose version 2>/dev/null || docker-compose --version))"check_env() {
-
-}    if [ ! -f ".env" ]; then
-
+check_env() {
+    if [ ! -f ".env" ]; then
         print_error "No .env file found!"
-
-show_help() {        echo "📝 Copy .env.example to .env and configure:"
-
-    echo "WhisperEngine Unified Bot Management"        echo "   cp .env.example .env"
-
-    echo ""        exit 1
-
-    echo "🤖 Multi-Bot Architecture: Start with 1 bot, scale to many"    fi
-
-    echo "   Shared infrastructure: PostgreSQL, Redis, Qdrant"    
-
-    echo "   Each bot gets its own Discord token and character"    # Basic .env validation
-
-    echo ""    if [[ ! -r ".env" ]]; then
-
-    echo "Usage: $0 <command> [options]"        print_error ".env file is not readable"
-
-    echo ""        exit 1
-
-    echo "🚀 Quick Start:"    fi
-
-    echo "  $0 start elena          # Start Elena bot only"    
-
-    echo "  $0 start all            # Start all configured bots"    # Check for critical variables (without sourcing the file)
-
-    echo "  $0 start infrastructure # Start databases only (for native development)"    local missing_vars=()
-
-    echo ""    
-
-    echo "Commands:"    if ! grep -q "^DISCORD_BOT_TOKEN=" ".env" 2>/dev/null; then
-
-    echo "  start <bot|all|infrastructure>  - Start specific bot(s) or infrastructure"        missing_vars+=("DISCORD_BOT_TOKEN")
-
-    echo "  stop [bot]                      - Stop specific bot or all bots"    fi
-
-    echo "  restart <bot|all>               - Restart specific bot(s)"    
-
-    echo "  status                          - Show all container status"    if ! grep -q "^LLM_CHAT_API_URL=" ".env" 2>/dev/null; then
-
-    echo "  logs [bot]                      - View logs (default: all bots)"        missing_vars+=("LLM_CHAT_API_URL")
-
-    echo "  build [--no-cache]              - Build bot images"    fi
-
-    echo ""    
-
-    echo "Available Bots:"    if [[ ${#missing_vars[@]} -gt 0 ]]; then
-
-    for bot in "${!BOT_CONFIGS[@]}"; do        print_warning "Missing critical environment variables in .env:"
-
-        IFS='|' read -r desc env_file char_file port <<< "${BOT_CONFIGS[$bot]}"        for var in "${missing_vars[@]}"; do
-
-        echo "  $bot    - $desc (port $port)"            echo "  • $var"
-
-    done        done
-
-    echo ""        echo ""
-
-    echo "Infrastructure Services:"        echo "Please configure these variables in .env before starting the bot."
-
-    echo "  PostgreSQL: localhost:5433"    fi
-
-    echo "  Redis:      localhost:6380"}
-
-    echo "  Qdrant:     localhost:6335"
-
-    echo ""show_help() {
-
-    echo "Examples:"    echo "Discord Bot Management Script"
-
-    echo "  $0 start elena          # Start just Elena"    echo ""
-
-    echo "  $0 start elena marcus   # Start Elena and Marcus"    echo "🚀 For Development: Choose your preferred development style!"
-
-    echo "  $0 stop elena           # Stop just Elena"    echo "   Containerized Development:  ./bot.sh start dev   # Hot-reload, mounted code"
-
-    echo "  $0 logs elena           # View Elena's logs"    echo "   Native Development:         python run.py        # After starting infrastructure"
-
-    echo "  $0 status               # Check all services"    echo "   Desktop App:                python universal_native_app.py"
-
-}    echo ""
-
-    echo "🚀 New to WhisperEngine? Try our cross-platform quick-start scripts:"
-
-check_env_files() {    echo "   Linux/macOS:   curl -sSL https://raw.githubusercontent.com/WhisperEngine-AI/whisperengine/main/scripts/quick-start.sh | bash"
-
-    local bots_to_check=("$@")    echo "   Windows (PS):  iwr https://raw.githubusercontent.com/WhisperEngine-AI/whisperengine/main/scripts/quick-start.ps1 | iex"
-
-    local missing_files=()    echo "   Windows (CMD): Download and run scripts/quick-start.bat"
-
-        echo ""
-
-    if [[ ${#bots_to_check[@]} -eq 0 ]]; then    echo "Usage: $0 <command> [mode]"
-
-        # Check all bot env files    echo ""
-
-        bots_to_check=("${!BOT_CONFIGS[@]}")    echo "Commands:"
-
-    fi    echo "  start [prod|dev|infrastructure]  - Start services (mode required)"
-
-        echo "  stop [prod|dev|infrastructure]   - Stop services"
-
-    for bot in "${bots_to_check[@]}"; do    echo "  logs [service]                   - View logs (default: whisperengine-bot)"
-
-        if [[ ! -v BOT_CONFIGS[$bot] ]]; then    echo "  status                           - Show container status"
-
-            print_warning "Unknown bot: $bot"    echo ""
-
-            continue    echo "Data Import:"
-
-        fi    echo "  import-chatgpt <file> <user-id> [options]  - Import ChatGPT conversations"
-
-            echo ""
-
-        IFS='|' read -r desc env_file char_file port <<< "${BOT_CONFIGS[$bot]}"    echo "Restart Commands (Data Preservation):"
-
-            echo "  restart [prod|dev|infrastructure]     - Restart services"
-
-        if [[ ! -f "$env_file" ]]; then    echo "  restart-all [prod|dev|infrastructure] - Restart all services, PRESERVE data"
-
-            missing_files+=("$env_file")    echo "  restart-full [prod|dev|infrastructure] - Alias for restart-all (preserve data)"
-
-        fi    echo "  restart-clean [prod|dev|infrastructure] - Restart all services, CLEAR cache only"
-
-    done    echo ""
-
-        echo "Data Management:"
-
-    if [[ ${#missing_files[@]} -gt 0 ]]; then    echo "  clear-cache [prod|dev|infrastructure] - Clear Redis cache, keep persistent data"
-
-        print_warning "Missing environment files: ${missing_files[*]}"    echo "  reset-data [prod|dev|infrastructure]  - ⚠️  DANGER: Clear ALL data volumes"
-
-        print_info "These files contain bot-specific Discord tokens and configuration"    echo "  cleanup                                - Remove orphaned containers and volumes"
-
-        print_info "Copy from .env.template and customize for each bot"    echo "  backup <create|list|restore|help>      - Data backup operations"
-
-        return 1    echo ""
-
-    fi    echo "Development:"
-
-        echo "  build-push [options]     - Build and push Docker image to Docker Hub"
-
-    return 0    echo ""
-
-}    echo "Modes:"
-
-    echo "  prod           - Full production deployment (Discord bot + all services in containers)"
-
-show_status() {    echo "  dev            - Full development deployment with hot-reload and mounted source code"
-
-    print_status "WhisperEngine Bot Status:"    echo "  infrastructure - Infrastructure services only (for developers running bot natively)"
-
-    echo ""    echo ""
-
-        echo ""
-
-    $COMPOSE_CMD ps --format "table {{.Name}}\t{{.Status}}\t{{.Ports}}" 2>/dev/null || {    echo "Examples:"
-
-        print_warning "No containers running"    echo "  $0 start prod                     # Full production deployment"
-
-        return    echo "  $0 start dev                      # Development with hot-reload (recommended for dev)"
-
-    }    echo "  $0 start infrastructure           # Start databases only (for native Python development)"
-
-        echo "  $0 import-chatgpt conversations.json 672814231002939413  # Import ChatGPT history"
-
-    echo ""    echo "  $0 restart dev                    # Restart development services with code changes"
-
-    print_info "Health Check Endpoints:"    echo "  $0 restart-all dev                # Restart all dev services, preserve data"
-
-    for bot in "${!BOT_CONFIGS[@]}"; do    echo "  $0 restart-clean dev              # Restart all, clear cache only"
-
-        IFS='|' read -r desc env_file char_file port <<< "${BOT_CONFIGS[$bot]}"    echo "  $0 clear-cache dev                # Clear cache without restarting"
-
-        echo "  $desc: http://localhost:$port/health"    echo "  $0 logs                           # View bot logs (auto-detects mode)"
-
-    done    echo "  $0 logs redis                     # View redis logs"
-
-        echo "  $0 stop                           # Stop (auto-detects mode)"
-
-    echo ""    echo "  $0 cleanup                        # Clean orphaned containers"
-
-    print_info "Infrastructure Services:"    echo ""
-
-    print_info "  PostgreSQL: localhost:5433"    echo "💡 Development Mode Benefits (dev):"
-
-    print_info "  Redis:      localhost:6380"    echo "   • 🔄 Hot-reload: Code changes automatically restart the bot"
-
-    print_info "  Qdrant:     localhost:6335 (HTTP) / 6336 (gRPC)"    echo "   • 📁 Local mounts: /src, /prompts, /config directories mounted from host"
-
-}    echo "   • 🐛 Debug logging: Detailed logs and error information"
-
-    echo "   • 🏥 Health checks: Monitor bot status during development"
-
-start_infrastructure() {    echo "   • 🚀 Full stack: All services running in containers for consistency"
-
-    print_status "Starting shared infrastructure..."    echo ""
-
-    print_info "  PostgreSQL (persistent data)"    echo "💡 Data Persistence Guide:"
-
-    print_info "  Redis (caching)"    echo "   • restart         → Bot only, everything preserved"
-
-    print_info "  Qdrant (vector storage)"    echo "   • restart-all     → All services, data preserved" 
-
-        echo "   • restart-clean   → All services, cache cleared, memories kept"
-
-    $COMPOSE_CMD up -d postgres redis qdrant    echo "   • reset-data      → ⚠️  Nuclear option: ALL data destroyed"
-
-        echo ""
-
-    print_status "Infrastructure started! Ready for native bot development."    echo "💡 Backup & Build Commands:"
-
-    print_info "Run 'python run.py' to start a bot natively with this infrastructure."    echo "  $0 backup create        # Create data backup"
-
-}    echo "  $0 backup list          # List available backups"
-
-    echo "  $0 build-push --help    # Show Docker build options"
-
-start_bots() {    echo "  $0 build-push v1.0.0    # Build and push specific version"
-
-    local bots_to_start=("$@")}
-
+        echo "📝 Copy .env.example to .env and configure:"
+        echo "   cp .env.example .env"
+        exit 1
+    fi
     
-
-    if [[ "${bots_to_start[0]}" == "all" ]]; then# Helper function to wait for services using health checks
-
-        bots_to_start=("${!BOT_CONFIGS[@]}")wait_for_services() {
-
-        print_status "Starting all character bots..."    local compose_files="$1"
-
-    else    local max_attempts=60
-
-        print_status "Starting bots: ${bots_to_start[*]}"    local attempt=0
-
-    fi    
-
-        echo "⏳ Waiting for all services to be healthy..."
-
-    # Validate bot names    echo "📊 Services: PostgreSQL, Redis, Qdrant, Bot"
-
-    for bot in "${bots_to_start[@]}"; do    
-
-        if [[ ! -v BOT_CONFIGS[$bot] ]]; then    while [[ $attempt -lt $max_attempts ]]; do
-
-            print_error "Unknown bot: $bot"        local healthy_count=0
-
-            print_info "Available bots: ${!BOT_CONFIGS[*]}"        local status_line=""
-
-            exit 1        
-
-        fi        # Check infrastructure services health
-
-    done        if $COMPOSE_CMD $compose_files ps postgres | grep -q "healthy"; then 
-
-                ((healthy_count++))
-
-    if ! check_env_files "${bots_to_start[@]}"; then            status_line+="✅DB "
-
-        print_error "Cannot start without proper environment files"        else
-
-        exit 1            status_line+="⏳DB "
-
-    fi        fi
-
-            
-
-    # Start infrastructure first        if $COMPOSE_CMD $compose_files ps redis | grep -q "healthy"; then 
-
-    $COMPOSE_CMD up -d postgres redis qdrant            ((healthy_count++))
-
-                status_line+="✅Redis "
-
-    # Start requested bots        else
-
-    local services_to_start=()            status_line+="⏳Redis "
-
-    for bot in "${bots_to_start[@]}"; do        fi
-
-        services_to_start+=("${bot}-bot")        
-
-    done        if $COMPOSE_CMD $compose_files ps qdrant | grep -q "healthy"; then 
-
-                ((healthy_count++))
-
-    $COMPOSE_CMD up -d "${services_to_start[@]}"            status_line+="✅Vector "
-
-            else
-
-    echo ""            status_line+="⏳Vector "
-
-    print_status "Bots starting up..."        fi
-
-            
-
-    echo ""        # Check bot health using our new health endpoint
-
-    print_info "Health Check Endpoints:"        if curl -sf http://localhost:9090/health >/dev/null 2>&1; then
-
-    for bot in "${bots_to_start[@]}"; do            ((healthy_count++))
-
-        IFS='|' read -r desc env_file char_file port <<< "${BOT_CONFIGS[$bot]}"            status_line+="✅Bot"
-
-        print_info "  $desc: http://localhost:$port/health"        else
-
-    done            status_line+="⏳Bot"
-
-}        fi
-
-        
-
-stop_bots() {        # Clear previous line and show current status
-
-    local bots_to_stop=("$@")        echo -ne "\r$status_line (${healthy_count}/5)"
-
-            
-
-    if [[ ${#bots_to_stop[@]} -eq 0 ]]; then        if [[ $healthy_count -eq 5 ]]; then
-
-        print_status "Stopping all services..."            echo ""
-
-        $COMPOSE_CMD down            return 0
-
-    else        fi
-
-        print_status "Stopping bots: ${bots_to_stop[*]}"        
-
-                sleep 2
-
-        local services_to_stop=()        ((attempt++))
-
-        for bot in "${bots_to_stop[@]}"; do    done
-
-            if [[ -v BOT_CONFIGS[$bot] ]]; then    
-
-                services_to_stop+=("${bot}-bot")    echo ""
-
-            else    print_warning "Some services may still be starting. Use '$0 status' to check."
-
-                print_warning "Unknown bot: $bot"    return 1
-
-            fi}
-
+    # Basic .env validation
+    if [[ ! -r ".env" ]]; then
+        print_error ".env file is not readable"
+        exit 1
+    fi
+    
+    # Check for critical variables (without sourcing the file)
+    local missing_vars=()
+    
+    if ! grep -q "^DISCORD_BOT_TOKEN=" ".env" 2>/dev/null; then
+        missing_vars+=("DISCORD_BOT_TOKEN")
+    fi
+    
+    if ! grep -q "^LLM_CHAT_API_URL=" ".env" 2>/dev/null; then
+        missing_vars+=("LLM_CHAT_API_URL")
+    fi
+    
+    if [[ ${#missing_vars[@]} -gt 0 ]]; then
+        print_warning "Missing critical environment variables in .env:"
+        for var in "${missing_vars[@]}"; do
+            echo "  • $var"
         done
-
-        start_bot() {
-
-        if [[ ${#services_to_stop[@]} -gt 0 ]]; then    local mode="$1"
-
-            $COMPOSE_CMD stop "${services_to_stop[@]}"    
-
-        fi    # Require explicit mode selection
-
-    fi    if [[ -z "$mode" ]]; then
-
-}        print_error "Mode is required. Please specify: prod, dev, or infrastructure"
-
         echo ""
+        echo "Please configure these variables in .env before starting the bot."
+    fi
+}
 
-restart_bots() {        echo "Usage: $0 start <mode>"
+show_help() {
+    echo "Discord Bot Management Script"
+    echo ""
+    echo "🚀 For Development: Choose your preferred development style!"
+    echo "   Containerized Development:  ./bot.sh start dev   # Hot-reload, mounted code"
+    echo "   Native Development:         python run.py        # After starting infrastructure"
+    echo "   Desktop App:                python universal_native_app.py"
+    echo ""
+    echo "🚀 New to WhisperEngine? Try our cross-platform quick-start scripts:"
+    echo "   Linux/macOS:   curl -sSL https://raw.githubusercontent.com/WhisperEngine-AI/whisperengine/main/scripts/quick-start.sh | bash"
+    echo "   Windows (PS):  iwr https://raw.githubusercontent.com/WhisperEngine-AI/whisperengine/main/scripts/quick-start.ps1 | iex"
+    echo "   Windows (CMD): Download and run scripts/quick-start.bat"
+    echo ""
+    echo "Usage: $0 <command> [mode]"
+    echo ""
+    echo "Commands:"
+    echo "  start [prod|dev|infrastructure]  - Start services (mode required)"
+    echo "  stop [prod|dev|infrastructure]   - Stop services"
+    echo "  logs [service]                   - View logs (default: whisperengine-bot)"
+    echo "  status                           - Show container status"
+    echo ""
+    echo "Data Import:"
+    echo "  import-chatgpt <file> <user-id> [options]  - Import ChatGPT conversations"
+    echo ""
+    echo "Restart Commands (Data Preservation):"
+    echo "  restart [prod|dev|infrastructure]     - Restart services"
+    echo "  restart-all [prod|dev|infrastructure] - Restart all services, PRESERVE data"
+    echo "  restart-full [prod|dev|infrastructure] - Alias for restart-all (preserve data)"
+    echo "  restart-clean [prod|dev|infrastructure] - Restart all services, CLEAR cache only"
+    echo ""
+    echo "Data Management:"
+    echo "  clear-cache [prod|dev|infrastructure] - Clear Redis cache, keep persistent data"
+    echo "  reset-data [prod|dev|infrastructure]  - ⚠️  DANGER: Clear ALL data volumes"
+    echo "  cleanup                                - Remove orphaned containers and volumes"
+    echo "  backup <create|list|restore|help>      - Data backup operations"
+    echo ""
+    echo "Development:"
+    echo "  build-push [options]     - Build and push Docker image to Docker Hub"
+    echo ""
+    echo "Modes:"
+    echo "  prod           - Full production deployment (Discord bot + all services in containers)"
+    echo "  dev            - Full development deployment with hot-reload and mounted source code"
+    echo "  infrastructure - Infrastructure services only (for developers running bot natively)"
+    echo ""
+    echo ""
+    echo "Examples:"
+    echo "  $0 start prod                     # Full production deployment"
+    echo "  $0 start dev                      # Development with hot-reload (recommended for dev)"
+    echo "  $0 start infrastructure           # Start databases only (for native Python development)"
+    echo "  $0 import-chatgpt conversations.json 672814231002939413  # Import ChatGPT history"
+    echo "  $0 restart dev                    # Restart development services with code changes"
+    echo "  $0 restart-all dev                # Restart all dev services, preserve data"
+    echo "  $0 restart-clean dev              # Restart all, clear cache only"
+    echo "  $0 clear-cache dev                # Clear cache without restarting"
+    echo "  $0 logs                           # View bot logs (auto-detects mode)"
+    echo "  $0 logs redis                     # View redis logs"
+    echo "  $0 stop                           # Stop (auto-detects mode)"
+    echo "  $0 cleanup                        # Clean orphaned containers"
+    echo ""
+    echo "💡 Development Mode Benefits (dev):"
+    echo "   • 🔄 Hot-reload: Code changes automatically restart the bot"
+    echo "   • 📁 Local mounts: /src, /prompts, /config directories mounted from host"
+    echo "   • 🐛 Debug logging: Detailed logs and error information"
+    echo "   • 🏥 Health checks: Monitor bot status during development"
+    echo "   • 🚀 Full stack: All services running in containers for consistency"
+    echo ""
+    echo "💡 Data Persistence Guide:"
+    echo "   • restart         → Bot only, everything preserved"
+    echo "   • restart-all     → All services, data preserved" 
+    echo "   • restart-clean   → All services, cache cleared, memories kept"
+    echo "   • reset-data      → ⚠️  Nuclear option: ALL data destroyed"
+    echo ""
+    echo "💡 Backup & Build Commands:"
+    echo "  $0 backup create        # Create data backup"
+    echo "  $0 backup list          # List available backups"
+    echo "  $0 build-push --help    # Show Docker build options"
+    echo "  $0 build-push v1.0.0    # Build and push specific version"
+}
 
-    local bots_to_restart=("$@")        echo "  prod           - Full production deployment (Discord bot + all services)"
+# Helper function to wait for services using health checks
+wait_for_services() {
+    local compose_files="$1"
+    local max_attempts=60
+    local attempt=0
+    
+    echo "⏳ Waiting for all services to be healthy..."
+    echo "📊 Services: PostgreSQL, Redis, Qdrant, Bot"
+    
+    while [[ $attempt -lt $max_attempts ]]; do
+        local healthy_count=0
+        local status_line=""
+        
+        # Check infrastructure services health
+        if $COMPOSE_CMD $compose_files ps postgres | grep -q "healthy"; then 
+            ((healthy_count++))
+            status_line+="✅DB "
+        else
+            status_line+="⏳DB "
+        fi
+        
+        if $COMPOSE_CMD $compose_files ps redis | grep -q "healthy"; then 
+            ((healthy_count++))
+            status_line+="✅Redis "
+        else
+            status_line+="⏳Redis "
+        fi
+        
+        if $COMPOSE_CMD $compose_files ps qdrant | grep -q "healthy"; then 
+            ((healthy_count++))
+            status_line+="✅Vector "
+        else
+            status_line+="⏳Vector "
+        fi
+        
+        # Check bot health using our new health endpoint
+        if curl -sf http://localhost:9090/health >/dev/null 2>&1; then
+            ((healthy_count++))
+            status_line+="✅Bot"
+        else
+            status_line+="⏳Bot"
+        fi
+        
+        # Clear previous line and show current status
+        echo -ne "\r$status_line (${healthy_count}/5)"
+        
+        if [[ $healthy_count -eq 5 ]]; then
+            echo ""
+            return 0
+        fi
+        
+        sleep 2
+        ((attempt++))
+    done
+    
+    echo ""
+    print_warning "Some services may still be starting. Use '$0 status' to check."
+    return 1
+}
 
-            echo "  dev            - Full development deployment with hot-reload and mounted code"
-
-    if [[ "${bots_to_restart[0]}" == "all" ]]; then        echo "  infrastructure - Infrastructure services only (for native bot development)" 
-
-        print_status "Restarting all bots..."        echo ""
-
-        $COMPOSE_CMD restart        echo "💡 For development, we recommend: $0 start dev (for containerized development with hot-reload)"
-
-    else        echo "💡 Or: python run.py (after starting infrastructure for native development)"
-
-        print_status "Restarting bots: ${bots_to_restart[*]}"        exit 1
-
+start_bot() {
+    local mode="$1"
+    
+    # Require explicit mode selection
+    if [[ -z "$mode" ]]; then
+        print_error "Mode is required. Please specify: prod, dev, or infrastructure"
+        echo ""
+        echo "Usage: $0 start <mode>"
+        echo "  prod           - Full production deployment (Discord bot + all services)"
+        echo "  dev            - Full development deployment with hot-reload and mounted code"
+        echo "  infrastructure - Infrastructure services only (for native bot development)" 
+        echo ""
+        echo "💡 For development, we recommend: $0 start dev (for containerized development with hot-reload)"
+        echo "💡 Or: python run.py (after starting infrastructure for native development)"
+        exit 1
+    fi
+    
+    check_docker
+    check_env
+    
+    # Validate compose files exist
+    case $mode in
+        "prod")
+            if [[ ! -f "docker-compose.yml" ]] || [[ ! -f "docker-compose.prod.yml" ]]; then
+                print_error "Required compose files not found (docker-compose.yml and docker-compose.prod.yml)"
+                exit 1
             fi
-
-        local services_to_restart=()    
-
-        for bot in "${bots_to_restart[@]}"; do    check_docker
-
-            if [[ -v BOT_CONFIGS[$bot] ]]; then    check_env
-
-                services_to_restart+=("${bot}-bot")    
-
-            else    # Validate compose files exist
-
-                print_warning "Unknown bot: $bot"    case $mode in
-
-            fi        "prod")
-
-        done            if [[ ! -f "docker-compose.yml" ]] || [[ ! -f "docker-compose.prod.yml" ]]; then
-
-                        print_error "Required compose files not found (docker-compose.yml and docker-compose.prod.yml)"
-
-        if [[ ${#services_to_restart[@]} -gt 0 ]]; then                exit 1
-
-            $COMPOSE_CMD restart "${services_to_restart[@]}"            fi
-
-        fi            ;;
-
-    fi        "dev")
-
-}            if [[ ! -f "docker-compose.yml" ]] || [[ ! -f "docker-compose.dev.yml" ]]; then
-
-                print_error "Required compose files not found (docker-compose.yml and docker-compose.dev.yml)"
-
-view_logs() {                exit 1
-
-    local bots_to_log=("$@")            fi
-
-                ;;
-
-    if [[ ${#bots_to_log[@]} -eq 0 ]]; then        "infrastructure")
-
-        print_status "Viewing logs for all services..."            if [[ ! -f "docker-compose.yml" ]]; then
-
-        $COMPOSE_CMD logs -f                print_error "docker-compose.yml not found"
-
-    else                exit 1
-
-        print_status "Viewing logs for: ${bots_to_log[*]}"            fi
-
-                    ;;
-
-        local services_to_log=()        *)
-
-        for bot in "${bots_to_log[@]}"; do            print_error "Invalid mode: $mode"
-
-            if [[ -v BOT_CONFIGS[$bot] ]]; then            echo "Valid modes: prod, dev, infrastructure"
-
-                services_to_log+=("${bot}-bot")            exit 1
-
-            else            ;;
-
-                print_warning "Unknown bot: $bot"    esac
-
-            fi    
-
-        done    case $mode in
-
-                "prod")
-
-        if [[ ${#services_to_log[@]} -gt 0 ]]; then            echo "🚀 Starting Discord Bot in Production Mode..."
-
-            $COMPOSE_CMD logs -f "${services_to_log[@]}"            $COMPOSE_CMD -f docker-compose.yml -f docker-compose.prod.yml up -d --build
-
-        fi            
-
-    fi            # Use improved health check waiting
-
-}            if wait_for_services "-f docker-compose.yml -f docker-compose.prod.yml"; then
-
-                print_status "Bot started in production mode with all services healthy!"
-
-build_images() {                echo ""
-
-    local build_args=("$@")                echo "🏥 Health Check: http://localhost:9090/health"
-
-                    echo "📊 Bot Status: http://localhost:9090/status" 
-
-    print_status "Building bot images..."            else
-
-                    print_warning "Some services may still be initializing"
-
-    if [[ " ${build_args[*]} " =~ " --no-cache " ]]; then            fi
-
-        $COMPOSE_CMD build --no-cache            
-
-    else            echo ""
-
-        $COMPOSE_CMD build            echo "📋 Quick Commands:"
-
-    fi            echo "   $0 logs        # View logs"
-
-                echo "   $0 stop        # Stop bot"
-
-    print_status "Build complete!"            echo "   $0 status      # Check status"
-
-}            ;;
-
+            ;;
         "dev")
-
-# Main command processing            echo "🚀 Starting Discord Bot in Development Mode with Hot-Reload..."
-
-main() {            echo "   🔄 Code changes will automatically reload"
-
-    if [[ $# -eq 0 ]]; then            echo "   📁 Local prompts and config mounted"
-
-        show_help            echo "   🐛 Debug mode enabled with detailed logging"
-
-        exit 0            
-
-    fi            $COMPOSE_CMD -f docker-compose.yml -f docker-compose.dev.yml up -d --build
-
+            if [[ ! -f "docker-compose.yml" ]] || [[ ! -f "docker-compose.dev.yml" ]]; then
+                print_error "Required compose files not found (docker-compose.yml and docker-compose.dev.yml)"
+                exit 1
+            fi
+            ;;
+        "infrastructure")
+            if [[ ! -f "docker-compose.yml" ]]; then
+                print_error "docker-compose.yml not found"
+                exit 1
+            fi
+            ;;
+        *)
+            print_error "Invalid mode: $mode"
+            echo "Valid modes: prod, dev, infrastructure"
+            exit 1
+            ;;
+    esac
+    
+    case $mode in
+        "prod")
+            echo "🚀 Starting Discord Bot in Production Mode..."
+            $COMPOSE_CMD -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+            
+            # Use improved health check waiting
+            if wait_for_services "-f docker-compose.yml -f docker-compose.prod.yml"; then
+                print_status "Bot started in production mode with all services healthy!"
+                echo ""
+                echo "🏥 Health Check: http://localhost:9090/health"
+                echo "📊 Bot Status: http://localhost:9090/status" 
+            else
+                print_warning "Some services may still be initializing"
+            fi
+            
+            echo ""
+            echo "📋 Quick Commands:"
+            echo "   $0 logs        # View logs"
+            echo "   $0 stop        # Stop bot"
+            echo "   $0 status      # Check status"
+            ;;
+        "dev")
+            echo "🚀 Starting Discord Bot in Development Mode with Hot-Reload..."
+            echo "   🔄 Code changes will automatically reload"
+            echo "   📁 Local prompts and config mounted"
+            echo "   🐛 Debug mode enabled with detailed logging"
+            
+            $COMPOSE_CMD -f docker-compose.yml -f docker-compose.dev.yml up -d --build
+            
+            # Use improved health check waiting
+            if wait_for_services "-f docker-compose.yml -f docker-compose.dev.yml"; then
+                print_status "Bot started in development mode with all services healthy!"
+                echo ""
+                echo "🏥 Health Check: http://localhost:9090/health"
+                echo "📊 Bot Status: http://localhost:9090/status" 
+                echo "🔄 Hot-reload: Code changes will automatically restart the bot"
+            else
+                print_warning "Some services may still be initializing"
+            fi
+            
+            echo ""
+            echo "📋 Development Features:"
+            echo "   • Hot-reload: Edit code and see changes instantly"
+            echo "   • Debug logging: Detailed logs for troubleshooting"
+            echo "   • Local mounts: /src, /prompts, /config directories mounted"
+            echo "   • Health endpoints: Monitor bot status during development"
+            echo ""
+            echo "📋 Quick Commands:"
+            echo "   $0 logs        # View detailed debug logs"
+            echo "   $0 stop        # Stop development environment"
+            echo "   $0 status      # Check service health"
+            echo "   $0 restart dev # Restart with code changes"
+            ;;
+        "infrastructure")
+            echo "🚀 Starting infrastructure services for native development..."
+            
+            # Start all 3 core datastores (all required for native development)
+            echo "🔄 Starting all core datastore services..."
+            echo "   📊 PostgreSQL (persistent data)"
+            echo "   🔴 Redis (caching)"  
+            echo "   🗃️ Qdrant (vector storage)"
+            
+            # Use --remove-orphans to clean up any leftover containers from previous configurations
+            $COMPOSE_CMD up -d --remove-orphans postgres redis qdrant
+            
+            echo "⏳ Waiting for all services to initialize..."
+            
+            # Wait for all services to be healthy with proper status checking
+            local max_attempts=30
+            local attempt=0
+            local services_ready=0
+            
+            while [[ $attempt -lt $max_attempts && $services_ready -lt 3 ]]; do
+                services_ready=0
                 
-
-    check_docker            # Use improved health check waiting
-
-                if wait_for_services "-f docker-compose.yml -f docker-compose.dev.yml"; then
-
-    local command="$1"                print_status "Bot started in development mode with all services healthy!"
-
-    shift                echo ""
-
-                    echo "🏥 Health Check: http://localhost:9090/health"
-
-    case "$command" in                echo "📊 Bot Status: http://localhost:9090/status" 
-
-        "start")                echo "🔄 Hot-reload: Code changes will automatically restart the bot"
-
-            if [[ $# -eq 0 ]]; then            else
-
-                print_error "Please specify what to start: <bot-name>, 'all', or 'infrastructure'"                print_warning "Some services may still be initializing"
-
-                print_info "Example: $0 start elena"            fi
-
-                exit 1            
-
-            fi            echo ""
-
-                        echo "📋 Development Features:"
-
-            if [[ "$1" == "infrastructure" ]]; then            echo "   • Hot-reload: Edit code and see changes instantly"
-
-                start_infrastructure            echo "   • Debug logging: Detailed logs for troubleshooting"
-
-            else            echo "   • Local mounts: /src, /prompts, /config directories mounted"
-
-                start_bots "$@"            echo "   • Health endpoints: Monitor bot status during development"
-
-            fi            echo ""
-
-            ;;            echo "📋 Quick Commands:"
-
-        "stop")            echo "   $0 logs        # View detailed debug logs"
-
-            stop_bots "$@"            echo "   $0 stop        # Stop development environment"
-
-            ;;            echo "   $0 status      # Check service health"
-
-        "restart")            echo "   $0 restart dev # Restart with code changes"
-
-            if [[ $# -eq 0 ]]; then            ;;
-
-                print_error "Please specify what to restart: <bot-name> or 'all'"        "infrastructure")
-
-                exit 1            echo "🚀 Starting infrastructure services for native development..."
-
-            fi            
-
-            restart_bots "$@"            # Start all 3 core datastores (all required for native development)
-
-            ;;            echo "🔄 Starting all core datastore services..."
-
-        "status")            echo "   📊 PostgreSQL (persistent data)"
-
-            show_status            echo "   🔴 Redis (caching)"  
-
-            ;;            echo "   🗃️ Qdrant (vector storage)"
-
-        "logs")            
-
-            view_logs "$@"            # Use --remove-orphans to clean up any leftover containers from previous configurations
-
-            ;;            $COMPOSE_CMD up -d --remove-orphans postgres redis qdrant
-
-        "build")            
-
-            build_images "$@"            echo "⏳ Waiting for all services to initialize..."
-
-            ;;            
-
-        "help"|"-h"|"--help")            # Wait for all services to be healthy with proper status checking
-
-            show_help            local max_attempts=30
-
-            ;;            local attempt=0
-
-        *)            local services_ready=0
-
-            print_error "Unknown command: $command"            
-
-            show_help            while [[ $attempt -lt $max_attempts && $services_ready -lt 3 ]]; do
-
-            exit 1                services_ready=0
-
-            ;;                
-
-    esac                # Check each service individually (only count once per loop)
-
-}                if $COMPOSE_CMD ps postgres | grep -q "healthy"; then ((services_ready++)); fi
-
+                # Check each service individually (only count once per loop)
+                if $COMPOSE_CMD ps postgres | grep -q "healthy"; then ((services_ready++)); fi
                 if $COMPOSE_CMD ps redis | grep -q "healthy"; then ((services_ready++)); fi
-
-main "$@"                if $COMPOSE_CMD ps qdrant | grep -q "healthy"; then ((services_ready++)); fi
+                if $COMPOSE_CMD ps qdrant | grep -q "healthy"; then ((services_ready++)); fi
                 
                 if [[ $services_ready -eq 3 ]]; then
                     echo "   ✅ All services ready!"
