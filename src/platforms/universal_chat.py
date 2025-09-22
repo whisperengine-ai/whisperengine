@@ -722,13 +722,19 @@ class UniversalChatOrchestrator:
         return None
 
     async def generate_ai_response(
-        self, message: Message, conversation_context: list[dict[str, str]]
+        self, 
+        message: Message, 
+        conversation_context: list[dict[str, str]],
+        phase3_context_switches=None,
+        phase3_empathy_calibration=None
     ) -> AIResponse:
-        """Generate AI response using conversation context (Discord model)"""
+        """Generate AI response using conversation context with Phase 3 intelligence"""
         try:
             # Check if we have access to the full WhisperEngine AI framework
             if self.bot_core and hasattr(self.bot_core, "memory_manager"):
-                return await self._generate_full_ai_response(message, conversation_context)
+                return await self._generate_full_ai_response(
+                    message, conversation_context, phase3_context_switches, phase3_empathy_calibration
+                )
             else:
                 # Use the character-enhanced conversation context passed in
                 # Don't override with generic WhisperEngine prompt
@@ -756,7 +762,11 @@ class UniversalChatOrchestrator:
             )
 
     async def _generate_full_ai_response(
-        self, message: Message, conversation_context: list[dict[str, str]]
+        self, 
+        message: Message, 
+        conversation_context: list[dict[str, str]],
+        phase3_context_switches=None,
+        phase3_empathy_calibration=None
     ) -> AIResponse:
         """Generate AI response using the full WhisperEngine AI framework"""
         try:
@@ -1109,6 +1119,39 @@ class UniversalChatOrchestrator:
                         context_parts.append(
                             f"- **Triggered by:** {len(moment['trigger_memories'])} related memories"
                         )
+
+                # Add Phase 3 intelligence context
+                if phase3_context_switches or phase3_empathy_calibration:
+                    context_parts.append("🧠 **Phase 3 Intelligence:**")
+                    
+                    if phase3_context_switches:
+                        context_parts.append(f"- **Context Switches Detected:** {len(phase3_context_switches)} switches")
+                        for switch in phase3_context_switches[:2]:  # Show top 2 switches
+                            switch_type = switch.get('switch_type', 'unknown')
+                            strength = switch.get('strength', 'unknown')
+                            description = switch.get('description', 'no description')[:100]
+                            context_parts.append(f"  - {switch_type} ({strength}): {description}")
+                            
+                            # Add adaptation strategy if available
+                            if switch.get('adaptation_strategy'):
+                                context_parts.append(f"    Strategy: {switch.get('adaptation_strategy')}")
+                    
+                    if phase3_empathy_calibration:
+                        empathy_style = phase3_empathy_calibration.get('empathy_style', 'unknown')
+                        confidence = phase3_empathy_calibration.get('confidence', 0.0)
+                        context_parts.append(f"- **Empathy Calibration:** Style: {empathy_style}, Confidence: {confidence:.2f}")
+                        
+                        # Add empathy guidance if available
+                        if phase3_empathy_calibration.get('guidance'):
+                            guidance = phase3_empathy_calibration.get('guidance', '')[:150]
+                            context_parts.append(f"  Guidance: {guidance}")
+                        
+                        # Add personalization factors if available
+                        if phase3_empathy_calibration.get('personalization_factors'):
+                            factors = phase3_empathy_calibration.get('personalization_factors', {})
+                            if factors:
+                                factor_list = [f"{k}: {v}" for k, v in list(factors.items())[:2]]
+                                context_parts.append(f"  Personalization: {', '.join(factor_list)}")
 
                 if context_parts:
                     # Include memory confidence assessment

@@ -2028,7 +2028,8 @@ class BotEventHandlers:
                         # Generate AI response using our conversation context directly
                         logger.info(f"🎯 CONTEXT DEBUG: Sending {len(final_context)} messages to Universal Chat Orchestrator")
                         ai_response = await self.chat_orchestrator.generate_ai_response(
-                            universal_message, final_context  # Use character-enhanced context!
+                            universal_message, final_context,  # Use character-enhanced context!
+                            phase3_context_switches, phase3_empathy_calibration  # Pass Phase 3 intelligence
                         )
 
                         response = ai_response.content
