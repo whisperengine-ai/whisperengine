@@ -47,6 +47,13 @@ env/
 ENV/
 __pypackages__/
 
+# Multi-bot environment files (contain secrets)
+.env.dream
+.env.elena  
+.env.marcus
+.env.marcus-chen
+.env.marcus-thompson
+
 # Keep example files
 !.env.example
 

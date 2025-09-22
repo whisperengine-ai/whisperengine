@@ -311,9 +311,13 @@ class VectorMemoryStore:
             logger.info(f"🔄 CHUNKING: Processing {len(chunks)} chunks for user {memory.user_id}")
             
             for i, chunk_content in enumerate(chunks):
+                # Generate proper UUID for chunk to avoid Qdrant point ID format errors
+                import uuid
+                chunk_id = str(uuid.uuid4())
+                
                 # Create chunk memory with enhanced metadata
                 chunk_memory = VectorMemory(
-                    id=f"{memory.id}_chunk_{i}",
+                    id=chunk_id,
                     user_id=memory.user_id,
                     memory_type=memory.memory_type,
                     content=chunk_content,
