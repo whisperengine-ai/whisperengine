@@ -2827,8 +2827,8 @@ class VectorMemoryManager:
             embedding_model=embedding_model
         )
         
-        # TEST: Verify logging is working
-        logger.error("🔥 VECTOR MEMORY MANAGER INITIALIZED - DEBUG LOGGING ACTIVE 🔥")
+        # DEBUG: Verify logging is working
+        logger.debug("🔥 VECTOR MEMORY MANAGER INITIALIZED - DEBUG LOGGING ACTIVE 🔥")
         
         # Store config for other services (PostgreSQL for user data, Redis for session cache)
         self.config = config

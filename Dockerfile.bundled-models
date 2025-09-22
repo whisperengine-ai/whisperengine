@@ -104,6 +104,12 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 COPY . /app
 WORKDIR /app
 
+# Make startup script executable
+RUN chmod +x /app/scripts/container_startup.sh
+
+# Install migration dependencies
+RUN pip install --no-cache-dir asyncpg
+
 # Set environment for offline model usage
 ENV MODEL_CACHE_DIR=/app/models
 ENV TRANSFORMERS_OFFLINE=1
@@ -126,5 +132,5 @@ exit(0 if config else 1) \
 HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
     CMD python -c "import sys; sys.exit(0)" || exit 1
 
-# Run application
-CMD ["python", "run.py"]
+# Run application with automatic migrations
+CMD ["/app/scripts/container_startup.sh"]

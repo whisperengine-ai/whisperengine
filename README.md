@@ -132,9 +132,9 @@ WhisperEngine now uses **focused, use-case-specific** configuration files instea
 **Quick Setup:**
 ```bash
 # Choose your configuration
-cp config/examples/.env.quick-start.example .env
+cp .env.elena.example .env.elena
 # Edit Discord token and LLM API key
-./bot.sh start dev
+./multi-bot.sh start elena
 ```
 
 **[📖 Full Configuration Guide](config/examples/README.md)** for all setup options
@@ -181,11 +181,8 @@ WhisperEngine now features a revolutionary memory system that provides **50-200x
 # Enable in .env file
 ENABLE_HIERARCHICAL_MEMORY=true
 
-# Start infrastructure
-./bot.sh start infrastructure
-
-# Start bot with hierarchical memory
-./bot.sh start dev
+# Start single bot with hierarchical memory
+./multi-bot.sh start elena
 ```
 
 **Performance Benchmarks:**
