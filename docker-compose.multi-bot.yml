@@ -237,6 +237,84 @@ services:
       qdrant:
         condition: service_healthy
 
+  # Dream of the Endless - Character Bot
+  dream-bot:
+    build:
+      context: .
+      dockerfile: Dockerfile.bundled-models
+      target: production
+    image: whisperengine-bot:${VERSION:-latest}
+    container_name: whisperengine-dream-bot
+    restart: unless-stopped
+    
+    # Dream-specific environment
+    env_file:
+      - .env.dream   # Dream-specific Discord token and configuration
+    environment:
+      # Bot identification
+      - DISCORD_BOT_NAME=Dream
+      - CDL_DEFAULT_CHARACTER=characters/examples/dream_of_the_endless.json
+      - CONTAINER_NAME=dream-bot
+      # Shared infrastructure endpoints  
+      - POSTGRES_HOST=postgres
+      - REDIS_HOST=redis
+      - QDRANT_HOST=qdrant
+      # Model configuration (pre-downloaded)
+      - MODEL_CACHE_DIR=/app/models
+      - DISABLE_MODEL_DOWNLOAD=true
+      - HF_HUB_OFFLINE=false  # Allow model downloads if pre-downloaded models not found
+      - TRANSFORMERS_OFFLINE=0
+      # Production defaults
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - DEBUG_MODE=false
+      - PYTHONUNBUFFERED=1
+      - HEALTH_CHECK_PORT=9094
+      - HEALTH_CHECK_HOST=0.0.0.0
+      
+    ports:
+      - "9094:9094"  # Dream health check endpoint
+      
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+          cpus: '4.0'
+        reservations:
+          memory: 2G
+          cpus: '2.0'
+    
+    # Health check
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9094/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    
+    # Shared volumes with bot-specific subdirectories
+    volumes:
+      - dream_backups:/app/backups
+      - dream_privacy:/app/privacy_data
+      - dream_temp:/app/temp_images
+      - dream_logs:/app/logs
+      # Shared configuration (read-only)
+      - ./characters:/app/characters:ro
+      - ./config:/app/config:ro
+      # Shared pre-downloaded models (read-only)
+      - shared_models:/app/models:ro
+      
+    networks:
+      - bot_network
+      
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+
   # === SHARED INFRASTRUCTURE ===
   # All bot containers share these services
   
@@ -371,6 +449,16 @@ volumes:
   marcus_chen_temp:
     driver: local
   marcus_chen_logs:
+    driver: local
+    
+  # Dream of the Endless volumes
+  dream_backups:
+    driver: local
+  dream_privacy:
+    driver: local
+  dream_temp:
+    driver: local
+  dream_logs:
     driver: local
     
   # Shared infrastructure volumes
