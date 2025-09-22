@@ -40,6 +40,130 @@ class SimplifiedEmotionManager:
         else:
             logger.error("❌ Emotion integration not available")
 
+    async def analyze_message_emotion_with_reactions(
+        self, 
+        user_id: str, 
+        message: str, 
+        conversation_context: Optional[Dict[str, Any]] = None,
+        emoji_reaction_context: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        """
+        Analyze emotion in user message enhanced with emoji reaction feedback.
+        
+        Args:
+            user_id: User identifier
+            message: User message content
+            conversation_context: Optional conversation context
+            emoji_reaction_context: Recent emoji reaction patterns from user
+            
+        Returns:
+            Enhanced emotion analysis with multimodal intelligence
+        """
+        # Get base emotion analysis
+        base_emotion = await self.analyze_message_emotion(user_id, message, conversation_context)
+        
+        # Enhance with emoji reaction data if available
+        if emoji_reaction_context and emoji_reaction_context.get("emotional_context") != "neutral":
+            reaction_emotion = emoji_reaction_context.get("emotional_context", "neutral")
+            reaction_confidence = emoji_reaction_context.get("confidence", 0.0)
+            
+            # Blend text-based emotion with reaction-based emotion
+            # Reactions are immediate feedback, so weight them highly for recent context
+            if reaction_confidence > 0.5:
+                # Strong reaction confidence - blend emotions
+                enhanced_emotion = self._blend_emotions(
+                    text_emotion=base_emotion.get("primary_emotion", "neutral"),
+                    text_confidence=base_emotion.get("confidence", 0.5),
+                    reaction_emotion=reaction_emotion,
+                    reaction_confidence=reaction_confidence
+                )
+                
+                base_emotion.update({
+                    "primary_emotion": enhanced_emotion["emotion"],
+                    "confidence": enhanced_emotion["confidence"],
+                    "multimodal_source": "text_and_reactions",
+                    "emoji_feedback": {
+                        "recent_pattern": reaction_emotion,
+                        "pattern_confidence": reaction_confidence,
+                        "sample_size": emoji_reaction_context.get("sample_size", 0)
+                    }
+                })
+                
+                # Enhance emotional intelligence section
+                if "emotional_intelligence" in base_emotion:
+                    base_emotion["emotional_intelligence"].update({
+                        "multimodal_analysis": True,
+                        "emoji_feedback_integrated": True,
+                        "reaction_pattern": reaction_emotion,
+                        "confidence_boost": reaction_confidence
+                    })
+                
+                logger.info(f"🎭 Enhanced emotion analysis with reactions: {enhanced_emotion['emotion']} (confidence: {enhanced_emotion['confidence']:.2f})")
+        
+        return base_emotion
+    
+    def _blend_emotions(self, text_emotion: str, text_confidence: float, 
+                       reaction_emotion: str, reaction_confidence: float) -> Dict[str, Any]:
+        """
+        Blend text-based emotion analysis with emoji reaction patterns.
+        
+        Args:
+            text_emotion: Emotion detected from text
+            text_confidence: Confidence in text emotion
+            reaction_emotion: Emotion pattern from reactions
+            reaction_confidence: Confidence in reaction pattern
+            
+        Returns:
+            Blended emotion result
+        """
+        # Map reaction types to standard emotions
+        reaction_to_emotion_map = {
+            "positive_strong": "joy",
+            "positive_mild": "contentment", 
+            "negative_strong": "frustration",
+            "negative_mild": "concern",
+            "mystical_wonder": "awe",
+            "tech_appreciation": "engagement",
+            "surprise": "surprise",
+            "confusion": "confusion",
+            "neutral_thoughtful": "contemplation"
+        }
+        
+        mapped_reaction = reaction_to_emotion_map.get(reaction_emotion, reaction_emotion)
+        
+        # If emotions align, boost confidence
+        if text_emotion == mapped_reaction or self._emotions_compatible(text_emotion, mapped_reaction):
+            return {
+                "emotion": text_emotion,
+                "confidence": min(0.95, (text_confidence + reaction_confidence) / 2 + 0.1)
+            }
+        
+        # If emotions conflict, use the one with higher confidence
+        if reaction_confidence > text_confidence:
+            return {
+                "emotion": mapped_reaction,
+                "confidence": reaction_confidence
+            }
+        else:
+            return {
+                "emotion": text_emotion,
+                "confidence": text_confidence
+            }
+    
+    def _emotions_compatible(self, emotion1: str, emotion2: str) -> bool:
+        """Check if two emotions are compatible/related."""
+        compatible_groups = [
+            {"joy", "contentment", "engagement", "awe"},
+            {"frustration", "concern", "confusion"},
+            {"surprise", "awe", "contemplation"},
+            {"neutral", "contemplation"}
+        ]
+        
+        for group in compatible_groups:
+            if emotion1 in group and emotion2 in group:
+                return True
+        return False
+
     async def analyze_message_emotion(
         self, 
         user_id: str, 

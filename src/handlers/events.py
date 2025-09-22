@@ -149,6 +149,13 @@ class BotEventHandlers:
         # Configuration flags - unified AI system always enabled
         self.voice_support_enabled = getattr(bot_core, "voice_support_enabled", False)
 
+        # Initialize Emoji Reaction Intelligence for multimodal emotional feedback
+        from src.intelligence.emoji_reaction_intelligence import EmojiReactionIntelligence
+        self.emoji_reaction_intelligence = EmojiReactionIntelligence(
+            memory_manager=self.memory_manager,
+            emotion_manager=self.phase2_integration
+        )
+
         # Initialize Universal Chat Orchestrator
         self.chat_orchestrator = None
         # Note: Universal Chat will be initialized asynchronously in setup_universal_chat()
@@ -305,6 +312,14 @@ class BotEventHandlers:
         @self.bot.event
         async def on_message(message):
             return await self.on_message(message)
+        
+        @self.bot.event
+        async def on_reaction_add(reaction, user):
+            return await self.on_reaction_add(reaction, user)
+        
+        @self.bot.event
+        async def on_reaction_remove(reaction, user):
+            return await self.on_reaction_remove(reaction, user)
 
     async def on_ready(self):
         """
@@ -1596,13 +1611,30 @@ class BotEventHandlers:
                 phase2_context["guild_id"] = str(message.guild.id)
                 phase2_context["channel_id"] = str(message.channel.id)
 
-            phase2_results = (
-                await self.phase2_integration.process_message_with_emotional_intelligence(
-                    user_id=user_id, message=content, conversation_context=phase2_context
-                )
-            )
+            # 🎭 MULTIMODAL INTELLIGENCE: Get recent emoji reaction context for enhanced emotion analysis
+            emoji_reaction_context = await self.get_recent_emotional_feedback(user_id)
+            if emoji_reaction_context.get("confidence", 0.0) > 0.3:
+                logger.debug(f"🎭 Integrating emoji reaction context: {emoji_reaction_context.get('emotional_context')} (confidence: {emoji_reaction_context.get('confidence', 0.0):.2f})")
+                phase2_context["emoji_reaction_context"] = emoji_reaction_context
 
-            logger.debug("Phase 2 emotional intelligence analysis completed")
+            # Enhanced emotion processing with multimodal intelligence
+            if hasattr(self.phase2_integration, 'analyze_message_emotion_with_reactions'):
+                # Use enhanced method that combines text and emoji reactions
+                phase2_results = await self.phase2_integration.analyze_message_emotion_with_reactions(
+                    user_id=user_id, 
+                    message=content, 
+                    conversation_context=phase2_context,
+                    emoji_reaction_context=emoji_reaction_context
+                )
+                logger.debug("🎭 Enhanced multimodal emotion analysis completed")
+            else:
+                # Fallback to standard emotion processing
+                phase2_results = (
+                    await self.phase2_integration.process_message_with_emotional_intelligence(
+                        user_id=user_id, message=content, conversation_context=phase2_context
+                    )
+                )
+                logger.debug("Phase 2 emotional intelligence analysis completed")
             return phase2_results, None  # Return results and placeholder for current_emotion_data
 
         except Exception as e:
@@ -3207,3 +3239,85 @@ class BotEventHandlers:
             logger.error(f"🎭 CDL CHARACTER ERROR: Failed to apply character enhancement: {e}")
             logger.error(f"🎭 CDL CHARACTER ERROR: Falling back to original conversation context")
             return None
+
+    # === Emoji Reaction Intelligence Event Handlers ===
+    
+    async def on_reaction_add(self, reaction, user):
+        """
+        Handle emoji reactions added to bot messages for multimodal emotional intelligence.
+        
+        Args:
+            reaction: Discord Reaction object
+            user: Discord User who added the reaction
+        """
+        try:
+            # Process the reaction through our emoji intelligence system
+            reaction_data = await self.emoji_reaction_intelligence.process_reaction_add(
+                reaction=reaction,
+                user=user,
+                bot_user_id=str(self.bot.user.id)
+            )
+            
+            if reaction_data:
+                logger.info(f"🎭 Emoji reaction captured: {reaction_data.emoji} → {reaction_data.reaction_type.value} from user {reaction_data.user_id}")
+                
+                # Optional: Get user's emotional patterns for future context
+                patterns = self.emoji_reaction_intelligence.get_user_emotional_patterns(reaction_data.user_id)
+                if patterns.get("total_reactions", 0) > 0:
+                    logger.debug(f"🎭 User {reaction_data.user_id} emotional pattern: {patterns.get('insights', 'No patterns yet')}")
+            
+        except Exception as e:
+            logger.error(f"Error processing emoji reaction add: {e}")
+    
+    async def on_reaction_remove(self, reaction, user):
+        """
+        Handle emoji reactions removed from bot messages.
+        
+        Args:
+            reaction: Discord Reaction object
+            user: Discord User who removed the reaction
+        """
+        try:
+            # Only log reaction removal for bot messages
+            if str(reaction.message.author.id) == str(self.bot.user.id) and not user.bot:
+                emoji_str = str(reaction.emoji)
+                user_id = str(user.id)
+                logger.debug(f"🎭 Emoji reaction removed: {emoji_str} by user {user_id}")
+                
+                # Note: We don't remove from memory since the initial reaction still provides
+                # valuable emotional feedback data about the user's response to the content
+                
+        except Exception as e:
+            logger.error(f"Error processing emoji reaction remove: {e}")
+
+    def get_user_emotional_context(self, user_id: str) -> dict:
+        """
+        Get emotional context from emoji reactions for use in response generation.
+        
+        Args:
+            user_id: Discord user ID
+            
+        Returns:
+            Dictionary with emotional context for response personalization
+        """
+        try:
+            return self.emoji_reaction_intelligence.get_user_emotional_patterns(user_id)
+        except Exception as e:
+            logger.error(f"Error getting user emotional context: {e}")
+            return {"patterns": {}, "insights": "No emotional data available"}
+    
+    async def get_recent_emotional_feedback(self, user_id: str) -> dict:
+        """
+        Get recent emotional feedback from emoji reactions for immediate context.
+        
+        Args:
+            user_id: Discord user ID
+            
+        Returns:
+            Recent emotional context for immediate response adjustment
+        """
+        try:
+            return await self.emoji_reaction_intelligence.get_emotional_context_for_response(user_id)
+        except Exception as e:
+            logger.error(f"Error getting recent emotional feedback: {e}")
+            return {"emotional_context": "neutral", "confidence": 0.0}
