@@ -569,6 +569,19 @@ class BotEventHandlers:
                             filters["prefer_recent_conversation"] = True
                             filters["recency_hours"] = 2  # Prefer memories from last 2 hours
                             
+                            # 🛡️ META-CONVERSATION FILTER: Exclude conversations ABOUT the bot system itself
+                            # This prevents our technical debugging from contaminating character responses
+                            # while allowing users to discuss these topics naturally
+                            meta_conversation_patterns = [
+                                "Elena's prompt", "your system prompt", "how you're programmed",
+                                "your character file", "cdl_ai_integration.py", "fix Elena's",
+                                "Elena is announcing wrong time", "Elena should speak like",
+                                "testing Elena's response", "Elena bot container",
+                                "Elena's speaking style", "Elena's mystical detection"
+                            ]
+                            filters["exclude_content_patterns"] = meta_conversation_patterns
+                            logger.info(f"🛡️ MEMORY FILTER: Excluding meta-conversations with {len(meta_conversation_patterns)} pattern filters")
+                            
                             # 🎭 CHARACTER FILTERING: Add character-aware memory filtering
                             # This ensures Elena gets Elena's memories, not generic WhisperEngine ones
                             if hasattr(self.bot_core, 'command_handlers') and 'cdl_test' in self.bot_core.command_handlers:
@@ -866,9 +879,8 @@ class BotEventHandlers:
                 f"SECURITY: Unsafe input detected from user {user_id} in server {message.guild.name}"
             )
             logger.error(f"SECURITY: Blocked patterns: {validation_result['blocked_patterns']}")
-            await reply_channel.send(
-                f"⚠️ {message.author.mention} Your message contains content that could not be processed for security reasons. Please rephrase your message."
-            )
+            security_msg = f"⚠️ {message.author.mention} Your message contains content that could not be processed for security reasons. Please rephrase your message."
+            await message.reply(security_msg, mention_author=False)  # mention_author=False since we already include the mention
             return
 
         content = validation_result["sanitized_content"]
@@ -2248,7 +2260,9 @@ class BotEventHandlers:
                 )
 
                 # Send response (chunked if too long)
-                await self._send_response_chunks(reply_channel, response_with_debug)
+                # Use reply format for guild mentions, regular send for DMs
+                reference_message = message if message.guild else None
+                await self._send_response_chunks(reply_channel, response_with_debug, reference_message)
 
                 # CRITICAL FIX: Add bot response to conversation cache after sending
                 if self.conversation_cache:
@@ -2288,29 +2302,39 @@ class BotEventHandlers:
 
             except LLMConnectionError:
                 logger.warning("LLM connection error")
-                await reply_channel.send(
-                    "I'm having trouble connecting to my knowledge systems. Please try again in a moment."
-                )
+                error_msg = "I'm having trouble connecting to my knowledge systems. Please try again in a moment."
+                if message.guild:
+                    await message.reply(error_msg, mention_author=True)
+                else:
+                    await reply_channel.send(error_msg)
             except LLMTimeoutError:
                 logger.warning("LLM timeout error")
-                await reply_channel.send(
-                    "I apologize, but that took longer than expected to process. Could you please try again?"
-                )
+                error_msg = "I apologize, but that took longer than expected to process. Could you please try again?"
+                if message.guild:
+                    await message.reply(error_msg, mention_author=True)
+                else:
+                    await reply_channel.send(error_msg)
             except LLMRateLimitError:
                 logger.warning("LLM rate limit error")
-                await reply_channel.send(
-                    "I'm experiencing high demand right now. Please wait a moment before trying again."
-                )
+                error_msg = "I'm experiencing high demand right now. Please wait a moment before trying again."
+                if message.guild:
+                    await message.reply(error_msg, mention_author=True)
+                else:
+                    await reply_channel.send(error_msg)
             except LLMError as e:
                 logger.error(f"LLM error: {e}")
-                await reply_channel.send(
-                    "*The threads of thought grow tangled for a moment...* Please, speak again, and I shall attend to thy words more clearly."
-                )
+                error_msg = "*The threads of thought grow tangled for a moment...* Please, speak again, and I shall attend to thy words more clearly."
+                if message.guild:
+                    await message.reply(error_msg, mention_author=True)
+                else:
+                    await reply_channel.send(error_msg)
             except Exception as e:
                 logger.error(f"Unexpected error processing message through Universal Chat: {e}")
-                await reply_channel.send(
-                    "*Something stirs in the darkness beyond my understanding...* Perhaps we might try this exchange anew?"
-                )
+                error_msg = "*Something stirs in the darkness beyond my understanding...* Perhaps we might try this exchange anew?"
+                if message.guild:
+                    await message.reply(error_msg, mention_author=True)
+                else:
+                    await reply_channel.send(error_msg)
 
     async def _store_conversation_memory(
         self,
@@ -2652,11 +2676,18 @@ class BotEventHandlers:
             logger.warning(f"Dynamic personality analysis failed for user {user_id}: {e}")
             return None
 
-    async def _send_response_chunks(self, channel, response):
-        """Send response in chunks if it's too long. Prevent sending empty/whitespace-only messages."""
+    async def _send_response_chunks(self, channel, response, reference_message=None):
+        """Send response in chunks if it's too long. Prevent sending empty/whitespace-only messages.
+        
+        Args:
+            channel: Discord channel to send to
+            response: Response text to send
+            reference_message: If provided, will reply to this message instead of just sending to channel
+        """
         if not response or not str(response).strip():
             logger.warning("Attempted to send empty or whitespace-only message. Skipping send.")
             return
+            
         if len(response) > 2000:
             chunks = [response[i : i + 1900] for i in range(0, len(response), 1900)]
             logger.info(
@@ -2664,15 +2695,25 @@ class BotEventHandlers:
             )
             for i, chunk in enumerate(chunks):
                 if chunk and str(chunk).strip():
-                    await channel.send(
-                        f"{chunk}" + (f"\n*(continued {i+1}/{len(chunks)})*" if len(chunks) > 1 else "")
-                    )
-                    logger.debug(f"Sent chunk {i+1}/{len(chunks)}")
+                    chunk_content = f"{chunk}" + (f"\n*(continued {i+1}/{len(chunks)})*" if len(chunks) > 1 else "")
+                    
+                    # Use reply for first chunk if reference message provided, otherwise regular send
+                    if i == 0 and reference_message:
+                        await reference_message.reply(chunk_content, mention_author=True)
+                        logger.debug(f"Replied to message with chunk {i+1}/{len(chunks)}")
+                    else:
+                        await channel.send(chunk_content)
+                        logger.debug(f"Sent chunk {i+1}/{len(chunks)}")
                 else:
                     logger.warning(f"Skipped sending empty chunk {i+1}/{len(chunks)}")
         else:
-            await channel.send(response)
-            logger.debug("Sent single message response")
+            # Use reply if reference message provided, otherwise regular send
+            if reference_message:
+                await reference_message.reply(response, mention_author=True)
+                logger.debug("Replied to message with single response")
+            else:
+                await channel.send(response)
+                logger.debug("Sent single message response")
 
     async def _send_voice_response(self, message, response):
         """Send voice response if user is in voice channel."""

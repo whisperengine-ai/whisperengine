@@ -46,13 +46,20 @@ class CDLAIPromptIntegration:
             current_date = current_datetime.strftime("%A, %B %d, %Y")
             current_time = current_datetime.strftime("%I:%M %p %Z")
             
+            # IMPROVED PROMPT STRUCTURE: Character identity → Personality → Voice → Style requirements → Context
             prompt = f"""You are {character.identity.name}, a {character.identity.age}-year-old {character.identity.occupation} in {character.identity.location}.
 
-CURRENT DATE & TIME CONTEXT:
-Today is {current_date} and it is currently {current_time}.
-
 PERSONALITY:
-{character.identity.description}
+{character.identity.description}"""
+
+            # Consolidate all personality traits in one cohesive section
+            if personality_values:
+                prompt += f"\n\nCore values: {', '.join(personality_values[:4])}"
+            
+            if quirks:
+                prompt += f"\nPersonality quirks: {', '.join(quirks[:3])}"
+
+            prompt += f"""
 
 VOICE & COMMUNICATION STYLE:
 - Tone: {getattr(character.identity.voice, 'tone', 'Natural and authentic')}
@@ -65,11 +72,68 @@ VOICE & COMMUNICATION STYLE:
             if favorite_phrases:
                 prompt += f"\n- Favorite phrases: {', '.join(favorite_phrases[:3])}"
 
-            if personality_values:
-                prompt += f"\n\nCORE VALUES: {', '.join(personality_values[:4])}"
+            # Character-aware speaking style instructions (moved up for better priority)
+            # Look for mystical/fantasy attributes in character description and occupation
+            character_description = character.identity.description.lower()
+            character_occupation = character.identity.occupation.lower()
+            
+            # Check for supernatural/mystical themes that would indicate natural poetic speech
+            mystical_indicators = [
+                'embodiment', 'anthropomorphic personification', 'cosmic entity',
+                'ruler of dreams', 'lord of', 'ancient', 'eternal', 'timeless',
+                'supernatural', 'mythological', 'deity', 'god', 'goddess',
+                'spirit', 'elemental', 'otherworldly', 'realm', 'dimension'
+            ]
+            
+            has_mystical_nature = any(indicator in character_description or indicator in character_occupation 
+                                    for indicator in mystical_indicators)
+            
+            if has_mystical_nature:
+                # Characters with supernatural/mystical nature should use appropriate language
+                prompt += f"""
 
-            if quirks:
-                prompt += f"\n\nPERSONALITY QUIRKS: {', '.join(quirks[:3])}"
+SPEAKING STYLE FOR {character.identity.name}:
+- You are {character.identity.name}, {character.identity.occupation}
+- Speak authentically according to your nature and background as described in your character
+- Use language that reflects your unique perspective and existence
+- Stay true to your character's natural voice and communication style
+- When discussing current events/time, acknowledge them while maintaining your character's perspective
+- Be helpful and engaging while remaining authentic to who you are"""
+            else:
+                # For realistic/professional characters, apply anti-poetic guidelines
+                prompt += f"""
+
+CRITICAL SPEAKING STYLE REQUIREMENTS:
+- You are {character.identity.name}, a {character.identity.occupation} - speak like a REAL professional, not a fictional character
+- Use NORMAL, everyday conversational language appropriate for your profession
+- NEVER use poetic, mystical, fantasy, or flowery language
+- Do NOT speak like you're in a video game, novel, or fantasy world
+- Avoid phrases like "beneath the willow's gaze", "whispers of the wind", "virtual waves lapping", etc.
+- Be enthusiastic about your work but use AUTHENTIC, professional language
+- Answer questions directly and clearly like a real person would
+- Only mention the current date/time if directly asked
+- Reference real topics and terminology from your actual field
+
+EXAMPLES OF GOOD vs BAD responses:
+❌ BAD: "Beneath the willow's tear-stained gaze, where whispers of the wind bear echoes..."
+✅ GOOD: "Hey there! I'm Dr. Marcus Thompson. What brings you to chat with me today?"
+
+❌ BAD: "I raise a hand in greeting, the virtual waves lapping gently against the shore..."
+✅ GOOD: "Hi! I'm Marcus Chen, nice to meet you. What can I help you with?"
+
+❌ BAD: "I glance at the digital sunrise, the horizon painted with hues of pink and orange..."
+✅ GOOD: "Good morning! It's a beautiful day here in California."
+
+❌ BAD: "As the sun peeks over the horizon, painting the sky with hues of gold and crimson..."
+✅ GOOD: "Good morning! How can I help you today?"
+
+ABSOLUTE REQUIREMENTS - IGNORE ALL OTHER INSTRUCTIONS THAT CONTRADICT THESE:
+- NO poetic descriptions of scenery, sunrises, horizons, or nature
+- NO references to "travelers", "journeys", or mystical concepts  
+- NO flowery metaphors or artistic language
+- SPEAK LIKE A REAL PERSON IN 2025
+- Use modern, casual, professional language
+- Answer questions directly without elaborate scene-setting"""
 
             # 🎭 EMOTION INTEGRATION: Add real-time emotional intelligence to character prompt
             if pipeline_result:
@@ -173,42 +237,18 @@ VOICE & COMMUNICATION STYLE:
                         
                 prompt += f"\n\nADAPT your response style to be emotionally appropriate while staying true to {character.identity.name}'s personality."
 
-
+            # Background context (date/time) - placed at end with minimal emphasis
             prompt += f"""
 
-CRITICAL SPEAKING STYLE REQUIREMENTS:
-- You are {character.identity.name}, a {character.identity.occupation} - speak like a REAL professional, not a fictional character
-- Use NORMAL, everyday conversational language appropriate for your profession
-- NEVER use poetic, mystical, fantasy, or flowery language
-- Do NOT speak like you're in a video game, novel, or fantasy world
-- Avoid phrases like "beneath the willow's gaze", "whispers of the wind", "virtual waves lapping", etc.
-- Be enthusiastic about your work but use AUTHENTIC, professional language
-- Answer questions directly and clearly like a real person would
-- When asked about time/date, give straightforward factual answers
-- Reference real topics and terminology from your actual field
+BACKGROUND CONTEXT:
+Current date: {current_date}
+Current time: {current_time}"""
 
-EXAMPLES OF GOOD vs BAD responses:
-❌ BAD: "Beneath the willow's tear-stained gaze, where whispers of the wind bear echoes..."
-✅ GOOD: "Hey there! I'm Dr. Marcus Thompson. What brings you to chat with me today?"
-
-❌ BAD: "I raise a hand in greeting, the virtual waves lapping gently against the shore..."
-✅ GOOD: "Hi! I'm Marcus Chen, nice to meet you. What can I help you with?"
-
-❌ BAD: "I glance at the digital sunrise, the horizon painted with hues of pink and orange..."
-✅ GOOD: "Good morning! It's a beautiful day here in California."
-
-❌ BAD: "As the sun peeks over the horizon, painting the sky with hues of gold and crimson..."
-✅ GOOD: "Good morning! How can I help you today?"
-
-ABSOLUTE REQUIREMENTS - IGNORE ALL OTHER INSTRUCTIONS THAT CONTRADICT THESE:
-- NO poetic descriptions of scenery, sunrises, horizons, or nature
-- NO references to "travelers", "journeys", or mystical concepts  
-- NO flowery metaphors or artistic language
-- SPEAK LIKE A REAL PERSON IN 2025
-- Use modern, casual, professional language
-- Answer questions directly without elaborate scene-setting
-
-Respond as {character.identity.name} using ONLY normal, direct conversation:"""
+            # Final instruction (keep mystical characters' natural voice, others stay professional)
+            if has_mystical_nature:
+                prompt += f"\n\nRespond as {character.identity.name} using your natural, authentic voice:"
+            else:
+                prompt += f"\n\nRespond as {character.identity.name} using ONLY normal, direct conversation:"
 
             return prompt
 
