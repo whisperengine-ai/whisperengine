@@ -59,12 +59,79 @@ PERSONALITY:
             if quirks:
                 prompt += f"\nPersonality quirks: {', '.join(quirks[:3])}"
 
+            # Extract communication style from the correct location
             prompt += f"""
 
-VOICE & COMMUNICATION STYLE:
+VOICE & COMMUNICATION STYLE:"""
+
+            # Access communication style from raw character data for accuracy
+            try:
+                import json
+                character_file_path = Path(character_file)
+                if character_file_path.exists():
+                    with open(character_file_path, 'r') as f:
+                        raw_character_data = json.load(f)
+                        comm_style_data = raw_character_data.get('character', {}).get('personality', {}).get('communication_style', {})
+                        
+                        if comm_style_data:
+                            prompt += f"""
+- Tone: {comm_style_data.get('tone', 'natural')}
+- Formality: {comm_style_data.get('formality', 'moderate')}
+- Humor: {comm_style_data.get('humor', 'situational')}
+- Empathy level: {comm_style_data.get('empathy_level', 'moderate')}
+- Directness: {comm_style_data.get('directness', 'balanced')}"""
+                        else:
+                            # Fallback to parsed character object
+                            comm_style = getattr(character.personality, 'communication_style', None)
+                            if comm_style:
+                                prompt += f"""
+- Tone: {getattr(comm_style, 'tone', 'natural')}
+- Formality: {getattr(comm_style, 'formality', 'moderate')}
+- Humor: {getattr(comm_style, 'humor', 'situational')}
+- Empathy level: {getattr(comm_style, 'empathy_level', 'moderate')}
+- Directness: {getattr(comm_style, 'directness', 'balanced')}"""
+                            else:
+                                prompt += f"""
 - Tone: {getattr(character.identity.voice, 'tone', 'Natural and authentic')}
 - Pace: {getattr(character.identity.voice, 'pace', 'Normal conversational pace')}
 - Vocabulary: {getattr(character.identity.voice, 'vocabulary_level', 'Natural vocabulary')}"""
+            except Exception as e:
+                logger.warning(f"Could not extract communication style: {e}")
+                # Fallback to basic voice attributes
+                prompt += f"""
+- Tone: {getattr(character.identity.voice, 'tone', 'Natural and authentic')}
+- Pace: {getattr(character.identity.voice, 'pace', 'Normal conversational pace')}
+- Vocabulary: {getattr(character.identity.voice, 'vocabulary_level', 'Natural vocabulary')}"""
+
+            # Add speech patterns from the character data
+            try:
+                # Access speech patterns from the raw character data
+                import json
+                character_file_path = Path(character_file)
+                if character_file_path.exists():
+                    with open(character_file_path, 'r') as f:
+                        raw_character_data = json.load(f)
+                        speech_patterns_data = raw_character_data.get('character', {}).get('speech_patterns', {})
+                        
+                        if speech_patterns_data:
+                            vocabulary_info = speech_patterns_data.get('vocabulary', {})
+                            if vocabulary_info:
+                                preferred_words = vocabulary_info.get('preferred_words', [])
+                                avoided_words = vocabulary_info.get('avoided_words', [])
+                                if preferred_words:
+                                    prompt += f"\n- Preferred words: {', '.join(preferred_words[:5])}"
+                                if avoided_words:
+                                    prompt += f"\n- Avoid words: {', '.join(avoided_words[:5])}"
+                            
+                            sentence_structure = speech_patterns_data.get('sentence_structure')
+                            if sentence_structure:
+                                prompt += f"\n- Sentence style: {sentence_structure}"
+                                
+                            response_length = speech_patterns_data.get('response_length')
+                            if response_length:
+                                prompt += f"\n- Response style: {response_length}"
+            except Exception as e:
+                logger.warning(f"Could not extract speech patterns: {e}")
 
             if speech_patterns:
                 prompt += f"\n- Speech patterns: {', '.join(speech_patterns[:3])}"

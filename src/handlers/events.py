@@ -155,6 +155,12 @@ class BotEventHandlers:
             memory_manager=self.memory_manager,
             emotion_manager=self.phase2_integration
         )
+        
+        # Initialize Vector-Based Emoji Response Intelligence 
+        from src.intelligence.vector_emoji_intelligence import EmojiResponseIntegration
+        self.emoji_response_intelligence = EmojiResponseIntegration(
+            memory_manager=self.memory_manager
+        )
 
         # Initialize Universal Chat Orchestrator
         self.chat_orchestrator = None
@@ -519,9 +525,41 @@ class BotEventHandlers:
 
         # Security validation
         validation_result = validate_user_input(message.content, user_id, "dm")
+        # Store validation result for emoji intelligence system
+        self._last_security_validation = validation_result
+        
         if not validation_result["is_safe"]:
             logger.error(f"SECURITY: Unsafe input detected from user {user_id} in DM")
             logger.error(f"SECURITY: Blocked patterns: {validation_result['blocked_patterns']}")
+            
+            # 🎭 EMOJI INTELLIGENCE: Use emoji response for inappropriate content
+            try:
+                # Determine bot character
+                bot_character = "general"
+                if 'elena' in str(self.bot.user.name).lower() or 'dream' in str(self.bot.user.name).lower():
+                    bot_character = "mystical"
+                elif 'marcus' in str(self.bot.user.name).lower():
+                    bot_character = "technical"
+                
+                # Evaluate emoji response for inappropriate content
+                emoji_decision = await self.emoji_response_intelligence.evaluate_emoji_response(
+                    user_id=user_id,
+                    user_message=message.content,
+                    bot_character=bot_character,
+                    security_validation_result=validation_result,
+                    emotional_context=None,
+                    conversation_context={'channel_type': 'dm'}
+                )
+                
+                if emoji_decision.should_use_emoji:
+                    logger.info(f"🎭 SECURITY + EMOJI: Using emoji '{emoji_decision.emoji_choice}' for inappropriate content")
+                    await self.emoji_response_intelligence.apply_emoji_response(message, emoji_decision)
+                    return
+                    
+            except Exception as e:
+                logger.error(f"Error in security emoji response: {e}")
+            
+            # Fallback to text warning if emoji response fails
             await reply_channel.send(
                 "⚠️ Your message contains content that could not be processed for security reasons. Please rephrase your message."
             )
@@ -2291,6 +2329,61 @@ class BotEventHandlers:
                     response, user_id, self.memory_manager, str(message.id)
                 )
 
+                # 🎭 VECTOR-POWERED EMOJI INTELLIGENCE: Evaluate if emoji response is more appropriate
+                try:
+                    # Determine bot character based on configured bot name or character file
+                    bot_character = "general"  # Default
+                    if hasattr(self, 'bot_character_type'):
+                        bot_character = self.bot_character_type
+                    elif 'elena' in str(self.bot.user.name).lower() or 'dream' in str(self.bot.user.name).lower():
+                        bot_character = "mystical"
+                    elif 'marcus' in str(self.bot.user.name).lower():
+                        bot_character = "technical"
+                    
+                    # Get security validation result from earlier in pipeline
+                    security_validation_result = getattr(self, '_last_security_validation', None)
+                    
+                    # Evaluate emoji response appropriateness using vector intelligence
+                    emoji_decision = await self.emoji_response_intelligence.evaluate_emoji_response(
+                        user_id=user_id,
+                        user_message=original_content or message.content,
+                        bot_character=bot_character,
+                        security_validation_result=security_validation_result,
+                        emotional_context=getattr(self, '_last_emotional_context', None),
+                        conversation_context={'channel_type': 'dm' if not message.guild else 'guild'}
+                    )
+                    
+                    # If emoji response is recommended, use it instead of text
+                    if emoji_decision.should_use_emoji:
+                        logger.info(f"🎭 EMOJI INTELLIGENCE: Using emoji response '{emoji_decision.emoji_choice}' "
+                                  f"(confidence: {emoji_decision.confidence_score:.2f}, reason: {emoji_decision.context_reason.value})")
+                        
+                        await self.emoji_response_intelligence.apply_emoji_response(message, emoji_decision)
+                        
+                        # Store the emoji response in memory as the bot's response
+                        if self.memory_manager:
+                            await self.memory_manager.store_conversation(
+                                user_id=user_id,
+                                user_message=original_content or message.content,
+                                bot_response=emoji_decision.emoji_choice,
+                                channel_id=str(reply_channel.id),
+                                metadata={
+                                    'response_type': 'emoji',
+                                    'emoji_decision_confidence': emoji_decision.confidence_score,
+                                    'emoji_decision_reason': emoji_decision.context_reason.value,
+                                    'original_text_response_length': len(response),
+                                    'bot_character': bot_character
+                                }
+                            )
+                        
+                        # Skip normal text response - emoji was sent instead
+                        logger.info(f"🎭 EMOJI RESPONSE: Sent emoji instead of text response")
+                        return
+                        
+                except Exception as e:
+                    logger.error(f"Error in emoji response evaluation: {e}")
+                    # Continue with normal text response if emoji evaluation fails
+                
                 # Send response (chunked if too long)
                 # Use reply format for guild mentions, regular send for DMs
                 reference_message = message if message.guild else None
