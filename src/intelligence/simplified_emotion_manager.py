@@ -150,6 +150,37 @@ class SimplifiedEmotionManager:
             }
         }
 
+    async def process_message_with_emotional_intelligence(
+        self, 
+        user_id: str, 
+        message: str, 
+        conversation_context: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """
+        Compatibility method that mimics the old Phase2Integration interface.
+        
+        Args:
+            user_id: User identifier
+            message: User message
+            conversation_context: Conversation context
+            
+        Returns:
+            Enhanced context with emotion data
+        """
+        # Get emotion analysis using the new method
+        emotion_data = await self.analyze_message_emotion(
+            user_id=user_id,
+            message=message,
+            conversation_context=conversation_context
+        )
+        
+        # Add emotion data to context (maintaining compatibility)
+        enhanced_context = conversation_context.copy()
+        enhanced_context["emotional_intelligence"] = emotion_data["emotional_intelligence"]
+        enhanced_context["emotion_analysis"] = emotion_data
+        
+        return enhanced_context
+
 
 # Factory function for easy integration
 def create_simplified_emotion_manager(vector_memory_manager=None) -> SimplifiedEmotionManager:
