@@ -856,6 +856,185 @@ class LLMClient:
             self.logger.error(f"Unexpected error generating chat completion: {e}")
             raise LLMError(f"Unexpected error: {str(e)}")
 
+    @monitor_performance("llm_tool_request", timeout_ms=45000)
+    def generate_chat_completion_with_tools(
+        self,
+        messages: list[dict[str, str]],
+        tools: list[dict[str, Any]] | None = None,
+        tool_choice: str | dict[str, Any] | None = "auto",
+        model: str | None = None,
+        temperature: float = 0.7,
+        max_tokens: int | None = None,
+        stream: bool = False,
+    ) -> dict[str, Any]:
+        """
+        Generate a chat completion response with tool calling support
+
+        Args:
+            messages: List of message dictionaries with 'role' and 'content'
+            tools: List of tool definitions in OpenAI format
+            tool_choice: Tool selection strategy ("auto", "none", or specific tool)
+            model: Name of the model (uses default if not specified)
+            temperature: Randomness of the generation (0.0 to 1.0)
+            max_tokens: Maximum tokens to generate (defaults to environment config)
+            stream: Whether to stream the response (not implemented yet)
+
+        Returns:
+            The response from the API with potential tool calls
+        """
+        # Handle local LLM inference first - tool calling support varies by model
+        if self.is_local_llm and self.local_model and self.local_tokenizer:
+            self.logger.warning("Tool calling with local transformers models not fully supported")
+            return self._generate_local_chat_completion(messages, temperature, max_tokens)
+
+        # Handle llama-cpp-python inference - some models support tool calling
+        if self.is_llamacpp:
+            if self.llamacpp_model:
+                self.logger.warning("Tool calling with llama-cpp-python may have limited support")
+                return self._generate_llamacpp_chat_completion(messages, temperature, max_tokens)
+            else:
+                return {
+                    "choices": [
+                        {
+                            "message": {
+                                "role": "assistant",
+                                "content": "Sorry, llama-cpp-python model is not loaded.",
+                            },
+                            "finish_reason": "stop",
+                        }
+                    ],
+                    "error": "llama-cpp-python model not loaded",
+                }
+
+        # Use environment default if model not specified
+        if model is None:
+            model = self.default_model_name
+
+        # Use environment default if max_tokens not specified
+        if max_tokens is None:
+            max_tokens = self.default_max_tokens_chat
+
+        self.logger.debug(f"Generating chat completion with tools: {len(tools) if tools else 0} tools")
+        self.logger.debug(f"Tool choice: {tool_choice}")
+        self.logger.debug(
+            f"Parameters: model={model}, temperature={temperature}, max_tokens={max_tokens}"
+        )
+
+        payload = {
+            "model": model,
+            "messages": messages,
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+            "stream": stream,
+        }
+
+        # Add tool calling parameters if tools are provided
+        if tools:
+            payload["tools"] = tools
+            if tool_choice is not None:
+                payload["tool_choice"] = tool_choice
+
+            # Convert tools for different providers if needed
+            if self.is_ollama:
+                payload = self._convert_tools_for_ollama(payload)
+            elif self.is_local_studio:
+                # LM Studio supports OpenAI tool calling format
+                pass
+            elif self.is_openrouter:
+                # OpenRouter supports OpenAI tool calling format
+                pass
+
+        try:
+            self.logger.debug(f"Sending tool-enabled request to {self.chat_endpoint}")
+
+            # SECURITY ENHANCEMENT: Prepare headers with secure credential handling
+            headers = {"Content-Type": "application/json"}
+            if self.api_key:
+                if self.api_key_manager:
+                    secure_headers = self.api_key_manager.secure_header_creation(
+                        self.api_key, "Bearer"
+                    )
+                    headers.update(secure_headers)
+                else:
+                    headers["Authorization"] = f"Bearer {self.api_key}"  # Fallback
+
+            response = self.session.post(
+                self.chat_endpoint,
+                json=payload,
+                headers=headers,
+                timeout=(self.connection_timeout, self.request_timeout),
+            )
+            response.raise_for_status()
+            result = response.json()
+            
+            # Log tool calling results
+            if "choices" in result and result["choices"]:
+                message = result["choices"][0].get("message", {})
+                if "tool_calls" in message:
+                    self.logger.debug(f"Tool calls received: {len(message['tool_calls'])} calls")
+                    for i, tool_call in enumerate(message["tool_calls"]):
+                        function_name = tool_call.get("function", {}).get("name", "unknown")
+                        self.logger.debug(f"  Tool call {i}: {function_name}")
+                else:
+                    self.logger.debug("No tool calls in response")
+            
+            self.logger.debug("Successfully received chat completion response with tools")
+            return result
+            
+        except requests.ConnectionError as e:
+            self.logger.error(f"Connection error generating chat completion with tools: {e}")
+            raise LLMConnectionError(
+                f"Cannot connect to {self.service_name} server. Is it running?"
+            )
+        except requests.Timeout as e:
+            self.logger.error(f"Timeout error generating chat completion with tools: {e}")
+            raise LLMTimeoutError(f"Request to {self.service_name} timed out")
+        except requests.HTTPError as e:
+            if e.response.status_code == 429:
+                self.logger.error("Rate limit exceeded")
+                raise LLMRateLimitError(f"{self.service_name} rate limit exceeded")
+            elif e.response.status_code >= 500:
+                self.logger.error(f"Server error: {e.response.status_code}")
+                raise LLMError(f"{self.service_name} server error: {e.response.status_code}")
+            else:
+                self.logger.error(f"HTTP error: {e.response.status_code}")
+                # Log response text for debugging tool calling issues
+                try:
+                    error_details = e.response.json()
+                    self.logger.error(f"Tool calling error details: {error_details}")
+                except:
+                    self.logger.error(f"Tool calling error response: {e.response.text}")
+                raise LLMError(f"HTTP error {e.response.status_code}: {e.response.text}")
+        except json.JSONDecodeError as e:
+            self.logger.error(f"JSON decode error: {e}")
+            raise LLMError(f"Invalid JSON response from {self.service_name}")
+        except Exception as e:
+            self.logger.error(f"Unexpected error generating chat completion with tools: {e}")
+            raise LLMError(f"Failed to generate chat completion with tools: {str(e)}")
+
+    def _convert_tools_for_ollama(self, payload: dict[str, Any]) -> dict[str, Any]:
+        """
+        Convert tool definitions for Ollama compatibility
+        
+        Ollama tool calling format may differ from OpenAI standard.
+        This method handles the conversion if needed.
+        """
+        # Check if Ollama needs tool format conversion
+        # As of recent versions, Ollama supports OpenAI-compatible tool calling
+        # but older versions or specific models might need conversion
+        
+        ollama_payload = payload.copy()
+        
+        if "tools" in payload:
+            # Log original format for debugging
+            self.logger.debug(f"Converting {len(payload['tools'])} tools for Ollama")
+            
+            # For now, keep OpenAI format as Ollama has been working towards compatibility
+            # Future: Add specific conversion logic if needed based on Ollama version
+            pass
+        
+        return ollama_payload
+
     def create_vision_message(self, text: str, images: list[str]) -> dict[str, Any]:
         """
         Create a message with both text and images for vision models

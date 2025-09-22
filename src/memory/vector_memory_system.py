@@ -287,12 +287,67 @@ class VectorMemoryStore:
         
         Uses:
         - Named vectors for multi-dimensional search (content + emotion + semantic)
+        - Intelligent chunking for long messages (QUICK FIX)
         - Sparse vectors for keyword features
         - Automatic deduplication via content hashing
         - Contradiction detection preparation via semantic grouping
         """
         # DEBUG: Log entry to this method for memory storage tracking
         logger.debug(f"🔥 STORE_MEMORY CALLED: user_id={memory.user_id}, content={memory.content[:50]}...")
+        
+        # 🔄 QUICK FIX: Check if content should be chunked for better vector quality
+        if self._should_chunk_content(memory.content):
+            return await self._store_memory_with_chunking(memory)
+        
+        # Original storage logic for short/simple content
+        return await self._store_memory_original(memory)
+
+    async def _store_memory_with_chunking(self, memory: VectorMemory) -> str:
+        """Store long content as multiple optimized chunks"""
+        try:
+            chunks = self._create_content_chunks(memory.content)
+            stored_ids = []
+            
+            logger.info(f"🔄 CHUNKING: Processing {len(chunks)} chunks for user {memory.user_id}")
+            
+            for i, chunk_content in enumerate(chunks):
+                # Create chunk memory with enhanced metadata
+                chunk_memory = VectorMemory(
+                    id=f"{memory.id}_chunk_{i}",
+                    user_id=memory.user_id,
+                    memory_type=memory.memory_type,
+                    content=chunk_content,
+                    source=f"{memory.source}_chunked",
+                    confidence=memory.confidence,
+                    timestamp=memory.timestamp,
+                    memory_tier=memory.memory_tier,
+                    tier_promotion_date=memory.tier_promotion_date,
+                    tier_demotion_date=memory.tier_demotion_date,
+                    decay_protection=memory.decay_protection,
+                    metadata={
+                        **memory.metadata,
+                        "original_message_id": memory.id,
+                        "chunk_index": i,
+                        "total_chunks": len(chunks),
+                        "is_chunked": True,
+                        "original_length": len(memory.content),
+                        "chunk_length": len(chunk_content)
+                    }
+                )
+                
+                chunk_id = await self._store_memory_original(chunk_memory)
+                stored_ids.append(chunk_id)
+            
+            logger.info(f"✅ CHUNKING: Stored {len(stored_ids)} chunks for memory {memory.id}")
+            return stored_ids[0]  # Return first chunk ID as primary reference
+            
+        except Exception as e:
+            logger.error(f"❌ CHUNKING: Failed to store chunked memory: {e}")
+            # Fallback to original storage
+            return await self._store_memory_original(memory)
+
+    async def _store_memory_original(self, memory: VectorMemory) -> str:
+        """Original memory storage logic (renamed for chunking integration)"""
         
         try:
             # 🎯 QDRANT FEATURE: Generate multiple embeddings for named vectors
@@ -460,6 +515,54 @@ class VectorMemoryStore:
         stop_words = {'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'is', 'are', 'was', 'were', 'be', 'been', 'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could', 'should'}
         keywords = [word for word in words if len(word) > 2 and word not in stop_words]
         return keywords[:20]  # Limit to top 20 keywords
+
+    def _should_chunk_content(self, content: str) -> bool:
+        """Determine if content should be chunked for better vector quality"""
+        # Quick wins criteria for chunking
+        return (
+            len(content) > 300 or  # Long messages
+            content.count('.') > 2 or  # Multiple sentences
+            content.count('!') > 1 or  # Multiple exclamations
+            content.count('?') > 1     # Multiple questions
+        )
+
+    def _create_content_chunks(self, content: str) -> List[str]:
+        """Split content into semantic chunks for better vector quality"""
+        import re
+        
+        # Split into sentences using multiple delimiters
+        sentences = re.split(r'[.!?]+', content)
+        sentences = [s.strip() for s in sentences if s.strip() and len(s.strip()) > 10]
+        
+        if len(sentences) <= 1:
+            return [content]  # Can't chunk meaningfully
+        
+        chunks = []
+        current_chunk = []
+        current_length = 0
+        
+        for sentence in sentences:
+            # Add sentence if it fits in current chunk
+            if current_length + len(sentence) <= 250 and len(current_chunk) < 3:
+                current_chunk.append(sentence)
+                current_length += len(sentence)
+            else:
+                # Save current chunk and start new one
+                if current_chunk:
+                    chunks.append('. '.join(current_chunk) + '.')
+                current_chunk = [sentence]
+                current_length = len(sentence)
+        
+        # Add final chunk
+        if current_chunk:
+            chunks.append('. '.join(current_chunk) + '.')
+        
+        # If chunking didn't help much, return original
+        if len(chunks) == 1:
+            return [content]
+        
+        logger.debug(f"🔄 CHUNKING: Split {len(content)} chars into {len(chunks)} chunks")
+        return chunks
     
     def _extract_emotional_context(self, content: str) -> tuple[str, float]:
         """Extract emotional context for memory embedding - use enhanced analyzer when available"""

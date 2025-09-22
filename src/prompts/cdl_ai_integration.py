@@ -63,30 +63,89 @@ VOICE & COMMUNICATION STYLE:
             if pipeline_result:
                 prompt += "\n\nREAL-TIME CONTEXT AWARENESS:"
                 
+                logger.debug("🎭 CDL EMOTION DEBUG: Processing pipeline result")
+                logger.debug("  - Has emotional_state: %s", bool(pipeline_result.emotional_state))
+                logger.debug("  - Has mood_assessment: %s", bool(pipeline_result.mood_assessment))
+                
                 # Add emotional state awareness
                 if pipeline_result.emotional_state:
                     prompt += f"\n- User's current emotional state: {pipeline_result.emotional_state}"
+                    logger.debug("  - Added emotional_state to prompt: %s", pipeline_result.emotional_state)
                 
+                # Enhanced emotion analysis integration
                 if pipeline_result.mood_assessment and isinstance(pipeline_result.mood_assessment, dict):
-                    primary_emotion = pipeline_result.mood_assessment.get('primary_emotion')
-                    confidence = pipeline_result.mood_assessment.get('confidence', 0)
+                    mood_data = pipeline_result.mood_assessment
+                    logger.debug("  - Processing mood_assessment data with keys: %s", 
+                               list(mood_data.keys()) if mood_data else [])
+                    
+                    # Use primary emotion from comprehensive analysis
+                    primary_emotion = mood_data.get('primary_emotion')
+                    confidence = mood_data.get('confidence', 0)
+                    
                     if primary_emotion and confidence > 0.5:
                         prompt += f"\n- Detected emotion: {primary_emotion} (confidence: {confidence:.1f})"
+                        logger.debug("  - Added primary emotion to prompt: %s (%.2f)", primary_emotion, confidence)
                         
-                        # Add emotion-appropriate response guidance
+                        # Add intensity context if available
+                        intensity = mood_data.get('intensity')
+                        if intensity and isinstance(intensity, (int, float)) and intensity > 0.6:
+                            prompt += f"\n- Emotional intensity: {intensity:.1f} (strong emotional state)"
+                        
+                        # Add support recommendations if needed
+                        if mood_data.get('support_needed'):
+                            prompt += "\n- User may need emotional support and understanding"
+                        
+                        # Include specific recommendations from emotion analysis
+                        recommendations = mood_data.get('recommendations')
+                        if recommendations and isinstance(recommendations, list) and len(recommendations) > 0:
+                            # Take up to 2 most relevant recommendations
+                            relevant_recs = recommendations[:2]
+                            for rec in relevant_recs:
+                                if isinstance(rec, str) and len(rec) < 100:  # Keep recommendations concise
+                                    prompt += f"\n- Guidance: {rec}"
+                        
+                        # Enhanced emotion-appropriate response guidance
                         emotion_guidance = {
                             'joy': 'Share in their positive energy and enthusiasm',
                             'excitement': 'Match their enthusiasm while staying authentic to your character',
+                            'happiness': 'Celebrate their positive mood with warmth',
                             'sadness': 'Show empathy and support while remaining genuine',
+                            'melancholy': 'Offer gentle understanding and compassionate presence',
                             'frustration': 'Acknowledge their feelings and offer perspective',
                             'anxiety': 'Provide calm, reassuring responses',
+                            'worry': 'Offer gentle reassurance and practical support',
                             'anger': 'Stay calm and avoid escalating the situation',
+                            'irritation': 'Be patient and understanding',
                             'fear': 'Offer gentle reassurance and support',
-                            'neutral': 'Maintain your natural conversational style'
+                            'stress': 'Provide calming, supportive responses',
+                            'overwhelmed': 'Break things down into manageable parts',
+                            'neutral': 'Maintain your natural conversational style',
+                            'contemplative': 'Engage thoughtfully with their reflections',
+                            'curious': 'Encourage their exploration and questions'
                         }
                         
                         guidance = emotion_guidance.get(primary_emotion, 'Respond naturally and authentically')
                         prompt += f"\n- Response approach: {guidance}"
+                        
+                        # Add emotional intelligence context if available
+                        if 'emotional_intelligence' in mood_data:
+                            ei_data = mood_data['emotional_intelligence']
+                            
+                            # Include stress indicators for context
+                            stress_indicators = ei_data.get('stress_indicators', [])
+                            if stress_indicators and len(stress_indicators) > 0:
+                                prompt += f"\n- Stress indicators detected: {len(stress_indicators)} signals present"
+                            
+                            # Include mood trend for response adaptation
+                            mood_trend = ei_data.get('mood_trend', 'stable')
+                            if mood_trend != 'stable':
+                                trend_guidance = {
+                                    'improving': 'Build on their positive momentum',
+                                    'declining': 'Offer gentle support and encouragement',
+                                    'fluctuating': 'Provide stable, consistent presence'
+                                }
+                                trend_advice = trend_guidance.get(mood_trend, 'Monitor their emotional needs')
+                                prompt += f"\n- Mood trend ({mood_trend}): {trend_advice}"
                 
                 # Add personality context if available
                 if pipeline_result.personality_profile and isinstance(pipeline_result.personality_profile, dict):

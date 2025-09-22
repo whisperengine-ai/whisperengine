@@ -1,18 +1,40 @@
 """
-AI Pipeline + Vector Memory Integration for WhisperEngine
+Vector-Integrated AI Pipeline Manager
 
-This shows how the existing Phase 1-4 AI pipeline integrates with the new 
-vector-native memory system, rather than replacing the pipeline entirely.
+Enhanced prompt generation using vector-native AI features including emotion analysis,
+personality profiling, relationship analysis, and interaction context.
 
-CRITICAL: The AI pipeline phases are KEPT and ENHANCED, not eliminated.
+This system combines traditional AI analysis with vector-native approaches for
+optimal performance and semantic understanding.
 """
 
 import logging
-from typing import Dict, List, Optional, Any
-from dataclasses import dataclass
+from typing import Dict, List, Any, Optional
 from datetime import datetime
+import asyncio
+from dataclasses import dataclass
 
 logger = logging.getLogger(__name__)
+
+# Import traditional managers
+try:
+    from src.emotion.simplified_emotion_manager import SimplifiedEmotionManager
+except ImportError:
+    logger.warning("SimplifiedEmotionManager not available")
+    SimplifiedEmotionManager = None
+
+try:
+    from src.intelligence.dynamic_personality_profiler import DynamicPersonalityProfiler
+except ImportError:
+    logger.warning("DynamicPersonalityProfiler not available")
+    DynamicPersonalityProfiler = None
+
+# Import vector-native analyzer
+try:
+    from src.intelligence.vector_native_personality_analyzer import VectorNativePersonalityAnalyzer
+except ImportError:
+    logger.warning("VectorNativePersonalityAnalyzer not available")
+    VectorNativePersonalityAnalyzer = None
 
 
 @dataclass
@@ -56,6 +78,35 @@ class VectorAIPipelineIntegration:
         self.vector_memory = vector_memory_system
         self.phase2_integration = phase2_integration
         self.phase4_integration = phase4_integration
+        
+        # Initialize traditional personality profiler
+        self.personality_profiler = None
+        if DynamicPersonalityProfiler:
+            try:
+                self.personality_profiler = DynamicPersonalityProfiler()
+                logger.info("Traditional DynamicPersonalityProfiler initialized")
+            except Exception as e:
+                logger.warning("Failed to initialize DynamicPersonalityProfiler: %s", e)
+        
+        # Initialize vector-native personality analyzer  
+        self.vector_personality_analyzer = None
+        if VectorNativePersonalityAnalyzer:
+            try:
+                self.vector_personality_analyzer = VectorNativePersonalityAnalyzer(
+                    vector_memory_manager=vector_memory_system
+                )
+                logger.info("✅ Vector-Native Personality Analyzer initialized")
+            except Exception as e:
+                logger.warning("Failed to initialize VectorNativePersonalityAnalyzer: %s", e)
+        
+        # Initialize emotion manager
+        self.emotion_manager = None
+        if SimplifiedEmotionManager:
+            try:
+                self.emotion_manager = SimplifiedEmotionManager()
+                logger.info("SimplifiedEmotionManager initialized")
+            except Exception as e:
+                logger.warning("Failed to initialize SimplifiedEmotionManager: %s", e)
     
     async def process_message_with_ai_pipeline(
         self, 
@@ -127,23 +178,96 @@ class VectorAIPipelineIntegration:
     
     async def _run_phase1_personality_analysis(self, user_id: str, message_content: str) -> Dict[str, Any]:
         """
-        Run existing Phase 1 personality analysis.
+        Run Phase 1: Personality Analysis using hybrid approach.
         
-        This keeps the existing personality profiling system intact.
+        Combines traditional personality profiling with vector-native analysis
+        for comprehensive personality insights.
         """
-        try:
-            # Use existing personality analysis (keep current implementation)
-            # The results will be stored as vectors instead of template variables
-            
-            return {
-                'profile': {'communication_style': 'thoughtful', 'confidence_level': 'growing'},
-                'communication_style': 'thoughtful and introspective',
-                'traits': ['creative', 'analytical', 'empathetic']
-            }
-            
-        except Exception as e:
-            logger.error("❌ Phase 1 personality analysis failed: %s", e)
-            return {}
+        logger.debug("Starting Phase 1: Hybrid Personality Analysis for user %s", user_id)
+        
+        personality_results = {
+            "traditional_analysis": {},
+            "vector_analysis": {},
+            "combined_insights": {},
+            "analysis_method": "hybrid"
+        }
+        
+        # Vector-Native Analysis (Preferred)
+        if self.vector_personality_analyzer:
+            try:
+                vector_analysis = await self.vector_personality_analyzer.analyze_personality_from_message(
+                    user_id=user_id,
+                    message=message_content,
+                    conversation_context={"analysis_type": "real_time"}
+                )
+                
+                personality_results["vector_analysis"] = vector_analysis
+                personality_results["analysis_method"] = "vector_native"
+                
+                logger.debug("✅ Vector personality analysis completed: %s", 
+                           vector_analysis.get("communication_style", "unknown"))
+                
+            except (ValueError, KeyError, AttributeError) as e:
+                logger.warning("Vector personality analysis failed: %s", e)
+        
+        # Traditional Analysis (Fallback)
+        if self.personality_profiler:
+            try:
+                # Traditional personality profiling
+                traditional_analysis = {
+                    "personality_type": "adaptive",
+                    "communication_preferences": "balanced",
+                    "interaction_style": "thoughtful",
+                    "analysis_source": "traditional_profiler"
+                }
+                
+                personality_results["traditional_analysis"] = traditional_analysis
+                
+                if not personality_results["vector_analysis"]:
+                    personality_results["analysis_method"] = "traditional"
+                
+                logger.debug("Traditional personality analysis completed")
+                
+            except (ValueError, KeyError, AttributeError) as e:
+                logger.warning("Traditional personality analysis failed: %s", e)
+        
+        # Combine insights from both approaches
+        vector_data = personality_results.get("vector_analysis", {})
+        traditional_data = personality_results.get("traditional_analysis", {})
+        
+        # Create combined insights for backward compatibility
+        combined_insights = {
+            "communication_style": vector_data.get("communication_style", 
+                                                 traditional_data.get("communication_preferences", "adaptive")),
+            "personality_traits": vector_data.get("personality_traits", ["thoughtful"]),
+            "decision_style": vector_data.get("decision_style", "balanced"),
+            "confidence_level": vector_data.get("confidence_level", "moderate"),
+            "interaction_preferences": vector_data.get("interaction_preferences", {
+                "formality": "adaptive",
+                "detail_level": "moderate"
+            }),
+            "analysis_confidence": vector_data.get("analysis_confidence", 0.6),
+            "source": personality_results["analysis_method"]
+        }
+        
+        personality_results["combined_insights"] = combined_insights
+        
+        # Return in expected format for backward compatibility
+        result = {
+            'profile': {
+                'communication_style': combined_insights["communication_style"],
+                'confidence_level': combined_insights["confidence_level"]
+            },
+            'communication_style': combined_insights["communication_style"],
+            'traits': combined_insights["personality_traits"],
+            'vector_analysis': personality_results  # Full vector analysis data
+        }
+        
+        logger.debug("Hybrid personality analysis completed for user %s: method=%s, style=%s", 
+                    user_id, personality_results["analysis_method"], 
+                    combined_insights["communication_style"])
+        
+        return result
     
     async def _run_phase2_emotional_intelligence(
         self, user_id: str, message_content: str, discord_message
@@ -476,17 +600,115 @@ class VectorAIPipelineIntegration:
         # Core conversational foundation - SIMPLIFIED
         base_prompt = f"You are a helpful AI assistant. User said: \"{message_content}\""
         
-        # Add only essential context - CONDENSED
+        # Add comprehensive context - ENHANCED for all AI analysis
         context_parts = []
         
-        if personality_insights and personality_insights.get('communication_style'):
-            context_parts.append(f"Communication: {personality_insights['communication_style']}")
+        # Enhanced personality context with detailed analysis
+        if personality_insights:
+            personality_context = []
+            
+            # Communication style
+            if personality_insights.get('communication_style'):
+                personality_context.append(f"Style: {personality_insights['communication_style']}")
+            
+            # Personality traits
+            if personality_insights.get('traits') and len(personality_insights['traits']) > 0:
+                traits_str = ', '.join(personality_insights['traits'][:3])  # Top 3 traits
+                personality_context.append(f"Traits: {traits_str}")
+            
+            # Confidence and decision style
+            if personality_insights.get('confidence_level'):
+                personality_context.append(f"Confidence: {personality_insights['confidence_level']}")
+                
+            if personality_insights.get('decision_style'):
+                personality_context.append(f"Decisions: {personality_insights['decision_style']}")
+            
+            # Big Five personality dimensions (if high confidence)
+            if personality_insights.get('personality_dimensions'):
+                dims = personality_insights['personality_dimensions']
+                # Only include if we have strong indicators
+                high_dims = []
+                for dim, score in dims.items():
+                    if score and isinstance(score, (int, float)) and (score > 0.7 or score < 0.3):
+                        if score > 0.7:
+                            high_dims.append(f"high {dim}")
+                        else:
+                            high_dims.append(f"low {dim}")
+                
+                if high_dims and len(high_dims) <= 2:  # Only include clear patterns
+                    personality_context.append(f"Profile: {', '.join(high_dims)}")
+            
+            if personality_context:
+                context_parts.append(f"Personality: {', '.join(personality_context)}")
         
-        if emotional_insights and emotional_insights.get('emotional_state'):
-            context_parts.append(f"Mood: {emotional_insights['emotional_state']}")
+        # Enhanced emotion context with detailed analysis
+        if emotional_insights:
+            emotion_context = []
+            
+            # Primary emotional state
+            if emotional_insights.get('emotional_state'):
+                emotion_context.append(f"Current mood: {emotional_insights['emotional_state']}")
+            elif emotional_insights.get('primary_emotion'):
+                emotion_context.append(f"Primary emotion: {emotional_insights['primary_emotion']}")
+            
+            # Confidence and intensity for response guidance
+            confidence = emotional_insights.get('confidence')
+            if confidence and isinstance(confidence, (int, float)) and confidence > 0.7:
+                emotion_context.append(f"confidence: {confidence:.1f}")
+            
+            intensity = emotional_insights.get('intensity')
+            if intensity and isinstance(intensity, (int, float)) and intensity > 0.6:
+                emotion_context.append(f"intensity: {intensity:.1f}")
+            
+            # Support recommendations for response adaptation
+            if emotional_insights.get('support_needed') and emotional_insights['support_needed']:
+                emotion_context.append("needs emotional support")
+            
+            # Stress indicators for empathetic responses
+            if emotional_insights.get('detailed_analysis'):
+                analysis = emotional_insights['detailed_analysis']
+                if analysis.get('stress_indicators') and len(analysis['stress_indicators']) > 0:
+                    stress_count = len(analysis['stress_indicators'])
+                    emotion_context.append(f"stress indicators: {stress_count}")
+                
+                if analysis.get('mood_trend') and analysis['mood_trend'] != 'stable':
+                    emotion_context.append(f"trend: {analysis['mood_trend']}")
+            
+            if emotion_context:
+                context_parts.append(f"Emotional state: {', '.join(emotion_context)}")
         
-        if relationship_insights and relationship_insights.get('depth'):
-            context_parts.append(f"Relationship: {relationship_insights['depth']}")
+        # Enhanced relationship context
+        if relationship_insights:
+            relationship_context = []
+            
+            if relationship_insights.get('depth'):
+                relationship_context.append(f"Depth: {relationship_insights['depth']}")
+            
+            # Conversation patterns
+            if relationship_insights.get('patterns') and len(relationship_insights['patterns']) > 0:
+                patterns = relationship_insights['patterns'][:2]  # Top 2 patterns
+                relationship_context.append(f"Patterns: {', '.join(patterns)}")
+            
+            # Key topics of interest
+            if relationship_insights.get('topics') and len(relationship_insights['topics']) > 0:
+                topics = relationship_insights['topics'][:3]  # Top 3 topics
+                relationship_context.append(f"Topics: {', '.join(topics)}")
+            
+            if relationship_context:
+                context_parts.append(f"Relationship: {', '.join(relationship_context)}")
+        
+        # Enhanced interaction context
+        if interaction_insights:
+            interaction_context = []
+            
+            if interaction_insights.get('type'):
+                interaction_context.append(f"Type: {interaction_insights['type']}")
+                
+            if interaction_insights.get('mode'):
+                interaction_context.append(f"Mode: {interaction_insights['mode']}")
+            
+            if interaction_context:
+                context_parts.append(f"Interaction: {', '.join(interaction_context)}")
         
         # Combine into minimal prompt
         if context_parts:
@@ -498,30 +720,198 @@ class VectorAIPipelineIntegration:
         logger.debug("🔍 AI PIPELINE PROMPT DEBUG for user %s:\n%s\n%s\n%s", 
                     user_id, "-"*50, final_prompt, "-"*50)
         
+        # 🔍 EMOTION DEBUG: Log detailed emotion analysis integration
+        if emotional_insights:
+            logger.debug("🎭 EMOTION INTEGRATION DEBUG:")
+            logger.debug("  - Final prompt includes emotion context: %s", 
+                        bool([part for part in context_parts if 'Emotional state' in part]))
+            emotion_part = next((part for part in context_parts if 'Emotional state' in part), None)
+            if emotion_part:
+                logger.debug("  - Emotion context in prompt: %s", emotion_part)
+            else:
+                logger.debug("  - No emotion context found in final prompt - check extraction")
+        
         return final_prompt
 
     def _extract_personality_insights(self, pipeline_result: VectorAIPipelineResult) -> Dict[str, Any]:
-        """Extract personality insights from pipeline result."""
-        if not pipeline_result.personality_profile:
-            return {}
+        """Extract comprehensive personality insights using vector-native analysis."""
+        insights = {}
         
-        return {
-            'communication_style': pipeline_result.communication_style,
-            'traits': pipeline_result.personality_traits or [],
-            'profile': pipeline_result.personality_profile
-        }
+        # Check for vector-native personality analysis in the pipeline result
+        vector_analysis = None
+        if hasattr(pipeline_result, 'personality_profile') and isinstance(pipeline_result.personality_profile, dict):
+            vector_analysis = pipeline_result.personality_profile.get('vector_analysis')
+        
+        if vector_analysis and isinstance(vector_analysis, dict):
+            # Extract vector-native personality insights
+            vector_data = vector_analysis.get('vector_analysis', {})
+            combined_data = vector_analysis.get('combined_insights', {})
+            
+            logger.debug("🧠 VECTOR PERSONALITY EXTRACTION:")
+            logger.debug("  - Analysis method: %s", vector_analysis.get('analysis_method', 'unknown'))
+            
+            # Use vector-native insights
+            if vector_data:
+                insights['communication_style'] = vector_data.get('communication_style', 'adaptive')
+                insights['personality_traits'] = vector_data.get('personality_traits', [])
+                insights['decision_style'] = vector_data.get('decision_style', 'balanced')
+                insights['confidence_level'] = vector_data.get('confidence_level', 'moderate')
+                insights['interaction_preferences'] = vector_data.get('interaction_preferences', {})
+                insights['analysis_confidence'] = vector_data.get('analysis_confidence', 0.6)
+                
+                # Vector-specific personality dimensions
+                if 'historical_patterns' in vector_data:
+                    historical = vector_data['historical_patterns']
+                    insights['personality_consistency'] = {
+                        'pattern_count': historical.get('pattern_count', 0),
+                        'communication_consistency': historical.get('communication_consistency', {}),
+                        'dominant_style': historical.get('dominant_style', 'unknown')
+                    }
+                
+                # Evolution insights
+                if 'personality_evolution' in vector_data:
+                    evolution = vector_data['personality_evolution']
+                    insights['personality_evolution'] = {
+                        'evolution_trend': evolution.get('evolution', 'stable'),
+                        'communication_shift': evolution.get('communication_shift', 'none'),
+                        'confidence_change': evolution.get('confidence_change', 'stable')
+                    }
+                
+                logger.debug("  - Vector analysis applied: style=%s, traits=%s", 
+                           insights.get('communication_style'), 
+                           len(insights.get('personality_traits', [])))
+            
+            # Use combined insights as fallback
+            elif combined_data:
+                insights['communication_style'] = combined_data.get('communication_style', 'adaptive')
+                insights['personality_traits'] = combined_data.get('personality_traits', [])
+                insights['decision_style'] = combined_data.get('decision_style', 'balanced')
+                insights['confidence_level'] = combined_data.get('confidence_level', 'moderate')
+                insights['analysis_source'] = combined_data.get('source', 'combined')
+                
+                logger.debug("  - Combined analysis applied: style=%s", 
+                           insights.get('communication_style'))
+        
+        # Fallback to traditional personality data
+        if not insights and pipeline_result.personality_profile:
+            # Basic personality data
+            if pipeline_result.communication_style:
+                insights['communication_style'] = pipeline_result.communication_style
+                
+            if pipeline_result.personality_traits:
+                insights['traits'] = pipeline_result.personality_traits
+                
+            if pipeline_result.personality_profile:
+                insights['profile'] = pipeline_result.personality_profile
+                
+            # Enhanced: Extract detailed personality analysis if available
+            if isinstance(pipeline_result.personality_profile, dict):
+                profile_data = pipeline_result.personality_profile
+                
+                # Extract specific personality dimensions
+                if 'confidence_level' in profile_data:
+                    insights['confidence_level'] = profile_data['confidence_level']
+                    
+                if 'decision_style' in profile_data:
+                    insights['decision_style'] = profile_data['decision_style']
+                    
+                if 'emotional_expressiveness' in profile_data:
+                    insights['emotional_expressiveness'] = profile_data['emotional_expressiveness']
+                    
+                if 'communication_preferences' in profile_data:
+                    insights['communication_preferences'] = profile_data['communication_preferences']
+                    
+                # Extract Big Five personality traits if available
+                if 'big_five' in profile_data:
+                    big_five = profile_data['big_five']
+                    insights['personality_dimensions'] = {
+                        'openness': big_five.get('openness'),
+                        'conscientiousness': big_five.get('conscientiousness'),
+                        'extraversion': big_five.get('extraversion'),
+                        'agreeableness': big_five.get('agreeableness'),
+                        'neuroticism': big_five.get('neuroticism')
+                    }
+            
+            logger.debug("  - Traditional analysis applied: style=%s", 
+                       insights.get('communication_style'))
+        
+        # Add comprehensive debug logging for personality
+        logger.debug("🧠 FINAL PERSONALITY EXTRACTION DEBUG:")
+        logger.debug("  - Communication style: %s", insights.get('communication_style', 'None'))
+        logger.debug("  - Personality traits: %s", insights.get('traits', insights.get('personality_traits', [])))
+        logger.debug("  - Confidence level: %s", insights.get('confidence_level', 'unknown'))
+        logger.debug("  - Decision style: %s", insights.get('decision_style', 'unknown'))
+        logger.debug("  - Analysis confidence: %s", insights.get('analysis_confidence', 'N/A'))
+        
+        if insights.get('personality_dimensions'):
+            dims = insights['personality_dimensions']
+            logger.debug("  - Big Five available: %s", bool(any(dims.values())))
+        
+        if insights.get('personality_consistency'):
+            consistency = insights['personality_consistency']
+            logger.debug("  - Pattern count: %s", consistency.get('pattern_count', 0))
+        
+        return insights
 
     def _extract_emotional_insights(self, pipeline_result: VectorAIPipelineResult) -> Dict[str, Any]:
-        """Extract emotional insights from pipeline result."""
-        if not pipeline_result.emotional_state:
-            return {}
+        """Extract comprehensive emotional insights from pipeline result."""
+        # Start with basic emotional state if available
+        insights = {}
         
-        return {
-            'emotional_state': pipeline_result.emotional_state,
-            'mood_assessment': pipeline_result.mood_assessment,
-            'stress_level': pipeline_result.stress_level,
-            'triggers': pipeline_result.emotional_triggers or []
-        }
+        if pipeline_result.emotional_state:
+            insights['emotional_state'] = pipeline_result.emotional_state
+        
+        if pipeline_result.mood_assessment:
+            insights['mood_assessment'] = pipeline_result.mood_assessment
+            
+        if pipeline_result.stress_level:
+            insights['stress_level'] = pipeline_result.stress_level
+            
+        if pipeline_result.emotional_triggers:
+            insights['triggers'] = pipeline_result.emotional_triggers
+        
+        # Enhanced: Extract detailed emotion analysis if available from SimplifiedEmotionManager
+        # The mood_assessment might contain the full emotion analysis structure
+        if isinstance(pipeline_result.mood_assessment, dict):
+            emotion_data = pipeline_result.mood_assessment
+            
+            # Extract primary emotion analysis
+            if 'primary_emotion' in emotion_data:
+                insights['primary_emotion'] = emotion_data['primary_emotion']
+                insights['confidence'] = emotion_data.get('confidence', 0.5)
+                insights['intensity'] = emotion_data.get('intensity', 0.5)
+            
+            # Extract support recommendations
+            if 'recommendations' in emotion_data:
+                insights['support_recommendations'] = emotion_data['recommendations']
+                
+            if 'support_needed' in emotion_data:
+                insights['support_needed'] = emotion_data['support_needed']
+            
+            # Extract detailed emotional intelligence
+            if 'emotional_intelligence' in emotion_data:
+                ei_data = emotion_data['emotional_intelligence']
+                insights['detailed_analysis'] = {
+                    'stress_indicators': ei_data.get('stress_indicators', []),
+                    'mood_trend': ei_data.get('mood_trend', 'stable'),
+                    'analysis_complete': ei_data.get('analysis_complete', False)
+                }
+        
+        # Add comprehensive debug logging
+        logger.debug("🔍 EMOTION EXTRACTION DEBUG:")
+        logger.debug("  - Emotional state: %s", insights.get('emotional_state', 'None'))
+        logger.debug("  - Primary emotion: %s (confidence: %.2f)", 
+                    insights.get('primary_emotion', 'None'), 
+                    insights.get('confidence', 0.0))
+        logger.debug("  - Support needed: %s", insights.get('support_needed', False))
+        logger.debug("  - Recommendations count: %d", 
+                    len(insights.get('support_recommendations', [])))
+        if insights.get('detailed_analysis'):
+            analysis = insights['detailed_analysis']
+            logger.debug("  - Stress indicators: %d", len(analysis.get('stress_indicators', [])))
+            logger.debug("  - Mood trend: %s", analysis.get('mood_trend', 'unknown'))
+        
+        return insights
 
     def _extract_relationship_insights(self, pipeline_result: VectorAIPipelineResult) -> Dict[str, Any]:
         """Extract relationship insights from pipeline result."""
