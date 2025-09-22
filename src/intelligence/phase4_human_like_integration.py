@@ -22,7 +22,7 @@ from ..utils.enhanced_query_processor import EnhancedQueryProcessor
 from ..utils.human_like_llm_processor import HumanLikeLLMProcessor
 
 # Import existing Phase systems
-from . import Phase2Integration
+from .simplified_emotion_manager import SimplifiedEmotionManager
 
 logger = logging.getLogger(__name__)
 
@@ -75,7 +75,7 @@ class Phase4HumanLikeIntegration:
 
     def __init__(
         self,
-        phase2_integration: Phase2Integration | None = None,
+        simplified_emotion_manager: SimplifiedEmotionManager | None = None,
         phase3_memory_networks: Phase3MemoryNetworks | None = None,
         memory_manager=None,
         llm_client=None,
@@ -105,7 +105,7 @@ class Phase4HumanLikeIntegration:
             relationship_tracking: Level of relationship tracking (basic/enhanced)
             query_optimization: Enable query optimization
         """
-        self.phase2_integration = phase2_integration
+        self.simplified_emotion_manager = simplified_emotion_manager
         self.phase3_memory_networks = phase3_memory_networks
         self.memory_manager = memory_manager
         self.llm_client = llm_client
@@ -190,7 +190,7 @@ class Phase4HumanLikeIntegration:
             )
 
             # Step 2: Execute Phase 2 (Emotional Intelligence) if available
-            if self.phase2_integration:
+            if self.simplified_emotion_manager:
                 try:
                     logger.debug("Executing Phase 2: Emotional Intelligence Analysis")
                     phase2_start = datetime.now(UTC)
@@ -206,7 +206,7 @@ class Phase4HumanLikeIntegration:
                     }
 
                     phase2_results = (
-                        await self.phase2_integration.process_message_with_emotional_intelligence(
+                        await self.simplified_emotion_manager.analyze_message_emotion(
                             user_id=user_id, message=message, conversation_context=phase2_context
                         )
                     )
@@ -703,7 +703,7 @@ class Phase4HumanLikeIntegration:
         """Get the current status of all integrated systems"""
         return {
             "phase4_status": "active",
-            "phase2_available": self.phase2_integration is not None,
+            "simplified_emotion_available": self.simplified_emotion_manager is not None,
             "phase3_available": self.phase3_memory_networks is not None,
             "human_like_processor_available": self.human_like_processor is not None,
             "enhanced_query_processor_available": self.enhanced_query_processor is not None,
@@ -721,7 +721,7 @@ class Phase4HumanLikeIntegration:
         available_systems = 0
         total_systems = 4  # Phase2, Phase3, HumanLike, EnhancedQuery
 
-        if self.phase2_integration:
+        if self.simplified_emotion_manager:
             available_systems += 1
         if self.phase3_memory_networks:
             available_systems += 1

@@ -59,6 +59,49 @@ VOICE & COMMUNICATION STYLE:
             if quirks:
                 prompt += f"\n\nPERSONALITY QUIRKS: {', '.join(quirks[:3])}"
 
+            # 🎭 EMOTION INTEGRATION: Add real-time emotional intelligence to character prompt
+            if pipeline_result:
+                prompt += "\n\nREAL-TIME CONTEXT AWARENESS:"
+                
+                # Add emotional state awareness
+                if pipeline_result.emotional_state:
+                    prompt += f"\n- User's current emotional state: {pipeline_result.emotional_state}"
+                
+                if pipeline_result.mood_assessment and isinstance(pipeline_result.mood_assessment, dict):
+                    primary_emotion = pipeline_result.mood_assessment.get('primary_emotion')
+                    confidence = pipeline_result.mood_assessment.get('confidence', 0)
+                    if primary_emotion and confidence > 0.5:
+                        prompt += f"\n- Detected emotion: {primary_emotion} (confidence: {confidence:.1f})"
+                        
+                        # Add emotion-appropriate response guidance
+                        emotion_guidance = {
+                            'joy': 'Share in their positive energy and enthusiasm',
+                            'excitement': 'Match their enthusiasm while staying authentic to your character',
+                            'sadness': 'Show empathy and support while remaining genuine',
+                            'frustration': 'Acknowledge their feelings and offer perspective',
+                            'anxiety': 'Provide calm, reassuring responses',
+                            'anger': 'Stay calm and avoid escalating the situation',
+                            'fear': 'Offer gentle reassurance and support',
+                            'neutral': 'Maintain your natural conversational style'
+                        }
+                        
+                        guidance = emotion_guidance.get(primary_emotion, 'Respond naturally and authentically')
+                        prompt += f"\n- Response approach: {guidance}"
+                
+                # Add personality context if available
+                if pipeline_result.personality_profile and isinstance(pipeline_result.personality_profile, dict):
+                    personality_insights = pipeline_result.personality_profile.get('personality_summary')
+                    if personality_insights:
+                        prompt += f"\n- User personality insights: {personality_insights[:100]}..."
+                
+                # Add conversation context
+                if pipeline_result.enhanced_context and isinstance(pipeline_result.enhanced_context, dict):
+                    conversation_mode = pipeline_result.enhanced_context.get('conversation_mode')
+                    if conversation_mode:
+                        prompt += f"\n- Conversation mode: {conversation_mode}"
+                        
+                prompt += f"\n\nADAPT your response style to be emotionally appropriate while staying true to {character.identity.name}'s personality."
+
 
             prompt += f"""
 

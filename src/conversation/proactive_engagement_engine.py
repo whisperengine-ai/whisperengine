@@ -41,7 +41,7 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from enum import Enum
-from typing import Any
+from typing import Any, Union
 
 # Import existing systems for integration
 try:
@@ -63,10 +63,15 @@ except ImportError:
 
 try:
     from src.intelligence.emotional_context_engine import EmotionalContext, EmotionalContextEngine
-
     EMOTIONAL_CONTEXT_AVAILABLE = True
 except ImportError:
     EMOTIONAL_CONTEXT_AVAILABLE = False
+
+try:
+    from src.intelligence.enhanced_vector_emotion_analyzer import EnhancedVectorEmotionAnalyzer
+    ENHANCED_EMOTION_ANALYZER_AVAILABLE = True
+except ImportError:
+    ENHANCED_EMOTION_ANALYZER_AVAILABLE = False
 
 try:
     from src.intelligence.dynamic_personality_profiler import (
@@ -217,11 +222,11 @@ class ProactiveConversationEngagementEngine:
         self,
         thread_manager: AdvancedConversationThreadManager | None = None,
         memory_moments: MemoryTriggeredMoments | None = None,
-        emotional_engine: EmotionalContextEngine | None = None,
+        emotional_engine: Union[EmotionalContextEngine, EnhancedVectorEmotionAnalyzer, None] = None,
         personality_profiler: DynamicPersonalityProfiler | None = None,
-        stagnation_threshold_minutes: int = 5,
-        engagement_check_interval_minutes: int = 3,
-        max_proactive_suggestions_per_hour: int = 8,
+        stagnation_threshold_minutes: int | None = None,
+        engagement_check_interval_minutes: int | None = None,
+        max_proactive_suggestions_per_hour: int | None = None,
     ):
         """
         Initialize the proactive conversation engagement engine.
@@ -229,16 +234,29 @@ class ProactiveConversationEngagementEngine:
         Args:
             thread_manager: Advanced conversation thread manager
             memory_moments: Memory-triggered moments system
-            emotional_engine: Emotional context engine
+            emotional_engine: Emotional context engine or Enhanced Vector Emotion Analyzer
             personality_profiler: Dynamic personality profiler
             stagnation_threshold_minutes: Minutes before considering conversation stagnant
             engagement_check_interval_minutes: How often to check engagement levels
             max_proactive_suggestions_per_hour: Limit proactive interventions
         """
+        import os
+        
         self.thread_manager = thread_manager
         self.memory_moments = memory_moments
         self.emotional_engine = emotional_engine
         self.personality_profiler = personality_profiler
+
+        # Use environment variables with fallbacks
+        stagnation_threshold_minutes = stagnation_threshold_minutes or int(
+            os.getenv("PHASE4_ENGAGEMENT_STAGNATION_THRESHOLD_MINUTES", "5")
+        )
+        engagement_check_interval_minutes = engagement_check_interval_minutes or int(
+            os.getenv("PHASE4_ENGAGEMENT_CHECK_INTERVAL_MINUTES", "3")
+        )
+        max_proactive_suggestions_per_hour = max_proactive_suggestions_per_hour or int(
+            os.getenv("PHASE4_ENGAGEMENT_MAX_SUGGESTIONS_PER_HOUR", "8")
+        )
 
         self.stagnation_threshold = timedelta(minutes=stagnation_threshold_minutes)
         self.engagement_check_interval = timedelta(minutes=engagement_check_interval_minutes)
@@ -287,16 +305,21 @@ class ProactiveConversationEngagementEngine:
         Returns:
             Comprehensive engagement analysis with proactive recommendations
         """
+        logger.info(f"🎯 ENGAGEMENT: Analyzing conversation for user {user_id} with {len(recent_messages)} recent messages")
+        
         # Analyze conversation flow state
         flow_analysis = await self._analyze_conversation_flow(user_id, recent_messages)
+        logger.info(f"🎯 ENGAGEMENT: Flow state: {flow_analysis['current_state'].value}, engagement score: {flow_analysis.get('engagement_score', 'N/A')}")
 
         # Detect stagnation signals
         stagnation_analysis = await self._detect_stagnation_signals(user_id, recent_messages)
+        logger.info(f"🎯 ENGAGEMENT: Stagnation risk: {stagnation_analysis['risk_level']}")
 
         # Check if proactive intervention is needed
         intervention_needed = await self._assess_intervention_need(
             user_id, flow_analysis, stagnation_analysis
         )
+        logger.info(f"🎯 ENGAGEMENT: Intervention needed: {intervention_needed}")
 
         # Generate proactive recommendations if needed
         recommendations = []
@@ -304,6 +327,7 @@ class ProactiveConversationEngagementEngine:
             recommendations = await self._generate_proactive_recommendations(
                 user_id, context_id, recent_messages, current_thread_info
             )
+            logger.info(f"🎯 ENGAGEMENT: Generated {len(recommendations)} proactive recommendations")
 
         # Update conversation rhythm analysis
         await self._update_conversation_rhythm(user_id, recent_messages)

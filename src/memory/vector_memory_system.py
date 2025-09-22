@@ -462,42 +462,9 @@ class VectorMemoryStore:
         return keywords[:20]  # Limit to top 20 keywords
     
     def _extract_emotional_context(self, content: str) -> tuple[str, float]:
-        """Extract emotional context and intensity for role-playing intelligence"""
-        content_lower = content.lower()
-        
-        # Enhanced emotional detection with intensity - Phase 1.1 Enhanced Detection
-        
-        # Negative emotions (very high intensity)
-        if any(word in content_lower for word in ['devastated', 'furious', 'enraged', 'terrified', 'horrified', 'catastrophic', 'crushing', 'destroyed', 'shattered']):
-            return 'very_negative', 0.95
-        # Negative emotions (high intensity) 
-        elif any(word in content_lower for word in ['grief', 'despair', 'anguish', 'tormented', 'miserable', 'heartbroken', 'desperate']):
-            return 'very_negative', 0.9
-        # Negative emotions (medium intensity)
-        elif any(word in content_lower for word in ['sad', 'angry', 'frustrated', 'hate', 'terrible', 'awful', 'upset', 'depressed', 'loss']):
-            return 'negative', 0.7
-        # Mildly negative
-        elif any(word in content_lower for word in ['disappointed', 'annoyed', 'bothered', 'concerned', 'worried', 'nervous']):
-            return 'mildly_negative', 0.4
-        
-        # Positive emotions (very high intensity)
-        elif any(word in content_lower for word in ['ecstatic', 'thrilled', 'overjoyed', 'fantastic', 'incredible', 'absolutely', 'promotion']):
-            return 'very_positive', 0.95
-        # Positive emotions (medium intensity)
-        elif any(word in content_lower for word in ['happy', 'joy', 'excited', 'love', 'wonderful', 'amazing', 'great', 'optimistic']):
-            return 'positive', 0.7
-        # Mildly positive
-        elif any(word in content_lower for word in ['good', 'nice', 'pleasant', 'okay', 'fine', 'well']):
-            return 'mildly_positive', 0.4
-        
-        # Anxious/stress emotions (separate category for better detection)
-        elif any(word in content_lower for word in ['anxious', 'stressed', 'overwhelmed', 'panic', 'fear', 'afraid', 'nervous', 'terrified']):
-            return 'anxious', 0.8
-        
-        # Complex/contemplative emotions
-        elif any(word in content_lower for word in ['confused', 'curious', 'wondering', 'thinking', 'pondering', 'interesting', 'perspective']):
-            return 'contemplative', 0.3
-        
+        """Extract emotional context for memory embedding - use enhanced analyzer when available"""
+        # TODO: Integrate with enhanced vector emotion analyzer
+        # For now, return neutral context until integration is complete
         return 'neutral', 0.1
     
     # Phase 1.2: Emotional Trajectory Tracking

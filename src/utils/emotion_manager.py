@@ -84,135 +84,6 @@ class UserProfile:
             self.trust_indicators = []
 
 
-class SentimentAnalyzer:
-    """
-    LLM-based emotion analysis for fallback scenarios
-
-    This analyzer provides simple but reliable emotion detection using the configured
-    LLM model when Phase 2 Predictive Emotional Intelligence fails. It uses structured
-    JSON prompts to classify emotions into 10 core emotional states with confidence scores.
-    """
-
-    def __init__(self, llm_client=None):
-        """Initialize with LLM client for emotion detection"""
-        self.llm_client = llm_client
-
-    def analyze_emotion(self, message: str) -> EmotionProfile:
-        """
-        Analyze emotion using LLM client as fallback when Phase 2 fails
-
-        This method provides reliable emotion detection using the configured LLM model
-        with structured JSON prompts. It's designed as a fallback for when the primary
-        Phase 2 Predictive Emotional Intelligence system encounters runtime errors.
-        """
-
-        if self.llm_client:
-            try:
-                logger.debug("Using LLM client for fallback emotion analysis")
-
-                # Use a simple emotion analysis prompt
-                prompt = f"""Analyze the emotion in this message and respond with JSON only:
-
-Message: "{message}"
-
-Respond with exactly this format:
-{{
-  "emotion": "happy|sad|angry|excited|frustrated|worried|grateful|curious|disappointed|neutral",
-  "confidence": 0.0-1.0,
-  "intensity": 0.0-1.0,
-  "triggers": ["word1", "word2"]
-}}"""
-
-                messages = [{"role": "user", "content": prompt}]
-
-                # Use emotion-specific endpoint if available, otherwise main endpoint
-                if (
-                    hasattr(self.llm_client, "generate_emotion_chat_completion")
-                    and self.llm_client.emotion_chat_endpoint
-                ):
-                    response = self.llm_client.generate_emotion_chat_completion(
-                        messages=messages,
-                        temperature=0.1,
-                        max_tokens=self.llm_client.max_tokens_emotion,
-                    )
-                else:
-                    response = self.llm_client.generate_chat_completion(
-                        messages=messages,
-                        temperature=0.1,
-                        max_tokens=self.llm_client.max_tokens_emotion,  # Use emotion limit even on main endpoint
-                    )
-
-                content = response["choices"][0]["message"]["content"].strip()
-
-                # Parse JSON response
-                import json
-
-                if content.startswith("{") and content.endswith("}"):
-                    emotion_data = json.loads(content)
-                else:
-                    # Try to extract JSON from the response
-                    start = content.find("{")
-                    end = content.rfind("}") + 1
-                    if start >= 0 and end > start:
-                        emotion_data = json.loads(content[start:end])
-                    else:
-                        raise ValueError("No valid JSON found in response")
-
-                # Map emotion string to EmotionalState enum
-                emotion_mapping = {
-                    "happy": EmotionalState.HAPPY,
-                    "sad": EmotionalState.SAD,
-                    "angry": EmotionalState.ANGRY,
-                    "excited": EmotionalState.EXCITED,
-                    "frustrated": EmotionalState.FRUSTRATED,
-                    "worried": EmotionalState.WORRIED,
-                    "grateful": EmotionalState.GRATEFUL,
-                    "curious": EmotionalState.CURIOUS,
-                    "disappointed": EmotionalState.DISAPPOINTED,
-                    "neutral": EmotionalState.NEUTRAL,
-                }
-
-                detected_emotion = emotion_mapping.get(
-                    emotion_data.get("emotion", "neutral").lower(), EmotionalState.NEUTRAL
-                )
-
-                confidence = float(emotion_data.get("confidence", 0.5))
-                intensity = float(emotion_data.get("intensity", 0.5))
-                triggers = emotion_data.get("triggers", [])
-
-                # Ensure triggers is a list of strings
-                if not isinstance(triggers, list):
-                    triggers = []
-                triggers = [str(t) for t in triggers if t][:5]  # Limit to 5 triggers
-
-                logger.debug(
-                    f"LLM emotion analysis: {detected_emotion.value} (confidence: {confidence:.2f})"
-                )
-
-                return EmotionProfile(
-                    detected_emotion=detected_emotion,
-                    confidence=confidence,
-                    triggers=triggers,
-                    intensity=intensity,
-                    timestamp=datetime.now(),
-                )
-
-            except Exception as e:
-                logger.warning(f"LLM emotion analysis failed: {e}")
-                # Fall through to neutral fallback
-
-        # Final safety fallback - return neutral with low confidence
-        # This ensures the system never crashes due to emotion analysis failures
-        logger.debug("Using neutral safety fallback for emotion analysis")
-        return EmotionProfile(
-            detected_emotion=EmotionalState.NEUTRAL,
-            confidence=0.1,  # Low confidence since we couldn't analyze
-            triggers=["analysis_failed"],
-            intensity=0.0,
-            timestamp=datetime.now(),
-        )
-
-
 class RelationshipManager:
     """Manages relationship progression based on user interactions"""
 
@@ -392,7 +263,7 @@ class EmotionManager:
         """Initialize the emotion manager"""
         self.use_database = use_database
         self.postgres_pool = postgres_pool  # Store reference to shared connection pool
-        self.sentiment_analyzer = SentimentAnalyzer(llm_client=llm_client)
+        # Legacy SentimentAnalyzer removed - using enhanced vector emotion analysis
         self.relationship_manager = RelationshipManager(
             llm_client=llm_client, memory_manager=memory_manager
         )
@@ -594,9 +465,9 @@ class EmotionManager:
                 )
 
         except Exception as e:
-            logger.warning(f"Phase 2 emotion analysis failed, falling back to LLM: {e}")
-            # Fallback to LLM-based sentiment analysis
-            return self.sentiment_analyzer.analyze_emotion(message)
+            logger.error(f"Phase 2 emotion analysis failed: {e}")
+            # No fallback - if Phase 2 fails, the system should be fixed
+            raise
 
     def load_profiles(self):
         """Load user profiles from persistent storage"""
@@ -893,9 +764,8 @@ class EmotionManager:
             loop = asyncio.get_event_loop()
             if loop.is_running():
                 # If loop is running, we need to handle this differently
-                # For now, fall back to LLM system to avoid conflicts
-                logger.debug("Event loop running, using LLM emotion analysis fallback")
-                emotion_profile = self.sentiment_analyzer.analyze_emotion(message)
+                logger.error("Event loop running - Phase 2 emotion analysis requires proper async context")
+                raise RuntimeError("Phase 2 emotion analysis requires proper async context")
             else:
                 # Run async Phase 2 emotion analysis
                 emotion_profile = loop.run_until_complete(
@@ -905,9 +775,8 @@ class EmotionManager:
             # No event loop, create one for Phase 2 analysis
             emotion_profile = asyncio.run(self._analyze_emotion_with_phase2(message, user_id))
         except Exception as e:
-            logger.warning(f"Phase 2 emotion analysis failed with error: {e}")
-            logger.debug("Falling back to LLM-based sentiment analysis")
-            emotion_profile = self.sentiment_analyzer.analyze_emotion(message)
+            logger.error(f"Phase 2 emotion analysis failed: {e}")
+            raise
 
         # Update user profile
         profile.interaction_count += 1

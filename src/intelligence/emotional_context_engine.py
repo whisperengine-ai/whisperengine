@@ -278,11 +278,13 @@ class EmotionalContextEngine:
                     "analysis_time_ms": result.analysis_time_ms
                 }
             except (AttributeError, TypeError, ConnectionError) as e:
-                logger.warning("Emotional AI analysis failed: %s", str(e))
+                logger.error("Emotional AI analysis failed: %s", str(e))
+                raise
 
-        # Fallback emotional analysis if needed
+        # No fallback - if emotion analysis fails, system should be fixed
         if not emotional_data:
-            emotional_data = self._fallback_emotional_analysis(user_message)
+            logger.error("No emotional data available - emotional AI analysis failed")
+            raise RuntimeError("Emotional analysis required but failed")
 
         # Get personality context
         personality_context = {}
@@ -611,42 +613,6 @@ class EmotionalContextEngine:
         except (AttributeError, TypeError, KeyError) as e:
             logger.warning("Failed to get conversation emotional context: %s", str(e))
             return context_data
-
-    def _fallback_emotional_analysis(self, text: str) -> dict[str, Any]:
-        """Provide basic emotional analysis when external AI is unavailable"""
-        # Simple keyword-based emotion detection
-        text_lower = text.lower()
-
-        emotions = {
-            "joy": ["happy", "excited", "great", "wonderful", "amazing", "love", "fantastic"],
-            "sadness": ["sad", "depressed", "down", "unhappy", "disappointed", "upset"],
-            "anger": ["angry", "mad", "frustrated", "annoyed", "furious", "irritated"],
-            "fear": ["scared", "afraid", "worried", "anxious", "nervous", "concerned"],
-            "surprise": ["surprised", "shocked", "unexpected", "wow", "amazing"],
-            "neutral": [],
-        }
-
-        emotion_scores = {}
-        for emotion, keywords in emotions.items():
-            score = sum(1 for keyword in keywords if keyword in text_lower)
-            if score > 0:
-                emotion_scores[emotion] = min(score / 3, 1.0)
-
-        if emotion_scores:
-            primary_emotion = max(emotion_scores.items(), key=lambda x: x[1])[0]
-            confidence = emotion_scores[primary_emotion]
-        else:
-            primary_emotion = "neutral"
-            confidence = 0.5
-            emotion_scores = {"neutral": 0.5}
-
-        return {
-            "primary_emotion": primary_emotion,
-            "confidence": confidence,
-            "intensity": confidence * 0.8,
-            "all_emotions": emotion_scores,
-            "sentiment": {"score": 0.5},
-        }
 
     def _detect_emotional_triggers(
         self, message: str, emotional_data: dict, personality_context: dict

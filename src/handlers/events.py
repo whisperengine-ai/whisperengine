@@ -1527,32 +1527,42 @@ class BotEventHandlers:
         return conversation_context
 
     async def _analyze_external_emotion(self, content, user_id, conversation_context):
-        """Analyze emotion using vector-native emotion intelligence."""
+        """Analyze emotion using enhanced vector emotion intelligence."""
         try:
-            logger.debug("Using vector-native emotion analysis...")
-
-            # Legacy emotion engine removed - vector system handles emotion analysis
-            # Emotion is embedded directly in conversation context through vector memory
+            # Use enhanced vector emotion analyzer
+            from src.intelligence.enhanced_vector_emotion_analyzer import EnhancedVectorEmotionAnalyzer
+            
+            # Initialize analyzer with memory manager
+            analyzer = EnhancedVectorEmotionAnalyzer(self.memory_manager)
+            
+            # Get comprehensive emotion analysis
+            emotion_result = await analyzer.analyze_emotion(
+                content=content,
+                user_id=user_id,
+                conversation_context=conversation_context
+            )
+            
+            # Convert to expected format
             emotion_data = {
-                "primary_emotion": "neutral",  # Vector system handles this automatically
-                "confidence": 0.8,
-                "sentiment_score": 0.5,
-                "all_emotions": {"neutral": 0.8},
-                "analysis_method": "vector_native",
+                "primary_emotion": emotion_result.primary_emotion,
+                "confidence": emotion_result.confidence,
+                "sentiment_score": emotion_result.intensity,
+                "all_emotions": {emotion_result.primary_emotion: emotion_result.confidence},
+                "analysis_method": "enhanced_vector",
                 "analysis_time_ms": 0,
                 "api_calls_made": 0
             }
 
             logger.debug(
-                f"Vector-native emotion analysis: {emotion_data.get('primary_emotion', 'unknown')} "
-                f"(processed via embedding intelligence)"
+                f"Enhanced vector emotion analysis: {emotion_result.primary_emotion} "
+                f"(confidence: {emotion_result.confidence:.2f})"
             )
 
             return emotion_data
 
         except Exception as e:
-            logger.error(f"Local Emotion Engine analysis failed: {e}")
-            return None
+            logger.error(f"Enhanced vector emotion analysis failed: {e}")
+            raise
 
     async def _analyze_phase2_emotion(
         self, user_id, content, message, context_type="discord_conversation"

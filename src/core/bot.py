@@ -232,11 +232,23 @@ class DiscordBotCore:
                     from src.conversation.engagement_protocol import create_engagement_engine
                     
                     # Create with available integrations using factory pattern
+                    # Initialize enhanced vector emotion analyzer for engagement engine
+                    enhanced_emotion_analyzer = None
+                    try:
+                        from src.intelligence.enhanced_vector_emotion_analyzer import EnhancedVectorEmotionAnalyzer
+                        if hasattr(self, 'memory_manager') and self.memory_manager:
+                            enhanced_emotion_analyzer = EnhancedVectorEmotionAnalyzer(
+                                vector_memory_manager=self.memory_manager
+                            )
+                            self.logger.info("✅ Enhanced Vector Emotion Analyzer initialized for engagement engine")
+                    except Exception as e:
+                        self.logger.warning("Enhanced emotion analyzer not available for engagement: %s", e)
+                    
                     self.engagement_engine = await create_engagement_engine(
                         engagement_engine_type=os.getenv("ENGAGEMENT_ENGINE_TYPE", "full"),
                         thread_manager=getattr(self, 'thread_manager', None),
                         memory_moments=getattr(self, 'memory_moments', None),
-                        emotional_engine=getattr(self.phase2_integration, 'emotional_context_engine', None) if hasattr(self, 'phase2_integration') else None,
+                        emotional_engine=enhanced_emotion_analyzer or (getattr(self.phase2_integration, 'emotional_context_engine', None) if hasattr(self, 'phase2_integration') else None),
                         personality_profiler=getattr(self, 'dynamic_personality_profiler', None)
                     )
                     self.logger.info("✅ Phase 4.3: Proactive Engagement Engine initialized with factory pattern")
@@ -326,28 +338,25 @@ class DiscordBotCore:
         # Initialize Predictive Emotional Intelligence
         self.logger.info("🎯 Initializing Predictive Emotional Intelligence...")
         try:
-            # All AI features are always enabled - unified AI system
-            from src.intelligence import Phase2Integration
+            # Use simplified emotion integration - vector-native architecture
+            from src.intelligence.simplified_emotion_manager import create_simplified_emotion_manager
 
-            self.logger.info("🧠 Emotional Intelligence Mode: Full Capabilities Always Active")
+            self.logger.info("🧠 Emotional Intelligence Mode: Simplified Vector-Native System")
 
-            # Phase 3.1 Integration: Provide dependencies for EmotionalContextEngine
-            graph_personality_manager = getattr(self, "graph_personality_manager", None)
-            conversation_cache = getattr(self, "conversation_cache", None)
+            # Create simplified emotion manager with vector memory integration
+            vector_memory_manager = getattr(self, "vector_memory_manager", None)
+            
+            self.simplified_emotion_manager = create_simplified_emotion_manager(vector_memory_manager)
+            self.logger.info("✅ Simplified Emotion Manager initialized with Enhanced Vector system")
 
-            self.phase2_integration = Phase2Integration(
-                bot_instance=self,
-                graph_personality_manager=graph_personality_manager,
-                conversation_cache=conversation_cache,
-            )
-            self.logger.info(
-                "✅ Predictive Emotional Intelligence initialized with Phase 3.1 support"
-            )
-
-            # Update emotion manager with phase2_integration if it exists
+            # For backward compatibility, also set as phase2_integration
+            # This allows existing code to work during transition
+            self.phase2_integration = self.simplified_emotion_manager
+            
+            # Update emotion manager with simplified system if it exists
             if hasattr(self, "graph_emotion_manager") and self.graph_emotion_manager:
-                self.graph_emotion_manager.phase2_integration = self.phase2_integration
-                self.logger.info("✅ Updated emotion manager with Phase 2 integration")
+                self.graph_emotion_manager.simplified_emotion_manager = self.simplified_emotion_manager
+                self.logger.info("✅ Updated emotion manager with Simplified Emotion system")
 
             # Also update the memory manager's emotion manager if it exists
             if (
@@ -356,22 +365,15 @@ class DiscordBotCore:
                 and hasattr(self.memory_manager, "emotion_manager")
                 and self.memory_manager.emotion_manager
             ):
-                self.memory_manager.emotion_manager.phase2_integration = self.phase2_integration
-                self.logger.info(
-                    "✅ Updated memory manager's emotion manager with Phase 2 integration"
-                )
-
-            # Use the new update method for consistency
-            if (
-                hasattr(self, "memory_manager")
-                and self.memory_manager
-                and hasattr(self.memory_manager, "update_phase2_integration")
-            ):
-                self.memory_manager.update_phase2_integration(self.phase2_integration)
+                self.memory_manager.emotion_manager.simplified_emotion_manager = self.simplified_emotion_manager
+                self.logger.info("✅ Updated memory manager's emotion manager with Simplified system")
 
         except Exception as e:
-            self.logger.error(f"Failed to initialize emotional intelligence: {e}")
+            self.logger.error("Failed to initialize simplified emotional intelligence: %s", e)
             self.logger.warning("⚠️ Continuing without emotional intelligence features")
+            # Set fallback
+            self.simplified_emotion_manager = None
+            self.phase2_integration = None
 
         # Legacy emotion engine removed - vector-native system handles emotion analysis
         self.local_emotion_engine = None

@@ -39,15 +39,16 @@ class MetricsIntegration:
         )
 
     async def process_message_with_metrics(
-        self, user_id: str, message: str, memory_manager, emotional_intelligence, phase4_integration
+        self, user_id: str, message: str, memory_manager, simplified_emotion_manager, phase4_integration
     ) -> dict[str, Any]:
         """
         Process a message with full metrics collection and A/B testing
+        Uses SimplifiedEmotionManager instead of legacy emotional_intelligence
         """
         if not self.metrics_enabled:
             # Fallback to original processing without metrics
             return await self._process_message_original(
-                user_id, message, memory_manager, emotional_intelligence, phase4_integration
+                user_id, message, memory_manager, simplified_emotion_manager, phase4_integration
             )
 
         # Start metrics collection
@@ -65,7 +66,7 @@ class MetricsIntegration:
                 user_id,
                 message,
                 memory_manager,
-                emotional_intelligence,
+                simplified_emotion_manager,
                 phase4_integration,
                 test_configs,
             )
@@ -76,7 +77,7 @@ class MetricsIntegration:
             logger.error(f"Error in metrics-enabled message processing: {e}")
             # Fallback to original processing
             return await self._process_message_original(
-                user_id, message, memory_manager, emotional_intelligence, phase4_integration
+                user_id, message, memory_manager, simplified_emotion_manager, phase4_integration
             )
 
     async def _process_with_instrumentation(
@@ -191,36 +192,44 @@ class MetricsIntegration:
             return []
 
     async def _analyze_emotion_with_config(
-        self, user_id: str, message: str, emotional_intelligence, config: dict
+        self, user_id: str, message: str, simplified_emotion_manager, config: dict
     ) -> dict:
-        """Analyze emotion with A/B test configuration"""
+        """Analyze emotion with configuration - updated for SimplifiedEmotionManager"""
         try:
-            # Apply test configuration to emotional analysis
+            # Apply configuration settings
             intervention_threshold = config.get("intervention_threshold", 0.7)
             support_sensitivity = config.get("support_sensitivity", 0.5)
 
-            # Perform emotional analysis
-            assessment = await emotional_intelligence.comprehensive_emotional_assessment(
-                user_id, message, {}
+            # Check if emotion manager is available
+            if not simplified_emotion_manager or not simplified_emotion_manager.is_available():
+                return {"detected_emotion": "neutral", "intervention_needed": False, "error": "emotion_unavailable"}
+
+            # Perform emotional analysis using simplified manager
+            emotion_data = await simplified_emotion_manager.analyze_message_emotion(
+                user_id=user_id, 
+                message=message, 
+                conversation_context={}
             )
 
             # Apply test configuration adjustments
             emotion_results = {
-                "assessment": assessment,
-                "detected_emotion": assessment.mood_assessment.mood_category.value,
-                "intervention_needed": assessment.emotional_prediction.risk_level
-                > intervention_threshold,
+                "assessment": emotion_data,
+                "detected_emotion": emotion_data.get("primary_emotion", "neutral"),
+                "confidence": emotion_data.get("confidence", 0.5),
+                "intervention_needed": emotion_data.get("support_needed", False) and 
+                                     emotion_data.get("confidence", 0.0) > intervention_threshold,
                 "support_level": min(
-                    1.0, assessment.emotional_prediction.risk_level / support_sensitivity
+                    1.0, emotion_data.get("confidence", 0.0) / support_sensitivity
                 ),
                 "config_applied": config,
+                "analysis_method": emotion_data.get("analysis_method", "simplified")
             }
 
             return emotion_results
 
         except Exception as e:
-            logger.error(f"Emotion analysis error: {e}")
-            return {"detected_emotion": "neutral", "intervention_needed": False}
+            logger.error("Emotion analysis error: %s", e)
+            return {"detected_emotion": "neutral", "intervention_needed": False, "error": str(e)}
 
     async def _generate_response_context(
         self,
