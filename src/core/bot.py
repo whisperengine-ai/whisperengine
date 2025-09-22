@@ -885,62 +885,11 @@ class DiscordBotCore:
     def get_components(self):
         """Get all initialized bot components as a dictionary."""
 
-        # Create optimized memory manager if components are available
-        optimized_memory_manager = self.memory_manager
-        try:
-            if hasattr(self, "llm_client") and self.llm_client and self.memory_manager:
-                # Try to find embedding manager from memory manager
-                embedding_manager = None
-                if (
-                    hasattr(self.memory_manager, "embedding_manager")
-                    and self.memory_manager.embedding_manager
-                ):
-                    embedding_manager = self.memory_manager.embedding_manager
-                elif (
-                    hasattr(self.memory_manager, "memory_manager")
-                    and self.memory_manager.memory_manager
-                    and hasattr(self.memory_manager.memory_manager, "embedding_manager")
-                ):
-                    embedding_manager = self.memory_manager.memory_manager.embedding_manager
-
-                optimized_memory_manager = create_optimized_memory_manager(
-                    llm_client=self.llm_client,
-                    embedding_manager=embedding_manager,
-                    memory_manager=self.memory_manager,
-                )
-
-                # Use logging if available
-                try:
-                    import logging
-
-                    logger = logging.getLogger(__name__)
-                    logger.info("✅ Memory optimization integrated successfully")
-                except:
-                    pass
-            else:
-                try:
-                    import logging
-
-                    logger = logging.getLogger(__name__)
-                    logger.info("ℹ️ Using standard memory manager (LLM client not available)")
-                except:
-                    pass
-        except Exception as e:
-            try:
-                import logging
-
-                logger = logging.getLogger(__name__)
-                logger.warning(
-                    f"Memory optimization initialization failed, using standard manager: {e}"
-                )
-            except:
-                pass
-            optimized_memory_manager = self.memory_manager
-
+        # Use the standard memory manager (vector-native architecture)
         return {
             "bot": self.bot,
             "llm_client": self.llm_client,
-            "memory_manager": optimized_memory_manager,
+            "memory_manager": self.memory_manager,
             "conversation_cache": self.conversation_cache,
             "image_processor": self.image_processor,
             "health_monitor": self.health_monitor,
