@@ -96,9 +96,9 @@ RUN --mount=type=cache,target=/root/.cache/pip \
     pip install --no-cache-dir -r requirements-discord.txt && \
     pip install --no-cache-dir -r requirements-vector-memory.txt
 
-# Install spaCy model in runtime stage (spaCy package is already in requirements-core.txt)
-RUN --mount=type=cache,target=/root/.cache/pip \
-    python -m spacy download en_core_web_sm
+# REMOVED: spaCy model download (spaCy superseded by vector-native memory system)
+# Previous: RUN --mount=type=cache,target=/root/.cache/pip \
+#     python -m spacy download en_core_web_sm
 
 # Copy application code
 COPY . /app

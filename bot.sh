@@ -397,10 +397,10 @@ start_bot() {
                     print_warning "Python $python_version detected. Python 3.13+ recommended for native development."
                 fi
                 
-                # Only show info about dependencies if they're missing (don't try to install)
-                if ! $python_cmd -c "import spacy; spacy.load('en_core_web_sm')" &>/dev/null 2>&1; then
-                    echo "ℹ️  Note: spaCy model not found (only needed for native development)"
-                fi
+                # REMOVED: spaCy check (spaCy superseded by vector-native memory system)
+                # Previous: if ! $python_cmd -c "import spacy; spacy.load('en_core_web_sm')" &>/dev/null 2>&1; then
+                #     echo "ℹ️  Note: spaCy model not found (only needed for native development)"
+                # fi
                 
                 # Check for required packages
                 if ! $python_cmd -c "import discord, asyncio" &>/dev/null 2>&1; then

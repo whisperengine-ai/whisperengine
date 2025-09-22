@@ -20,57 +20,13 @@ logger = logging.getLogger(__name__)
 
 async def verify_spacy() -> dict[str, Any]:
     """Verify spaCy installation and model availability."""
-    try:
-        import spacy
-
-        # Check which models are available
-        models_available = []
-        models_tested = []
-
-        # Try large model first
-        try:
-            nlp = spacy.load("en_core_web_lg")
-            doc = nlp("This is a test sentence about technology and artificial intelligence.")
-            entities = [ent.text for ent in doc.ents]
-            models_available.append("en_core_web_lg")
-            models_tested.append(
-                {"model": "en_core_web_lg", "entities": entities, "status": "working"}
-            )
-        except OSError:
-            models_tested.append({"model": "en_core_web_lg", "status": "not_found"})
-
-        # Try small model as fallback
-        try:
-            nlp_sm = spacy.load("en_core_web_sm")
-            doc_sm = nlp_sm("This is a test sentence about technology and artificial intelligence.")
-            entities_sm = [ent.text for ent in doc_sm.ents]
-            models_available.append("en_core_web_sm")
-            models_tested.append(
-                {"model": "en_core_web_sm", "entities": entities_sm, "status": "working"}
-            )
-        except OSError:
-            models_tested.append({"model": "en_core_web_sm", "status": "not_found"})
-
-        if models_available:
-            return {
-                "status": "success",
-                "version": spacy.__version__,
-                "models_available": models_available,
-                "models_tested": models_tested,
-                "recommended_model": models_available[0],  # First available (lg preferred)
-                "functional": True,
-            }
-        else:
-            return {
-                "status": "error",
-                "version": spacy.__version__,
-                "models_available": [],
-                "error": "No spaCy models found. Run: python -m spacy download en_core_web_sm",
-                "functional": False,
-            }
-
-    except ImportError as e:
-        return {"status": "error", "error": f"spaCy not installed: {e}", "functional": False}
+    # REMOVED: spaCy superseded by vector-native memory system
+    return {
+        "status": "disabled",
+        "message": "spaCy superseded by vector-native memory system",
+        "functional": False,
+        "reason": "Legacy NLP pipeline replaced with vector-based approach"
+    }
 
 
 async def verify_transformers() -> dict[str, Any]:

@@ -3095,41 +3095,16 @@ class BotEventHandlers:
         try:
             logger.info(f"🎭 CDL CHARACTER DEBUG: Starting enhancement for user {user_id}")
             
-            # Check if CDL test commands are available
-            logger.info(f"🎭 CDL CHARACTER DEBUG: Bot has command_handlers attr: {hasattr(self.bot, 'command_handlers')}")
-            if hasattr(self.bot, 'command_handlers'):
-                logger.info(f"🎭 CDL CHARACTER DEBUG: Available handlers: {list(getattr(self.bot, 'command_handlers', {}).keys())}")
+            # Use CDL_DEFAULT_CHARACTER directly from environment - no dependency on CDL handler
+            import os
+            character_file = os.getenv("CDL_DEFAULT_CHARACTER")
             
-            if not hasattr(self.bot, 'command_handlers') or 'cdl_test' not in getattr(self.bot, 'command_handlers', {}):
-                logger.info(f"🎭 CDL CHARACTER DEBUG: CDL test handler not found, returning None")
-                return None
-            
-            # Get CDL test commands handler to check for active character
-            cdl_handler = None
-            # Access the CDL handler through the bot manager
-            for handler_name, handler in getattr(self.bot, 'command_handlers', {}).items():
-                if handler_name == 'cdl_test':
-                    cdl_handler = handler
-                    break
-            
-            if not cdl_handler:
-                logger.info(f"🎭 CDL CHARACTER DEBUG: CDL handler not found in loop, returning None")
-                return None
-                
-            # Check if user has an active character
-            character_file = cdl_handler.get_user_character(user_id)
-            
-            # Auto-assign Elena character if bot name is Elena and no character is set
             if not character_file:
-                import os
-                bot_name = os.getenv("DISCORD_BOT_NAME", "").lower()
-                if bot_name == "elena":
-                    character_file = "characters/examples/elena-rodriguez.json"
-                    # Store this assignment in the handler
-                    cdl_handler.user_characters[user_id] = character_file
-                    logger.info(f"🎭 CDL CHARACTER: Auto-assigned Elena character to user {user_id}")
-                else:
-                    return None
+                logger.info(f"🎭 CDL CHARACTER DEBUG: No CDL_DEFAULT_CHARACTER environment variable set")
+                return None
+            
+            bot_name = os.getenv("DISCORD_BOT_NAME", "Unknown")
+            logger.info(f"🎭 CDL CHARACTER: Using {bot_name} bot default character ({character_file}) for user {user_id}")
             
             logger.info(f"🎭 CDL CHARACTER: User {user_id} has active character: {character_file}")
             
