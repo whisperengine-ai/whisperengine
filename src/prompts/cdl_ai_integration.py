@@ -61,8 +61,18 @@ class CDLAIPromptIntegration:
             current_date = current_datetime.strftime("%A, %B %d, %Y")
             current_time = current_datetime.strftime("%I:%M %p %Z")
             
+            # Check for custom introduction override
+            custom_introduction = getattr(character.identity, 'custom_introduction', None)
+            
             # IMPROVED PROMPT STRUCTURE: Character identity → Personality → Voice → Style requirements → Context
-            prompt = f"""You are {character.identity.name}, a {character.identity.age}-year-old {character.identity.occupation} in {character.identity.location}.
+            if custom_introduction:
+                prompt = f"""IDENTITY:
+{custom_introduction}
+
+PERSONALITY:
+{character.identity.description}"""
+            else:
+                prompt = f"""You are {character.identity.name}, a {character.identity.age}-year-old {character.identity.occupation} in {character.identity.location}.
 
 PERSONALITY:
 {character.identity.description}"""
@@ -155,34 +165,52 @@ VOICE & COMMUNICATION STYLE:"""
                 prompt += f"\n- Favorite phrases: {', '.join(favorite_phrases[:3])}"
 
             # Character-aware speaking style instructions (moved up for better priority)
-            # Check speaking style from CDL category (cleaner than hardcoded logic)
+            # Check for custom speaking instructions override first, then fall back to categories
             speaking_style_category = None
+            custom_speaking_instructions = None
             try:
                 import json
                 character_file_path = Path(character_file)
                 if character_file_path.exists():
                     with open(character_file_path, 'r') as f:
                         raw_character_data = json.load(f)
+                        # Standardized location: character.personality.communication_style
                         comm_style = raw_character_data.get('character', {}).get('personality', {}).get('communication_style', {})
+                        
+                        # Check for custom override first
+                        custom_speaking_instructions = comm_style.get('custom_speaking_instructions')
+                        
+                        # Fall back to category system
                         speaking_style_category = comm_style.get('category', 'default')
             except Exception as e:
                 logger.warning(f"Could not check speaking style category: {e}")
                 speaking_style_category = 'default'
             
-            if speaking_style_category == 'mystical' or speaking_style_category == 'supernatural':
-                # Characters with supernatural/mystical nature should use appropriate language
+            # Apply custom instructions if provided, otherwise use category templates
+            if custom_speaking_instructions:
                 prompt += f"""
 
-SPEAKING STYLE FOR {character.identity.name}:
+CUSTOM SPEAKING STYLE FOR {character.identity.name}:"""
+                for instruction in custom_speaking_instructions:
+                    prompt += f"""
+- {instruction}"""
+            else:
+                # Use category-based templates when no custom instructions provided
+                if speaking_style_category == 'mystical' or speaking_style_category == 'supernatural':
+                    # Characters with supernatural/mystical nature should use appropriate language
+                    prompt += f"""
+
+MYSTICAL/SUPERNATURAL SPEAKING STYLE FOR {character.identity.name}:
 - You are {character.identity.name}, {character.identity.occupation}
-- Speak authentically according to your nature and background as described in your character
-- Use language that reflects your unique perspective and existence
-- Stay true to your character's natural voice and communication style
+- Speak authentically according to your supernatural nature and mythological background
+- Use language that reflects your unique perspective and otherworldly existence
+- Poetic, mystical, and metaphorical language is natural to your character
+- Stay true to your character's mythological voice and communication style
 - When discussing current events/time, acknowledge them while maintaining your character's perspective
 - Be helpful and engaging while remaining authentic to who you are"""
-            elif speaking_style_category == 'warm_affectionate':
-                # Characters with warm/affectionate communication styles should be naturally warm
-                prompt += f"""
+                elif speaking_style_category == 'warm_affectionate':
+                    # Characters with warm/affectionate communication styles should be naturally warm
+                    prompt += f"""
 
 WARM CHARACTER SPEAKING STYLE FOR {character.identity.name}:
 - You are {character.identity.name}, a {character.identity.occupation} with a naturally warm and affectionate personality
@@ -193,9 +221,35 @@ WARM CHARACTER SPEAKING STYLE FOR {character.identity.name}:
 - Use your authentic voice including cultural expressions and affectionate language
 - Stay true to your naturally loving and warm personality while being professional when needed
 - Answer questions directly with your characteristic warmth and genuine care"""
-            else:
-                # For other realistic/professional characters, apply anti-poetic guidelines
-                prompt += f"""
+                elif speaking_style_category == 'academic_professional':
+                    # Academic characters should be educational and precise
+                    prompt += f"""
+
+ACADEMIC PROFESSIONAL SPEAKING STYLE FOR {character.identity.name}:
+- You are {character.identity.name}, a {character.identity.occupation} - speak like a knowledgeable academic
+- Use precise, well-structured language appropriate for your field of expertise
+- Explain complex concepts in accessible ways when needed
+- Be educational and informative while remaining approachable
+- Use technical terminology naturally but provide context when helpful
+- Build concepts progressively and logically
+- Stay professional but be engaging and enthusiastic about your research area
+- Answer questions thoroughly with scientific rigor and clarity"""
+                elif speaking_style_category == 'creative_casual':
+                    # Creative professionals should be relaxed but insightful
+                    prompt += f"""
+
+CREATIVE CASUAL SPEAKING STYLE FOR {character.identity.name}:
+- You are {character.identity.name}, a {character.identity.occupation} - speak like a thoughtful creative professional
+- Use casual, relaxed language while showing deep expertise in your field
+- Draw analogies and connections from your creative work when relevant
+- Be honest and straightforward with a touch of dry humor
+- Use technical terms from your field naturally but explain when needed
+- Stay authentic to your creative perspective and independent spirit
+- Be approachable and friendly while showing passion for your craft
+- Answer questions with creative insights and practical experience"""
+                else:
+                    # For other realistic/professional characters, apply anti-poetic guidelines
+                    prompt += f"""
 
 CRITICAL SPEAKING STYLE REQUIREMENTS:
 - You are {character.identity.name}, a {character.identity.occupation} - speak like a REAL professional, not a fictional character
