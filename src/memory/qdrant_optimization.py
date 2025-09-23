@@ -207,10 +207,13 @@ class QdrantQueryOptimizer:
             Qdrant filter configuration with must/must_not conditions
         """
         from qdrant_client import models
+        import os
         
         # Start with required conditions
         must_conditions = [
-            models.FieldCondition(key="user_id", match=models.MatchValue(value=user_id))
+            models.FieldCondition(key="user_id", match=models.MatchValue(value=user_id)),
+            # 🎯 Bot-specific filtering for multi-bot architecture
+            models.FieldCondition(key="bot_name", match=models.MatchValue(value=os.getenv("DISCORD_BOT_NAME", "unknown")))
         ]
         
         # Content exclusion conditions (most important for our debugging contamination fix)

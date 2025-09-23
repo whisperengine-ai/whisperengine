@@ -3136,24 +3136,65 @@ class VectorMemoryManager:
         query: str,
         limit: int = 10
     ) -> List[Dict[str, Any]]:
-        """Retrieve memories relevant to the given query."""
+        """Retrieve memories relevant to the given query with performance optimization."""
+        import time
+        
+        start_time = time.time()
         try:
+            # 🚀 PERFORMANCE: Use optimized search if query optimizer available
+            try:
+                from src.memory.qdrant_optimization import QdrantQueryOptimizer
+                optimizer = QdrantQueryOptimizer(self.vector_store)
+                
+                # Use optimized search with adaptive thresholds
+                results = await optimizer.optimized_search(
+                    query=query,
+                    user_id=user_id,
+                    query_type="general_search",
+                    user_history={},
+                    filters={}
+                )
+                
+                # Convert to expected format and limit results
+                formatted_results = []
+                for r in results[:limit]:
+                    formatted_results.append({
+                        "content": r.get("content", ""),
+                        "score": r.get("score", 0.0), 
+                        "timestamp": r.get("timestamp", ""),
+                        "metadata": r.get("metadata", {}),
+                        "memory_type": r.get("memory_type", "unknown"),
+                        "optimized": True
+                    })
+                
+                logger.debug(f"🚀 OPTIMIZED: Retrieved {len(formatted_results)} memories in {(time.time() - start_time)*1000:.1f}ms")
+                return formatted_results
+                
+            except (ImportError, Exception) as e:
+                logger.debug(f"QdrantQueryOptimizer not available, using standard search: {e}")
+                
+            # Fallback to standard search
             results = await self.vector_store.search_memories(
                 query=query,
                 user_id=user_id,
                 top_k=limit,
                 min_score=0.5
             )
-            return [
+            
+            formatted_results = [
                 {
-                    "content": r["content"],
-                    "score": r["score"],
-                    "timestamp": r["timestamp"],
+                    "content": r.get("content", ""),
+                    "score": r.get("score", 0.0),
+                    "timestamp": r.get("timestamp", ""),
                     "metadata": r.get("metadata", {}),
-                    "memory_type": r.get("memory_type", "unknown")
+                    "memory_type": r.get("memory_type", "unknown"),
+                    "optimized": False
                 }
                 for r in results
             ]
+            
+            return formatted_results
+            
         except Exception as e:
             logger.error(f"Failed to retrieve memories: {e}")
             return []
