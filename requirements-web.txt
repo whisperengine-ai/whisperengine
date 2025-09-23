@@ -9,7 +9,7 @@ python-multipart==0.0.6
 pydantic==2.5.0
 
 # CORS middleware
-starlette==0.27.0
+starlette==0.47.2
 
 # Optional: JWT authentication (for production)
 python-jose[cryptography]==3.3.0
