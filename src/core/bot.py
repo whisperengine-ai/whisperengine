@@ -178,6 +178,22 @@ class DiscordBotCore:
             # This enables easy A/B testing: just change MEMORY_SYSTEM_TYPE
             memory_manager = create_memory_manager(memory_type)
             
+            # Wrap with Universal Identity Adapter for Discord ID compatibility
+            try:
+                from src.identity.universal_identity_adapter import UniversalIdentityAdapter
+                postgres_pool = getattr(self, 'postgres_pool', None)
+                
+                if postgres_pool:
+                    # Wrap memory manager with Universal Identity Adapter
+                    memory_manager = UniversalIdentityAdapter(memory_manager, postgres_pool)
+                    self.logger.info("✅ Memory manager wrapped with Universal Identity Adapter")
+                else:
+                    self.logger.warning("⚠️ No PostgreSQL pool available - Universal Identity Adapter disabled")
+            except ImportError:
+                self.logger.warning("⚠️ Universal Identity Adapter not available")
+            except Exception as e:
+                self.logger.warning("⚠️ Failed to initialize Universal Identity Adapter: %s", e)
+            
             # Set as THE memory manager (clean, simple)
             self.safe_memory_manager = memory_manager
             self.memory_manager = memory_manager

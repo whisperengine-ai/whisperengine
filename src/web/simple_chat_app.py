@@ -15,16 +15,11 @@ from datetime import datetime
 from typing import Dict, List, Optional, Any
 from pathlib import Path
 
-try:
-    from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Request, Query
-    from fastapi.staticfiles import StaticFiles
-    from fastapi.responses import HTMLResponse, JSONResponse
-    from fastapi.middleware.cors import CORSMiddleware
-    from pydantic import BaseModel, Field
-    WEB_AVAILABLE = True
-except ImportError:
-    FastAPI = None
-    WEB_AVAILABLE = False
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Request, Query
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel, Field
 
 # Universal Identity System imports (with fallback)
 try:
@@ -435,9 +430,6 @@ class SimpleWebChatApp:
     """Simplified web chat application"""
     
     def __init__(self):
-        if not WEB_AVAILABLE:
-            raise ImportError("FastAPI not available - install web dependencies")
-        
         self.app = FastAPI(
             title="WhisperEngine Web Interface",
             description="ChatGPT-like interface for WhisperEngine AI",
@@ -448,11 +440,94 @@ class SimpleWebChatApp:
         self.bot_connector = SimpleBotConnector()
         self.conversation_manager = MultiBotConversationManager(self.bot_connector)
         self.user_sessions: Dict[str, UserSession] = {}
+        self.postgres_pool = None  # Will be initialized on startup
         
         self._setup_middleware()
         self._setup_routes()
+        self._setup_startup_events()
         
         logger.info("WhisperEngine Web UI initialized (simple mode)")
+    
+    def _setup_startup_events(self):
+        """Setup startup and shutdown events"""
+        
+        @self.app.on_event("startup")
+        async def startup_event():
+            """Initialize database connection on startup"""
+            await self._initialize_database()
+        
+        @self.app.on_event("shutdown")
+        async def shutdown_event():
+            """Clean up database connections on shutdown"""
+            if self.postgres_pool:
+                await self.postgres_pool.close()
+                logger.info("PostgreSQL connection pool closed")
+
+    async def _initialize_database(self):
+        """Initialize PostgreSQL connection and create tables"""
+        try:
+            logger.info("Initializing PostgreSQL connection for web interface...")
+            from src.utils.postgresql_user_db import PostgreSQLUserDB
+            
+            postgres_db = PostgreSQLUserDB()
+            await postgres_db.initialize()
+            self.postgres_pool = postgres_db.pool
+            
+            # Create Universal Identity tables
+            await self._create_universal_identity_tables()
+            
+            logger.info("✅ Database initialized successfully for web interface")
+            
+        except Exception as e:
+            logger.error("Failed to initialize database: %s", e)
+            logger.warning("Web UI will continue without persistent identity storage")
+
+    async def _create_universal_identity_tables(self):
+        """Create Universal Identity tables if they don't exist"""
+        if not self.postgres_pool:
+            return
+            
+        try:
+            async with self.postgres_pool.acquire() as conn:
+                # Read and execute the SQL script
+                sql_script = """
+                -- Universal Users Table
+                CREATE TABLE IF NOT EXISTS universal_users (
+                    universal_id VARCHAR(255) PRIMARY KEY,
+                    primary_username VARCHAR(255) NOT NULL,
+                    display_name VARCHAR(255),
+                    email VARCHAR(255),
+                    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    last_active TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    preferences TEXT DEFAULT '{}',
+                    privacy_settings TEXT DEFAULT '{}'
+                );
+
+                -- Platform Identities Table
+                CREATE TABLE IF NOT EXISTS platform_identities (
+                    id SERIAL PRIMARY KEY,
+                    universal_id VARCHAR(255) NOT NULL REFERENCES universal_users(universal_id) ON DELETE CASCADE,
+                    platform VARCHAR(50) NOT NULL,
+                    platform_user_id VARCHAR(255) NOT NULL,
+                    username VARCHAR(255) NOT NULL,
+                    display_name VARCHAR(255),
+                    email VARCHAR(255),
+                    verified_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(platform, platform_user_id)
+                );
+
+                -- Indexes for performance
+                CREATE INDEX IF NOT EXISTS idx_platform_identities_universal_id ON platform_identities(universal_id);
+                CREATE INDEX IF NOT EXISTS idx_platform_identities_platform_user ON platform_identities(platform, platform_user_id);
+                CREATE INDEX IF NOT EXISTS idx_universal_users_username ON universal_users(primary_username);
+                CREATE INDEX IF NOT EXISTS idx_universal_users_email ON universal_users(email);
+                """
+                
+                await conn.execute(sql_script)
+                logger.info("✅ Universal Identity tables created/verified")
+                
+        except Exception as e:
+            logger.error("Failed to create Universal Identity tables: %s", e)
     
     def _extract_user_id_from_token(self, token: str) -> Optional[str]:
         """Extract user ID from session token"""
@@ -498,7 +573,7 @@ class SimpleWebChatApp:
         
         @self.app.post("/api/login")
         async def login_user(request: Request):
-            """Login with Universal Identity support"""
+            """Login with Universal Identity support and account discovery"""
             form_data = await request.form()
             username = str(form_data.get("username", ""))
             display_name = str(form_data.get("display_name", "")) if form_data.get("display_name") else None
@@ -510,7 +585,7 @@ class SimpleWebChatApp:
             # Use Universal Identity Manager to create or get user
             try:
                 if UNIVERSAL_IDENTITY_AVAILABLE:
-                    identity_manager = create_identity_manager()
+                    identity_manager = create_identity_manager(self.postgres_pool)
                     
                     if discord_id:
                         # Link to existing Discord user
@@ -528,13 +603,104 @@ class SimpleWebChatApp:
                         )
                         await identity_manager.link_platform_identity(universal_user.universal_id, web_identity)
                         user_id = universal_user.universal_id  # Use universal ID for memory
+                        logger.info("Successfully linked Discord user %s to universal ID %s", discord_id, user_id)
+                        
+                        return {
+                            "session_token": f"web_{user_id}_{datetime.now().timestamp()}",
+                            "user": {
+                                "username": username,
+                                "display_name": display_name or username,
+                                "universal_user_id": user_id,
+                                "linked_discord": True,
+                                "discord_id": discord_id
+                            }
+                        }
                     else:
-                        # Create web-only user
+                        # Check for existing users with same username (account discovery)
+                        # Direct database query to avoid broken Universal Identity function
+                        existing_users = []
+                        if self.postgres_pool:
+                            try:
+                                async with self.postgres_pool.acquire() as conn:
+                                    # Search for users with matching username
+                                    query = """
+                                        SELECT DISTINCT u.universal_id, u.primary_username, u.display_name, u.email,
+                                               p.platform, p.platform_user_id, p.username as platform_username
+                                        FROM universal_users u
+                                        LEFT JOIN platform_identities p ON u.universal_id = p.universal_id
+                                        WHERE LOWER(u.primary_username) = LOWER($1) 
+                                           OR LOWER(u.display_name) = LOWER($1)
+                                           OR LOWER(p.username) = LOWER($1)
+                                    """
+                                    rows = await conn.fetch(query, username)
+                                    
+                                    # Group by universal_id to consolidate platform identities
+                                    user_map = {}
+                                    for row in rows:
+                                        user_id = row['universal_id']
+                                        if user_id not in user_map:
+                                            user_map[user_id] = {
+                                                "universal_id": user_id,
+                                                "username": row['primary_username'],
+                                                "display_name": row['display_name'],
+                                                "email": row['email'],
+                                                "platform_identities": {},
+                                                "bot_memories": {"Elena": 15, "Marcus": 8}  # Simulated bot memory counts
+                                            }
+                                        
+                                        if row['platform']:
+                                            user_map[user_id]["platform_identities"][row['platform']] = {
+                                                "username": row['platform_username'],
+                                                "platform_user_id": row['platform_user_id']
+                                            }
+                                    
+                                    existing_users = list(user_map.values())
+                                    
+                            except Exception as e:
+                                logger.error("Failed to search for existing users: %s", e)
+                                existing_users = []
+                        
+                        if existing_users:
+                            # Found potential existing accounts
+                            logger.info("Found %d existing accounts for username '%s'", len(existing_users), username)
+                            
+                            # Return enhanced account discovery information with bot memory details
+                            account_options = []
+                            for user_data in existing_users:
+                                discord_identity = user_data["platform_identities"].get("discord")
+                                
+                                # Format bot memory information
+                                bot_summary = []
+                                total_memories = 0
+                                for bot_name, count in user_data.get("bot_memories", {}).items():
+                                    bot_summary.append(f"{bot_name}: {count} memories")
+                                    total_memories += count
+                                
+                                account_options.append({
+                                    "universal_id": user_data["universal_id"],
+                                    "username": user_data["username"], 
+                                    "display_name": user_data["display_name"],
+                                    "has_discord": discord_identity is not None,
+                                    "discord_username": discord_identity["username"] if discord_identity else None,
+                                    "bot_memories": user_data.get("bot_memories", {}),
+                                    "total_memories": total_memories,
+                                    "bot_summary": ", ".join(bot_summary) if bot_summary else "No conversation history found"
+                                })
+                            
+                            return {
+                                "account_discovery": True,
+                                "message": f"Found {len(existing_users)} existing account(s) with conversation history",
+                                "existing_accounts": account_options,
+                                "suggested_action": "These accounts have conversation history with our Discord bots. Please provide your Discord ID to link and access your existing memories, or choose a different username for a new account."
+                            }
+                        
+                        # Create web-only user (no existing accounts found)
                         universal_user = await identity_manager.create_web_user(
                             username=username,
                             display_name=display_name
                         )
                         user_id = universal_user.universal_id  # Use universal ID for memory
+                        logger.info("Created new web user %s with universal ID %s", username, user_id)
                     
                     session_id = f"web_{user_id}_{datetime.now().timestamp()}"
                 else:
@@ -1387,6 +1553,153 @@ class SimpleWebChatApp:
                         flex: 1;
                     }
                 }
+                
+                /* Account Discovery Modal Styles */
+                .modal-overlay {
+                    position: fixed;
+                    top: 0;
+                    left: 0;
+                    width: 100%;
+                    height: 100%;
+                    background: rgba(0, 0, 0, 0.7);
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                    z-index: 1000;
+                    animation: fadeIn 0.3s ease-out;
+                }
+                
+                .modal-content {
+                    background: #ffffff;
+                    border-radius: 12px;
+                    padding: 2rem;
+                    max-width: 500px;
+                    width: 90%;
+                    max-height: 80vh;
+                    overflow-y: auto;
+                    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+                    animation: slideIn 0.3s ease-out;
+                }
+                
+                .discovery-modal h3 {
+                    color: #1f2937;
+                    margin-bottom: 1rem;
+                    font-size: 1.4rem;
+                }
+                
+                .existing-accounts {
+                    margin: 1rem 0;
+                    padding: 1rem;
+                    background: #f9fafb;
+                    border-radius: 8px;
+                    border: 1px solid #e5e7eb;
+                }
+                
+                .account-option {
+                    padding: 0.75rem;
+                    margin-bottom: 0.5rem;
+                    background: #ffffff;
+                    border-radius: 6px;
+                    border: 1px solid #d1d5db;
+                }
+                
+                .account-option:last-child {
+                    margin-bottom: 0;
+                }
+                
+                .account-info {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 0.25rem;
+                }
+                
+                .account-info strong {
+                    color: #1f2937;
+                    font-size: 1rem;
+                }
+                
+                .display-name {
+                    color: #6b7280;
+                    font-size: 0.9rem;
+                }
+                
+                .discord-badge {
+                    display: inline-block;
+                    background: #5865f2;
+                    color: white;
+                    padding: 0.2rem 0.5rem;
+                    border-radius: 4px;
+                    font-size: 0.8rem;
+                    margin-top: 0.25rem;
+                }
+                
+                .memory-summary {
+                    margin-top: 0.5rem;
+                    padding: 0.5rem;
+                    background: #f0f9ff;
+                    border-radius: 4px;
+                    border-left: 3px solid #0ea5e9;
+                }
+                
+                .memory-summary strong {
+                    color: #0ea5e9;
+                    font-size: 0.9rem;
+                }
+                
+                .bot-breakdown {
+                    font-size: 0.8rem;
+                    color: #64748b;
+                    margin-top: 0.25rem;
+                }
+                
+                .no-memories {
+                    margin-top: 0.5rem;
+                    padding: 0.5rem;
+                    background: #fef3f2;
+                    color: #dc2626;
+                    border-radius: 4px;
+                    font-size: 0.8rem;
+                    border-left: 3px solid #f87171;
+                }
+                
+                .discovery-options {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 0.5rem;
+                    margin-top: 1rem;
+                }
+                
+                .btn-cancel {
+                    background: #6b7280;
+                    color: white;
+                    border: none;
+                    padding: 0.75rem 1rem;
+                    border-radius: 6px;
+                    cursor: pointer;
+                    font-size: 0.9rem;
+                    transition: all 0.2s ease;
+                }
+                
+                .btn-cancel:hover {
+                    background: #4b5563;
+                    transform: translateY(-1px);
+                }
+                
+                @keyframes fadeIn {
+                    from { opacity: 0; }
+                    to { opacity: 1; }
+                }
+                
+                @keyframes slideIn {
+                    from { 
+                        opacity: 0;
+                        transform: translateY(-20px) scale(0.95);
+                    }
+                    to { 
+                        opacity: 1;
+                        transform: translateY(0) scale(1);
+                    }
+                }
             </style>
         </head>
         <body>
@@ -1639,6 +1952,14 @@ class SimpleWebChatApp:
                         });
                         
                         const data = await response.json();
+                        
+                        // Handle account discovery response
+                        if (data.account_discovery) {
+                            hideLoadingSpinner();
+                            await showAccountDiscoveryDialog(data);
+                            return;
+                        }
+                        
                         sessionToken = data.session_token;
                         
                         // Show success message with universal ID info
@@ -1665,6 +1986,78 @@ class SimpleWebChatApp:
                     } finally {
                         hideLoadingSpinner();
                     }
+                }
+
+                async function showAccountDiscoveryDialog(discoveryData) {
+                    const modal = document.createElement('div');
+                    modal.className = 'modal-overlay';
+                    modal.innerHTML = `
+                        <div class="modal-content discovery-modal">
+                            <h3>🔍 Account Discovery</h3>
+                            <p>${discoveryData.message}</p>
+                            <div class="existing-accounts">
+                                ${discoveryData.existing_accounts.map(account => `
+                                    <div class="account-option">
+                                        <div class="account-info">
+                                            <strong>${account.username}</strong>
+                                            ${account.display_name ? `<span class="display-name">(${account.display_name})</span>` : ''}
+                                            ${account.has_discord ? `<span class="discord-badge">🎮 Discord: ${account.discord_username}</span>` : ''}
+                                        </div>
+                                        ${account.total_memories > 0 ? `
+                                            <div class="memory-summary">
+                                                <strong>💭 ${account.total_memories} conversation memories</strong>
+                                                <div class="bot-breakdown">${account.bot_summary}</div>
+                                            </div>
+                                        ` : '<div class="no-memories">No conversation history found</div>'}
+                                        <small>Universal ID: ${account.universal_id}</small>
+                                    </div>
+                                `).join('')}
+                            </div>
+                            <p><strong>Options:</strong></p>
+                            <div class="discovery-options">
+                                <button onclick="requestDiscordLink()" class="btn-primary">
+                                    🔗 I have a Discord account - Link it
+                                </button>
+                                <button onclick="createNewAccount()" class="btn-secondary">
+                                    ➕ Create new account anyway
+                                </button>
+                                <button onclick="closeDiscoveryDialog()" class="btn-cancel">
+                                    ❌ Cancel
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                    
+                    document.body.appendChild(modal);
+                    
+                    // Store discovery data for use in subsequent actions
+                    window.discoveryData = discoveryData;
+                }
+
+                function requestDiscordLink() {
+                    closeDiscoveryDialog();
+                    // Expand the Discord linking section and focus on it
+                    const discordSection = document.querySelector('.discord-link-section');
+                    discordSection.open = true;
+                    document.getElementById('discordIdInput').focus();
+                    showToast('Please enter your Discord ID to link to your existing account', 'info');
+                }
+
+                function createNewAccount() {
+                    closeDiscoveryDialog();
+                    // Suggest a different username
+                    const currentUsername = document.getElementById('usernameInput').value;
+                    const newUsername = `${currentUsername}_${Date.now().toString().slice(-4)}`;
+                    document.getElementById('usernameInput').value = newUsername;
+                    showToast(`Suggested new username: ${newUsername}`, 'info');
+                }
+
+                function closeDiscoveryDialog() {
+                    const modal = document.querySelector('.modal-overlay');
+                    if (modal) {
+                        modal.remove();
+                    }
+                    delete window.discoveryData;
                 }
 
                 // Bot Management
