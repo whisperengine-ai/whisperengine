@@ -1,0 +1,47 @@
+# Standalone Web UI with minimal infrastructure
+version: '3.8'
+
+services:
+  # ===== WEB UI SERVICE =====
+  whisperengine-web-ui:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+    container_name: whisperengine-web-ui
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      # Standalone mode - no external dependencies required
+      - WEB_UI_HOST=0.0.0.0
+      - WEB_UI_PORT=8080
+      - PYTHONPATH=/app
+      - STANDALONE_MODE=true
+      # Bot endpoints (will try to connect to existing bots if available)
+      - ELENA_BOT_URL=http://host.docker.internal:9091
+      - MARCUS_BOT_URL=http://host.docker.internal:9092
+      - MARCUS_CHEN_BOT_URL=http://host.docker.internal:9093
+      - DREAM_BOT_URL=http://host.docker.internal:9094
+      - GABRIEL_BOT_URL=http://host.docker.internal:9095
+    volumes:
+      - ./characters:/app/characters:ro
+      - ./logs/web-ui:/app/logs
+      - ./web-ui-data:/app/data
+    networks:
+      - web-ui-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    extra_hosts:
+      # Allow connection to host services
+      - "host.docker.internal:host-gateway"
+
+networks:
+  web-ui-network:
+    name: whisperengine-web-ui-network
+
+volumes:
+  web-ui-data:
+    name: whisperengine-web-ui-data

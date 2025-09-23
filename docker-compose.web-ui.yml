@@ -1,0 +1,48 @@
+# WhisperEngine Web UI - Standalone Docker Compose
+version: '3.8'
+
+services:
+  # ===== WEB UI SERVICE =====
+  whisperengine-web-ui:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+    container_name: whisperengine-web-ui
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      # Connect to existing multi-bot infrastructure
+      - DATABASE_URL=postgresql://whisperengine:whisperengine_password@host.docker.internal:5433/whisperengine
+      - REDIS_URL=redis://host.docker.internal:6380/0
+      - QDRANT_URL=http://host.docker.internal:6334
+      - WEB_UI_HOST=0.0.0.0
+      - WEB_UI_PORT=8080
+      - PYTHONPATH=/app
+      # Security settings
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-change-this-in-production}
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:3000,http://localhost:8080}
+      # Bot configuration
+      - AVAILABLE_BOTS=elena,marcus,marcus-chen,dream,gabriel
+    volumes:
+      - ./characters:/app/characters:ro
+      - ./logs/web-ui:/app/logs
+      - ./web-ui-data:/app/data
+    networks:
+      - web-ui-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    extra_hosts:
+      # Allow connection to host services (multi-bot infrastructure)
+      - "host.docker.internal:host-gateway"
+
+networks:
+  web-ui-network:
+    name: whisperengine-web-ui-network
+
+volumes:
+  web-ui-data:
+    name: whisperengine-web-ui-data

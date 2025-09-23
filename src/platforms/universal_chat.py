@@ -34,6 +34,7 @@ class ChatPlatform(Enum):
     WHATSAPP = "whatsapp"
     API = "api"
     CLI = "cli"
+    WEB_UI = "web_ui"
 
 
 class MessageType(Enum):

@@ -46,15 +46,52 @@ services:
     container_name: whisperengine-multi-qdrant
     restart: unless-stopped
     ports:
-      - "6335:6333"
+      - "6334:6333"
     volumes:
       - qdrant_data:/qdrant/storage
     networks:
       - bot_network
+    # healthcheck:
+    #   test: ["CMD-SHELL", "wget --quiet --tries=1 --spider http://localhost:6333/ || exit 1"]
+    #   interval: 30s
+    #   timeout: 10s
+    #   retries: 3
 
-  # ===== BOT SERVICES =====
-  # This section will be populated dynamically by the configuration script
-  
+  # ===== WEB INTERFACE =====
+  whisperengine-web:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+    container_name: whisperengine-web-interface
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      - DATABASE_URL=postgresql://whisperengine:whisperengine_password@postgres:5432/whisperengine
+      - REDIS_URL=redis://redis:6379/0
+      - QDRANT_URL=http://qdrant:6333
+      - WEB_UI_HOST=0.0.0.0
+      - WEB_UI_PORT=8080
+      - PYTHONPATH=/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      qdrant:
+        condition: service_started
+    networks:
+      - bot_network
+    volumes:
+      - ./characters:/app/characters:ro
+      - ./logs:/app/logs
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ===== BOT SERVICES (populated dynamically) =====
   marcus-bot:
     build:
       context: .
