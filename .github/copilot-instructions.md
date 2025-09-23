@@ -15,6 +15,10 @@
 
 **DOCKER-FIRST DEVELOPMENT**: Container-based development is the PRIMARY workflow. Use `./multi-bot.sh` for all operations (auto-generated, don't edit manually).
 
+**UNIVERSAL IDENTITY SYSTEM**: NEW platform-agnostic user identity system in `src/identity/` allows users to interact across Discord, Web UI, and future platforms while maintaining consistent memory and conversations.
+
+**WEB INTERFACE INTEGRATION**: Complete web chat interface (`src/web/simple_chat_app.py`) with real-time WebSocket messaging, multi-bot character selection, and Universal Identity integration. Accessible at http://localhost:8081.
+
 **PYTHON VIRTUAL ENVIRONMENT**: Always use `.venv/bin/activate` for Python commands:
 ```bash
 source .venv/bin/activate   # ALWAYS use this for Python execution
@@ -35,7 +39,7 @@ python scripts/generate_multi_bot_config.py  # Example: configuration generation
 
 ## Architecture Overview
 
-WhisperEngine is a **multi-bot Discord AI companion system** with vector-native memory, CDL (Character Definition Language) personalities, and protocol-based dependency injection.
+WhisperEngine is a **multi-bot Discord AI companion system** with vector-native memory, CDL (Character Definition Language) personalities, Universal Identity system, and protocol-based dependency injection.
 
 ### Core Patterns
 
@@ -52,6 +56,10 @@ querier = create_multi_bot_querier()
 # LLM client
 from src.llm.llm_protocol import create_llm_client
 llm_client = create_llm_client(llm_client_type="openrouter")
+
+# Universal Identity (NEW)
+from src.identity.universal_identity import create_identity_manager
+identity_manager = create_identity_manager(postgres_pool)
 ```
 
 **Multi-Bot Architecture**: Single infrastructure supports multiple character bots:
@@ -59,6 +67,12 @@ llm_client = create_llm_client(llm_client_type="openrouter")
 - Shared PostgreSQL, Redis, and Qdrant infrastructure
 - Dynamic discovery and configuration generation
 - Isolated personalities but shared memory intelligence
+
+**Universal Identity System**: Platform-agnostic user identity management:
+- Users can interact via Discord, Web UI, or future platforms
+- Consistent universal IDs that map to platform-specific identities
+- Enhanced account discovery prevents duplicate accounts
+- Bot-specific memory isolation while preserving cross-platform identity
 
 ### Entry Points
 
@@ -71,6 +85,12 @@ llm_client = create_llm_client(llm_client_type="openrouter")
 - All component initialization in `initialize_all()`
 - Factory-based component creation
 - Async initialization for heavy components
+
+**Web Interface**: `src/web/simple_chat_app.py` → `SimpleWebChatApp` class
+- FastAPI-based ChatGPT-like interface
+- WebSocket real-time messaging
+- Universal Identity integration for cross-platform user management
+- Enhanced account discovery with bot-specific memory information
 
 ## Development Workflow
 
@@ -99,6 +119,29 @@ llm_client = create_llm_client(llm_client_type="openrouter")
 - PostgreSQL: `postgres:16.4-alpine` (pinned for stability)
 - Redis: `redis:7.4-alpine` (pinned for stability)  
 - Qdrant: `qdrant/qdrant:v1.15.4` (pinned for vector stability)
+
+### Web Interface Development
+
+**Web UI Setup**: Run the web interface independently:
+```bash
+# Start infrastructure first (PostgreSQL on port 5433, Redis on 6380, Qdrant on 6334)
+./multi-bot.sh start all
+
+# Export correct PostgreSQL configuration
+export POSTGRES_HOST=localhost POSTGRES_PORT=5433 POSTGRES_DB=whisperengine 
+export POSTGRES_USER=whisperengine POSTGRES_PASSWORD=whisperengine123
+
+# Start web interface
+source .venv/bin/activate
+python src/web/simple_chat_app.py
+# Accessible at http://localhost:8081
+```
+
+**Web UI Features**:
+- Real-time WebSocket chat with multiple bot personalities
+- Universal Identity account discovery (prevents duplicate accounts)
+- Bot-specific memory isolation and conversation history
+- Enhanced UX for Discord users migrating to web interface
 
 ### Adding New Bots
 ```bash
@@ -154,6 +197,16 @@ await memory_manager.store_conversation(
 )
 ```
 
+**Bot-Specific Memory Isolation**: Critical discovery - each bot has completely isolated memories:
+```python
+# Memory queries filter by bot_name (Elena, Marcus, etc.)
+# This creates complete conversation isolation between bots
+# Account discovery must show which bots user has history with
+
+# Memory filtering uses: user_id + bot_name + memory_type
+# Environment variable: DISCORD_BOT_NAME determines bot context
+```
+
 **Multi-Bot Memory Intelligence**:
 ```python
 # Query across all bots (admin/debugging)
@@ -162,6 +215,36 @@ all_results = await querier.query_all_bots("user preferences", "user123")
 
 # Cross-bot analysis and insights
 analysis = await querier.cross_bot_analysis("user123", "conversation style")
+```
+
+## Universal Identity & Account Discovery
+
+**Universal Identity System**: Platform-agnostic user management:
+```python
+from src.identity.universal_identity import create_identity_manager
+identity_manager = create_identity_manager(postgres_pool)
+
+# Create web-only user
+universal_user = await identity_manager.create_web_user(
+    username=username, 
+    display_name=display_name
+)
+
+# Link Discord to existing user
+universal_user = await identity_manager.get_or_create_discord_user(
+    discord_user_id=discord_id,
+    username=username
+)
+```
+
+**Enhanced Account Discovery**: Prevents duplicate accounts in web UI:
+```python
+# Search for existing users by username patterns
+existing_users = await identity_manager.find_users_by_username(username)
+
+# Shows bot-specific memory counts and conversation history
+# Guides users to link Discord accounts or choose different usernames
+# Critical for preventing account fragmentation across platforms
 ```
 
 ## Character System
@@ -202,6 +285,8 @@ prompt = await cdl_integration.create_character_aware_prompt(
 - `src/memory/` - Vector-native memory system with multi-bot querying
 - `src/handlers/` - Discord command handlers (modular architecture)
 - `src/prompts/` - CDL integration and prompt management
+- `src/identity/` - Universal Identity system (NEW) - platform-agnostic user management
+- `src/web/` - Web chat interface (NEW) - FastAPI-based real-time chat
 - `characters/examples/` - CDL character definitions (JSON)
 - `scripts/` - Configuration generation and utilities
 - `.env.*` files - Bot-specific configurations (auto-discovered)
@@ -451,6 +536,8 @@ memories = await memory_manager.retrieve_relevant_memories(
 - `src/prompts/` - CDL integration and prompt management
 
 ## Recent Major Changes
+
+**Universal Identity & Web Interface** (NEW): Introduced platform-agnostic user identity system allowing users to interact via Discord, Web UI, or future platforms while maintaining consistent memory. Enhanced account discovery prevents duplicate accounts.
 
 **Template-Based Multi-Bot System** (Complete): Migrated from programmatic Docker Compose generation to safe template-based approach. Infrastructure versions now pinned (PostgreSQL 16.4, Redis 7.4, Qdrant v1.15.4) to prevent breaking updates.
 
