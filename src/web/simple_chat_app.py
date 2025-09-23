@@ -124,14 +124,14 @@ class SimpleBotConnector:
         self.timeout = aiohttp.ClientTimeout(total=30)
     
     async def send_message_to_bot(self, bot_name: str, user_id: str, message: str) -> str:
-        """Send message to bot via HTTP and get response"""
+        """Send message to bot via HTTP chat API and get response"""
         bot_port = self.bot_ports.get(bot_name)
         if not bot_port:
             return f"Sorry, bot '{bot_name}' is not available."
         
         try:
             async with aiohttp.ClientSession(timeout=self.timeout) as session:
-                # Try to send to bot's health endpoint first to check if it's running
+                # Check if bot is running via health endpoint
                 health_url = f"http://localhost:{bot_port}/health"
                 try:
                     async with session.get(health_url) as response:
@@ -140,22 +140,48 @@ class SimpleBotConnector:
                 except Exception:
                     return f"Bot '{bot_name}' is not running. Start it with: ./multi-bot.sh start {bot_name}"
                 
-                # For now, simulate bot response since we don't have HTTP endpoints yet
-                # In production, this would call the bot's REST API
-                bot_responses = {
-                    "elena": f"🌊 Hi! I'm Elena Rodriguez, marine biologist. You said: '{message[:50]}...' Let me share some ocean insights!",
-                    "marcus": f"🤖 Hello! Marcus Thompson here, AI researcher. Regarding '{message[:50]}...', let me provide some technical perspective.",
-                    "marcus-chen": f"🎮 Hey! Marcus Chen, game developer. About '{message[:50]}...', that reminds me of some game design patterns.",
-                    "dream": f"✨ Greetings, mortal. I am Dream of the Endless. Your words '{message[:50]}...' echo through the realm of dreams.",
-                    "gabriel": f"👼 Peace be with you. Gabriel Tether here. Your message '{message[:50]}...' brings to mind some spiritual reflections."
+                # Send message to bot's chat API endpoint
+                chat_url = f"http://localhost:{bot_port}/api/chat"
+                chat_payload = {
+                    "user_id": user_id,
+                    "message": message,
+                    "platform": "WEB_UI"
                 }
                 
-                response_text = bot_responses.get(bot_name, f"Response from {bot_name}: {message}")
-                return response_text
+                try:
+                    async with session.post(chat_url, json=chat_payload) as response:
+                        if response.status == 200:
+                            response_data = await response.json()
+                            if response_data.get("success"):
+                                return response_data.get("response", "No response from bot")
+                            else:
+                                logger.warning(f"Bot {bot_name} returned unsuccessful response: {response_data}")
+                                return f"Bot '{bot_name}' couldn't process the message. Please try again."
+                        else:
+                            logger.warning(f"Chat API returned status {response.status} for bot {bot_name}")
+                            # Fall back to demo responses if chat API not available
+                            return self._get_fallback_response(bot_name, message)
+                            
+                except Exception as chat_error:
+                    logger.warning(f"Chat API not available for bot {bot_name}: {chat_error}")
+                    # Fall back to demo responses if chat API fails
+                    return self._get_fallback_response(bot_name, message)
                 
         except Exception as e:
             logger.error("Failed to communicate with bot %s: %s", bot_name, e)
             return f"Sorry, I couldn't reach {bot_name} right now. Please try again later."
+    
+    def _get_fallback_response(self, bot_name: str, message: str) -> str:
+        """Get fallback demo response when chat API is unavailable"""
+        bot_responses = {
+            "elena": f"🌊 Hi! I'm Elena Rodriguez, marine biologist. You said: '{message[:50]}...' Let me share some ocean insights! (Demo mode - chat API not available)",
+            "marcus": f"🤖 Hello! Marcus Thompson here, AI researcher. Regarding '{message[:50]}...', let me provide some technical perspective. (Demo mode - chat API not available)",
+            "marcus-chen": f"🎮 Hey! Marcus Chen, game developer. About '{message[:50]}...', that reminds me of some game design patterns. (Demo mode - chat API not available)",
+            "dream": f"✨ Greetings, mortal. I am Dream of the Endless. Your words '{message[:50]}...' echo through the realm of dreams. (Demo mode - chat API not available)",
+            "gabriel": f"👼 Peace be with you. Gabriel Tether here. Your message '{message[:50]}...' brings to mind some spiritual reflections. (Demo mode - chat API not available)"
+        }
+        
+        return bot_responses.get(bot_name, f"Response from {bot_name}: {message} (Demo mode - chat API not available)")
     
     def get_available_bots(self) -> List[Dict[str, Any]]:
         """Get list of available bots"""

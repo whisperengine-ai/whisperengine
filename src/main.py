@@ -34,7 +34,7 @@ from src.handlers.performance_commands import create_performance_commands
 from src.handlers.privacy import PrivacyCommandHandlers
 from src.handlers.status import StatusCommandHandlers
 from src.handlers.voice import VoiceCommandHandlers
-from src.utils.health_server import create_health_server
+from src.utils.enhanced_health_server import create_enhanced_health_server
 
 # Enhanced production systems
 from src.utils.production_error_handler import (
@@ -331,7 +331,7 @@ class ModularBotManager:
             health_host = os.getenv("HEALTH_CHECK_HOST", "0.0.0.0")
 
             # Create and start health server
-            self.health_server = create_health_server(self.bot, port=health_port, host=health_host)
+            self.health_server = create_enhanced_health_server(self.bot, port=health_port, host=health_host, bot_manager=self)
             await self.health_server.start()
 
             logger.info(f"🏥 Health check server started on {health_host}:{health_port}")
