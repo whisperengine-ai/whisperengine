@@ -611,34 +611,26 @@ class BotEventHandlers:
                                               f"preference: {breakdown.get('preference_boost', 0):.3f}")
                             
                         except Exception as e:
-                            logger.warning(f"🚀 MEMORY DEBUG: Optimized retrieval failed, falling back to basic: {e}")
-                            relevant_memories = None
-                    
-                    # Fallback to basic memory retrieval if optimization not available or failed
-                    if not relevant_memories:
-                        logger.info("🔍 MEMORY DEBUG: Using basic memory retrieval with conversation priority")
-                        
-                        # Check if temporal/recent conversation query
-                        is_temporal = any(keyword in message.content.lower() 
-                                        for keyword in ['last', 'recent', 'just', 'earlier', 'before'])
-                        
-                        if is_temporal:
-                            # Use temporal query handling for better continuity
+                            logger.warning(f"🚀 MEMORY DEBUG: Optimized retrieval failed, using context-aware fallback: {e}")
+                            # Use context-aware retrieval as fallback (no hardcoded temporal detection)
                             relevant_memories = await self.memory_manager.retrieve_context_aware_memories(
                                 user_id=user_id, 
                                 query=message.content, 
                                 max_memories=20,
                                 context=message_context,
-                                emotional_context="recent conversation continuity"
+                                emotional_context="general conversation"
                             )
-                        else:
-                            # Regular retrieval but with conversation context prioritization
-                            relevant_memories = await self.memory_manager.retrieve_context_aware_memories(
-                                user_id=user_id, 
-                                query=message.content, 
-                                max_memories=20,
-                                context=message_context
-                            )
+                    
+                    # Ensure we always have some form of memory retrieval
+                    if not relevant_memories:
+                        logger.info("🔍 MEMORY DEBUG: Using context-aware memory retrieval")
+                        relevant_memories = await self.memory_manager.retrieve_context_aware_memories(
+                            user_id=user_id, 
+                            query=message.content, 
+                            max_memories=20,
+                            context=message_context,
+                            emotional_context="general conversation"
+                        )
                     
                     logger.info(f"🔍 MEMORY DEBUG: Retrieved {len(relevant_memories) if relevant_memories else 0} memories")
                     if relevant_memories:
@@ -1637,20 +1629,44 @@ class BotEventHandlers:
                 logger.debug("Empathy calibrator not available")
                 return None
 
-            # First detect emotion for empathy calibration (simplified for now)
+            # Use sophisticated emotion detection from Enhanced Vector Emotion Analyzer
             from src.intelligence.empathy_calibrator import EmotionalResponseType
             
-            # Use a simple emotion detection based on message content
-            # In production, this could be enhanced with more sophisticated emotion detection
-            detected_emotion = EmotionalResponseType.NEUTRAL
-            if any(word in content.lower() for word in ['sad', 'upset', 'angry', 'frustrated']):
-                detected_emotion = EmotionalResponseType.STRESS
-            elif any(word in content.lower() for word in ['happy', 'excited', 'joy', 'great']):
-                detected_emotion = EmotionalResponseType.JOY
-            elif any(word in content.lower() for word in ['worried', 'anxious', 'nervous']):
-                detected_emotion = EmotionalResponseType.ANXIETY
-            elif any(word in content.lower() for word in ['confused', 'lost', 'don\'t understand']):
-                detected_emotion = EmotionalResponseType.CONFUSION
+            detected_emotion = EmotionalResponseType.CONTENTMENT  # Default to contentment instead of neutral
+            
+            # Try to use Enhanced Vector Emotion Analyzer for sophisticated emotion detection
+            if hasattr(self.bot, 'enhanced_emotion_analyzer') and self.bot.enhanced_emotion_analyzer:
+                try:
+                    emotion_analysis = await self.bot.enhanced_emotion_analyzer.analyze_emotional_context(
+                        user_id=user_id, 
+                        message_content=content, 
+                        conversation_context=message.channel.type.name if hasattr(message.channel, 'type') else 'unknown'
+                    )
+                    
+                    # Map enhanced emotion analysis to empathy calibrator emotion types
+                    if emotion_analysis and hasattr(emotion_analysis, 'primary_emotion'):
+                        emotion_mapping = {
+                            'stress': EmotionalResponseType.STRESS,
+                            'anxiety': EmotionalResponseType.ANXIETY,
+                            'frustration': EmotionalResponseType.FRUSTRATION,
+                            'sadness': EmotionalResponseType.SADNESS,
+                            'joy': EmotionalResponseType.JOY,
+                            'excitement': EmotionalResponseType.EXCITEMENT,
+                            'confusion': EmotionalResponseType.CONFUSION,
+                            'anger': EmotionalResponseType.ANGER,
+                            'overwhelm': EmotionalResponseType.OVERWHELM,
+                            'contentment': EmotionalResponseType.CONTENTMENT
+                        }
+                        
+                        primary_emotion = emotion_analysis.primary_emotion.lower()
+                        detected_emotion = emotion_mapping.get(primary_emotion, EmotionalResponseType.CONTENTMENT)
+                        
+                        logger.debug(f"Enhanced emotion detection: {primary_emotion} -> {detected_emotion.value}")
+                    
+                except Exception as e:
+                    logger.warning(f"Enhanced emotion detection failed, using contentment: {e}")
+            else:
+                logger.debug("Enhanced emotion analyzer not available, using contentment emotion")
 
             # Calibrate empathy
             empathy_calibration = await self.bot.empathy_calibrator.calibrate_empathy(

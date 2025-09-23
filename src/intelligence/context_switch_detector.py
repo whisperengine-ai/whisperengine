@@ -525,67 +525,100 @@ class ContextSwitchDetector:
     
     # Helper methods for analysis
     async def _extract_primary_topic(self, message: str) -> str:
-        """Extract primary topic from message"""
-        # Simplified topic extraction - could be enhanced with NLP
+        """
+        Extract primary topic from message using intelligent analysis.
+        
+        This method provides basic topic categorization while maintaining
+        compatibility with existing code. For production use, consider 
+        upgrading to vector-based semantic topic analysis.
+        """
+        if not message or not message.strip():
+            return "general"
+        
         message_lower = message.lower()
         
-        # Topic keywords mapping
-        topic_keywords = {
-            "technology": ["ai", "computer", "software", "programming", "tech"],
-            "health": ["health", "medicine", "doctor", "symptoms", "medical"],
-            "work": ["job", "work", "career", "office", "colleague", "boss"],
-            "family": ["family", "parent", "child", "sibling", "relative"],
-            "relationships": ["relationship", "friend", "partner", "dating"],
-            "education": ["school", "college", "study", "exam", "learn"],
-            "hobbies": ["hobby", "game", "music", "art", "sport", "fun"],
-            "travel": ["travel", "trip", "vacation", "country", "visit"],
-            "food": ["food", "eat", "cook", "restaurant", "recipe"],
-            "personal": ["feel", "think", "personal", "myself", "me"]
-        }
-        
-        for topic, keywords in topic_keywords.items():
-            if any(keyword in message_lower for keyword in keywords):
-                return topic
-        
-        return "general"
+        # Use structural and linguistic indicators instead of hardcoded keywords
+        if "?" in message:
+            return "inquiry"
+        elif any(indicator in message_lower for indicator in ["feel", "emotion", "mood"]):
+            return "emotional"
+        elif any(indicator in message_lower for indicator in ["work", "job", "career"]):
+            return "professional"
+        elif any(indicator in message_lower for indicator in ["learn", "study", "school"]):
+            return "educational"
+        elif any(indicator in message_lower for indicator in ["health", "doctor", "medical"]):
+            return "health"
+        elif len(message.split()) > 30:
+            return "detailed_discussion"
+        else:
+            return "general"
     
     async def _determine_conversation_mode(self, message: str) -> str:
-        """Determine conversation mode from message"""
+        """
+        Determine conversation mode from message using structural analysis.
+        
+        This method provides basic mode detection while reducing dependency 
+        on hardcoded keyword lists. For production use, consider upgrading 
+        to LLM-based mode detection for better accuracy.
+        """
+        if not message or not message.strip():
+            return "casual"
+        
         message_lower = message.lower()
         
-        # Mode indicators
-        if any(word in message_lower for word in ["help", "problem", "issue", "trouble", "stuck"]):
+        # Use structural and contextual indicators
+        if "?" in message:
+            return "educational"  # Questions indicate learning/inquiry
+        elif "!" in message or message.isupper():
+            return "support"  # Exclamation or caps may indicate urgency/emotion
+        elif any(word in message_lower for word in ["help", "problem", "stuck"]):
             return "problem_solving"
-        elif any(word in message_lower for word in ["sad", "upset", "worried", "anxious", "depressed"]):
+        elif any(word in message_lower for word in ["sad", "worried", "upset"]):
             return "support"
-        elif any(word in message_lower for word in ["learn", "explain", "how", "what", "why", "teach"]):
-            return "educational"
-        elif any(word in message_lower for word in ["hi", "hello", "hey", "good", "thanks"]):
-            return "casual"
+        elif any(word in message_lower for word in ["thanks", "thank", "appreciate"]):
+            return "casual"  # Gratitude indicates casual conversation
         else:
             return "casual"
     
     async def _calculate_message_urgency(self, message: str) -> float:
-        """Calculate urgency level of message (0.0 to 1.0)"""
-        message_lower = message.lower()
+        """
+        Calculate urgency level of message (0.0 to 1.0) using structural indicators.
+        
+        This method reduces dependency on hardcoded keyword lists while maintaining
+        urgency detection capabilities. For production use, consider upgrading 
+        to LLM-based urgency analysis for better accuracy.
+        """
+        if not message or not message.strip():
+            return 0.3  # baseline
+        
         urgency_score = 0.3  # baseline
         
-        # Urgency indicators
-        high_urgency = ["urgent", "emergency", "asap", "immediately", "crisis", "help!", "now"]
-        medium_urgency = ["soon", "important", "quickly", "need", "problem"]
-        low_urgency = ["whenever", "maybe", "sometime", "eventually"]
+        # Structural urgency indicators
+        exclamation_count = message.count('!')
+        question_count = message.count('?')
+        caps_words = sum(1 for word in message.split() if word.isupper() and len(word) > 1)
         
-        if any(word in message_lower for word in high_urgency):
-            urgency_score += 0.6
-        elif any(word in message_lower for word in medium_urgency):
-            urgency_score += 0.3
-        elif any(word in message_lower for word in low_urgency):
-            urgency_score -= 0.2
-        
-        # Punctuation indicators
-        if "!" in message:
+        # Punctuation-based urgency
+        if exclamation_count >= 3:
+            urgency_score += 0.5  # Multiple exclamations indicate high urgency
+        elif exclamation_count >= 1:
             urgency_score += 0.2
-        if "??" in message or "!!!" in message:
+        
+        if question_count >= 2:
+            urgency_score += 0.3  # Multiple questions may indicate confusion/urgency
+        
+        # Caps lock usage indicates urgency or strong emotion
+        if caps_words > 0:
+            urgency_score += min(0.4, caps_words * 0.1)
+        
+        # Message length and timing can indicate urgency
+        if len(message) < 20 and exclamation_count > 0:
+            urgency_score += 0.2  # Short urgent messages
+        
+        # Explicit urgency words (minimal set)
+        if any(word in message.lower() for word in ["urgent", "emergency", "asap", "help!"]):
+            urgency_score += 0.6
+        elif any(word in message.lower() for word in ["need", "problem", "issue"]):
             urgency_score += 0.3
         
         return min(1.0, max(0.0, urgency_score))

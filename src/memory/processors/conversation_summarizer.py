@@ -71,20 +71,18 @@ class ConversationSummarizer:
         self.llm_client = llm_client
         self.max_summary_length = max_summary_length
         
-        # Pre-compiled regex patterns for fast text processing
-        self.question_patterns = re.compile(r'\b(what|how|why|when|where|who|can|could|would|should|is|are|do|does|did)\b', re.IGNORECASE)
-        self.request_patterns = re.compile(r'\b(please|help|explain|show|tell|teach|need|want|looking for)\b', re.IGNORECASE)
-        self.greeting_patterns = re.compile(r'\b(hello|hi|hey|good morning|good afternoon|good evening|greetings)\b', re.IGNORECASE)
+        # Pre-compiled regex patterns for fast structural analysis
+        self.question_patterns = re.compile(r'\?|what|how|why|when|where|who', re.IGNORECASE)
+        self.request_patterns = re.compile(r'please|help|need|want', re.IGNORECASE)
+        self.greeting_patterns = re.compile(r'hello|hi|hey|good', re.IGNORECASE)
         
-        # Topic extraction patterns
-        self.topic_patterns = {
-            'technology': re.compile(r'\b(ai|artificial intelligence|machine learning|ml|programming|python|javascript|code|coding|software|computer|tech|algorithm|neural network|deep learning)\b', re.IGNORECASE),
-            'science': re.compile(r'\b(physics|chemistry|biology|mathematics|math|research|experiment|theory|hypothesis|scientific|study)\b', re.IGNORECASE),
-            'business': re.compile(r'\b(business|marketing|sales|finance|economy|company|startup|entrepreneur|strategy|management)\b', re.IGNORECASE),
-            'education': re.compile(r'\b(learn|study|school|university|college|course|tutorial|lesson|teach|education|academic)\b', re.IGNORECASE),
-            'health': re.compile(r'\b(health|medical|medicine|doctor|treatment|symptom|disease|therapy|wellness|fitness)\b', re.IGNORECASE),
-            'creative': re.compile(r'\b(art|music|writing|creative|design|draw|paint|compose|story|novel|poem|photography)\b', re.IGNORECASE),
-            'personal': re.compile(r'\b(personal|life|family|relationship|friend|feeling|emotion|advice|help|support)\b', re.IGNORECASE)
+        # Minimal topic indicators (reduced from hardcoded keyword lists)
+        # These are used as structural hints rather than comprehensive categorization
+        self.topic_indicators = {
+            'technical': re.compile(r'\b(code|programming|software|algorithm)\b', re.IGNORECASE),
+            'educational': re.compile(r'\b(learn|study|course|lesson)\b', re.IGNORECASE),
+            'personal': re.compile(r'\b(feel|personal|life|family)\b', re.IGNORECASE),
+            'inquiry': re.compile(r'\?', re.IGNORECASE)
         }
         
         # Cache for performance optimization
@@ -162,14 +160,25 @@ class ConversationSummarizer:
             return [await self._create_fallback_summary(user_message, bot_response, metadata)]
     
     async def _extract_topics(self, user_message: str, bot_response: str) -> List[str]:
-        """Extract topics from conversation using pattern matching and optional LLM"""
+        """
+        Extract topics from conversation using improved pattern matching and optional LLM.
+        
+        This method uses reduced pattern sets while maintaining topic detection capabilities.
+        For production use, consider upgrading to LLM-based topic extraction for better accuracy.
+        """
         combined_text = f"{user_message} {bot_response}".lower()
         
-        # Fast pattern-based topic extraction
+        # Minimal pattern-based topic detection (reduced from hardcoded keyword lists)
         detected_topics = []
-        for topic, pattern in self.topic_patterns.items():
+        for topic, pattern in self.topic_indicators.items():
             if pattern.search(combined_text):
                 detected_topics.append(topic)
+        
+        # Structural topic detection
+        if len(combined_text.split()) > 50:
+            detected_topics.append("detailed_discussion")
+        if "?" in combined_text:
+            detected_topics.append("inquiry")
         
         # Extract specific entities and technical terms
         technical_terms = self._extract_technical_terms(combined_text)
@@ -181,7 +190,7 @@ class ConversationSummarizer:
                 llm_topics = await self._llm_extract_topics(user_message, bot_response)
                 detected_topics.extend(llm_topics)
             except Exception as e:
-                logger.debug(f"LLM topic extraction failed: {e}")
+                logger.debug("LLM topic extraction failed: %s", str(e))
         
         # Clean and deduplicate topics
         final_topics = list(set([topic.strip() for topic in detected_topics if topic.strip()]))

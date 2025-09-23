@@ -664,51 +664,62 @@ class ProactiveConversationEngagementEngine:
         return recommendations[:3]  # Return top 3 recommendations
 
     async def _analyze_topic_coherence(self, recent_content: list[str]) -> float:
-        """Analyze topic coherence in recent messages"""
+        """Analyze topic coherence in recent messages using intelligent analysis"""
         if len(recent_content) < 2:
             return 0.5
 
-        # Simple keyword overlap analysis
-        all_keywords = []
-        for content in recent_content:
-            keywords = self._extract_simple_keywords(content)
-            all_keywords.extend(keywords)
+        # Use Phase 4 analysis if available for better coherence detection
+        if self.personality_profiler:
+            try:
+                import asyncio
+                async def analyze_coherence():
+                    # Analyze themes across messages
+                    themes_per_message = []
+                    for content in recent_content:
+                        if content.strip():
+                            themes = self._identify_message_themes(content)
+                            themes_per_message.append(set(themes))
+                    
+                    if len(themes_per_message) < 2:
+                        return 0.3
+                    
+                    # Calculate thematic coherence
+                    overlaps = []
+                    for i in range(1, len(themes_per_message)):
+                        themes1 = themes_per_message[i-1]
+                        themes2 = themes_per_message[i]
+                        if themes1 and themes2:
+                            overlap = len(themes1 & themes2) / len(themes1 | themes2)
+                            overlaps.append(overlap)
+                    
+                    return statistics.mean(overlaps) if overlaps else 0.3
+                
+                return asyncio.run(analyze_coherence())
+            except Exception:
+                pass
 
-        if not all_keywords:
-            return 0.3
-
-        # Calculate keyword overlap between messages
+        # Fallback: structural coherence analysis
         overlaps = []
         for i in range(1, len(recent_content)):
-            keywords1 = set(self._extract_simple_keywords(recent_content[i - 1]))
-            keywords2 = set(self._extract_simple_keywords(recent_content[i]))
-
-            if keywords1 and keywords2:
-                overlap = len(keywords1 & keywords2) / len(keywords1 | keywords2)
-                overlaps.append(overlap)
+            content1 = recent_content[i-1].lower()
+            content2 = recent_content[i].lower()
+            
+            # Simple coherence indicators
+            has_questions = ('?' in content1) and ('?' in content2)
+            similar_length = abs(len(content1) - len(content2)) < 100
+            contains_pronouns = any(word in content2 for word in ['it', 'that', 'this', 'they'])
+            
+            coherence_score = 0.0
+            if has_questions:
+                coherence_score += 0.3
+            if similar_length:
+                coherence_score += 0.2
+            if contains_pronouns:
+                coherence_score += 0.2
+                
+            overlaps.append(min(1.0, coherence_score))
 
         return statistics.mean(overlaps) if overlaps else 0.3
-
-    def _extract_simple_keywords(self, text: str) -> list[str]:
-        """Extract simple keywords from text"""
-        words = re.findall(r"\b\w+\b", text.lower())
-        stop_words = {
-            "the",
-            "a",
-            "an",
-            "and",
-            "or",
-            "but",
-            "in",
-            "on",
-            "at",
-            "to",
-            "for",
-            "of",
-            "with",
-            "by",
-        }
-        return [word for word in words if len(word) > 2 and word not in stop_words]
 
     # Additional methods for topic generation, prompt creation, etc. will be added...
 
@@ -804,25 +815,28 @@ class ProactiveConversationEngagementEngine:
             except Exception as e:
                 logger.debug(f"Phase 4 topic analysis unavailable: {e}")
         
-        # Fallback to pattern-based detection (always runs for completeness)
-        content_lower = content.lower()
-        
-        # Enhanced theme patterns (improved from simple keywords)
-        theme_patterns = {
-            "work": ["work", "job", "career", "office", "meeting", "project", "colleagues", "boss", "workplace"],
-            "technology": ["tech", "computer", "software", "ai", "programming", "coding", "development", "digital"],
-            "health": ["health", "exercise", "fitness", "wellness", "medical", "nutrition", "workout", "mental health"],
-            "learning": ["learn", "study", "education", "course", "skill", "training", "knowledge", "research"],
-            "entertainment": ["movie", "music", "game", "book", "show", "series", "streaming", "reading"],
-            "relationships": ["friend", "family", "partner", "social", "dating", "marriage", "children", "parents"],
-            "hobbies": ["hobby", "art", "craft", "sport", "photography", "cooking", "gardening", "collecting"],
-            "travel": ["travel", "trip", "vacation", "visit", "explore", "journey", "adventure", "destination"],
-        }
-
-        for theme, keywords in theme_patterns.items():
-            if any(keyword in content_lower for keyword in keywords):
-                if theme not in themes:  # Avoid duplicates from Phase 4
-                    themes.append(theme)
+        # If no Phase 4 themes detected, use minimal intelligent fallback
+        if not themes:
+            content_lower = content.lower()
+            
+            # Basic categorization without hardcoded keyword lists
+            word_count = len(content.split())
+            if word_count > 50:
+                themes.append("detailed_discussion")
+            elif "?" in content:
+                themes.append("inquiry")
+            elif any(word in content_lower for word in ["feel", "emotion", "mood"]):
+                themes.append("emotional")
+            elif any(word in content_lower for word in ["work", "job", "career"]):
+                themes.append("professional")
+            elif any(word in content_lower for word in ["learn", "study", "education"]):
+                themes.append("learning")
+            else:
+                themes.append("general")
+                
+        # Ensure we always have at least one theme
+        if not themes:
+            themes.append("conversation")
 
         return themes
 

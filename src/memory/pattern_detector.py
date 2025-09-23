@@ -183,39 +183,68 @@ class CrossReferencePatternDetector:
         return patterns
     
     async def _detect_topical_patterns(self, memories: List[Dict[str, Any]]) -> List[DetectedPattern]:
-        """Detect topical/subject patterns"""
+        """
+        DEPRECATED: Detect topical/subject patterns using hardcoded keywords
+        
+        This method uses hardcoded keyword patterns and should be replaced
+        with vector-based semantic topic analysis for production use.
+        """
         patterns = []
         
+        logger.warning(
+            "Using deprecated hardcoded topic detection. "
+            "Consider upgrading to vector-based semantic topic analysis."
+        )
+        
         try:
-            # Simple topic detection based on keywords
-            topic_keywords = {
-                'work': ['work', 'job', 'career', 'office', 'boss', 'colleague', 'project'],
-                'family': ['family', 'parents', 'siblings', 'kids', 'children', 'spouse'],
-                'hobbies': ['hobby', 'fun', 'enjoy', 'passion', 'interest', 'love doing'],
-                'health': ['health', 'exercise', 'fitness', 'medical', 'doctor', 'sick'],
-                'technology': ['computer', 'software', 'tech', 'app', 'digital', 'online']
-            }
+            # Minimal topic detection without hardcoded keyword lists
+            # Group memories by basic content characteristics
+            content_lengths = {'short': [], 'medium': [], 'long': []}
+            question_memories = []
             
-            for topic, keywords in topic_keywords.items():
-                topic_memories = []
-                for memory in memories:
-                    content = memory.get('content', '') or memory.get('user_message', '')
-                    if any(keyword in content.lower() for keyword in keywords):
-                        topic_memories.append(memory)
+            for memory in memories:
+                content = memory.get('content', '') or memory.get('user_message', '')
+                content_length = len(content.split())
                 
-                if len(topic_memories) >= self.min_pattern_frequency:
+                if '?' in content:
+                    question_memories.append(memory)
+                elif content_length < 10:
+                    content_lengths['short'].append(memory)
+                elif content_length < 30:
+                    content_lengths['medium'].append(memory)
+                else:
+                    content_lengths['long'].append(memory)
+            
+            # Create patterns for significant groups
+            for category, category_memories in content_lengths.items():
+                if len(category_memories) >= self.min_pattern_frequency:
                     pattern = DetectedPattern(
                         pattern_type=PatternType.TOPICAL,
-                        title=f"{topic.title()} Topic Pattern",
-                        description=f"User frequently discusses {topic}-related topics",
-                        confidence=min(1.0, len(topic_memories) / 8.0),
-                        supporting_memories=[m.get('id', '') for m in topic_memories],
-                        frequency=len(topic_memories),
-                        first_occurrence=self._get_earliest_timestamp(topic_memories),
-                        last_occurrence=self._get_latest_timestamp(topic_memories),
-                        metadata={'topic': topic, 'keywords': keywords}
+                        title=f"{category.title()} Message Pattern",
+                        description=f"User frequently sends {category} messages",
+                        confidence=min(1.0, len(category_memories) / 10.0),
+                        supporting_memories=[m.get('id', '') for m in category_memories],
+                        frequency=len(category_memories),
+                        first_occurrence=self._get_earliest_timestamp(category_memories),
+                        last_occurrence=self._get_latest_timestamp(category_memories),
+                        metadata={'category': category, 'message_type': 'length_based'}
                     )
                     patterns.append(pattern)
+            
+            # Create pattern for question-heavy conversations
+            if len(question_memories) >= self.min_pattern_frequency:
+                pattern = DetectedPattern(
+                    pattern_type=PatternType.TOPICAL,
+                    title="Inquiry Pattern",
+                    description="User frequently asks questions",
+                    confidence=min(1.0, len(question_memories) / 8.0),
+                    supporting_memories=[m.get('id', '') for m in question_memories],
+                    frequency=len(question_memories),
+                    first_occurrence=self._get_earliest_timestamp(question_memories),
+                    last_occurrence=self._get_latest_timestamp(question_memories),
+                    metadata={'category': 'inquiry', 'message_type': 'question_based'}
+                )
+                patterns.append(pattern)
                     
         except Exception as e:
             logger.warning("Error detecting topical patterns: %s", str(e))
@@ -394,24 +423,25 @@ class CrossReferencePatternDetector:
         return time_groups
     
     def _detect_simple_emotions(self, content: str) -> Dict[str, float]:
-        """Simple emotion detection based on keywords"""
-        emotions = {}
+        """
+        DEPRECATED: Simple emotion detection based on keywords
         
-        emotion_keywords = {
-            'joy': ['happy', 'excited', 'great', 'awesome', 'wonderful', 'amazing'],
-            'sadness': ['sad', 'depressed', 'down', 'upset', 'disappointed'],
-            'anger': ['angry', 'frustrated', 'annoyed', 'mad', 'irritated'],
-            'fear': ['scared', 'worried', 'anxious', 'nervous', 'afraid'],
-            'surprise': ['surprised', 'shocked', 'unexpected', 'wow']
-        }
+        This method uses hardcoded keyword patterns and should be replaced
+        with the Enhanced Vector Emotion Analyzer for production use.
+        """
+        logger.warning(
+            "Using deprecated hardcoded emotion detection. "
+            "Consider upgrading to Enhanced Vector Emotion Analyzer."
+        )
         
+        # Minimal fallback - just detect if emotional content is present
         content_lower = content.lower()
-        for emotion, keywords in emotion_keywords.items():
-            score = sum(1 for keyword in keywords if keyword in content_lower)
-            if score > 0:
-                emotions[emotion] = min(1.0, score / 3.0)  # Normalize score
+        emotional_indicators = ['feel', 'emotion', 'mood', 'happy', 'sad', 'angry', 'excited']
         
-        return emotions
+        if any(indicator in content_lower for indicator in emotional_indicators):
+            return {'general_emotion': 0.5}
+        else:
+            return {}
     
     def _get_earliest_timestamp(self, memories: List[Dict[str, Any]]) -> Optional[datetime]:
         """Get earliest timestamp from memory list"""

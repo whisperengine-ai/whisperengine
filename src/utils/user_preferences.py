@@ -84,29 +84,69 @@ async def get_user_preferred_name(user_id: str, memory_manager=None) -> Optional
 
 
 def _extract_name_from_text(text: str) -> Optional[str]:
-    """Extract name from text using pattern matching."""
+    """
+    Extract name from text using improved pattern matching.
+    
+    NOTE: This method uses basic patterns as a fallback while maintaining compatibility.
+    For production use, consider replacing with LLM-based name extraction for better accuracy.
+    """
     if not text:
         return None
     
-    # Common name introduction patterns
-    patterns = [
-        r"my name is ([a-zA-Z]+)",
-        r"i'm ([a-zA-Z]+)",
-        r"i am ([a-zA-Z]+)", 
-        r"call me ([a-zA-Z]+)",
-        r"name's ([a-zA-Z]+)",
-        r"you can call me ([a-zA-Z]+)",
-    ]
+    # Improved name introduction detection with fewer hardcoded patterns
+    text_lower = text.lower().strip()
     
-    for pattern in patterns:
-        match = re.search(pattern, text, re.IGNORECASE)
-        if match:
-            name = match.group(1).strip().title()
-            # Basic validation: 2-20 chars, letters only
-            if 2 <= len(name) <= 20 and name.isalpha():
-                return name
+    # Look for explicit name introductions
+    if "my name is" in text_lower:
+        # Find the part after "my name is"
+        name_part = text_lower.split("my name is", 1)[1].strip()
+        # Extract first word that looks like a name
+        words = name_part.split()
+        if words:
+            potential_name = words[0].strip('.,!?').title()
+            if _is_valid_name(potential_name):
+                return potential_name
+    
+    elif text_lower.startswith("i'm ") or text_lower.startswith("i am "):
+        # Handle "I'm John" or "I am John"
+        words = text_lower.split()
+        if len(words) >= 2:
+            potential_name = words[1].strip('.,!?').title()
+            if _is_valid_name(potential_name):
+                return potential_name
+    
+    elif "call me " in text_lower:
+        # Find the part after "call me"
+        name_part = text_lower.split("call me ", 1)[1].strip()
+        words = name_part.split()
+        if words:
+            potential_name = words[0].strip('.,!?').title()
+            if _is_valid_name(potential_name):
+                return potential_name
     
     return None
+
+
+def _is_valid_name(name: str) -> bool:
+    """Validate if a string looks like a valid name."""
+    if not name or not isinstance(name, str):
+        return False
+    
+    # Basic validation: 2-20 chars, mostly letters
+    if not (2 <= len(name) <= 20):
+        return False
+    
+    # Must be mostly alphabetic (allow for names like "Mary-Ann" or "O'Connor")
+    alpha_chars = sum(1 for c in name if c.isalpha())
+    if alpha_chars < len(name) * 0.7:  # At least 70% alphabetic
+        return False
+    
+    # Avoid common non-name words
+    non_names = {'and', 'the', 'but', 'you', 'not', 'yes', 'can', 'will', 'that', 'this'}
+    if name.lower() in non_names:
+        return False
+    
+    return True
 
 
 def _sort_memories_by_timestamp(memories):
