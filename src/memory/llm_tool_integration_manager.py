@@ -30,11 +30,12 @@ class LLMToolIntegrationManager:
     
     def __init__(self, vector_memory_tool_manager, intelligent_memory_manager, 
                  character_evolution_tool_manager, emotional_intelligence_tool_manager,
-                 llm_client):
+                 phase3_memory_tool_manager, llm_client):
         self.vector_memory_tools = vector_memory_tool_manager
         self.intelligent_memory_tools = intelligent_memory_manager
         self.character_evolution_tools = character_evolution_tool_manager
         self.emotional_intelligence_tools = emotional_intelligence_tool_manager
+        self.phase3_memory_tools = phase3_memory_tool_manager  # Phase 3: Multi-Dimensional Memory Networks
         self.llm_client = llm_client
         
         # Combine all tools
@@ -60,6 +61,10 @@ class LLMToolIntegrationManager:
         # Add emotional intelligence tools (Phase 2)
         if hasattr(self.emotional_intelligence_tools, 'tools'):
             combined_tools.extend(self.emotional_intelligence_tools.tools)
+        
+        # Add Phase 3 memory network tools (Phase 3)
+        if hasattr(self.phase3_memory_tools, 'tools'):
+            combined_tools.extend(self.phase3_memory_tools.tools)
         
         logger.info("Combined %d tools from all managers", len(combined_tools))
         return combined_tools
@@ -146,6 +151,14 @@ You have access to powerful tools for:
    - Provide proactive emotional support when needed
    - Analyze emotional patterns for better understanding
    - Implement crisis intervention when necessary
+   
+4. MULTI-DIMENSIONAL MEMORY NETWORKS:
+   - Analyze complex memory networks for deep insights
+   - Detect recurring patterns and themes across memories
+   - Evaluate memory importance for better prioritization
+   - Discover semantic memory clusters for contextual understanding
+   - Generate actionable insights from memory analysis
+   - Map connections between related memories
 
 TOOL USAGE GUIDELINES:
 - Use tools proactively to enhance conversation quality
@@ -153,6 +166,9 @@ TOOL USAGE GUIDELINES:
 - Adapt your character based on user feedback and interaction patterns
 - Store important moments and insights for future reference
 - Be thoughtful about when and how to offer support
+- Leverage memory network analysis for deeper user understanding
+- Use pattern detection to recognize recurring themes in conversations
+- Apply memory insights to create more meaningful connections
 
 IMPORTANT: Always prioritize user emotional wellbeing and safety."""
 
@@ -243,8 +259,17 @@ IMPORTANT: Always prioritize user emotional wellbeing and safety."""
         emotional_intelligence_tools = [
             "detect_emotional_crisis", "calibrate_empathy_response",
             "provide_proactive_support", "analyze_emotional_patterns",
-            "emotional_crisis_intervention"
         ]
+            
+        # Phase 3 Memory Network Tools (Multi-Dimensional Memory Networks)
+        phase3_memory_network_tools = [
+            "analyze_memory_network", "detect_memory_patterns",
+            "evaluate_memory_importance", "get_memory_clusters",
+            "generate_memory_insights", "discover_memory_connections",
+        ]
+        
+        # Add any additional tool names
+        emotional_intelligence_tools.append("emotional_crisis_intervention")
         
         # Route to appropriate manager
         if function_name in vector_memory_tools:
@@ -262,6 +287,10 @@ IMPORTANT: Always prioritize user emotional wellbeing and safety."""
         elif function_name in emotional_intelligence_tools:
             return await self.emotional_intelligence_tools.execute_tool(
                 function_name, parameters, user_id
+            )
+        elif function_name in phase3_memory_network_tools:
+            return await self.phase3_memory_tools.handle_tool_call(
+                function_name, parameters
             )
         else:
             logger.warning("Unknown tool function: %s", function_name)

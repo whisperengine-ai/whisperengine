@@ -224,13 +224,14 @@ def create_multi_bot_querier(memory_manager=None):
 
 def create_llm_tool_integration_manager(memory_manager, character_manager, llm_client):
     """
-    Create LLM Tool Integration Manager for Phase 2 character evolution and emotional intelligence
+    Create LLM Tool Integration Manager for Phase 1-3 tools
     
     Features:
     - Unified tool calling interface
-    - Character evolution tools (personality adaptation, backstory updates, communication style)
-    - Emotional intelligence tools (crisis detection, empathy calibration, proactive support)
-    - Integration with existing Phase 1 memory tools
+    - Phase 1: Memory tools (store, retrieve, search, optimize)
+    - Phase 2: Character evolution tools (personality adaptation, backstory updates)
+    - Phase 2: Emotional intelligence tools (crisis detection, empathy calibration)
+    - Phase 3: Multi-dimensional memory networks (pattern detection, memory clustering)
     
     Args:
         memory_manager: Memory manager instance
@@ -249,6 +250,9 @@ def create_llm_tool_integration_manager(memory_manager, character_manager, llm_c
         from .character_evolution_tool_manager import CharacterEvolutionToolManager
         from .emotional_intelligence_tool_manager import EmotionalIntelligenceToolManager
         
+        # Import Phase 3 managers
+        from .phase3_memory_tool_manager import Phase3MemoryToolManager
+        
         # Import integration manager
         from .llm_tool_integration_manager import LLMToolIntegrationManager
         
@@ -266,12 +270,16 @@ def create_llm_tool_integration_manager(memory_manager, character_manager, llm_c
             memory_manager, llm_client
         )
         
+        # Create Phase 3 tool manager
+        phase3_memory_tools = Phase3MemoryToolManager(memory_manager)
+        
         # Create unified integration manager
         return LLMToolIntegrationManager(
             vector_memory_tools,
             intelligent_memory_tools,
             character_evolution_tools,
             emotional_intelligence_tools,
+            phase3_memory_tools,
             llm_client
         )
         
