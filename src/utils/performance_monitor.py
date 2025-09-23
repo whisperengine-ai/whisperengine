@@ -74,10 +74,10 @@ class PerformanceMonitor:
         
         # Alert thresholds
         self.alert_thresholds = {
-            'slow_operation_ms': 5000,
-            'low_success_rate': 0.90,
-            'high_memory_mb': 1200,  # Adjusted for AI workloads (LLMs need ~1GB+)
-            'high_cpu_percent': 80
+            'slow_operation_ms': 20000,  # 20 seconds - increased for LLM operations
+            'high_memory_mb': 1000,
+            'low_success_rate': 0.85,
+            'high_cpu_percent': 90
         }
         
         # Background monitoring
@@ -242,9 +242,11 @@ class PerformanceMonitor:
     
     async def _background_monitor(self):
         """Background monitoring loop"""
+        last_warning_time = datetime.now() - timedelta(minutes=10)  # Allow immediate first warning
+        
         while self._running:
             try:
-                await asyncio.sleep(30)  # Check every 30 seconds
+                await asyncio.sleep(60)  # Check every 60 seconds (reduced frequency)
                 
                 # Clean old metrics
                 cutoff_time = datetime.now() - timedelta(hours=1)
@@ -253,18 +255,23 @@ class PerformanceMonitor:
                     while metrics and metrics[0].timestamp < cutoff_time:
                         metrics.popleft()
                 
-                # Check for system-wide issues
-                health = self.get_system_health()
-                if health['overall_health'] == 'degraded':
-                    logger.warning("⚠️ System performance degraded: %.1f%% success rate, %.0fms avg response time", 
-                                 health['avg_success_rate'] * 100, health['avg_response_time_ms'])
+                # Check for system-wide issues (with throttling)
+                now = datetime.now()
+                if now - last_warning_time > timedelta(minutes=5):  # Only warn every 5 minutes
+                    health = self.get_system_health()
+                    # Increase threshold - only warn if really degraded
+                    if health['overall_health'] == 'degraded' and health['avg_response_time_ms'] > 10000:
+                        logger.warning("⚠️ System performance degraded: %.1f%% success rate, %.0fms avg response time", 
+                                     health['avg_success_rate'] * 100, health['avg_response_time_ms'])
+                        last_warning_time = now
                 
-                # Report bottlenecks
-                bottlenecks = self.get_bottlenecks()
-                if bottlenecks:
-                    logger.info("📊 Performance bottlenecks detected: %d operations", len(bottlenecks))
-                    for bottleneck in bottlenecks[:3]:  # Top 3
-                        logger.info("   • %s: %s", bottleneck['operation'], bottleneck['issues'][0])
+                # Report bottlenecks (less frequently)
+                if now.minute % 10 == 0:  # Only every 10 minutes
+                    bottlenecks = self.get_bottlenecks()
+                    if bottlenecks:
+                        logger.info("📊 Performance bottlenecks detected: %d operations", len(bottlenecks))
+                        for bottleneck in bottlenecks[:3]:  # Top 3
+                            logger.info("   • %s: %s", bottleneck['operation'], bottleneck['issues'][0])
                 
             except Exception as e:
                 logger.error("Background monitoring error: %s", e)

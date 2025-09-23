@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 # Import traditional managers
 try:
-    from src.emotion.simplified_emotion_manager import SimplifiedEmotionManager
+    from src.intelligence.simplified_emotion_manager import SimplifiedEmotionManager
 except ImportError:
     logger.warning("SimplifiedEmotionManager not available")
     SimplifiedEmotionManager = None

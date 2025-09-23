@@ -3080,13 +3080,13 @@ class BotEventHandlers:
         else:
             return "general_search"
     
-    def _build_user_preferences(self, user_id: str, message_context: dict) -> dict:
+    def _build_user_preferences(self, user_id: str, message_context) -> dict:
         """
         Build user preferences for optimization based on interaction history.
         
         Args:
             user_id: User identifier
-            message_context: Message context dictionary
+            message_context: Message context (MemoryContext object or dict)
             
         Returns:
             User preferences dictionary
@@ -3096,53 +3096,77 @@ class BotEventHandlers:
         # Default conversational behavior for Discord bot
         preferences['conversational_user'] = True
         
-        # Check if user typically asks for recent information
-        if message_context and message_context.get('recent_messages'):
-            recent_messages = message_context['recent_messages']
-            recent_queries = [msg.get('content', '') for msg in recent_messages[-5:] if msg.get('content')]
-            
-            # Look for patterns indicating preference for recent info
-            recent_keywords = ['recent', 'lately', 'yesterday', 'today', 'now', 'current']
-            if any(any(keyword in query.lower() for keyword in recent_keywords) for query in recent_queries):
-                preferences['prefers_recent'] = True
+        # Handle both MemoryContext object and dictionary
+        if message_context:
+            # If it's a MemoryContext object, we don't have recent_messages data
+            # This data should come from a different source
+            if hasattr(message_context, 'context_type'):
+                # It's a MemoryContext object - extract what we can
+                preferences['context_type'] = message_context.context_type.value
+                preferences['is_private'] = message_context.is_private
+                if message_context.server_id:
+                    preferences['server_id'] = message_context.server_id
+                if message_context.channel_id:
+                    preferences['channel_id'] = message_context.channel_id
+            elif isinstance(message_context, dict):
+                # It's a dictionary - use the old logic
+                if message_context.get('recent_messages'):
+                    recent_messages = message_context['recent_messages']
+                    recent_queries = [msg.get('content', '') for msg in recent_messages[-5:] if msg.get('content')]
+                    
+                    # Look for patterns indicating preference for recent info
+                    recent_keywords = ['recent', 'lately', 'yesterday', 'today', 'now', 'current']
+                    if any(any(keyword in query.lower() for keyword in recent_keywords) for query in recent_queries):
+                        preferences['prefers_recent'] = True
+                        
+                    # Look for patterns indicating preference for precise answers
+                    precise_keywords = ['exactly', 'specifically', 'precise', 'what is', 'define']
+                    if any(any(keyword in query.lower() for keyword in precise_keywords) for query in recent_queries):
+                        preferences['prefers_precise_answers'] = True
+                        
+                    # Look for exploratory behavior
+                    explore_keywords = ['tell me about', 'more about', 'explain', 'describe']
+                    if any(any(keyword in query.lower() for keyword in explore_keywords) for query in recent_queries):
+                        preferences['exploration_mode'] = True
                 
-            # Look for patterns indicating preference for precise answers
-            precise_keywords = ['exactly', 'specifically', 'precise', 'what is', 'define']
-            if any(any(keyword in query.lower() for keyword in precise_keywords) for query in recent_queries):
-                preferences['prefers_precise_answers'] = True
-                
-            # Look for exploratory behavior
-            explore_keywords = ['tell me about', 'more about', 'explain', 'describe']
-            if any(any(keyword in query.lower() for keyword in explore_keywords) for query in recent_queries):
-                preferences['exploration_mode'] = True
-        
-        # Extract favorite topics from context
-        if message_context and message_context.get('topics'):
-            preferences['favorite_topics'] = message_context['topics']
+                # Extract favorite topics from context
+                if message_context.get('topics'):
+                    preferences['favorite_topics'] = message_context['topics']
         
         return preferences
     
-    def _build_memory_filters(self, message_context: dict) -> dict:
+    def _build_memory_filters(self, message_context) -> dict:
         """
         Build memory filters from message context.
         
         Args:
-            message_context: Message context dictionary
+            message_context: Message context (MemoryContext object or dict)
             
         Returns:
             Filters dictionary for memory search
         """
         filters = {}
         
-        # Add channel context if available
-        if message_context and message_context.get('channel_id'):
-            filters['channel_id'] = message_context['channel_id']
-        
-        # Add time-based filtering for recent queries
-        if message_context and message_context.get('is_recent_query'):
-            from datetime import datetime, timedelta
-            recent_cutoff = datetime.now() - timedelta(hours=24)
-            filters['timestamp'] = {'$gte': recent_cutoff}
+        # Handle both MemoryContext object and dictionary
+        if message_context:
+            if hasattr(message_context, 'context_type'):
+                # It's a MemoryContext object
+                if message_context.channel_id:
+                    filters['channel_id'] = message_context.channel_id
+                if message_context.server_id:
+                    filters['server_id'] = message_context.server_id
+                filters['context_type'] = message_context.context_type.value
+                filters['is_private'] = message_context.is_private
+            elif isinstance(message_context, dict):
+                # It's a dictionary - use the old logic
+                if message_context.get('channel_id'):
+                    filters['channel_id'] = message_context['channel_id']
+                
+                # Add time-based filtering for recent queries
+                if message_context.get('is_recent_query'):
+                    from datetime import datetime, timedelta
+                    recent_cutoff = datetime.now() - timedelta(hours=24)
+                    filters['timestamp'] = {'$gte': recent_cutoff}
         
         return filters
 
