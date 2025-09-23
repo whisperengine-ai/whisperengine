@@ -195,11 +195,12 @@ class EnhancedHealthServer:
             if orchestrator:
                 try:
                     # Generate AI response using universal system
+                    conversation_context = await orchestrator.build_conversation_context(
+                        user_id, "web_chat", message_content
+                    )
                     ai_response = await orchestrator.generate_ai_response(
                         universal_message, 
-                        orchestrator.build_conversation_context(
-                            user_id, "web_chat", message_content
-                        )
+                        conversation_context
                     )
                     
                     response_content = ai_response.content if hasattr(ai_response, 'content') else str(ai_response)

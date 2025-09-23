@@ -612,7 +612,7 @@ class UniversalChatOrchestrator:
         """Handle incoming message from any platform"""
         try:
             # Build conversation context from stored conversation pairs (Discord model)
-            conversation_context = self.build_conversation_context(
+            conversation_context = await self.build_conversation_context(
                 message.user_id, message.channel_id or "direct", message.content
             )
 
@@ -1314,7 +1314,7 @@ class UniversalChatOrchestrator:
                 character_prompt = await self.character_system.create_character_aware_prompt(
                     character_file=character_file,
                     user_id=user_id,
-                    current_message=""  # No current message in this context
+                    message_content=""  # No current message in this context
                 )
                 if character_prompt:
                     logging.info(f"✅ UNIVERSAL CHAT: Using character-aware prompt for user {user_id} ({len(character_prompt)} chars)")
@@ -1489,7 +1489,7 @@ class UniversalChatOrchestrator:
         """Generate consistent conversation ID across platforms"""
         return f"conversation_{user_id}_{platform_value}_{channel_id or 'direct'}"
 
-    def build_conversation_context(
+    async def build_conversation_context(
         self, user_id: str, channel_id: str, current_message: str
     ) -> list[dict[str, str]]:
         """Build conversation context from stored message pairs (Discord architecture)"""
@@ -1497,7 +1497,7 @@ class UniversalChatOrchestrator:
 
         try:
             # Add character-aware system prompt first (only if available)
-            system_prompt = self._get_basic_system_prompt(user_id, current_message)
+            system_prompt = await self._get_basic_system_prompt(user_id, current_message)
             if system_prompt:
                 conversation_context.append({"role": "system", "content": system_prompt})
             else:
@@ -1735,7 +1735,7 @@ class UniversalChatOrchestrator:
             logging.warning(f"Failed to get user active character: {e}")
         return None
 
-    def _get_basic_system_prompt(self, user_id: str = None, current_message: str = "") -> str:
+    async def _get_basic_system_prompt(self, user_id: str = None, current_message: str = "") -> str:
         """Get system prompt - character-aware if CDL system is available"""
         
         logging.info(f"🎭 UNIVERSAL CHAT DEBUG: Getting system prompt for user {user_id}")
@@ -1754,12 +1754,10 @@ class UniversalChatOrchestrator:
                 else:
                     logging.info(f"🎭 UNIVERSAL CHAT: User {user_id} has active character: {character_file}")
                 
-                character_prompt = asyncio.run(
-                    self.character_system.create_character_aware_prompt(
-                        character_file=character_file,
-                        user_id=user_id,
-                        current_message=current_message
-                    )
+                character_prompt = await self.character_system.create_character_aware_prompt(
+                    character_file=character_file,
+                    user_id=user_id,
+                    message_content=current_message
                 )
                 if character_prompt:
                     logging.info(f"✅ UNIVERSAL CHAT: Using character-aware prompt for user {user_id} ({len(character_prompt)} chars)")
