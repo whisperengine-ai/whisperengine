@@ -134,3 +134,4 @@ docker-data/
 .setup_complete
 .env.marcus-chen
 .env.gabriel
+characters/examples/gabriel-tether.json
