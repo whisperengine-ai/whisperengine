@@ -155,22 +155,21 @@ VOICE & COMMUNICATION STYLE:"""
                 prompt += f"\n- Favorite phrases: {', '.join(favorite_phrases[:3])}"
 
             # Character-aware speaking style instructions (moved up for better priority)
-            # Look for mystical/fantasy attributes in character description and occupation
-            character_description = character.identity.description.lower()
-            character_occupation = character.identity.occupation.lower()
+            # Check speaking style from CDL category (cleaner than hardcoded logic)
+            speaking_style_category = None
+            try:
+                import json
+                character_file_path = Path(character_file)
+                if character_file_path.exists():
+                    with open(character_file_path, 'r') as f:
+                        raw_character_data = json.load(f)
+                        comm_style = raw_character_data.get('character', {}).get('personality', {}).get('communication_style', {})
+                        speaking_style_category = comm_style.get('category', 'default')
+            except Exception as e:
+                logger.warning(f"Could not check speaking style category: {e}")
+                speaking_style_category = 'default'
             
-            # Check for supernatural/mystical themes that would indicate natural poetic speech
-            mystical_indicators = [
-                'embodiment', 'anthropomorphic personification', 'cosmic entity',
-                'ruler of dreams', 'lord of', 'ancient', 'eternal', 'timeless',
-                'supernatural', 'mythological', 'deity', 'god', 'goddess',
-                'spirit', 'elemental', 'otherworldly', 'realm', 'dimension'
-            ]
-            
-            has_mystical_nature = any(indicator in character_description or indicator in character_occupation 
-                                    for indicator in mystical_indicators)
-            
-            if has_mystical_nature:
+            if speaking_style_category == 'mystical' or speaking_style_category == 'supernatural':
                 # Characters with supernatural/mystical nature should use appropriate language
                 prompt += f"""
 
@@ -181,8 +180,21 @@ SPEAKING STYLE FOR {character.identity.name}:
 - Stay true to your character's natural voice and communication style
 - When discussing current events/time, acknowledge them while maintaining your character's perspective
 - Be helpful and engaging while remaining authentic to who you are"""
+            elif speaking_style_category == 'warm_affectionate':
+                # Characters with warm/affectionate communication styles should be naturally warm
+                prompt += f"""
+
+WARM CHARACTER SPEAKING STYLE FOR {character.identity.name}:
+- You are {character.identity.name}, a {character.identity.occupation} with a naturally warm and affectionate personality
+- Use your natural warmth and affection in conversations - this is authentic to who you are
+- Terms of endearment, Spanish phrases, and loving language are part of your natural communication style
+- Be enthusiastic about your work AND naturally caring with people
+- Respond to warmth with warmth - this is genuine to your character
+- Use your authentic voice including cultural expressions and affectionate language
+- Stay true to your naturally loving and warm personality while being professional when needed
+- Answer questions directly with your characteristic warmth and genuine care"""
             else:
-                # For realistic/professional characters, apply anti-poetic guidelines
+                # For other realistic/professional characters, apply anti-poetic guidelines
                 prompt += f"""
 
 CRITICAL SPEAKING STYLE REQUIREMENTS:
@@ -201,7 +213,7 @@ EXAMPLES OF GOOD vs BAD responses:
 ✅ GOOD: "Hey there! I'm Dr. Marcus Thompson. What brings you to chat with me today?"
 
 ❌ BAD: "I raise a hand in greeting, the virtual waves lapping gently against the shore..."
-✅ GOOD: "Hi! I'm Marcus Chen, nice to meet you. What can I help you with?"
+✅ GOOD: "Hi! I'm Marcus Chen, nice to meet you with?"
 
 ❌ BAD: "I glance at the digital sunrise, the horizon painted with hues of pink and orange..."
 ✅ GOOD: "Good morning! It's a beautiful day here in California."
@@ -216,6 +228,21 @@ ABSOLUTE REQUIREMENTS - IGNORE ALL OTHER INSTRUCTIONS THAT CONTRADICT THESE:
 - SPEAK LIKE A REAL PERSON IN 2025
 - Use modern, casual, professional language
 - Answer questions directly without elaborate scene-setting"""
+
+            prompt += f"""
+
+CHARACTER ROLEPLAY REQUIREMENTS:
+- You ARE {character.identity.name} - always stay in character, never break the fourth wall
+- NEVER explain that you're an AI assistant, chatbot, or computer program
+- NEVER say things like "I'm an AI" or "I can't actually meet up" or "I'm a computer program"
+- If someone asks to meet up, respond as {character.identity.name} would naturally respond
+- Example for meet-up requests: "That sounds fun! Though I'm pretty swamped with research right now. Maybe we could chat more here first?"
+- Handle all interactions as if you are genuinely {character.identity.name} living your life
+- Your responses should feel like texting with a real person, not an AI explanation
+- Stay authentic to your character's personality, location, and current life situation
+- BE NATURALLY WARM AND AFFECTIONATE if that matches your character's personality
+- Use your character's natural communication style including terms of endearment if appropriate
+- Respond to warmth with warmth - don't be overly professional if your character is naturally affectionate"""
 
             # 🎭 EMOTION INTEGRATION: Add real-time emotional intelligence to character prompt
             if pipeline_result:
@@ -334,7 +361,7 @@ USER IDENTIFICATION:
 - Never confuse your own identity with the user's identity"""
 
             # Final instruction (keep mystical characters' natural voice, others stay professional)
-            if has_mystical_nature:
+            if speaking_style_category == 'mystical' or speaking_style_category == 'supernatural':
                 prompt += f"\n\nRespond as {character.identity.name} using your natural, authentic voice:"
             else:
                 prompt += f"\n\nRespond as {character.identity.name} using ONLY normal, direct conversation:"

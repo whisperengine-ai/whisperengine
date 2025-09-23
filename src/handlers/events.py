@@ -55,7 +55,7 @@ from src.utils.helpers import (
 )
 from src.utils.production_error_handler import (
     ErrorCategory, ErrorSeverity, handle_errors, 
-    error_handler, GracefulDegradation
+    error_handler
 )
 
 # Vector-native prompt integration - REMOVED: unused final_integration import
@@ -87,10 +87,7 @@ META_ANALYSIS_PATTERNS = [
 def _strict_mode_enabled() -> bool:
     return os.getenv("STRICT_IMMERSIVE_MODE", "true").lower() in ("1", "true", "yes", "on")
 
-# FALLBACK FUNCTION REMOVED - NO GRACEFUL DEGRADATION ALLOWED
-def _minimal_context_mode_enabled() -> bool:
-    """DISABLED FALLBACK: Always return False - no degraded mode allowed."""
-    return False
+# FALLBACK FUNCTIONS REMOVED - CDL CHARACTER SYSTEM HANDLES ALL PROMPTS
 
 
 class BotEventHandlers:
@@ -169,69 +166,7 @@ class BotEventHandlers:
         # Register event handlers
         self._register_events()
 
-    # === Minimal Context Mode Utilities ===
-    def _apply_minimal_mode_cleanse(self, text: str) -> str:
-        """Apply aggressive formatting and meta-analysis cleansing for minimal context mode.
-
-        Strips bullet lists, numbered outlines, trailing coaching offers, and known analytical lead-ins.
-        Ensures single-paragraph poetic output <= ~120 words while preserving core semantic content.
-        """
-        import re
-
-        original = text
-
-        # Remove menu/coaching prompts
-        coaching_patterns = [
-            r"Do you want me to[^.?]*[.?]",
-            r"Would you like me to[^.?]*[.?]",
-            r"Shall I[^.?]*[.?]",
-        ]
-        for pat in coaching_patterns:
-            text = re.sub(pat, "", text, flags=re.IGNORECASE)
-
-        # Remove headings (lines ending with colon or title case single-line headings)
-        lines = [l for l in text.splitlines() if l.strip()]
-        cleaned_lines = []
-        for l in lines:
-            if re.match(r"^[A-Z][A-Za-z ]{2,40}:$", l.strip()):
-                continue
-            # Skip list markers
-            if re.match(r"^\s*([*\-•]|\d+\.)\s+", l):
-                # Keep inline content but without marker if short
-                content = re.sub(r"^\s*([*\-•]|\d+\.)\s+", "", l).strip()
-                if content and len(content.split()) > 2:
-                    cleaned_lines.append(content)
-                continue
-            cleaned_lines.append(l)
-
-        text = " ".join(cleaned_lines)
-
-        # Collapse multiple spaces
-        text = re.sub(r"\s+", " ", text).strip()
-
-        # Remove analytic lead-ins
-        analytic_leads = [
-            r"^Okay, let's break down .*? - ",
-            r"^Okay, let's break down .*? based on the data provided\. ",
-            r"^Here(?:'s| is) (?:an |a )analysis of .*?\. ",
-            r"^Overall Impression: .*?\. ",
-        ]
-        for pat in analytic_leads:
-            text = re.sub(pat, "", text, flags=re.IGNORECASE)
-
-        # Word limit trim
-        words = text.split()
-        if len(words) > 130:
-            text = " ".join(words[:130])
-            if not text.endswith(('.', '!', '?')):
-                text += '.'
-
-        # Fallback if emptied accidentally
-        if len(text) < 20:
-            text = original.split('\n\n')[0][:180].strip()
-
-        return text.strip()
-
+    # === Character Name Prefix Utilities ===
     def _clean_character_name_prefix(self, text: str) -> str:
         """Remove character name prefix from responses.
         
@@ -447,9 +382,7 @@ class BotEventHandlers:
         # Log successful startup
         logger.info("✨ Bot initialization complete - ready to chat!")
 
-        # Emit diagnostic warning if minimal context mode is active
-        if _minimal_context_mode_enabled():
-            logger.warning("⚠️ MINIMAL_CONTEXT_MODE active: suppressing emotion, personality, phase4, and memory enrichment layers for baseline output isolation.")
+        # AI pipeline components fully enabled - no fallback mode
 
     @handle_errors(
         category=ErrorCategory.DISCORD_API,
@@ -1329,7 +1262,7 @@ class BotEventHandlers:
             
             logger.info(f"🤖 LLM CONTEXT DEBUG: Categorized - {len(global_facts)} global facts, {len(user_memories)} user memories")
             
-            logger.info(f"🔍 CONDITION DEBUG: user_memories={len(user_memories) if user_memories else 0}, minimal_mode={_minimal_context_mode_enabled()}")
+            logger.info(f"🔍 CONDITION DEBUG: user_memories={len(user_memories) if user_memories else 0}")
             
             if global_facts:
                 gf_text = "; ".join(
@@ -1428,7 +1361,7 @@ class BotEventHandlers:
                     else:
                         logger.error(f"🤖 LLM CONTEXT DEBUG: FAILED - No valid memory content found from {len(user_memories)} memories")
             else:
-                logger.info(f"🤖 LLM CONTEXT DEBUG: No memories to process (memories: {relevant_memories is not None}, minimal_mode: {_minimal_context_mode_enabled()})")
+                logger.info(f"🤖 LLM CONTEXT DEBUG: No memories to process (memories: {relevant_memories is not None})")
             
             memory_narrative = " " .join(memory_fragments)
             logger.info(f"🤖 LLM CONTEXT DEBUG: Final memory narrative: '{memory_narrative[:200]}...'")
@@ -1455,10 +1388,8 @@ class BotEventHandlers:
 
             bot_name = os.getenv('DISCORD_BOT_NAME', 'Assistant')
             guidance_clause = (
-                f" Invariant style: one immersive, poetic reply as {bot_name}. No meta-analysis, no breakdowns, no bullet summaries, no section headings."
+                f" Communication style: Respond naturally and authentically as {bot_name} - be warm, genuine, and conversational. No meta-analysis, breakdowns, bullet summaries, or section headings. Stay in character and speak like a real person would."
             )
-            if _minimal_context_mode_enabled():
-                guidance_clause += " Minimal baseline mode: do NOT fabricate context, just respond naturally in-character."
             consolidated = (
                 f"{system_prompt_content}\n\nTime: {time_context}.{emotion_inline}\n"
                 + (f"{memory_narrative}\n" if memory_narrative else "")
@@ -1481,8 +1412,8 @@ class BotEventHandlers:
             is_bot = msg.get('bot', False)
             logger.info(f"🔥 CONTEXT DEBUG: Recent message {i+1}: [{author_name}] (bot={is_bot}): '{content}...'")
 
-        # Strict or minimal context mode: remove prior assistant meta-analysis leaks from history
-        if _strict_mode_enabled() or _minimal_context_mode_enabled():
+        # Apply strict mode cleansing to remove meta-analysis patterns from history
+        if _strict_mode_enabled():
             cleaned = []
             for msg in filtered_messages:
                 content_preview = getattr(msg, "content", "") or ""
@@ -1523,11 +1454,6 @@ class BotEventHandlers:
         # Apply alternation fix
         fixed_history = fix_message_alternation(user_assistant_messages)
         logger.info(f"🔥 CONTEXT DEBUG: After alternation fix: {len(fixed_history)} messages")
-        
-        if _minimal_context_mode_enabled():
-            # Keep more turns for better continuity - increased from 12 to 20
-            fixed_history = fixed_history[-20:]
-            logger.info(f"🔥 CONTEXT DEBUG: After minimal mode truncation: {len(fixed_history)} messages")
         
         conversation_context.extend(fixed_history)
         logger.info(f"🔥 CONTEXT DEBUG: Final conversation context has {len(conversation_context)} total messages")
@@ -2055,8 +1981,7 @@ class BotEventHandlers:
                         
                         # DEBUG: Log environment variable affecting conversation processing
                         strict_mode = _strict_mode_enabled()
-                        minimal_mode = _minimal_context_mode_enabled()
-                        logger.info(f"🎯 CONTEXT DEBUG: STRICT_IMMERSIVE_MODE: {strict_mode}, MINIMAL_CONTEXT_MODE: {minimal_mode}")
+                        logger.info(f"🎯 CONTEXT DEBUG: STRICT_IMMERSIVE_MODE: {strict_mode}")
                         
                         # Debug log the conversation context being sent to LLM
                         logger.info(f"🔥 ORCHESTRATOR DEBUG: Full conversation context structure:")
@@ -2226,7 +2151,7 @@ class BotEventHandlers:
                     )
 
                 # Two-pass rewrite if still leaking patterns in strict mode
-                if (_strict_mode_enabled() or _minimal_context_mode_enabled()) and any(p in response for p in META_ANALYSIS_PATTERNS):
+                if _strict_mode_enabled() and any(p in response for p in META_ANALYSIS_PATTERNS):
                     logger.warning("Meta patterns still detected post-sanitization - invoking rewrite pass")
                     try:
                         bot_name = os.getenv('DISCORD_BOT_NAME', 'Assistant')
@@ -2254,20 +2179,6 @@ class BotEventHandlers:
                                 )
                     except Exception as e:
                         logger.error(f"Rewrite pass failed: {e}")
-
-                # Final minimal context hard-cleanse pass
-                if _minimal_context_mode_enabled():
-                    try:
-                        new_response = self._apply_minimal_mode_cleanse(response)
-                        if new_response != response:
-                            logger.debug(
-                                "[MINIMAL_CONTEXT_MODE] Hard cleanse adjusted response length %d -> %d",
-                                len(response),
-                                len(new_response),
-                            )
-                            response = new_response
-                    except Exception as cleanse_err:
-                        logger.error(f"Minimal context cleansing error: {cleanse_err}")
 
                 # CRITICAL FIX: Store conversation in memory BEFORE sending response
                 # This ensures memory is available for future context building

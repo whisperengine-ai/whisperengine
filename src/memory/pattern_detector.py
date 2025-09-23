@@ -45,6 +45,35 @@ class CrossReferencePatternDetector:
     def __init__(self):
         self.min_pattern_frequency = 2  # Minimum occurrences to consider a pattern
         self.confidence_threshold = 0.6  # Minimum confidence for pattern detection
+        self.detected_patterns = {}  # Store detected patterns by user_id
+    
+    async def detect_memory_patterns(self, memories: List[Dict[str, Any]], user_id: str) -> List[DetectedPattern]:
+        """Detect memory patterns (alias for detect_patterns)"""
+        patterns = await self.detect_patterns(memories, user_id)
+        self.detected_patterns[user_id] = patterns
+        return patterns
+    
+    def get_pattern_statistics(self, user_id: str) -> Dict[str, Any]:
+        """Get pattern statistics for a user"""
+        patterns = self.detected_patterns.get(user_id, [])
+        if not patterns:
+            return {"total_patterns": 0, "pattern_types": {}, "average_confidence": 0.0}
+        
+        pattern_types = {}
+        total_confidence = 0.0
+        
+        for pattern in patterns:
+            pattern_type = pattern.pattern_type.value
+            if pattern_type not in pattern_types:
+                pattern_types[pattern_type] = 0
+            pattern_types[pattern_type] += 1
+            total_confidence += pattern.confidence
+        
+        return {
+            "total_patterns": len(patterns),
+            "pattern_types": pattern_types,
+            "average_confidence": total_confidence / len(patterns) if patterns else 0.0
+        }
     
     async def detect_patterns(
         self, 

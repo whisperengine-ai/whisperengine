@@ -39,7 +39,7 @@ from src.utils.health_server import create_health_server
 # Enhanced production systems
 from src.utils.production_error_handler import (
     ErrorCategory, ErrorSeverity, handle_errors, 
-    error_handler, GracefulDegradation
+    error_handler
 )
 
 # Logging is already configured by the root launcher
@@ -86,25 +86,15 @@ class ModularBotManager:
 
             # Step 1: Initialize bot core with all components
             logger.info("⚙️ Initializing bot core components...")
-            async with GracefulDegradation("bot_core_initialization") as core_init:
-                self.bot_core = DiscordBotCore(debug_mode=self.debug_mode)
-                self.bot_core.initialize_all()  # Initialize all components synchronously
-                self.bot = self.bot_core.get_bot()  # Get the initialized Discord bot
-            
-            if core_init.error_occurred:
-                raise RuntimeError("Failed to initialize bot core components")
-            
+            self.bot_core = DiscordBotCore(debug_mode=self.debug_mode)
+            self.bot_core.initialize_all()  # Initialize all components synchronously
+            self.bot = self.bot_core.get_bot()  # Get the initialized Discord bot
             logger.info("✅ Bot core components initialized")
 
             # Step 2: Initialize event handlers
             logger.info("📡 Initializing event handlers...")
-            async with GracefulDegradation("event_handlers") as event_init:
-                self.event_handlers = BotEventHandlers(self.bot_core)
-            
-            if event_init.error_occurred:
-                logger.warning("⚠️ Event handlers initialization had issues, but continuing...")
-            else:
-                logger.info("✅ Event handlers registered")
+            self.event_handlers = BotEventHandlers(self.bot_core)
+            logger.info("✅ Event handlers registered")
 
             # Step 3: Initialize command handlers with dependency injection
             logger.info("🎛️ Initializing command handlers...")

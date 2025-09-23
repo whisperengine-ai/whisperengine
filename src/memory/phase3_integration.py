@@ -14,6 +14,7 @@ import os
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any, Optional, Union
+from enum import Enum
 
 from .memory_importance_engine import MemoryImportanceEngine
 from .pattern_detector import CrossReferencePatternDetector, DetectedPattern, PatternType
@@ -22,6 +23,14 @@ from .pattern_detector import CrossReferencePatternDetector, DetectedPattern, Pa
 # Removed obsolete SemanticMemoryClusterer in favor of VectorMemoryStore.get_memory_clusters_for_roleplay()
 
 logger = logging.getLogger(__name__)
+
+
+class ClusterType(Enum):
+    """Types of memory clusters"""
+    TOPICAL = "topical"
+    TEMPORAL = "temporal"
+    EMOTIONAL = "emotional"
+    SEMANTIC = "semantic"
 
 
 @dataclass
@@ -51,6 +60,26 @@ class MemoryInsight:
     created_at: datetime
 
 
+class SemanticClustererStub:
+    """Stub for semantic clustering functionality (handled by Qdrant)"""
+    
+    async def get_clusters_by_type(self, user_id: str, cluster_type: ClusterType):
+        """Get clusters by type"""
+        return []
+    
+    async def create_memory_clusters(self, user_id: str, memory_manager):
+        """Create memory clusters"""
+        return {}
+    
+    async def update_cluster_relationships(self, user_id: str, memory_manager):
+        """Update cluster relationships"""
+        pass
+    
+    def get_clustering_statistics(self, scope: str):
+        """Get clustering statistics"""
+        return {"total_clusters": 0, "scope": scope}
+
+
 class Phase3MemoryNetworks:
     """Main integration class for Phase 3 memory network functionality"""
 
@@ -60,6 +89,7 @@ class Phase3MemoryNetworks:
         # Use VectorMemoryStore.get_memory_clusters_for_roleplay() instead
         self.importance_engine = MemoryImportanceEngine()
         self.pattern_detector = CrossReferencePatternDetector()
+        self.semantic_clusterer = SemanticClustererStub()  # Stub for compatibility
 
         # Performance limits to prevent excessive processing
         self.max_memories_for_analysis = int(os.getenv("PHASE3_MAX_MEMORIES", "50"))

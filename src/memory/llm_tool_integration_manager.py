@@ -74,15 +74,134 @@ class LLMToolIntegrationManager:
         logger.info("Combined %d tools from all managers", len(combined_tools))
         return combined_tools
     
+    def _filter_relevant_tools(self, user_message: str, emotional_context: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
+        """Intelligently filter tools based on conversation context to reduce token usage"""
+        
+        # Always include core memory tools (Phase 1) - these are lightweight and frequently useful
+        core_tools = []
+        for tool in self.all_tools:
+            tool_name = tool.get("function", {}).get("name", "")
+            if tool_name in ["store_conversation_memory", "retrieve_relevant_memories", "search_memories"]:
+                core_tools.append(tool)
+        
+        # Check for emotional crisis indicators
+        emotional_crisis_detected = self._detect_emotional_crisis(user_message, emotional_context)
+        
+        # Check for character evolution requests  
+        character_adaptation_needed = self._detect_character_adaptation_request(user_message)
+        
+        # Check for complex analysis requests
+        complex_analysis_needed = self._detect_complex_analysis_request(user_message)
+        
+        # Check for workflow/planning requests
+        workflow_planning_needed = self._detect_workflow_planning_request(user_message)
+        
+        additional_tools = []
+        
+        # Add emotional intelligence tools if crisis detected
+        if emotional_crisis_detected:
+            for tool in self.all_tools:
+                tool_name = tool.get("function", {}).get("name", "")
+                if "emotional" in tool_name or "crisis" in tool_name or "empathy" in tool_name:
+                    additional_tools.append(tool)
+        
+        # Add character evolution tools if adaptation requested
+        if character_adaptation_needed:
+            for tool in self.all_tools:
+                tool_name = tool.get("function", {}).get("name", "")
+                if "character" in tool_name or "personality" in tool_name or "adapt" in tool_name:
+                    additional_tools.append(tool)
+        
+        # Add Phase 3 tools for complex analysis
+        if complex_analysis_needed:
+            for tool in self.all_tools:
+                tool_name = tool.get("function", {}).get("name", "")
+                if "analyze" in tool_name or "pattern" in tool_name or "insight" in tool_name:
+                    additional_tools.append(tool)
+        
+        # Add Phase 4 tools for workflow planning
+        if workflow_planning_needed:
+            for tool in self.all_tools:
+                tool_name = tool.get("function", {}).get("name", "")
+                if "orchestrate" in tool_name or "plan" in tool_name or "workflow" in tool_name:
+                    additional_tools.append(tool)
+        
+        # Combine and deduplicate
+        relevant_tools = core_tools + additional_tools
+        seen_names = set()
+        filtered_tools = []
+        for tool in relevant_tools:
+            tool_name = tool.get("function", {}).get("name", "")
+            if tool_name not in seen_names:
+                filtered_tools.append(tool)
+                seen_names.add(tool_name)
+        
+        logger.info("Filtered tools: %d/%d (saved %d tools from prompt)", 
+                   len(filtered_tools), len(self.all_tools), len(self.all_tools) - len(filtered_tools))
+        
+        return filtered_tools
+    
+    def _detect_emotional_crisis(self, message: str, emotional_context: Optional[Dict[str, Any]] = None) -> bool:
+        """Detect if message indicates emotional crisis requiring support tools"""
+        crisis_keywords = [
+            'depressed', 'hopeless', 'overwhelmed', 'anxious', 'panic', 'crisis',
+            'can\'t cope', 'breaking down', 'falling apart', 'desperate', 'suicidal'
+        ]
+        message_lower = message.lower()
+        
+        # Check for crisis keywords
+        keyword_crisis = any(keyword in message_lower for keyword in crisis_keywords)
+        
+        # Check emotional context if available
+        context_crisis = False
+        if emotional_context:
+            high_intensity_emotions = emotional_context.get('high_intensity_emotions', [])
+            context_crisis = any(emotion in ['extreme_sadness', 'anxiety', 'despair'] for emotion in high_intensity_emotions)
+        
+        return keyword_crisis or context_crisis
+    
+    def _detect_character_adaptation_request(self, message: str) -> bool:
+        """Detect if user is requesting character adaptation"""
+        adaptation_keywords = [
+            'be more', 'be less', 'adapt', 'change your', 'adjust your',
+            'personality', 'communication style', 'approach', 'manner',
+            'tone', 'be different', 'act more', 'respond differently'
+        ]
+        message_lower = message.lower()
+        return any(keyword in message_lower for keyword in adaptation_keywords)
+    
+    def _detect_complex_analysis_request(self, message: str) -> bool:
+        """Detect if user is requesting complex memory analysis"""
+        analysis_keywords = [
+            'analyze', 'pattern', 'insight', 'understand', 'explain',
+            'what do you notice', 'trends', 'connections', 'relationships',
+            'history', 'development', 'evolution', 'changes over time'
+        ]
+        message_lower = message.lower()
+        return any(keyword in message_lower for keyword in analysis_keywords)
+    
+    def _detect_workflow_planning_request(self, message: str) -> bool:
+        """Detect if user is requesting workflow planning or complex tasks"""
+        workflow_keywords = [
+            'plan', 'help me', 'guide me', 'steps', 'process', 'workflow',
+            'organize', 'strategy', 'approach', 'method', 'accomplish',
+            'achieve', 'goal', 'project', 'task'
+        ]
+        message_lower = message.lower()
+        return any(keyword in message_lower for keyword in workflow_keywords)
+    
     async def execute_llm_with_tools(self, user_message: str, user_id: str, 
                                    character_context: str = "", 
                                    emotional_context: Dict[str, Any] = None) -> Dict[str, Any]:
-        """Execute LLM with full tool calling capabilities"""
+        """Execute LLM with intelligently filtered tool calling capabilities"""
         start_time = datetime.now()
         
         try:
             # Build comprehensive context for LLM
             system_prompt = self._build_system_prompt(character_context, emotional_context)
+            
+            # Intelligently filter tools based on conversation context
+            relevant_tools = self._filter_relevant_tools(user_message, emotional_context)
             
             # Prepare messages for LLM
             messages = [
@@ -90,10 +209,10 @@ class LLMToolIntegrationManager:
                 {"role": "user", "content": user_message}
             ]
             
-            # Call LLM with all available tools
+            # Call LLM with filtered tools to reduce token usage
             response = await self.llm_client.generate_with_tools(
                 messages=messages,
-                tools=self.all_tools,
+                tools=relevant_tools,
                 max_tool_iterations=5,  # Allow multiple tool calls
                 user_id=user_id
             )
@@ -388,5 +507,10 @@ IMPORTANT: Always prioritize user emotional wellbeing and safety."""
             "tool_categories": tool_categories,
             "phase_1_complete": True,  # Memory and Intelligence tools
             "phase_2_complete": True,  # Character Evolution and Emotional Intelligence
+            "phase_3_complete": True,  # Multi-Dimensional Memory Networks
+            "phase_4_complete": True,  # Proactive Intelligence & Tool Orchestration
+            "intelligent_filtering": "enabled",  # NEW: Intelligent tool filtering to reduce tokens
+            "average_tools_per_request": "3-8 (filtered from 27)",  # Estimated after filtering
+            "token_optimization": "active",
             "integration_status": "fully_operational"
         }

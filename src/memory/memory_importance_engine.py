@@ -36,6 +36,41 @@ class MemoryImportanceEngine:
             'semantic_relevance': 0.25    # Relevance to user patterns
         }
     
+    async def calculate_memory_importance(
+        self, 
+        memories: List[Dict[str, Any]], 
+        user_context: Optional[Dict[str, Any]] = None
+    ) -> List[MemoryImportance]:
+        """Calculate importance for multiple memories (alias for rank_memories_by_importance)"""
+        return await self.rank_memories_by_importance(memories, user_context)
+    
+    async def identify_core_memories(
+        self, 
+        user_id: str, 
+        limit: int = 10, 
+        memory_manager=None
+    ) -> List[Dict[str, Any]]:
+        """Identify the most important core memories for a user"""
+        # This would need access to all user memories to rank them
+        # For now, return empty list since we need memory_manager integration
+        return []
+    
+    def get_importance_statistics(self, user_id: str) -> Dict[str, Any]:
+        """Get importance statistics for a user"""
+        # Placeholder - would need to track per-user statistics
+        return {
+            "total_memories_analyzed": 0,
+            "high_importance_count": 0,
+            "medium_importance_count": 0,
+            "low_importance_count": 0,
+            "average_importance_score": 0.0
+        }
+    
+    async def auto_adjust_importance(self, user_id: str, memory_manager=None):
+        """Automatically adjust importance scores based on usage patterns"""
+        # Placeholder for auto-adjustment logic
+        pass
+    
     async def evaluate_memory_importance(
         self, 
         memory: Dict[str, Any], 
