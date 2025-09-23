@@ -1095,6 +1095,37 @@ class LLMClient:
         """
         return {"supports_vision": self.supports_vision, "max_images": self.vision_max_images}
 
+    async def generate_with_tools(
+        self,
+        messages: list[dict[str, str]],
+        tools: list[dict[str, Any]] | None = None,
+        max_tool_iterations: int = 3,
+        user_id: str | None = None,
+        **kwargs
+    ) -> dict[str, Any]:
+        """
+        Async wrapper for tool calling - required by LLM Tool Integration Manager
+        
+        Args:
+            messages: List of message dictionaries with 'role' and 'content'
+            tools: List of tool definitions in OpenAI format
+            max_tool_iterations: Maximum number of tool call iterations (ignored for now)
+            user_id: User ID for context (ignored for now)
+            **kwargs: Additional arguments passed to underlying method
+            
+        Returns:
+            The response from the API with potential tool calls
+        """
+        import asyncio
+        
+        # Run the sync method in a thread pool to make it async
+        return await asyncio.to_thread(
+            self.generate_chat_completion_with_tools,
+            messages=messages,
+            tools=tools,
+            **kwargs
+        )
+
     def generate_completion(
         self,
         prompt: str,

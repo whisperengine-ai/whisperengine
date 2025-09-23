@@ -3,7 +3,7 @@
 WhisperEngine Main Bot Module - Modular Architecture Implementation
 Discord Bot with AI capabilities and personality         if "Failed to initialize memory system" in error_msg:
             logger.error("💡 Memory system initialization failed")
-            if "vector store" in error_msg or "Qdrant" in error_msg:
+                       # Multi-entity handlers removed - using vector-native memoryector store" in error_msg or "Qdrant" in error_msg:
                 logger.error("💡 Solution: Start Qdrant with 'docker compose up qdrant'")
             elif "connection" in error_msg:
                 logger.error("💡 Solution: Ensure Qdrant server is running and accessible")
@@ -28,7 +28,7 @@ from src.handlers.events import BotEventHandlers
 from src.handlers.help import HelpCommandHandlers
 from src.handlers.memory import MemoryCommandHandlers
 from src.handlers.monitoring_commands import MonitoringCommands
-from src.handlers.multi_entity_handlers import MultiEntityCommandHandlers
+# Multi-entity handlers removed - using vector-native memory
 from src.handlers.onboarding_commands import create_onboarding_commands
 from src.handlers.performance_commands import create_performance_commands
 from src.handlers.privacy import PrivacyCommandHandlers
@@ -312,6 +312,23 @@ class ModularBotManager:
             )
             self.command_handlers["monitoring"].register_commands(bot_name_filter, is_admin)
             logger.info("✅ Monitoring command handlers registered")
+            
+            # LLM Tool Calling Commands (Phase 1 & 2)
+            components = self.bot_core.get_components()
+            llm_tool_manager = components.get("llm_tool_manager")
+            
+            # LLM Tool Calling Commands (Phase 1 & 2) - always enabled in development!
+            if llm_tool_manager:
+                from src.handlers.llm_tool_commands import LLMToolCommandHandlers
+                self.command_handlers["llm_tools"] = LLMToolCommandHandlers(
+                    bot=self.bot,
+                    memory_manager=components.get("memory_manager"),
+                    llm_tool_manager=llm_tool_manager
+                )
+                await self.command_handlers["llm_tools"].register_commands()
+                logger.info("✅ LLM Tool Calling command handlers registered")
+            else:
+                logger.info("ℹ️ LLM Tool Calling commands disabled (feature flag or component unavailable)")
             
             # Store command handlers on bot instance for access by events handler
             self.bot.command_handlers = self.command_handlers

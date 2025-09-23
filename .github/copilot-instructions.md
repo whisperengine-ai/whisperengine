@@ -4,6 +4,15 @@
 
 **ALPHA/DEV PHASE**: WhisperEngine is in active development. Prioritize working features over production optimization. No production users yet - we can freely iterate and change.
 
+**🚨 CRITICAL DEV RULE: NO FEATURE FLAGS FOR LOCAL CODE!** 
+- Features should work BY DEFAULT in development
+- **ONLY use feature flags for REMOTE/EXTERNAL dependencies** (APIs, external services, optional dependencies)
+- **NEVER use feature flags for LOCAL code dependencies** - this creates spaghetti conditionals and silent failures
+- We are in ALPHA - all LOCAL features should be enabled and testable immediately
+- Environment variables are for infrastructure config ONLY (database URLs, API keys, etc.)
+- When implementing features with LOCAL dependencies, make them work directly - don't hide them behind flags
+- Use stubs/no-op implementations for missing EXTERNAL dependencies, not feature flags
+
 **DOCKER-FIRST DEVELOPMENT**: Container-based development is the PRIMARY workflow. Use `./multi-bot.sh` for all operations (auto-generated, don't edit manually).
 
 **PYTHON VIRTUAL ENVIRONMENT**: Always use `.venv/bin/activate` for Python commands:
@@ -12,7 +21,15 @@ source .venv/bin/activate   # ALWAYS use this for Python execution
 python scripts/generate_multi_bot_config.py  # Example: configuration generation
 ```
 
+**ENVIRONMENT LOADING**: `run.py` uses `env_manager.py` for smart environment loading:
+- `python run.py` - Uses env_manager.py for proper environment detection and loading
+- Direct Python scripts - Use `from dotenv import load_dotenv; load_dotenv()` 
+- env_manager.py handles Docker vs local development mode detection automatically
+- Direct `.env` loading may miss environment-specific configurations
+
 **VECTOR MEMORY PRIMACY**: Qdrant vector memory system (`src/memory/vector_memory_system.py`) is THE PRIMARY memory implementation. Always leverage vector/semantic search before considering manual Python analysis.
+
+**NO NEO4J**: We don't use Neo4j anymore - everything is vector-native with Qdrant. Delete any Neo4j references, imports, or graph database code.
 
 **DYNAMIC MULTI-BOT SYSTEM**: Bot configurations are auto-discovered from `.env.*` files. No hardcoded bot names - everything is generated dynamically by `scripts/generate_multi_bot_config.py`.
 
@@ -164,9 +181,15 @@ prompt = await cdl_integration.create_character_aware_prompt(
 
 **Integration-First Development**: Before marking any feature "complete":
 - ✅ Verify it's imported and called in main application flow (`src/main.py`)
-- ✅ Check feature flags default to "enabled" for dev/alpha
+- ✅ **NO ENVIRONMENT VARIABLE FLAGS** - features work by default in development
 - ✅ Test the feature actually works via Discord commands
 - ✅ Document integration points in handler classes
+
+**🚨 DEVELOPMENT ANTI-PATTERNS TO AVOID:**
+- ❌ Environment variable feature flags (`ENABLE_X=true`) 
+- ❌ Features that are "implemented" but require special configuration to work
+- ❌ Silent fallbacks that mask real failures
+- ❌ "Phantom features" that exist in code but aren't accessible to users
 
 **Vector-First Analysis**: Before writing manual analysis code:
 - ✅ Check if vector memory can provide insights via semantic search

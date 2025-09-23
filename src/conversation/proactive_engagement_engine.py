@@ -54,34 +54,14 @@ except ImportError:
     # Import failed - thread manager components not available
     pass
 
-try:
-    from src.personality.memory_moments import ConversationContext, MemoryTriggeredMoments
-
-    MEMORY_MOMENTS_AVAILABLE = True
-except ImportError:
-    MEMORY_MOMENTS_AVAILABLE = False
-
-try:
-    from src.intelligence.emotional_context_engine import EmotionalContext, EmotionalContextEngine
-    EMOTIONAL_CONTEXT_AVAILABLE = True
-except ImportError:
-    EMOTIONAL_CONTEXT_AVAILABLE = False
-
-try:
-    from src.intelligence.enhanced_vector_emotion_analyzer import EnhancedVectorEmotionAnalyzer
-    ENHANCED_EMOTION_ANALYZER_AVAILABLE = True
-except ImportError:
-    ENHANCED_EMOTION_ANALYZER_AVAILABLE = False
-
-try:
-    from src.intelligence.dynamic_personality_profiler import (
-        DynamicPersonalityProfiler,
-        PersonalityProfile,
-    )
-
-    PERSONALITY_PROFILER_AVAILABLE = True
-except ImportError:
-    PERSONALITY_PROFILER_AVAILABLE = False
+# Import local dependencies - all should be available in our codebase
+from src.personality.memory_moments import ConversationContext, MemoryTriggeredMoments
+from src.intelligence.emotional_context_engine import EmotionalContext, EmotionalContextEngine
+from src.intelligence.enhanced_vector_emotion_analyzer import EnhancedVectorEmotionAnalyzer
+from src.intelligence.dynamic_personality_profiler import (
+    DynamicPersonalityProfiler,
+    PersonalityProfile,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -801,7 +781,8 @@ class ProactiveConversationEngagementEngine:
         themes = []
         
         # Try Phase 4 topic analysis first for more sophisticated theme detection
-        if self.personality_profiler and PERSONALITY_PROFILER_AVAILABLE:
+        # Analyze personality if profiler is available
+        if self.personality_profiler:
             try:
                 import asyncio
                 # Run Phase 4 analysis for better topic detection
@@ -945,7 +926,7 @@ class ProactiveConversationEngagementEngine:
                 return connections
 
             # Enhanced: Use memory moments for authentic memory connections
-            if MEMORY_MOMENTS_AVAILABLE:
+            # Always trigger memory-based moments when available
                 try:
                     # Analyze recent conversation for memory connections
                     memory_connections = (
@@ -1156,15 +1137,7 @@ async def create_proactive_engagement_engine(
             "AdvancedConversationThreadManager not available - limited thread integration"
         )
 
-    if not MEMORY_MOMENTS_AVAILABLE:
-        logger.warning("MemoryTriggeredMoments not available - limited memory integration")
-
-    if not EMOTIONAL_CONTEXT_AVAILABLE:
-        logger.warning("EmotionalContextEngine not available - limited emotional integration")
-
-    if not PERSONALITY_PROFILER_AVAILABLE:
-        logger.warning("DynamicPersonalityProfiler not available - limited personality integration")
-
+    # All local dependencies should be available since we import them directly
     engine = ProactiveConversationEngagementEngine(
         thread_manager=thread_manager,
         memory_moments=memory_moments,

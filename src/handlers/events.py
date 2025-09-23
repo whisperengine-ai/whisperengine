@@ -9,6 +9,7 @@ import asyncio
 import logging
 import os
 import time
+import traceback
 from datetime import UTC, datetime
 
 import discord
@@ -268,11 +269,11 @@ class BotEventHandlers:
             logger.info("🌐 Setting up Universal Chat Orchestrator for Discord integration...")
 
             # Create database manager without adaptive config (using simple environment variables)
-            db_manager = DatabaseIntegrationManager(adaptive_config_manager=None)
+            db_manager = DatabaseIntegrationManager()
 
             # Create universal chat orchestrator (no adaptive config needed with Docker env vars)
             self.chat_orchestrator = UniversalChatOrchestrator(
-                config_manager=None, db_manager=db_manager
+                db_manager=db_manager
             )
 
             # Initialize the orchestrator
@@ -573,14 +574,7 @@ class BotEventHandlers:
         # Replace original message content with sanitized version
         message.content = sanitized_content
 
-        # Detect and store user name preferences
-        try:
-            from src.utils.user_preferences import detect_name_introduction
-            detected_name = await detect_name_introduction(message.content, user_id, self.memory_manager)
-            if detected_name:
-                logger.info(f"Detected name introduction from user {user_id}: {detected_name}")
-        except Exception as e:
-            logger.debug(f"Name detection failed: {e}")
+        # (User preferred name detection and storage via Postgres has been removed. See LLM tool calling roadmap for new approach.)
 
         # Initialize variables early
         enhanced_system_prompt = None
@@ -1803,9 +1797,8 @@ class BotEventHandlers:
             human_like_task = None
             conversation_analysis_task = None
 
-            # Prepare thread manager task
-            if (os.getenv("ENABLE_PHASE4_THREAD_MANAGER", "true").lower() == "true" and 
-                hasattr(self.bot, 'thread_manager') and self.bot.thread_manager):
+            # Prepare thread manager task - ALWAYS enabled in development!
+            if (hasattr(self.bot, 'thread_manager') and self.bot.thread_manager):
                 thread_manager_task = asyncio.create_task(
                     self.bot.thread_manager.process_user_message(
                         user_id=user_id,
@@ -1819,9 +1812,8 @@ class BotEventHandlers:
                     )
                 )
 
-            # Prepare engagement engine task
-            if (os.getenv("ENABLE_PHASE4_PROACTIVE_ENGAGEMENT", "true").lower() == "true" and 
-                hasattr(self.bot, 'engagement_engine') and self.bot.engagement_engine):
+            # Prepare engagement engine task - always enabled in development!
+            if (hasattr(self.bot, 'engagement_engine') and self.bot.engagement_engine):
                 # Prepare recent messages in the expected format
                 formatted_recent_messages = []
                 for msg in recent_messages[-10:]:  # Last 10 messages
@@ -2037,7 +2029,42 @@ class BotEventHandlers:
             logger.info(f"[TRACE-START] Starting _generate_and_send_response for user {user_id}")
             logger.debug("Started typing indicator - simulating thinking and typing process")
             try:
-                logger.debug("Processing message through Universal Chat Orchestrator...")
+                # PHASE 1 & 2 LLM TOOL CALLING: Always enabled in development - no environment flags!
+                llm_tool_manager = getattr(self.bot_core, 'llm_tool_manager', None)
+                
+                # EXPLICIT LOGGING: Always log the LLM tool status 
+                if not llm_tool_manager:
+                    logger.error("❌ LLM TOOL CALLING: llm_tool_manager not found on bot_core - tools unavailable")
+                else:
+                    logger.info("🔧 LLM TOOL CALLING: Using Phase 1 & 2 LLM tools for enhanced memory and analysis")
+                
+                if llm_tool_manager:
+                    try:
+                        # Use LLM tools to process the message with memory search and analysis
+                        tool_response = await llm_tool_manager.process_with_tools(
+                            user_id=user_id,
+                            message=content,
+                            system_prompt=f"You are Elena Rodriguez, a marine biologist. Current time: {self._get_current_time()}. " +
+                                        (f"Memory context: {memory_narrative}" if memory_narrative else "No specific memories available."),
+                            conversation_context=conversation_context[-5:] if conversation_context else []  # Last 5 messages for context
+                        )
+                        
+                        if tool_response and tool_response.strip():
+                            logger.info(f"✅ LLM TOOL CALLING: Generated response using Phase 1 & 2 tools ({len(tool_response)} chars)")
+                            # Store the conversation in memory
+                            await self._store_conversation_memory(user_id, content, tool_response, phase2_context)
+                            # Send the response
+                            await self._send_response(reply_channel, tool_response)
+                            return
+                        else:
+                            logger.warning("⚠️ LLM TOOL CALLING FALLBACK: Tools returned empty response, FALLING BACK to Universal Chat Orchestrator")
+                            
+                    except Exception as e:
+                        logger.error(f"❌ LLM TOOL CALLING FALLBACK: Error using Phase 1 & 2 tools: {e} - FALLING BACK to Universal Chat Orchestrator")
+                        logger.debug(f"LLM tool error details: {traceback.format_exc()}")
+                        # Fall back to Universal Chat
+                        
+                logger.info("🤖 UNIVERSAL CHAT: Processing message through Universal Chat Orchestrator (either as primary path or LLM tool fallback)")
 
                 # Use Universal Chat Orchestrator if available
                 if self.chat_orchestrator:
@@ -2454,19 +2481,29 @@ class BotEventHandlers:
                 else:
                     await reply_channel.send(error_msg)
             except LLMError as e:
-                logger.error(f"LLM error: {e}")
+                # LOG FALLBACK: Explicit logging when LLM fails and we use fallback message
+                logger.error(f"🤖 LLM ERROR FALLBACK: LLM processing failed: {e} - Sending fallback message to user")
+                logger.debug(f"LLM error details: {traceback.format_exc()}")
                 error_msg = "*The threads of thought grow tangled for a moment...* Please, speak again, and I shall attend to thy words more clearly."
                 if message.guild:
                     await message.reply(error_msg, mention_author=True)
                 else:
                     await reply_channel.send(error_msg)
             except Exception as e:
-                logger.error(f"Unexpected error processing message through Universal Chat: {e}")
-                error_msg = "*Something stirs in the darkness beyond my understanding...* Perhaps we might try this exchange anew?"
+                # FAIL FAST: No more silent fallbacks - log the error clearly and fail
+                logger.error(f"💥 CRITICAL ERROR: Message processing failed completely: {e}")
+                logger.error(f"User: {user_id}, Message: '{content[:100]}{'...' if len(content) > 100 else ''}'")
+                logger.debug(f"Full error traceback: {traceback.format_exc()}")
+                
+                # Send a clear error message instead of cryptic mystical nonsense
+                error_msg = f"❌ **System Error**: I encountered a technical issue processing your message. Please try again or contact support if this persists.\n\n*Error ID: {str(e)[:50]}*"
                 if message.guild:
                     await message.reply(error_msg, mention_author=True)
                 else:
                     await reply_channel.send(error_msg)
+                
+                # Re-raise the exception to ensure it's properly tracked and not silently ignored
+                raise RuntimeError(f"Message processing failed for user {user_id}: {e}") from e
 
     async def _store_conversation_memory(
         self,
@@ -2915,9 +2952,8 @@ class BotEventHandlers:
         logger.info(f"🚀 AI PIPELINE DEBUG: Conversation context messages: {len(conversation_context) if conversation_context else 0}")
         start_time = time.time()
         
-        # Use ConcurrentConversationManager for proper scatter-gather if available
-        if (self.conversation_manager and 
-            os.getenv("ENABLE_CONCURRENT_CONVERSATION_MANAGER", "false").lower() == "true"):
+        # Use ConcurrentConversationManager for proper scatter-gather - ALWAYS enabled!
+        if self.conversation_manager:
             
             logger.info("🚀 AI PIPELINE DEBUG: Using ConcurrentConversationManager for scatter-gather processing")
             

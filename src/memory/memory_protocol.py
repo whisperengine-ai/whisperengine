@@ -220,3 +220,61 @@ def create_multi_bot_querier(memory_manager=None):
     except ImportError as e:
         logger.warning(f"MultiBotMemoryQuerier not available: {e}")
         return None
+
+
+def create_llm_tool_integration_manager(memory_manager, character_manager, llm_client):
+    """
+    Create LLM Tool Integration Manager for Phase 2 character evolution and emotional intelligence
+    
+    Features:
+    - Unified tool calling interface
+    - Character evolution tools (personality adaptation, backstory updates, communication style)
+    - Emotional intelligence tools (crisis detection, empathy calibration, proactive support)
+    - Integration with existing Phase 1 memory tools
+    
+    Args:
+        memory_manager: Memory manager instance
+        character_manager: Character/CDL manager instance  
+        llm_client: LLM client for tool calling
+        
+    Returns:
+        LLMToolIntegrationManager instance
+    """
+    try:
+        # Import Phase 1 managers
+        from .vector_memory_tool_manager import VectorMemoryToolManager
+        from .intelligent_memory_manager import IntelligentMemoryManager
+        
+        # Import Phase 2 managers
+        from .character_evolution_tool_manager import CharacterEvolutionToolManager
+        from .emotional_intelligence_tool_manager import EmotionalIntelligenceToolManager
+        
+        # Import integration manager
+        from .llm_tool_integration_manager import LLMToolIntegrationManager
+        
+        # Create Phase 1 tool managers
+        vector_memory_tools = VectorMemoryToolManager(memory_manager)
+        intelligent_memory_tools = IntelligentMemoryManager(
+            memory_manager, llm_client, vector_memory_tools
+        )
+        
+        # Create Phase 2 tool managers
+        character_evolution_tools = CharacterEvolutionToolManager(
+            character_manager, memory_manager, llm_client
+        )
+        emotional_intelligence_tools = EmotionalIntelligenceToolManager(
+            memory_manager, llm_client
+        )
+        
+        # Create unified integration manager
+        return LLMToolIntegrationManager(
+            vector_memory_tools,
+            intelligent_memory_tools,
+            character_evolution_tools,
+            emotional_intelligence_tools,
+            llm_client
+        )
+        
+    except ImportError as e:
+        logger.warning(f"LLM Tool Integration Manager not available: {e}")
+        return None

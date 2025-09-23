@@ -1,0 +1,14 @@
+# WhisperEngine Platform-Specific Dependencies
+# Platform optimizations and system-specific packages
+# All versions locked for reproducible builds
+
+# Cross-platform system utilities
+psutil==7.1.0  # System and process utilities (already in core, kept for compatibility)
+
+# Platform-specific optimizations
+# Currently minimal - can be extended with platform markers like:
+# some-package==1.0.0; sys_platform == "win32"
+# other-package==2.0.0; sys_platform == "linux"
+
+# No additional platform-specific dependencies at this time
+# This file exists for future platform optimizations

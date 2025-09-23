@@ -1,9 +1,120 @@
 """
-Multi-Entity Relationship Manager
+Multi-Entity Relationship Manager - Vector-Native Stub
 
-This module provides comprehensive management of relationships between
-Users, Characters, and AI Self entities in the graph database.
+This module provides a stub implementation for multi-entity relationships
+without Neo4j dependencies. All operations are no-ops since we use vector-native
+memory for relationship storage now.
 """
+
+import logging
+from typing import Dict, List, Optional, Any
+from datetime import datetime
+
+from src.graph_database.multi_entity_models import (
+    EnhancedUserNode, EnhancedCharacterNode, AISelfNode,
+    EntityRelationship, InteractionEvent, EntityType, RelationshipType,
+    TrustLevel, FamiliarityLevel
+)
+
+logger = logging.getLogger(__name__)
+
+
+class MultiEntityRelationshipManager:
+    """
+    Stub implementation of multi-entity relationship manager.
+    All operations are no-ops since we use vector-native memory now.
+    """
+
+    def __init__(self):
+        self.logger = logger
+        self.logger.info("MultiEntityRelationshipManager initialized as vector-native stub")
+
+    async def initialize_schema(self):
+        """No-op: Schema initialization not needed for vector-native storage."""
+        self.logger.debug("Schema initialization skipped (vector-native stub)")
+
+    async def create_user_entity(self, user_data: Dict[str, Any]) -> Optional[str]:
+        """No-op: User creation handled by vector memory."""
+        self.logger.debug("User entity creation skipped (vector-native stub)")
+        return "stub_user_id"
+
+    async def get_user_entity_id_by_discord_id(self, discord_id: str) -> Optional[str]:
+        """No-op: User lookup handled by vector memory."""
+        self.logger.debug("User entity lookup skipped (vector-native stub)")
+        return "stub_user_id"
+
+    async def create_character_entity(self, character_data: Dict[str, Any], creator_user_id: Optional[str] = None) -> Optional[str]:
+        """No-op: Character creation handled by vector memory."""
+        self.logger.debug("Character entity creation skipped (vector-native stub)")
+        return "stub_character_id"
+
+    async def get_or_create_ai_self(self) -> Optional[str]:
+        """No-op: AI Self handled by vector memory."""
+        self.logger.debug("AI Self creation skipped (vector-native stub)")
+        return "stub_ai_self_id"
+
+    async def create_relationship(self, *args, **kwargs) -> bool:
+        """No-op: Relationships handled by vector memory."""
+        self.logger.debug("Relationship creation skipped (vector-native stub)")
+        return True
+
+    async def record_interaction(self, *args, **kwargs) -> bool:
+        """No-op: Interactions handled by vector memory."""
+        self.logger.debug("Interaction recording skipped (vector-native stub)")
+        return True
+
+    async def get_entity_relationships(self, entity_id: str, relationship_types: Optional[List[RelationshipType]] = None) -> List[Dict[str, Any]]:
+        """No-op: Return empty list."""
+        self.logger.debug("Entity relationships query skipped (vector-native stub)")
+        return []
+
+    async def get_user_characters(self, discord_id: str) -> List[Dict[str, Any]]:
+        """No-op: Return empty list."""
+        self.logger.debug("User characters query skipped (vector-native stub)")
+        return []
+
+    async def get_character_network(self, character_id: str) -> Dict[str, Any]:
+        """No-op: Return empty dict."""
+        self.logger.debug("Character network query skipped (vector-native stub)")
+        return {}
+
+    async def find_character_similarities(self, character_id: str, similarity_threshold: float = 0.6) -> List[Dict[str, Any]]:
+        """No-op: Return empty list."""
+        self.logger.debug("Character similarities query skipped (vector-native stub)")
+        return []
+
+    async def get_ai_self_overview(self) -> Dict[str, Any]:
+        """No-op: Return empty dict."""
+        self.logger.debug("AI Self overview query skipped (vector-native stub)")
+        return {}
+
+    async def cleanup(self):
+        """No-op: No cleanup needed for stub."""
+        self.logger.debug("Cleanup skipped (vector-native stub)")
+
+    async def create_relationship(self, relationship: EntityRelationship) -> bool:
+        """No-op: Relationships handled by vector memory."""
+        self.logger.debug("Relationship creation skipped (vector-native stub)")
+        return True
+
+    async def record_interaction(self, interaction: InteractionEvent) -> bool:
+        """No-op: Interactions handled by vector memory."""
+        self.logger.debug("Interaction recording skipped (vector-native stub)")
+        return True
+
+    async def get_user_relationships(self, user_id: str) -> List[Dict[str, Any]]:
+        """No-op: Return empty list."""
+        self.logger.debug("User relationships query skipped (vector-native stub)")
+        return []
+
+    async def get_character_relationships(self, character_id: str) -> List[Dict[str, Any]]:
+        """No-op: Return empty list."""
+        self.logger.debug("Character relationships query skipped (vector-native stub)")
+        return []
+
+    async def cleanup(self):
+        """No-op: No cleanup needed for stub."""
+        self.logger.debug("Cleanup skipped (vector-native stub)")
 
 import json
 import logging
@@ -12,7 +123,9 @@ from typing import Dict, List, Optional, Any, Tuple
 from datetime import datetime, timedelta
 import uuid
 
-from src.graph_database.neo4j_connector import Neo4jConnector, get_neo4j_connector
+# Remove Neo4j dependency - we're vector-native now!
+# from src.graph_database.neo4j_connector import Neo4jConnector, get_neo4j_connector
+
 from src.graph_database.multi_entity_models import (
     EnhancedUserNode, EnhancedCharacterNode, AISelfNode,
     EntityRelationship, InteractionEvent, EntityType, RelationshipType,

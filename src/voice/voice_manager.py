@@ -81,15 +81,11 @@ class DiscordVoiceManager:
         # Guild-specific voice states
         self.voice_states: dict[int, VoiceState] = {}
 
-        # Configuration from environment
+        # Configuration from environment - voice features always enabled in development!
         self.auto_join_enabled = os.getenv("VOICE_AUTO_JOIN", "false").lower() == "true"
-        self.voice_response_enabled = os.getenv("VOICE_RESPONSE_ENABLED", "true").lower() == "true"
-        self.voice_listening_enabled = (
-            os.getenv("VOICE_LISTENING_ENABLED", "true").lower() == "true"
-        )
-        self.voice_streaming_enabled = (
-            os.getenv("VOICE_STREAMING_ENABLED", "true").lower() == "true"
-        )
+        self.voice_response_enabled = True  # Always enabled in development
+        self.voice_listening_enabled = True  # Always enabled in development
+        self.voice_streaming_enabled = True  # Always enabled in development
         self.max_audio_length = int(os.getenv("VOICE_MAX_AUDIO_LENGTH", "30"))  # seconds
         self.response_delay = float(os.getenv("VOICE_RESPONSE_DELAY", "1.0"))  # seconds
 

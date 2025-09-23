@@ -1,249 +1,205 @@
 """
-User Preferences Management - Optimized Version
-Fast dual-storage system: PostgreSQL for structured preferences + Qdrant for semantic fallback
+LLM Tool Calling - User Preferences Management
+Vector-native user preference detection and storage using LLM tool calling system.
 """
 
 import logging
 import re
-from typing import Optional
+from typing import Optional, Dict, Any
 
 logger = logging.getLogger(__name__)
 
-# Optimized regex patterns for name detection (compiled for speed)
-NAME_PATTERNS = [
-    re.compile(r"my name is ([a-zA-Z]+)", re.IGNORECASE),
-    re.compile(r"i'm ([a-zA-Z]+)", re.IGNORECASE), 
-    re.compile(r"i am ([a-zA-Z]+)", re.IGNORECASE),
-    re.compile(r"call me ([a-zA-Z]+)", re.IGNORECASE),
-    re.compile(r"name's ([a-zA-Z]+)", re.IGNORECASE),
-    re.compile(r"you can call me ([a-zA-Z]+)", re.IGNORECASE),
-]
-
-# Fast name cache (in-memory for single session)
-_name_cache = {}
-
-
-def detect_name_introduction(message_content: str) -> Optional[str]:
-    """
-    Fast name detection using compiled regex patterns.
-    Returns detected name immediately without async operations.
-    
-    Args:
-        message_content: The user's message text
-        
-    Returns:
-        Detected name if found, None otherwise
-    """
-    if not message_content:
-        return None
-        
-    content_clean = message_content.strip()
-    
-    # Try each compiled pattern for fast matching
-    for pattern in NAME_PATTERNS:
-        match = pattern.search(content_clean)
-        if match:
-            detected_name = match.group(1).strip().title()
-            # Simple validation: name should be 2-20 chars, only letters
-            if 2 <= len(detected_name) <= 20 and detected_name.isalpha():
-                logger.info(f"Detected name introduction: '{detected_name}' from message: '{content_clean[:50]}...'")
-                return detected_name
-                
-    return None
-
-
-async def detect_name_introduction_and_store(message_content: str, user_id: str, memory_manager=None) -> Optional[str]:
-    """
-    Enhanced function that detects names AND stores them immediately.
-    Used in message processing pipeline for automatic name capture.
-    
-    Args:
-        message_content: The user's message text
-        user_id: User's ID
-        memory_manager: Memory manager instance (optional)
-        
-    Returns:
-        Detected name if found, None otherwise
-    """
-    detected_name = detect_name_introduction(message_content)
-    
-    if detected_name:
-        # Store immediately in PostgreSQL for fast future access
-        try:
-            from src.utils.postgresql_user_db import PostgreSQLUserDB
-            db = PostgreSQLUserDB()
-            await db.initialize()
-            
-            await store_user_preference(user_id, "preferred_name", detected_name, db)
-            logger.info(f"Auto-stored preferred name '{detected_name}' for user {user_id}")
-            
-            # Also cache it for this session
-            _name_cache[user_id] = detected_name
-            
-        except Exception as e:
-            logger.error(f"Failed to store detected name: {e}")
-            # Continue anyway - we detected the name even if storage failed
-            
-    return detected_name
-
-
-async def store_user_preference(user_id: str, preference_type: str, preference_value: str, db=None):
-    """
-    Store a user preference in PostgreSQL for fast access.
-    
-    Args:
-        user_id: User ID
-        preference_type: Type of preference (e.g., 'preferred_name')
-        preference_value: Value to store
-        db: Optional database instance (will create if not provided)
-    """
-    if not db:
-        from src.utils.postgresql_user_db import PostgreSQLUserDB
-        db = PostgreSQLUserDB()
-        await db.initialize()
-    
-    try:
-        # Get existing user profile or create new one
-        user_profile = await db.get_user_profile(user_id)
-        
-        if user_profile:
-            # Update existing preferences
-            preferences = user_profile.preferences or {}
-            preferences[preference_type] = preference_value
-            
-            # Update the profile
-            user_profile.preferences = preferences
-            await db.update_user_profile(user_profile)
-            
-        else:
-            # Create new user profile with preference
-            from src.utils.user_profile import UserProfile
-            new_profile = UserProfile(
-                user_id=user_id,
-                preferences={preference_type: preference_value}
-            )
-            await db.create_user_profile(new_profile)
-            
-        logger.info(f"Stored preference {preference_type}={preference_value} for user {user_id}")
-        
-        # Also cache it
-        _name_cache[user_id] = preference_value if preference_type == "preferred_name" else _name_cache.get(user_id)
-        
-    except Exception as e:
-        logger.error(f"Failed to store user preference: {e}")
-        raise
-
-
-async def get_user_preference(user_id: str, preference_type: str, db=None) -> Optional[str]:
-    """
-    Get a user preference with fast caching.
-    
-    Args:
-        user_id: User ID
-        preference_type: Type of preference to retrieve
-        db: Optional database instance
-        
-    Returns:
-        Preference value if found, None otherwise
-    """
-    # Check cache first for preferred_name
-    if preference_type == "preferred_name" and user_id in _name_cache:
-        return _name_cache[user_id]
-    
-    if not db:
-        from src.utils.postgresql_user_db import PostgreSQLUserDB
-        db = PostgreSQLUserDB()
-        await db.initialize()
-    
-    try:
-        user_profile = await db.get_user_profile(user_id)
-        if user_profile and user_profile.preferences:
-            preference_value = user_profile.preferences.get(preference_type)
-            
-            # Cache preferred names for speed
-            if preference_type == "preferred_name" and preference_value:
-                _name_cache[user_id] = preference_value
-                
-            return preference_value
-            
-    except Exception as e:
-        logger.error(f"Failed to get user preference: {e}")
-        
-    return None
-
 
 async def get_user_preferred_name(user_id: str, memory_manager=None) -> Optional[str]:
-    """
-    Get user's preferred name with optimized dual-storage approach.
+    """Get user's preferred name using vector memory search."""
+    if not memory_manager:
+        logger.debug("No memory manager available for preferred name lookup")
+        return None
     
-    Priority:
-    1. Fast cache (in-memory)
-    2. PostgreSQL (structured fast access)
-    3. Qdrant vector search (semantic fallback)
-    
-    Args:
-        user_id: User ID
-        memory_manager: Optional memory manager for vector fallback
-        
-    Returns:
-        User's preferred name if found, None otherwise
-    """
-    # 1. Check fast cache first
-    if user_id in _name_cache:
-        return _name_cache[user_id]
-    
-    # 2. Try PostgreSQL (fast structured access)
     try:
-        from src.utils.postgresql_user_db import PostgreSQLUserDB
-        db = PostgreSQLUserDB()
-        await db.initialize()
+        # Use vector search to find name-related memories
+        name_memories = await memory_manager.retrieve_relevant_memories(
+            user_id=user_id,
+            query="my name is, call me, I am, preferred name, introduce",
+            limit=10
+        )
         
-        user_profile = await db.get_user_profile(user_id)
-        if user_profile and user_profile.preferences:
-            preferred_name = user_profile.preferences.get('preferred_name')
-            if preferred_name:
-                logger.info("Retrieved preferred name from PostgreSQL for user %s: %s", user_id, preferred_name)
-                # Cache it for next time
-                _name_cache[user_id] = preferred_name
-                return preferred_name
-                
-    except Exception as e:
-        logger.warning(f"PostgreSQL lookup failed for user {user_id}: {e}")
-    
-    # 3. Fallback to vector memory search (slower but semantic)
-    if memory_manager:
-        try:
-            memories = await memory_manager.retrieve_relevant_memories(
-                user_id=user_id,
-                query="my name is",
-                limit=5
-            )
+        if not name_memories:
+            logger.debug(f"No name-related memories found for user {user_id}")
+            return None
+        
+        # Look for the most recent/relevant name information
+        # Sort memories by timestamp (most recent first) for conflict resolution
+        sorted_memories = _sort_memories_by_timestamp(name_memories)
+        
+        detected_names = []
+        for memory in sorted_memories:
+            # Check user messages for name patterns
+            if hasattr(memory, 'user_message') and memory.user_message:
+                detected_name = _extract_name_from_text(memory.user_message)
+                if detected_name:
+                    timestamp = _get_memory_timestamp(memory)
+                    detected_names.append({
+                        'name': detected_name,
+                        'timestamp': timestamp,
+                        'source': 'user_message',
+                        'raw_text': memory.user_message[:100]
+                    })
             
-            # Look for name introductions in conversation history
-            for memory in memories:
-                if hasattr(memory, 'user_message'):
-                    detected_name = detect_name_introduction(memory.user_message)
-                    if detected_name:
-                        logger.info(f"Found preferred name in vector memory: {detected_name}")
-                        
-                        # Store it in PostgreSQL for faster future access
-                        try:
-                            await store_user_preference(user_id, "preferred_name", detected_name)
-                        except Exception as store_e:
-                            logger.warning(f"Failed to store found name in PostgreSQL: {store_e}")
-                        
-                        # Cache it
-                        _name_cache[user_id] = detected_name
-                        return detected_name
-                        
-        except Exception as e:
-            logger.warning(f"Vector memory fallback failed: {e}")
+            # Check metadata for stored name information
+            if hasattr(memory, 'metadata') and memory.metadata:
+                if isinstance(memory.metadata, dict):
+                    stored_name = memory.metadata.get('preferred_name') or memory.metadata.get('user_name')
+                    if stored_name:
+                        timestamp = _get_memory_timestamp(memory)
+                        detected_names.append({
+                            'name': stored_name,
+                            'timestamp': timestamp,
+                            'source': 'metadata',
+                            'raw_text': str(memory.metadata)[:100]
+                        })
+        
+        # Return most recent name, with conflict detection logging
+        if detected_names:
+            most_recent = detected_names[0]  # Already sorted by timestamp
+            
+            # Log potential conflicts for LLM resolution
+            if len(detected_names) > 1:
+                other_names = [n['name'] for n in detected_names[1:] if n['name'] != most_recent['name']]
+                if other_names:
+                    logger.warning(f"Name conflict detected for user {user_id}: "
+                                 f"Current='{most_recent['name']}', Previous={other_names}. "
+                                 f"Using most recent. LLM conflict resolution needed.")
+            
+            logger.info(f"Found preferred name '{most_recent['name']}' for user {user_id} "
+                       f"from {most_recent['source']} (timestamp: {most_recent['timestamp']})")
+            return most_recent['name']
+        
+        logger.debug(f"No preferred name found in vector memories for user {user_id}")
+        return None
+        
+    except Exception as e:
+        logger.warning(f"Failed to retrieve preferred name from vector memory for user {user_id}: {e}")
+        return None
+
+
+def _extract_name_from_text(text: str) -> Optional[str]:
+    """Extract name from text using pattern matching."""
+    if not text:
+        return None
+    
+    # Common name introduction patterns
+    patterns = [
+        r"my name is ([a-zA-Z]+)",
+        r"i'm ([a-zA-Z]+)",
+        r"i am ([a-zA-Z]+)", 
+        r"call me ([a-zA-Z]+)",
+        r"name's ([a-zA-Z]+)",
+        r"you can call me ([a-zA-Z]+)",
+    ]
+    
+    for pattern in patterns:
+        match = re.search(pattern, text, re.IGNORECASE)
+        if match:
+            name = match.group(1).strip().title()
+            # Basic validation: 2-20 chars, letters only
+            if 2 <= len(name) <= 20 and name.isalpha():
+                return name
     
     return None
 
 
-def clear_cache():
-    """Clear the in-memory name cache (useful for testing)"""
-    global _name_cache
-    _name_cache = {}
-    logger.info("Cleared user preferences cache")
+def _sort_memories_by_timestamp(memories):
+    """Sort memories by timestamp, most recent first."""
+    def get_sort_key(memory):
+        timestamp = _get_memory_timestamp(memory)
+        if timestamp is None:
+            return 0  # Put memories without timestamps at the end
+        if isinstance(timestamp, str):
+            try:
+                from datetime import datetime
+                return datetime.fromisoformat(timestamp.replace('Z', '+00:00')).timestamp()
+            except:
+                return 0
+        elif isinstance(timestamp, (int, float)):
+            return timestamp
+        else:
+            return 0
+    
+    return sorted(memories, key=get_sort_key, reverse=True)
+
+
+def _get_memory_timestamp(memory):
+    """Extract timestamp from memory object."""
+    # Try different timestamp locations
+    if hasattr(memory, 'timestamp') and memory.timestamp:
+        return memory.timestamp
+    elif hasattr(memory, 'metadata') and memory.metadata:
+        if isinstance(memory.metadata, dict):
+            return memory.metadata.get('timestamp') or memory.metadata.get('created_at')
+    elif isinstance(memory, dict):
+        return memory.get('timestamp') or memory.get('created_at')
+    return None
+
+
+# TODO: Implement LLM tool calling for automatic preference detection and storage
+async def detect_and_store_preferences_via_llm(
+    user_id: str,
+    message_content: str,
+    memory_manager=None,
+    llm_client=None
+) -> Dict[str, Any]:
+    """
+    Future implementation: Use LLM tool calling to automatically detect and store preferences.
+    
+    This will solve the conflict resolution problem by using LLM intelligence to:
+    
+    CONFLICT RESOLUTION EXAMPLES:
+    
+    Scenario 1 - Name Correction:
+    User: "My name is Alice"  
+    [LLM stores: store_semantic_memory("User's name is Alice")]
+    
+    User: "Actually, my name is Bob, not Alice"
+    [LLM detects correction and calls: update_memory_context(
+        search_query="user name Alice", 
+        correction="User's actual name is Bob, Alice was incorrect",
+        merge_strategy="replace"
+    )]
+    
+    Scenario 2 - Name Change:
+    User: "My name is Alice"
+    [stored in memory]
+    
+    User: "I go by Bob now" 
+    [LLM detects name change and calls: store_semantic_memory(
+        "User now prefers to be called Bob (changed from Alice)",
+        importance=9,
+        tags=["name_change", "preference_update"]
+    )]
+    
+    Scenario 3 - Context-Aware Resolution:
+    User: "My name is Dr. Smith but call me John"
+    [LLM stores both: formal_name="Dr. Smith", preferred_name="John"]
+    
+    INTELLIGENT FEATURES:
+    - Detects corrections vs. changes vs. context
+    - Maintains history while prioritizing current preference
+    - Cross-references with conversation context
+    - Automatic conflict resolution based on temporal and semantic cues
+    - Learning from user feedback patterns
+    
+    Args:
+        user_id: User ID
+        message_content: The user's message content  
+        memory_manager: Memory manager instance
+        llm_client: LLM client for intelligent analysis
+        
+    Returns:
+        Dictionary containing detected preferences and actions taken
+    """
+    # TODO: Implement when LLM tool calling Phase 2 (Character Evolution Tools) is ready
+    # This will use the intelligent memory manager and vector memory tool manager
+    # to automatically detect, resolve conflicts, and store user preferences
+    logger.debug("LLM-based preference detection not yet implemented - using Phase 1 tools")
+    return {}

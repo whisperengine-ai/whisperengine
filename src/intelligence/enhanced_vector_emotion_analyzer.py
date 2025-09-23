@@ -74,8 +74,8 @@ class EnhancedVectorEmotionAnalyzer:
         """Initialize the enhanced emotion analyzer"""
         self.vector_memory_manager = vector_memory_manager
         
-        # Load configuration from environment variables
-        self.enabled = os.getenv("ENHANCED_EMOTION_ENABLED", "true").lower() == "true"
+        # Load configuration from environment variables - always enabled in development!
+        self.enabled = True  # Always enabled in development
         self.keyword_weight = float(os.getenv("ENHANCED_EMOTION_KEYWORD_WEIGHT", "0.3"))
         self.semantic_weight = float(os.getenv("ENHANCED_EMOTION_SEMANTIC_WEIGHT", "0.4"))
         self.context_weight = float(os.getenv("ENHANCED_EMOTION_CONTEXT_WEIGHT", "0.3"))

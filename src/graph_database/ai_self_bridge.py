@@ -11,7 +11,7 @@ from typing import Dict, List, Optional, Any, Tuple
 from datetime import datetime, timedelta
 import json
 
-from src.graph_database.multi_entity_manager import MultiEntityRelationshipManager
+# Multi-entity relationship management removed - using vector-native memory
 from src.graph_database.multi_entity_models import (
     EntityType, RelationshipType, TrustLevel, FamiliarityLevel
 )
@@ -33,7 +33,8 @@ class AISelfEntityBridge:
     
     def __init__(self):
         self.logger = logging.getLogger(__name__)
-        self.relationship_manager = MultiEntityRelationshipManager()
+        # Multi-entity relationship management removed - using vector-native memory
+        self.relationship_manager = None
         self.ai_self_id: Optional[str] = None
         
         # AI Self personality traits for relationship management
@@ -45,22 +46,15 @@ class AISelfEntityBridge:
             "empathetic": 0.8          # Understands emotional dynamics
         }
         
-    async def initialize(self) -> bool:
-        """Initialize the AI Self entity bridge"""
+    async def initialize(self):
+        """Initialize AI Self (stub - using vector-native memory)."""
         try:
-            # Initialize schema and get AI Self ID
-            await self.relationship_manager.initialize_schema()
-            self.ai_self_id = await self.relationship_manager.get_or_create_ai_self()
-            
-            if self.ai_self_id:
-                self.logger.info("AI Self Entity Bridge initialized with ID: %s", self.ai_self_id[:8])
-                return True
-            else:
-                self.logger.error("Failed to initialize AI Self entity")
-                return False
-                
+            # Multi-entity relationship management removed - no-op for vector-native memory
+            self.ai_self_id = "vector_ai_self"
+            self.logger.info("AISelfEntityBridge initialized as vector-native stub")
+            return True
         except Exception as e:
-            self.logger.error("Failed to initialize AI Self Entity Bridge: %s", e)
+            self.logger.error("Failed to initialize AI Self bridge: %s", e)
             return False
     
     async def introduce_character_to_user(self, 

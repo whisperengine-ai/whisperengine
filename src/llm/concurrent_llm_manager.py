@@ -113,6 +113,97 @@ class ConcurrentLLMManager:
             with self._operations_lock:
                 self._active_operations.discard(operation_id)
 
+    async def generate_with_tools(
+        self,
+        messages,
+        tools=None,
+        max_tool_iterations=3,
+        user_id=None,
+        timeout=60.0,
+        **kwargs
+    ):
+        """Thread-safe tool calling with adaptive throttling"""
+        operation_id = f"tools_{int(time.time() * 1000)}"
+
+        # Track operation
+        with self._operations_lock:
+            self._active_operations.add(operation_id)
+
+        # Apply adaptive throttling if needed
+        async with self._throttle_lock:
+            if self._rate_limit_backoff > 1.0:
+                delay = (self._rate_limit_backoff - 1.0) * 0.5
+                logger.debug(f"Applying adaptive throttling delay: {delay:.2f}s")
+                await asyncio.sleep(delay)
+
+        try:
+            # Check connection before making request
+            if not await self._check_connection_cached():
+                raise Exception("LLM connection unavailable")
+
+            # Check if base client has the tool calling method
+            if hasattr(self.base_llm_client, 'generate_with_tools'):
+                # Use the async method if available
+                def _blocking_call():
+                    return asyncio.run(self.base_llm_client.generate_with_tools(
+                        messages=messages,
+                        tools=tools,
+                        max_tool_iterations=max_tool_iterations,
+                        user_id=user_id,
+                        **kwargs
+                    ))
+            elif hasattr(self.base_llm_client, 'generate_chat_completion_with_tools'):
+                # Fallback to sync method
+                def _blocking_call():
+                    return self.base_llm_client.generate_chat_completion_with_tools(
+                        messages=messages,
+                        tools=tools,
+                        **kwargs
+                    )
+            else:
+                # No tool support - fallback to regular chat completion
+                logger.warning("Base LLM client doesn't support tool calling, falling back to regular completion")
+                def _blocking_call():
+                    return self.base_llm_client.get_chat_response(messages, **kwargs)
+
+            # Execute with timeout
+            result = await asyncio.wait_for(
+                asyncio.get_event_loop().run_in_executor(self._executor, _blocking_call),
+                timeout=timeout,
+            )
+
+            # Success - gradually reduce backoff
+            async with self._throttle_lock:
+                if self._consecutive_rate_limits > 0:
+                    self._consecutive_rate_limits = max(0, self._consecutive_rate_limits - 1)
+                    self._rate_limit_backoff = max(1.0, self._rate_limit_backoff * 0.8)
+                    if self._rate_limit_backoff <= 1.1:
+                        self._rate_limit_backoff = 1.0
+                        logger.debug("LLM rate limit backoff reset")
+
+            logger.debug(f"LLM tool call completed for operation {operation_id}")
+            return result
+
+        except TimeoutError:
+            logger.error(f"LLM tool call timed out after {timeout}s for operation {operation_id}")
+            raise
+        except Exception as e:
+            # Check if this was a rate limit error and adjust throttling
+            error_str = str(e).lower()
+            if "rate limit" in error_str or "429" in error_str or "ratelimiterror" in error_str:
+                async with self._throttle_lock:
+                    self._consecutive_rate_limits += 1
+                    self._rate_limit_backoff = min(8.0, self._rate_limit_backoff * 1.5)
+                    logger.warning(
+                        f"LLM rate limit detected, increasing backoff to {self._rate_limit_backoff:.1f}x"
+                    )
+
+            logger.error(f"LLM tool call failed for operation {operation_id}: {e}")
+            raise
+        finally:
+            with self._operations_lock:
+                self._active_operations.discard(operation_id)
+
     async def _check_connection_cached(self) -> bool:
         """Check connection with caching to avoid excessive checks"""
         now = time.time()

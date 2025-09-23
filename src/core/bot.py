@@ -38,15 +38,9 @@ from src.utils.health_monitor import HealthMonitor
 # Voice functionality import
 from src.voice.voice_protocol import create_voice_service
 
-# Redis conversation cache and profile memory cache
-try:
-    from src.memory.redis_conversation_cache import RedisConversationCache
-    from src.memory.redis_profile_memory_cache import RedisProfileAndMemoryCache
-    REDIS_CACHE_AVAILABLE = True
-except ImportError:
-    REDIS_CACHE_AVAILABLE = False
-    RedisConversationCache = None
-    RedisProfileAndMemoryCache = None
+# Redis conversation cache and profile memory cache - our own local code, always import
+from src.memory.redis_conversation_cache import RedisConversationCache
+from src.memory.redis_profile_memory_cache import RedisProfileAndMemoryCache
 
 # Graph memory availability check - REMOVED
 # Vector-native components replace previous graph relationships
@@ -54,25 +48,12 @@ GRAPH_MEMORY_AVAILABLE = False
 
 # Legacy emotion engine removed - vector-native system handles emotion analysis
 
-# Production Optimization Integration
-try:
-    from src.integration.production_system_integration import WhisperEngineProductionAdapter
+# Production Optimization Integration - our own local code, always import
+from src.integration.production_system_integration import WhisperEngineProductionAdapter
 
-    PRODUCTION_OPTIMIZATION_AVAILABLE = True
-except ImportError:
-    PRODUCTION_OPTIMIZATION_AVAILABLE = False
-    WhisperEngineProductionAdapter = None
-
-# Multi-Entity Relationship Integration
-try:
-    from src.graph_database.multi_entity_manager import MultiEntityRelationshipManager
-    from src.graph_database.ai_self_bridge import AISelfEntityBridge
-
-    MULTI_ENTITY_AVAILABLE = True
-except ImportError:
-    MULTI_ENTITY_AVAILABLE = False
-    MultiEntityRelationshipManager = None
-    AISelfEntityBridge = None
+# Multi-Entity Relationship Integration - our own local code, always import  
+# Multi-entity relationship management removed - using vector-native memory
+# AI Self bridge removed - using vector-native memory
 
 
 class DiscordBotCore:
@@ -209,6 +190,58 @@ class DiscordBotCore:
         except Exception as e:
             self.logger.debug("Memory system initialization failed: %s", str(e))
             raise
+    
+    def initialize_llm_tool_integration(self):
+        """Initialize LLM Tool Integration Manager for Phase 2 features."""
+        
+        # ALWAYS initialize LLM tool calling in development - no environment flags!
+        try:
+            # Import the factory function
+            from src.memory.memory_protocol import create_llm_tool_integration_manager
+            
+            # Check if we have required components
+            if not hasattr(self, 'memory_manager') or self.memory_manager is None:
+                self.logger.warning("Memory manager not available for LLM tool integration")
+                self.llm_tool_manager = None
+                return
+                
+            if not hasattr(self, 'llm_client') or self.llm_client is None:
+                self.logger.warning("LLM client not available for LLM tool integration")
+                self.llm_tool_manager = None
+                return
+            
+            # For now, use a simple character manager placeholder
+            # TODO: Replace with actual CDL character manager when available
+            character_manager = getattr(self, 'character_manager', None)
+            
+            # Create the LLM tool integration manager
+            self.llm_tool_manager = create_llm_tool_integration_manager(
+                self.memory_manager, 
+                character_manager,
+                self.llm_client
+            )
+            
+            if self.llm_tool_manager:
+                self.logger.info("✅ LLM Tool Integration Manager initialized successfully")
+                
+                # Log enabled features - always enabled in development!
+                features = ["Phase 1 Memory Tools", "Phase 2 Character Evolution", "Phase 2 Emotional Intelligence"]
+                self.logger.info("Available LLM Tool Categories: %s", ", ".join(features))
+                
+                # Get tools summary for logging
+                try:
+                    tools_summary = self.llm_tool_manager.get_available_tools_summary()
+                    total_tools = tools_summary.get("total_tools_available", 0)
+                    self.logger.info("Total LLM tools available: %d", total_tools)
+                except Exception as e:
+                    self.logger.debug("Could not get tools summary: %s", e)
+                    
+            else:
+                self.logger.warning("⚠️ LLM Tool Integration Manager creation returned None")
+                
+        except Exception as e:
+            self.logger.error("Failed to initialize LLM tool integration: %s", str(e))
+            self.llm_tool_manager = None
             
     # REMOVED: Legacy memory optimizer - replaced by vector-native memory system
 
@@ -314,21 +347,13 @@ class DiscordBotCore:
         # Initialize Dynamic Personality Profiler
         self.logger.info("🎭 Initializing Dynamic Personality Profiler...")
         try:
-            # Check if dynamic personality profiling is enabled
-            enable_dynamic_personality = (
-                os.getenv("ENABLE_DYNAMIC_PERSONALITY", "true").lower() == "true"
+            # Dynamic personality profiling - always enabled in development!
+            from src.intelligence.dynamic_personality_profiler import (
+                PersistentDynamicPersonalityProfiler,
             )
 
-            if enable_dynamic_personality:
-                from src.intelligence.dynamic_personality_profiler import (
-                    PersistentDynamicPersonalityProfiler,
-                )
-
-                self.dynamic_personality_profiler = PersistentDynamicPersonalityProfiler()
-                self.logger.info("✅ Dynamic personality profiler initialized (always active)")
-            else:
-                self.dynamic_personality_profiler = None
-                self.logger.info("📊 Dynamic personality profiler disabled by configuration")
+            self.dynamic_personality_profiler = PersistentDynamicPersonalityProfiler()
+            self.logger.info("✅ Dynamic personality profiler initialized (always active)")
 
         except Exception as e:
             self.logger.error(f"Failed to initialize dynamic personality profiler: {e}")
@@ -506,7 +531,7 @@ class DiscordBotCore:
 
             use_redis = os.getenv("USE_REDIS_CACHE", "true").lower() == "true"
 
-            if use_redis and REDIS_CACHE_AVAILABLE:
+            if use_redis:
                 self.logger.info("Attempting to initialize Redis-based conversation cache")
                 self.conversation_cache = RedisConversationCache(
                     cache_timeout_minutes=cache_timeout,
@@ -518,14 +543,6 @@ class DiscordBotCore:
                 self.logger.info(
                     "Redis conversation cache initialized (connection will be established on bot start)"
                 )
-            elif use_redis and not REDIS_CACHE_AVAILABLE:
-                self.logger.warning("Redis cache requested but Redis dependencies not available, falling back to in-memory cache")
-                self.conversation_cache = HybridConversationCache(
-                    cache_timeout_minutes=cache_timeout,
-                    bootstrap_limit=bootstrap_limit,
-                    max_local_messages=max_local_messages,
-                )
-                self.profile_memory_cache = None
             else:
                 self.logger.info("Using in-memory conversation cache (Redis disabled)")
                 self.conversation_cache = HybridConversationCache(
@@ -626,8 +643,8 @@ class DiscordBotCore:
         """Initialize voice functionality using the factory pattern."""
         voice_service_type = os.getenv("VOICE_SERVICE_TYPE", "discord_elevenlabs")
         
-        # Check if voice support is enabled
-        voice_support_enabled = os.getenv("VOICE_SUPPORT_ENABLED", "true").lower() == "true"
+        # Voice support always enabled in development!
+        voice_support_enabled = True
         
         if not voice_support_enabled:
             voice_service_type = "disabled"
@@ -659,79 +676,45 @@ class DiscordBotCore:
             self.voice_support_enabled = False
 
     def initialize_production_optimization(self):
-        """Initialize the production optimization system if available."""
-        enable_production_optimization = (
-            os.getenv("ENABLE_PRODUCTION_OPTIMIZATION", "true").lower() == "true"
-        )
+        """Initialize the production optimization system."""
+        try:
+            self.logger.info("Initializing production optimization system...")
 
-        if (
-            PRODUCTION_OPTIMIZATION_AVAILABLE
-            and enable_production_optimization
-            and WhisperEngineProductionAdapter is not None
-        ):
-            try:
-                self.logger.info("Initializing production optimization system...")
+            # Initialize production adapter with bot core
+            self.production_adapter = WhisperEngineProductionAdapter(bot_core=self)
 
-                # Initialize production adapter with bot core
-                self.production_adapter = WhisperEngineProductionAdapter(bot_core=self)
+            # Initialize production mode asynchronously
+            # Note: This will be called during bot startup
+            self.logger.info("✅ Production optimization adapter initialized successfully!")
+            self.logger.info("🚀 Production mode will be enabled during bot startup")
 
-                # Initialize production mode asynchronously
-                # Note: This will be called during bot startup
-                self.logger.info("✅ Production optimization adapter initialized successfully!")
-                self.logger.info("🚀 Production mode will be enabled during bot startup")
-
-            except Exception as e:
-                self.logger.error(f"Failed to initialize production optimization adapter: {e}")
-                self.logger.warning("Bot will continue with standard performance")
-                self.production_adapter = None
-        else:
-            if not enable_production_optimization:
-                self.logger.info(
-                    "Production optimization system disabled via ENABLE_PRODUCTION_OPTIMIZATION"
-                )
-            else:
-                self.logger.info("Production optimization system dependencies not available")
+        except Exception as e:
+            self.logger.error(f"Failed to initialize production optimization adapter: {e}")
+            self.logger.warning("Bot will continue with standard performance")
             self.production_adapter = None
 
     def initialize_multi_entity_system(self):
-        """Initialize the multi-entity relationship system if available."""
-        enable_multi_entity = (
-            os.getenv("ENABLE_MULTI_ENTITY_RELATIONSHIPS", "true").lower() == "true"
-        )
+        """Initialize the multi-entity relationship system."""
+        try:
+            self.logger.info("🌐 Initializing Multi-Entity Relationship System...")
 
-        if (
-            MULTI_ENTITY_AVAILABLE
-            and enable_multi_entity
-            and MultiEntityRelationshipManager is not None
-            and AISelfEntityBridge is not None
-        ):
-            try:
-                self.logger.info("🌐 Initializing Multi-Entity Relationship System...")
+            # Initialize multi-entity relationship manager
+            # Multi-entity relationship management removed - using vector-native memory
+            self.multi_entity_manager = None
 
-                # Initialize multi-entity relationship manager
-                self.multi_entity_manager = MultiEntityRelationshipManager()
+            # Note: Schema initialization will happen when first database operation is called
+            self.logger.info("📊 Multi-entity schema will be initialized on first use")
 
-                # Note: Schema initialization will happen when first database operation is called
-                self.logger.info("📊 Multi-entity schema will be initialized on first use")
+            # Initialize AI Self bridge
+            # AI Self bridge removed - using vector-native memory
+            self.ai_self_bridge = None
 
-                # Initialize AI Self bridge
-                self.ai_self_bridge = AISelfEntityBridge()
+            self.logger.info("✅ Multi-Entity Relationship System initialized successfully!")
+            self.logger.info("🎭 Characters can now be connected to users and AI Self")
 
-                self.logger.info("✅ Multi-Entity Relationship System initialized successfully!")
-                self.logger.info("🎭 Characters can now be connected to users and AI Self")
-
-            except Exception as e:
-                self.logger.error(f"Failed to initialize multi-entity relationship system: {e}")
-                self.logger.warning("Bot will continue without multi-entity features")
-                self.multi_entity_manager = None
-                self.ai_self_bridge = None
-        else:
-            if not enable_multi_entity:
-                self.logger.info(
-                    "Multi-entity relationship system disabled via ENABLE_MULTI_ENTITY_RELATIONSHIPS"
-                )
-            else:
-                self.logger.info("Multi-entity relationship system dependencies not available")
+        except Exception as e:
+            self.logger.error(f"Failed to initialize multi-entity relationship system: {e}")
+            self.logger.warning("Bot will continue without multi-entity features")
             self.multi_entity_manager = None
             self.ai_self_bridge = None
 
@@ -838,6 +821,9 @@ class DiscordBotCore:
         self.initialize_bot()
         self.initialize_llm_client()
         self.initialize_memory_system()
+        
+        # Initialize LLM Tool Integration (Phase 2)
+        self.initialize_llm_tool_integration()
 
         # Schedule async initialization of batch optimizer
         if self._needs_batch_init:
@@ -879,6 +865,7 @@ class DiscordBotCore:
             "bot": self.bot,
             "llm_client": self.llm_client,
             "memory_manager": self.memory_manager,
+            "llm_tool_manager": getattr(self, "llm_tool_manager", None),  # Phase 2 LLM Tool Integration
             "conversation_cache": self.conversation_cache,
             "image_processor": self.image_processor,
             "health_monitor": self.health_monitor,

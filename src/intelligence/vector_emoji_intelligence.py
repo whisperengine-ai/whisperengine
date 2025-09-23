@@ -85,11 +85,11 @@ class VectorEmojiIntelligence:
         self.memory_manager = memory_manager
         self.emoji_mapper = emoji_mapper or EmojiEmotionMapper()
         
-        # Read emoji configuration from environment
-        self.emoji_enabled = os.getenv("EMOJI_ENABLED", "true").lower() == "true"
+        # Read emoji configuration from environment - always enabled in development!
+        self.emoji_enabled = True  # Always enabled in development
         self.base_threshold = float(os.getenv("EMOJI_BASE_THRESHOLD", "0.4"))
         self.new_user_threshold = float(os.getenv("EMOJI_NEW_USER_THRESHOLD", "0.3"))
-        self.visual_reaction_enabled = os.getenv("VISUAL_REACTION_ENABLED", "true").lower() == "true"
+        self.visual_reaction_enabled = True  # Always enabled in development
         
         # Character-specific emoji sets
         self.character_emoji_sets = {

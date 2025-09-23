@@ -23,9 +23,9 @@ logger = logging.getLogger(__name__)
 def _create_monitoring_config_from_env() -> Dict[str, Any]:
     """Create monitoring configuration from environment variables."""
     return {
-        'enable_health_monitoring': os.getenv('ENABLE_HEALTH_MONITORING', 'true').lower() == 'true',
-        'enable_engagement_tracking': os.getenv('ENABLE_ENGAGEMENT_TRACKING', 'true').lower() == 'true',
-        'enable_error_tracking': os.getenv('ENABLE_ERROR_TRACKING', 'true').lower() == 'true',
+        'enable_health_monitoring': True,  # Always enabled in development
+        'enable_engagement_tracking': True,  # Always enabled in development
+        'enable_error_tracking': True,  # Always enabled in development
         'enable_dashboard': os.getenv('ENABLE_MONITORING_DASHBOARD', 'false').lower() == 'true',
         'dashboard': {
             'host': os.getenv('DASHBOARD_HOST', '127.0.0.1'),
