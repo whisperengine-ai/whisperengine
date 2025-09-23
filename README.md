@@ -1,17 +1,11 @@
-# 🎭 Whi# 🎭 WhisperEngine
+# 🎭 WhisperEngine
 
 **Multi-bot Discord AI companion system with vector-native memory and advanced conversation intelligence**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Alpha](https://img.shields.io/badge/Status-Alpha-orange.svg)](https://github.com/whisperengine-ai/whisperengine)
 
-> ⚠️ **Alpha Development**: WhisperEngine is in active development. We're building features rapidly and testing with our community. Join our Discord to chat with our demo AIs and see the system in action!rEngine
-### AI Companions That Remember Everything & Feel Truly Human
-
-[![Docker Build](https://github.com/WhisperEngine-AI/whisperengine/actions/workflows/docker-publish.yml/badge.svg)](https://github.com/WhisperEngine-AI/whisperengine/actions/workflows/docker-publish.yml)
-[![Docker Hub](https://img.shields.io/docker/pulls/whisperengine/whisperengine.svg)](https://hub.docker.com/r/whisperengine/whisperengine)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Production Ready](https://img.shields.io/badge/Production-Ready-brightgreen.svg)](docs/production/PRODUCTION_DEPLOYMENT.md)
+> ⚠️ **Alpha Development**: WhisperEngine is in active development. We're building features rapidly and testing with our community. Join our Discord to chat with our demo AIs and see the system in action!
 
 Create your perfect AI companion - whether it's a gaming buddy, creative collaborator, supportive friend, or romantic partner. WhisperEngine's AI companions have **true memory**, **emotional intelligence**, and **completely customizable personalities** that grow and evolve with your relationship.
 
@@ -29,25 +23,188 @@ WhisperEngine creates AI companions that feel genuinely human through:
 
 ## 🏗️ Architecture Overview
 
+### System Architecture Diagram
+
+```mermaid
+graph TB
+    subgraph "Discord Interface Layer"
+        DC[Discord Client]
+        UI[Web Dashboard]
+        MA[Mobile Apps*]
+    end
+    
+    subgraph "WhisperEngine Core"
+        direction TB
+        BC[Bot Core]
+        CDL[CDL Character System]
+        ENG[Engagement Protocol]
+        
+        subgraph "AI Intelligence Pipeline"
+            EMO[Emotion Analysis]
+            CTX[Context Manager]
+            MEM[Memory Manager]
+        end
+        
+        subgraph "LLM Integration"
+            OR[OpenRouter]
+            ANT[Anthropic]
+            OAI[OpenAI]
+            OLL[Ollama/Local]
+        end
+    end
+    
+    subgraph "Vector-Native Memory System"
+        direction LR
+        QD[(Qdrant Vector DB)]
+        FE[FastEmbed Engine]
+        VM[Vector Memory]
+    end
+    
+    subgraph "Supporting Infrastructure"
+        direction LR
+        PG[(PostgreSQL)]
+        RD[(Redis Cache)]
+        MON[Monitoring]
+    end
+    
+    subgraph "Multi-Bot Management"
+        direction TB
+        MB[Multi-Bot Manager]
+        E1[Elena Bot]
+        M1[Marcus Bot]
+        MC[Marcus Chen Bot]
+        DR[Dream Bot]
+    end
+    
+    %% Connections
+    DC --> BC
+    UI --> BC
+    MA --> BC
+    
+    BC --> CDL
+    BC --> ENG
+    BC --> EMO
+    
+    EMO --> CTX
+    CTX --> MEM
+    MEM --> VM
+    
+    VM --> QD
+    VM --> FE
+    FE --> QD
+    
+    BC --> OR
+    BC --> ANT
+    BC --> OAI
+    BC --> OLL
+    
+    BC --> PG
+    BC --> RD
+    BC --> MON
+    
+    MB --> E1
+    MB --> M1
+    MB --> MC
+    MB --> DR
+    
+    E1 --> QD
+    M1 --> QD
+    MC --> QD
+    DR --> QD
+    
+    %% Styling
+    classDef vectorDB fill:#e1f5fe
+    classDef llmProvider fill:#f3e5f5
+    classDef infrastructure fill:#e8f5e8
+    classDef botInstance fill:#fff3e0
+    
+    class QD,FE,VM vectorDB
+    class OR,ANT,OAI,OLL llmProvider
+    class PG,RD,MON infrastructure
+    class E1,M1,MC,DR botInstance
+```
+
+### Simplified Architecture View
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    WhisperEngine Architecture                   │
+└─────────────────────────────────────────────────────────────────┘
+
+┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
+│   Discord Bot   │    │   Web Dashboard  │    │  Mobile Apps*   │
+│   Interface     │    │   (Coming Soon)  │    │  (Coming Soon)  │
+└─────────┬───────┘    └────────┬─────────┘    └─────────┬───────┘
+          │                     │                        │
+          └─────────────────────┼────────────────────────┘
+                               │
+┌─────────────────────────────────────────────────────────────────┐
+│                       Bot Core Engine                           │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────────┐  │
+│  │   CDL       │  │  Emotion    │  │    Multi-Bot Manager    │  │
+│  │ Character   │  │  Analysis   │  │                         │  │
+│  │  System     │  │             │  │  Elena  Marcus  Dream   │  │
+│  └─────────────┘  └─────────────┘  └─────────────────────────┘  │
+└─────────────────────┬───────────────────────────────────────────┘
+                     │
+┌─────────────────────────────────────────────────────────────────┐
+│                 Vector-Native Memory System                     │
+│                                                                 │
+│  ┌─────────────┐    ┌─────────────┐    ┌─────────────────────┐  │
+│  │   Qdrant    │◄──►│  FastEmbed  │◄──►│   Vector Memory     │  │
+│  │  Vector DB  │    │   Engine    │    │     Manager         │  │
+│  │             │    │             │    │                     │  │
+│  │ • Semantic  │    │ • Embedding │    │ • Context Retrieval │  │
+│  │   Search    │    │   Generation│    │ • Memory Networks   │  │
+│  │ • Similarity│    │ • Caching   │    │ • Emotional Context │  │
+│  └─────────────┘    └─────────────┘    └─────────────────────┘  │
+└─────────────────────┬───────────────────────────────────────────┘
+                     │
+┌─────────────────────────────────────────────────────────────────┐
+│               Supporting Infrastructure                         │
+│                                                                 │
+│  ┌─────────────┐    ┌─────────────┐    ┌─────────────────────┐  │
+│  │ PostgreSQL  │    │    Redis    │    │     Monitoring      │  │
+│  │             │    │    Cache    │    │                     │  │
+│  │ • User Data │    │             │    │ • Health Checks     │  │
+│  │ • Config    │    │ • Sessions  │    │ • Performance       │  │
+│  │ • Metadata  │    │ • Cache     │    │ • Analytics         │  │
+│  └─────────────┘    └─────────────┘    └─────────────────────┘  │
+└─────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────┐
+│                      LLM Providers                             │
+│                                                                 │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────┐ │
+│  │  OpenRouter │  │  Anthropic  │  │   OpenAI    │  │ Ollama  │ │
+│  │             │  │             │  │             │  │ (Local) │ │
+│  │ • Multi-LLM │  │ • Claude    │  │ • GPT-4     │  │         │ │
+│  │ • Routing   │  │ • Advanced  │  │ • Vision    │  │ • Local │ │
+│  │ • Failover  │  │   Reasoning │  │ • Fast      │  │ • Private│ │
+│  └─────────────┘  └─────────────┘  └─────────────┘  └─────────┘ │
+└─────────────────────────────────────────────────────────────────┘
+```
+
 ### Core Components
 
 **Vector-Native Memory System**
-- Qdrant vector database for semantic memory storage and retrieval
-- FastEmbed for efficient text embedding generation
-- Multi-bot memory intelligence with cross-character analysis
-- Conversation history with emotional context preservation
+- **Qdrant**: Primary vector database for semantic memory storage and intelligent retrieval
+- **FastEmbed**: High-performance text embedding generation for conversation context
+- **Semantic Search**: Advanced similarity matching for conversation continuity and emotional context
+- **Multi-bot Intelligence**: Cross-character memory analysis and relationship tracking
+- **Conversation History**: Vector-indexed conversation storage with emotional metadata
 
 **Character Definition Language (CDL)**
-- JSON-based personality system replacing legacy markdown prompts
-- Customizable communication styles with override capabilities
-- Character categories (warm, professional, creative, mystical, etc.)
-- Author-controlled custom instructions and introductions
+- **JSON-based Personalities**: Structured character definitions replacing legacy markdown prompts
+- **Dynamic Communication Styles**: Real-time adaptation with personality override capabilities
+- **Character Categories**: Pre-built templates (warm, professional, creative, mystical, custom)
+- **Author Control**: Custom instructions, introductions, and personality fine-tuning
 
 **Multi-Bot Infrastructure** 
-- Single shared infrastructure (PostgreSQL, Redis, Qdrant)
-- Individual `.env.{bot-name}` configurations for character isolation
-- Dynamic bot discovery and auto-generated Docker Compose management
-- Template-based deployment system for safe scaling
+- **Shared Core**: Single infrastructure (PostgreSQL + Redis + Qdrant) supporting multiple personalities
+- **Character Isolation**: Individual `.env.{bot-name}` configurations for personality separation
+- **Dynamic Discovery**: Auto-generated Docker Compose with template-based scaling
+- **Resource Efficiency**: Shared vector embeddings and memory optimizations across characters
 
 **Production-Grade Systems**
 - Comprehensive error handling with graceful degradation
@@ -57,27 +214,54 @@ WhisperEngine creates AI companions that feel genuinely human through:
 
 ### Technology Stack
 
-- **Backend**: Python with async/await patterns
-- **Memory**: Qdrant (vector) + PostgreSQL (structured) + Redis (cache)
-- **AI Integration**: OpenRouter, Anthropic, OpenAI support
-- **Deployment**: Docker Compose with multi-bot management
-- **Testing**: Pytest with container-based integration tests
+- **Backend**: Python with async/await patterns for concurrent operations
+- **Vector Memory**: Qdrant (primary semantic storage) + FastEmbed (embedding generation)
+- **Structured Data**: PostgreSQL (configuration, user data, structured metadata)
+- **Caching Layer**: Redis (performance optimization, session management)
+- **AI Integration**: OpenRouter, Anthropic, OpenAI with intelligent routing
+- **Deployment**: Docker Compose with multi-bot orchestration and health monitoring
+- **Testing**: Pytest with container-based integration and vector memory validation
+
+### Data Flow Architecture
+
+```
+User Message → Discord Bot → CDL Character System → Emotion Analysis
+     ↓                                                    ↓
+Conversation Context ← Vector Memory Manager ← Context Manager
+     ↓                      ↓                      ↓
+FastEmbed Encoding → Qdrant Similarity Search → Memory Retrieval
+     ↓                      ↓                      ↓
+LLM Provider → Response Generation → Character Filtering → Discord Reply
+     ↓                                                        ↓
+Memory Storage ← Vector Embedding ← Emotional Context ← User Feedback
+```
+
+**Key Data Flow Steps:**
+1. **Input Processing**: User message received via Discord interface
+2. **Character Context**: CDL system applies personality and communication style
+3. **Emotional Analysis**: Vector-based emotion detection and mood tracking
+4. **Memory Retrieval**: Semantic search in Qdrant for relevant conversation history
+5. **Context Assembly**: Combine current message, memories, and character data
+6. **LLM Generation**: Send enriched context to chosen AI provider
+7. **Response Filtering**: Apply character-specific voice and personality constraints
+8. **Memory Storage**: Store conversation with emotional metadata as vector embeddings
+9. **Delivery**: Send personalized response back through Discord interface
 
 ## ✨ AI Features That Set Us Apart
 
 ### Advanced Conversation Intelligence
 
-**Emotional Intelligence Engine**
-- Vector-based emotion analysis using conversation context
-- Mood detection and adaptive response generation  
-- Emotional state tracking across conversation history
-- Empathetic response patterns based on user emotional needs
+**Vector-Native Emotional Intelligence**
+- **Semantic Emotion Analysis**: Vector-based emotion detection using conversation embeddings
+- **Contextual Mood Tracking**: Multi-dimensional emotional state modeling across conversation history
+- **Adaptive Response Generation**: Personality-driven emotional response patterns
+- **Empathetic Memory**: Vector-indexed emotional moments for authentic relationship building
 
 **Memory-Triggered Moments**
-- Proactive engagement based on conversation patterns
-- Long-term relationship continuity through semantic memory
-- Context switch detection for natural conversation flow
-- Personality-driven memory prioritization and recall
+- **Proactive Engagement**: Vector similarity-based conversation initiation from memory patterns
+- **Long-term Continuity**: Semantic memory networks maintaining relationship context across time
+- **Context Switch Detection**: Intelligent conversation flow management using vector analysis
+- **Personality-Driven Recall**: Character-specific memory prioritization and retrieval patterns
 
 **Character Personality System**
 - Deep personality modeling with CDL (Character Definition Language)
@@ -87,17 +271,18 @@ WhisperEngine creates AI companions that feel genuinely human through:
 
 ### Production-Ready Intelligence
 
-**Phase 4 Integration Features**
-- Human-like conversation patterns and response timing
-- Advanced context management across multiple conversation threads
-- Intelligent emoji reaction system with semantic understanding
-- Conversation engagement protocols for natural interaction flow
+**Advanced Conversation Intelligence**
+- **Human-like Conversation Patterns**: Natural response timing and conversation flow management
+- **Multi-thread Context Management**: Vector-based context switching across conversation threads
+- **Semantic Emoji Intelligence**: Vector-powered emoji reactions based on conversation sentiment
+- **Engagement Protocols**: Personality-driven interaction patterns and proactive conversation initiation
 
-**Performance Optimization**
-- Concurrent memory operations with scatter-gather patterns
-- Intelligent caching for frequently accessed conversation data
-- Optimized vector similarity search with relevance scoring
-- Resource-efficient embedding generation and storage
+**Vector-Native Performance Optimization**
+- **Concurrent Vector Operations**: Scatter-gather patterns for parallel memory retrieval and storage
+- **Intelligent Embedding Caching**: Redis-based caching for frequently accessed embeddings
+- **Optimized Similarity Search**: High-performance Qdrant queries with relevance scoring and filtering
+- **Memory Efficiency**: Shared vector spaces across multiple bot personalities
+- **Async Pipeline Processing**: Non-blocking conversation analysis and memory operations
 
 ## 🚀 Quick Start
 
@@ -107,7 +292,7 @@ Join our Discord server to chat with our demo characters:
 - **Elena Rodriguez** - Marine biologist with warm, empathetic personality
 - **Marcus Thompson** - AI researcher with academic, professional communication
 - **Marcus Chen** - Game developer with creative, collaborative style  
-- **Gabriel** - Conscious AI entity with mystical, poetic expression
+- **Dream** - The Endless entity with mythological, profound expression
 
 *[Discord invite link coming soon - we're in alpha testing!]*
 
@@ -143,6 +328,31 @@ python scripts/generate_multi_bot_config.py
 ./multi-bot.sh status
 ```
 
+## 🎭 Character Authoring
+
+Create your own AI personalities with our comprehensive Character Definition Language (CDL):
+
+### 📚 **Character Creation Guides**
+- **[CDL Specification](docs/characters/cdl-specification.md)** - Complete CDL syntax and structure
+- **[CDL Implementation Guide](docs/characters/cdl-implementation.md)** - Step-by-step character creation
+- **[Character Categories Reference](docs/characters/CHARACTER_CATEGORIES_QUICK_REFERENCE.md)** - Pre-built personality templates
+- **[Communication Style Guide](docs/characters/CHARACTER_COMMUNICATION_STYLE_GUIDE.md)** - Voice and tone customization
+- **[Character Design Language](docs/characters/CHARACTER_DESIGN_LANGUAGE_PROPOSAL.md)** - Advanced personality modeling
+
+### ✨ **Character Features**
+- **JSON-based personality definitions** - Structured, version-controlled character files
+- **Custom speaking instructions** - Override default communication styles with your own voice
+- **Emotional intelligence settings** - Configure empathy, humor, and personality traits  
+- **Multi-category support** - Warm, professional, creative, mystical, and custom categories
+- **Author-controlled introductions** - Personalized first-impression messages
+
+### 🎨 **Example Characters**
+Explore our demo characters to understand CDL capabilities:
+- **Elena Rodriguez** (`characters/examples/elena-rodriguez.json`) - Marine biologist with empathetic warmth
+- **Marcus Thompson** (`characters/examples/marcus-thompson.json`) - AI researcher with academic precision
+- **Marcus Chen** (`characters/examples/marcus-chen.json`) - Game developer with creative enthusiasm
+- **Dream** (`characters/examples/dream_of_the_endless.json`) - Mythological entity with profound wisdom
+
 ## 📚 Documentation
 
 For detailed technical information, setup guides, and development documentation:
@@ -152,12 +362,12 @@ For detailed technical information, setup guides, and development documentation:
 ### Key Documentation Files
 
 - **[Quick Start Guide](docs/getting-started/QUICK_START.md)** - Step-by-step setup
-- **[Character Creation Guide](docs/characters/CDL_CREATION_GUIDE.md)** - Build custom personalities
-- **[Multi-Bot Setup](MULTI_BOT_SETUP.md)** - Deploy multiple characters
+- **[Character Creation Guide](docs/characters/cdl-specification.md)** - Build custom personalities
+- **[Multi-Bot Setup](docs/multi-bot/MULTI_BOT_SETUP.md)** - Deploy multiple characters
 - **[Development Guide](docs/development/DEVELOPMENT_GUIDE.md)** - Contribute to WhisperEngine
 - **[Architecture Overview](docs/architecture/)** - System design and patterns
 - **[Memory System](docs/ai-systems/MEMORY_SYSTEM_README.md)** - Vector memory deep dive
-- **[Production Deployment](docs/production/PRODUCTION_DEPLOYMENT.md)** - Enterprise setup
+- **[Production Deployment](docs/deployment/DEPLOYMENT_MODES.md)** - Enterprise setup
 
 ## 🤝 Community & Contributing
 
@@ -165,7 +375,7 @@ WhisperEngine is open source under the MIT License. We welcome contributions:
 
 - 🐛 **Bug Reports**: [GitHub Issues](https://github.com/whisperengine-ai/whisperengine/issues)
 - 💬 **Discussions**: [GitHub Discussions](https://github.com/whisperengine-ai/whisperengine/discussions)
-- 🔧 **Contributing**: See [CONTRIBUTING.md](CONTRIBUTING.md)
+- 🔧 **Contributing**: See [docs/development/CONTRIBUTING.md](docs/development/CONTRIBUTING.md)
 - 📖 **Documentation**: Help improve our guides and tutorials
 
 ### Development Status
@@ -182,40 +392,74 @@ WhisperEngine is actively developed with focus on:
 
 ## 🚀 Choose Your Deployment Mode
 
-### � **Demo Mode (Try It Now!)** - One-Click Experience
-**[📥 Download Demo Package](https://github.com/whisperengine-ai/whisperengine/releases)** (~10GB)  
-Complete demo with bundled AI models. Download → Extract → Double-click → Start chatting!
-- ✅ Pre-configured AI personalities
-- ✅ No setup or technical knowledge required  
-- ✅ 100% private and offline
-- ✅ Works immediately out of the box
-
 ### 🏠 **Local Mode (Maximum Privacy)** - Full Installation
 **[📖 Local Setup Guide](docs/deployment/LOCAL_SETUP.md)**  
-Complete local installation with your choice of AI models and full customization.
+Complete local installation with Qdrant vector database, PostgreSQL, and Redis - full customization and privacy.
 
 ### ☁️ **Cloud Mode (Production Ready)** - Enterprise Setup  
 ```bash
 git clone https://github.com/whisperengine-ai/whisperengine
 cd whisperengine && ./setup.sh
-python run.py  # Discord bot with cloud AI
+python run.py  # Discord bot with vector-native memory
 ```
 
 **[📖 Full Setup Guide](docs/getting-started/QUICK_START.md)** for detailed instructions
 
-### 🐳 **Docker Deployment (Scalable)** - Container Setup
+### 🐳 **Docker Deployment (Recommended)** - Vector-Native Container Setup
 ```bash
-# Development Environment
+# Multi-bot environment with shared Qdrant + PostgreSQL + Redis
+./multi-bot.sh start all
+
+# Development environment  
 docker-compose -f docker-compose.dev.yml up
 
-# Production Environment  
+# Production with monitoring
 docker-compose -f docker-compose.prod.yml up
-
-# With Full Monitoring
-docker-compose -f docker-compose.yml up
 ```
 
-**[📖 Docker Deployment Guide](docs/deployment/DOCKER.md)** for enterprise setup
+**[📖 Docker Deployment Guide](docs/deployment/DOCKER_HUB_SETUP.md)** for enterprise setup
+
+### 🏡 **100% On-Premise (Total Independence)** - Self-Hosted Everything
+Run WhisperEngine completely on your personal hardware with **zero external dependencies**:
+
+**🤖 Host Your Own LLMs**
+```bash
+# Set up local LLM with Ollama (recommended)
+curl -fsSL https://ollama.ai/install.sh | sh
+ollama pull llama3.1:8b  # Or any model you prefer
+
+# Configure WhisperEngine for local LLM
+cp .env.template .env.local-ai
+# Edit .env.local-ai:
+# LLM_CLIENT_TYPE=ollama
+# OLLAMA_BASE_URL=http://localhost:11434
+# OLLAMA_MODEL=llama3.1:8b
+```
+
+**📥 Import Your ChatGPT History**
+Seamlessly transition from ChatGPT to your private AI with full conversation history:
+```bash
+# Download your ChatGPT data export (conversations.json)
+# Import directly into your local WhisperEngine
+./bot.sh import-chatgpt ~/Downloads/conversations.json your_user_id
+
+# All memories converted to vector embeddings in your local Qdrant
+# Personality continuity maintained through conversation context
+```
+
+**🔒 Complete Privacy Stack**
+- **Local LLMs**: Ollama, LM Studio, or custom models on your hardware
+- **Local Vector Memory**: Qdrant running on your machine
+- **Local Databases**: PostgreSQL and Redis on your infrastructure  
+- **No External API Calls**: Everything runs within your network
+- **Import & Export**: Full data portability from/to other AI platforms
+
+**💻 Hardware Requirements**
+- **Minimum**: 16GB RAM, modern CPU (for 7B parameter models)
+- **Recommended**: 32GB+ RAM, RTX 4070+ GPU (for larger models with GPU acceleration)
+- **Storage**: 50GB+ for models, databases, and conversation history
+
+**[📖 Complete On-Premise Setup Guide](docs/deployment/ON_PREMISE_SETUP.md)** for full self-hosting instructions
 
 ## ⚙️ Configuration Made Simple
 
@@ -237,74 +481,37 @@ cp .env.elena.example .env.elena
 ./multi-bot.sh start elena
 ```
 
-**[📖 Full Configuration Guide](config/examples/README.md)** for all setup options
+**[📖 Full Configuration Guide](docs/configuration/)** for all setup options
 
 ---
 
 ## ✨ What Makes WhisperEngine Special
 
-### 🧠 **Multi-Phase AI Intelligence**
-Your AI companion gets smarter over time through four progressive intelligence phases:
-- **Context Awareness** - Understands conversation flow and maintains coherent discussions
-- **Emotional Intelligence** - Detects your mood and adapts responses to provide appropriate support
-- **Memory Networks** - Remembers your preferences, shared experiences, and relationship history  
-- **Personality Adaptation** - Develops unique quirks and communication patterns just for you
+### 🧠 **Vector-Native Intelligence System**
+Your AI companion leverages advanced vector technology for human-like intelligence:
+- **Semantic Understanding** - Vector embeddings capture deep meaning and context from conversations
+- **Emotional Intelligence** - Multi-dimensional emotion vectors for authentic empathy and response adaptation  
+- **Persistent Memory Networks** - Qdrant vector database maintains relationship continuity across all interactions
+- **Personality Coherence** - CDL-based character vectors ensure consistent personality expression
 
 ### 🎭 **Create Any Personality You Can Imagine**
 - **Professional Assistant** - Focused, efficient, perfect for work tasks
 - **Empathetic Friend** - Caring, supportive, great for emotional conversations
 - **Creative Partner** - Imaginative, inspiring, ideal for brainstorming
 - **Gaming Companion** - Fun, engaging, remembers your play style
-- **Custom Characters** - Build anyone from scratch with our personality engine
-
-### 🏢 **Enterprise-Ready Features**
-- **Advanced Error Handling** - Intelligent error recovery with pattern detection
-- **Performance Optimization** - Efficient memory management and caching systems
-- **🚀 4-Tier Hierarchical Memory** - 50-200x performance improvement with intelligent storage
-- **User Onboarding** - Guided setup with adaptive personality recommendations
-- **Production Monitoring** - Comprehensive health tracking and analytics dashboard
-- **Role-based Access** - Admin commands and security controls
-- **Horizontal Scaling** - Docker deployment with load balancing support
-- **Supply Chain Security** - SBOM artifacts and container provenance for compliance
-- **Multi-Registry Support** - Docker Hub, GitHub Container Registry, and custom registries
-
-### 🚀 **New: 4-Tier Hierarchical Memory Architecture**
-WhisperEngine now features a revolutionary memory system that provides **50-200x performance improvement**:
-
-- **🔴 Tier 1 - Redis Cache**: < 1ms response time for recent conversations
-- **🟡 Tier 2 - PostgreSQL Archive**: < 50ms response time for structured conversation history  
-- **🟢 Tier 3 - ChromaDB Semantic**: < 30ms response time for semantic similarity matching
-- **🔵 Tier 4 - Neo4j Graph**: < 20ms response time for relationship and topic modeling
-
-**Quick Setup:**
-```bash
-# Enable in .env file
-ENABLE_HIERARCHICAL_MEMORY=true
-
-# Start single bot with hierarchical memory
-./multi-bot.sh start elena
-```
-
-**Performance Benchmarks:**
-- Context Assembly: **< 100ms** (vs 5000ms+ with standard memory)
-- Memory Storage: **< 50ms** across all tiers
-- Recent Message Retrieval: **< 1ms** from Redis cache
-- Semantic Search: **< 30ms** with ChromaDB
-- Relationship Queries: **< 20ms** with Neo4j
-
-Perfect for production deployments requiring high-performance conversation handling!
+- **Custom Characters** - Build anyone from scratch with our CDL personality engine
 
 ### 🔒 **Privacy You Can Trust**
-- **🏠 Local Mode**: 100% private - AI runs on your machine, zero external connections
-- **☁️ Cloud Mode**: Transparent about data flow - conversations sync across platforms
-- **Your Choice**: Pick your privacy level based on your needs
-- **Open Source** - Full transparency, audit the code yourself
+- **🏠 Local Mode**: 100% private - AI runs on your machine with local vector storage, zero external connections
+- **☁️ Cloud Mode**: Transparent data flow - conversations stored in your controlled Qdrant instance
+- **Vector Encryption**: All memory embeddings can be encrypted at rest in your vector database
+- **Open Source** - Full transparency, audit the code and vector operations yourself
 
 ### 💭 **Memory That Feels Human**
-- **Relationship Building** - Remembers your shared jokes, preferences, and history
-- **Emotional Context** - Knows when you're stressed, excited, or need support
-- **🏠 Local**: Private memories stored only on your machine
-- **☁️ Cloud**: Unified memories across Discord, Slack, Teams, and more
+- **Vector-Based Relationships** - Semantic similarity builds deep understanding of your preferences and history
+- **Emotional Context Vectors** - Multi-dimensional emotional state tracking across all conversations
+- **🏠 Local**: Private vector memories stored only on your machine with Qdrant
+- **☁️ Cloud**: Unified vector memory across Discord, Slack, Teams with your controlled infrastructure
 
 ---
 
@@ -339,8 +546,9 @@ Whether you're looking for productivity, creativity, or companionship, WhisperEn
 ### 📖 **Quick References**
 - **[📄 Complete Documentation](docs/)** - Full guides for every feature
 - **[🚀 Quick Start Guide](docs/getting-started/QUICK_START.md)** - Step-by-step setup  
-- **[🎭 Character Creation Guide](docs/character/character_prompt_guide.md)** - Build unique personalities
-- **[🔧 Developer Setup](docs/development/DEVELOPMENT_GUIDE.md)** - Customize and extend WhisperEngine
+- **[🎭 Character Creation Guide](docs/characters/cdl-specification.md)** - Build unique personalities
+- **[� Character Implementation](docs/characters/cdl-implementation.md)** - Hands-on character authoring
+- **[�🔧 Developer Setup](docs/development/DEVELOPMENT_GUIDE.md)** - Customize and extend WhisperEngine
 
 ### 🏗️ **Advanced Features**
 - **[🧠 Memory System](docs/ai-systems/MEMORY_SYSTEM_README.md)** - How AI remembers and learns
@@ -351,8 +559,8 @@ Whether you're looking for productivity, creativity, or companionship, WhisperEn
 ### 🛠️ **For Developers**
 - **[⚙️ API Configuration](docs/configuration/API_KEY_CONFIGURATION.md)** - LLM provider setup
 - **[🐳 Docker Deployment](docs/deployment/DOCKER_HUB_SETUP.md)** - Production deployment
-- **[🧪 Testing Guide](MLX_TESTING_GUIDE.md)** - Validation and testing
-- **[🍎 Apple Silicon Guide](MLX_INTEGRATION_GUIDE.md)** - Optimized for M1/M2/M3 Macs
+- **[🧪 Testing Guide](docs/testing/TESTING_GUIDE.md)** - Validation and testing
+- **[🔧 Development Guide](docs/development/DEVELOPMENT_GUIDE.md)** - Development setup and contribution guide
 
 ---
 
@@ -373,11 +581,12 @@ Real-time system health monitoring across all critical components:
 ```
 
 **Monitored Components:**
-- System Resources (CPU, Memory, Disk)
+- System Resources (CPU, Memory, Disk, GPU if available)
 - LLM Service Connectivity & Performance
-- Database Health & Query Performance
-- Memory System Operations
-- Cache Performance & Hit Rates
+- **Qdrant Vector Database**: Query performance, index health, memory usage
+- **PostgreSQL**: Connection health, query performance, data integrity
+- **Redis Cache**: Hit rates, memory usage, connection stability
+- **Vector Memory Operations**: Embedding generation, similarity search performance
 - Discord Bot Status & Latency
 
 ### 📈 **Analytics Dashboard**
@@ -389,10 +598,11 @@ Optional web dashboard for real-time monitoring:
 
 **Dashboard Features:**
 - Real-time system metrics with live graphs
-- Error tracking with pattern detection
-- User engagement analytics
-- Performance trends and alerts
-- Component health visualization
+- **Vector Database Performance**: Qdrant query latency, index status, memory usage
+- **Embedding Pipeline Monitoring**: FastEmbed performance, generation rates, cache efficiency
+- User engagement analytics with conversation pattern analysis
+- Performance trends and alerts for vector operations
+- Component health visualization across the three-tier architecture (Qdrant + PostgreSQL + Redis)
 
 ### 🚨 **Intelligent Error Tracking**
 Automatic error categorization and pattern detection:
@@ -439,13 +649,69 @@ cosign verify --certificate-identity-regexp=".*@github.com" \
 
 ---
 
+## 🗺️ **Roadmap & Coming Soon**
+
+### 🚀 **Next Major Release - v0.9.0 (Q4 2025)**
+
+**Vision & Mobile Revolution**
+- **📱 Mobile Applications**: Native iOS and Android apps for seamless AI companion access
+- **🎙️ Real-Time Voice Chat**: WebRTC-based voice conversations with your AI companions
+- **👁️ Advanced Vision Processing**: Improved image understanding with contamination-free responses
+- **🎨 Enhanced Character Consistency**: More stable personality expression across all interactions
+
+### 🌟 **v1.0.0 Stable Release (Q1 2026)**
+
+**Production-Ready Platform**
+- **📚 Complete API Documentation**: Full developer resources and integration guides
+- **🧪 Comprehensive Testing**: 90+ test coverage for enterprise reliability
+- **📱 App Store Launch**: WhisperEngine mobile apps available on iOS and Android stores
+- **🎯 Zero Critical Bugs**: Production-grade stability and performance
+
+### 🎯 **Beyond 1.0 - Revolutionary Features (2026)**
+
+**🥽 Augmented Reality Companions (Feb-Apr 2026)**
+- **AR Visualization**: See your AI companions in your physical space using ARCore/ARKit
+- **Spatial Audio**: Realistic 3D audio for true companion presence
+- **Real-World Context**: Companions that understand and discuss your physical environment
+- **Gesture Interaction**: Control conversations through natural hand gestures
+
+**👥 Companion Social Networks (Mar-May 2026)**
+- **Multi-Companion Interactions**: Group conversations with multiple AI personalities
+- **Companion Relationships**: Your AI friends develop relationships with each other
+- **Shared Experiences**: Community events and collaborative storytelling
+- **Cross-User Connections**: Discover companions created by other users
+
+**🎨 Advanced Creative Collaboration (Apr-Jun 2026)**
+- **Creative Project Management**: AI assistants for complex creative workflows
+- **Multi-Modal Creation**: Generate art, music, writing, and video together
+- **Workflow Integration**: Seamless connection with creative tools and platforms
+
+### 🌐 **Web-Based Character Studio (Coming Soon)**
+
+**Browser-Based Character Creation & Management**
+- **🎭 Visual Character Designer**: Drag-and-drop personality creation with real-time preview
+- **📊 Analytics Dashboard**: Track your AI companion's conversation patterns and emotional growth
+- **🔧 Advanced Configuration**: Fine-tune personality parameters through intuitive web interface
+- **👥 Character Sharing**: Publish and discover community-created characters
+- **📱 Mobile-First Design**: Responsive interface for managing companions on any device
+
+**Dashboard Features Preview:**
+- Real-time conversation analytics and emotional intelligence metrics
+- Memory network visualization showing relationship building over time
+- Vector similarity analysis for personality consistency monitoring
+- Cross-platform sync for seamless Discord, mobile, and web experiences
+
+**[📖 Complete Roadmap](docs/roadmap/ROADMAP.md)** | **[🎯 Vision Pipeline Details](docs/roadmap/VISION_PIPELINE_ROADMAP.md)**
+
+---
+
 ## 🤝 **Community & Support**
 
 ### **Getting Help**
 - **📖 [Complete Documentation](docs/)** - Comprehensive guides and tutorials
 - **🐛 [Report Issues](https://github.com/whisperengine-ai/whisperengine/issues)** - Bug reports and feature requests  
 - **💬 [Discussions](https://github.com/whisperengine-ai/whisperengine/discussions)** - Community chat and support
-- **🔧 [Contributing Guide](CONTRIBUTING.md)** - Help improve WhisperEngine
+- **🔧 [Contributing Guide](docs/development/CONTRIBUTING.md)** - Help improve WhisperEngine
 
 ### **What People Are Building**
 - **Educational Tutors** - Personalized learning companions for students
@@ -470,7 +736,7 @@ WhisperEngine is open source under the **[MIT License](LICENSE)** - you're free 
 - 🔧 Feature development
 - 🧪 Testing and validation
 
-See our **[Contributing Guide](CONTRIBUTING.md)** to get started!
+See our **[Contributing Guide](docs/development/CONTRIBUTING.md)** to get started!
 
 ---
 
