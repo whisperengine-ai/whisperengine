@@ -864,13 +864,40 @@ class UniversalChatOrchestrator:
                 except Exception as e:
                     logging.warning(f"Context-aware memory retrieval failed: {e}")
 
-            # Get emotional context
+            # Get sophisticated emotional context using Enhanced Vector Emotion Analyzer
             emotion_context = {}
-            if hasattr(memory_manager, "get_emotion_context"):
+            
+            # Try Enhanced Vector Emotion Analyzer through engagement engine
+            if (hasattr(self.bot_core, 'engagement_engine') and self.bot_core.engagement_engine and 
+                hasattr(self.bot_core.engagement_engine, 'emotional_engine')):
                 try:
-                    emotion_context = await memory_manager.get_emotion_context(message.user_id)
+                    emotional_engine = self.bot_core.engagement_engine.emotional_engine
+                    if emotional_engine and hasattr(emotional_engine, 'analyze_emotional_context'):
+                        logging.info(f"🧠 VECTOR EMOTION: Calling Enhanced Vector Emotion Analyzer for {message.user_id}")
+                        emotion_analysis = await emotional_engine.analyze_emotional_context(
+                            user_id=message.user_id,
+                            message_content=message.content,
+                            conversation_context=relevant_memories[:5] if relevant_memories else []
+                        )
+                        emotion_context = emotion_analysis
+                        logging.info(f"✅ VECTOR EMOTION: Enhanced analysis complete: {type(emotion_context)} - {len(str(emotion_context))} chars")
+                    else:
+                        logging.error("❌ VECTOR EMOTION: Enhanced Vector Emotion Analyzer not properly initialized")
                 except Exception as e:
-                    logging.warning(f"Emotion context retrieval failed: {e}")
+                    logging.error(f"❌ VECTOR EMOTION: Enhanced Vector Emotion Analyzer failed: {e}")
+                    import traceback
+                    logging.error(f"VECTOR EMOTION stack trace: {traceback.format_exc()}")
+            else:
+                logging.warning("⚠️ VECTOR EMOTION: Engagement engine or emotional engine not available")
+                
+            # Fallback to basic emotion context if Enhanced Vector not available
+            if not emotion_context and hasattr(memory_manager, "get_emotion_context"):
+                try:
+                    logging.info("🔄 FALLBACK EMOTION: Using basic emotion context")
+                    emotion_context = await memory_manager.get_emotion_context(message.user_id)
+                    logging.info(f"✅ FALLBACK EMOTION: Basic emotion context retrieved: {type(emotion_context)}")
+                except Exception as e:
+                    logging.error(f"❌ FALLBACK EMOTION: Basic emotion context failed: {e}")
 
             # Memory retrieval is handled by the vector memory system
             additional_memories = []
@@ -1169,76 +1196,98 @@ class UniversalChatOrchestrator:
             # Add current message to conversation context
             conversation_context.append({"role": "user", "content": message.content})
 
-            # Generate response using the Discord bot's LLM client (run in thread to avoid blocking)
-            response_data = await asyncio.to_thread(
-                llm_client.generate_chat_completion, conversation_context
-            )
-
-            # Extract the response content if it's in OpenAI format
-            if isinstance(response_data, dict) and "choices" in response_data:
+            # 🔧 LLM TOOL CALLING INTEGRATION 🔧
+            # Try LLM tool calling first for enhanced capabilities
+            llm_tool_manager = getattr(self.bot_core, 'llm_tool_manager', None)
+            if llm_tool_manager:
                 try:
-                    response_text = response_data["choices"][0]["message"]["content"]
+                    logging.info("🔧 LLM TOOL CALLING: Using Phase 1 & 2 tools within Universal Chat Orchestrator")
                     
-                    # Check for common error patterns in the response
-                    if response_text and self._is_error_response(response_text):
-                        logging.error(f"Detected error response from LLM: {response_text}")
-                        response_text = "I apologize, but I encountered an issue processing your request. Please try again with a shorter message."
-                    elif not response_text:
-                        logging.error(f"Empty content in LLM response: {response_data}")
-                        response_text = "I apologize, but I'm having trouble generating a response right now. Please try again."
-                except (KeyError, IndexError, TypeError) as e:
-                    logging.error(f"Error extracting content from LLM response: {e}")
-                    logging.error(f"Response structure: {response_data}")
-                    response_text = "I apologize, but I'm having trouble processing my response. Please try again."
+                    # Get proper CDL character context with detailed logging
+                    character_context = ""
+                    if hasattr(self.bot_core, 'character_system') and self.bot_core.character_system:
+                        try:
+                            # Get CDL character file for this bot
+                            character_file = getattr(self.bot_core, 'character_file', None)
+                            logging.info(f"🎭 CDL CHARACTER: Checking character file: {character_file}")
+                            if character_file:
+                                # Create character-aware prompt using CDL system
+                                logging.info(f"🎭 CDL CHARACTER: Calling CDL system for {message.user_id}")
+                                cdl_prompt = await self.bot_core.character_system.create_character_aware_prompt(
+                                    character_file=character_file,
+                                    user_id=message.user_id,
+                                    message_content=message.content,
+                                    pipeline_result=emotion_context if emotion_context else None
+                                )
+                                character_context = cdl_prompt
+                                logging.info(f"✅ CDL CHARACTER: CDL prompt generated: {len(character_context)} chars")
+                            else:
+                                logging.error("❌ CDL CHARACTER: No character file available for CDL integration")
+                        except Exception as e:
+                            logging.error(f"❌ CDL CHARACTER: CDL character context failed: {e}")
+                            import traceback
+                            logging.error(f"CDL CHARACTER stack trace: {traceback.format_exc()}")
+                    else:
+                        logging.warning("⚠️ CDL CHARACTER: Character system not available")
+                        
+                    # Fallback to system message extraction if CDL not available
+                    if not character_context:
+                        logging.info("🔄 FALLBACK CHARACTER: Using system message for character context")
+                        for msg in conversation_context:
+                            if msg.get("role") == "system":
+                                character_context = msg.get("content", "")
+                                break
+                        logging.info(f"✅ FALLBACK CHARACTER: System message context: {len(character_context)} chars")
+                    
+                    # Use LLM tools with proper character context from the conversation pipeline
+                    logging.info(f"🔧 LLM TOOLS: Calling execute_llm_with_tools for {message.user_id}")
+                    logging.info(f"🔧 LLM TOOLS: Character context length: {len(character_context)} chars")
+                    logging.info(f"🔧 LLM TOOLS: Emotion context type: {type(emotion_context)}")
+                    
+                    tool_result = await llm_tool_manager.execute_llm_with_tools(
+                        user_message=message.content,
+                        user_id=message.user_id,
+                        character_context=character_context,
+                        emotional_context=emotion_context or {}
+                    )
+                    
+                    logging.info(f"🔧 LLM TOOLS: Tool result type: {type(tool_result)}, success: {tool_result.get('success') if tool_result else 'None'}")
+                    
+                    # Check if tool execution was successful and has content
+                    if (tool_result and tool_result.get("success") and 
+                        tool_result.get("llm_response") and tool_result.get("llm_response").strip()):
+                        
+                        tool_response = tool_result.get("llm_response")
+                        logging.info(f"✅ LLM TOOLS: Generated response using sophisticated tools ({len(tool_response)} chars)")
+                        
+                        # Calculate generation time
+                        generation_time = (datetime.now() - start_time).total_seconds() * 1000
+                        
+                        # Return successful tool response with proper AIResponse format
+                        return AIResponse(
+                            content=tool_response,
+                            model_used="llm_tools",
+                            tokens_used=int(len(tool_response.split()) * 1.3),  # Rough estimate
+                            cost=0.0,  # Tool cost tracking could be added
+                            generation_time_ms=int(generation_time),
+                            confidence=0.9,  # Tools generally provide high confidence
+                        )
+                    else:
+                        logging.error("❌ LLM TOOLS: Tools returned empty response or failed")
+                        logging.error(f"❌ LLM TOOLS: Tool result details: {tool_result}")
+                        
+                except Exception as e:
+                    logging.error(f"❌ LLM TOOLS: Error using tools: {e}")
+                    import traceback
+                    logging.error(f"LLM TOOLS stack trace: {traceback.format_exc()}")
             else:
-                # If response is already a string or unexpected format
-                if isinstance(response_data, str):
-                    response_text = response_data
-                    # Check for error patterns in string responses too
-                    if self._is_error_response(response_text):
-                        logging.error(f"Detected error in string response: {response_text}")
-                        response_text = "I apologize, but I encountered an issue processing your request. Please try again."
-                else:
-                    logging.error(f"Unexpected LLM response format: {type(response_data)} - {response_data}")
-                    response_text = "I apologize, but I received an unexpected response format. Please try again."
-
-            # Ensure we have a valid response
-            if not response_text or not response_text.strip():
-                logging.error("Final response_text is empty or whitespace-only")
-                response_text = "I apologize, but I'm unable to generate a proper response right now. Please try again."
-            
-            # Note: Removed overly aggressive prompt-to-response size comparison
-            # The _is_error_response() method above already handles actual error detection
-            # Short responses to short user messages are perfectly normal and valid
-
-            end_time = datetime.now()
-            generation_time_ms = int((end_time - start_time).total_seconds() * 1000)
-
-            # Estimate tokens and cost
-            estimated_tokens = len(response_text.split()) * 1.3
-            estimated_cost = estimated_tokens * 0.00001
-
-            logging.info(
-                "✅ Generated full WhisperEngine AI response: %d chars, %dms", 
-                len(response_text), generation_time_ms
-            )
-
-            return AIResponse(
-                content=response_text,
-                model_used="whisperengine_full_ai",
-                tokens_used=int(estimated_tokens),
-                cost=estimated_cost,
-                generation_time_ms=generation_time_ms,
-                confidence=0.95,  # Higher confidence for full AI system
-            )
-
+                logging.error("❌ LLM TOOLS: llm_tool_manager not available")
+                
         except Exception as e:
             logging.error(f"Full AI response generation failed: {e}")
             import traceback
-
             traceback.print_exc()
-            # Fall back to basic response
-            return await self._generate_basic_ai_response(message, conversation_context)
+            raise  # Don't mask the real problem - let it fail properly
 
     async def _load_system_prompt(
         self, user_id: str | None = None, template_context: dict | None = None

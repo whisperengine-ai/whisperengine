@@ -177,26 +177,25 @@ class EnhancedVectorEmotionAnalyzer:
         start_time = time.perf_counter()
         
         try:
-            # Step 1: Basic keyword-based emotion detection
-            keyword_emotions = await self._analyze_keyword_emotions(content)
+            # VECTOR-NATIVE ANALYSIS ONLY - No legacy keyword matching!
             
-            # Step 2: Vector-based semantic emotion analysis
-            vector_emotions = await self._analyze_vector_emotions(user_id)
+            # Step 1: Vector-based semantic emotion analysis using the actual message content
+            vector_emotions = await self._analyze_vector_emotions(user_id, content)
             
-            # Step 3: Context-aware emotion analysis
+            # Step 2: Context-aware emotion analysis using vector memory
             context_emotions = await self._analyze_context_emotions(
                 conversation_context, recent_emotions
             )
             
-            # Step 4: Emotional intensity analysis
+            # Step 3: Emotional intensity analysis
             intensity = self._analyze_emotional_intensity(content)
             
-            # Step 5: Emotional trajectory analysis
+            # Step 4: Emotional trajectory analysis
             trajectory = self._analyze_emotional_trajectory(content, recent_emotions)
             
-            # Step 6: Combine and weight all analyses
+            # Step 5: Combine vector and context analyses (no more keyword analysis!)
             final_emotions = self._combine_emotion_analyses(
-                keyword_emotions, vector_emotions, context_emotions
+                {}, vector_emotions, context_emotions  # Empty dict for deprecated keyword_emotions
             )
             
             # Step 7: Determine primary emotion and confidence
@@ -244,34 +243,10 @@ class EnhancedVectorEmotionAnalyzer:
                 pattern_match_score=0.0
             )
     
-    async def _analyze_keyword_emotions(self, content: str) -> Dict[str, Any]:
-        """Analyze emotions based on keyword matching"""
-        content_lower = content.lower()
-        emotion_scores = {}
-        total_matches = 0
-        
-        for emotion_dim, keywords in self.emotion_keywords.items():
-            matches = sum(1 for keyword in keywords if keyword in content_lower)
-            if matches > 0:
-                emotion_scores[emotion_dim.value] = matches
-                total_matches += matches
-        
-        # Normalize scores
-        if total_matches > 0:
-            for emotion in emotion_scores:
-                emotion_scores[emotion] = emotion_scores[emotion] / total_matches
-        
-        # Add pattern matching confidence
-        pattern_score = min(total_matches / 10.0, 1.0)  # Max confidence at 10+ matches
-        
-        return {
-            **emotion_scores,
-            'pattern_score': pattern_score,
-            'total_matches': total_matches
-        }
+    # LEGACY KEYWORD ANALYSIS REMOVED - Using vector-native analysis only!
     
-    async def _analyze_vector_emotions(self, user_id: str) -> Dict[str, Any]:
-        """Analyze emotions using vector memory system semantic search"""
+    async def _analyze_vector_emotions(self, user_id: str, content: str) -> Dict[str, Any]:
+        """Analyze emotions using vector memory system semantic search with actual message content"""
         vector_emotions = {}
         
         if not self.vector_memory_manager:
@@ -282,53 +257,36 @@ class EnhancedVectorEmotionAnalyzer:
             }
         
         try:
-            # Search for emotionally similar memories
-            emotion_queries = [
-                "feeling happy and joyful",
-                "feeling sad and down", 
-                "feeling angry and frustrated",
-                "feeling scared and anxious",
-                "feeling excited and thrilled",
-                "feeling calm and peaceful"
-            ]
+            # VECTOR-NATIVE APPROACH: Use the actual message content for semantic emotion analysis
+            # Find emotionally similar messages in user's memory
+            similar_emotional_memories = await self.vector_memory_manager.retrieve_relevant_memories(
+                user_id=user_id,
+                query=content,  # Use actual message content, not hardcoded emotion queries!
+                limit=5
+            )
             
             semantic_scores = {}
             max_similarity = 0.0
             
-            for query in emotion_queries:
-                try:
-                    # Use vector search to find semantic similarity
-                    similar_memories = await self.vector_memory_manager.retrieve_relevant_memories(
-                        user_id=user_id,
-                        query=query,
-                        limit=3
-                    )
+            if similar_emotional_memories:
+                # Extract emotional patterns from semantically similar memories
+                for memory in similar_emotional_memories:
+                    score = memory.get('score', 0.0)
+                    max_similarity = max(max_similarity, score)
                     
-                    if similar_memories:
-                        # Calculate average similarity score
-                        avg_score = sum(
-                            m.get('score', 0.0) for m in similar_memories
-                        ) / len(similar_memories)
-                        
-                        # Extract emotion from query
-                        if "happy" in query:
-                            semantic_scores["joy"] = avg_score
-                        elif "sad" in query:
-                            semantic_scores["sadness"] = avg_score
-                        elif "angry" in query:
-                            semantic_scores["anger"] = avg_score
-                        elif "scared" in query:
-                            semantic_scores["fear"] = avg_score
-                        elif "excited" in query:
-                            semantic_scores["excitement"] = avg_score
-                        elif "calm" in query:
-                            semantic_scores["contentment"] = avg_score
-                        
-                        max_similarity = max(max_similarity, avg_score)
-                
-                except (KeyError, IndexError, ValueError) as e:
-                    logger.debug("Vector emotion query failed for '%s': %s", query, e)
-                    continue
+                    # Get emotional context from memory metadata
+                    metadata = memory.get('metadata', {})
+                    emotional_context = metadata.get('emotional_context', '')
+                    
+                    if emotional_context and score > 0.1:  # Only consider meaningful similarities
+                        # Use vector similarity to weight emotional context
+                        if emotional_context in semantic_scores:
+                            semantic_scores[emotional_context] = max(
+                                semantic_scores[emotional_context], 
+                                score
+                            )
+                        else:
+                            semantic_scores[emotional_context] = score
             
             # Normalize semantic scores
             if max_similarity > 0:

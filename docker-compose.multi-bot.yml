@@ -108,6 +108,14 @@ services:
       - marcus_privacy:/app/privacy
       - marcus_temp:/app/temp
       - ./sql:/app/sql:ro
+      # Live code mounting for development (no rebuild needed)
+      - ./src:/app/src
+      - ./scripts:/app/scripts
+      - ./characters:/app/characters
+      - ./config:/app/config
+      - ./validate_config.py:/app/validate_config.py
+      - ./run.py:/app/run.py
+      - ./env_manager.py:/app/env_manager.py
       # Note: Using Docker logging instead of mounted log volumes
     networks:
       - bot_network
@@ -169,6 +177,14 @@ services:
       - dream_privacy:/app/privacy
       - dream_temp:/app/temp
       - ./sql:/app/sql:ro
+      # Live code mounting for development (no rebuild needed)
+      - ./src:/app/src
+      - ./scripts:/app/scripts
+      - ./characters:/app/characters
+      - ./config:/app/config
+      - ./validate_config.py:/app/validate_config.py
+      - ./run.py:/app/run.py
+      - ./env_manager.py:/app/env_manager.py
       # Note: Using Docker logging instead of mounted log volumes
     networks:
       - bot_network
@@ -230,6 +246,14 @@ services:
       - marcus-chen_privacy:/app/privacy
       - marcus-chen_temp:/app/temp
       - ./sql:/app/sql:ro
+      # Live code mounting for development (no rebuild needed)
+      - ./src:/app/src
+      - ./scripts:/app/scripts
+      - ./characters:/app/characters
+      - ./config:/app/config
+      - ./validate_config.py:/app/validate_config.py
+      - ./run.py:/app/run.py
+      - ./env_manager.py:/app/env_manager.py
       # Note: Using Docker logging instead of mounted log volumes
     networks:
       - bot_network
@@ -291,6 +315,82 @@ services:
       - elena_privacy:/app/privacy
       - elena_temp:/app/temp
       - ./sql:/app/sql:ro
+      # Live code mounting for development (no rebuild needed)
+      - ./src:/app/src
+      - ./scripts:/app/scripts
+      - ./characters:/app/characters
+      - ./config:/app/config
+      - ./validate_config.py:/app/validate_config.py
+      - ./run.py:/app/run.py
+      - ./env_manager.py:/app/env_manager.py
+      # Note: Using Docker logging instead of mounted log volumes
+    networks:
+      - bot_network
+    depends_on:
+      - postgres
+      - redis
+      - qdrant
+
+  elena.local-bot:
+    build:
+      context: .
+      dockerfile: Dockerfile.bundled-models
+      target: production
+    image: whisperengine-bot:${VERSION:-latest}
+    container_name: whisperengine-elena.local-bot
+    restart: unless-stopped
+    env_file:
+      - .env.elena.local
+    environment:
+      - DISCORD_BOT_NAME=Elena.Local
+      - POSTGRES_HOST=postgres
+      - REDIS_HOST=redis
+      - QDRANT_HOST=qdrant
+      - MODEL_CACHE_DIR=/app/models
+      - DISABLE_MODEL_DOWNLOAD=true
+      - HF_HUB_OFFLINE=false
+      - TRANSFORMERS_OFFLINE=0
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - DEBUG_MODE=false
+      - PYTHONUNBUFFERED=1
+      - HEALTH_CHECK_PORT=8001
+      - HEALTH_CHECK_HOST=0.0.0.0
+    ports:
+      - "8001:8001"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+        tag: "elena.local-{.ImageName}-{.Name}-{.ID}"
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+          cpus: "4.0"
+        reservations:
+          memory: 2G
+          cpus: "2.0"
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - curl -f http://localhost:8001/health || exit 1
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    volumes:
+      - elena.local_backups:/app/backups
+      - elena.local_privacy:/app/privacy
+      - elena.local_temp:/app/temp
+      - ./sql:/app/sql:ro
+      # Live code mounting for development (no rebuild needed)
+      - ./src:/app/src
+      - ./scripts:/app/scripts
+      - ./characters:/app/characters
+      - ./config:/app/config
+      - ./validate_config.py:/app/validate_config.py
+      - ./run.py:/app/run.py
+      - ./env_manager.py:/app/env_manager.py
       # Note: Using Docker logging instead of mounted log volumes
     networks:
       - bot_network
@@ -352,6 +452,14 @@ services:
       - gabriel_privacy:/app/privacy
       - gabriel_temp:/app/temp
       - ./sql:/app/sql:ro
+      # Live code mounting for development (no rebuild needed)
+      - ./src:/app/src
+      - ./scripts:/app/scripts
+      - ./characters:/app/characters
+      - ./config:/app/config
+      - ./validate_config.py:/app/validate_config.py
+      - ./run.py:/app/run.py
+      - ./env_manager.py:/app/env_manager.py
       # Note: Using Docker logging instead of mounted log volumes
     networks:
       - bot_network
@@ -408,6 +516,14 @@ volumes:
     name: whisperengine-multi_elena_temp
   elena_logs:
     name: whisperengine-multi_elena_logs
+  elena.local_backups:
+    name: whisperengine-multi_elena.local_backups
+  elena.local_privacy:
+    name: whisperengine-multi_elena.local_privacy
+  elena.local_temp:
+    name: whisperengine-multi_elena.local_temp
+  elena.local_logs:
+    name: whisperengine-multi_elena.local_logs
   gabriel_backups:
     name: whisperengine-multi_gabriel_backups
   gabriel_privacy:

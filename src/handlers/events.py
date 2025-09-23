@@ -2029,42 +2029,7 @@ class BotEventHandlers:
             logger.info(f"[TRACE-START] Starting _generate_and_send_response for user {user_id}")
             logger.debug("Started typing indicator - simulating thinking and typing process")
             try:
-                # PHASE 1 & 2 LLM TOOL CALLING: Always enabled in development - no environment flags!
-                llm_tool_manager = getattr(self.bot_core, 'llm_tool_manager', None)
-                
-                # EXPLICIT LOGGING: Always log the LLM tool status 
-                if not llm_tool_manager:
-                    logger.error("❌ LLM TOOL CALLING: llm_tool_manager not found on bot_core - tools unavailable")
-                else:
-                    logger.info("🔧 LLM TOOL CALLING: Using Phase 1 & 2 LLM tools for enhanced memory and analysis")
-                
-                if llm_tool_manager:
-                    try:
-                        # Use LLM tools to process the message with memory search and analysis
-                        tool_response = await llm_tool_manager.process_with_tools(
-                            user_id=user_id,
-                            message=content,
-                            system_prompt=f"You are Elena Rodriguez, a marine biologist. Current time: {self._get_current_time()}. " +
-                                        (f"Memory context: {memory_narrative}" if memory_narrative else "No specific memories available."),
-                            conversation_context=conversation_context[-5:] if conversation_context else []  # Last 5 messages for context
-                        )
-                        
-                        if tool_response and tool_response.strip():
-                            logger.info(f"✅ LLM TOOL CALLING: Generated response using Phase 1 & 2 tools ({len(tool_response)} chars)")
-                            # Store the conversation in memory
-                            await self._store_conversation_memory(user_id, content, tool_response, phase2_context)
-                            # Send the response
-                            await self._send_response(reply_channel, tool_response)
-                            return
-                        else:
-                            logger.warning("⚠️ LLM TOOL CALLING FALLBACK: Tools returned empty response, FALLING BACK to Universal Chat Orchestrator")
-                            
-                    except Exception as e:
-                        logger.error(f"❌ LLM TOOL CALLING FALLBACK: Error using Phase 1 & 2 tools: {e} - FALLING BACK to Universal Chat Orchestrator")
-                        logger.debug(f"LLM tool error details: {traceback.format_exc()}")
-                        # Fall back to Universal Chat
-                        
-                logger.info("🤖 UNIVERSAL CHAT: Processing message through Universal Chat Orchestrator (either as primary path or LLM tool fallback)")
+                logger.info("🤖 UNIVERSAL CHAT: Processing message through Universal Chat Orchestrator")
 
                 # Use Universal Chat Orchestrator if available
                 if self.chat_orchestrator:
@@ -3112,24 +3077,13 @@ class BotEventHandlers:
             comprehensive_context = None
             enhanced_system_prompt = None
             
-            logger.info("🚀 AI PIPELINE DEBUG: Checking Phase 4 intelligence processing...")
+            # LEGACY PHASE 4 SYSTEM DISABLED - Using Vector Analysis in Universal Chat Orchestrator
+            logger.info("🚀 AI PIPELINE DEBUG: Skipping legacy Phase 4 - using modern vector analysis in Universal Chat Orchestrator")
             
-            if (os.getenv("DISABLE_PHASE4_INTELLIGENCE", "false").lower() != "true"
-                and hasattr(self.memory_manager, "process_with_phase4_intelligence")):
-                try:
-                    logger.info("🚀 AI PIPELINE DEBUG: Starting Phase 4 intelligence processing...")
-                    phase4_context, comprehensive_context, enhanced_system_prompt = (
-                        await self._process_phase4_intelligence(
-                            user_id, message, recent_messages, external_emotion_data, phase2_context,
-                            phase3_context_switches, phase3_empathy_calibration
-                        )
-                    )
-                    logger.info(f"🚀 AI PIPELINE DEBUG: Phase 4 completed - Context: {str(phase4_context)[:100] if phase4_context else 'None'}")
-                    logger.info(f"🚀 AI PIPELINE DEBUG: Enhanced prompt length: {len(enhanced_system_prompt) if enhanced_system_prompt else 0} chars")
-                except Exception as e:
-                    logger.warning(f"🚀 AI PIPELINE DEBUG: Phase 4 intelligence processing failed: {e}")
-            else:
-                logger.info("🚀 AI PIPELINE DEBUG: Phase 4 intelligence processing disabled or unavailable")
+            # Set legacy variables to None since we're using modern vector analysis
+            phase4_context = None
+            comprehensive_context = None
+            enhanced_system_prompt = None
                     
             # Store results in instance variables for use by response generation
             self._last_external_emotion_data = external_emotion_data

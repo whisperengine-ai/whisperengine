@@ -318,25 +318,10 @@ class VectorEmojiIntelligence:
             )
     
     def _analyze_message_emotions(self, user_message: str) -> List[str]:
-        """Simple emotion analysis by keyword detection"""
-        message_lower = user_message.lower()
-        emotions = []
-        
-        # Positive emotions
-        if any(word in message_lower for word in ["happy", "joy", "great", "awesome", "love", "excited"]):
-            emotions.append("joy")
-        if any(word in message_lower for word in ["thank", "grateful", "appreciate"]):
-            emotions.append("gratitude")
-        if any(word in message_lower for word in ["amazing", "incredible", "wow", "fantastic"]):
-            emotions.append("wonder")
-        
-        # Negative emotions
-        if any(word in message_lower for word in ["sad", "upset", "disappointed", "frustrated"]):
-            emotions.append("sadness")
-        if any(word in message_lower for word in ["angry", "mad", "annoyed", "irritated"]):
-            emotions.append("anger")
-        
-        return emotions
+        """DEPRECATED: Use Enhanced Vector Emotion Analyzer instead of keyword detection"""
+        # VECTOR-NATIVE REPLACEMENT: This should call Enhanced Vector Emotion Analyzer
+        # For now, minimal fallback to prevent crashes during migration
+        return ["neutral"]  # Default fallback - Enhanced Vector Emotion Analyzer handles real analysis
     
     async def _analyze_user_personality_context(self, user_id: str) -> Dict[str, Any]:
         """

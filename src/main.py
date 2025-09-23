@@ -281,15 +281,7 @@ class ModularBotManager:
             self.command_handlers["performance"].register_commands(bot_name_filter, is_admin)
             logger.info("✅ Performance monitoring command handlers registered")
 
-            # Multi-Entity Character System Commands
-            self.command_handlers["multi_entity"] = MultiEntityCommandHandlers(
-                bot=self.bot,
-                multi_entity_manager=components.get("multi_entity_manager"),
-                ai_self_bridge=components.get("ai_self_bridge"),
-                memory_manager=components.get("memory_manager")
-            )
-            self.command_handlers["multi_entity"].register_commands(bot_name_filter, is_admin)
-            logger.info("✅ Multi-entity character command handlers registered")
+            # ℹ️ Multi-entity handlers removed - using vector-native memory approach
 
             # Onboarding and enhanced help commands
             self.command_handlers["onboarding"] = create_onboarding_commands(
