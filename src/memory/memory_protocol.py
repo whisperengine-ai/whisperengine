@@ -224,7 +224,7 @@ def create_multi_bot_querier(memory_manager=None):
 
 def create_llm_tool_integration_manager(memory_manager, character_manager, llm_client):
     """
-    Create LLM Tool Integration Manager for Phase 1-3 tools
+    Create LLM Tool Integration Manager for Phase 1-4 tools
     
     Features:
     - Unified tool calling interface
@@ -232,6 +232,7 @@ def create_llm_tool_integration_manager(memory_manager, character_manager, llm_c
     - Phase 2: Character evolution tools (personality adaptation, backstory updates)
     - Phase 2: Emotional intelligence tools (crisis detection, empathy calibration)
     - Phase 3: Multi-dimensional memory networks (pattern detection, memory clustering)
+    - Phase 4: Proactive intelligence & tool orchestration (complex workflows, autonomous planning)
     
     Args:
         memory_manager: Memory manager instance
@@ -253,6 +254,9 @@ def create_llm_tool_integration_manager(memory_manager, character_manager, llm_c
         # Import Phase 3 managers
         from .phase3_memory_tool_manager import Phase3MemoryToolManager
         
+        # Import Phase 4 managers
+        from .phase4_tool_orchestration_manager import Phase4ToolOrchestrationManager
+        
         # Import integration manager
         from .llm_tool_integration_manager import LLMToolIntegrationManager
         
@@ -273,15 +277,29 @@ def create_llm_tool_integration_manager(memory_manager, character_manager, llm_c
         # Create Phase 3 tool manager
         phase3_memory_tools = Phase3MemoryToolManager(memory_manager)
         
+        # Create Phase 4 tool orchestration manager
+        phase4_orchestration_tools = Phase4ToolOrchestrationManager(
+            # Pass the integration manager (will be created below) - circular dependency handled
+            None,  # Will be set after creation
+            memory_manager,
+            llm_client
+        )
+        
         # Create unified integration manager
-        return LLMToolIntegrationManager(
+        integration_manager = LLMToolIntegrationManager(
             vector_memory_tools,
             intelligent_memory_tools,
             character_evolution_tools,
             emotional_intelligence_tools,
             phase3_memory_tools,
+            phase4_orchestration_tools,
             llm_client
         )
+        
+        # Set the integration manager reference in Phase 4 orchestration
+        phase4_orchestration_tools.tool_integration_manager = integration_manager
+        
+        return integration_manager
         
     except ImportError as e:
         logger.warning(f"LLM Tool Integration Manager not available: {e}")

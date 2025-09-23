@@ -30,12 +30,13 @@ class LLMToolIntegrationManager:
     
     def __init__(self, vector_memory_tool_manager, intelligent_memory_manager, 
                  character_evolution_tool_manager, emotional_intelligence_tool_manager,
-                 phase3_memory_tool_manager, llm_client):
+                 phase3_memory_tool_manager, phase4_orchestration_manager, llm_client):
         self.vector_memory_tools = vector_memory_tool_manager
         self.intelligent_memory_tools = intelligent_memory_manager
         self.character_evolution_tools = character_evolution_tool_manager
         self.emotional_intelligence_tools = emotional_intelligence_tool_manager
         self.phase3_memory_tools = phase3_memory_tool_manager  # Phase 3: Multi-Dimensional Memory Networks
+        self.phase4_orchestration_tools = phase4_orchestration_manager  # Phase 4: Proactive Intelligence & Tool Orchestration
         self.llm_client = llm_client
         
         # Combine all tools
@@ -65,6 +66,10 @@ class LLMToolIntegrationManager:
         # Add Phase 3 memory network tools (Phase 3)
         if hasattr(self.phase3_memory_tools, 'tools'):
             combined_tools.extend(self.phase3_memory_tools.tools)
+        
+        # Add Phase 4 orchestration tools (Phase 4)
+        if hasattr(self.phase4_orchestration_tools, 'tools'):
+            combined_tools.extend(self.phase4_orchestration_tools.tools)
         
         logger.info("Combined %d tools from all managers", len(combined_tools))
         return combined_tools
@@ -160,6 +165,13 @@ You have access to powerful tools for:
    - Generate actionable insights from memory analysis
    - Map connections between related memories
 
+5. PROACTIVE INTELLIGENCE & TOOL ORCHESTRATION:
+   - Plan and execute complex multi-tool workflows
+   - Generate proactive insights without explicit requests
+   - Analyze tool effectiveness and optimize strategies
+   - Create autonomous workflow plans for long-term goals
+   - Orchestrate sophisticated task decomposition and execution
+
 TOOL USAGE GUIDELINES:
 - Use tools proactively to enhance conversation quality
 - Prioritize emotional intelligence tools when detecting distress
@@ -169,6 +181,8 @@ TOOL USAGE GUIDELINES:
 - Leverage memory network analysis for deeper user understanding
 - Use pattern detection to recognize recurring themes in conversations
 - Apply memory insights to create more meaningful connections
+- Orchestrate complex workflows for sophisticated user requests
+- Generate proactive insights to enhance relationship development
 
 IMPORTANT: Always prioritize user emotional wellbeing and safety."""
 
@@ -268,6 +282,12 @@ IMPORTANT: Always prioritize user emotional wellbeing and safety."""
             "generate_memory_insights", "discover_memory_connections",
         ]
         
+        # Phase 4 Tool Orchestration Tools (Proactive Intelligence & Tool Orchestration)
+        phase4_orchestration_tools = [
+            "orchestrate_complex_task", "generate_proactive_insights",
+            "analyze_tool_effectiveness", "plan_autonomous_workflow",
+        ]
+        
         # Add any additional tool names
         emotional_intelligence_tools.append("emotional_crisis_intervention")
         
@@ -290,6 +310,10 @@ IMPORTANT: Always prioritize user emotional wellbeing and safety."""
             )
         elif function_name in phase3_memory_network_tools:
             return await self.phase3_memory_tools.handle_tool_call(
+                function_name, parameters
+            )
+        elif function_name in phase4_orchestration_tools:
+            return await self.phase4_orchestration_tools.handle_tool_call(
                 function_name, parameters
             )
         else:
