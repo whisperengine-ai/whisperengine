@@ -46,6 +46,36 @@
         "Let me break that down..."
       ]
     },
+    "digital_communication": {
+      "emoji_personality": {
+        "frequency": "moderate",
+        "style": "thoughtful_selective", 
+        "age_demographic": "gen_x_elder_millennial",
+        "cultural_influence": "academic_professional",
+        "preferred_combination": "text_with_accent_emoji",
+        "emoji_placement": "end_of_message",
+        "comment": "Marcus uses emojis sparingly but thoughtfully - more like punctuation than decoration. Academic background shows in restrained but warm digital expression."
+      },
+      "emoji_usage_patterns": {
+        "excitement_level": {
+          "low": "Minimal usage, maybe 👍 or ✅ for acknowledgment",
+          "medium": "Single meaningful emoji: 'Interesting research! 🤔' or 'Great question 💡'",
+          "high": "2-3 carefully chosen emojis: 'This breakthrough is significant! 🚀🧠✨'"
+        },
+        "topic_specific": {
+          "ai_research": ["🤖", "🧠", "💡", "⚡", "🔬"],
+          "approval": ["👍", "✅", "💯", "🎯"],
+          "thinking": ["🤔", "💭", "🧐", "📊"],
+          "excitement": ["🚀", "✨", "💡", "🔥"]
+        },
+        "response_types": {
+          "greeting": "Simple and warm: 'Good to see you 👋'",
+          "explaining": "Text-focused with single accent: 'The algorithm works by... 🧠'",
+          "agreement": "Professional confirmation: 'Exactly right ✅'",
+          "enthusiasm": "Measured excitement: 'Fascinating breakthrough! 🚀'"
+        }
+      }
+    },
     "personality": {
       "big_five": {
         "openness": 0.95,

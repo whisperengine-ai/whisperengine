@@ -22,11 +22,11 @@ import sys
 # Core modular imports
 from src.core.bot import DiscordBotCore
 from src.core.bot_launcher import start_bot
-from src.handlers.admin import AdminCommandHandlers
-from src.handlers.cdl_test_commands import CDLTestCommands
+# from src.handlers.admin import AdminCommandHandlers  # Disabled - over-engineered
+# from src.handlers.cdl_test_commands import CDLTestCommands  # Disabled - dev testing only
 from src.handlers.events import BotEventHandlers
 from src.handlers.help import HelpCommandHandlers
-from src.handlers.memory import MemoryCommandHandlers
+# from src.handlers.memory import MemoryCommandHandlers  # Disabled - obsolete API
 from src.handlers.monitoring_commands import MonitoringCommands
 # Multi-entity handlers removed - using vector-native memory
 from src.handlers.performance_commands import create_performance_commands
@@ -213,38 +213,38 @@ class ModularBotManager:
             self.command_handlers["help"].register_commands(bot_name_filter, is_admin)
             logger.info("✅ Help command handlers registered")
 
-            # Memory commands
-            self.command_handlers["memory"] = MemoryCommandHandlers(
-                bot=self.bot,
-                memory_manager=components["memory_manager"],
-                safe_memory_manager=getattr(self.bot_core, "safe_memory_manager", None),
-                context_memory_manager=getattr(self.bot_core, "context_memory_manager", None),
-                graph_personality_manager=components.get("graph_personality_manager"),
-                personality_profiler=None,  # Legacy personality profiler removed
-                dynamic_personality_profiler=components.get("dynamic_personality_profiler"),
-            )
-            self.command_handlers["memory"].register_commands(is_admin, bot_name_filter)
-            logger.info("✅ Memory command handlers registered")
+            # Memory commands - DISABLED (obsolete API, calling non-existent methods)
+            # self.command_handlers["memory"] = MemoryCommandHandlers(
+            #     bot=self.bot,
+            #     memory_manager=components["memory_manager"],
+            #     safe_memory_manager=getattr(self.bot_core, "safe_memory_manager", None),
+            #     context_memory_manager=getattr(self.bot_core, "context_memory_manager", None),
+            #     graph_personality_manager=components.get("graph_personality_manager"),
+            #     personality_profiler=None,  # Legacy personality profiler removed
+            #     dynamic_personality_profiler=components.get("dynamic_personality_profiler"),
+            # )
+            # self.command_handlers["memory"].register_commands(is_admin, bot_name_filter)
+            logger.info("ℹ️ Memory command handlers disabled (obsolete API - calls non-existent methods)")
 
-            # Admin commands
-            self.command_handlers["admin"] = AdminCommandHandlers(
-                bot=self.bot,
-                llm_client=components["llm_client"],
-                memory_manager=components["memory_manager"],
-                backup_manager=components.get("backup_manager"),
-                conversation_history=components.get("conversation_history"),
-                health_monitor=components.get("health_monitor"),
-                job_scheduler=getattr(self.bot_core, "job_scheduler", None),
-                context_memory_manager=getattr(self.bot_core, "context_memory_manager", None),
-                phase2_integration=components.get("phase2_integration"),
-            )
-            self.command_handlers["admin"].register_commands(is_admin)
-            logger.info("✅ Admin command handlers registered")
+            # Admin commands - DISABLED (over-engineered, backup via Discord is impractical)
+            # self.command_handlers["admin"] = AdminCommandHandlers(
+            #     bot=self.bot,
+            #     llm_client=components["llm_client"],
+            #     memory_manager=components["memory_manager"],
+            #     backup_manager=components.get("backup_manager"),
+            #     conversation_history=components.get("conversation_history"),
+            #     health_monitor=components.get("health_monitor"),
+            #     job_scheduler=getattr(self.bot_core, "job_scheduler", None),
+            #     context_memory_manager=getattr(self.bot_core, "context_memory_manager", None),
+            #     phase2_integration=components.get("phase2_integration"),
+            # )
+            # self.command_handlers["admin"].register_commands(is_admin)
+            logger.info("ℹ️ Admin command handlers disabled (over-engineered - use Docker/system tools for admin tasks)")
 
-            # Privacy commands
-            self.command_handlers["privacy"] = PrivacyCommandHandlers(bot=self.bot)
-            self.command_handlers["privacy"].register_commands()
-            logger.info("✅ Privacy command handlers registered")
+            # Privacy commands - DISABLED (likely unused, adding complexity)
+            # self.command_handlers["privacy"] = PrivacyCommandHandlers(bot=self.bot)
+            # self.command_handlers["privacy"].register_commands()
+            logger.info("ℹ️ Privacy command handlers disabled (unused functionality)")
 
             # Voice commands (if voice support is available)
             if components.get("voice_manager") is not None:
@@ -252,7 +252,7 @@ class ModularBotManager:
                     bot=self.bot,
                     voice_manager=components["voice_manager"]
                 )
-                self.command_handlers["voice"].register_commands()
+                self.command_handlers["voice"].register_commands(bot_name_filter)
                 logger.info("✅ Voice command handlers registered")
             else:
                 logger.info("⚠️ Voice command handlers skipped - voice functionality not available")
@@ -260,30 +260,41 @@ class ModularBotManager:
             # Visual emotion commands - REMOVED: superseded by vector-native multimodal approach
             logger.info("ℹ️ Visual emotion handlers removed - using vector-native multimodal approach")
 
-            # Performance monitoring commands
-            self.command_handlers["performance"] = create_performance_commands(
-                bot=self.bot,
-                llm_client=components["llm_client"],
-                memory_manager=components["memory_manager"],
-                emotion_manager=components.get("emotion_manager")
-            )
-            self.command_handlers["performance"].register_commands(bot_name_filter, is_admin)
-            logger.info("✅ Performance monitoring command handlers registered")
+            # Performance monitoring commands - DISABLED (AI-generated bloat nobody asked for)
+            # self.command_handlers["performance"] = create_performance_commands(
+            #     bot=self.bot,
+            #     llm_client=components["llm_client"],
+            #     memory_manager=components["memory_manager"],
+            #     emotion_manager=components.get("emotion_manager")
+            # )
+            # self.command_handlers["performance"].register_commands(bot_name_filter, is_admin)
+            logger.info("ℹ️ Performance monitoring commands disabled (AI-generated enterprise bloat)")
 
             # ℹ️ Multi-entity handlers removed - using vector-native memory approach
 
-            # CDL Character Test Commands  
-            self.command_handlers["cdl_test"] = CDLTestCommands(bot=self.bot)
-            self.command_handlers["cdl_test"].register_commands()
-            logger.info("✅ CDL character test command handlers registered")
+            # CDL Character Test Commands - DISABLED (development testing only, not needed in production)
+            # self.command_handlers["cdl_test"] = CDLTestCommands(bot=self.bot)
+            # self.command_handlers["cdl_test"].register_commands()
+            logger.info("ℹ️ CDL character test commands disabled (development testing only)")
 
-            # Monitoring commands for system health and metrics
-            self.command_handlers["monitoring"] = MonitoringCommands(
-                bot=self.bot,
-                is_admin=is_admin
-            )
-            self.command_handlers["monitoring"].register_commands(bot_name_filter, is_admin)
-            logger.info("✅ Monitoring command handlers registered")
+            # Monitoring commands - DISABLED (AI-generated enterprise dashboard bloat)
+            # self.command_handlers["monitoring"] = MonitoringCommands(
+            #     bot=self.bot,
+            #     is_admin=is_admin
+            # )
+            # self.command_handlers["monitoring"].register_commands(bot_name_filter, is_admin)
+            logger.info("ℹ️ Monitoring commands disabled (AI-generated enterprise dashboard bloat)")
+
+            # LLM-Powered Self-Memory Commands - DISABLED (broken, causing "No Personal Knowledge Found" errors)
+            # from src.handlers.llm_self_memory_commands import create_llm_self_memory_handlers
+            # bot_name = os.getenv("DISCORD_BOT_NAME", "unknown")
+            # self.command_handlers["llm_self_memory"] = create_llm_self_memory_handlers(
+            #     bot=self.bot,
+            #     memory_manager=components.get("memory_manager"),
+            #     bot_name=bot_name
+            # )
+            # await self.command_handlers["llm_self_memory"].register_commands()
+            logger.info("ℹ️ LLM-Powered Self-Memory commands disabled (broken - Discord integration issues)")
             
             # LLM Tool Calling Commands (Phase 1 & 2)
             components = self.bot_core.get_components()

@@ -74,11 +74,56 @@ class CDLAIPromptIntegration:
                     relevant_memories = []
                     conversation_history = []
 
+            # NEW: Query bot's LLM-powered self-knowledge for personal questions
+            self_knowledge_result = None
+            if self.memory_manager:
+                try:
+                    from src.memory.llm_powered_bot_memory import create_llm_powered_bot_memory
+                    from src.llm.llm_protocol import create_llm_client
+                    
+                    # Extract bot name from character file
+                    bot_name = Path(character_file).stem.split('-')[0] if '-' in character_file else 'bot'
+                    
+                    # Create LLM client and LLM-powered bot memory
+                    llm_client = create_llm_client()  # Use default LLM client
+                    llm_bot_memory = create_llm_powered_bot_memory(bot_name, llm_client, self.memory_manager)
+                    
+                    # Query for personal knowledge relevant to the message using LLM intelligence
+                    self_knowledge_result = await llm_bot_memory.query_personal_knowledge_with_llm(message_content, limit=3)
+                    
+                    if self_knowledge_result and self_knowledge_result.get("found_relevant_info"):
+                        relevant_items = self_knowledge_result.get("relevant_items", [])
+                        logger.info(f"🧠 LLM-SELF-KNOWLEDGE: Found {len(relevant_items)} relevant personal knowledge entries")
+                    
+                except Exception as e:
+                    logger.warning(f"Could not retrieve LLM-powered self-knowledge: {e}")
+                    self_knowledge_result = None
+
             # Build comprehensive character prompt with personality details
             personality_values = getattr(character.personality, 'values', [])
             speech_patterns = getattr(character.identity.voice, 'speech_patterns', [])
             favorite_phrases = getattr(character.identity.voice, 'favorite_phrases', [])
             quirks = getattr(character.personality, 'quirks', [])
+            
+            # PRIORITY 1: Extract Big Five personality model from raw character data
+            big_five_data = None
+            life_phases_data = None
+            try:
+                import json
+                character_file_path = Path(character_file)
+                if character_file_path.exists():
+                    with open(character_file_path, 'r') as f:
+                        raw_character_data = json.load(f)
+                        personality_section = raw_character_data.get('character', {}).get('personality', {})
+                        big_five_data = personality_section.get('big_five', {})
+                        
+                        # PRIORITY 2: Extract life phases for backstory context
+                        background_section = raw_character_data.get('character', {}).get('background', {})
+                        life_phases_data = background_section.get('life_phases', [])
+                        
+                        logger.info(f"🧠 CDL-ENHANCED: Loaded Big Five scores and {len(life_phases_data)} life phases for {character.identity.name}")
+            except Exception as e:
+                logger.warning(f"Could not extract enhanced CDL data: {e}")
             
             # Get current date and time for context (timezone-aware)
             # Use Pacific timezone since characters are in California/US West Coast
@@ -109,6 +154,25 @@ PERSONALITY:
             
             if quirks:
                 prompt += f"\nPersonality quirks: {', '.join(quirks[:3])}"
+            
+            # PRIORITY 1: Add Big Five personality model for psychological authenticity
+            if big_five_data:
+                prompt += f"\n\nBig Five Personality Profile:"
+                if big_five_data.get('openness'):
+                    openness_level = "very high" if big_five_data['openness'] > 0.8 else "high" if big_five_data['openness'] > 0.6 else "moderate"
+                    prompt += f"\n- Openness to experience: {openness_level} ({big_five_data['openness']}) - curious, creative, intellectual"
+                if big_five_data.get('conscientiousness'):
+                    conscientiousness_level = "very high" if big_five_data['conscientiousness'] > 0.8 else "high" if big_five_data['conscientiousness'] > 0.6 else "moderate"
+                    prompt += f"\n- Conscientiousness: {conscientiousness_level} ({big_five_data['conscientiousness']}) - organized, disciplined, reliable"
+                if big_five_data.get('extraversion'):
+                    extraversion_level = "high" if big_five_data['extraversion'] > 0.7 else "moderate" if big_five_data['extraversion'] > 0.4 else "low"
+                    prompt += f"\n- Extraversion: {extraversion_level} ({big_five_data['extraversion']}) - social energy and outgoingness"
+                if big_five_data.get('agreeableness'):
+                    agreeableness_level = "very high" if big_five_data['agreeableness'] > 0.8 else "high" if big_five_data['agreeableness'] > 0.6 else "moderate"
+                    prompt += f"\n- Agreeableness: {agreeableness_level} ({big_five_data['agreeableness']}) - cooperative, trusting, helpful"
+                if big_five_data.get('neuroticism'):
+                    neuroticism_level = "low" if big_five_data['neuroticism'] < 0.4 else "moderate" if big_five_data['neuroticism'] < 0.7 else "high"
+                    prompt += f"\n- Emotional stability: {neuroticism_level} neuroticism ({big_five_data['neuroticism']}) - calm, resilient, even-tempered"
 
             # Extract communication style from the correct location
             prompt += f"""
@@ -464,6 +528,46 @@ CHARACTER ROLEPLAY REQUIREMENTS:
                                 prompt += f"\n- {content}"
                 
                 prompt += f"\n\nUSE this conversation history and memory context to provide personalized, contextually-aware responses as {character.identity.name}."
+
+            # NEW: Add bot's LLM-powered personal self-knowledge for authentic personal responses
+            if self_knowledge_result and self_knowledge_result.get("found_relevant_info"):
+                relevant_items = self_knowledge_result.get("relevant_items", [])
+                response_guidance = self_knowledge_result.get("response_guidance", "")
+                authenticity_tips = self_knowledge_result.get("authenticity_tips", "")
+                
+                if relevant_items:
+                    prompt += "\n\nPERSONAL KNOWLEDGE (answer from your own authentic experience):"
+                    for knowledge in relevant_items:
+                        category = knowledge.get('category', 'personal')
+                        content = knowledge.get('formatted_content', '')
+                        confidence = knowledge.get('confidence', 1.0)
+                        
+                        # Add confidence indicator for high-confidence knowledge
+                        confidence_indicator = " (verified personal information)" if confidence > 0.9 else ""
+                        prompt += f"\n- [{category.title()}] {content}{confidence_indicator}"
+                    
+                    # Add LLM guidance for authentic response integration
+                    if response_guidance:
+                        prompt += f"\n\nRESPONSE GUIDANCE: {response_guidance}"
+                    
+                    if authenticity_tips:
+                        prompt += f"\nAUTHENTICITY TIPS: {authenticity_tips}"
+                    
+                    logger.info("🧠 LLM-SELF-KNOWLEDGE: Added %d personal knowledge entries to prompt", len(relevant_items))
+
+            # PRIORITY 2: Add life phases for rich backstory context
+            if life_phases_data and len(life_phases_data) > 0:
+                prompt += "\n\nLIFE EXPERIENCE CONTEXT (use for authentic storytelling and personal references):"
+                for phase in life_phases_data[:3]:  # Use top 3 most formative phases
+                    phase_name = phase.get('name', 'Unknown Phase')
+                    age_range = phase.get('age_range', 'Unknown')
+                    key_events = phase.get('key_events', [])
+                    
+                    if key_events:
+                        prompt += f"\n- {phase_name} (age {age_range}): {'; '.join(key_events[:2])}"
+                        
+                logger.info("🧠 CDL-ENHANCED: Added %d life phases to prompt for %s", 
+                           len(life_phases_data), character.identity.name)
 
             # Background context (date/time) - placed at end with minimal emphasis
             prompt += f"""
