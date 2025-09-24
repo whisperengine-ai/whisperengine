@@ -30,13 +30,15 @@ class LLMToolIntegrationManager:
     
     def __init__(self, vector_memory_tool_manager, intelligent_memory_manager, 
                  character_evolution_tool_manager, emotional_intelligence_tool_manager,
-                 phase3_memory_tool_manager, phase4_orchestration_manager, llm_client):
+                 phase3_memory_tool_manager, phase4_orchestration_manager, llm_client,
+                 web_search_tool_manager=None):
         self.vector_memory_tools = vector_memory_tool_manager
         self.intelligent_memory_tools = intelligent_memory_manager
         self.character_evolution_tools = character_evolution_tool_manager
         self.emotional_intelligence_tools = emotional_intelligence_tool_manager
         self.phase3_memory_tools = phase3_memory_tool_manager  # Phase 3: Multi-Dimensional Memory Networks
         self.phase4_orchestration_tools = phase4_orchestration_manager  # Phase 4: Proactive Intelligence & Tool Orchestration
+        self.web_search_tools = web_search_tool_manager  # Web Search: Current Events & Information
         self.llm_client = llm_client
         
         # Combine all tools
@@ -71,6 +73,10 @@ class LLMToolIntegrationManager:
         if hasattr(self.phase4_orchestration_tools, 'tools'):
             combined_tools.extend(self.phase4_orchestration_tools.tools)
         
+        # Add web search tools (Current Events & Information)
+        if self.web_search_tools and hasattr(self.web_search_tools, 'tools'):
+            combined_tools.extend(self.web_search_tools.tools)
+        
         logger.info("Combined %d tools from all managers", len(combined_tools))
         return combined_tools
     
@@ -95,6 +101,15 @@ class LLMToolIntegrationManager:
         
         # Check for workflow/planning requests
         workflow_planning_needed = self._detect_workflow_planning_request(user_message)
+        
+        # Check for current events/web search requests
+        web_search_needed = self._detect_web_search_request(user_message)
+        
+        # Log web search detection for monitoring
+        if web_search_needed:
+            logger.info("🔍 Web search needed detected for message: '%s'", user_message[:100] + "..." if len(user_message) > 100 else user_message)
+        else:
+            logger.debug("🔍 No web search needed for message: '%s'", user_message[:50] + "..." if len(user_message) > 50 else user_message)
         
         additional_tools = []
         
@@ -125,6 +140,20 @@ class LLMToolIntegrationManager:
                 tool_name = tool.get("function", {}).get("name", "")
                 if "orchestrate" in tool_name or "plan" in tool_name or "workflow" in tool_name:
                     additional_tools.append(tool)
+        
+        # Add web search tools for current events
+        web_search_tools_added = 0
+        if web_search_needed:
+            for tool in self.all_tools:
+                tool_name = tool.get("function", {}).get("name", "")
+                if "search_current_events" in tool_name or "verify_current_information" in tool_name:
+                    additional_tools.append(tool)
+                    web_search_tools_added += 1
+            
+            if web_search_tools_added > 0:
+                logger.info("🔍 Added %d web search tools to LLM context", web_search_tools_added)
+            else:
+                logger.warning("🔍 Web search needed but no web search tools available in system")
         
         # Combine and deduplicate
         relevant_tools = core_tools + additional_tools
@@ -198,6 +227,18 @@ class LLMToolIntegrationManager:
         message_lower = message.lower()
         return any(keyword in message_lower for keyword in workflow_keywords)
     
+    def _detect_web_search_request(self, message: str) -> bool:
+        """Detect if user is requesting current events or web search"""
+        web_search_keywords = [
+            'news', 'current', 'recent', 'latest', 'what\'s happening',
+            'look up', 'search', 'find out', 'current events', 'today',
+            'this week', 'this month', 'verify', 'fact check', 'check if',
+            'is it true', 'what happened', 'recent developments',
+            'current situation', 'up to date', 'recent information'
+        ]
+        message_lower = message.lower()
+        return any(keyword in message_lower for keyword in web_search_keywords)
+    
     async def execute_llm_with_tools(self, user_message: str, user_id: str, 
                                    character_context: str = "", 
                                    emotional_context: Dict[str, Any] = None) -> Dict[str, Any]:
@@ -240,13 +281,27 @@ class LLMToolIntegrationManager:
             
             execution_time = (datetime.now() - start_time).total_seconds()
             
+            # Check if web search was used and add emoji prefix
+            llm_response = response.get("choices", [{}])[0].get("message", {}).get("content", "")
+            web_search_used = any(
+                result.get("tool_name") in ["search_current_events", "verify_current_information"]
+                for result in tool_results
+                if result.get("success", False)
+            )
+            
+            # Add emoji prefix if web search was used
+            if web_search_used and llm_response:
+                llm_response = f"🌐 {llm_response}"
+                logger.info("🌐 Added web search indicator to response (user will see network usage)")
+            
             result = {
                 "success": True,
-                "llm_response": response.get("choices", [{}])[0].get("message", {}).get("content", ""),
+                "llm_response": llm_response,
                 "tool_calls_made": len(tool_calls),
                 "tool_results": tool_results,
                 "execution_time": execution_time,
-                "timestamp": datetime.now().isoformat()
+                "timestamp": datetime.now().isoformat(),
+                "web_search_used": web_search_used  # For debugging/logging
             }
             
             return result
@@ -289,6 +344,12 @@ You have access to powerful tools for:
    - Provide proactive emotional support when needed
    - Analyze emotional patterns for better understanding
    - Implement crisis intervention when necessary
+
+4. CURRENT EVENTS & WEB SEARCH:
+   - Search for current events, news, and recent developments
+   - Verify information against current sources
+   - Access up-to-date information not in memory
+   - Fact-check claims using web sources
    
 4. MULTI-DIMENSIONAL MEMORY NETWORKS:
    - Analyze complex memory networks for deep insights
@@ -424,6 +485,11 @@ IMPORTANT: Always prioritize user emotional wellbeing and safety. When tools are
             "analyze_tool_effectiveness", "plan_autonomous_workflow",
         ]
         
+        # Web Search Tools (Current Events & Information)
+        web_search_tools = [
+            "search_current_events", "verify_current_information"
+        ]
+        
         # Add any additional tool names
         emotional_intelligence_tools.append("emotional_crisis_intervention")
         
@@ -452,6 +518,21 @@ IMPORTANT: Always prioritize user emotional wellbeing and safety. When tools are
             return await self.phase4_orchestration_tools.handle_tool_call(
                 function_name, parameters
             )
+        elif function_name in web_search_tools:
+            logger.info("🔍 Executing web search tool: %s with parameters: %s", function_name, parameters)
+            if self.web_search_tools:
+                result = await self.web_search_tools.execute_tool(
+                    function_name, parameters, user_id
+                )
+                if result.get("success"):
+                    logger.info("✅ Web search completed successfully - found %d results", 
+                               result.get("results_count", result.get("sources_found", 0)))
+                else:
+                    logger.warning("⚠️ Web search failed: %s", result.get("error", "Unknown error"))
+                return result
+            else:
+                logger.error("❌ Web search requested but web search tools not available")
+                return {"success": False, "error": "Web search tools not available"}
         else:
             logger.warning("Unknown tool function: %s", function_name)
             return {"success": False, "error": f"Unknown tool: {function_name}"}
@@ -516,6 +597,9 @@ IMPORTANT: Always prioritize user emotional wellbeing and safety. When tools are
                 "detect_emotional_crisis", "calibrate_empathy_response",
                 "provide_proactive_support", "analyze_emotional_patterns",
                 "emotional_crisis_intervention"
+            ],
+            "Web Search & Current Events": [
+                "search_current_events", "verify_current_information"
             ]
         }
         
@@ -526,8 +610,9 @@ IMPORTANT: Always prioritize user emotional wellbeing and safety. When tools are
             "phase_2_complete": True,  # Character Evolution and Emotional Intelligence
             "phase_3_complete": True,  # Multi-Dimensional Memory Networks
             "phase_4_complete": True,  # Proactive Intelligence & Tool Orchestration
+            "web_search_available": self.web_search_tools is not None,  # NEW: Web search capabilities
             "intelligent_filtering": "enabled",  # NEW: Intelligent tool filtering to reduce tokens
-            "average_tools_per_request": "3-8 (filtered from 27)",  # Estimated after filtering
+            "average_tools_per_request": "3-10 (filtered from 29)",  # Estimated after filtering
             "token_optimization": "active",
             "integration_status": "fully_operational"
         }

@@ -310,8 +310,12 @@ class ModularBotManager:
                 )
                 await self.command_handlers["llm_tools"].register_commands()
                 logger.info("✅ LLM Tool Calling command handlers registered")
+                
+                # Web Search Integration - works automatically in conversation, no extra commands needed!
+                logger.info("✅ Web Search integration enabled (automatic in conversation)")
             else:
                 logger.info("ℹ️ LLM Tool Calling commands disabled (feature flag or component unavailable)")
+                logger.info("ℹ️ Web Search integration disabled (requires LLM tool integration)")
             
             # Store command handlers on bot instance for access by events handler
             self.bot.command_handlers = self.command_handlers

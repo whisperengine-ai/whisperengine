@@ -285,6 +285,18 @@ def create_llm_tool_integration_manager(memory_manager, character_manager, llm_c
             llm_client
         )
         
+        # Create web search tool manager (optional - can be disabled)
+        web_search_tools = None
+        try:
+            from ..web_search.web_search_tool_manager import WebSearchToolManager
+            web_search_tools = WebSearchToolManager()
+            logger.info("🔍 Web search tools initialized successfully - Characters can now access current events")
+            logger.info("🔍 Available web search tools: %d", len(web_search_tools.tools))
+        except ImportError as e:
+            logger.info("🔍 Web search tools not available - continuing without web search capabilities: %s", e)
+        except Exception as e:
+            logger.warning("🔍 Failed to initialize web search tools: %s", e)
+        
         # Create unified integration manager
         integration_manager = LLMToolIntegrationManager(
             vector_memory_tools,
@@ -293,7 +305,8 @@ def create_llm_tool_integration_manager(memory_manager, character_manager, llm_c
             emotional_intelligence_tools,
             phase3_memory_tools,
             phase4_orchestration_tools,
-            llm_client
+            llm_client,
+            web_search_tools
         )
         
         # Set the integration manager reference in Phase 4 orchestration
