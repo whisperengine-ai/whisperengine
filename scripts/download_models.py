@@ -23,12 +23,24 @@ def download_embedding_models():
         models_dir = Path("/app/models/embeddings")
         models_dir.mkdir(parents=True, exist_ok=True)
         
+        # Ensure FastEmbed cache directory exists and is set correctly
+        fastembed_cache = os.environ.get('FASTEMBED_CACHE_PATH', '/root/.cache/fastembed')
+        os.makedirs(fastembed_cache, exist_ok=True)
+        logger.info(f"📁 FastEmbed cache directory: {fastembed_cache}")
+        
         # Primary embedding model (fastembed approach)
         model_name = "snowflake/snowflake-arctic-embed-xs"
         logger.info(f"📥 Downloading vector-native embedding model ({model_name})...")
         
         # Initialize fastembed model (this downloads it to cache)
         embedding_model = TextEmbedding(model_name=model_name)
+        
+        # Verify cache was created
+        if os.path.exists(fastembed_cache) and os.listdir(fastembed_cache):
+            logger.info(f"✅ FastEmbed cache populated: {fastembed_cache}")
+            logger.info(f"📁 Cache contents: {os.listdir(fastembed_cache)}")
+        else:
+            logger.warning(f"⚠️  FastEmbed cache not found or empty: {fastembed_cache}")
         
         # Create a test embedding to ensure model works
         test_embedding = list(embedding_model.embed(["test sentence"]))[0]
@@ -38,7 +50,7 @@ def download_embedding_models():
         model_info = {
             "model_name": model_name,
             "embedding_dimension": len(test_embedding),
-            "cache_location": os.path.expanduser("~/.cache/fastembed"),
+            "cache_location": fastembed_cache,
             "model_type": "fastembed",
             "architecture": "vector_native",
             "verified": True
