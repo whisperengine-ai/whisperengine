@@ -722,11 +722,31 @@ class LLMClient:
             model: Name of the model (usually just use "local-model" for LM Studio)
             temperature: Randomness of the generation (0.0 to 1.0)
             max_tokens: Maximum tokens to generate (defaults to environment config)
-            stream: Whether to stream the response (not implemented yet)
+            stream: Whether to stream the response (redirects to streaming method)
 
         Returns:
             The response from the API
         """
+        if stream:
+            # Collect all chunks and return as single response
+            full_content = ""
+            for chunk in self.generate_chat_completion_stream(messages, model, temperature, max_tokens):
+                if chunk.get("choices") and chunk["choices"][0].get("delta", {}).get("content"):
+                    full_content += chunk["choices"][0]["delta"]["content"]
+            
+            # Return standard response format
+            return {
+                "choices": [
+                    {
+                        "message": {
+                            "role": "assistant",
+                            "content": full_content
+                        },
+                        "finish_reason": "stop"
+                    }
+                ]
+            }
+        
         # Handle local LLM inference first
         if self.is_local_llm and self.local_model and self.local_tokenizer:
             return self._generate_local_chat_completion(messages, temperature, max_tokens)
@@ -855,6 +875,92 @@ class LLMClient:
         except Exception as e:
             self.logger.error(f"Unexpected error generating chat completion: {e}")
             raise LLMError(f"Unexpected error: {str(e)}")
+
+    def generate_chat_completion_stream(
+        self,
+        messages: list[dict[str, str]],
+        model: str | None = None,
+        temperature: float = 0.7,
+        max_tokens: int | None = None,
+    ):
+        """
+        Generate a streaming chat completion response
+        
+        Args:
+            messages: List of message dictionaries with 'role' and 'content'
+            model: Name of the model (uses default if not specified)
+            temperature: Randomness of the generation (0.0 to 1.0)
+            max_tokens: Maximum tokens to generate (defaults to environment config)
+            
+        Yields:
+            Streaming response chunks in OpenAI format
+        """
+        try:
+            # Use the default model if none provided
+            model = model or self.chat_model_name
+            
+            # Use the configured max_tokens if none provided
+            max_tokens = max_tokens or self.default_max_tokens_chat
+            
+            # Prepare the payload
+            payload = {
+                "model": model,
+                "messages": messages,
+                "temperature": temperature,
+                "max_tokens": max_tokens,
+                "stream": True,  # Enable streaming
+            }
+            
+            headers = {"Content-Type": "application/json"}
+            if self.api_key:
+                if self.api_key_manager:
+                    secure_headers = self.api_key_manager.secure_header_creation(
+                        self.api_key, "Bearer"
+                    )
+                    headers.update(secure_headers)
+                else:
+                    headers["Authorization"] = f"Bearer {self.api_key}"
+            
+            self.logger.debug(f"Streaming chat completion to {self.chat_endpoint}")
+            
+            # Make streaming request
+            response = self.session.post(
+                self.chat_endpoint,
+                json=payload,
+                headers=headers,
+                timeout=(self.connection_timeout, self.request_timeout),
+                stream=True  # Enable streaming response
+            )
+            response.raise_for_status()
+            
+            # Process streaming response
+            for line in response.iter_lines():
+                if line:
+                    line = line.decode('utf-8')
+                    if line.startswith('data: '):
+                        data = line[6:]  # Remove 'data: ' prefix
+                        if data.strip() == '[DONE]':
+                            break
+                        try:
+                            chunk = json.loads(data)
+                            yield chunk
+                        except json.JSONDecodeError:
+                            continue  # Skip malformed chunks
+                            
+        except requests.ConnectionError as e:
+            self.logger.error(f"Connection error in streaming chat completion: {e}")
+            raise LLMConnectionError(f"Cannot connect to {self.service_name} server")
+        except requests.Timeout as e:
+            self.logger.error(f"Timeout error in streaming chat completion: {e}")
+            raise LLMTimeoutError(f"Streaming request to {self.service_name} timed out")
+        except requests.HTTPError as e:
+            if e.response.status_code == 429:
+                raise LLMRateLimitError(f"{self.service_name} rate limit exceeded")
+            else:
+                raise LLMError(f"HTTP error in streaming: {e.response.status_code}")
+        except Exception as e:
+            self.logger.error(f"Unexpected error in streaming chat completion: {e}")
+            raise LLMError(f"Streaming error: {str(e)}")
 
     @monitor_performance("llm_tool_request", timeout_ms=45000)
     def generate_chat_completion_with_tools(

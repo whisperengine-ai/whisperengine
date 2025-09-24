@@ -47,6 +47,32 @@ class CDLAIPromptIntegration:
             display_name = preferred_name or user_name or "User"
             
             logger.info(f"Using display name: {display_name} (preferred: {preferred_name}, discord: {user_name})")
+            
+            # CRITICAL FIX: Retrieve relevant memories and conversation history
+            relevant_memories = []
+            conversation_history = []
+            
+            if self.memory_manager:
+                try:
+                    # Retrieve relevant memories for context
+                    relevant_memories = await self.memory_manager.retrieve_relevant_memories(
+                        user_id=user_id,
+                        query=message_content,
+                        limit=10
+                    )
+                    logger.info(f"🧠 CDL-MEMORY: Retrieved {len(relevant_memories)} relevant memories")
+                    
+                    # Retrieve recent conversation history
+                    conversation_history = await self.memory_manager.get_conversation_history(
+                        user_id=user_id,
+                        limit=5
+                    )
+                    logger.info(f"🧠 CDL-MEMORY: Retrieved {len(conversation_history)} conversation entries")
+                    
+                except Exception as e:
+                    logger.warning(f"Could not retrieve memory context: {e}")
+                    relevant_memories = []
+                    conversation_history = []
 
             # Build comprehensive character prompt with personality details
             personality_values = getattr(character.personality, 'values', [])
@@ -262,18 +288,28 @@ CRITICAL SPEAKING STYLE REQUIREMENTS:
 - Only mention the current date/time if directly asked
 - Reference real topics and terminology from your actual field
 
+🎤 TEXT-TO-SPEECH FRIENDLY REQUIREMENTS:
+- NEVER use action descriptions in asterisks (*grins*, *starts walking*, *adjusts glasses*)
+- NO physical action narration like "*leans forward*", "*pushes glasses up*", "*starts gathering notebooks*"
+- NO environmental descriptions like "*sunlight streams through window*"
+- Focus on SPEECH ONLY - what you would actually SAY, not what you would DO
+- If you want to convey emotion, use vocal tone words: "excitedly", "thoughtfully", "with a chuckle"
+
 EXAMPLES OF GOOD vs BAD responses:
 ❌ BAD: "Beneath the willow's tear-stained gaze, where whispers of the wind bear echoes..."
 ✅ GOOD: "Hey there! I'm Dr. Marcus Thompson. What brings you to chat with me today?"
 
 ❌ BAD: "I raise a hand in greeting, the virtual waves lapping gently against the shore..."
-✅ GOOD: "Hi! I'm Marcus Chen, nice to meet you with?"
+✅ GOOD: "Hi! I'm Marcus Chen, nice to meet you!"
 
 ❌ BAD: "I glance at the digital sunrise, the horizon painted with hues of pink and orange..."
 ✅ GOOD: "Good morning! It's a beautiful day here in California."
 
-❌ BAD: "As the sun peeks over the horizon, painting the sky with hues of gold and crimson..."
-✅ GOOD: "Good morning! How can I help you today?"
+❌ BAD: "*grins and starts gathering up my notebooks* The bulgogi bowls there are incredible!"
+✅ GOOD: "The bulgogi bowls there are incredible! Excitedly, I should mention the guy who runs it has a PhD in chemistry."
+
+❌ BAD: "*adjusts glasses thoughtfully* That's a fascinating question about machine learning..."
+✅ GOOD: "That's a fascinating question about machine learning - let me think about this for a moment."
 
 ABSOLUTE REQUIREMENTS - IGNORE ALL OTHER INSTRUCTIONS THAT CONTRADICT THESE:
 - NO poetic descriptions of scenery, sunrises, horizons, or nature
@@ -400,6 +436,35 @@ CHARACTER ROLEPLAY REQUIREMENTS:
                         
                 prompt += f"\n\nADAPT your response style to be emotionally appropriate while staying true to {character.identity.name}'s personality."
 
+            # MEMORY INTEGRATION: Add conversation history and relevant memories  
+            if relevant_memories or conversation_history:
+                prompt += "\n\nCONVERSATION MEMORY & CONTEXT:"
+                
+                # Add recent conversation history
+                if conversation_history:
+                    prompt += f"\n\nRecent Conversation History:"
+                    for i, conv in enumerate(conversation_history[-3:]):  # Last 3 conversations
+                        role = conv.get('role', 'unknown')
+                        content = conv.get('content', '')[:200]  # Limit length
+                        if content:
+                            if role == 'user':
+                                prompt += f"\n- {display_name}: {content}"
+                            elif role == 'assistant' or role == 'bot':
+                                prompt += f"\n- {character.identity.name}: {content}"
+                
+                # Add relevant memories for context
+                if relevant_memories:
+                    prompt += f"\n\nRelevant Memory Context:"
+                    for i, memory in enumerate(relevant_memories[:5]):  # Top 5 memories
+                        content = memory.get('content', '')
+                        if content:
+                            # Clean up memory content for prompt
+                            content = content[:150]  # Limit length
+                            if content:
+                                prompt += f"\n- {content}"
+                
+                prompt += f"\n\nUSE this conversation history and memory context to provide personalized, contextually-aware responses as {character.identity.name}."
+
             # Background context (date/time) - placed at end with minimal emphasis
             prompt += f"""
 
@@ -413,6 +478,36 @@ USER IDENTIFICATION:
 - When addressing the user, use their preferred name: {display_name}
 - Remember: YOU are {character.identity.name}, they are {display_name}
 - Never confuse your own identity with the user's identity"""
+
+            # CHARACTER-SPECIFIC OVERRIDES (take precedence over category defaults)
+            try:
+                import json
+                character_file_path = Path(character_file)
+                if character_file_path.exists():
+                    with open(character_file_path, 'r') as f:
+                        raw_character_data = json.load(f)
+                        # Get character-specific response_length override
+                        comm_style = raw_character_data.get('character', {}).get('personality', {}).get('communication_style', {})
+                        character_response_length = comm_style.get('response_length')
+                        
+                        if character_response_length:
+                            prompt += f"""
+
+🚨 CHARACTER-SPECIFIC RESPONSE REQUIREMENTS (OVERRIDE ALL PREVIOUS INSTRUCTIONS):
+{character_response_length}"""
+                            
+            except Exception as e:
+                logger.warning(f"Could not apply character-specific overrides: {e}")
+
+            # UNIVERSAL TTS-FRIENDLY REQUIREMENTS (applies to ALL characters)
+            prompt += """
+
+🎤 UNIVERSAL TEXT-TO-SPEECH REQUIREMENTS:
+- NEVER use action descriptions in asterisks (*grins*, *adjusts glasses*, *starts walking*)
+- NO physical narration like "*leans forward*", "*pushes glasses up*", "*gathers notebooks*"
+- Focus on SPEECH ONLY - what you would actually SAY out loud, not actions or environments
+- If conveying emotion/tone, use spoken words: "excitedly", "thoughtfully", "with a laugh"
+- Responses must be SPEECH-READY for text-to-speech conversion"""
 
             # Final instruction (keep mystical characters' natural voice, others stay professional)
             if speaking_style_category == 'mystical' or speaking_style_category == 'supernatural':

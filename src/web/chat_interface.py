@@ -407,7 +407,7 @@ class WebChatApplication:
                     <select id="botSelector" class="bot-selector">
                         <option value="elena">Elena Rodriguez</option>
                         <option value="marcus">Marcus Thompson</option>
-                        <option value="marcus-chen">Marcus Chen</option>
+                        <option value="ryan-chen">Ryan Chen</option>
                     </select>
                     <div id="connectionStatus">Connecting...</div>
                 </div>
@@ -604,9 +604,9 @@ class WebChatApplication:
                 character_file="characters/examples/marcus-thompson.json",
                 description="AI researcher companion"
             ),
-            "marcus-chen": BotConfiguration(
-                bot_name="marcus-chen",
-                character_file="characters/examples/marcus-chen.json",
+            "ryan-chen": BotConfiguration(
+                bot_name="ryan-chen",
+                character_file="characters/examples/ryan-chen.json",
                 description="Game developer companion"
             )
         }

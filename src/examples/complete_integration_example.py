@@ -275,7 +275,7 @@ class CompleteIntegratedBot:
             self.memory_manager.retrieve_relevant_memories("test_user", "test", limit=1)
             status["components"]["memory_manager"] = {
                 "status": "healthy",
-                "embedding_model": os.getenv("LLM_LOCAL_EMBEDDING_MODEL", "unknown"),
+                "embedding_model": os.getenv("EMBEDDING_MODEL", "snowflake/snowflake-arctic-embed-xs"),
             }
         except Exception as e:
             status["components"]["memory_manager"] = {"status": "error", "error": str(e)}

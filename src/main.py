@@ -29,7 +29,6 @@ from src.handlers.help import HelpCommandHandlers
 from src.handlers.memory import MemoryCommandHandlers
 from src.handlers.monitoring_commands import MonitoringCommands
 # Multi-entity handlers removed - using vector-native memory
-from src.handlers.onboarding_commands import create_onboarding_commands
 from src.handlers.performance_commands import create_performance_commands
 from src.handlers.privacy import PrivacyCommandHandlers
 from src.handlers.status import StatusCommandHandlers
@@ -272,15 +271,6 @@ class ModularBotManager:
             logger.info("✅ Performance monitoring command handlers registered")
 
             # ℹ️ Multi-entity handlers removed - using vector-native memory approach
-
-            # Onboarding and enhanced help commands
-            self.command_handlers["onboarding"] = create_onboarding_commands(
-                bot=self.bot,
-                llm_client=components["llm_client"],
-                memory_manager=components["memory_manager"]
-            )
-            self.command_handlers["onboarding"].register_commands(bot_name_filter, is_admin)
-            logger.info("✅ Onboarding command handlers registered")
 
             # CDL Character Test Commands  
             self.command_handlers["cdl_test"] = CDLTestCommands(bot=self.bot)

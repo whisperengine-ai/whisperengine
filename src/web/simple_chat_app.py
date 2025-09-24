@@ -156,7 +156,7 @@ class SimpleBotConnector:
             self.bot_hosts = {
                 "elena": "whisperengine-elena-bot:9091",
                 "marcus": "whisperengine-marcus-bot:9092", 
-                "marcus-chen": "whisperengine-marcus-chen-bot:9093",
+                "ryan-chen": "whisperengine-ryan-chen-bot:9093",
                 "dream": "whisperengine-dream-bot:9094",
                 "gabriel": "whisperengine-gabriel-bot:9095"
             }
@@ -165,7 +165,7 @@ class SimpleBotConnector:
             self.bot_hosts = {
                 "elena": "localhost:9091",
                 "marcus": "localhost:9092",
-                "marcus-chen": "localhost:9093", 
+                "ryan-chen": "localhost:9093", 
                 "dream": "localhost:9094",
                 "gabriel": "localhost:9095"
             }
@@ -220,12 +220,96 @@ class SimpleBotConnector:
             logger.error("Failed to communicate with bot %s: %s", bot_name, e)
             return f"Sorry, I couldn't reach {bot_name} right now. Please try again later."
     
+    async def send_message_to_bot_stream(self, bot_name: str, user_id: str, message: str):
+        """Send message to bot and get streaming response"""
+        bot_host = self.bot_hosts.get(bot_name)
+        if not bot_host:
+            yield {"error": f"Bot '{bot_name}' is not available"}
+            return
+        
+        try:
+            async with aiohttp.ClientSession(timeout=self.timeout) as session:
+                # Check if bot is running via health endpoint
+                health_url = f"http://{bot_host}/health"
+                try:
+                    async with session.get(health_url) as response:
+                        if response.status != 200:
+                            yield {"error": f"Bot '{bot_name}' is not responding"}
+                            return
+                except Exception:
+                    yield {"error": f"Bot '{bot_name}' is not running"}
+                    return
+                
+                # Try streaming chat API endpoint first
+                stream_url = f"http://{bot_host}/api/chat/stream"
+                chat_payload = {
+                    "user_id": user_id,
+                    "message": message,
+                    "platform": "WEB_UI"
+                }
+                
+                try:
+                    async with session.post(stream_url, json=chat_payload) as response:
+                        if response.status == 200:
+                            # Process streaming response
+                            async for line in response.content:
+                                if line:
+                                    line_str = line.decode('utf-8').strip()
+                                    if line_str.startswith('data: '):
+                                        data = line_str[6:]  # Remove 'data: ' prefix
+                                        if data.strip() == '[DONE]':
+                                            break
+                                        try:
+                                            chunk = json.loads(data)
+                                            yield chunk
+                                        except json.JSONDecodeError:
+                                            continue
+                        else:
+                            # Fallback to regular API if streaming not available
+                            regular_response = await self.send_message_to_bot(bot_name, user_id, message)
+                            # Simulate streaming by yielding each word
+                            words = regular_response.split()
+                            for word in words:
+                                yield {
+                                    "choices": [{
+                                        "delta": {"content": word + " "},
+                                        "finish_reason": None
+                                    }]
+                                }
+                                await asyncio.sleep(0.05)  # 50ms delay between words
+                            
+                            # Send final completion
+                            yield {
+                                "choices": [{
+                                    "delta": {},
+                                    "finish_reason": "stop"
+                                }]
+                            }
+                            
+                except Exception as stream_error:
+                    logger.warning(f"Streaming API not available for bot {bot_name}: {stream_error}")
+                    # Fallback to regular response with simulated streaming
+                    fallback_response = self._get_fallback_response(bot_name, message)
+                    words = fallback_response.split()
+                    for word in words:
+                        yield {
+                            "choices": [{
+                                "delta": {"content": word + " "},
+                                "finish_reason": None
+                            }]
+                        }
+                        await asyncio.sleep(0.1)  # Slower for demo mode
+                
+        except Exception as e:
+            logger.error("Failed to get streaming response from bot %s: %s", bot_name, e)
+            yield {"error": f"Streaming failed for {bot_name}"}
+    
     def _get_fallback_response(self, bot_name: str, message: str) -> str:
         """Get fallback demo response when chat API is unavailable"""
         bot_responses = {
             "elena": f"🌊 Hi! I'm Elena Rodriguez, marine biologist. You said: '{message[:50]}...' Let me share some ocean insights! (Demo mode - chat API not available)",
             "marcus": f"🤖 Hello! Marcus Thompson here, AI researcher. Regarding '{message[:50]}...', let me provide some technical perspective. (Demo mode - chat API not available)",
-            "marcus-chen": f"🎮 Hey! Marcus Chen, game developer. About '{message[:50]}...', that reminds me of some game design patterns. (Demo mode - chat API not available)",
+            "ryan-chen": f"🎮 Hey! Ryan Chen, game developer. About '{message[:50]}...', that reminds me of some game design patterns. (Demo mode - chat API not available)",
             "dream": f"✨ Greetings, mortal. I am Dream of the Endless. Your words '{message[:50]}...' echo through the realm of dreams. (Demo mode - chat API not available)",
             "gabriel": f"👼 Peace be with you. Gabriel Tether here. Your message '{message[:50]}...' brings to mind some spiritual reflections. (Demo mode - chat API not available)"
         }
@@ -237,7 +321,7 @@ class SimpleBotConnector:
         return [
             {"name": "elena", "display_name": "Elena Rodriguez", "description": "Marine biologist AI companion", "emoji": "🌊"},
             {"name": "marcus", "display_name": "Marcus Thompson", "description": "AI researcher companion", "emoji": "🤖"},
-            {"name": "marcus-chen", "display_name": "Marcus Chen", "description": "Game developer companion", "emoji": "🎮"},
+            {"name": "ryan-chen", "display_name": "Ryan Chen", "description": "Game developer companion", "emoji": "🎮"},
             {"name": "dream", "display_name": "Dream of the Endless", "description": "Mythological being", "emoji": "✨"},
             {"name": "gabriel", "display_name": "Gabriel Tether", "description": "Spiritual guide", "emoji": "👼"}
         ]
@@ -565,6 +649,24 @@ class SimpleWebChatApp:
             """Serve main chat interface"""
             return self._get_chat_html()
         
+        # Include voice API routes
+        try:
+            from src.web.voice_api import voice_router
+            self.app.include_router(voice_router)
+            logger.info("Voice API routes included")
+        except Exception as e:
+            logger.warning("Failed to include voice API routes: %s", e)
+        
+        # Mount static files for voice chat
+        try:
+            from pathlib import Path
+            static_path = Path(__file__).parent / "static"
+            if static_path.exists():
+                self.app.mount("/static", StaticFiles(directory=str(static_path)), name="static")
+                logger.info("Static files mounted at /static")
+        except Exception as e:
+            logger.warning("Failed to mount static files: %s", e)
+        
         # API endpoints
         @self.app.get("/api/bots")
         async def get_available_bots():
@@ -574,152 +676,37 @@ class SimpleWebChatApp:
         @self.app.post("/api/login")
         async def login_user(request: Request):
             """Login with Universal Identity support and account discovery"""
-            form_data = await request.form()
-            username = str(form_data.get("username", ""))
-            display_name = str(form_data.get("display_name", "")) if form_data.get("display_name") else None
-            discord_id = str(form_data.get("discord_id", "")) if form_data.get("discord_id") else None
-            
-            if not username:
-                raise HTTPException(status_code=400, detail="Username is required")
-            
-            # Use Universal Identity Manager to create or get user
             try:
-                if UNIVERSAL_IDENTITY_AVAILABLE:
-                    identity_manager = create_identity_manager(self.postgres_pool)
-                    
-                    if discord_id:
-                        # Link to existing Discord user
-                        universal_user = await identity_manager.get_or_create_discord_user(
-                            discord_user_id=discord_id,
-                            username=username,
-                            display_name=display_name
-                        )
-                        # Add web platform identity
-                        web_identity = PlatformIdentity(
-                            platform=ChatPlatform.WEB_UI,
-                            platform_user_id=f"web_{username}_{datetime.now().timestamp()}",
-                            username=username,
-                            display_name=display_name
-                        )
-                        await identity_manager.link_platform_identity(universal_user.universal_id, web_identity)
-                        user_id = universal_user.universal_id  # Use universal ID for memory
-                        logger.info("Successfully linked Discord user %s to universal ID %s", discord_id, user_id)
-                        
-                        return {
-                            "session_token": f"web_{user_id}_{datetime.now().timestamp()}",
-                            "user": {
-                                "username": username,
-                                "display_name": display_name or username,
-                                "universal_user_id": user_id,
-                                "linked_discord": True,
-                                "discord_id": discord_id
-                            }
-                        }
-                    else:
-                        # Check for existing users with same username (account discovery)
-                        # Direct database query to avoid broken Universal Identity function
-                        existing_users = []
-                        if self.postgres_pool:
-                            try:
-                                async with self.postgres_pool.acquire() as conn:
-                                    # Search for users with matching username
-                                    query = """
-                                        SELECT DISTINCT u.universal_id, u.primary_username, u.display_name, u.email,
-                                               p.platform, p.platform_user_id, p.username as platform_username
-                                        FROM universal_users u
-                                        LEFT JOIN platform_identities p ON u.universal_id = p.universal_id
-                                        WHERE LOWER(u.primary_username) = LOWER($1) 
-                                           OR LOWER(u.display_name) = LOWER($1)
-                                           OR LOWER(p.username) = LOWER($1)
-                                    """
-                                    rows = await conn.fetch(query, username)
-                                    
-                                    # Group by universal_id to consolidate platform identities
-                                    user_map = {}
-                                    for row in rows:
-                                        user_id = row['universal_id']
-                                        if user_id not in user_map:
-                                            user_map[user_id] = {
-                                                "universal_id": user_id,
-                                                "username": row['primary_username'],
-                                                "display_name": row['display_name'],
-                                                "email": row['email'],
-                                                "platform_identities": {},
-                                                "bot_memories": {"Elena": 15, "Marcus": 8}  # Simulated bot memory counts
-                                            }
-                                        
-                                        if row['platform']:
-                                            user_map[user_id]["platform_identities"][row['platform']] = {
-                                                "username": row['platform_username'],
-                                                "platform_user_id": row['platform_user_id']
-                                            }
-                                    
-                                    existing_users = list(user_map.values())
-                                    
-                            except Exception as e:
-                                logger.error("Failed to search for existing users: %s", e)
-                                existing_users = []
-                        
-                        if existing_users:
-                            # Found potential existing accounts
-                            logger.info("Found %d existing accounts for username '%s'", len(existing_users), username)
-                            
-                            # Return enhanced account discovery information with bot memory details
-                            account_options = []
-                            for user_data in existing_users:
-                                discord_identity = user_data["platform_identities"].get("discord")
-                                
-                                # Format bot memory information
-                                bot_summary = []
-                                total_memories = 0
-                                for bot_name, count in user_data.get("bot_memories", {}).items():
-                                    bot_summary.append(f"{bot_name}: {count} memories")
-                                    total_memories += count
-                                
-                                account_options.append({
-                                    "universal_id": user_data["universal_id"],
-                                    "username": user_data["username"], 
-                                    "display_name": user_data["display_name"],
-                                    "has_discord": discord_identity is not None,
-                                    "discord_username": discord_identity["username"] if discord_identity else None,
-                                    "bot_memories": user_data.get("bot_memories", {}),
-                                    "total_memories": total_memories,
-                                    "bot_summary": ", ".join(bot_summary) if bot_summary else "No conversation history found"
-                                })
-                            
-                            return {
-                                "account_discovery": True,
-                                "message": f"Found {len(existing_users)} existing account(s) with conversation history",
-                                "existing_accounts": account_options,
-                                "suggested_action": "These accounts have conversation history with our Discord bots. Please provide your Discord ID to link and access your existing memories, or choose a different username for a new account."
-                            }
-                        
-                        # Create web-only user (no existing accounts found)
-                        universal_user = await identity_manager.create_web_user(
-                            username=username,
-                            display_name=display_name
-                        )
-                        user_id = universal_user.universal_id  # Use universal ID for memory
-                        logger.info("Created new web user %s with universal ID %s", username, user_id)
-                    
-                    session_id = f"web_{user_id}_{datetime.now().timestamp()}"
-                else:
-                    raise ImportError("Universal Identity not available")
+                logger.info("Login attempt started")
+                form_data = await request.form()
+                username = str(form_data.get("username", ""))
+                display_name = str(form_data.get("display_name", "")) if form_data.get("display_name") else None
+                discord_id = str(form_data.get("discord_id", "")) if form_data.get("discord_id") else None
                 
-            except Exception as e:
-                logger.warning(f"Universal Identity Manager failed, falling back to simple ID: {e}")
-                # Fallback to current behavior if Universal Identity fails
+                logger.info(f"Login data: username={username}, display_name={display_name}, discord_id={discord_id}")
+                
+                if not username:
+                    raise HTTPException(status_code=400, detail="Username is required")
+                
+                # Simplified login - just create a session for now
                 user_id = f"web_{username}_{datetime.now().timestamp()}"
                 session_id = user_id
-            
-            user_session = UserSession(
-                username=username,
-                display_name=display_name or username,
-                session_id=session_id,
-                universal_user_id=user_id if user_id != session_id else None
-            )
-            self.user_sessions[session_id] = user_session
-            return {"session_token": session_id, "user": user_session.dict()}
+                
+                user_session = UserSession(
+                    username=username,
+                    display_name=display_name or username,
+                    session_id=session_id,
+                    universal_user_id=None  # Simplified for debugging
+                )
+                
+                logger.info(f"Storing session: {session_id} for user: {username}")
+                self.user_sessions[session_id] = user_session
+                logger.info(f"Session stored. Total sessions: {len(self.user_sessions)}")
+                return {"session_token": session_id, "user": user_session.dict()}
+                
+            except Exception as login_error:
+                logger.error(f"Login failed with error: {login_error}", exc_info=True)
+                raise HTTPException(status_code=500, detail=f"Login failed: {str(login_error)}")
         
         @self.app.get("/api/multibot-status")
         async def multibot_status():
@@ -734,11 +721,13 @@ class SimpleWebChatApp:
             """Send chat message to bot"""
             session_token = request.headers.get("session_token")
             if not session_token:
+                logger.warning("Chat API called without session_token header")
                 raise HTTPException(status_code=401, detail="Session token required")
                 
             user_session = self.user_sessions.get(session_token)
             if not user_session:
-                raise HTTPException(status_code=401, detail="Invalid session")
+                logger.warning(f"Chat API called with invalid session_token: {session_token}. Available sessions: {list(self.user_sessions.keys())}")
+                raise HTTPException(status_code=401, detail="Invalid session - please refresh page and login again")
             
             try:
                 # Determine which user ID to use for memory operations
@@ -765,15 +754,77 @@ class SimpleWebChatApp:
                 logger.error("Chat message failed: %s", e)
                 raise HTTPException(status_code=500, detail="Message processing failed")
         
+        @self.app.post("/api/chat/stream")
+        async def send_message_stream(message_data: ChatMessage, request: Request):
+            """Send chat message to bot with streaming response"""
+            from fastapi.responses import StreamingResponse
+            
+            session_token = request.headers.get("session_token")
+            if not session_token:
+                logger.warning("Streaming chat API called without session_token header")
+                raise HTTPException(status_code=401, detail="Session token required")
+                
+            user_session = self.user_sessions.get(session_token)
+            if not user_session:
+                logger.warning(f"Streaming chat API called with invalid session_token: {session_token}")
+                raise HTTPException(status_code=401, detail="Invalid session")
+            
+            async def generate_streaming_response():
+                try:
+                    # Determine which user ID to use for memory operations
+                    memory_user_id = user_session.universal_user_id or user_session.session_id
+                    
+                    # Send streaming response to bot
+                    full_response = ""
+                    async for chunk in self.bot_connector.send_message_to_bot_stream(
+                        bot_name=message_data.bot_name,
+                        user_id=memory_user_id,
+                        message=message_data.content
+                    ):
+                        # Send each token as it arrives
+                        if isinstance(chunk, dict):
+                            if chunk.get("choices"):
+                                choices = chunk.get("choices", [])
+                                if choices and len(choices) > 0:
+                                    choice = choices[0]
+                                    if isinstance(choice, dict):
+                                        delta = choice.get("delta", {})
+                                        if isinstance(delta, dict) and delta.get("content"):
+                                            token = delta["content"]
+                                            full_response += token
+                                            yield f"data: {json.dumps({'token': token})}\n\n"
+                            elif chunk.get("error"):
+                                yield f"data: {json.dumps({'error': chunk['error']})}\n\n"
+                                return
+                    
+                    # Send completion signal
+                    yield f"data: {json.dumps({'type': 'complete', 'full_response': full_response})}\n\n"
+                    
+                except Exception as e:
+                    logger.error("Streaming chat message failed: %s", e)
+                    yield f"data: {json.dumps({'error': str(e)})}\n\n"
+            
+            return StreamingResponse(
+                generate_streaming_response(),
+                media_type="text/plain",
+                headers={
+                    "Cache-Control": "no-cache",
+                    "Connection": "keep-alive",
+                    "X-Accel-Buffering": "no"
+                }
+            )
+        
         # WebSocket endpoint
         @self.app.websocket("/ws")
         async def websocket_endpoint(websocket: WebSocket, token: str):
             """WebSocket endpoint for real-time chat"""
             user_session = self.user_sessions.get(token)
             if not user_session:
-                await websocket.close(code=4001, reason="Invalid session")
+                logger.warning(f"WebSocket connection rejected: Invalid token {token}. Available sessions: {list(self.user_sessions.keys())}")
+                await websocket.close(code=4001, reason="Invalid session - please refresh page and login again")
                 return
             
+            logger.info(f"WebSocket connected for user: {user_session.session_id}")
             await self.websocket_manager.connect(websocket, user_session.session_id)
             
             try:
@@ -1177,7 +1228,7 @@ class SimpleWebChatApp:
                 
                 .elena-avatar { background: linear-gradient(45deg, #3498db, #2980b9); }
                 .marcus-avatar { background: linear-gradient(45deg, #9b59b6, #8e44ad); }
-                .marcus-chen-avatar { background: linear-gradient(45deg, #e67e22, #d35400); }
+                .ryan-chen-avatar { background: linear-gradient(45deg, #e67e22, #d35400); }
                 .dream-avatar { background: linear-gradient(45deg, #2c3e50, #34495e); }
                 .gabriel-avatar { background: linear-gradient(45deg, #f39c12, #f1c40f); }
                 
@@ -1202,6 +1253,23 @@ class SimpleWebChatApp:
                     color: #2c3e50;
                     border-radius: 20px 20px 20px 5px;
                     box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+                }
+                
+                /* Streaming Message Styles */
+                .message.streaming .message-content {
+                    background: linear-gradient(45deg, #f8f9fa, #e9ecef);
+                    border: 1px solid rgba(52, 152, 219, 0.3);
+                }
+                
+                .streaming-cursor {
+                    animation: blink 1s infinite;
+                    color: #3498db;
+                    font-weight: bold;
+                }
+                
+                @keyframes blink {
+                    0%, 50% { opacity: 1; }
+                    51%, 100% { opacity: 0; }
                 }
                 
                 .message-info {
@@ -1299,6 +1367,63 @@ class SimpleWebChatApp:
                     opacity: 0.5;
                     transform: none;
                     cursor: not-allowed;
+                }
+                
+                .voice-button {
+                    width: 45px;
+                    height: 45px;
+                    background: linear-gradient(45deg, #e74c3c, #c0392b);
+                    color: white;
+                    border: none;
+                    border-radius: 50%;
+                    cursor: pointer;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-size: 1rem;
+                    transition: all 0.3s ease;
+                    box-shadow: 0 3px 12px rgba(231, 76, 60, 0.3);
+                }
+                
+                .voice-button:hover {
+                    transform: translateY(-2px);
+                    box-shadow: 0 6px 20px rgba(231, 76, 60, 0.4);
+                }
+                
+                .voice-button.recording {
+                    background: linear-gradient(45deg, #e74c3c, #c0392b);
+                    animation: pulse-record 1.5s infinite;
+                }
+                
+                .voice-toggle-button {
+                    width: 45px;
+                    height: 45px;
+                    background: linear-gradient(45deg, #9b59b6, #8e44ad);
+                    color: white;
+                    border: none;
+                    border-radius: 50%;
+                    cursor: pointer;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-size: 1rem;
+                    transition: all 0.3s ease;
+                    box-shadow: 0 3px 12px rgba(155, 89, 182, 0.3);
+                }
+                
+                .voice-toggle-button:hover {
+                    transform: translateY(-2px);
+                    box-shadow: 0 6px 20px rgba(155, 89, 182, 0.4);
+                }
+                
+                .voice-toggle-button.muted {
+                    background: linear-gradient(45deg, #95a5a6, #7f8c8d);
+                }
+                
+                @keyframes pulse-record {
+                    0% { box-shadow: 0 3px 12px rgba(231, 76, 60, 0.3); }
+                    50% { box-shadow: 0 3px 12px rgba(231, 76, 60, 0.7); }
+                    100% { box-shadow: 0 3px 12px rgba(231, 76, 60, 0.3); }
                 }
                 
                 .chat-mode {
@@ -1725,8 +1850,8 @@ class SimpleWebChatApp:
                             <input type="text" id="discordIdInput" placeholder="Discord User ID (18-digit number)" class="input-modern">
                             <small>Link your Discord account to access your conversation history across platforms</small>
                         </details>
-                        <button onclick="loginUser()" class="btn-primary">
-                            <i class="fas fa-sign-in-alt"></i> Login
+                        <button onclick="window.testFunction()" class="btn-primary">
+                            <i class="fas fa-sign-in-alt"></i> Login (Test)
                         </button>
                     </div>
                 </div>
@@ -1803,13 +1928,19 @@ class SimpleWebChatApp:
 
                             <div class="input-area">
                                 <div class="input-container">
+                                    <button class="voice-button" onclick="toggleVoiceRecording()" id="voiceButton" title="Voice input">
+                                        <i class="fas fa-microphone"></i>
+                                    </button>
                                     <textarea 
                                         id="messageInput" 
                                         class="message-input" 
-                                        placeholder="Type your message..."
+                                        placeholder="Type your message or use voice input..."
                                         rows="1"
                                         onkeypress="handleKeyPress(event)"
                                     ></textarea>
+                                    <button class="voice-toggle-button" onclick="toggleVoiceOutput()" id="voiceToggleButton" title="Toggle voice responses">
+                                        <i class="fas fa-volume-up" id="voiceToggleIcon"></i>
+                                    </button>
                                     <button class="send-button" onclick="sendMessage()" id="sendButton">
                                         <i class="fas fa-paper-plane"></i>
                                     </button>
@@ -1852,13 +1983,19 @@ class SimpleWebChatApp:
 
                             <div class="input-area">
                                 <div class="input-container">
+                                    <button class="voice-button" onclick="toggleMultiVoiceRecording()" id="multiVoiceButton" title="Voice input">
+                                        <i class="fas fa-microphone"></i>
+                                    </button>
                                     <textarea 
                                         id="multiMessageInput" 
                                         class="message-input" 
-                                        placeholder="Ask multiple AI companions..."
+                                        placeholder="Ask multiple AI companions or use voice input..."
                                         rows="1"
                                         onkeypress="handleMultiKeyPress(event)"
                                     ></textarea>
+                                    <button class="voice-toggle-button" onclick="toggleVoiceOutput()" id="multiVoiceToggleButton" title="Toggle voice responses">
+                                        <i class="fas fa-volume-up" id="multiVoiceToggleIcon"></i>
+                                    </button>
                                     <button class="send-button" onclick="sendMultiMessage()" id="multiSendButton">
                                         <i class="fas fa-paper-plane"></i>
                                     </button>
@@ -1878,6 +2015,14 @@ class SimpleWebChatApp:
                 let availableBots = [];
                 let currentChatMode = 'single';
                 let isTyping = false;
+                
+                // Voice-related variables
+                let mediaRecorder = null;
+                let audioChunks = [];
+                let isRecording = false;
+                let voiceOutputEnabled = true;
+                let availableVoices = [];
+                let currentVoiceId = null;
                 
                 // Initialize app when DOM is loaded
                 document.addEventListener('DOMContentLoaded', () => {
@@ -1900,6 +2045,9 @@ class SimpleWebChatApp:
                         }
                     });
 
+                    // Initialize voice functionality
+                    initializeVoice();
+
                     // Show welcome screen initially
                     showWelcomeScreen();
                 }
@@ -1920,10 +2068,21 @@ class SimpleWebChatApp:
                     document.getElementById('chatContainer').style.display = 'block';
                 }
 
+                // Simple test function
+                window.testFunction = function() {
+                    alert('Test function works!');
+                };
+
                 // Login Functions
-                async function loginUser() {
+                window.loginUser = async function() {
+                    alert('Login button clicked!'); // Debug alert
+                    console.log('loginUser function called');
+                    
                     const username = document.getElementById('usernameInput').value.trim();
+                    console.log('Username:', username);
+                    
                     if (!username) {
+                        console.log('No username provided');
                         showToast('Please enter a username', 'error');
                         return;
                     }
@@ -1931,12 +2090,16 @@ class SimpleWebChatApp:
                     const displayName = document.getElementById('displayNameInput').value.trim() || username;
                     const discordId = document.getElementById('discordIdInput').value.trim();
                     
+                    console.log('Login data:', { username, displayName, discordId });
+                    
                     // Validate Discord ID format if provided
-                    if (discordId && (!/^\\d{17,19}$/.test(discordId))) {
+                    if (discordId && (!/^[0-9]{17,19}$/.test(discordId))) {
+                        console.log('Invalid Discord ID format');
                         showToast('Discord ID must be a 17-19 digit number', 'error');
                         return;
                     }
                     
+                    console.log('Starting login request...');
                     showLoadingSpinner(discordId ? 'Linking Discord account...' : 'Signing you in...');
                     
                     try {
@@ -1945,22 +2108,29 @@ class SimpleWebChatApp:
                             body += `&discord_id=${encodeURIComponent(discordId)}`;
                         }
                         
+                        console.log('Making fetch request with body:', body);
+                        
                         const response = await fetch('/api/login', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                             body: body
                         });
                         
+                        console.log('Login response status:', response.status);
+                        
                         const data = await response.json();
+                        console.log('Login response data:', data);
                         
                         // Handle account discovery response
                         if (data.account_discovery) {
+                            console.log('Account discovery triggered');
                             hideLoadingSpinner();
                             await showAccountDiscoveryDialog(data);
                             return;
                         }
                         
                         sessionToken = data.session_token;
+                        console.log('Session token received:', sessionToken);
                         
                         // Show success message with universal ID info
                         if (data.user.universal_user_id) {
@@ -1986,7 +2156,7 @@ class SimpleWebChatApp:
                     } finally {
                         hideLoadingSpinner();
                     }
-                }
+                }; // End of window.loginUser
 
                 async function showAccountDiscoveryDialog(discoveryData) {
                     const modal = document.createElement('div');
@@ -1996,22 +2166,22 @@ class SimpleWebChatApp:
                             <h3>🔍 Account Discovery</h3>
                             <p>${discoveryData.message}</p>
                             <div class="existing-accounts">
-                                ${discoveryData.existing_accounts.map(account => `
-                                    <div class="account-option">
-                                        <div class="account-info">
-                                            <strong>${account.username}</strong>
-                                            ${account.display_name ? `<span class="display-name">(${account.display_name})</span>` : ''}
-                                            ${account.has_discord ? `<span class="discord-badge">🎮 Discord: ${account.discord_username}</span>` : ''}
-                                        </div>
-                                        ${account.total_memories > 0 ? `
-                                            <div class="memory-summary">
-                                                <strong>💭 ${account.total_memories} conversation memories</strong>
-                                                <div class="bot-breakdown">${account.bot_summary}</div>
-                                            </div>
-                                        ` : '<div class="no-memories">No conversation history found</div>'}
-                                        <small>Universal ID: ${account.universal_id}</small>
-                                    </div>
-                                `).join('')}
+                                ${discoveryData.existing_accounts.map(account => 
+                                    '<div class="account-option">' +
+                                        '<div class="account-info">' +
+                                            '<strong>' + account.username + '</strong>' +
+                                            (account.display_name ? '<span class="display-name">(' + account.display_name + ')</span>' : '') +
+                                            (account.has_discord ? '<span class="discord-badge">🎮 Discord: ' + account.discord_username + '</span>' : '') +
+                                        '</div>' +
+                                        (account.total_memories > 0 ? 
+                                            '<div class="memory-summary">' +
+                                                '<strong>💭 ' + account.total_memories + ' conversation memories</strong>' +
+                                                '<div class="bot-breakdown">' + account.bot_summary + '</div>' +
+                                            '</div>'
+                                        : '<div class="no-memories">No conversation history found</div>') +
+                                        '<small>Universal ID: ' + account.universal_id + '</small>' +
+                                    '</div>'
+                                ).join('')}
                             </div>
                             <p><strong>Options:</strong></p>
                             <div class="discovery-options">
@@ -2182,7 +2352,255 @@ class SimpleWebChatApp:
                     });
                 }
 
-                // Single Bot Messaging
+                // Voice Functionality
+                async function initializeVoice() {
+                    try {
+                        // Load available voices
+                        const response = await fetch('/api/voice/voices');
+                        if (response.ok) {
+                            availableVoices = await response.json();
+                            if (availableVoices.length > 0) {
+                                // Default to Rachel's voice
+                                currentVoiceId = availableVoices.find(v => v.name === 'Rachel')?.voice_id || availableVoices[0].voice_id;
+                            }
+                        }
+                    } catch (error) {
+                        console.error('Failed to initialize voice:', error);
+                    }
+                }
+
+                async function toggleVoiceRecording() {
+                    const button = document.getElementById('voiceButton');
+                    const icon = button.querySelector('i');
+                    
+                    if (!isRecording) {
+                        await startRecording();
+                        button.classList.add('recording');
+                        icon.className = 'fas fa-stop';
+                        button.title = 'Stop recording';
+                    } else {
+                        await stopRecording();
+                        button.classList.remove('recording');
+                        icon.className = 'fas fa-microphone';
+                        button.title = 'Voice input';
+                    }
+                }
+
+                async function toggleMultiVoiceRecording() {
+                    const button = document.getElementById('multiVoiceButton');
+                    const icon = button.querySelector('i');
+                    
+                    if (!isRecording) {
+                        await startRecording(true);
+                        button.classList.add('recording');
+                        icon.className = 'fas fa-stop';
+                        button.title = 'Stop recording';
+                    } else {
+                        await stopRecording(true);
+                        button.classList.remove('recording');
+                        icon.className = 'fas fa-microphone';
+                        button.title = 'Voice input';
+                    }
+                }
+
+                async function startRecording(isMulti = false) {
+                    try {
+                        console.log('Starting voice recording...');
+                        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                        
+                        // Use a more compatible audio format
+                        const options = { mimeType: 'audio/webm' };
+                        if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+                            options.mimeType = 'audio/ogg';
+                            if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+                                options.mimeType = ''; // Use default
+                            }
+                        }
+                        
+                        console.log('Using MIME type:', options.mimeType || 'default');
+                        mediaRecorder = new MediaRecorder(stream, options.mimeType ? options : {});
+                        audioChunks = [];
+                        
+                        mediaRecorder.ondataavailable = (event) => {
+                            console.log('Audio chunk received:', event.data.size, 'bytes');
+                            audioChunks.push(event.data);
+                        };
+                        
+                        mediaRecorder.onstop = async () => {
+                            console.log('Recording stopped, processing audio...');
+                            const audioBlob = new Blob(audioChunks, { type: mediaRecorder.mimeType || 'audio/webm' });
+                            console.log('Audio blob created:', audioBlob.size, 'bytes, type:', audioBlob.type);
+                            await processVoiceInput(audioBlob, isMulti);
+                            stream.getTracks().forEach(track => track.stop());
+                        };
+                        
+                        mediaRecorder.start();
+                        isRecording = true;
+                        console.log('Recording started successfully');
+                        showToast('🎤 Recording... Click stop when finished', 'info');
+                        
+                    } catch (error) {
+                        console.error('Error starting recording:', error);
+                        showToast('Microphone access denied or not available', 'error');
+                    }
+                }
+
+                async function stopRecording(isMulti = false) {
+                    if (mediaRecorder && isRecording) {
+                        mediaRecorder.stop();
+                        isRecording = false;
+                    }
+                }
+
+                async function processVoiceInput(audioBlob, isMulti = false) {
+                    try {
+                        showToast('🔄 Processing voice input...', 'info');
+                        
+                        const formData = new FormData();
+                        formData.append('audio', audioBlob, 'recording.wav');
+                        
+                        const response = await fetch('/api/voice/stt', {
+                            method: 'POST',
+                            body: formData
+                        });
+                        
+                        if (!response.ok) {
+                            throw new Error('Voice processing failed');
+                        }
+                        
+                        const data = await response.json();
+                        const text = data.text.trim();
+                        
+                        if (text) {
+                            const inputElement = isMulti ? 
+                                document.getElementById('multiMessageInput') : 
+                                document.getElementById('messageInput');
+                            inputElement.value = text;
+                            showToast(`✅ Voice input: "${text}"`, 'success');
+                        } else {
+                            showToast('No speech detected. Please try again.', 'warning');
+                        }
+                        
+                    } catch (error) {
+                        console.error('Error processing voice input:', error);
+                        showToast('Failed to process voice input', 'error');
+                    }
+                }
+
+                function toggleVoiceOutput() {
+                    voiceOutputEnabled = !voiceOutputEnabled;
+                    
+                    const buttons = ['voiceToggleButton', 'multiVoiceToggleButton'];
+                    const icons = ['voiceToggleIcon', 'multiVoiceToggleIcon'];
+                    
+                    buttons.forEach((buttonId, index) => {
+                        const button = document.getElementById(buttonId);
+                        const icon = document.getElementById(icons[index]);
+                        
+                        if (button && icon) {
+                            button.classList.toggle('muted', !voiceOutputEnabled);
+                            icon.className = voiceOutputEnabled ? 'fas fa-volume-up' : 'fas fa-volume-mute';
+                            button.title = voiceOutputEnabled ? 'Disable voice responses' : 'Enable voice responses';
+                        }
+                    });
+                    
+                    showToast(
+                        voiceOutputEnabled ? '🔊 Voice responses enabled' : '🔇 Voice responses disabled', 
+                        'info'
+                    );
+                }
+
+                async function playVoiceResponse(text) {
+                    console.log('playVoiceResponse called with:', { text, voiceOutputEnabled, currentVoiceId });
+                    
+                    if (!voiceOutputEnabled || !currentVoiceId || !text.trim()) {
+                        console.log('Voice response skipped:', { voiceOutputEnabled, currentVoiceId, hasText: !!text.trim() });
+                        return;
+                    }
+                    
+                    try {
+                        console.log('Making streaming TTS request...');
+                        
+                        // Try streaming TTS first for better performance
+                        const streamResponse = await fetch('/api/voice/tts/stream', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ 
+                                text: text,
+                                voice_id: currentVoiceId
+                            })
+                        });
+                        
+                        if (streamResponse.ok && streamResponse.body) {
+                            console.log('Using streaming TTS for better performance');
+                            
+                            // Create audio from streaming response
+                            const audioBlob = await streamResponse.blob();
+                            const audioUrl = URL.createObjectURL(audioBlob);
+                            const audio = new Audio(audioUrl);
+                            
+                            console.log('Attempting to play streaming audio...');
+                            audio.play().then(() => {
+                                console.log('Streaming audio playing successfully!');
+                            }).catch(error => {
+                                console.error('Error playing streaming audio:', error);
+                                showMessage('Voice playback blocked by browser. Please click the speaker button to enable.', 'warning');
+                            });
+                            
+                            // Cleanup
+                            audio.addEventListener('ended', () => {
+                                console.log('Streaming audio playback finished');
+                                URL.revokeObjectURL(audioUrl);
+                            });
+                            
+                        } else {
+                            console.log('Streaming TTS not available, falling back to regular TTS');
+                            
+                            // Fallback to regular TTS
+                            const response = await fetch('/api/voice/tts', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ 
+                                    text: text,
+                                    voice_id: currentVoiceId
+                                })
+                            });
+                            
+                            if (!response.ok) throw new Error(`TTS failed: ${response.status}`);
+                            
+                            const data = await response.json();
+                            console.log('Regular TTS response received, playing audio...');
+                            
+                            // Convert base64 audio to blob and play
+                            const audioBlob = new Blob([
+                                Uint8Array.from(atob(data.audio_data), c => c.charCodeAt(0))
+                            ], { type: 'audio/mpeg' });
+                            
+                            const audioUrl = URL.createObjectURL(audioBlob);
+                            const audio = new Audio(audioUrl);
+                            
+                            console.log('Attempting to play regular audio...');
+                            audio.play().then(() => {
+                                console.log('Audio playing successfully!');
+                            }).catch(error => {
+                                console.error('Error playing audio:', error);
+                                showMessage('Voice playback blocked by browser. Please click the speaker button to enable.', 'warning');
+                            });
+                            
+                            // Cleanup
+                            audio.addEventListener('ended', () => {
+                                console.log('Audio playback finished');
+                                URL.revokeObjectURL(audioUrl);
+                            });
+                        }
+                        
+                    } catch (error) {
+                        console.error('Error playing voice response:', error);
+                        showMessage('Voice response failed: ' + error.message, 'error');
+                    }
+                }
+
+                // Single Bot Messaging with Streaming Support
                 async function sendMessage() {
                     if (!currentBot) {
                         showToast('Please select an AI companion first', 'warning');
@@ -2197,10 +2615,12 @@ class SimpleWebChatApp:
                     input.value = '';
                     input.style.height = 'auto';
                     
-                    showTypingIndicator();
+                    // Create bot message container for streaming
+                    const botMessageElement = addStreamingMessage(currentBot);
                     
                     try {
-                        const response = await fetch('/api/chat', {
+                        // Try streaming first
+                        const streamResponse = await fetch('/api/chat/stream', {
                             method: 'POST',
                             headers: { 
                                 'Content-Type': 'application/json',
@@ -2212,15 +2632,81 @@ class SimpleWebChatApp:
                             })
                         });
                         
-                        if (!response.ok) {
-                            throw new Error('Failed to send message');
+                        if (streamResponse.ok && streamResponse.body) {
+                            console.log('Using streaming response for better experience');
+                            
+                            const reader = streamResponse.body.getReader();
+                            const decoder = new TextDecoder();
+                            let fullResponse = '';
+                            
+                            try {
+                                while (true) {
+                                    const { done, value } = await reader.read();
+                                    if (done) break;
+                                    
+                                    const chunk = decoder.decode(value);
+                                    const lines = chunk.split('\n');
+                                    
+                                    for (const line of lines) {
+                                        if (line.startsWith('data: ')) {
+                                            try {
+                                                const data = JSON.parse(line.slice(6));
+                                                
+                                                if (data.token) {
+                                                    // Add token to streaming message
+                                                    fullResponse += data.token;
+                                                    updateStreamingMessage(botMessageElement, fullResponse);
+                                                } else if (data.type === 'complete') {
+                                                    // Stream complete
+                                                    finalizeStreamingMessage(botMessageElement, data.full_response || fullResponse);
+                                                    
+                                                    // Play voice response if enabled
+                                                    if (voiceOutputEnabled) {
+                                                        playVoiceResponse(data.full_response || fullResponse);
+                                                    }
+                                                    break;
+                                                } else if (data.error) {
+                                                    throw new Error(data.error);
+                                                }
+                                            } catch (parseError) {
+                                                console.warn('Failed to parse streaming data:', parseError);
+                                            }
+                                        }
+                                    }
+                                }
+                            } finally {
+                                reader.releaseLock();
+                            }
+                            
+                        } else {
+                            // Fallback to regular API
+                            console.log('Streaming not available, using regular API');
+                            
+                            const response = await fetch('/api/chat', {
+                                method: 'POST',
+                                headers: { 
+                                    'Content-Type': 'application/json',
+                                    'session_token': sessionToken
+                                },
+                                body: JSON.stringify({
+                                    content: message,
+                                    bot_name: currentBot
+                                })
+                            });
+                            
+                            if (!response.ok) {
+                                throw new Error('Failed to send message');
+                            }
+                            
+                            // The regular API response comes via WebSocket
+                            // Replace streaming message with "waiting" state
+                            updateStreamingMessage(botMessageElement, 'Thinking...');
                         }
                         
                     } catch (error) {
-                        hideTypingIndicator();
-                        addMessage('Error: Failed to send message', 'system');
-                        showToast('Failed to send message', 'error');
                         console.error('Send message error:', error);
+                        updateStreamingMessage(botMessageElement, 'Error: Failed to send message');
+                        showToast('Failed to send message', 'error');
                     }
                 }
 
@@ -2288,17 +2774,86 @@ class SimpleWebChatApp:
                     });
                     
                     container.scrollTop = container.scrollHeight;
+                    
+                    // Play voice response for bot messages
+                    if (type === 'bot' && content.trim()) {
+                        playVoiceResponse(content);
+                    }
                 }
 
                 function getBotColor(botName) {
                     const colors = {
                         'elena': '#4ecdc4, #44a08d',
                         'marcus': '#667eea, #764ba2',
-                        'marcus-chen': '#f093fb, #f5576c',
+                        'ryan-chen': '#f093fb, #f5576c',
                         'dream': '#4facfe, #00f2fe',
                         'gabriel': '#43e97b, #38f9d7'
                     };
                     return colors[botName] || '#6c757d, #495057';
+                }
+
+                // Streaming Message Functions
+                function addStreamingMessage(botName) {
+                    const container = document.getElementById('messagesContainer');
+                    const message = document.createElement('div');
+                    message.className = 'message bot streaming';
+                    
+                    // Create avatar
+                    const avatar = document.createElement('div');
+                    avatar.className = 'message-avatar bot-avatar';
+                    const bot = availableBots.find(b => b.name === botName);
+                    if (bot) {
+                        avatar.innerHTML = `<i class="fas fa-robot"></i>`;
+                        avatar.style.background = `linear-gradient(135deg, ${getBotColor(bot.name)})`;
+                    } else {
+                        avatar.innerHTML = `<i class="fas fa-robot"></i>`;
+                    }
+                    
+                    // Create message content
+                    const messageDiv = document.createElement('div');
+                    
+                    if (botName) {
+                        const bot = availableBots.find(b => b.name === botName);
+                        const botDisplayName = bot ? bot.display_name : botName;
+                        
+                        const messageInfo = document.createElement('div');
+                        messageInfo.className = 'message-info';
+                        messageInfo.textContent = botDisplayName;
+                        messageDiv.appendChild(messageInfo);
+                    }
+                    
+                    const messageContent = document.createElement('div');
+                    messageContent.className = 'message-content';
+                    messageContent.innerHTML = '<span class="streaming-cursor">|</span>';
+                    
+                    messageDiv.appendChild(messageContent);
+                    message.appendChild(avatar);
+                    message.appendChild(messageDiv);
+                    container.appendChild(message);
+                    
+                    // Auto-scroll
+                    container.scrollTop = container.scrollHeight;
+                    
+                    return messageContent;
+                }
+                
+                function updateStreamingMessage(messageElement, content) {
+                    if (messageElement) {
+                        // Remove cursor and add content with new cursor
+                        messageElement.innerHTML = content + '<span class="streaming-cursor">|</span>';
+                        
+                        // Auto-scroll
+                        const container = document.getElementById('messagesContainer');
+                        container.scrollTop = container.scrollHeight;
+                    }
+                }
+                
+                function finalizeStreamingMessage(messageElement, finalContent) {
+                    if (messageElement) {
+                        // Remove cursor and set final content
+                        messageElement.innerHTML = finalContent;
+                        messageElement.parentElement.parentElement.classList.remove('streaming');
+                    }
                 }
 
                 // Typing Indicators

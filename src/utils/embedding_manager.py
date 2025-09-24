@@ -25,7 +25,7 @@ class LocalEmbeddingManager:
 
         # Model configuration - optimized for speed and quality
         self.embedding_model_name = os.getenv(
-            "LLM_LOCAL_EMBEDDING_MODEL",
+            "EMBEDDING_MODEL",
             "snowflake/snowflake-arctic-embed-xs",  # 384-dim, optimal for real-time chat
         )
 
