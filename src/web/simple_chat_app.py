@@ -801,8 +801,8 @@ class SimpleWebChatApp:
                     yield f"data: {json.dumps({'type': 'complete', 'full_response': full_response})}\n\n"
                     
                 except Exception as e:
-                    logger.error("Streaming chat message failed: %s", e)
-                    yield f"data: {json.dumps({'error': str(e)})}\n\n"
+                    logger.error("Streaming chat message failed: %s", e, exc_info=True)
+                    yield f"data: {json.dumps({'error': 'Internal server error'})}\n\n"
             
             return StreamingResponse(
                 generate_streaming_response(),
