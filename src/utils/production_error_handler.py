@@ -7,7 +7,7 @@ Enhanced error handling, recovery mechanisms, and user-friendly error messages f
 import logging
 import traceback
 import asyncio
-from enum import Enum
+from enum import Enum, IntEnum
 from typing import Optional, Dict, Any, Callable, Awaitable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
@@ -18,12 +18,12 @@ import os
 logger = logging.getLogger(__name__)
 
 
-class ErrorSeverity(Enum):
+class ErrorSeverity(IntEnum):
     """Error severity levels for different types of failures"""
-    LOW = "low"          # Non-critical, system continues normally
-    MEDIUM = "medium"    # Some features may be degraded
-    HIGH = "high"        # Major functionality affected
-    CRITICAL = "critical"  # System stability at risk
+    LOW = 1          # Non-critical, system continues normally
+    MEDIUM = 2       # Some features may be degraded
+    HIGH = 3         # Major functionality affected
+    CRITICAL = 4     # System stability at risk
 
 
 class ErrorCategory(Enum):
