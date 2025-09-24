@@ -2314,7 +2314,7 @@ class BotEventHandlers:
                         user_id=user_id,
                         user_message=original_content or message.content,
                         bot_character=bot_character,
-                        security_validation_result=security_validation_result,
+                        security_validation_result=getattr(self, '_last_security_validation', None),
                         emotional_context=getattr(self, '_last_emotional_context', None),
                         conversation_context={'channel_type': 'dm' if not message.guild else 'guild'}
                     )
