@@ -177,6 +177,7 @@ class CharacterIdentity:
     gender: GenderIdentity = GenderIdentity.PREFER_NOT_TO_SAY
     occupation: str = ""
     location: str = ""
+    timezone: str = "America/Los_Angeles"  # Default to Pacific Time (server timezone)
     nickname: str = ""
     full_name: str = ""
     description: str = ""

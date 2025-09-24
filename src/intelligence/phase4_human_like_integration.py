@@ -671,14 +671,24 @@ class Phase4HumanLikeIntegration:
 
         # Add human-like processing results
         if phase4_context.human_like_results:
-            response_context["human_like_insights"] = {
-                "conversation_stage": phase4_context.human_like_results.get("conversation_stage"),
-                "emotional_resonance": phase4_context.human_like_results.get("emotional_resonance"),
-                "personality_adaptation": phase4_context.human_like_results.get(
-                    "personality_adaptation"
-                ),
-                "response_style": phase4_context.human_like_results.get("response_style"),
-            }
+            # Handle HumanLikeQueryResult object properly
+            if hasattr(phase4_context.human_like_results, 'conversation_purpose'):
+                # It's a HumanLikeQueryResult dataclass
+                response_context["human_like_insights"] = {
+                    "conversation_purpose": phase4_context.human_like_results.conversation_purpose,
+                    "emotional_context": phase4_context.human_like_results.emotional_context,
+                    "relationship_tone": phase4_context.human_like_results.relationship_tone,
+                    "memory_priority": phase4_context.human_like_results.memory_priority,
+                    "human_association": phase4_context.human_like_results.human_association,
+                }
+            elif isinstance(phase4_context.human_like_results, dict):
+                # It's a dictionary - use original approach
+                response_context["human_like_insights"] = {
+                    "conversation_stage": phase4_context.human_like_results.get("conversation_stage"),
+                    "emotional_resonance": phase4_context.human_like_results.get("emotional_resonance"),
+                    "personality_adaptation": phase4_context.human_like_results.get("personality_adaptation"),
+                    "response_style": phase4_context.human_like_results.get("response_style"),
+                }
 
         # Add enhanced memory query results
         if phase4_context.memory_enhancement_results:

@@ -31,6 +31,21 @@ from src.memory.memory_protocol import MemoryManagerProtocol
 
 logger = logging.getLogger(__name__)
 
+# Import enhanced emotion analysis
+try:
+    from src.intelligence.enhanced_vector_emotion_analyzer import (
+        EnhancedVectorEmotionAnalyzer,
+        create_enhanced_emotion_analyzer
+    )
+    ENHANCED_EMOTION_ANALYZER_AVAILABLE = True
+except ImportError as e:
+    logger.warning("Enhanced Vector Emotion Analyzer not available: %s", e)
+    ENHANCED_EMOTION_ANALYZER_AVAILABLE = False
+    EnhancedVectorEmotionAnalyzer = None
+    create_enhanced_emotion_analyzer = None
+
+logger = logging.getLogger(__name__)
+
 
 class EmojiResponseContext(Enum):
     """Context types that determine emoji response appropriateness"""
@@ -84,6 +99,16 @@ class VectorEmojiIntelligence:
     ):
         self.memory_manager = memory_manager
         self.emoji_mapper = emoji_mapper or EmojiEmotionMapper()
+        
+        # Initialize Enhanced Vector Emotion Analyzer if available
+        self.enhanced_emotion_analyzer = None
+        if ENHANCED_EMOTION_ANALYZER_AVAILABLE:
+            try:
+                self.enhanced_emotion_analyzer = create_enhanced_emotion_analyzer(memory_manager)
+                logger.info("✅ Enhanced Vector Emotion Analyzer initialized successfully")
+            except Exception as e:
+                logger.warning("Failed to initialize Enhanced Vector Emotion Analyzer: %s", e)
+                self.enhanced_emotion_analyzer = None
         
         # Read emoji configuration from environment - always enabled in development!
         self.emoji_enabled = True  # Always enabled in development
@@ -317,11 +342,54 @@ class VectorEmojiIntelligence:
                 personality_match=0.5
             )
     
-    def _analyze_message_emotions(self, user_message: str) -> List[str]:
-        """DEPRECATED: Use Enhanced Vector Emotion Analyzer instead of keyword detection"""
-        # VECTOR-NATIVE REPLACEMENT: This should call Enhanced Vector Emotion Analyzer
-        # For now, minimal fallback to prevent crashes during migration
-        return ["neutral"]  # Default fallback - Enhanced Vector Emotion Analyzer handles real analysis
+    async def _analyze_message_emotions(self, user_id: str, user_message: str) -> List[str]:
+        """
+        Analyze message emotions using Enhanced Vector Emotion Analyzer.
+        Falls back to keyword detection if enhanced analyzer is unavailable.
+        """
+        try:
+            # Use Enhanced Vector Emotion Analyzer if available
+            if self.enhanced_emotion_analyzer is not None:
+                emotion_result = await self.enhanced_emotion_analyzer.analyze_emotion(
+                    content=user_message,
+                    user_id=user_id
+                )
+                emotions = [emotion_result.primary_emotion]
+                
+                # Add secondary emotions based on confidence
+                if emotion_result.all_emotions:
+                    secondary_emotions = [
+                        emotion for emotion, confidence in emotion_result.all_emotions.items()
+                        if emotion != emotion_result.primary_emotion and confidence > 0.3
+                    ]
+                    emotions.extend(secondary_emotions[:2])  # Add up to 2 secondary emotions
+                    
+                return emotions
+            
+            # Fallback to simple keyword detection if enhanced analyzer unavailable
+            emotion_keywords = {
+                "joy": ["happy", "excited", "great", "awesome", "amazing", "wonderful", "fantastic", "love", "😀", "😁", "😂", "😃", "😄", "😆", "🤩", "❤️"],
+                "sadness": ["sad", "crying", "upset", "down", "depressed", "😢", "😭", "😔", "💔", "😞"],
+                "anger": ["angry", "mad", "furious", "annoyed", "frustrated", "😠", "😡", "🤬"],
+                "fear": ["scared", "afraid", "worried", "anxious", "nervous", "😰", "😱", "😨"],
+                "surprise": ["surprised", "shocked", "wow", "omg", "😲", "😱", "🤯"],
+                "gratitude": ["thank", "grateful", "appreciate", "thanks", "🙏", "💝"],
+                "excitement": ["excited", "thrilled", "pumped", "stoked", "🤩", "🎉", "🔥"],
+                "curiosity": ["curious", "wondering", "question", "how", "why", "what", "🤔", "❓"]
+            }
+            
+            message_lower = user_message.lower()
+            detected_emotions = []
+            
+            for emotion, keywords in emotion_keywords.items():
+                if any(keyword in message_lower for keyword in keywords):
+                    detected_emotions.append(emotion)
+            
+            return detected_emotions if detected_emotions else ["neutral"]
+            
+        except Exception as e:
+            logger.error("Error analyzing message emotions: %s", e)
+            return ["neutral"]
     
     async def _analyze_user_personality_context(self, user_id: str) -> Dict[str, Any]:
         """
@@ -432,7 +500,7 @@ class VectorEmojiIntelligence:
             }
             
             # Analyze current message emotions
-            current_emotions = self._analyze_message_emotions(user_message)
+            current_emotions = await self._analyze_message_emotions(user_id, user_message)
             
             # Get recent emotional pattern from memory
             recent_emotional_memories = await self.memory_manager.retrieve_relevant_memories(
@@ -453,7 +521,7 @@ class VectorEmojiIntelligence:
                         recent_emotions.append(metadata["emotional_context"])
                     
                     # Analyze content for emotions
-                    content_emotions = self._analyze_message_emotions(content)
+                    content_emotions = await self._analyze_message_emotions(user_id, content)
                     recent_emotions.extend(content_emotions)
                 
                 # Determine emotional trajectory
@@ -999,7 +1067,7 @@ class VectorEmojiIntelligence:
             
             # Analyze current message emotion using existing emoji mapper
             # Use simplified emotion analysis - look for emotional keywords
-            message_emotions = self._analyze_message_emotions(user_message)
+            message_emotions = await self._analyze_message_emotions(user_id, user_message)
             
             # Check for emotional overwhelm (very high intensity emotions)
             if emotional_context:

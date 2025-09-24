@@ -174,6 +174,16 @@ class VectorMemoryStore:
         # Initialize collection if it doesn't exist
         self._ensure_collection_exists()
         
+        # Initialize enhanced emotion analyzer for consistent emotion detection
+        self._enhanced_emotion_analyzer = None
+        try:
+            from src.intelligence.enhanced_vector_emotion_analyzer import create_enhanced_emotion_analyzer
+            # Create self-referencing memory manager for emotion analysis
+            self._enhanced_emotion_analyzer = create_enhanced_emotion_analyzer(None)
+            logger.info("Enhanced emotion analyzer initialized for consistent emotion detection")
+        except ImportError as e:
+            logger.warning("Enhanced emotion analyzer not available: %s", e)
+        
         # Performance tracking
         self.stats = {
             "embeddings_generated": 0,
@@ -184,6 +194,51 @@ class VectorMemoryStore:
         
         logger.info(f"VectorMemoryStore initialized: {qdrant_host}:{qdrant_port}, "
                    f"collection={collection_name}, embedding_dim={self.embedding_dimension}")
+    
+    def _get_multi_emotion_payload(self) -> Dict[str, Any]:
+        """
+        Extract multi-emotion payload from last RoBERTa analysis for storage
+        
+        Returns:
+            Dictionary with multi-emotion data for Qdrant payload
+        """
+        if not hasattr(self, '_last_emotion_analysis') or not self._last_emotion_analysis:
+            return {}
+        
+        analysis = self._last_emotion_analysis
+        payload = {}
+        
+        # Store secondary emotions if multiple emotions detected
+        if analysis.get('is_multi_emotion', False) and analysis.get('all_emotions'):
+            all_emotions = analysis['all_emotions']
+            primary = analysis['primary_emotion']
+            
+            # Store all emotions as separate fields for easy querying
+            payload['all_emotions_json'] = str(all_emotions)  # JSON string for full data
+            payload['emotion_count'] = len(all_emotions)
+            payload['is_multi_emotion'] = True
+            
+            # Store top secondary emotions (up to 3)
+            secondary_emotions = {k: v for k, v in all_emotions.items() if k != primary}
+            if secondary_emotions:
+                sorted_secondary = sorted(secondary_emotions.items(), key=lambda x: x[1], reverse=True)[:3]
+                
+                for i, (emotion, intensity) in enumerate(sorted_secondary):
+                    payload[f'secondary_emotion_{i+1}'] = emotion
+                    payload[f'secondary_intensity_{i+1}'] = intensity
+            
+            # Store emotion complexity metrics
+            intensities = list(all_emotions.values())
+            payload['emotion_variance'] = max(intensities) - min(intensities) if len(intensities) > 1 else 0.0
+            payload['emotion_dominance'] = analysis['primary_intensity'] / sum(intensities) if sum(intensities) > 0 else 1.0
+        else:
+            payload['is_multi_emotion'] = False
+            payload['emotion_count'] = 1
+            
+        # Store RoBERTa confidence
+        payload['roberta_confidence'] = analysis.get('confidence', 0.0)
+        
+        return payload
     
     def _ensure_collection_exists(self):
         """
@@ -420,7 +475,7 @@ class VectorMemoryStore:
             logger.debug(f"Generated content embedding: {type(content_embedding)}, length: {len(content_embedding) if content_embedding else None}")
             
             # Create emotional embedding for sentiment-aware search  
-            emotional_context, emotional_intensity = self._extract_emotional_context(memory.content)
+            emotional_context, emotional_intensity = await self._extract_emotional_context(memory.content, memory.user_id)
             emotion_embedding = await self.generate_embedding(f"emotion {emotional_context}: {memory.content}")
             logger.debug(f"Generated emotion embedding: {type(emotion_embedding)}, length: {len(emotion_embedding) if emotion_embedding else None}")
             
@@ -499,13 +554,17 @@ class VectorMemoryStore:
                 "word_count": len(memory.content.split()),
                 "char_count": len(memory.content),
                 
+                # 🎭 ENHANCED: Multi-emotion RoBERTa storage
+                **self._get_multi_emotion_payload(),
+                
                 # 🎭 PHASE 1.2: Emotional trajectory tracking
                 **trajectory_data,
                 
                 # 🎯 PHASE 1.3: Memory significance scoring
                 **significance_data,
                 
-                **memory.metadata
+                # Handle metadata safely
+                **(memory.metadata if memory.metadata else {})
             }
             
             # 🚀 QDRANT FEATURE: Named vectors for intelligent multi-dimensional search
@@ -632,27 +691,100 @@ class VectorMemoryStore:
         logger.debug(f"🔄 CHUNKING: Split {len(content)} chars into {len(chunks)} chunks")
         return chunks
     
-    def _extract_emotional_context(self, content: str) -> tuple[str, float]:
-        """Extract emotional context for memory embedding using vector-native analysis"""
-        # VECTOR-NATIVE: Use enhanced emotion analyzer instead of hardcoded neutral
+    async def _extract_emotional_context(self, content: str, user_id: str = "unknown") -> tuple[str, float]:
+        """Extract emotional context using Enhanced Vector Emotion Analyzer for superior accuracy"""
         try:
-            # Quick emotional scoring based on content semantic analysis
-            # This is a lightweight version - full analysis happens in Enhanced Vector Emotion Analyzer
-            positive_indicators = ["great", "love", "amazing", "happy", "excited", "wonderful"]
-            negative_indicators = ["sad", "angry", "frustrated", "disappointed", "terrible", "awful"]
+            # Try to use Enhanced Vector Emotion Analyzer first (much better than keywords)
+            if self._enhanced_emotion_analyzer:
+                try:
+                    analysis_result = await self._enhanced_emotion_analyzer.analyze_emotion(
+                        content=content,
+                        user_id=user_id
+                    )
+                    
+                    # Store multi-emotion data for future use
+                    self._last_emotion_analysis = {
+                        "primary_emotion": analysis_result.primary_emotion,
+                        "primary_intensity": analysis_result.intensity,
+                        "all_emotions": analysis_result.all_emotions,
+                        "confidence": analysis_result.confidence,
+                        "is_multi_emotion": len(analysis_result.all_emotions) > 1
+                    }
+                    
+                    # Return primary emotion and intensity (backward compatibility)
+                    return analysis_result.primary_emotion, analysis_result.intensity
+                    
+                except Exception as e:
+                    logger.warning(f"Enhanced emotion analyzer failed, falling back to keywords: {e}")
+                    self._last_emotion_analysis = None
             
+            # Fallback to keyword analysis if Enhanced Vector Emotion Analyzer unavailable
             content_lower = content.lower()
-            positive_count = sum(1 for word in positive_indicators if word in content_lower)
-            negative_count = sum(1 for word in negative_indicators if word in content_lower)
             
-            if positive_count > negative_count and positive_count > 0:
-                return 'positive', min(positive_count * 0.3, 1.0)
-            elif negative_count > positive_count and negative_count > 0:
-                return 'negative', min(negative_count * 0.3, 1.0)
+            # Use comprehensive emotion keywords (same as Enhanced Vector Emotion Analyzer)
+            emotion_patterns = {
+                "joy": ["happy", "joy", "delighted", "pleased", "cheerful", "elated", "ecstatic", 
+                       "thrilled", "excited", "wonderful", "amazing", "fantastic", "great", "awesome", 
+                       "brilliant", "perfect", "love", "adore", "celebration", "bliss", "euphoric",
+                       "overjoyed", "gleeful", "jubilant", "radiant", "beaming", "yay"],
+                "sadness": ["sad", "unhappy", "depressed", "melancholy", "sorrowful", "grief", 
+                           "disappointed", "heartbroken", "down", "blue", "gloomy", "miserable", "crying",
+                           "tragedy", "loss", "tears", "devastated", "crushed", "despair", "desolate",
+                           "mournful", "dejected", "forlorn", "disheartened", "crestfallen", "woeful"],
+                "anger": ["angry", "mad", "furious", "rage", "irritated", "annoyed", "frustrated", 
+                         "outraged", "livid", "incensed", "hostile", "aggressive", "hate", "disgusted",
+                         "appalled", "infuriated", "upset", "bothered", "irate", "enraged", "seething",
+                         "wrathful", "indignant", "resentful", "bitter", "raging"],
+                "fear": ["afraid", "scared", "frightened", "terrified", "worried", "anxious", 
+                        "nervous", "panic", "dread", "horror", "alarmed", "startled", "intimidated",
+                        "threatened", "concerned", "uneasy", "apprehensive", "petrified", "horrified",
+                        "panicked", "fearful", "timid", "trembling", "shaking"],
+                "excitement": ["excited", "thrilled", "energetic", "enthusiastic", "pumped", 
+                              "eager", "anticipation", "can't wait", "hyped", "electrified", "exhilarated",
+                              "animated", "spirited", "vivacious", "dynamic", "charged"],
+                "gratitude": ["grateful", "thankful", "appreciate", "blessed", "fortunate", 
+                             "thank you", "thanks", "indebted", "obliged", "recognition", "appreciative",
+                             "beholden", "grateful for", "much appreciated"],
+                "curiosity": ["curious", "wondering", "interested", "intrigued", "questioning", 
+                             "exploring", "learning", "discovery", "fascinated", "inquisitive", "puzzled",
+                             "perplexed", "bewildered", "inquiring", "investigative"],
+                "surprise": ["surprised", "shocked", "amazed", "astonished", "bewildered", 
+                            "stunned", "confused", "puzzled", "unexpected", "wow", "incredible", 
+                            "unbelievable", "startling", "remarkable", "astounded", "flabbergasted",
+                            "dumbfounded", "taken aback"],
+                "anxiety": ["anxious", "stressed", "overwhelmed", "pressure", "tension",
+                           "worried", "nervous", "uneasy", "restless", "troubled", "distressed",
+                           "frazzled", "agitated", "jittery", "on edge", "wound up"],
+                "contentment": ["content", "satisfied", "peaceful", "calm", "serene", "relaxed",
+                               "comfortable", "at ease", "tranquil", "balanced", "fulfilled", "placid",
+                               "composed", "untroubled", "at peace", "mellow"],
+                "disgust": ["disgusted", "gross", "eww", "revolting", "nauseating", "repulsive",
+                           "sickening", "appalling", "repugnant", "loathsome", "abhorrent"],
+                "shame": ["ashamed", "embarrassed", "humiliated", "mortified", "shameful", "guilty",
+                         "regretful", "remorseful", "sheepish", "chagrined", "red-faced"],
+                "pride": ["proud", "accomplished", "achievement", "triumphant", "victorious", "successful",
+                         "accomplished", "pleased with", "satisfied with", "boastful"],
+                "loneliness": ["lonely", "isolated", "alone", "solitary", "abandoned", "forsaken",
+                              "desolate", "friendless", "cut off", "estranged"]
+            }
+            
+            # Score each emotion based on keyword matches
+            emotion_scores = {}
+            for emotion, keywords in emotion_patterns.items():
+                matches = sum(1 for keyword in keywords if keyword in content_lower)
+                if matches > 0:
+                    emotion_scores[emotion] = matches
+            
+            # Return the highest scoring emotion
+            if emotion_scores:
+                best_emotion = max(emotion_scores.items(), key=lambda x: x[1])
+                intensity = min(best_emotion[1] * 0.3, 1.0)  # Scale intensity
+                return best_emotion[0], intensity
             else:
                 return 'neutral', 0.1
                 
-        except Exception:
+        except Exception as e:
+            logger.error("Error in emotional context extraction: %s", e)
             return 'neutral', 0.1
     
     # Phase 1.2: Emotional Trajectory Tracking
@@ -2275,83 +2407,6 @@ class VectorMemoryStore:
         except Exception as e:
             logger.error(f"Batch memory update failed: {e}")
             return {"success": False, "error": str(e)}
-
-    # 🔧 COMPATIBILITY: Bridge method for legacy search_memories calls
-    async def search_memories(self, 
-                            query: str,
-                            user_id: str,
-                            memory_types: Optional[List[MemoryType]] = None,
-                            top_k: int = 10,
-                            min_score: float = 0.7) -> List[Dict[str, Any]]:
-        """
-        Compatibility bridge to new Qdrant-native search method
-        """
-        try:
-            # Route to the new enhanced method
-            return await self.search_memories_with_qdrant_intelligence(
-                query=query,
-                user_id=user_id,
-                memory_types=memory_types,
-                top_k=top_k,
-                min_score=min_score,
-                emotional_context=None,
-                prefer_recent=True
-            )
-        except Exception as e:
-            logger.error(f"Compatibility search_memories failed: {e}")
-            return await self._fallback_basic_search(query, user_id, memory_types, top_k, min_score)
-        try:
-            # Generate query embedding
-            query_embedding = await self.generate_embedding(query)
-            
-            # Prepare filter conditions
-            filter_conditions = [
-                models.FieldCondition(
-                    key="user_id",
-                    match=models.MatchValue(value=user_id)
-                )
-            ]
-            
-            if memory_types:
-                memory_type_values = [mt.value for mt in memory_types]
-                filter_conditions.append(
-                    models.FieldCondition(
-                        key="memory_type",
-                        match=models.MatchAny(any=memory_type_values)
-                    )
-                )
-            
-            # ENHANCED: Search with larger initial set for post-processing
-            search_limit = max(top_k * 3, 30)  # Get more results for filtering
-            
-            # Search Qdrant
-            results = self.client.search(
-                collection_name=self.collection_name,
-                query_vector=models.NamedVector(name="content", vector=query_embedding),  # 🎯 NAMED VECTOR
-                query_filter=models.Filter(must=filter_conditions),
-                limit=search_limit,
-                score_threshold=min_score * 0.8,  # Lower threshold for initial search
-                with_payload=True,
-                with_vectors=False  # Don't need vectors for result processing
-            )
-            
-            # ENHANCED: Post-process results with intelligent ranking
-            processed_results = await self._intelligent_ranking(
-                results, query, prefer_recent, resolve_contradictions
-            )
-            
-            # Return top results after intelligent processing
-            final_results = processed_results[:top_k]
-            
-            self.stats["searches_performed"] += 1
-            logger.debug(f"Found {len(final_results)} memories for query: {query[:50]} "
-                        f"(processed {len(results)} raw results)")
-            
-            return final_results
-            
-        except Exception as e:
-            logger.error(f"Memory search failed: {e}")
-            raise
     
     async def _intelligent_ranking(self, 
                                  raw_results: List,
@@ -2573,9 +2628,8 @@ class VectorMemoryStore:
             similar_memories = await self.search_memories(
                 query=new_content,
                 user_id=user_id,
-                memory_types=[MemoryType.FACT, MemoryType.PREFERENCE],
-                top_k=20,
-                min_score=similarity_threshold
+                memory_types=[MemoryType.FACT.value, MemoryType.PREFERENCE.value],  # Convert enums to strings
+                limit=20  # Fixed: interface contract violation - use 'limit' not 'top_k'
             )
             
             contradictions = []
@@ -2718,6 +2772,39 @@ class VectorMemoryStore:
                 "storage": {"error": str(e)},
                 "timestamp": datetime.utcnow().isoformat()
             }
+    
+    async def search_memories(self, 
+                             user_id: str,
+                             query: str,
+                             memory_types: Optional[List[str]] = None,
+                             limit: int = 10) -> List[Dict[str, Any]]:
+        """
+        Protocol-compliant search method for VectorMemoryStore.
+        
+        STANDARDIZED INTERFACE - matches MemoryManagerProtocol:
+        - user_id: str (required)
+        - query: str (required) 
+        - memory_types: Optional[List[str]] (protocol standard - strings, not enums)
+        - limit: int (protocol standard - not top_k)
+        """
+        # Convert string memory types to MemoryType enums for internal use
+        vector_memory_types = None
+        if memory_types:
+            vector_memory_types = []
+            for mem_type in memory_types:
+                try:
+                    vector_memory_types.append(MemoryType(mem_type))
+                except ValueError:
+                    logger.warning(f"Unknown memory type: {mem_type}")
+        
+        return await self.search_memories_with_qdrant_intelligence(
+            query=query,
+            user_id=user_id,
+            memory_types=vector_memory_types,
+            top_k=limit,  # Convert limit to top_k for internal method
+            min_score=0.7,
+            prefer_recent=True
+        )
 
 
 class MemoryTools:
@@ -2810,7 +2897,7 @@ class MemoryTools:
                 query=query,
                 user_id=user_id,
                 memory_types=memory_types,
-                top_k=5
+                limit=5  # Fixed: interface contract violation - use 'limit' not 'top_k'
             )
             
             if results:
@@ -2838,7 +2925,7 @@ class MemoryTools:
             memories = await self.vector_store.search_memories(
                 query=content,
                 user_id=user_id,
-                top_k=5,
+                limit=5,
                 min_score=0.9  # High threshold for deletion
             )
             
@@ -2989,7 +3076,7 @@ class VectorMemoryManager:
                     MemoryType.FACT,
                     MemoryType.PREFERENCE
                 ],
-                top_k=20,
+                limit=20,
                 min_score=0.6
             )
             
@@ -3189,23 +3276,27 @@ class VectorMemoryManager:
         query: str,
         limit: int = 10
     ) -> List[Dict[str, Any]]:
-        """Retrieve memories relevant to the given query with performance optimization."""
+        """Retrieve memories relevant to the given query using vector similarity."""
         import time
         
         start_time = time.time()
         try:
+            # 🚀 SIMPLIFIED: Trust vector embeddings for semantic search
+            # RoBERTa-enhanced emotional metadata from storage provides the intelligence
+            # No need for query-time emotion analysis - embeddings capture meaning naturally
+            
             # 🚀 PERFORMANCE: Use optimized search if query optimizer available
             try:
                 from src.memory.qdrant_optimization import QdrantQueryOptimizer
                 optimizer = QdrantQueryOptimizer(self.vector_store)
                 
-                # Use optimized search with adaptive thresholds
+                # Use standard optimized search without emotion filtering
                 results = await optimizer.optimized_search(
                     query=query,
                     user_id=user_id,
-                    query_type="general_search",
+                    query_type="semantic_search", 
                     user_history={},
-                    filters={}
+                    filters={}  # No emotion filters - trust embeddings
                 )
                 
                 # Convert to expected format and limit results
@@ -3217,21 +3308,21 @@ class VectorMemoryManager:
                         "timestamp": r.get("timestamp", ""),
                         "metadata": r.get("metadata", {}),
                         "memory_type": r.get("memory_type", "unknown"),
-                        "optimized": True
+                        "optimized": True,
+                        "search_type": "semantic_similarity"
                     })
                 
-                logger.debug(f"🚀 OPTIMIZED: Retrieved {len(formatted_results)} memories in {(time.time() - start_time)*1000:.1f}ms")
+                logger.debug(f"🚀 SEMANTIC SEARCH: Retrieved {len(formatted_results)} memories in {(time.time() - start_time)*1000:.1f}ms")
                 return formatted_results
                 
             except (ImportError, Exception) as e:
-                logger.debug(f"QdrantQueryOptimizer not available, using standard search: {e}")
+                logger.debug(f"QdrantQueryOptimizer not available, using emotion-enhanced standard search: {e}")
                 
-            # Fallback to standard search
+            # 🎭 ENHANCED FALLBACK: Use protocol-compliant search method
             results = await self.vector_store.search_memories(
-                query=query,
                 user_id=user_id,
-                top_k=limit,
-                min_score=0.5
+                query=query,
+                limit=limit
             )
             
             formatted_results = [
@@ -3332,8 +3423,8 @@ class VectorMemoryManager:
             results = await self.search_memories(
                 query="conversation user_message bot_response",
                 user_id=user_id,
-                memory_types=[MemoryType.CONVERSATION],
-                top_k=limit * 2  # Get more to filter properly
+                memory_types=["conversation"],  # Convert MemoryType.CONVERSATION to string
+                limit=limit * 2  # Get more to filter properly
             )
             
             conversations = []
@@ -3417,7 +3508,7 @@ class VectorMemoryManager:
                 query=query,
                 user_id=user_id,
                 memory_types=[MemoryType.FACT],
-                top_k=limit,
+                limit=limit,
                 min_score=0.6
             )
             return [
@@ -3467,7 +3558,7 @@ class VectorMemoryManager:
                 query="",
                 user_id=user_id,
                 memory_types=[MemoryType.PREFERENCE],
-                top_k=50,
+                limit=50,
                 min_score=0.0
             )
             
@@ -3494,9 +3585,8 @@ class VectorMemoryManager:
             results = await self.vector_store.search_memories(
                 query="",
                 user_id=user_id,
-                memory_types=[MemoryType.CONVERSATION],
-                top_k=limit,
-                min_score=0.0
+                memory_types=["CONVERSATION"],  # Fixed: Convert enum to string for protocol compliance
+                limit=limit  # Fixed: interface contract violation - use 'limit' not 'top_k'
             )
             
             return [
@@ -3534,8 +3624,7 @@ class VectorMemoryManager:
                 query=query,
                 user_id=user_id,
                 memory_types=vector_memory_types if vector_memory_types else None,
-                top_k=limit,
-                min_score=0.5
+                limit=limit
             )
             
             return [
@@ -3582,9 +3671,8 @@ class VectorMemoryManager:
             results = await self.vector_store.search_memories(
                 query="emotional state",
                 user_id=user_id,
-                memory_types=[MemoryType.CONTEXT],
-                top_k=10,
-                min_score=0.5
+                memory_types=["CONTEXT"],  # Fixed: Convert enum to string for protocol compliance
+                limit=10
             )
             
             # Get the most recent emotional context

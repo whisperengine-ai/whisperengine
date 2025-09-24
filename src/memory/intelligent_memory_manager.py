@@ -381,7 +381,7 @@ Use the available tools to implement specific optimizations. Focus on changes th
             memories = await self.vector_store.search_memories(
                 query="",  # Empty query to get general recent memories
                 user_id=user_id,
-                top_k=sample_size
+                limit=sample_size  # Fixed: use 'limit' instead of 'top_k'
             )
             
             return memories

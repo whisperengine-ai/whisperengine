@@ -207,6 +207,25 @@ class DiscordBotCore:
             self.logger.debug("Memory system initialization failed: %s", str(e))
             raise
     
+    def initialize_hybrid_emotion_analyzer(self):
+        """🚀 FAST TRACK: Initialize hybrid emotion analyzer for optimal performance"""
+        try:
+            from src.intelligence.hybrid_emotion_analyzer import create_hybrid_emotion_analyzer
+            self.hybrid_emotion_analyzer = create_hybrid_emotion_analyzer()
+            self.logger.info("✅ FAST TRACK: Hybrid Emotion Analyzer (RoBERTa+VADER+Keywords) initialized")
+        except Exception as e:
+            self.logger.warning("⚠️ Hybrid emotion analyzer failed: %s", str(e))
+            # Fallback to enhanced vector emotion analyzer
+            try:
+                from src.intelligence.enhanced_vector_emotion_analyzer import EnhancedVectorEmotionAnalyzer
+                self.hybrid_emotion_analyzer = EnhancedVectorEmotionAnalyzer(
+                    vector_memory_manager=self.memory_manager
+                )
+                self.logger.info("✅ Enhanced Vector Emotion Analyzer initialized as fallback")
+            except Exception as fallback_e:
+                self.logger.error("❌ No emotion analyzer available: %s", fallback_e)
+                self.hybrid_emotion_analyzer = None
+    
     def initialize_llm_tool_integration(self):
         """Initialize LLM Tool Integration Manager for Phase 1-4 features.
         
@@ -293,23 +312,31 @@ class DiscordBotCore:
                     from src.conversation.engagement_protocol import create_engagement_engine
                     
                     # Create with available integrations using factory pattern
-                    # Initialize enhanced vector emotion analyzer for engagement engine
-                    enhanced_emotion_analyzer = None
+                    # Initialize HYBRID emotion analyzer for engagement engine (FAST TRACK!)
+                    emotion_analyzer = None
                     try:
-                        from src.intelligence.enhanced_vector_emotion_analyzer import EnhancedVectorEmotionAnalyzer
-                        if hasattr(self, 'memory_manager') and self.memory_manager:
-                            enhanced_emotion_analyzer = EnhancedVectorEmotionAnalyzer(
-                                vector_memory_manager=self.memory_manager
-                            )
-                            self.logger.info("✅ Enhanced Vector Emotion Analyzer initialized for engagement engine")
+                        from src.intelligence.hybrid_emotion_analyzer import create_hybrid_emotion_analyzer
+                        emotion_analyzer = create_hybrid_emotion_analyzer()
+                        self.logger.info("✅ FAST TRACK: Hybrid Emotion Analyzer (RoBERTa+VADER) initialized")
                     except Exception as e:
-                        self.logger.warning("Enhanced emotion analyzer not available for engagement: %s", e)
+                        self.logger.warning("Hybrid emotion analyzer not available: %s", str(e))
+                        
+                        # Fallback to enhanced vector emotion analyzer
+                        try:
+                            from src.intelligence.enhanced_vector_emotion_analyzer import EnhancedVectorEmotionAnalyzer
+                            if hasattr(self, 'memory_manager') and self.memory_manager:
+                                emotion_analyzer = EnhancedVectorEmotionAnalyzer(
+                                    vector_memory_manager=self.memory_manager
+                                )
+                                self.logger.info("✅ Enhanced Vector Emotion Analyzer initialized for engagement engine")
+                        except Exception as fallback_e:
+                            self.logger.warning("Enhanced emotion analyzer not available for engagement: %s", fallback_e)
                     
                     self.engagement_engine = await create_engagement_engine(
                         engagement_engine_type=os.getenv("ENGAGEMENT_ENGINE_TYPE", "full"),
                         thread_manager=getattr(self, 'thread_manager', None),
                         memory_moments=getattr(self, 'memory_moments', None),
-                        emotional_engine=enhanced_emotion_analyzer or (getattr(self.phase2_integration, 'emotional_context_engine', None) if hasattr(self, 'phase2_integration') else None),
+                        emotional_engine=emotion_analyzer or (getattr(self.phase2_integration, 'emotional_context_engine', None) if hasattr(self, 'phase2_integration') else None),
                         personality_profiler=getattr(self, 'dynamic_personality_profiler', None)
                     )
                     self.logger.info("✅ Phase 4.3: Proactive Engagement Engine initialized with factory pattern")

@@ -12,7 +12,7 @@ async def test():
         'collection_name': 'whisperengine_memory',
         'bot_name': 'elena',
         'embeddings': {
-            'model_name': 'BAAI/bge-small-en-v1.5',
+            'model_name': 'snowflake/snowflake-arctic-embed-xs',
             'dimension': 384,
             'normalize': True
         }

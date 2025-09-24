@@ -1,16 +1,21 @@
 """
-Enhanced Vector-Native Emotion Analyzer
-=======================================
+Enhanced Vector-Native Emotion Analyzer with RoBERTa Integration
+===============================================================
 
-Advanced emotion detection using vector embeddings and semantic analysis.
+Advanced emotion detection using RoBERTa transformers with vector embeddings.
 Integrates with WhisperEngine's vector memory system for superior accuracy.
 
 Features:
-- Multi-dimensional emotion analysis using embeddings
+- RoBERTa transformer models for state-of-art emotion detection (Primary)
+- VADER sentiment analysis for fast sentiment backup (Secondary)
+- Multi-dimensional emotion analysis using embeddings (Tertiary)
 - Contextual emotion detection based on conversation history
 - Integration with vector memory for emotional pattern recognition
 - Real-time emotional state tracking
 - Semantic emotion classification beyond simple sentiment
+
+Architecture: RoBERTa → VADER → Keywords → Embeddings
+Performance: Accuracy over speed (emotional intelligence is core value)
 """
 
 import logging
@@ -20,6 +25,20 @@ from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, List, Optional, Tuple
+
+# RoBERTa Integration with graceful fallbacks
+try:
+    from transformers import pipeline
+    ROBERTA_AVAILABLE = True
+except ImportError:
+    ROBERTA_AVAILABLE = False
+    
+# VADER Integration  
+try:
+    from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
+    VADER_AVAILABLE = True
+except ImportError:
+    VADER_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
 
@@ -87,52 +106,51 @@ class EnhancedVectorEmotionAnalyzer:
                    self.context_weight, self.confidence_threshold)
         
         # Emotion classification mappings for vector analysis
+        # Comprehensive emotion keywords for fallback analysis (expanded with intensity indicators)
         self.emotion_keywords = {
-            EmotionDimension.JOY: [
-                "happy", "joy", "delighted", "pleased", "cheerful", "elated", "ecstatic",
-                "thrilled", "excited", "wonderful", "amazing", "fantastic", "great",
-                "awesome", "brilliant", "perfect", "love", "adore", "celebration"
-            ],
-            EmotionDimension.SADNESS: [
-                "sad", "unhappy", "depressed", "melancholy", "sorrowful", "grief",
-                "disappointed", "heartbroken", "down", "blue", "gloomy", "miserable",
-                "tragedy", "loss", "crying", "tears", "devastated", "crushed"
-            ],
-            EmotionDimension.ANGER: [
-                "angry", "mad", "furious", "rage", "irritated", "annoyed", "frustrated",
-                "outraged", "livid", "incensed", "hostile", "aggressive", "violent",
-                "hate", "disgusted", "appalled", "infuriated", "upset", "bothered"
-            ],
-            EmotionDimension.FEAR: [
-                "afraid", "scared", "frightened", "terrified", "worried", "anxious",
-                "nervous", "panic", "dread", "horror", "alarmed", "startled",
-                "intimidated", "threatened", "concerned", "uneasy", "apprehensive"
-            ],
-            EmotionDimension.SURPRISE: [
-                "surprised", "shocked", "amazed", "astonished", "bewildered",
-                "stunned", "confused", "puzzled", "unexpected", "sudden", "wow",
-                "incredible", "unbelievable", "startling", "remarkable"
-            ],
-            EmotionDimension.EXCITEMENT: [
-                "excited", "thrilled", "energetic", "enthusiastic", "pumped",
-                "eager", "anticipation", "looking forward", "can't wait", "hyped"
-            ],
-            EmotionDimension.CURIOSITY: [
-                "curious", "wondering", "interested", "intrigued", "questioning",
-                "exploring", "learning", "discovery", "fascinated", "inquisitive"
-            ],
-            EmotionDimension.GRATITUDE: [
-                "grateful", "thankful", "appreciate", "blessed", "fortunate",
-                "thank you", "thanks", "indebted", "obliged", "recognition"
-            ],
-            EmotionDimension.ANXIETY: [
-                "anxious", "stressed", "overwhelmed", "pressure", "tension",
-                "worried", "nervous", "uneasy", "restless", "troubled", "distressed"
-            ],
-            EmotionDimension.CONTENTMENT: [
-                "content", "satisfied", "peaceful", "calm", "serene", "relaxed",
-                "comfortable", "at ease", "tranquil", "balanced", "fulfilled"
-            ]
+            "joy": ["happy", "joy", "delighted", "pleased", "cheerful", "elated", "ecstatic", 
+                   "thrilled", "excited", "wonderful", "amazing", "fantastic", "great", "awesome", 
+                   "brilliant", "perfect", "love", "adore", "celebration", "bliss", "euphoric",
+                   "overjoyed", "gleeful", "jubilant", "radiant", "beaming", "yay"],
+            "sadness": ["sad", "unhappy", "depressed", "melancholy", "sorrowful", "grief", 
+                       "disappointed", "heartbroken", "down", "blue", "gloomy", "miserable", "crying",
+                       "tragedy", "loss", "tears", "devastated", "crushed", "despair", "desolate",
+                       "mournful", "dejected", "forlorn", "disheartened", "crestfallen", "woeful"],
+            "anger": ["angry", "mad", "furious", "rage", "irritated", "annoyed", "frustrated", 
+                     "outraged", "livid", "incensed", "hostile", "aggressive", "hate", "disgusted",
+                     "appalled", "infuriated", "upset", "bothered", "irate", "enraged", "seething",
+                     "wrathful", "indignant", "resentful", "bitter", "raging"],
+            "fear": ["afraid", "scared", "frightened", "terrified", "worried", "anxious", 
+                    "nervous", "panic", "dread", "horror", "alarmed", "startled", "intimidated",
+                    "threatened", "concerned", "uneasy", "apprehensive", "petrified", "horrified",
+                    "panicked", "fearful", "timid", "trembling", "shaking"],
+            "excitement": ["excited", "thrilled", "energetic", "enthusiastic", "pumped", 
+                          "eager", "anticipation", "can't wait", "hyped", "electrified", "exhilarated",
+                          "animated", "spirited", "vivacious", "dynamic", "charged"],
+            "gratitude": ["grateful", "thankful", "appreciate", "blessed", "fortunate", 
+                         "thank you", "thanks", "indebted", "obliged", "recognition", "appreciative",
+                         "beholden", "grateful for", "much appreciated"],
+            "curiosity": ["curious", "wondering", "interested", "intrigued", "questioning", 
+                         "exploring", "learning", "discovery", "fascinated", "inquisitive", "puzzled",
+                         "perplexed", "bewildered", "inquiring", "investigative"],
+            "surprise": ["surprised", "shocked", "amazed", "astonished", "bewildered", 
+                        "stunned", "confused", "puzzled", "unexpected", "wow", "incredible", 
+                        "unbelievable", "startling", "remarkable", "astounded", "flabbergasted",
+                        "dumbfounded", "taken aback"],
+            "anxiety": ["anxious", "stressed", "overwhelmed", "pressure", "tension",
+                       "worried", "nervous", "uneasy", "restless", "troubled", "distressed",
+                       "frazzled", "agitated", "jittery", "on edge", "wound up"],
+            "contentment": ["content", "satisfied", "peaceful", "calm", "serene", "relaxed",
+                           "comfortable", "at ease", "tranquil", "balanced", "fulfilled", "placid",
+                           "composed", "untroubled", "at peace", "mellow"],
+            "disgust": ["disgusted", "gross", "eww", "revolting", "nauseating", "repulsive",
+                       "sickening", "appalling", "repugnant", "loathsome", "abhorrent"],
+            "shame": ["ashamed", "embarrassed", "humiliated", "mortified", "shameful", "guilty",
+                     "regretful", "remorseful", "sheepish", "chagrined", "red-faced"],
+            "pride": ["proud", "accomplished", "achievement", "triumphant", "victorious", "successful",
+                     "accomplished", "pleased with", "satisfied with", "boastful"],
+            "loneliness": ["lonely", "isolated", "alone", "solitary", "abandoned", "forsaken",
+                          "desolate", "friendless", "cut off", "estranged"]
         }
         
         # Emotional intensity indicators
@@ -177,7 +195,7 @@ class EnhancedVectorEmotionAnalyzer:
         start_time = time.perf_counter()
         
         try:
-            # VECTOR-NATIVE ANALYSIS ONLY - No legacy keyword matching!
+            # VECTOR-NATIVE ANALYSIS WITH KEYWORD FALLBACK
             
             # Step 1: Vector-based semantic emotion analysis using the actual message content
             vector_emotions = await self._analyze_vector_emotions(user_id, content)
@@ -187,15 +205,18 @@ class EnhancedVectorEmotionAnalyzer:
                 conversation_context, recent_emotions
             )
             
-            # Step 3: Emotional intensity analysis
+            # Step 3: Keyword-based fallback analysis (essential for new users)
+            keyword_emotions = self._analyze_keyword_emotions(content)
+            
+            # Step 4: Emotional intensity analysis
             intensity = self._analyze_emotional_intensity(content)
             
-            # Step 4: Emotional trajectory analysis
+            # Step 5: Emotional trajectory analysis
             trajectory = self._analyze_emotional_trajectory(content, recent_emotions)
             
-            # Step 5: Combine vector and context analyses (no more keyword analysis!)
+            # Step 6: Combine all emotion analyses
             final_emotions = self._combine_emotion_analyses(
-                {}, vector_emotions, context_emotions  # Empty dict for deprecated keyword_emotions
+                keyword_emotions, vector_emotions, context_emotions
             )
             
             # Step 7: Determine primary emotion and confidence
@@ -243,7 +264,151 @@ class EnhancedVectorEmotionAnalyzer:
                 pattern_match_score=0.0
             )
     
-    # LEGACY KEYWORD ANALYSIS REMOVED - Using vector-native analysis only!
+    # KEYWORD ANALYSIS - Essential fallback for new users!
+    
+    def _analyze_keyword_emotions(self, content: str) -> Dict[str, float]:
+        """
+        Multi-layer emotion analysis: RoBERTa (primary) → VADER (fallback) → Keywords (backup).
+        This is the core emotion detection method with state-of-art accuracy.
+        """
+        try:
+            if not content:
+                return {}
+            
+            content_lower = content.lower()
+            emotion_scores = {}
+            
+            # LAYER 1: RoBERTa Transformer Analysis (PRIMARY - State-of-art accuracy)
+            if ROBERTA_AVAILABLE:
+                try:
+                    # Initialize RoBERTa classifier if not already done
+                    if not hasattr(self, '_roberta_classifier') or self._roberta_classifier is None:
+                        logger.info("Initializing RoBERTa emotion classifier...")
+                        self._roberta_classifier = pipeline(
+                            "text-classification",
+                            model="j-hartmann/emotion-english-distilroberta-base",
+                            return_all_scores=True
+                        )
+                        logger.info("✅ RoBERTa emotion classifier initialized")
+                    
+                    # Analyze emotions with RoBERTa
+                    results = self._roberta_classifier(content)
+                    logger.debug("RoBERTa emotion analysis completed with %d results", len(results[0]))
+                    
+                    # Process RoBERTa results
+                    for result in results[0]:  # First (only) text result
+                        emotion_label = result["label"].lower()
+                        confidence = result["score"]
+                        
+                        # Map RoBERTa labels to our emotion dimensions
+                        emotion_scores[emotion_label] = confidence
+                        logger.debug("RoBERTa detected %s: %.3f", emotion_label, confidence)
+                    
+                    # If RoBERTa found strong emotions, prioritize them
+                    if any(score > 0.6 for score in emotion_scores.values()):
+                        logger.info("RoBERTa detected strong emotions - using as primary analysis")
+                        return emotion_scores  # Return RoBERTa results directly
+                        
+                except Exception as roberta_error:
+                    logger.warning("RoBERTa analysis failed: %s", roberta_error)
+                    # Continue to VADER fallback
+            else:
+                logger.debug("RoBERTa not available - falling back to VADER + keywords")
+            
+            # LAYER 2: VADER Sentiment Analysis (FALLBACK)
+            if VADER_AVAILABLE:
+                try:
+                    if not hasattr(self, '_vader_analyzer') or self._vader_analyzer is None:
+                        self._vader_analyzer = SentimentIntensityAnalyzer()
+                        logger.debug("VADER sentiment analyzer initialized")
+                    
+                    scores = self._vader_analyzer.polarity_scores(content)
+                    
+                    # Map VADER scores to our emotion categories
+                    if scores['pos'] > 0.3:  # Positive sentiment
+                        emotion_scores['joy'] = max(emotion_scores.get('joy', 0.0), scores['pos'])
+                    if scores['neg'] > 0.3:  # Negative sentiment  
+                        # Determine if it's anger or sadness based on keywords
+                        if any(word in content_lower for word in ['angry', 'mad', 'furious', 'hate', 'rage']):
+                            emotion_scores['anger'] = max(emotion_scores.get('anger', 0.0), scores['neg'])
+                        else:
+                            emotion_scores['sadness'] = max(emotion_scores.get('sadness', 0.0), scores['neg'])
+                    
+                    # Use compound score for overall intensity
+                    if abs(scores['compound']) > 0.1:  # Significant emotion detected
+                        intensity_multiplier = min(abs(scores['compound']) + 1.0, 2.0)
+                        # Boost all detected emotions based on VADER intensity
+                        for emotion in emotion_scores:
+                            emotion_scores[emotion] *= intensity_multiplier
+                    
+                    logger.debug("VADER analysis: %s, multiplier: %s", scores, 
+                               locals().get('intensity_multiplier', 1.0))
+                        
+                except Exception as vader_error:
+                    logger.warning("VADER analysis failed: %s", vader_error)
+                    # Continue to keyword fallback
+            
+            # LAYER 3: Keyword Analysis (BACKUP - Always available)
+            # Check for emotion keywords
+            for emotion_dimension, keywords in self.emotion_keywords.items():
+                emotion_name = emotion_dimension  # Fixed: emotion_dimension is already a string
+                matches = 0
+                total_weight = 0.0
+                
+                for keyword in keywords:
+                    if keyword in content_lower:
+                        matches += 1
+                        # Weight longer keywords more highly
+                        weight = min(len(keyword) / 10.0, 1.0)
+                        total_weight += weight
+                
+                if matches > 0:
+                    # Base score on number of matches and total weight
+                    base_score = min(matches / 3.0, 1.0)  # Max 3 matches for full score
+                    weight_score = min(total_weight, 1.0)
+                    keyword_score = (base_score + weight_score) / 2.0
+                    
+                    # Combine with any existing scores (from RoBERTa/VADER)
+                    emotion_scores[emotion_name] = max(
+                        emotion_scores.get(emotion_name, 0.0), 
+                        keyword_score
+                    )
+            
+            # LAYER 4: Apply intensity amplifiers
+            for amplifier in self.intensity_amplifiers:
+                if amplifier in content_lower:
+                    # Boost all detected emotions when intensity amplifiers are present
+                    for emotion in emotion_scores:
+                        emotion_scores[emotion] = min(emotion_scores[emotion] * 1.3, 1.0)
+                    break  # Only apply once
+            
+            return emotion_scores
+            
+        except Exception as analysis_error:
+            logger.error("Emotion analysis failed: %s", analysis_error)
+            # Return neutral emotion as ultimate fallback
+            return {"neutral": 0.5}
+    
+    def _analyze_emoji_emotions(self, content: str) -> Dict[str, float]:
+        """Analyze emotions from emojis in the content"""
+        emoji_emotions = {
+            "joy": ["😀", "😁", "😂", "😃", "😄", "😆", "😊", "😍", "🤩", "❤️", "💖", "🥰"],
+            "sadness": ["😢", "😭", "😔", "💔", "😞", "😟", "🥺", "😰"],
+            "anger": ["😠", "😡", "🤬", "💢"],
+            "surprise": ["😲", "😱", "🤯", "😯"],
+            "fear": ["😰", "😱", "😨", "😬"],
+            "excitement": ["🤩", "🎉", "🔥", "⚡", "💥"],
+            "gratitude": ["🙏", "💝", "🤗"],
+            "curiosity": ["🤔", "❓", "🧐"]
+        }
+        
+        emotion_scores = {}
+        for emotion, emojis in emoji_emotions.items():
+            count = sum(content.count(emoji) for emoji in emojis)
+            if count > 0:
+                emotion_scores[emotion] = min(count * 0.3, 1.0)  # Each emoji adds 0.3, max 1.0
+                
+        return emotion_scores
     
     async def _analyze_vector_emotions(self, user_id: str, content: str) -> Dict[str, Any]:
         """Analyze emotions using vector memory system semantic search with actual message content"""

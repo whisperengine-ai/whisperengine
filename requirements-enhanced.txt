@@ -36,7 +36,13 @@ numpy==2.3.3  # Updated from 2.3.2
 # REMOVED: vaderSentiment==3.3.2     # Only used in demos, uses vector-native emotion analysis
 
 # Advanced NLP Dependencies (Phase 1)
-textblob==0.18.0.post0  # Lightweight sentiment analysis (replaces RoBERTa/transformers)
+textblob==0.18.0.post0  # Lightweight sentiment analysis (fallback for RoBERTa)
+
+# RoBERTa Enhancement Dependencies (Phase 4)
+transformers==4.44.2     # Hugging Face transformers for RoBERTa emotion analysis
+torch>=2.0.0            # PyTorch backend for transformers
+vaderSentiment==3.3.2   # Fast sentiment analysis for real-time emoji reactions
+accelerate==0.34.2      # Hardware acceleration for transformer models
 
 # ENHANCED: Async Redis and Caching
 redis==6.4.0  # Updated from 5.2.1

@@ -94,40 +94,19 @@ class QdrantQueryOptimizer:
             manager_class = self.vector_manager.__class__.__name__
             
             if manager_class == 'VectorMemoryManager':
-                # For VectorMemoryManager, use regular search_memories
-                # VectorMemoryManager.search_memories supports top_k parameter
+                # For VectorMemoryManager, use search_memories with limit parameter
                 return await self.vector_manager.search_memories(
-                    query=query,
                     user_id=user_id,
-                    top_k=limit
+                    query=query,
+                    limit=limit
                 )
             elif hasattr(self.vector_manager, 'search_memories'):
-                # For other objects with search_memories, try different parameter patterns
-                try:
-                    # Try with top_k parameter
-                    return await self.vector_manager.search_memories(
-                        query=query,
-                        user_id=user_id,
-                        top_k=limit
-                    )
-                except TypeError as e:
-                    if "unexpected keyword argument 'top_k'" in str(e):
-                        # Try with limit parameter
-                        try:
-                            return await self.vector_manager.search_memories(
-                                query=query,
-                                user_id=user_id,
-                                limit=limit
-                            )
-                        except TypeError:
-                            # Last resort - try without parameter
-                            logger.warning("Neither top_k nor limit accepted, trying without parameter")
-                            return await self.vector_manager.search_memories(
-                                query=query,
-                                user_id=user_id
-                            )
-                    else:
-                        raise
+                # For other objects with search_memories, use the standard signature
+                return await self.vector_manager.search_memories(
+                    user_id=user_id,
+                    query=query,
+                    limit=limit
+                )
             else:
                 # Object has no search_memories method
                 logger.error(f"Vector manager of type {manager_class} has no search_memories method")
@@ -622,27 +601,9 @@ class OptimizedVectorMemoryManager:
         except Exception as e:
             logger.error(f"Optimized retrieval failed: {e}")
             # Fallback to base retrieval
-            # VectorMemoryManager uses search_memories with top_k parameter
-            if self.base_manager.__class__.__name__ == 'VectorMemoryManager':
-                return await self.base_manager.search_memories(
-                    query=query,
-                    user_id=user_id,
-                    top_k=limit
-                )
-            else:
-                # Otherwise try regular search_memories
-                try:
-                    return await self.base_manager.search_memories(
-                        query=query,
-                        user_id=user_id,
-                        top_k=limit
-                    )
-                except TypeError as e:
-                    # If top_k doesn't work, try without it
-                    if "unexpected keyword argument" in str(e):
-                        logger.warning(f"Parameter error ({str(e)}), trying without parameters")
-                        return await self.base_manager.search_memories(
-                            query=query,
-                            user_id=user_id
-                        )
-                    raise
+            # All memory managers should use the standard signature now
+            return await self.base_manager.search_memories(
+                user_id=user_id,
+                query=query,
+                limit=limit
+            )

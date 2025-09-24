@@ -285,16 +285,16 @@ class ModularBotManager:
             # self.command_handlers["monitoring"].register_commands(bot_name_filter, is_admin)
             logger.info("ℹ️ Monitoring commands disabled (AI-generated enterprise dashboard bloat)")
 
-            # LLM-Powered Self-Memory Commands - DISABLED (broken, causing "No Personal Knowledge Found" errors)
-            # from src.handlers.llm_self_memory_commands import create_llm_self_memory_handlers
-            # bot_name = os.getenv("DISCORD_BOT_NAME", "unknown")
-            # self.command_handlers["llm_self_memory"] = create_llm_self_memory_handlers(
-            #     bot=self.bot,
-            #     memory_manager=components.get("memory_manager"),
-            #     bot_name=bot_name
-            # )
-            # await self.command_handlers["llm_self_memory"].register_commands()
-            logger.info("ℹ️ LLM-Powered Self-Memory commands disabled (broken - Discord integration issues)")
+            # LLM-Powered Self-Memory Commands - ENABLED for CDL knowledge extraction
+            from src.handlers.llm_self_memory_commands import create_llm_self_memory_handlers
+            bot_name = os.getenv("DISCORD_BOT_NAME", "unknown")
+            self.command_handlers["llm_self_memory"] = create_llm_self_memory_handlers(
+                bot=self.bot,
+                memory_manager=components.get("memory_manager"),
+                bot_name=bot_name
+            )
+            await self.command_handlers["llm_self_memory"].register_commands()
+            logger.info("✅ LLM-Powered Self-Memory commands enabled (CDL extraction available)")
             
             # LLM Tool Calling Commands (Phase 1 & 2)
             components = self.bot_core.get_components()

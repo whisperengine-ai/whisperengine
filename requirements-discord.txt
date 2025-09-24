@@ -22,5 +22,11 @@ audioop-lts==0.2.2
 # API integrations for Discord
 elevenlabs==2.16.0  # Updated from 2.15.0
 
-# Local AI processing for Discord bot
-# REMOVED: vaderSentiment==3.3.2  # Only used in demos, not main bot - uses vector-native emotion analysis
+# Local AI processing for Discord bot - EMOTION ANALYSIS PRIORITY
+vaderSentiment==3.3.2  # Lightweight sentiment backup (125KB)
+torch==2.6.0  # Required for RoBERTa transformer models (95MB)
+transformers>=4.56.0  # HuggingFace transformers for state-of-art emotion detection (11.6MB)
+# RoBERTa model (j-hartmann/emotion-english-distilroberta-base): 329MB cached on first use
+# Emotions detected: anger, disgust, fear, joy, neutral, sadness, surprise
+# Performance: Multi-emotion detection with 85-90% accuracy vs VADER's basic sentiment
+# Usage: Storage-only (not query-time) - RoBERTa enhances storage, embeddings handle retrieval

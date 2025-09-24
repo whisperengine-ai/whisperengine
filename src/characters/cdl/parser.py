@@ -185,6 +185,8 @@ class CDLParser:
             identity.occupation = str(data['occupation'])
         if 'location' in data:
             identity.location = str(data['location'])
+        if 'timezone' in data:
+            identity.timezone = str(data['timezone'])
         if 'nickname' in data:
             identity.nickname = str(data['nickname'])
         if 'full_name' in data:

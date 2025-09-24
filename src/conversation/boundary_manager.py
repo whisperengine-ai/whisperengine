@@ -850,7 +850,13 @@ Summary:"""
                 {"role": "user", "content": summary_prompt}
             ], max_tokens=80, temperature=0.3)  # Low temperature for consistent summaries
             
-            summary = response.strip()
+            # Extract content from response
+            if isinstance(response, dict) and "choices" in response and len(response["choices"]) > 0:
+                content = response["choices"][0].get("message", {}).get("content", "")
+                summary = content.strip()
+            else:
+                # Fallback if response format is unexpected
+                summary = str(response).strip()
             
             # Add basic stats prefix for context
             return f"[{duration:.1f}min, {session.message_count} msgs] {summary}"

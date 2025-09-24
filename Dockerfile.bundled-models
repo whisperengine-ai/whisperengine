@@ -4,10 +4,12 @@
 # Stage 1: Model Download & Bundle
 FROM python:3.13-slim as model-downloader
 
-# Install model download dependencies - Vector-native only
+# Install model download dependencies - Vector-native + RoBERTa emotion models
 RUN pip install --no-cache-dir \
     fastembed>=0.7.0 \
-    numpy>=1.24.0
+    numpy>=1.24.0 \
+    transformers>=4.56.0 \
+    torch>=2.0.0
 
 # Create models directory
 WORKDIR /app
@@ -16,8 +18,9 @@ RUN mkdir -p /app/models
 # Copy model download script
 COPY scripts/download_models.py .
 
-# Set fastembed cache to persistent location
-ENV FASTEMBED_CACHE_PATH=/tmp/fastembed_cache
+# Set model cache paths to persistent locations
+ENV HF_HOME=/root/.cache/huggingface
+ENV TRANSFORMERS_CACHE=/root/.cache/huggingface
 
 # Download all models during build (network required only at build time)
 RUN python download_models.py
@@ -38,7 +41,10 @@ RUN apt-get update && apt-get install -y \
 
 # Copy pre-downloaded models from builder stage
 COPY --from=model-downloader /app/models /app/models
-COPY --from=model-downloader /tmp/fastembed_cache /tmp/fastembed_cache
+# Copy HuggingFace cache (RoBERTa models)
+COPY --from=model-downloader /root/.cache/huggingface /root/.cache/huggingface
+# Copy FastEmbed cache (snowflake embedding models) - CRITICAL for preventing runtime downloads
+COPY --from=model-downloader /root/.cache/fastembed /root/.cache/fastembed
 
 # Copy and install Python dependencies using multi-tier structure
 COPY requirements-core.txt requirements-platform.txt requirements-discord.txt requirements-vector-memory.txt requirements-dev.txt ./
@@ -59,7 +65,7 @@ WORKDIR /app
 
 # Set environment for offline model usage
 ENV MODEL_CACHE_DIR=/app/models
-ENV FASTEMBED_CACHE_PATH=/tmp/fastembed_cache
+ENV FASTEMBED_CACHE_PATH=/root/.cache/fastembed
 # Note: Removed TRANSFORMERS_OFFLINE and HF_DATASETS_OFFLINE as they interfere with FastEmbed cache usage
 # FastEmbed will automatically use local cache when available
 
@@ -67,7 +73,7 @@ ENV FASTEMBED_CACHE_PATH=/tmp/fastembed_cache
 RUN useradd --create-home appuser && \
     mkdir -p chromadb_data backups privacy_data temp_images logs && \
     chown -R appuser:appuser /app && \
-    chown -R appuser:appuser /tmp/fastembed_cache
+    chown -R appuser:appuser /root/.cache
 
 USER appuser
 
@@ -85,7 +91,8 @@ RUN apt-get update && apt-get install -y \
 
 # Copy pre-downloaded models from builder stage
 COPY --from=model-downloader /app/models /app/models
-COPY --from=model-downloader /tmp/fastembed_cache /tmp/fastembed_cache
+# Copy HuggingFace cache (RoBERTa models) - FastEmbed cache not needed (embedded directly)  
+COPY --from=model-downloader /root/.cache/huggingface /root/.cache/huggingface
 
 # Copy and install Python dependencies using multi-tier structure
 COPY requirements-core.txt requirements-platform.txt requirements-discord.txt requirements-vector-memory.txt ./
@@ -115,7 +122,7 @@ ENV MODEL_CACHE_DIR=/app/models
 ENV TRANSFORMERS_OFFLINE=1
 ENV HF_DATASETS_OFFLINE=1
 ENV SENTENCE_TRANSFORMERS_HOME=/app/models
-ENV FASTEMBED_CACHE_PATH=/tmp/fastembed_cache
+ENV FASTEMBED_CACHE_PATH=/root/.cache/fastembed
 
 # Verify models are accessible
 RUN python -c "\

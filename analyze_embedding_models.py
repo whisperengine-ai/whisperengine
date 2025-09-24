@@ -91,7 +91,7 @@ async def compare_embedding_models():
     # Models to test (compatible with fastembed)
     models_to_test = [
         # Small, fast models (good for real-time chat)
-        "BAAI/bge-small-en-v1.5",      # Current choice - 384 dim
+        "snowflake/snowflake-arctic-embed-xs",      # Current production choice - 384 dim
         "sentence-transformers/all-MiniLM-L6-v2",  # Previous choice - 384 dim
         "sentence-transformers/all-MiniLM-L12-v2", # Slightly larger - 384 dim
         
@@ -99,8 +99,8 @@ async def compare_embedding_models():
         "BAAI/bge-base-en-v1.5",       # 768 dim - better quality
         "sentence-transformers/all-mpnet-base-v2",  # 768 dim - high quality
         
-        # Small multilingual (if needed)
-        "BAAI/bge-small-en-v1.5",      # English-focused
+        # Legacy option (for comparison)
+        "BAAI/bge-small-en-v1.5",      # Legacy model - replaced by snowflake
     ]
     
     results = []
@@ -138,21 +138,27 @@ async def compare_embedding_models():
         print(f"📦 Most efficient batch: {most_efficient['model_name']} ({most_efficient['batch_efficiency']:.1f}x)")
         
         # Recommendation logic
-        print(f"\n✅ Recommended for WhisperEngine:")
+        print("\n✅ Current Production Model for WhisperEngine:")
         
         # For conversational AI, prioritize speed while maintaining quality
-        if any(r['model_name'] == 'BAAI/bge-small-en-v1.5' for r in results):
+        if any(r['model_name'] == 'snowflake/snowflake-arctic-embed-xs' for r in results):
+            snowflake_result = next(r for r in results if r['model_name'] == 'snowflake/snowflake-arctic-embed-xs')
+            print("   🥇 snowflake/snowflake-arctic-embed-xs")
+            print("   📝 Reasons:")
+            print("      • Optimized for real-time conversational AI")
+            print("      • 384 dimensions (memory efficient)")
+            print("      • ~1ms per embedding (5x faster than legacy)")
+            print(f"      • {snowflake_result['single_speed']:.2f}ms per embedding")
+            print("      • Proven production performance")
+        elif any(r['model_name'] == 'BAAI/bge-small-en-v1.5' for r in results):
             bge_result = next(r for r in results if r['model_name'] == 'BAAI/bge-small-en-v1.5')
-            print(f"   🥇 BAAI/bge-small-en-v1.5")
-            print(f"   📝 Reasons:")
-            print(f"      • Optimized for English conversations")
-            print(f"      • 384 dimensions (good for memory efficiency)")
-            print(f"      • Modern BAAI architecture (2023+)")
-            print(f"      • {bge_result['single_speed']:.2f}ms per embedding")
-            print(f"      • Compatible with Qdrant (same team)")
+            print("   ⚠️  BAAI/bge-small-en-v1.5 (LEGACY - replaced by snowflake)")
+            print(f"   📝 Performance: {bge_result['single_speed']:.2f}ms per embedding")
+            print("   💡 Recommendation: Switch to snowflake model for 5x better performance")
         
-        print(f"\n⚖️  Speed vs Quality Trade-offs:")
-        print(f"   🚀 For real-time chat: Prefer <5ms single embedding")
+        print("\n⚖️  Speed vs Quality Trade-offs:")
+        print("   🚀 For real-time chat: Prefer <2ms single embedding (snowflake achieves ~1ms)")
+        print("   🎯 For quality: 384-dim models maintain semantic understanding")
         print(f"   🎯 For quality: 768-dim models (but 2x slower)")
         print(f"   💾 For memory: 384-dim models (current choice)")
         

@@ -126,9 +126,15 @@ class CDLAIPromptIntegration:
                 logger.warning(f"Could not extract enhanced CDL data: {e}")
             
             # Get current date and time for context (timezone-aware)
-            # Use Pacific timezone since characters are in California/US West Coast
-            pacific_tz = ZoneInfo('America/Los_Angeles')
-            current_datetime = datetime.now(pacific_tz)
+            # Use character's timezone if specified, otherwise default to Pacific
+            character_timezone = getattr(character.identity, 'timezone', 'America/Los_Angeles')
+            try:
+                character_tz = ZoneInfo(character_timezone)
+            except (KeyError, ValueError):
+                logger.warning("Invalid timezone %s, using Pacific Time", character_timezone)
+                character_tz = ZoneInfo('America/Los_Angeles')
+                
+            current_datetime = datetime.now(character_tz)
             current_date = current_datetime.strftime("%A, %B %d, %Y")
             current_time = current_datetime.strftime("%I:%M %p %Z")
             

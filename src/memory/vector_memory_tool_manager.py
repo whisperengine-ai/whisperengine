@@ -17,7 +17,12 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass
-class VectorMemoryAction:
+class VectorMemo            # Find related memories
+            related_memories = await self.vector_store.search_memories(
+                query=topic,
+                user_id=user_id,
+                limit=search_limit  # Fixed: interface contract violation - use 'limit' not 'top_k'
+            )ion:
     """Represents a memory action taken by the LLM"""
     action_type: str
     memory_id: Optional[str]
@@ -392,7 +397,7 @@ class VectorMemoryToolManager:
             existing_memories = await self.vector_store.search_memories(
                 query=search_query,
                 user_id=user_id,
-                top_k=5
+                limit=5  # Fixed: interface contract violation - use 'limit' not 'top_k'
             )
             
             if not existing_memories:
@@ -472,7 +477,7 @@ class VectorMemoryToolManager:
             related_memories = await self.vector_store.search_memories(
                 query=topic,
                 user_id=user_id,
-                top_k=search_limit
+                limit=search_limit  # Fixed: interface contract violation - use 'limit' not 'top_k'
             )
             
             if len(related_memories) < 2:
@@ -556,7 +561,7 @@ class VectorMemoryToolManager:
                 candidate_memories = await self.vector_store.search_memories(
                     query=topic_filter,
                     user_id=user_id,
-                    top_k=50
+                    limit=50  # Fixed: interface contract violation - use 'limit' not 'top_k'
                 )
             else:
                 # Get recent memories for analysis - this would need a method to get all user memories
@@ -564,7 +569,7 @@ class VectorMemoryToolManager:
                 candidate_memories = await self.vector_store.search_memories(
                     query="",  # Empty query to get general memories
                     user_id=user_id,
-                    top_k=100
+                    limit=100  # Fixed: interface contract violation - use 'limit' not 'top_k'
                 )
             
             archived_count = 0
@@ -640,7 +645,7 @@ class VectorMemoryToolManager:
             memories_to_enhance = await self.vector_store.search_memories(
                 query=search_query,
                 user_id=user_id,
-                top_k=10
+                limit=10  # Fixed: interface contract violation - use 'limit' not 'top_k'
             )
             
             if not memories_to_enhance:
@@ -729,7 +734,7 @@ class VectorMemoryToolManager:
             topic_memories = await self.vector_store.search_memories(
                 query=topic,
                 user_id=user_id,
-                top_k=max_memories
+                limit=max_memories  # Fixed: interface contract violation - use 'limit' not 'top_k'
             )
             
             if not topic_memories:
