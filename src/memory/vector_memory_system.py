@@ -3393,7 +3393,7 @@ class VectorMemoryManager:
             results = await self.vector_store.search_memories_with_qdrant_intelligence(
                 query=effective_query,
                 user_id=user_id,
-                memory_types=[MemoryType.CONVERSATION, MemoryType.FACT, MemoryType.PREFERENCE],
+                memory_types=[MemoryType.CONVERSATION.value, MemoryType.FACT.value, MemoryType.PREFERENCE.value],  # Convert enums to strings
                 top_k=effective_limit,
                 min_score=0.7,
                 emotional_context=emotional_context,
