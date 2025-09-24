@@ -3585,7 +3585,7 @@ class VectorMemoryManager:
             results = await self.vector_store.search_memories(
                 query="",
                 user_id=user_id,
-                memory_types=["CONVERSATION"],  # Fixed: Convert enum to string for protocol compliance
+                memory_types=["conversation"],  # Fixed: Use lowercase to match MemoryType.CONVERSATION.value
                 limit=limit  # Fixed: interface contract violation - use 'limit' not 'top_k'
             )
             
