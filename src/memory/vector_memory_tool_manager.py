@@ -17,12 +17,7 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass
-class VectorMemo            # Find related memories
-            related_memories = await self.vector_store.search_memories(
-                query=topic,
-                user_id=user_id,
-                limit=search_limit  # Fixed: interface contract violation - use 'limit' not 'top_k'
-            )ion:
+class VectorMemoryAction:
     """Represents a memory action taken by the LLM"""
     action_type: str
     memory_id: Optional[str]

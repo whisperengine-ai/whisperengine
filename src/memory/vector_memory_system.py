@@ -1887,7 +1887,7 @@ class VectorMemoryStore:
     async def search_memories_with_qdrant_intelligence(self, 
                                                       query: str,
                                                       user_id: str,
-                                                      memory_types: Optional[List[MemoryType]] = None,
+                                                      memory_types: Optional[List[str]] = None,
                                                       top_k: int = 10,
                                                       min_score: float = 0.7,
                                                       emotional_context: Optional[str] = None,
@@ -1922,7 +1922,7 @@ class VectorMemoryStore:
                 must_conditions.append(
                     models.FieldCondition(
                         key="memory_type", 
-                        match=models.MatchAny(any=[mt.value for mt in memory_types])
+                        match=models.MatchAny(any=memory_types)  # memory_types is already a list of strings
                     )
                 )
             
@@ -2094,7 +2094,7 @@ class VectorMemoryStore:
             logger.error(f"Qdrant temporal query handling failed: {e}")
             return []
 
-    async def _fallback_basic_search(self, query: str, user_id: str, memory_types: Optional[List[MemoryType]], 
+    async def _fallback_basic_search(self, query: str, user_id: str, memory_types: Optional[List[str]], 
                                    top_k: int, min_score: float) -> List[Dict[str, Any]]:
         """Fallback to basic Qdrant search if advanced features fail"""
         try:
@@ -2103,7 +2103,7 @@ class VectorMemoryStore:
             
             if memory_types:
                 filter_conditions.append(
-                    models.FieldCondition(key="memory_type", match=models.MatchAny(any=[mt.value for mt in memory_types]))
+                    models.FieldCondition(key="memory_type", match=models.MatchAny(any=memory_types))  # memory_types is already a list of strings
                 )
             
             results = self.client.search(
@@ -2841,7 +2841,7 @@ class MemoryTools:
             existing_memories = await self.vector_store.search_memories(
                 query=f"{subject} {old_value}",
                 user_id=user_id,
-                memory_types=[MemoryType.FACT]
+                memory_types=[MemoryType.FACT.value]
             )
             
             # Update or create new fact
@@ -2891,7 +2891,7 @@ class MemoryTools:
         try:
             memory_types = None
             if memory_type:
-                memory_types = [MemoryType(memory_type)]
+                memory_types = [MemoryType(memory_type).value]  # Convert to string for protocol compliance
             
             results = await self.vector_store.search_memories(
                 query=query,
@@ -3393,7 +3393,7 @@ class VectorMemoryManager:
             results = await self.vector_store.search_memories_with_qdrant_intelligence(
                 query=effective_query,
                 user_id=user_id,
-                memory_types=[MemoryType.CONVERSATION.value, MemoryType.FACT.value, MemoryType.PREFERENCE.value],  # Convert enums to strings
+                memory_types=[MemoryType.CONVERSATION.value, MemoryType.FACT.value, MemoryType.PREFERENCE.value],  # These are strings now, which matches the protocol
                 top_k=effective_limit,
                 min_score=0.7,
                 emotional_context=emotional_context,
@@ -3507,7 +3507,7 @@ class VectorMemoryManager:
             results = await self.vector_store.search_memories(
                 query=query,
                 user_id=user_id,
-                memory_types=[MemoryType.FACT],
+                memory_types=[MemoryType.FACT.value],
                 limit=limit,
                 min_score=0.6
             )
@@ -3557,7 +3557,7 @@ class VectorMemoryManager:
             results = await self.vector_store.search_memories(
                 query="",
                 user_id=user_id,
-                memory_types=[MemoryType.PREFERENCE],
+                memory_types=[MemoryType.PREFERENCE.value],
                 limit=50,
                 min_score=0.0
             )
