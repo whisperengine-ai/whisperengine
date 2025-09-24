@@ -387,7 +387,7 @@ async def voice_health_check(
         logger.error("Voice health check failed: %s", e)
         return {
             "status": "unhealthy",
-            "error": str(e),
+            "error": "An internal error occurred.",
             "timestamp": datetime.now().isoformat()
         }
 
