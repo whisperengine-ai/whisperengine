@@ -6,6 +6,7 @@ Provides unified interface for all Phase 2 LLM tooling capabilities.
 """
 
 import logging
+import json
 from typing import Dict, List, Optional, Any, Union
 from dataclasses import dataclass
 from datetime import datetime
@@ -278,11 +279,50 @@ class LLMToolIntegrationManager:
                 tool_results = await self._process_tool_calls(
                     tool_calls, user_id
                 )
+                
+                # Make second LLM call with tool results to get final response
+                if tool_results:
+                    logger.info("🔄 Making second LLM call with %d tool results", len(tool_results))
+                    
+                    # Build messages with tool results
+                    tool_messages = []
+                    for i, (tool_call, tool_result) in enumerate(zip(tool_calls, tool_results)):
+                        tool_messages.append({
+                            "role": "tool",
+                            "tool_call_id": tool_call.get("id", f"call_{i}"),
+                            "name": tool_call.get("function", {}).get("name", "unknown"),
+                            "content": json.dumps(tool_result)
+                        })
+                    
+                    # Make second call with tool results
+                    messages_with_results = messages + [
+                        response.get("choices", [{}])[0].get("message", {}),
+                    ] + tool_messages
+                    
+                    try:
+                        second_response = self.llm_client.generate_chat_completion(
+                            messages_with_results
+                        )
+                        
+                        if second_response.get("choices") and len(second_response["choices"]) > 0:
+                            final_content = second_response["choices"][0].get("message", {}).get("content", "")
+                            logger.info("✅ Second LLM call generated %d character response", len(final_content))
+                        else:
+                            logger.error("❌ Second LLM call failed to generate response")
+                            final_content = ""
+                    except Exception as e:
+                        logger.error("❌ Second LLM call failed: %s", e)
+                        final_content = ""
+                else:
+                    final_content = ""
+            else:
+                # No tool calls, use original response
+                final_content = response.get("choices", [{}])[0].get("message", {}).get("content", "")
             
             execution_time = (datetime.now() - start_time).total_seconds()
             
             # Check if web search was used and add emoji prefix
-            llm_response = response.get("choices", [{}])[0].get("message", {}).get("content", "")
+            llm_response = final_content
             web_search_used = any(
                 result.get("tool_name") in ["search_current_events", "verify_current_information"]
                 for result in tool_results
@@ -400,7 +440,18 @@ IMPORTANT: Always prioritize user emotional wellbeing and safety. When tools are
         
         for tool_call in tool_calls:
             function_name = tool_call.get("function", {}).get("name")
-            parameters = tool_call.get("function", {}).get("arguments", {})
+            parameters_raw = tool_call.get("function", {}).get("arguments", {})
+            
+            # Parse arguments if they're a JSON string
+            if isinstance(parameters_raw, str):
+                try:
+                    import json
+                    parameters = json.loads(parameters_raw)
+                except json.JSONDecodeError as e:
+                    logger.error("Failed to parse tool arguments as JSON: %s", e)
+                    parameters = {}
+            else:
+                parameters = parameters_raw
             
             start_time = datetime.now()
             

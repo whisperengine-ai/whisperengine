@@ -311,6 +311,15 @@ class ModularBotManager:
                 await self.command_handlers["llm_tools"].register_commands()
                 logger.info("✅ LLM Tool Calling command handlers registered")
                 
+                # Web Search Commands - explicit commands for testing web search functionality
+                from src.handlers.web_search_commands import WebSearchCommands
+                self.command_handlers["web_search"] = WebSearchCommands(
+                    bot=self.bot,
+                    llm_tool_integration_manager=llm_tool_manager
+                )
+                await self.command_handlers["web_search"].register_commands()
+                logger.info("✅ Web Search command handlers registered (!search_news, !verify_info, !test_web_search)")
+                
                 # Web Search Integration - works automatically in conversation, no extra commands needed!
                 logger.info("✅ Web Search integration enabled (automatic in conversation)")
             else:

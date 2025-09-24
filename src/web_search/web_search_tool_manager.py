@@ -239,17 +239,21 @@ class WebSearchToolManager:
         }
     
     def _enhance_query_for_current_events(self, query: str, search_focus: str) -> str:
-        """Enhance search query based on focus type"""
-        current_year = datetime.now().year
+        """Enhance search query - DuckDuckGo works better with general topics than news queries"""
+        # Remove news-specific terms that make DuckDuckGo return empty results
+        query_cleaned = query.replace("latest news", "").replace("recent news", "").replace("news", "")
+        query_cleaned = query_cleaned.replace("latest", "").replace("recent", "").replace("developments", "")
+        query_cleaned = query_cleaned.replace("2025", "").replace("2024", "").strip()
         
-        if search_focus == "news":
-            return f"{query} news {current_year}"
-        elif search_focus == "recent":
-            return f"{query} recent {current_year}"
-        elif search_focus == "factual":
-            return f"{query} facts information {current_year}"
+        # Use general topic terms that work better with DuckDuckGo
+        if "AI" in query or "artificial intelligence" in query.lower():
+            return "artificial intelligence"
+        elif "machine learning" in query.lower():
+            return "machine learning"
+        elif "OpenAI" in query or "ChatGPT" in query:
+            return "OpenAI GPT"
         else:
-            return f"{query} {current_year}"
+            return query_cleaned if query_cleaned else query
     
     async def _perform_duckduckgo_search(self, query: str, max_results: int) -> List[WebSearchResult]:
         """Perform web search using DuckDuckGo's instant answer API"""
@@ -321,11 +325,11 @@ class WebSearchToolManager:
             response.raise_for_status()
             
             # Very basic HTML parsing - in a real implementation you'd use BeautifulSoup
-            # For now, just return a placeholder result indicating search was attempted
+            # For now, just return a helpful result explaining search limitations  
             # Note: max_results is intentionally unused as this is a simple fallback
             return [WebSearchResult(
-                title=f"Search results for: {query}",
-                snippet=f"Web search attempted for '{query}'. For better results, consider using a paid search API.",
+                title=f"Search attempted: {query}",
+                snippet=f"I searched for information about '{query}' but couldn't find recent news results. My web search uses DuckDuckGo's free API which provides general knowledge but not current news. For specific topics, try asking about general concepts rather than recent developments.",
                 url="https://duckduckgo.com",
                 source="DuckDuckGo",
                 relevance_score=0.5

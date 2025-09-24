@@ -224,10 +224,10 @@ class BotEventHandlers:
                 self.chat_orchestrator = None
                 return False
 
-            # Set bot instance for Universal Chat to access command handlers
+            # Set bot_core instance for Universal Chat to access WhisperEngine components (memory_manager, etc.)
             if hasattr(self.chat_orchestrator, "set_bot_core"):
-                self.chat_orchestrator.set_bot_core(self.bot)
-                logger.info("✅ Universal Chat configured with bot instance for CDL character access")
+                self.chat_orchestrator.set_bot_core(self.bot_core)
+                logger.info("✅ Universal Chat configured with bot_core for full AI capabilities (memory_manager, LLM tools, etc.)")
 
             # Setup Discord adapter and set bot instance
             if (
