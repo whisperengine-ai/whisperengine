@@ -2787,20 +2787,13 @@ class VectorMemoryStore:
         - memory_types: Optional[List[str]] (protocol standard - strings, not enums)
         - limit: int (protocol standard - not top_k)
         """
-        # Convert string memory types to MemoryType enums for internal use
-        vector_memory_types = None
-        if memory_types:
-            vector_memory_types = []
-            for mem_type in memory_types:
-                try:
-                    vector_memory_types.append(MemoryType(mem_type))
-                except ValueError:
-                    logger.warning(f"Unknown memory type: {mem_type}")
+        # Convert string memory types back to strings for internal method (protocol compliance)
+        vector_memory_types = memory_types  # Keep as strings - protocol compliant
         
         return await self.search_memories_with_qdrant_intelligence(
             query=query,
             user_id=user_id,
-            memory_types=vector_memory_types,
+            memory_types=vector_memory_types,  # Already strings, no conversion needed
             top_k=limit,  # Convert limit to top_k for internal method
             min_score=0.7,
             prefer_recent=True
@@ -2925,8 +2918,7 @@ class MemoryTools:
             memories = await self.vector_store.search_memories(
                 query=content,
                 user_id=user_id,
-                limit=5,
-                min_score=0.9  # High threshold for deletion
+                limit=5  # Use protocol-compliant parameters only
             )
             
             deleted_count = 0
@@ -3072,12 +3064,11 @@ class VectorMemoryManager:
                 query=current_message,
                 user_id=user_id,
                 memory_types=[
-                    MemoryType.CONVERSATION,
-                    MemoryType.FACT,
-                    MemoryType.PREFERENCE
+                    MemoryType.CONVERSATION.value,
+                    MemoryType.FACT.value,
+                    MemoryType.PREFERENCE.value
                 ],
-                limit=20,
-                min_score=0.6
+                limit=20
             )
             
             # Assemble context prioritizing recent and relevant
@@ -3508,8 +3499,7 @@ class VectorMemoryManager:
                 query=query,
                 user_id=user_id,
                 memory_types=[MemoryType.FACT.value],
-                limit=limit,
-                min_score=0.6
+                limit=limit
             )
             return [
                 {
@@ -3558,8 +3548,7 @@ class VectorMemoryManager:
                 query="",
                 user_id=user_id,
                 memory_types=[MemoryType.PREFERENCE.value],
-                limit=50,
-                min_score=0.0
+                limit=50
             )
             
             profile = {}
@@ -3611,19 +3600,11 @@ class VectorMemoryManager:
     ) -> List[Dict[str, Any]]:
         """Search memories with optional type filtering."""
         try:
-            vector_memory_types = []
-            if memory_types:
-                for mem_type in memory_types:
-                    try:
-                        vector_memory_types.append(MemoryType(mem_type))
-                    except ValueError:
-                        # Skip unknown memory types
-                        pass
-            
+            # Pass memory_types directly as strings (protocol-compliant)
             results = await self.vector_store.search_memories(
                 query=query,
                 user_id=user_id,
-                memory_types=vector_memory_types if vector_memory_types else None,
+                memory_types=memory_types,  # Already strings, no conversion needed
                 limit=limit
             )
             
