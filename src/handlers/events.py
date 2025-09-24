@@ -58,6 +58,9 @@ from src.utils.production_error_handler import (
     error_handler
 )
 
+# Import our refactored services
+from src.handlers.services import MessageProcessingService
+
 # Vector-native prompt integration - REMOVED: unused final_integration import
 
 logger = logging.getLogger(__name__)
@@ -158,6 +161,9 @@ class BotEventHandlers:
         self.emoji_response_intelligence = EmojiResponseIntegration(
             memory_manager=self.memory_manager
         )
+
+        # Initialize Message Processing Service
+        self.message_processor = MessageProcessingService(self.bot, bot_core)
 
         # Initialize Universal Chat Orchestrator
         self.chat_orchestrator = None
@@ -446,74 +452,26 @@ class BotEventHandlers:
 
     async def _handle_dm_message(self, message):
         """Handle direct message to the bot."""
-        # Check if this is a command first
-        if message.content.startswith("!"):
-            await self.bot.process_commands(message)
+        # Delegate to Message Processing Service
+        processed_info = await self.message_processor.handle_dm_message(message)
+        
+        if not processed_info:
+            # Message was handled (command or rejected for security)
             return
-
-        reply_channel = message.channel
-        user_id = str(message.author.id)
-        logger.debug(f"Processing DM from {message.author.name}")
-
-        # Security validation
-        validation_result = validate_user_input(message.content, user_id, "dm")
+        
+        # Extract processed information
+        message = processed_info['message']
+        reply_channel = processed_info['reply_channel'] 
+        user_id = processed_info['user_id']
+        validation_result = processed_info['validation_result']
+        
         # Store validation result for emoji intelligence system
         self._last_security_validation = validation_result
-        
-        if not validation_result["is_safe"]:
-            logger.error(f"SECURITY: Unsafe input detected from user {user_id} in DM")
-            logger.error(f"SECURITY: Blocked patterns: {validation_result['blocked_patterns']}")
-            
-            # 🎭 EMOJI INTELLIGENCE: Use emoji response for inappropriate content
-            try:
-                # Determine bot character
-                bot_character = "general"
-                if 'elena' in str(self.bot.user.name).lower() or 'dream' in str(self.bot.user.name).lower():
-                    bot_character = "mystical"
-                elif 'marcus' in str(self.bot.user.name).lower():
-                    bot_character = "technical"
-                
-                # Evaluate emoji response for inappropriate content
-                emoji_decision = await self.emoji_response_intelligence.evaluate_emoji_response(
-                    user_id=user_id,
-                    user_message=message.content,
-                    bot_character=bot_character,
-                    security_validation_result=validation_result,
-                    emotional_context=None,
-                    conversation_context={'channel_type': 'dm'}
-                )
-                
-                if emoji_decision.should_use_emoji:
-                    logger.info(f"🎭 SECURITY + EMOJI: Using emoji '{emoji_decision.emoji_choice}' for inappropriate content")
-                    await self.emoji_response_intelligence.apply_emoji_response(message, emoji_decision)
-                    return
-                    
-            except Exception as e:
-                logger.error(f"Error in security emoji response: {e}")
-            
-            # Fallback to text warning if emoji response fails
-            await reply_channel.send(
-                "⚠️ Your message contains content that could not be processed for security reasons. Please rephrase your message."
-            )
-            return
-
-        # Use sanitized content
-        sanitized_content = validation_result["sanitized_content"]
-        if validation_result["warnings"]:
-            logger.warning(
-                f"SECURITY: Input warnings for user {user_id} in DM: {validation_result['warnings']}"
-            )
-
-        # Replace original message content with sanitized version
-        message.content = sanitized_content
-
-        # (User preferred name detection and storage via Postgres has been removed. See LLM tool calling roadmap for new approach.)
 
         # Initialize variables early
         enhanced_system_prompt = None
         phase4_context = None
         comprehensive_context = None
-
 
         # Get relevant memories with context-aware filtering, using Redis cache if available
         relevant_memories = None
@@ -549,186 +507,66 @@ class BotEventHandlers:
                             # Build user preferences from context
                             user_preferences = self._build_user_preferences(user_id, message_context)
                             
-                            # Build filters from message context
-                            filters = self._build_memory_filters(message_context)
+                            # Build memory filters
+                            memory_filters = self._build_memory_filters(message_context)
                             
-                            # Add recency boost for conversation continuity
-                            filters["prefer_recent_conversation"] = True
-                            filters["recency_hours"] = 2  # Prefer memories from last 2 hours
+                            logger.info(f"� MEMORY DEBUG: Query type: {query_type}, preferences: {len(user_preferences)}, filters: {len(memory_filters)}")
                             
-                            # 🛡️ META-CONVERSATION FILTER: Exclude conversations ABOUT the bot system itself
-                            # This prevents our technical debugging from contaminating character responses
-                            # while allowing users to discuss these topics naturally
-                            meta_conversation_patterns = [
-                                "Elena's prompt", "your system prompt", "how you're programmed",
-                                "your character file", "cdl_ai_integration.py", "fix Elena's",
-                                "Elena is announcing wrong time", "Elena should speak like",
-                                "testing Elena's response", "Elena bot container",
-                                "Elena's speaking style", "Elena's mystical detection"
-                            ]
-                            filters["exclude_content_patterns"] = meta_conversation_patterns
-                            logger.info(f"🛡️ MEMORY FILTER: Excluding meta-conversations with {len(meta_conversation_patterns)} pattern filters")
-                            
-                            # 🎭 CHARACTER FILTERING: Add character-aware memory filtering
-                            # This ensures Elena gets Elena's memories, not generic WhisperEngine ones
-                            if hasattr(self.bot_core, 'command_handlers') and 'cdl_test' in self.bot_core.command_handlers:
-                                cdl_handler = self.bot_core.command_handlers['cdl_test']
-                                if hasattr(cdl_handler, '_get_user_active_character'):
-                                    try:
-                                        active_character = cdl_handler._get_user_active_character(user_id)
-                                        if active_character:
-                                            character_name = active_character.replace('.json', '').replace('examples/', '')
-                                            filters["active_character"] = character_name
-                                            filters["has_character"] = True
-                                            logger.info(f"🎭 MEMORY SEARCH: Filtering for character: {character_name}")
-                                        else:
-                                            filters["has_character"] = False
-                                            logger.info(f"🎭 MEMORY SEARCH: Filtering for non-character conversations")
-                                    except Exception as e:
-                                        logger.warning(f"🎭 MEMORY SEARCH: Could not detect character for search: {e}")
-                                        # Don't add character filters if detection fails
-                            
+                            # Use optimized retrieval with enhanced parameters
                             relevant_memories = await self.memory_manager.retrieve_relevant_memories_optimized(
                                 user_id=user_id,
                                 query=message.content,
                                 query_type=query_type,
-                                user_history=user_preferences,
-                                filters=filters,
-                                limit=20
+                                limit=10,
+                                user_preferences=user_preferences,
+                                filters=memory_filters,
+                                rerank=True
                             )
                             
                             logger.info(f"🚀 MEMORY DEBUG: Optimized retrieval returned {len(relevant_memories) if relevant_memories else 0} memories")
                             
-                            # Log optimization details for debugging
-                            if relevant_memories and len(relevant_memories) > 0:
-                                sample = relevant_memories[0]
-                                if 'reranked_score' in sample:
-                                    logger.info(f"🚀 MEMORY DEBUG: Re-ranking active - top reranked score: {sample['reranked_score']:.3f}")
-                                if 'scoring_breakdown' in sample:
-                                    breakdown = sample['scoring_breakdown']
-                                    logger.info(f"🚀 MEMORY DEBUG: Scoring breakdown - base: {breakdown.get('base_score', 0):.3f}, "
-                                              f"recency: {breakdown.get('recency_boost', 0):.3f}, "
-                                              f"preference: {breakdown.get('preference_boost', 0):.3f}")
-                            
                         except Exception as e:
-                            logger.warning(f"🚀 MEMORY DEBUG: Optimized retrieval failed, using context-aware fallback: {e}")
-                            # Use context-aware retrieval as fallback (no hardcoded temporal detection)
-                            relevant_memories = await self.memory_manager.retrieve_context_aware_memories(
-                                user_id=user_id, 
-                                query=message.content, 
-                                max_memories=20,
-                                context=message_context,
-                                emotional_context="general conversation"
-                            )
+                            logger.warning(f"🚀 MEMORY DEBUG: Optimized retrieval failed: {e}")
+                            logger.info("🚀 MEMORY DEBUG: Falling back to standard retrieval")
+                            relevant_memories = None
                     
-                    # Ensure we always have some form of memory retrieval
-                    if not relevant_memories:
-                        logger.info("🔍 MEMORY DEBUG: Using context-aware memory retrieval")
-                        relevant_memories = await self.memory_manager.retrieve_context_aware_memories(
-                            user_id=user_id, 
-                            query=message.content, 
-                            max_memories=20,
-                            context=message_context,
-                            emotional_context="general conversation"
+                    # Fallback to standard memory retrieval
+                    if relevant_memories is None:
+                        logger.info("� MEMORY DEBUG: Using standard memory retrieval")
+                        relevant_memories = await self.memory_manager.retrieve_relevant_memories(
+                            user_id, message.content, limit=10
                         )
-                    
-                    logger.info(f"🔍 MEMORY DEBUG: Retrieved {len(relevant_memories) if relevant_memories else 0} memories")
-                    if relevant_memories:
-                        for i, memory in enumerate(relevant_memories[:3]):  # Log first 3 memories
-                            content = memory.get('content', '')[:100]
-                            score = memory.get('score', 'N/A')
-                            reranked = memory.get('reranked_score')
-                            score_text = f"score: {score}"
-                            if reranked:
-                                score_text += f", reranked: {reranked:.3f}"
-                            logger.info(f"🔍 MEMORY DEBUG: Memory {i+1}: ({score_text}) '{content}...'")
-                    else:
-                        logger.warning(f"🔍 MEMORY DEBUG: No memories retrieved for user {user_id}")
-                    
-                    # Store in cache for next time
-                    if self.profile_memory_cache and relevant_memories:
-                        try:
-                            if not self.profile_memory_cache.redis:
-                                await self.profile_memory_cache.initialize()
-                            await self.profile_memory_cache.set_memory_retrieval(user_id, message.content, relevant_memories)
-                        except Exception as e:
-                            logger.debug(f"Failed to cache memory retrieval: {e}")
-
-                # Get emotion context if available
-                emotion_context = ""
-                if hasattr(self.memory_manager, "get_emotion_context"):
+                        logger.info(f"� MEMORY DEBUG: Standard retrieval returned {len(relevant_memories) if relevant_memories else 0} memories")
+                        
+                # Cache memory retrieval result if successful
+                if self.profile_memory_cache and relevant_memories and len(relevant_memories) > 0:
                     try:
-                        # Check if method is async or sync and handle accordingly (WhisperEngine architecture)
-                        import inspect
-                        if inspect.iscoroutinefunction(self.memory_manager.get_emotion_context):
-                            emotion_context = await self.memory_manager.get_emotion_context(user_id)
-                        else:
-                            # Use thread worker pattern for sync methods in async context
-                            loop = asyncio.get_running_loop()
-                            emotion_context = await loop.run_in_executor(
-                                None, self.memory_manager.get_emotion_context, user_id
-                            )
+                        await self.profile_memory_cache.cache_memory_retrieval(
+                            user_id, message.content, relevant_memories
+                        )
+                        logger.debug(f"[CACHE] Cached memory retrieval for user {user_id}")
                     except Exception as e:
-                        logger.debug(f"Could not get emotion context: {e}")
-                        emotion_context = ""
-            else:
-                logger.warning("memory_manager is not initialized; skipping memory retrieval.")
-                relevant_memories = []
-                emotion_context = ""
+                        logger.debug(f"Cache storage failed: {e}")
 
-        except (MemoryRetrievalError, ValidationError) as e:
-            logger.warning(f"Could not retrieve memories for user {user_id}: {e}")
+        except MemoryRetrievalError as e:
+            logger.error(f"Memory retrieval failed for user {user_id}: {e}")
             relevant_memories = []
-            emotion_context = ""
         except Exception as e:
-            logger.error(f"Unexpected error retrieving memories: {e}")
+            logger.error(f"Unexpected error during memory retrieval: {e}")
             relevant_memories = []
-            emotion_context = ""
 
-        # Get recent conversation history - Use HYBRID approach: summary + recent messages
-        conversation_summary = await self._get_intelligent_conversation_summary(reply_channel, user_id, message)
-        
-        if conversation_summary:
-            # Use HYBRID: intelligent summary for older context + recent messages for continuity
-            logger.info(f"✅ Using HYBRID approach: conversation summary + recent messages for user {user_id}")
-            recent_messages = await self._get_recent_messages(reply_channel, user_id, message.id)
-            # Add summary as a system context message
-            conversation_summary_context = [
-                {"role": "system", "content": f"Previous conversation summary: {conversation_summary}"}
-            ]
-        else:
-            # Fall back to traditional message loading
-            recent_messages = await self._get_recent_messages(reply_channel, user_id, message.id)
-            conversation_summary_context = []
+        # Recent message retrieval and conversation context building  
+        recent_messages = await self._get_recent_messages(message.channel, user_id, exclude_message_id=message.id)
 
-        # Build conversation context
+        # Build comprehensive conversation context
         conversation_context = await self._build_conversation_context(
-            message, relevant_memories, emotion_context, recent_messages, enhanced_system_prompt
-        )
-        
-        # Add intelligent conversation summary if available
-        if conversation_summary_context:
-            # Insert summary before user messages but after system prompts
-            # Find where to insert (after system messages, before user messages)
-            insert_pos = len([ctx for ctx in conversation_context if ctx["role"] == "system"])
-            conversation_context[insert_pos:insert_pos] = conversation_summary_context
-
-        external_emotion_data = None
-        phase2_context = None
-        current_emotion_data = None
-        dynamic_personality_context = None
-        phase4_context = None
-        comprehensive_context = None
-        enhanced_system_prompt = None
-
-        # ALWAYS process AI components - NO CONDITIONAL FALLBACKS
-        (external_emotion_data, phase2_context, current_emotion_data, 
-         dynamic_personality_context, phase4_context, comprehensive_context, 
-         enhanced_system_prompt, phase3_context_switches, phase3_empathy_calibration) = await self._process_ai_components_parallel(
-            user_id, message.content, message, recent_messages, conversation_context
+            message, relevant_memories, None, recent_messages, enhanced_system_prompt
         )
 
-        # Process message with images
+        # Process message with AI components in parallel
+        await self._process_ai_components_parallel(user_id, message.content, message, recent_messages, conversation_context)
+
+        # Process any images attached to the message
         conversation_context = await process_message_with_images(
             message.content,
             message.attachments,
@@ -755,76 +593,10 @@ class BotEventHandlers:
 
     async def _handle_guild_message(self, message):
         """Handle guild (server) message."""
-        # Configurable response behavior:
-        # DISCORD_RESPOND_MODE options:
-        #   mention (default)  -> only reply when explicitly mentioned
-        #   name               -> reply when bot name OR fallback name appears as a whole word OR mentioned
-        #   all                -> reply to any non-command message in guild channel (acts like a chat bot)
-        # Backward compatibility: if REQUIRE_DISCORD_MENTION=true force mention mode.
-
-        try:
-            respond_mode = os.getenv("DISCORD_RESPOND_MODE", "mention").lower().strip()
-            if os.getenv("REQUIRE_DISCORD_MENTION", "false").lower() == "true":
-                respond_mode = "mention"
-        except Exception:
-            respond_mode = "mention"
-
-        # Fast‑path for commands (always allow the command system to process first)
-        # Commands are handled by discord.py after this method returns from process_commands
-        # We avoid double-processing: if command prefix matches, let process_commands handle and exit early
-        command_prefix = os.getenv("DISCORD_COMMAND_PREFIX", "!")
-        if message.content.startswith(command_prefix):
-            await self.bot.process_commands(message)
-            return
-
-        bot_name = os.getenv("DISCORD_BOT_NAME", "").lower()
-        fallback_name = "whisperengine"
-        content_lower = message.content.lower()
-        content_words = content_lower.split()
-
-        should_active_reply = False
-
-        # Mention always triggers active reply
-        if self.bot.user in message.mentions:
-            should_active_reply = True
-        else:
-            if respond_mode == "name":
-                # Check if bot name appears anywhere in message (improved detection)
-                name_found = False
-                if bot_name:
-                    # Check both as separate word and as substring
-                    if bot_name in content_words or bot_name in content_lower:
-                        name_found = True
-                # Also check fallback name
-                if fallback_name in content_words or fallback_name in content_lower:
-                    name_found = True
-                
-                if name_found:
-                    should_active_reply = True
-                    logger.debug(f"Bot name detected in message: '{message.content[:50]}...'")
-            elif respond_mode == "all":
-                should_active_reply = True
-            # mention mode (default) leaves should_active_reply False unless mentioned
-
-        # Optional verbose logging when debugging interaction issues
-        if logger.isEnabledFor(logging.INFO) and should_active_reply:
-            logger.info(
-                "💬 Guild message triggering reply (mode=%s, author=%s, channel=%s): %.80s",
-                respond_mode,
-                getattr(message.author, 'name', 'unknown'),
-                getattr(message.channel, 'name', 'dm'),
-                message.content.replace("\n", " "),
-            )
-        elif logger.isEnabledFor(logging.DEBUG):
-            logger.debug(
-                "Guild message received (mode=%s, reply=%s, author=%s, channel=%s)",
-                respond_mode,
-                should_active_reply,
-                getattr(message.author, 'name', 'unknown'),
-                getattr(message.channel, 'name', 'dm'),
-            )
-
-        if should_active_reply:
+        # Delegate to Message Processing Service
+        should_handle_mention = await self.message_processor.handle_guild_message(message)
+        
+        if should_handle_mention:
             await self._handle_mention_message(message)
         else:
             # Still allow command processing (in case of edge cases like missing prefix detection)
@@ -832,41 +604,17 @@ class BotEventHandlers:
 
     async def _handle_mention_message(self, message):
         """Handle message where bot is mentioned."""
-        reply_channel = message.channel
-        user_id = str(message.author.id)
-        logger.info(f"[CONV-CTX] Handling mention message_id={message.id} user_id={user_id} channel_id={getattr(message.channel, 'id', None)} guild_id={getattr(message.guild, 'id', None)} content='{message.content[:60]}'")
-
-        # Remove mentions from content
-        content = message.content
-        logger.info(f"[CONV-CTX] Original message content: '{message.content}'")
-        for mention in message.mentions:
-            if mention == self.bot.user:
-                content = (
-                    content.replace(f"<@{mention.id}>", "").replace(f"<@!{mention.id}>", "").strip()
-                )
-        logger.info(f"[CONV-CTX] Content after mention removal: '{content}'")
-
-        if not content:
-            logger.info(f"[CONV-CTX] No content after mention removal, processing as command")
-            await self.bot.process_commands(message)
+        # Delegate to Message Processing Service
+        processed_info = await self.message_processor.handle_mention_message(message)
+        
+        if not processed_info:
+            # Message was handled as command or failed security validation
             return
-
-        # Security validation for guild messages
-        validation_result = validate_user_input(content, user_id, "server_channel")
-        if not validation_result["is_safe"]:
-            logger.error(
-                f"SECURITY: Unsafe input detected from user {user_id} in server {message.guild.name}"
-            )
-            logger.error(f"SECURITY: Blocked patterns: {validation_result['blocked_patterns']}")
-            security_msg = f"⚠️ {message.author.mention} Your message contains content that could not be processed for security reasons. Please rephrase your message."
-            await message.reply(security_msg, mention_author=False)  # mention_author=False since we already include the mention
-            return
-
-        content = validation_result["sanitized_content"]
-        if validation_result["warnings"]:
-            logger.warning(
-                f"SECURITY: Input warnings for user {user_id} in server {message.guild.name}: {validation_result['warnings']}"
-            )
+        
+        # Extract processed information
+        content = processed_info['content']  # Content after mention removal and sanitization
+        user_id = processed_info['user_id']
+        reply_channel = processed_info['reply_channel']
 
         # Get relevant memories with context-aware filtering, using Redis cache if available
         relevant_memories = None
