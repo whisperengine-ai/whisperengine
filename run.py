@@ -31,16 +31,10 @@ setup_logging(debug=debug_mode, environment=environment, log_dir=log_dir, app_na
 # Import and run the main function (logging is now configured)
 import asyncio
 from src.main import main as bot_async_main  # Import the real async entry point
-from src.utils.onboarding_manager import ensure_onboarding_complete
 
 
 async def launcher_main():
-    """Launcher entry point that performs onboarding then delegates to the core async bot."""
-    # Run onboarding / first‑run check
-    should_continue = await ensure_onboarding_complete()
-    if not should_continue:
-        return 1
-
+    """Launcher entry point that delegates to the core async bot."""
     # Delegate directly to the bot's async main (avoid nested asyncio.run())
     return await bot_async_main()
 

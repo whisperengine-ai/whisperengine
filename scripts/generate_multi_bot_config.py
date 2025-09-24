@@ -38,9 +38,9 @@ class BotConfigDiscovery:
         """
         bot_configs = {}
         
-        # Scan for .env.* files (excluding .example and .template files)
+        # Scan for .env.* files (excluding .example, .template, and .local files)
         for env_file in self.workspace_root.glob(".env.*"):
-            if env_file.name.endswith(".example") or env_file.name.endswith(".template"):
+            if env_file.name.endswith(".example") or env_file.name.endswith(".template") or env_file.name.endswith(".local"):
                 continue
                 
             match = self.env_pattern.match(env_file.name)
@@ -101,6 +101,8 @@ class BotConfigDiscovery:
             f"{bot_name}-thompson" if bot_name == "marcus" else None,
             f"{bot_name}-tether" if bot_name == "gabriel" else None,
             f"{bot_name}_of_the_endless" if bot_name == "dream" else None,
+            f"{bot_name}-blake" if bot_name == "sophia" else None,
+            f"{bot_name}-sterling" if bot_name == "jake" else None,
         ]
         
         # Filter out None values

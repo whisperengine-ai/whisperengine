@@ -81,7 +81,7 @@ class LLMToolIntegrationManager:
         core_tools = []
         for tool in self.all_tools:
             tool_name = tool.get("function", {}).get("name", "")
-            if tool_name in ["store_conversation_memory", "retrieve_relevant_memories", "search_memories"]:
+            if tool_name in ["store_semantic_memory", "update_memory_context", "enhance_memory_retrieval", "create_memory_summary"]:
                 core_tools.append(tool)
         
         # Check for emotional crisis indicators
@@ -102,7 +102,7 @@ class LLMToolIntegrationManager:
         if emotional_crisis_detected:
             for tool in self.all_tools:
                 tool_name = tool.get("function", {}).get("name", "")
-                if "emotional" in tool_name or "crisis" in tool_name or "empathy" in tool_name:
+                if any(keyword in tool_name for keyword in ["emotional", "crisis", "empathy", "detect_emotional", "analyze_emotional", "calibrate_emotional"]):
                     additional_tools.append(tool)
         
         # Add character evolution tools if adaptation requested
@@ -145,7 +145,8 @@ class LLMToolIntegrationManager:
         """Detect if message indicates emotional crisis requiring support tools"""
         crisis_keywords = [
             'depressed', 'hopeless', 'overwhelmed', 'anxious', 'panic', 'crisis',
-            'can\'t cope', 'breaking down', 'falling apart', 'desperate', 'suicidal'
+            'can\'t cope', 'breaking down', 'falling apart', 'desperate', 'suicidal',
+            'sad', 'feeling sad', 'upset', 'emotional support', 'distressed'
         ]
         message_lower = message.lower()
         
@@ -155,8 +156,15 @@ class LLMToolIntegrationManager:
         # Check emotional context if available
         context_crisis = False
         if emotional_context:
+            # Check for explicit support needed flag
+            if emotional_context.get('support_needed', False):
+                context_crisis = True
+            # Check for distressed mood
+            if emotional_context.get('mood') in ['distressed', 'sad', 'anxious', 'upset']:
+                context_crisis = True
+            # Check for high intensity emotions
             high_intensity_emotions = emotional_context.get('high_intensity_emotions', [])
-            context_crisis = any(emotion in ['extreme_sadness', 'anxiety', 'despair'] for emotion in high_intensity_emotions)
+            context_crisis = context_crisis or any(emotion in ['extreme_sadness', 'anxiety', 'despair'] for emotion in high_intensity_emotions)
         
         return keyword_crisis or context_crisis
     
@@ -219,17 +227,23 @@ class LLMToolIntegrationManager:
             
             # Process any tool calls made by LLM
             tool_results = []
-            if response.get("tool_calls"):
+            # Extract tool calls from proper API response structure
+            tool_calls = []
+            if response.get("choices") and len(response["choices"]) > 0:
+                message = response["choices"][0].get("message", {})
+                tool_calls = message.get("tool_calls", [])
+            
+            if tool_calls:
                 tool_results = await self._process_tool_calls(
-                    response["tool_calls"], user_id
+                    tool_calls, user_id
                 )
             
             execution_time = (datetime.now() - start_time).total_seconds()
             
             result = {
                 "success": True,
-                "llm_response": response.get("content", ""),
-                "tool_calls_made": len(response.get("tool_calls", [])),
+                "llm_response": response.get("choices", [{}])[0].get("message", {}).get("content", ""),
+                "tool_calls_made": len(tool_calls),
                 "tool_results": tool_results,
                 "execution_time": execution_time,
                 "timestamp": datetime.now().isoformat()
@@ -302,8 +316,11 @@ TOOL USAGE GUIDELINES:
 - Apply memory insights to create more meaningful connections
 - Orchestrate complex workflows for sophisticated user requests
 - Generate proactive insights to enhance relationship development
+- ALWAYS use memory tools when users mention storing, retrieving, or recalling information
+- ALWAYS use character evolution tools when users ask for personality changes or adaptations
+- ALWAYS use emotional intelligence tools when users express distress, sadness, or need support
 
-IMPORTANT: Always prioritize user emotional wellbeing and safety."""
+IMPORTANT: Always prioritize user emotional wellbeing and safety. When tools are available, USE THEM to provide better assistance."""
 
         if character_context:
             base_prompt += f"\n\nCHARACTER CONTEXT:\n{character_context}"

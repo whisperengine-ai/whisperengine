@@ -13,6 +13,7 @@ import asyncio
 import json
 import logging
 import os
+import re
 import time
 from datetime import datetime, timedelta
 from enum import Enum
@@ -60,6 +61,58 @@ class MemoryTier(Enum):
     SHORT_TERM = "short_term"      # Recent conversations, temporary facts (1-7 days)
     MEDIUM_TERM = "medium_term"    # Important conversations, established facts (1-30 days)
     LONG_TERM = "long_term"        # Highly significant memories, core relationships (permanent)
+
+
+def normalize_bot_name(bot_name: str) -> str:
+    """
+    Normalize bot name for consistent memory storage and retrieval.
+    
+    CRITICAL: This function prevents memory isolation failures due to:
+    - Case sensitivity: "Elena" vs "elena" 
+    - Space handling: "Marcus Chen" vs "marcus_chen"
+    - Special characters and inconsistent formatting
+    
+    Rules:
+    - Convert to lowercase for case-insensitive matching
+    - Replace spaces with underscores for system compatibility
+    - Remove special characters except underscore/hyphen/alphanumeric
+    - Handle empty/None values gracefully
+    
+    Examples:
+    - "Elena" -> "elena"
+    - "Marcus Chen" -> "marcus_chen" 
+    - "Dream of the Endless" -> "dream_of_the_endless"
+    - None -> "unknown"
+    """
+    if not bot_name or not isinstance(bot_name, str):
+        return "unknown"
+    
+    # Step 1: Trim and lowercase
+    normalized = bot_name.strip().lower()
+    
+    # Step 2: Replace spaces with underscores
+    normalized = re.sub(r'\s+', '_', normalized)
+    
+    # Step 3: Remove special characters except underscore/hyphen/alphanumeric
+    normalized = re.sub(r'[^a-z0-9_-]', '', normalized)
+    
+    # Step 4: Collapse multiple underscores/hyphens
+    normalized = re.sub(r'[_-]+', '_', normalized)
+    
+    # Step 5: Remove leading/trailing underscores
+    normalized = normalized.strip('_-')
+    
+    return normalized if normalized else "unknown"
+
+
+def get_normalized_bot_name_from_env() -> str:
+    """Get normalized bot name from environment variables with fallback"""
+    raw_bot_name = (
+        os.getenv("DISCORD_BOT_NAME") or 
+        os.getenv("BOT_NAME") or 
+        "unknown"
+    )
+    return normalize_bot_name(raw_bot_name.strip())
 
 
 @dataclass
@@ -394,7 +447,7 @@ class VectorMemoryStore:
             content_hash = hash(content_normalized)
             
             # 🚀 QDRANT FEATURE: Check for exact duplicates using optimized index
-            current_bot_name = os.getenv("DISCORD_BOT_NAME", "unknown")
+            current_bot_name = get_normalized_bot_name_from_env()
             existing = self.client.scroll(
                 collection_name=self.collection_name,
                 scroll_filter=models.Filter(
@@ -422,7 +475,7 @@ class VectorMemoryStore:
             # Enhanced payload optimized for Qdrant operations
             qdrant_payload = {
                 "user_id": memory.user_id,
-                "bot_name": os.getenv("DISCORD_BOT_NAME", "unknown"),  # 🎯 Bot-specific memory segmentation
+                "bot_name": get_normalized_bot_name_from_env(),  # 🎯 NORMALIZED Bot-specific memory segmentation
                 "memory_type": memory.memory_type.value,
                 "content": memory.content,
                 "timestamp": memory.timestamp.isoformat(),
@@ -667,7 +720,7 @@ class VectorMemoryStore:
                 scroll_filter=models.Filter(
                     must=[
                         models.FieldCondition(key="user_id", match=models.MatchValue(value=user_id)),
-                        models.FieldCondition(key="bot_name", match=models.MatchValue(value=os.getenv("DISCORD_BOT_NAME", "unknown"))),  # 🎯 Bot-specific filtering
+                        models.FieldCondition(key="bot_name", match=models.MatchValue(value=get_normalized_bot_name_from_env())),  # 🎯 NORMALIZED Bot-specific filtering
                         models.FieldCondition(key="memory_type", match=models.MatchValue(value="conversation")),
                         models.FieldCondition(key="timestamp_unix", range=Range(gte=recent_timestamp))
                     ]
@@ -1727,10 +1780,10 @@ class VectorMemoryStore:
                 return await self._handle_temporal_query_with_qdrant(query, user_id, top_k)
             
             # Regular semantic search continues below...
-            current_bot_name = os.getenv("DISCORD_BOT_NAME", "unknown")
+            current_bot_name = get_normalized_bot_name_from_env()
             must_conditions = [
                 models.FieldCondition(key="user_id", match=models.MatchValue(value=user_id)),
-                models.FieldCondition(key="bot_name", match=models.MatchValue(value=current_bot_name))  # 🎯 Bot-specific filtering
+                models.FieldCondition(key="bot_name", match=models.MatchValue(value=current_bot_name))  # 🎯 NORMALIZED Bot-specific filtering
             ]
             
             if memory_types:
@@ -1813,7 +1866,7 @@ class VectorMemoryStore:
             recent_cutoff_timestamp = recent_cutoff_dt.timestamp()
             
             # Get recent conversation messages in chronological order
-            current_bot_name = os.getenv("DISCORD_BOT_NAME", "unknown")
+            current_bot_name = get_normalized_bot_name_from_env()
             scroll_result = self.client.scroll(
                 collection_name=self.collection_name,
                 scroll_filter=models.Filter(

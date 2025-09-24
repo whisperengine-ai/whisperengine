@@ -79,7 +79,8 @@ class CDLTestCommands:
                 # Map character names to files
                 character_files = {
                     'elena': 'characters/examples/elena-rodriguez.json',
-                    'marcus': 'characters/examples/marcus-chen.json'
+                    'marcus': 'characters/examples/marcus-thompson.json',
+                    'ryan': 'characters/examples/ryan-chen.json'
                 }
                 
                 if character_name not in character_files:

@@ -65,41 +65,9 @@ class StatusCommandHandlers:
             """Check and refresh the bot's Discord presence"""
             await status_handler_instance._bot_status_handler(ctx)
 
-        @self.bot.command(name="clear_chat")
-        @bot_name_filter()
-        async def clear_chat(ctx):
-            """Clear the conversation history in this channel"""
-            await status_handler_instance._clear_chat_handler(ctx)
-
-        @self.bot.command(name="cache_stats")
-        @bot_name_filter()
-        async def cache_stats(ctx):
-            """Show conversation cache statistics"""
-            await status_handler_instance._cache_stats_handler(ctx)
-
-        @self.bot.command(name="vision_status")
-        @bot_name_filter()
-        async def vision_status(ctx):
-            """Check if the LLM supports vision (image processing)"""
-            await status_handler_instance._vision_status_handler(ctx)
-
-        @self.bot.command(name="voice_status")
-        @bot_name_filter()
-        async def voice_status(ctx):
-            """Check voice support status and configuration"""
-            await status_handler_instance._voice_status_handler(ctx)
-
-        @self.bot.command(name="test_image")
-        @bot_name_filter()
-        async def test_image(ctx):
-            """Test image processing with an attached image"""
-            await status_handler_instance._test_image_handler(ctx)
-
-        @self.bot.command(name="health_status", aliases=["system_health"])
-        @bot_name_filter()
-        async def health_status(ctx):
-            """Check comprehensive system health including all services"""
-            await status_handler_instance._health_status_handler(ctx)
+        # Removed the other hidden status commands Copilot added:
+        # cache_stats, vision_status, voice_status, test_image, health_status
+        # Users don't need detailed technical diagnostic commands
 
     async def _llm_status_handler(self, ctx):
         """Handle LLM status command"""
@@ -254,22 +222,7 @@ class StatusCommandHandlers:
 
         await ctx.send(embed=embed)
 
-    async def _clear_chat_handler(self, ctx):
-        """Handle clear chat command"""
-        logger.info(
-            f"Clear chat command called by {ctx.author.name} in {ctx.channel.name if ctx.guild else 'DM'}"
-        )
-        channel_id = str(ctx.channel.id)
-
-        # Clear both old conversation history and new cache
-        if self.conversation_history:
-            self.conversation_history.clear_channel(channel_id)
-        if self.conversation_cache:
-            self.conversation_cache.clear_channel_cache(channel_id)
-
-        logger.debug(f"Cleared conversation history and cache for channel {channel_id}")
-
-        await ctx.send("✅ Conversation history has been cleared.")
+    # Removed _clear_chat_handler - users don't need manual memory management
 
     async def _cache_stats_handler(self, ctx):
         """Handle cache stats command"""

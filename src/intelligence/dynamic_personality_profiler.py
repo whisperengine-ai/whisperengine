@@ -1158,6 +1158,27 @@ class DynamicPersonalityProfiler:
         # If it's already a list, return it
         if isinstance(value, list):
             return value
+            
+    def _safe_parse_json(self, value, default=None):
+        """Safely parse JSON data, handling various input types"""
+        if value is None:
+            return default if default is not None else {}
+            
+        # If it's already a dict, return it
+        if isinstance(value, dict):
+            return value
+            
+        # If it's a string, try to parse it
+        if isinstance(value, str):
+            try:
+                return json.loads(value)
+            except (json.JSONDecodeError, ValueError):
+                logger.warning(f"Failed to parse JSON string: {value[:50]}...")
+                return default if default is not None else {}
+                
+        # For any other type, return default
+        logger.warning(f"Unexpected type for JSON parsing: {type(value)}")
+        return default if default is not None else {}
 
         # If it's a dict, convert to list if possible, otherwise return default
         if isinstance(value, dict):
@@ -1276,8 +1297,8 @@ class DynamicPersonalityProfiler:
                     relationship_depth=profile_row["relationship_depth"],
                     trust_level=profile_row["trust_level"],
                     adaptation_success_rate=0.5,  # Default value - can be enhanced later
-                    preferred_response_style=json.loads(
-                        profile_row["preferred_response_style"] or "{}"
+                    preferred_response_style=self._safe_parse_json(
+                        profile_row["preferred_response_style"], default={}
                     ),
                     effective_conversation_patterns=[],  # Can be derived from analysis data
                     topics_of_high_engagement=[],  # Can be derived from analysis data

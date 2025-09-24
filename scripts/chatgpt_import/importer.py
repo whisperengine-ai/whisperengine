@@ -65,7 +65,7 @@ class ChatGPTImporter:
                     'vector_size': int(os.getenv('VECTOR_EMBEDDING_SIZE', '384'))
                 },
                 'embeddings': {
-                    'model_name': os.getenv('VECTOR_EMBEDDING_MODEL', 'snowflake/snowflake-arctic-embed-xs'),
+                    'model_name': os.getenv('EMBEDDING_MODEL', 'snowflake/snowflake-arctic-embed-xs'),
                     'device': os.getenv('VECTOR_EMBEDDING_DEVICE', 'cpu')
                 },
                 'postgresql': {

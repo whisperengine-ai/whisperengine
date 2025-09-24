@@ -154,7 +154,7 @@ class BotEventHandlers:
         )
         
         # Initialize Vector-Based Emoji Response Intelligence 
-        from src.intelligence.vector_emoji_intelligence import EmojiResponseIntegration
+        from src.intelligence.vector_emoji_intelligence import EmojiResponseIntegration, EmojiResponseContext
         self.emoji_response_intelligence = EmojiResponseIntegration(
             memory_manager=self.memory_manager
         )
@@ -2255,21 +2255,61 @@ class BotEventHandlers:
                     response, user_id, self.memory_manager, str(message.id)
                 )
 
-                # 🎭 VECTOR-POWERED EMOJI INTELLIGENCE: Evaluate if emoji response is more appropriate
+                # 🎭 CDL EMOJI PERSONALITY: Enhance response with character-appropriate emojis
                 try:
-                    # Determine bot character based on configured bot name or character file
-                    bot_character = "general"  # Default
-                    if hasattr(self, 'bot_character_type'):
-                        bot_character = self.bot_character_type
-                    elif 'elena' in str(self.bot.user.name).lower() or 'dream' in str(self.bot.user.name).lower():
+                    # Import our new CDL emoji integration system
+                    from src.intelligence.cdl_emoji_integration import create_cdl_emoji_integration
+                    
+                    cdl_emoji_integration = create_cdl_emoji_integration()
+                    
+                    # Determine character file based on bot name
+                    character_file = "elena-rodriguez.json"  # Default
+                    bot_name = os.getenv("DISCORD_BOT_NAME", "").lower()
+                    if "elena" in bot_name:
+                        character_file = "elena-rodriguez.json"
+                    elif "marcus" in bot_name and "chen" in bot_name:
+                        character_file = "marcus-chen.json"
+                    elif "marcus" in bot_name:
+                        character_file = "marcus-thompson.json"
+                    elif "dream" in bot_name:
+                        character_file = "dream-of-the-endless.json"
+                    elif "sophia" in bot_name:
+                        character_file = "sophia-martinez.json"
+                    
+                    # Enhance response with CDL-appropriate emojis (ADDS to text, doesn't replace)
+                    enhanced_response, emoji_metadata = cdl_emoji_integration.enhance_bot_response(
+                        character_file=character_file,
+                        user_id=user_id,
+                        user_message=original_content or message.content,
+                        bot_response=response_with_debug,
+                        context={
+                            'emotional_context': getattr(self, '_last_emotional_context', None),
+                            'conversation_history': conversation_context[:3] if conversation_context else []
+                        }
+                    )
+                    
+                    if emoji_metadata.get("cdl_emoji_applied", False):
+                        response_with_debug = enhanced_response
+                        logger.info(f"🎭 CDL EMOJI: Enhanced response with {len(emoji_metadata.get('emoji_additions', []))} emojis "
+                                  f"({emoji_metadata.get('placement_style', 'unknown')} style)")
+                    else:
+                        logger.debug(f"🎭 CDL EMOJI: No enhancement applied - {emoji_metadata.get('reason', 'unknown')}")
+                        
+                except Exception as e:
+                    logger.error(f"Error in CDL emoji enhancement: {e}")
+                    # Continue with original response if CDL emoji enhancement fails
+                
+                # LEGACY EMOJI SYSTEM: Disable emoji-only responses, use only for reactions
+                try:
+                    # Determine bot character for emoji reactions
+                    bot_character = "general"
+                    bot_name = str(self.bot.user.name).lower()
+                    if 'elena' in bot_name or 'dream' in bot_name:
                         bot_character = "mystical"
-                    elif 'marcus' in str(self.bot.user.name).lower():
+                    elif 'marcus' in bot_name:
                         bot_character = "technical"
                     
-                    # Get security validation result from earlier in pipeline
-                    security_validation_result = getattr(self, '_last_security_validation', None)
-                    
-                    # Evaluate emoji response appropriateness using vector intelligence
+                    # Only add emoji reactions, don't replace text responses
                     emoji_decision = await self.emoji_response_intelligence.evaluate_emoji_response(
                         user_id=user_id,
                         user_message=original_content or message.content,
@@ -2279,36 +2319,18 @@ class BotEventHandlers:
                         conversation_context={'channel_type': 'dm' if not message.guild else 'guild'}
                     )
                     
-                    # If emoji response is recommended, use it instead of text
-                    if emoji_decision.should_use_emoji:
-                        logger.info(f"🎭 EMOJI INTELLIGENCE: Using emoji response '{emoji_decision.emoji_choice}' "
-                                  f"(confidence: {emoji_decision.confidence_score:.2f}, reason: {emoji_decision.context_reason.value})")
-                        
-                        await self.emoji_response_intelligence.apply_emoji_response(message, emoji_decision)
-                        
-                        # Store the emoji response in memory as the bot's response
-                        if self.memory_manager:
-                            await self.memory_manager.store_conversation(
-                                user_id=user_id,
-                                user_message=original_content or message.content,
-                                bot_response=emoji_decision.emoji_choice,
-                                channel_id=str(reply_channel.id),
-                                metadata={
-                                    'response_type': 'emoji',
-                                    'emoji_decision_confidence': emoji_decision.confidence_score,
-                                    'emoji_decision_reason': emoji_decision.context_reason.value,
-                                    'original_text_response_length': len(response),
-                                    'bot_character': bot_character
-                                }
-                            )
-                        
-                        # Skip normal text response - emoji was sent instead
-                        logger.info(f"🎭 EMOJI RESPONSE: Sent emoji instead of text response")
-                        return
+                    # Only add reaction, don't replace text response
+                    if emoji_decision.should_use_emoji and emoji_decision.context_reason != EmojiResponseContext.INAPPROPRIATE_CONTENT:
+                        logger.info(f"🎭 REACTION: Adding emoji reaction '{emoji_decision.emoji_choice}' "
+                                  f"(confidence: {emoji_decision.confidence_score:.2f})")
+                        try:
+                            await message.add_reaction(emoji_decision.emoji_choice)
+                        except Exception as reaction_error:
+                            logger.warning(f"Could not add emoji reaction: {reaction_error}")
                         
                 except Exception as e:
-                    logger.error(f"Error in emoji response evaluation: {e}")
-                    # Continue with normal text response if emoji evaluation fails
+                    logger.error(f"Error in emoji reaction evaluation: {e}")
+                    # Continue with text response regardless
                 
                 # Send response (chunked if too long)
                 # Use reply format for guild mentions, regular send for DMs

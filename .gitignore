@@ -128,10 +128,13 @@ docker-data/
 /data/
 .env.elena
 .gitignore
-.env.template
 .env.marcus
 .gitignore
 .setup_complete
 .env.marcus-chen
 .env.gabriel
-characters/examples/gabriel-tether.json
+.env.ryan-chen
+.gitignore
+.env.jake
+.env.sophia
+characters/examples/gabriel.json

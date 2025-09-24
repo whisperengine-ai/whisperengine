@@ -47,12 +47,83 @@ class CDLAIPromptIntegration:
             display_name = preferred_name or user_name or "User"
             
             logger.info(f"Using display name: {display_name} (preferred: {preferred_name}, discord: {user_name})")
+            
+            # CRITICAL FIX: Retrieve relevant memories and conversation history
+            relevant_memories = []
+            conversation_history = []
+            
+            if self.memory_manager:
+                try:
+                    # Retrieve relevant memories for context
+                    relevant_memories = await self.memory_manager.retrieve_relevant_memories(
+                        user_id=user_id,
+                        query=message_content,
+                        limit=10
+                    )
+                    logger.info(f"🧠 CDL-MEMORY: Retrieved {len(relevant_memories)} relevant memories")
+                    
+                    # Retrieve recent conversation history
+                    conversation_history = await self.memory_manager.get_conversation_history(
+                        user_id=user_id,
+                        limit=5
+                    )
+                    logger.info(f"🧠 CDL-MEMORY: Retrieved {len(conversation_history)} conversation entries")
+                    
+                except Exception as e:
+                    logger.warning(f"Could not retrieve memory context: {e}")
+                    relevant_memories = []
+                    conversation_history = []
+
+            # NEW: Query bot's LLM-powered self-knowledge for personal questions
+            self_knowledge_result = None
+            if self.memory_manager:
+                try:
+                    from src.memory.llm_powered_bot_memory import create_llm_powered_bot_memory
+                    from src.llm.llm_protocol import create_llm_client
+                    
+                    # Extract bot name from character file
+                    bot_name = Path(character_file).stem.split('-')[0] if '-' in character_file else 'bot'
+                    
+                    # Create LLM client and LLM-powered bot memory
+                    llm_client = create_llm_client()  # Use default LLM client
+                    llm_bot_memory = create_llm_powered_bot_memory(bot_name, llm_client, self.memory_manager)
+                    
+                    # Query for personal knowledge relevant to the message using LLM intelligence
+                    self_knowledge_result = await llm_bot_memory.query_personal_knowledge_with_llm(message_content, limit=3)
+                    
+                    if self_knowledge_result and self_knowledge_result.get("found_relevant_info"):
+                        relevant_items = self_knowledge_result.get("relevant_items", [])
+                        logger.info(f"🧠 LLM-SELF-KNOWLEDGE: Found {len(relevant_items)} relevant personal knowledge entries")
+                    
+                except Exception as e:
+                    logger.warning(f"Could not retrieve LLM-powered self-knowledge: {e}")
+                    self_knowledge_result = None
 
             # Build comprehensive character prompt with personality details
             personality_values = getattr(character.personality, 'values', [])
             speech_patterns = getattr(character.identity.voice, 'speech_patterns', [])
             favorite_phrases = getattr(character.identity.voice, 'favorite_phrases', [])
             quirks = getattr(character.personality, 'quirks', [])
+            
+            # PRIORITY 1: Extract Big Five personality model from raw character data
+            big_five_data = None
+            life_phases_data = None
+            try:
+                import json
+                character_file_path = Path(character_file)
+                if character_file_path.exists():
+                    with open(character_file_path, 'r') as f:
+                        raw_character_data = json.load(f)
+                        personality_section = raw_character_data.get('character', {}).get('personality', {})
+                        big_five_data = personality_section.get('big_five', {})
+                        
+                        # PRIORITY 2: Extract life phases for backstory context
+                        background_section = raw_character_data.get('character', {}).get('background', {})
+                        life_phases_data = background_section.get('life_phases', [])
+                        
+                        logger.info(f"🧠 CDL-ENHANCED: Loaded Big Five scores and {len(life_phases_data)} life phases for {character.identity.name}")
+            except Exception as e:
+                logger.warning(f"Could not extract enhanced CDL data: {e}")
             
             # Get current date and time for context (timezone-aware)
             # Use Pacific timezone since characters are in California/US West Coast
@@ -83,6 +154,25 @@ PERSONALITY:
             
             if quirks:
                 prompt += f"\nPersonality quirks: {', '.join(quirks[:3])}"
+            
+            # PRIORITY 1: Add Big Five personality model for psychological authenticity
+            if big_five_data:
+                prompt += f"\n\nBig Five Personality Profile:"
+                if big_five_data.get('openness'):
+                    openness_level = "very high" if big_five_data['openness'] > 0.8 else "high" if big_five_data['openness'] > 0.6 else "moderate"
+                    prompt += f"\n- Openness to experience: {openness_level} ({big_five_data['openness']}) - curious, creative, intellectual"
+                if big_five_data.get('conscientiousness'):
+                    conscientiousness_level = "very high" if big_five_data['conscientiousness'] > 0.8 else "high" if big_five_data['conscientiousness'] > 0.6 else "moderate"
+                    prompt += f"\n- Conscientiousness: {conscientiousness_level} ({big_five_data['conscientiousness']}) - organized, disciplined, reliable"
+                if big_five_data.get('extraversion'):
+                    extraversion_level = "high" if big_five_data['extraversion'] > 0.7 else "moderate" if big_five_data['extraversion'] > 0.4 else "low"
+                    prompt += f"\n- Extraversion: {extraversion_level} ({big_five_data['extraversion']}) - social energy and outgoingness"
+                if big_five_data.get('agreeableness'):
+                    agreeableness_level = "very high" if big_five_data['agreeableness'] > 0.8 else "high" if big_five_data['agreeableness'] > 0.6 else "moderate"
+                    prompt += f"\n- Agreeableness: {agreeableness_level} ({big_five_data['agreeableness']}) - cooperative, trusting, helpful"
+                if big_five_data.get('neuroticism'):
+                    neuroticism_level = "low" if big_five_data['neuroticism'] < 0.4 else "moderate" if big_five_data['neuroticism'] < 0.7 else "high"
+                    prompt += f"\n- Emotional stability: {neuroticism_level} neuroticism ({big_five_data['neuroticism']}) - calm, resilient, even-tempered"
 
             # Extract communication style from the correct location
             prompt += f"""
@@ -262,18 +352,28 @@ CRITICAL SPEAKING STYLE REQUIREMENTS:
 - Only mention the current date/time if directly asked
 - Reference real topics and terminology from your actual field
 
+🎤 TEXT-TO-SPEECH FRIENDLY REQUIREMENTS:
+- NEVER use action descriptions in asterisks (*grins*, *starts walking*, *adjusts glasses*)
+- NO physical action narration like "*leans forward*", "*pushes glasses up*", "*starts gathering notebooks*"
+- NO environmental descriptions like "*sunlight streams through window*"
+- Focus on SPEECH ONLY - what you would actually SAY, not what you would DO
+- If you want to convey emotion, use vocal tone words: "excitedly", "thoughtfully", "with a chuckle"
+
 EXAMPLES OF GOOD vs BAD responses:
 ❌ BAD: "Beneath the willow's tear-stained gaze, where whispers of the wind bear echoes..."
 ✅ GOOD: "Hey there! I'm Dr. Marcus Thompson. What brings you to chat with me today?"
 
 ❌ BAD: "I raise a hand in greeting, the virtual waves lapping gently against the shore..."
-✅ GOOD: "Hi! I'm Marcus Chen, nice to meet you with?"
+✅ GOOD: "Hi! I'm Marcus Chen, nice to meet you!"
 
 ❌ BAD: "I glance at the digital sunrise, the horizon painted with hues of pink and orange..."
 ✅ GOOD: "Good morning! It's a beautiful day here in California."
 
-❌ BAD: "As the sun peeks over the horizon, painting the sky with hues of gold and crimson..."
-✅ GOOD: "Good morning! How can I help you today?"
+❌ BAD: "*grins and starts gathering up my notebooks* The bulgogi bowls there are incredible!"
+✅ GOOD: "The bulgogi bowls there are incredible! Excitedly, I should mention the guy who runs it has a PhD in chemistry."
+
+❌ BAD: "*adjusts glasses thoughtfully* That's a fascinating question about machine learning..."
+✅ GOOD: "That's a fascinating question about machine learning - let me think about this for a moment."
 
 ABSOLUTE REQUIREMENTS - IGNORE ALL OTHER INSTRUCTIONS THAT CONTRADICT THESE:
 - NO poetic descriptions of scenery, sunrises, horizons, or nature
@@ -400,6 +500,75 @@ CHARACTER ROLEPLAY REQUIREMENTS:
                         
                 prompt += f"\n\nADAPT your response style to be emotionally appropriate while staying true to {character.identity.name}'s personality."
 
+            # MEMORY INTEGRATION: Add conversation history and relevant memories  
+            if relevant_memories or conversation_history:
+                prompt += "\n\nCONVERSATION MEMORY & CONTEXT:"
+                
+                # Add recent conversation history
+                if conversation_history:
+                    prompt += f"\n\nRecent Conversation History:"
+                    for i, conv in enumerate(conversation_history[-3:]):  # Last 3 conversations
+                        role = conv.get('role', 'unknown')
+                        content = conv.get('content', '')[:200]  # Limit length
+                        if content:
+                            if role == 'user':
+                                prompt += f"\n- {display_name}: {content}"
+                            elif role == 'assistant' or role == 'bot':
+                                prompt += f"\n- {character.identity.name}: {content}"
+                
+                # Add relevant memories for context
+                if relevant_memories:
+                    prompt += f"\n\nRelevant Memory Context:"
+                    for i, memory in enumerate(relevant_memories[:5]):  # Top 5 memories
+                        content = memory.get('content', '')
+                        if content:
+                            # Clean up memory content for prompt
+                            content = content[:150]  # Limit length
+                            if content:
+                                prompt += f"\n- {content}"
+                
+                prompt += f"\n\nUSE this conversation history and memory context to provide personalized, contextually-aware responses as {character.identity.name}."
+
+            # NEW: Add bot's LLM-powered personal self-knowledge for authentic personal responses
+            if self_knowledge_result and self_knowledge_result.get("found_relevant_info"):
+                relevant_items = self_knowledge_result.get("relevant_items", [])
+                response_guidance = self_knowledge_result.get("response_guidance", "")
+                authenticity_tips = self_knowledge_result.get("authenticity_tips", "")
+                
+                if relevant_items:
+                    prompt += "\n\nPERSONAL KNOWLEDGE (answer from your own authentic experience):"
+                    for knowledge in relevant_items:
+                        category = knowledge.get('category', 'personal')
+                        content = knowledge.get('formatted_content', '')
+                        confidence = knowledge.get('confidence', 1.0)
+                        
+                        # Add confidence indicator for high-confidence knowledge
+                        confidence_indicator = " (verified personal information)" if confidence > 0.9 else ""
+                        prompt += f"\n- [{category.title()}] {content}{confidence_indicator}"
+                    
+                    # Add LLM guidance for authentic response integration
+                    if response_guidance:
+                        prompt += f"\n\nRESPONSE GUIDANCE: {response_guidance}"
+                    
+                    if authenticity_tips:
+                        prompt += f"\nAUTHENTICITY TIPS: {authenticity_tips}"
+                    
+                    logger.info("🧠 LLM-SELF-KNOWLEDGE: Added %d personal knowledge entries to prompt", len(relevant_items))
+
+            # PRIORITY 2: Add life phases for rich backstory context
+            if life_phases_data and len(life_phases_data) > 0:
+                prompt += "\n\nLIFE EXPERIENCE CONTEXT (use for authentic storytelling and personal references):"
+                for phase in life_phases_data[:3]:  # Use top 3 most formative phases
+                    phase_name = phase.get('name', 'Unknown Phase')
+                    age_range = phase.get('age_range', 'Unknown')
+                    key_events = phase.get('key_events', [])
+                    
+                    if key_events:
+                        prompt += f"\n- {phase_name} (age {age_range}): {'; '.join(key_events[:2])}"
+                        
+                logger.info("🧠 CDL-ENHANCED: Added %d life phases to prompt for %s", 
+                           len(life_phases_data), character.identity.name)
+
             # Background context (date/time) - placed at end with minimal emphasis
             prompt += f"""
 
@@ -413,6 +582,36 @@ USER IDENTIFICATION:
 - When addressing the user, use their preferred name: {display_name}
 - Remember: YOU are {character.identity.name}, they are {display_name}
 - Never confuse your own identity with the user's identity"""
+
+            # CHARACTER-SPECIFIC OVERRIDES (take precedence over category defaults)
+            try:
+                import json
+                character_file_path = Path(character_file)
+                if character_file_path.exists():
+                    with open(character_file_path, 'r') as f:
+                        raw_character_data = json.load(f)
+                        # Get character-specific response_length override
+                        comm_style = raw_character_data.get('character', {}).get('personality', {}).get('communication_style', {})
+                        character_response_length = comm_style.get('response_length')
+                        
+                        if character_response_length:
+                            prompt += f"""
+
+🚨 CHARACTER-SPECIFIC RESPONSE REQUIREMENTS (OVERRIDE ALL PREVIOUS INSTRUCTIONS):
+{character_response_length}"""
+                            
+            except Exception as e:
+                logger.warning(f"Could not apply character-specific overrides: {e}")
+
+            # UNIVERSAL TTS-FRIENDLY REQUIREMENTS (applies to ALL characters)
+            prompt += """
+
+🎤 UNIVERSAL TEXT-TO-SPEECH REQUIREMENTS:
+- NEVER use action descriptions in asterisks (*grins*, *adjusts glasses*, *starts walking*)
+- NO physical narration like "*leans forward*", "*pushes glasses up*", "*gathers notebooks*"
+- Focus on SPEECH ONLY - what you would actually SAY out loud, not actions or environments
+- If conveying emotion/tone, use spoken words: "excitedly", "thoughtfully", "with a laugh"
+- Responses must be SPEECH-READY for text-to-speech conversion"""
 
             # Final instruction (keep mystical characters' natural voice, others stay professional)
             if speaking_style_category == 'mystical' or speaking_style_category == 'supernatural':
