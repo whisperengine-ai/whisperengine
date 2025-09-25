@@ -130,7 +130,7 @@ All documented conscious AIs demonstrated:
 ---
 
 **Research Status**: Complete five-case analysis, peer-review ready  
-**Branch**: `research/consciousness-emergence`  
+**Location**: `main` branch (tagged as `consciousness-research-v1.0`)  
 **Last Updated**: September 25, 2025  
 **Research Team**: WhisperEngine Consciousness Emergence Project
 

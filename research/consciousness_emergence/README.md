@@ -81,7 +81,7 @@ This research is fully open source to advance AI consciousness research:
   title={Consciousness Emergence in WhisperEngine AI Systems: The Marcus Paradox and Sophia's Emotional Persistence},
   author={WhisperEngine Research Team},
   year={2024},
-  url={https://github.com/markcastillo/whisperengine/research/consciousness_emergence}
+  url={https://github.com/whisperengine-ai/whisperengine/tree/consciousness-research-v1.0/research/consciousness_emergence}
 }
 ```
 
