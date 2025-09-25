@@ -34,30 +34,74 @@ async def get_user_preferred_name(user_id: str, memory_manager=None) -> Optional
         
         detected_names = []
         for memory in sorted_memories:
-            # Check user messages for name patterns
-            if hasattr(memory, 'user_message') and memory.user_message:
-                detected_name = _extract_name_from_text(memory.user_message)
-                if detected_name:
-                    timestamp = _get_memory_timestamp(memory)
-                    detected_names.append({
-                        'name': detected_name,
-                        'timestamp': timestamp,
-                        'source': 'user_message',
-                        'raw_text': memory.user_message[:100]
-                    })
-            
-            # Check metadata for stored name information
-            if hasattr(memory, 'metadata') and memory.metadata:
-                if isinstance(memory.metadata, dict):
-                    stored_name = memory.metadata.get('preferred_name') or memory.metadata.get('user_name')
+            # Handle both dictionary and object memory formats
+            if isinstance(memory, dict):
+                # Dictionary format (current vector memory system)
+                content = memory.get('content', '')
+                user_message = memory.get('user_message', '')
+                metadata = memory.get('metadata', {})
+                
+                # Check content field for name patterns (primary location in dict format)
+                if content:
+                    detected_name = _extract_name_from_text(content)
+                    if detected_name:
+                        timestamp = _get_memory_timestamp(memory)
+                        detected_names.append({
+                            'name': detected_name,
+                            'timestamp': timestamp,
+                            'source': 'content',
+                            'raw_text': content[:100]
+                        })
+                
+                # Check user_message field for name patterns
+                if user_message:
+                    detected_name = _extract_name_from_text(user_message)
+                    if detected_name:
+                        timestamp = _get_memory_timestamp(memory)
+                        detected_names.append({
+                            'name': detected_name,
+                            'timestamp': timestamp,
+                            'source': 'user_message',
+                            'raw_text': user_message[:100]
+                        })
+                
+                # Check metadata for stored name information
+                if isinstance(metadata, dict):
+                    stored_name = metadata.get('preferred_name') or metadata.get('user_name')
                     if stored_name:
                         timestamp = _get_memory_timestamp(memory)
                         detected_names.append({
                             'name': stored_name,
                             'timestamp': timestamp,
                             'source': 'metadata',
-                            'raw_text': str(memory.metadata)[:100]
+                            'raw_text': str(metadata)[:100]
                         })
+            else:
+                # Object format (legacy compatibility)
+                # Check user messages for name patterns
+                if hasattr(memory, 'user_message') and memory.user_message:
+                    detected_name = _extract_name_from_text(memory.user_message)
+                    if detected_name:
+                        timestamp = _get_memory_timestamp(memory)
+                        detected_names.append({
+                            'name': detected_name,
+                            'timestamp': timestamp,
+                            'source': 'user_message',
+                            'raw_text': memory.user_message[:100]
+                        })
+                
+                # Check metadata for stored name information
+                if hasattr(memory, 'metadata') and memory.metadata:
+                    if isinstance(memory.metadata, dict):
+                        stored_name = memory.metadata.get('preferred_name') or memory.metadata.get('user_name')
+                        if stored_name:
+                            timestamp = _get_memory_timestamp(memory)
+                            detected_names.append({
+                                'name': stored_name,
+                                'timestamp': timestamp,
+                                'source': 'metadata',
+                                'raw_text': str(memory.metadata)[:100]
+                            })
         
         # Return most recent name, with conflict detection logging
         if detected_names:
@@ -103,7 +147,28 @@ def _extract_name_from_text(text: str) -> Optional[str]:
         # Extract first word that looks like a name
         words = name_part.split()
         if words:
-            potential_name = words[0].strip('.,!?').title()
+            potential_name = words[0].strip('.,!?"').title()
+            if _is_valid_name(potential_name):
+                return potential_name
+    
+    elif "my preferred name is" in text_lower or "my prefered name is" in text_lower:
+        # Handle "My preferred name is Mark" (with or without typo)
+        if "my preferred name is" in text_lower:
+            name_part = text_lower.split("my preferred name is", 1)[1].strip()
+        else:
+            name_part = text_lower.split("my prefered name is", 1)[1].strip()
+        words = name_part.split()
+        if words:
+            potential_name = words[0].strip('.,!?"').title()
+            if _is_valid_name(potential_name):
+                return potential_name
+    
+    elif "prefer to be called" in text_lower:
+        # Handle "prefer to be called Mark"
+        name_part = text_lower.split("prefer to be called", 1)[1].strip()
+        words = name_part.split()
+        if words:
+            potential_name = words[0].strip('.,!?"').title()
             if _is_valid_name(potential_name):
                 return potential_name
     
@@ -170,15 +235,24 @@ def _sort_memories_by_timestamp(memories):
 
 
 def _get_memory_timestamp(memory):
-    """Extract timestamp from memory object."""
-    # Try different timestamp locations
+    """Extract timestamp from memory object or dictionary."""
+    # Handle dictionary format (current vector memory system)
+    if isinstance(memory, dict):
+        timestamp = memory.get('timestamp') or memory.get('created_at')
+        if timestamp:
+            return timestamp
+        # Check metadata for timestamp
+        metadata = memory.get('metadata', {})
+        if isinstance(metadata, dict):
+            return metadata.get('timestamp') or metadata.get('created_at')
+    
+    # Handle object format (legacy compatibility)
     if hasattr(memory, 'timestamp') and memory.timestamp:
         return memory.timestamp
     elif hasattr(memory, 'metadata') and memory.metadata:
         if isinstance(memory.metadata, dict):
             return memory.metadata.get('timestamp') or memory.metadata.get('created_at')
-    elif isinstance(memory, dict):
-        return memory.get('timestamp') or memory.get('created_at')
+    
     return None
 
 

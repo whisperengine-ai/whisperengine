@@ -1,8 +1,19 @@
 """
 Character Evolution Tool Manager for LLM Tool Calling
 
-Provides intelligent character development tools that enable LLMs to 
-dynamically adapt character traits, backstories, and relationships based on user interactions.
+CONSOLIDATION UPDATE: All character evolution tools removed due to HIGH priority 
+conflicts with CDL (Character Definition Language) system.
+
+Character evolution tools fundamentally conflict with CDL's static character definitions
+and would cause personality inconsistencies. The CDL system provides stable, 
+well-defined character personalities that should not be dynamically modified.
+
+Removed tools (conflicted with CDL system):
+- adapt_personality_trait
+- update_character_backstory  
+- modify_communication_style
+- calibrate_emotional_expression
+- create_character_relationship
 """
 
 import json
@@ -30,7 +41,23 @@ class CharacterEvolutionAction:
 
 
 class CharacterEvolutionToolManager:
-    """Manages character evolution tools for LLM tool calling"""
+    """
+    Character Evolution Tool Manager - DISABLED
+    
+    CONSOLIDATION UPDATE: All character evolution tools removed due to HIGH priority 
+    conflicts with CDL (Character Definition Language) system.
+    
+    Character evolution tools fundamentally conflict with CDL's static character definitions
+    and would cause personality inconsistencies. The CDL system provides stable, 
+    well-defined character personalities that should not be dynamically modified.
+    
+    Removed tools (conflicted with CDL system):
+    - adapt_personality_trait -> Use CDL character definitions as authoritative source
+    - update_character_backstory -> Use CDL backstory as canonical character history
+    - modify_communication_style -> Use CDL voice/communication style definitions
+    - calibrate_emotional_expression -> Use CDL personality/emotion definitions
+    - create_character_relationship -> Use CDL relationship definitions
+    """
     
     def __init__(self, character_manager, memory_manager, llm_client):
         self.character_manager = character_manager
@@ -38,8 +65,15 @@ class CharacterEvolutionToolManager:
         self.llm_client = llm_client
         self.tools = self._initialize_character_tools()
         self.evolution_history: List[CharacterEvolutionAction] = []
+        
+        logger.warning("CharacterEvolutionToolManager initialized with no tools - "
+                      "character evolution disabled to prevent CDL conflicts")
     
     def _initialize_character_tools(self) -> List[Dict[str, Any]]:
+        """Initialize character evolution tools for LLM (DISABLED - all tools removed)"""
+        # ALL CHARACTER EVOLUTION TOOLS REMOVED TO PREVENT CDL CONFLICTS
+        # The CDL system is the authoritative source for character definitions
+        return []
         """Initialize character evolution tools for LLM"""
         return [
             {
@@ -251,25 +285,41 @@ class CharacterEvolutionToolManager:
             }
         ]
     
+    def get_tools(self) -> List[Dict[str, Any]]:
+        """Get all available character evolution tools (DISABLED)"""
+        return self.tools
+    
+    async def handle_tool_call(self, function_name: str, parameters: Dict[str, Any], user_id: str) -> Dict[str, Any]:
+        """
+        Handle LLM tool calls for character evolution (ALL DISABLED)
+        
+        CONSOLIDATION NOTE: All character evolution tools disabled due to CDL conflicts
+        """
+        logger.warning("Character evolution tool %s called but DISABLED - conflicts with CDL system", function_name)
+        
+        # All character evolution tools are disabled to prevent CDL conflicts
+        disabled_tools = [
+            "adapt_personality_trait",
+            "update_character_backstory", 
+            "modify_communication_style",
+            "calibrate_emotional_expression",
+            "create_character_relationship"
+        ]
+        
+        if function_name in disabled_tools:
+            return {
+                "success": False,
+                "error": f"Tool {function_name} disabled to prevent CDL character conflicts",
+                "message": "Character evolution tools conflict with CDL system's static character definitions",
+                "recommendation": "Use CDL character files as authoritative source for character traits"
+            }
+        else:
+            return {"success": False, "error": f"Unknown character evolution tool: {function_name}"}
+    
+    # Legacy method aliases for backward compatibility
     async def execute_tool(self, function_name: str, parameters: Dict[str, Any], user_id: str) -> Dict[str, Any]:
-        """Execute a character evolution tool with the given parameters"""
-        try:
-            if function_name == "adapt_personality_trait":
-                return await self._adapt_personality_trait(parameters, user_id)
-            elif function_name == "update_character_backstory":
-                return await self._update_character_backstory(parameters, user_id)
-            elif function_name == "modify_communication_style":
-                return await self._modify_communication_style(parameters, user_id)
-            elif function_name == "calibrate_emotional_expression":
-                return await self._calibrate_emotional_expression(parameters, user_id)
-            elif function_name == "create_character_relationship":
-                return await self._create_character_relationship(parameters, user_id)
-            else:
-                return {"success": False, "error": f"Unknown tool: {function_name}"}
-                
-        except Exception as e:
-            logger.error(f"Error executing character evolution tool {function_name}: {e}")
-            return {"success": False, "error": str(e)}
+        """Legacy method - redirects to handle_tool_call"""
+        return await self.handle_tool_call(function_name, parameters, user_id)
     
     async def _adapt_personality_trait(self, params: Dict[str, Any], user_id: str) -> Dict[str, Any]:
         """Adapt a character personality trait based on conversation patterns"""

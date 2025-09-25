@@ -590,7 +590,8 @@ IMPORTANT: Always prioritize user emotional wellbeing and safety. When tools are
         vector_memory_tools = [
             "store_conversation_memory", "retrieve_relevant_memories", 
             "search_memories_with_context", "get_conversation_summary",
-            "manage_memory_capacity", "optimize_memory_storage"
+            "manage_memory_capacity", "optimize_memory_storage",
+            "store_semantic_memory"
         ]
         
         # Intelligent Memory Tools (Phase 1)

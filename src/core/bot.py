@@ -290,6 +290,31 @@ class DiscordBotCore:
             self.logger.error("Failed to initialize LLM tool integration: %s", str(e))
             self.llm_tool_manager = None
             
+    def initialize_character_system(self):
+        """Initialize CDL character system for consistent personality"""
+        try:
+            from src.prompts.cdl_ai_integration import CDLAIPromptIntegration
+            
+            # Create CDL integration system
+            self.character_system = CDLAIPromptIntegration()
+            
+            # Get character file from environment
+            self.character_file = os.getenv('CDL_DEFAULT_CHARACTER')
+            
+            if self.character_file:
+                self.logger.info(f"✅ Character system initialized with file: {self.character_file}")
+            else:
+                self.logger.warning("⚠️ No CDL_DEFAULT_CHARACTER specified - character system will use defaults")
+                
+        except ImportError as e:
+            self.logger.warning("⚠️ CDL character system not available: %s", str(e))
+            self.character_system = None
+            self.character_file = None
+        except Exception as e:
+            self.logger.error("Failed to initialize character system: %s", str(e))
+            self.character_system = None
+            self.character_file = None
+            
     # REMOVED: Legacy memory optimizer - replaced by vector-native memory system
 
     async def initialize_phase4_components(self):
@@ -553,6 +578,16 @@ class DiscordBotCore:
             self.logger.debug("⚠️ Continuing without proactive engagement features")
             self.engagement_engine = None
 
+        # Initialize ProactiveSupport System
+        self.logger.info("💝 Initializing Proactive Emotional Support System...")
+        try:
+            from src.intelligence.proactive_support import ProactiveSupport
+            self.proactive_support = ProactiveSupport()
+            self.logger.info("✅ Proactive Emotional Support System initialized")
+        except Exception as e:
+            self.logger.error(f"Failed to initialize ProactiveSupport: {e}")
+            self.proactive_support = None
+
         # Initialize Phase 4 Human-Like Intelligence
         self.logger.info("🤖 Initializing Phase 4: Human-Like Conversation Intelligence...")
         try:
@@ -566,6 +601,12 @@ class DiscordBotCore:
                 self.logger.info("🤗 Human-Like Memory System: Built into Protocol architecture")
                 self.logger.info("💝 Emotional Intelligence Level: Integrated in memory system")
                 self.logger.info("🧠 Phase 4 Integration Health: Clean Protocol-based")
+                
+                # Log ProactiveSupport integration status
+                if self.proactive_support:
+                    self.logger.info("🎯 ProactiveSupport: Integrated with trend analysis and timed interventions")
+                else:
+                    self.logger.warning("⚠️ ProactiveSupport: Not available - using fallback LLM tools")
             else:
                 self.logger.warning(
                     "⚠️ Cannot initialize AI system - missing memory manager or LLM client"
@@ -879,6 +920,9 @@ class DiscordBotCore:
         
         # Initialize LLM Tool Integration (Phase 2)
         self.initialize_llm_tool_integration()
+        
+        # Initialize Character System (CDL)
+        self.initialize_character_system()
 
         # Schedule async initialization of batch optimizer
         if self._needs_batch_init:

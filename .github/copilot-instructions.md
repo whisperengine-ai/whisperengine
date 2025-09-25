@@ -13,6 +13,8 @@
 - When implementing features with LOCAL dependencies, make them work directly - don't hide them behind flags
 - Use stubs/no-op implementations for missing EXTERNAL dependencies, not feature flags
 
+**🚨 PHANTOM FEATURE ELIMINATION PRIORITY**: Hunt down and decide on phantom features, duplicates, and partial integrations before adding new functionality. Clean codebase = clear development path.
+
 **DOCKER-FIRST DEVELOPMENT**: Container-based development is the PRIMARY workflow. Use `./multi-bot.sh` for all operations (auto-generated, don't edit manually).
 
 **UNIVERSAL IDENTITY SYSTEM**: NEW platform-agnostic user identity system in `src/identity/` allows users to interact across Discord, Web UI, and future platforms while maintaining consistent memory and conversations.
@@ -31,7 +33,30 @@ python scripts/generate_multi_bot_config.py  # Example: configuration generation
 - env_manager.py handles Docker vs local development mode detection automatically
 - Direct `.env` loading may miss environment-specific configurations
 
-**VECTOR MEMORY PRIMACY**: Qdrant vector memory system (`src/memory/vector_memory_system.py`) is THE PRIMARY memory implementation. Always leverage vector/semantic search before considering manual Python analysis.
+### **Successful Cleanup Example: LLM Tool Consolidation**
+**✅ COMPLETED**: Successfully identified and removed 10 HIGH priority redundant LLM tools:
+- **4 Emotional Intelligence tools** → Redirected to existing ProactiveSupport system
+- **5 Character Evolution tools** → Disabled due to conflicts with CDL system
+- **1 Vector Memory tool** → Redirected to core memory system
+
+**Key Lessons:**
+- **Duplicated functionality** across systems is a major source of complexity
+- **Architectural conflicts** (like Character Evolution vs CDL) must be resolved decisively
+- **Integration beats duplication** - use existing mature systems instead of building new ones
+- **Document decisions** so future developers understand why code was removed
+
+### **Next Cleanup Targets**
+Look for these patterns in the codebase:
+- Multiple implementations of similar functionality
+- Features that exist but aren't accessible via Discord/web UI
+- Manager classes with no clear integration points
+- Code that requires environment flags to work
+- Duplicate or similar-named files (e.g., `file.py` vs `file_consolidated.py`)
+
+**Vector-First Analysis**: Before writing manual analysis code:
+- ✅ Check if vector memory can provide insights via semantic search
+- ✅ Use `search_memories_with_qdrant_intelligence()` for pattern detection
+- ✅ Only write manual Python if vector approach is insufficient
 
 **NO NEO4J**: We don't use Neo4j anymore - everything is vector-native with Qdrant. Delete any Neo4j references, imports, or graph database code.
 
@@ -260,24 +285,72 @@ prompt = await cdl_integration.create_character_aware_prompt(
 )
 ```
 
-## Anti-Phantom Feature Guidelines
+## 🚨 PHANTOM FEATURE & CODE CLEANUP DIRECTIVE 🚨
 
-**Integration-First Development**: Before marking any feature "complete":
+**PRIMARY MISSION**: Systematically eliminate phantom features, duplicates, and partially integrated code to move forward without confusion.
+
+### **Phantom Feature Detection Protocol**
+**Phase 1: Identify & Classify**
+- 🔍 **Hunt Phantom Features**: Find features that exist in code but aren't integrated into main application flow
+- 🔍 **Find Duplicates**: Identify redundant implementations of the same functionality across different modules
+- 🔍 **Locate Partial Integration**: Discover features that are half-implemented or require manual configuration to work
+
+**Phase 2: Decision Matrix**
+- ✅ **DELETE if**: Feature is truly obsolete, superseded by better implementations, or conflicts with core architecture
+- ✅ **KEEP & INTEGRATE if**: Feature provides unique value but needs proper integration into main flow
+- ✅ **CONSOLIDATE if**: Multiple implementations exist - keep the best one, remove others
+
+**Phase 3: Clean Implementation**
+- 🗑️ **Delete Redundant Code**: Remove duplicate implementations without mercy
+- �️ **Delete Obsolete Documentation**: Remove outdated .md files that describe deleted/obsolete features
+- �🔗 **Complete Integration**: Ensure kept features are properly wired into main application
+- 📝 **Document Decisions**: Record why features/docs were kept/deleted for future reference
+- 📝 **Defer Documentation**: Don't update docs during cleanup - regenerate from working code after cleanup complete
+
+### **Code Archaeology Guidelines**
+**Before Adding New Features**:
+- 🔍 Search codebase for existing similar functionality
+- 🔍 Check if "missing" features already exist but aren't integrated
+- 🔍 Look for abandoned/phantom implementations that could be revived
+
+**Integration-First Development**:
 - ✅ Verify it's imported and called in main application flow (`src/main.py`)
 - ✅ **NO ENVIRONMENT VARIABLE FLAGS** - features work by default in development
-- ✅ Test the feature actually works via Discord commands
+- ✅ Test the feature actually works via Discord commands or web interface
 - ✅ Document integration points in handler classes
 
-**🚨 DEVELOPMENT ANTI-PATTERNS TO AVOID:**
-- ❌ Environment variable feature flags (`ENABLE_X=true`) 
+**🚨 DEVELOPMENT ANTI-PATTERNS TO ELIMINATE:**
+- ❌ Environment variable feature flags (`ENABLE_X=true`) hiding broken features
+- ❌ Multiple implementations of the same concept in different files
 - ❌ Features that are "implemented" but require special configuration to work
 - ❌ Silent fallbacks that mask real failures
 - ❌ "Phantom features" that exist in code but aren't accessible to users
+- ❌ Duplicate manager classes (e.g., `file.py` and `file_consolidated.py`)
+- ❌ Legacy code kept "just in case" without integration path
+- ❌ **Obsolete/outdated MD documentation files** - delete them, will regenerate from source code after cleanup
 
-**Vector-First Analysis**: Before writing manual analysis code:
-- ✅ Check if vector memory can provide insights via semantic search
-- ✅ Use `search_memories_with_qdrant_intelligence()` for pattern detection
-- ✅ Only write manual Python if vector approach is insufficient
+### **Documentation Cleanup Priority**
+**DELETE OBSOLETE MD FILES**: Focus on code cleanup first, documentation second
+- 🗑️ **Delete outdated .md files** that describe obsolete features or architectures
+- 🗑️ **Remove stale documentation** that no longer matches current implementation
+- 🗑️ **Don't spend time updating docs** for features being deleted/consolidated
+- 📝 **Regenerate documentation** from source of truth (actual working code) AFTER code cleanup is complete
+- ✅ **Source code is the documentation** during cleanup phase - keep it clean and self-documenting
+
+### **Decision Framework for Code Cleanup**
+**ASK THESE QUESTIONS:**
+1. **Is this feature accessible to users?** (Discord commands, web interface, or main flow)
+2. **Does this duplicate existing functionality?** (Search for similar implementations)
+3. **Is this feature actually better than existing alternatives?** (Compare implementations)
+4. **Would removing this break anything that's currently working?** (Check imports/references)
+5. **Is this feature aligned with WhisperEngine's current architecture?** (CDL, vector memory, etc.)
+
+**DECISION RULES:**
+- If YES to #1 and NO to #2 → **KEEP**
+- If NO to #1 but YES to #3 → **INTEGRATE** (make it accessible)
+- If YES to #2 → **CONSOLIDATE** (keep best implementation)
+- If NO to #3 and #4 → **DELETE**
+- If NO to #5 → **DELETE** (architectural mismatch)
 
 ## Key Directories
 
