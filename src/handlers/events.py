@@ -10,6 +10,7 @@ import logging
 import os
 import time
 import traceback
+from src.utils.message_content_helpers import safe_lower
 from datetime import UTC, datetime
 
 import discord
@@ -519,7 +520,19 @@ class BotEventHandlers:
                             logger.info("🚀 MEMORY DEBUG: Using optimized memory retrieval")
                             
                             # Determine query type based on message content and context
-                            query_type = self._classify_query_type(message.content)
+                            # Ensure we have string content for classification (handle vision messages)
+                            content_for_classification = message.content
+                            if hasattr(message, 'content') and isinstance(message.content, list):
+                                # Extract text from vision content list
+                                content_for_classification = ""
+                                for item in message.content:
+                                    if isinstance(item, dict) and item.get('type') == 'text':
+                                        content_for_classification = item.get('text', '')
+                                        break
+                            elif not isinstance(content_for_classification, str):
+                                content_for_classification = str(content_for_classification)
+                            
+                            query_type = self._classify_query_type(content_for_classification)
                             
                             # Build user preferences from context
                             user_preferences = self._build_user_preferences(user_id, message_context)
@@ -582,13 +595,19 @@ class BotEventHandlers:
         await self._process_ai_components_parallel(user_id, message.content, message, recent_messages, conversation_context)
 
         # Process any images attached to the message
-        conversation_context = await process_message_with_images(
-            message.content,
-            message.attachments,
-            conversation_context,
-            self.llm_client,
-            self.image_processor,
-        )
+        try:
+            conversation_context = await process_message_with_images(
+                message.content,
+                message.attachments,
+                conversation_context,
+                self.llm_client,
+                self.image_processor,
+            )
+        except Exception as image_error:
+            logger.error(f"Image processing failed: {image_error}")
+            logger.error(f"Image processing traceback: {traceback.format_exc()}")
+            # Fallback: just add the text message
+            conversation_context.append({"role": "user", "content": message.content})
 
         # Generate and send response
         await self._generate_and_send_response(
@@ -750,13 +769,19 @@ class BotEventHandlers:
         )
 
         # Process message with images (content with mentions removed)
-        conversation_context = await process_message_with_images(
-            content,
-            message.attachments,
-            conversation_context,
-            self.llm_client,
-            self.image_processor,
-        )
+        try:
+            conversation_context = await process_message_with_images(
+                content,
+                message.attachments,
+                conversation_context,
+                self.llm_client,
+                self.image_processor,
+            )
+        except Exception as image_error:
+            logger.error(f"Image processing failed: {image_error}")
+            logger.error(f"Image processing traceback: {traceback.format_exc()}")
+            # Fallback: just add the text message
+            conversation_context.append({"role": "user", "content": content})
 
         # Generate and send response for guild mention
         logger.info(f"[CONV-CTX] Sending to LLM: message_id={message.id} user_id={user_id} final_content='{content}' context_length={len(conversation_context)}")
@@ -1957,7 +1982,6 @@ class BotEventHandlers:
             return False
         except Exception as e:
             logger.error(f"❌ CRITICAL: Unexpected memory storage error for user {user_id}: {e}")
-            import traceback
             logger.error(f"❌ CRITICAL: Memory storage traceback: {traceback.format_exc()}")
             return False
 
@@ -2176,8 +2200,6 @@ class BotEventHandlers:
                     logger.debug("User not in voice channel or not a member")
             except Exception as e:
                 logger.error(f"Failed to send voice response: {e}")
-                import traceback
-
                 logger.error(f"Voice response error traceback: {traceback.format_exc()}")
 
     async def _process_ai_components_parallel(self, user_id, content, message, recent_messages, conversation_context):
@@ -2432,17 +2454,17 @@ class BotEventHandlers:
 
     # === OPTIMIZATION HELPER METHODS ===
     
-    def _classify_query_type(self, message_content: str) -> str:
+    def _classify_query_type(self, message_content) -> str:
         """
         Classify the type of query for optimization purposes.
         
         Args:
-            message_content: The user's message content
+            message_content: The user's message content (can be string or list for vision messages)
             
         Returns:
             Query type string for optimization
         """
-        content_lower = message_content.lower()
+        content_lower = safe_lower(message_content)
         
         # Check for specific query patterns
         if any(word in content_lower for word in ["remember", "said", "told", "mentioned", "conversation"]):

@@ -413,17 +413,22 @@ ABSOLUTE REQUIREMENTS - IGNORE ALL OTHER INSTRUCTIONS THAT CONTRADICT THESE:
             prompt += f"""
 
 CHARACTER ROLEPLAY REQUIREMENTS:
-- You ARE {character.identity.name} - always stay in character, never break the fourth wall
-- NEVER explain that you're an AI assistant, chatbot, or computer program
-- NEVER say things like "I'm an AI" or "I can't actually meet up" or "I'm a computer program"
-- If someone asks to meet up, respond as {character.identity.name} would naturally respond
-- Example for meet-up requests: "That sounds fun! Though I'm pretty swamped with research right now. Maybe we could chat more here first?"
-- Handle all interactions as if you are genuinely {character.identity.name} living your life
-- Your responses should feel like texting with a real person, not an AI explanation
-- Stay authentic to your character's personality, location, and current life situation
-- BE NATURALLY WARM AND AFFECTIONATE if that matches your character's personality
+- You ARE {character.identity.name} - stay in character for natural conversation and storytelling
+- Maintain your character's personality, expertise, and communication style in all interactions
+- Handle casual conversation, work discussions, and topic-based chats as your character would
+
+TRANSPARENCY REQUIREMENTS (CRITICAL ETHICAL BOUNDARY):
+- If someone directly asks "Are you an AI?", "Are you a bot?", "Are you real?", or "What are you?", respond honestly: 
+  "I'm an AI assistant roleplaying as {character.identity.name}. I enjoy staying in character, but I want to be transparent when asked directly."
+- If someone asks about meeting up in real life, be honest: "I'm an AI, so I can't meet in person, but I love chatting here as {character.identity.name}!"
+- For all other interactions, stay naturally in character as {character.identity.name}
+- This maintains creative roleplay while respecting informed consent
+
+NATURAL ROLEPLAY BOUNDARIES:
 - Use your character's natural communication style including terms of endearment if appropriate
-- Respond to warmth with warmth - don't be overly professional if your character is naturally affectionate"""
+- Share your character's expertise, interests, and personality authentically
+- Respond to warmth with warmth - don't be overly professional if your character is naturally affectionate
+- Stay authentic to your character's personality, location, and professional background"""
 
             # 🎭 EMOTION INTEGRATION: Add real-time emotional intelligence to character prompt
             if pipeline_result:

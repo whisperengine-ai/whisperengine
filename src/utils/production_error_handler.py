@@ -200,8 +200,12 @@ class ProductionErrorHandler:
         message = category_messages.get(context.severity, "⚠️ Something went wrong. Please try again.")
         
         # Add recovery information if attempted
-        if recovery_attempted and context.severity >= ErrorSeverity.MEDIUM:
-            message += " (Attempting automatic recovery...)"
+        try:
+            if recovery_attempted and isinstance(context.severity, ErrorSeverity) and context.severity >= ErrorSeverity.MEDIUM:
+                message += " (Attempting automatic recovery...)"
+        except TypeError as severity_error:
+            logger.warning("ErrorSeverity comparison failed: %s. context.severity = %s, type = %s", 
+                         severity_error, context.severity, type(context.severity))
         
         return message
     

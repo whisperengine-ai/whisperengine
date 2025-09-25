@@ -16,6 +16,7 @@ from typing import Any
 
 from src.database.database_integration import DatabaseIntegrationManager
 # Removed cost optimizer - not needed
+from src.utils.message_content_helpers import extract_text_content, safe_lower
 
 # Import character definition system
 try:

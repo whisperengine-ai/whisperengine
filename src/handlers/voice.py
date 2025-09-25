@@ -11,6 +11,7 @@ from functools import wraps
 import discord
 from discord.ext import commands
 
+from src.security.command_security import secure_command
 from src.utils.exceptions import LLMConnectionError, LLMRateLimitError, LLMTimeoutError
 
 logger = logging.getLogger(__name__)
@@ -112,6 +113,7 @@ class VoiceCommandHandlers:
 
         @self.bot.command(name="speak", aliases=["say", "tts"])
         @bot_name_filter()
+        @secure_command("voice", max_length=500)
         async def speak_text(ctx, *, text: str):
             """
             Make the bot speak text in the voice channel

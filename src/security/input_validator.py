@@ -60,6 +60,8 @@ class InputValidator:
         r"UNION\\s+SELECT",
         r"'\\s*;\\s*DROP\\s+TABLE",  # Common SQL injection with quotes
         r'"\\s*;\\s*DROP\\s+TABLE',  # Common SQL injection with double quotes
+        r"DROP\\s+TABLE\\s+\\w+",     # Simple DROP TABLE pattern
+        r"DELETE\\s+FROM\\s+\\w+",    # Simple DELETE FROM pattern
         # Command injection patterns
         r"&&\\s*rm\\s+-rf",
         r"\\|\\s*curl\\s+",

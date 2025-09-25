@@ -8,6 +8,7 @@ from datetime import UTC, datetime
 
 import discord
 
+from src.security.command_security import secure_command
 from src.utils.helpers import extract_text_for_memory_storage
 from src.utils.production_error_handler import handle_errors, ErrorCategory, ErrorSeverity
 
@@ -35,14 +36,16 @@ class MemoryCommandHandlers:
         self.personality_profiler = personality_profiler
         self.dynamic_personality_profiler = dynamic_personality_profiler
 
-    def register_commands(self, is_admin, bot_name_filter=None):
+    def register_commands(self, is_admin, bot_name_filter_param=None):
         """Register all memory commands"""
 
         # Default to no-op filter if none provided
-        if bot_name_filter is None:
+        if bot_name_filter_param is None:
 
             def bot_name_filter():
                 return lambda func: func
+        else:
+            bot_name_filter = bot_name_filter_param
 
         @self.bot.command(name="list_facts", aliases=["facts"])
         @bot_name_filter()
@@ -102,6 +105,7 @@ class MemoryCommandHandlers:
             await self._auto_extracted_facts_handler(ctx)
 
         @self.bot.command(name="extract_facts")
+        @secure_command("memory", max_length=1000)
         async def extract_facts(ctx, *, message):
             """Test fact extraction on a message"""
             await self._extract_facts_handler(ctx, message)

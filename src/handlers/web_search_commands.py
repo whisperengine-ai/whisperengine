@@ -9,6 +9,8 @@ from typing import Optional
 import discord
 from discord.ext import commands
 
+from src.security.command_security import secure_command
+
 logger = logging.getLogger(__name__)
 
 
@@ -23,19 +25,37 @@ class WebSearchCommands:
         """Register web search commands with the bot"""
         
         @self.bot.command(name="search_news")
+        @secure_command("web_search", max_length=200)
         async def search_news_command(ctx, *, query: str):
             """Search for current news and events
             
             Usage: !search_news AI developments
             """
+            # Additional web search validation
+            query_lower = query.lower()
+            blocked_terms = ['localhost', '127.0.0.1', '192.168.', '10.0.0.', 'internal', 'admin', 'config']
+            
+            if any(term in query_lower for term in blocked_terms):
+                await ctx.send("⚠️ Search query contains restricted terms")
+                return
+                
             await self._handle_search_news(ctx, query)
         
-        @self.bot.command(name="verify_info") 
+        @self.bot.command(name="verify_info")
+        @secure_command("web_search", max_length=300)
         async def verify_info_command(ctx, *, claim: str):
             """Verify information against current sources
             
             Usage: !verify_info Python is the most popular language in 2025
             """
+            # Additional validation for information verification
+            claim_lower = claim.lower()
+            blocked_terms = ['localhost', '127.0.0.1', '192.168.', 'internal', 'admin']
+            
+            if any(term in claim_lower for term in blocked_terms):
+                await ctx.send("⚠️ Information claim contains restricted terms")
+                return
+                
             await self._handle_verify_info(ctx, claim)
         
         @self.bot.command(name="test_web_search")

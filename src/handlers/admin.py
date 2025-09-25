@@ -9,6 +9,8 @@ import time
 
 import discord
 
+from src.security.command_security import admin_secure_command
+
 logger = logging.getLogger(__name__)
 
 
@@ -44,6 +46,7 @@ class AdminCommandHandlers:
         admin_handler_instance = self
 
         @self.bot.command(name="debug")
+        @admin_secure_command("debug")
         async def toggle_debug(ctx, action: str = "status"):
             """Toggle debug logging on/off or check status (admin only)"""
             await admin_handler_instance._debug_handler(ctx, action, is_admin)
