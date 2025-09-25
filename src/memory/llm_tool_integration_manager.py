@@ -106,11 +106,17 @@ class LLMToolIntegrationManager:
         # Check for current events/web search requests
         web_search_needed = self._detect_web_search_request(user_message)
         
-        # Log web search detection for monitoring
+        # Check for memory storage requests
+        memory_storage_needed = self._detect_memory_storage_request(user_message)
+        high_priority_memory = self._detect_high_priority_memory(user_message, emotional_context)
+        
+        # Log detection results for monitoring
         if web_search_needed:
             logger.info("🔍 Web search needed detected for message: '%s'", user_message[:100] + "..." if len(user_message) > 100 else user_message)
-        else:
-            logger.debug("🔍 No web search needed for message: '%s'", user_message[:50] + "..." if len(user_message) > 50 else user_message)
+        if memory_storage_needed:
+            logger.info("🧠 Memory storage needed detected for message: '%s'", user_message[:100] + "..." if len(user_message) > 100 else user_message)
+        if high_priority_memory:
+            logger.info("⭐ HIGH-PRIORITY memory detected for message: '%s'", user_message[:100] + "..." if len(user_message) > 100 else user_message)
         
         additional_tools = []
         
@@ -155,6 +161,20 @@ class LLMToolIntegrationManager:
                 logger.info("🔍 Added %d web search tools to LLM context", web_search_tools_added)
             else:
                 logger.warning("🔍 Web search needed but no web search tools available in system")
+        
+        # Prioritize memory tools when memory storage is detected
+        memory_tools_added = 0 
+        if memory_storage_needed:
+            # Add all memory management tools for storage/update operations
+            for tool in self.all_tools:
+                tool_name = tool.get("function", {}).get("name", "")
+                if tool_name in ["store_semantic_memory", "update_memory_context", "organize_related_memories"]:
+                    if tool not in core_tools:  # Avoid duplicates
+                        additional_tools.append(tool) 
+                        memory_tools_added += 1
+            
+            if memory_tools_added > 0:
+                logger.info("🧠 Added %d additional memory tools for storage request", memory_tools_added)
         
         # Combine and deduplicate
         relevant_tools = core_tools + additional_tools
@@ -239,6 +259,75 @@ class LLMToolIntegrationManager:
         ]
         message_lower = message.lower()
         return any(keyword in message_lower for keyword in web_search_keywords)
+    
+    def _detect_memory_storage_request(self, message: str) -> bool:
+        """Detect if user is requesting to store, remember, or update important information"""
+        memory_keywords = [
+            'remember', 'store', 'keep in mind', 'don\'t forget', 'make note',
+            'important fact', 'my name is', 'i prefer', 'call me', 'i go by',
+            'update:', 'correction:', 'actually', 'i work at', 'i am a',
+            'my job', 'my profession', 'my hobby', 'i like', 'i love',
+            'i hate', 'i dislike', 'never', 'always', 'my preference',
+            'i live in', 'i\'m from', 'my address', 'my wife', 'my husband',
+            'my partner', 'my kids', 'my family'
+        ]
+        message_lower = message.lower()
+        return any(keyword in message_lower for keyword in memory_keywords)
+    
+    def _detect_high_priority_memory(self, message: str, emotional_context: Optional[Dict[str, Any]] = None) -> bool:
+        """Detect if this is a high-priority personal fact or preference, considering emotional weight and conversation context"""
+        high_priority_keywords = [
+            'my name is', 'call me', 'i prefer to be called', 'i go by',
+            'i work at', 'my job is', 'i am a', 'my profession',
+            'i live in', 'i\'m from', 'my location',
+            'important:', 'remember this:', 'don\'t forget:'
+        ]
+        message_lower = message.lower()
+        has_high_priority_keywords = any(keyword in message_lower for keyword in high_priority_keywords)
+        
+        # Enhanced emotional weighting with conversation context
+        emotional_boost = False
+        conversation_emotional_boost = False
+        
+        if emotional_context:
+            # Current message emotional intensity
+            intensity = emotional_context.get('intensity', 0)
+            confidence = emotional_context.get('confidence', 0)
+            primary_emotion = emotional_context.get('primary_emotion', 'neutral')
+            
+            # Crisis emotions boost importance
+            crisis_emotions = ['anger', 'sadness', 'fear', 'disgust', 'distress', 'anxiety']
+            positive_intense = ['joy', 'love', 'excitement', 'pride']
+            
+            emotional_boost = (
+                intensity > 0.7 or  # High emotional intensity
+                confidence > 0.9 or  # Very confident emotion detection
+                primary_emotion in crisis_emotions or  # Crisis situations
+                primary_emotion in positive_intense  # Strong positive moments
+            )
+            
+            # Conversation-level emotional context analysis
+            conversation_trajectory = emotional_context.get('trajectory', {})
+            conversation_momentum = emotional_context.get('momentum', 'neutral')
+            emotional_stability = emotional_context.get('stability', 1.0)
+            
+            # Conversation patterns that boost memory importance
+            conversation_emotional_boost = (
+                conversation_momentum in ['building', 'escalating', 'crisis'] or  # Emotional momentum
+                emotional_stability < 0.5 or  # Emotional instability in conversation
+                conversation_trajectory.get('intensity_trend') == 'increasing' or  # Growing intensity
+                conversation_trajectory.get('duration') == 'extended'  # Long emotional conversation
+            )
+            
+            if emotional_boost:
+                logger.info("💫 Message-level emotion boosting memory importance: %s (intensity=%.2f)", 
+                           primary_emotion, intensity)
+            
+            if conversation_emotional_boost:
+                logger.info("🌊 Conversation-level emotion boosting memory importance: momentum=%s, stability=%.2f", 
+                           conversation_momentum, emotional_stability)
+        
+        return has_high_priority_keywords or emotional_boost or conversation_emotional_boost
     
     async def execute_llm_with_tools(self, user_message: str, user_id: str, 
                                    character_context: str = "", 

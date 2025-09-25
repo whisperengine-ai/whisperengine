@@ -48,19 +48,40 @@ class CDLAIPromptIntegration:
             
             logger.info(f"Using display name: {display_name} (preferred: {preferred_name}, discord: {user_name})")
             
-            # CRITICAL FIX: Retrieve relevant memories and conversation history
+            # ENHANCED: Emotionally-weighted memory retrieval using context-aware search
             relevant_memories = []
             conversation_history = []
             
             if self.memory_manager:
                 try:
-                    # Retrieve relevant memories for context
-                    relevant_memories = await self.memory_manager.retrieve_relevant_memories(
-                        user_id=user_id,
-                        query=message_content,
-                        limit=10
-                    )
-                    logger.info(f"🧠 CDL-MEMORY: Retrieved {len(relevant_memories)} relevant memories")
+                    # Extract emotional context for enhanced memory retrieval
+                    emotional_context_str = None
+                    if pipeline_result and hasattr(pipeline_result, 'mood_analysis') and pipeline_result.mood_analysis:
+                        mood_data = pipeline_result.mood_analysis
+                        primary_emotion = mood_data.get('primary_emotion', 'neutral')
+                        intensity = mood_data.get('intensity', 0.0)
+                        emotional_context_str = f"{primary_emotion} (intensity: {intensity:.2f})"
+                        logger.info(f"🧠 CDL-EMOTIONAL-CONTEXT: Using {emotional_context_str} for memory prioritization")
+                    
+                    # First try enhanced context-aware retrieval for emotionally-weighted memories
+                    try:
+                        relevant_memories = await self.memory_manager.retrieve_context_aware_memories(
+                            user_id=user_id,
+                            query=message_content,
+                            limit=10,
+                            emotional_context=emotional_context_str
+                        )
+                        logger.info(f"🧠 CDL-ENHANCED-MEMORY: Retrieved {len(relevant_memories)} context-aware memories with emotional weighting")
+                        
+                    except Exception as context_error:
+                        logger.warning(f"Context-aware memory retrieval failed, falling back to standard: {context_error}")
+                        # Fallback to standard retrieval if enhanced method fails
+                        relevant_memories = await self.memory_manager.retrieve_relevant_memories(
+                            user_id=user_id,
+                            query=message_content,
+                            limit=10
+                        )
+                        logger.info(f"🧠 CDL-MEMORY-FALLBACK: Retrieved {len(relevant_memories)} memories using standard method")
                     
                     # Retrieve recent conversation history
                     conversation_history = await self.memory_manager.get_conversation_history(
@@ -522,16 +543,59 @@ CHARACTER ROLEPLAY REQUIREMENTS:
                             elif role == 'assistant' or role == 'bot':
                                 prompt += f"\n- {character.identity.name}: {content}"
                 
-                # Add relevant memories for context
+                # Add relevant memories with emotional importance prioritization
                 if relevant_memories:
-                    prompt += f"\n\nRelevant Memory Context:"
-                    for i, memory in enumerate(relevant_memories[:5]):  # Top 5 memories
+                    prompt += "\n\nRelevant Memory Context (prioritized by emotional importance):"
+                    
+                    # Sort memories by emotional importance if available
+                    def get_memory_importance(memory):
+                        """Calculate memory importance based on emotional weight and metadata"""
+                        base_importance = 0.5
+                        
+                        # Check for emotional metadata
+                        if 'emotion' in memory:
+                            emotion = memory['emotion']
+                            # Crisis emotions get higher priority
+                            crisis_emotions = ['sadness', 'anger', 'fear', 'anxiety', 'distress']
+                            if emotion in crisis_emotions:
+                                base_importance += 0.3
+                            # Positive intense emotions also get priority
+                            positive_intense = ['joy', 'love', 'excitement', 'pride']
+                            if emotion in positive_intense:
+                                base_importance += 0.2
+                        
+                        # Check for high intensity
+                        if 'intensity' in memory:
+                            intensity = memory.get('intensity', 0)
+                            if intensity > 0.7:
+                                base_importance += 0.2
+                        
+                        # Check for personal significance keywords
+                        content = memory.get('content', '').lower()
+                        important_keywords = ['my name', 'i prefer', 'call me', 'remember', 'important']
+                        if any(keyword in content for keyword in important_keywords):
+                            base_importance += 0.3
+                        
+                        # Recent memories get slight boost
+                        if 'timestamp' in memory:
+                            # This would need proper date parsing, simplified for now
+                            base_importance += 0.1
+                        
+                        return base_importance
+                    
+                    # Sort memories by importance (highest first)
+                    sorted_memories = sorted(relevant_memories, key=get_memory_importance, reverse=True)
+                    
+                    for i, memory in enumerate(sorted_memories[:5]):  # Top 5 most important memories
                         content = memory.get('content', '')
                         if content:
                             # Clean up memory content for prompt
                             content = content[:150]  # Limit length
                             if content:
-                                prompt += f"\n- {content}"
+                                # Add importance indicators for high-priority memories
+                                importance_score = get_memory_importance(memory)
+                                importance_indicator = " [HIGH PRIORITY]" if importance_score > 0.8 else " [IMPORTANT]" if importance_score > 0.6 else ""
+                                prompt += f"\n- {content}{importance_indicator}"
                 
                 prompt += f"\n\nUSE this conversation history and memory context to provide personalized, contextually-aware responses as {character.identity.name}."
 
