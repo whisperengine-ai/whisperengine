@@ -1,0 +1,137 @@
+{
+  "character_system": {
+    "CDL character file exists": {
+      "passed": true,
+      "details": {
+        "file_path": "characters/examples/elena-rodriguez.json",
+        "file_size": 17735,
+        "has_identity": false,
+        "has_personality": false,
+        "character_name": "Unknown"
+      },
+      "timestamp": "2025-09-24T21:26:33.553685"
+    },
+    "Character parser can load Elena": {
+      "passed": true,
+      "details": {
+        "character_loaded": true,
+        "name": "Elena Rodriguez",
+        "occupation": "Marine Biologist & Research Scientist"
+      },
+      "timestamp": "2025-09-24T21:26:33.564823"
+    },
+    "Spanish phrases are defined": {
+      "passed": true,
+      "details": {
+        "found_spanish_indicators": [
+          "\u00a1",
+          "Spanish",
+          "bilingual"
+        ],
+        "content_sample": "{\n  \"cdl_version\": \"1.0\",\n  \"format\": \"json\",\n  \"description\": \"Character Definition Language v1.0 - Elena Rodriguez - Marine Biologist\",\n  \"character\": {\n    \"metadata\": {\n      \"character_id\": \"elen..."
+      },
+      "timestamp": "2025-09-24T21:26:33.564934"
+    },
+    "Marine biology personality traits exist": {
+      "passed": false,
+      "details": {},
+      "timestamp": "2025-09-24T21:26:33.564949"
+    },
+    "Emoji preferences are configured": {
+      "passed": false,
+      "details": {},
+      "timestamp": "2025-09-24T21:26:33.564968"
+    }
+  },
+  "memory_system": {
+    "Vector memory is operational": {
+      "passed": false,
+      "details": {},
+      "error": "Memory manager creation failed: No module named 'qdrant_client'",
+      "timestamp": "2025-09-24T21:26:33.565593"
+    },
+    "Can store conversations": {
+      "passed": false,
+      "details": {},
+      "timestamp": "2025-09-24T21:26:33.565624"
+    },
+    "Can retrieve relevant memories": {
+      "passed": false,
+      "details": {},
+      "timestamp": "2025-09-24T21:26:33.565643"
+    },
+    "Emotion context is captured": {
+      "passed": false,
+      "details": {},
+      "timestamp": "2025-09-24T21:26:33.565658"
+    },
+    "User preferences are remembered": {
+      "passed": false,
+      "details": {},
+      "timestamp": "2025-09-24T21:26:33.565671"
+    }
+  },
+  "llm_integration": {
+    "LLM client is configured": {
+      "passed": true,
+      "details": {
+        "client_type": "NoOpLLMClient",
+        "has_generate_method": false,
+        "api_key_configured": false
+      },
+      "timestamp": "2025-09-24T21:26:33.566151"
+    },
+    "OpenAI/OpenRouter connection works": {
+      "passed": false,
+      "details": {},
+      "timestamp": "2025-09-24T21:26:33.566164"
+    },
+    "CDL prompt integration functions": {
+      "passed": false,
+      "details": {},
+      "timestamp": "2025-09-24T21:26:33.566179"
+    },
+    "Response generation completes": {
+      "passed": false,
+      "details": {},
+      "timestamp": "2025-09-24T21:26:33.566192"
+    },
+    "Character personality shows in responses": {
+      "passed": false,
+      "details": {},
+      "timestamp": "2025-09-24T21:26:33.566206"
+    }
+  },
+  "discord_integration": {
+    "Bot is connected to Discord": {
+      "passed": false,
+      "details": {
+        "token_configured": false,
+        "bot_name": null,
+        "character_file_env": null
+      },
+      "error": "Discord token or bot name not configured",
+      "timestamp": "2025-09-24T21:26:33.566230"
+    },
+    "Can receive DMs": {
+      "passed": false,
+      "details": {},
+      "timestamp": "2025-09-24T21:26:33.566245"
+    },
+    "Can send responses": {
+      "passed": false,
+      "details": {},
+      "timestamp": "2025-09-24T21:26:33.566259"
+    },
+    "Rate limiting is handled": {
+      "passed": false,
+      "details": {},
+      "timestamp": "2025-09-24T21:26:33.566272"
+    },
+    "Message caching works": {
+      "passed": false,
+      "details": {},
+      "timestamp": "2025-09-24T21:26:33.566285"
+    }
+  }
+}

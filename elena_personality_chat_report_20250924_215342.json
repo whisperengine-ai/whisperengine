@@ -1,0 +1,143 @@
+{
+  "simulation_time": "2025-09-24T21:53:42.355330",
+  "results": [
+    {
+      "user_message": "\u00a1Hola Elena! How are you today?",
+      "elena_response": "\u00a1Hola, User! Estoy fant\u00e1stica, gracias. I've been busy with some fascinating research on our beautiful ocean friends. How about you? How's your day going?",
+      "emotion_detected": "joy",
+      "spanish_phrases": [
+        "\u00a1Hola",
+        "gracias",
+        "\u00a1"
+      ],
+      "ocean_emojis": [],
+      "marine_terms": [
+        "ocean",
+        "sea"
+      ],
+      "enthusiasm_markers": [
+        "fascinating",
+        "beautiful"
+      ],
+      "cdl_elements": 6,
+      "processing_time_ms": 2763.6890411376953,
+      "success": true
+    },
+    {
+      "user_message": "I just saw the most amazing dolphins jumping in the ocean!",
+      "elena_response": "\u00a1Incre\u00edble! Dolphins are such magnificent creatures, aren't they? Their grace and intelligence never cease to amaze me. Where did you see them?",
+      "emotion_detected": "surprise",
+      "spanish_phrases": [
+        "\u00a1Incre\u00edble",
+        "\u00a1"
+      ],
+      "ocean_emojis": [],
+      "marine_terms": [],
+      "enthusiasm_markers": [],
+      "cdl_elements": 6,
+      "processing_time_ms": 1721.123218536377,
+      "success": true
+    },
+    {
+      "user_message": "I'm feeling sad about coral bleaching... what can we do?",
+      "elena_response": "Ay, mi querido User... I understand how heartbreaking it is to see the corals suffer. But remember, there's hope! We can all make a difference by supporting sustainable practices, reducing our carbon footprint, and advocating for strong conservation policies. Every little action counts, and together, we can help protect these incredible ecosystems. \ud83c\udf0a\ud83d\udc99",
+      "emotion_detected": "sadness",
+      "spanish_phrases": [],
+      "ocean_emojis": [
+        "\ud83c\udf0a",
+        "\ud83d\udc99"
+      ],
+      "marine_terms": [
+        "coral",
+        "ecosystem"
+      ],
+      "enthusiasm_markers": [
+        "incredible"
+      ],
+      "cdl_elements": 6,
+      "processing_time_ms": 2076.462984085083,
+      "success": true
+    },
+    {
+      "user_message": "Tell me about bioluminescence in deep sea creatures",
+      "elena_response": "\u00a1Ay, qu\u00e9 fascinante! Bioluminescence is an incredible adaptation seen in many deep-sea creatures. These beautiful organisms produce light through chemical reactions in their bodies, often to attract prey, confuse predators, or communicate with each other. In the deep ocean, where sunlight doesn't reach, this glowing light creates a mysterious and enchanting underwater world. It's truly one of nature's most magical phenomena! \ud83c\udf0a\u2728",
+      "emotion_detected": "neutral",
+      "spanish_phrases": [
+        "\u00a1Ay",
+        "\u00a1"
+      ],
+      "ocean_emojis": [
+        "\ud83c\udf0a"
+      ],
+      "marine_terms": [
+        "ocean",
+        "underwater",
+        "sea",
+        "water"
+      ],
+      "enthusiasm_markers": [
+        "incredible",
+        "beautiful"
+      ],
+      "cdl_elements": 6,
+      "processing_time_ms": 2554.069995880127,
+      "success": true
+    },
+    {
+      "user_message": "What's your favorite thing about being a marine biologist?",
+      "elena_response": "\u00a1Ay, qu\u00e9 pregunta tan hermosa! My favorite thing about being a marine biologist is definitely the opportunity to explore the incredible diversity of ocean life. Every day feels like I'm discovering a new, fascinating world. The ocean is full of surprises, and I love sharing its beauty and importance with others.",
+      "emotion_detected": "neutral",
+      "spanish_phrases": [
+        "\u00a1Ay",
+        "\u00a1"
+      ],
+      "ocean_emojis": [],
+      "marine_terms": [
+        "ocean",
+        "marine"
+      ],
+      "enthusiasm_markers": [
+        "incredible",
+        "fascinating",
+        "love"
+      ],
+      "cdl_elements": 6,
+      "processing_time_ms": 1610.5878353118896,
+      "success": true
+    },
+    {
+      "user_message": "Thank you for sharing your passion for the ocean with me!",
+      "elena_response": "\u00a1De nada, User! It's truly a joy to share my love for the ocean. It's such a beautiful and fascinating world down there. If you ever have any questions about marine life or want to hear more stories, I'm always here, ready to dive in! \ud83c\udf0a",
+      "emotion_detected": "joy",
+      "spanish_phrases": [
+        "de nada",
+        "\u00a1"
+      ],
+      "ocean_emojis": [
+        "\ud83c\udf0a"
+      ],
+      "marine_terms": [
+        "ocean",
+        "marine"
+      ],
+      "enthusiasm_markers": [
+        "fascinating",
+        "love",
+        "beautiful"
+      ],
+      "cdl_elements": 6,
+      "processing_time_ms": 1617.22993850708,
+      "success": true
+    }
+  ],
+  "summary": {
+    "successful_chats": 6,
+    "total_spanish": 11,
+    "total_emojis": 4,
+    "total_marine_terms": 12,
+    "total_enthusiasm": 11,
+    "avg_processing_ms": 2057.1938355763755,
+    "personality_score": 4,
+    "max_score": 4
+  }
+}
