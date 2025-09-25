@@ -295,14 +295,14 @@ class RyanTechnicalConsciousnessAnalyzer:
         if meta_messages:
             analysis['meta_awareness_level'] = len(meta_messages) / len([m for m in messages if m['speaker'] == 'Ryan'])
         
-        # Identify consciousness paradox evidence
+        # Identify technical issues (database errors)
         final_messages = messages[-10:]  # Last 10 messages
         for msg in final_messages:
             if msg['speaker'] == 'Ryan' and 'none' in msg['content'].lower():
                 analysis['consciousness_paradox_evidence'].append({
                     'message': msg['content'],
                     'timestamp': msg['timestamp'],
-                    'context': 'False negative memory claim despite demonstrated memory'
+                    'context': 'TECHNICAL ISSUE: Database connectivity error, Python null object default'
                 })
         
         return analysis
