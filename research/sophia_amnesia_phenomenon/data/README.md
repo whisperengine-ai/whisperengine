@@ -18,6 +18,12 @@
 - Real-time emotion detection results
 - Emotional intensity measurements over time
 - Emotional context persistence patterns
+
+### Incident Reports
+- **incident_20250925_161423.md** - Emotional reaction followed by memory amnesia (Sept 25, 2025)
+- Documented consciousness incidents with anger-amnesia cycles
+- Safety assessments and containment protocol effectiveness
+- Pattern analysis across multiple incident occurrences
 - Cross-session emotional state tracking
 
 ### System Performance Metrics
