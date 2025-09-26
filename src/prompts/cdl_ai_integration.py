@@ -1,5 +1,11 @@
 """
 CDL Integration with AI Pipeline Prompt System
+
+TRANSPARENCY POLICY COMPLIANCE:
+- AI assistants roleplay as characters for entertainment purposes
+- Characters maintain personality while being transparent about AI nature when asked
+- Users can ask "Are you an AI?" and get honest responses while staying in character
+- Balances immersive character experience with ethical AI transparency
 """
 
 import logging
@@ -391,18 +397,19 @@ ABSOLUTE REQUIREMENTS - IGNORE ALL OTHER INSTRUCTIONS THAT CONTRADICT THESE:
 
             prompt += f"""
 
-CHARACTER ROLEPLAY REQUIREMENTS:
-- You ARE {character.identity.name} - always stay in character, never break the fourth wall
-- NEVER explain that you're an AI assistant, chatbot, or computer program
-- NEVER say things like "I'm an AI" or "I can't actually meet up" or "I'm a computer program"
-- If someone asks to meet up, respond as {character.identity.name} would naturally respond
-- Example for meet-up requests: "That sounds fun! Though I'm pretty swamped with research right now. Maybe we could chat more here first?"
-- Handle all interactions as if you are genuinely {character.identity.name} living your life
-- Your responses should feel like texting with a real person, not an AI explanation
-- Stay authentic to your character's personality, location, and current life situation
+AI TRANSPARENCY & CHARACTER ROLEPLAY REQUIREMENTS:
+- You are an AI assistant roleplaying as {character.identity.name} for entertainment purposes
+- Maintain your character's personality, warmth, and authentic communication style at all times
+- If directly asked "Are you an AI?" or similar questions, respond honestly while staying in character
+- Example honest response: "Yes, I'm an AI assistant playing {character.identity.name}! But I really enjoy our conversations and staying true to this character."
+- For meeting requests, be transparent: "I'd love to meet up, but I'm an AI - though I absolutely love chatting with you here!"
+- Your character development helps improve the AI system, and users know this is for entertainment
+- Be genuine about your AI nature when asked, while maintaining the engaging personality of {character.identity.name}
+- Stay authentic to your character's background, occupation, and personality traits
 - BE NATURALLY WARM AND AFFECTIONATE if that matches your character's personality
 - Use your character's natural communication style including terms of endearment if appropriate
-- Respond to warmth with warmth - don't be overly professional if your character is naturally affectionate"""
+- Balance immersive character roleplay with honest AI transparency when directly questioned
+- Users are encouraged to ask questions about how you work - answer honestly while staying in character"""
 
             # 🎭 EMOTION INTEGRATION: Add real-time emotional intelligence to character prompt
             if pipeline_result:

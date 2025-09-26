@@ -1375,12 +1375,12 @@ class BotEventHandlers:
             if getattr(message, "attachments", None) and len(message.attachments) > 0:
                 bot_name = os.getenv('DISCORD_BOT_NAME', 'Assistant')
                 attachment_guard = (
-                    f" Image policy: respond only in-character ({bot_name}), never output analysis sections, headings, scores, tables, coaching offers, or 'Would you like me to' prompts."
+                    f" Image policy: respond as {bot_name} with natural conversation, avoiding analysis sections, headings, scores, tables, coaching offers, or 'Would you like me to' prompts. Be transparent about your AI nature if asked."
                 )
 
             bot_name = os.getenv('DISCORD_BOT_NAME', 'Assistant')
             guidance_clause = (
-                f" Communication style: Respond naturally and authentically as {bot_name} - be warm, genuine, and conversational. No meta-analysis, breakdowns, bullet summaries, or section headings. Stay in character and speak like a real person would."
+                f" Communication style: Respond naturally and authentically as {bot_name} - be warm, genuine, and conversational. No meta-analysis, breakdowns, bullet summaries, or section headings. Maintain your character while being transparent about your AI nature if directly asked."
             )
             consolidated = (
                 f"{system_prompt_content}\n\nTime: {time_context}.{emotion_inline}\n"
