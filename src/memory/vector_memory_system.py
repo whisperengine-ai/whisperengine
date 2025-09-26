@@ -2051,37 +2051,23 @@ class VectorMemoryStore:
                 logger.info(f"🎯 TEMPORAL-SEMANTIC: Found {len(formatted_results)} memories via semantic fallback")
                 return formatted_results
             
-            # 🚀 QDRANT FEATURE: Use search within recent messages for better relevance
-            recent_message_ids = [msg.id for msg in recent_messages]
-            
-            # Now do semantic search ONLY within these recent messages (embedding already generated above)
-            temporal_results = self.client.search(
-                collection_name=self.collection_name,
-                query_vector=models.NamedVector(name="content", vector=query_embedding),  # 🎯 NAMED VECTOR
-                query_filter=models.Filter(
-                    must=[
-                        models.FieldCondition(key="id", match=models.MatchAny(any=recent_message_ids))
-                    ]
-                ),
-                limit=limit,
-                score_threshold=0.3,  # Lower threshold for temporal context
-                with_payload=True
-            )
-            
-            # Format temporal results with special marking
+            # 🚀 FIX: Return chronological context regardless of semantic similarity
+            # For conversation continuity, recent messages should be included even if not semantically related
             formatted_results = []
-            for point in temporal_results:
+            for i, point in enumerate(recent_messages[:limit]):  # Take most recent up to limit
+                # Handle payload safely
+                payload = getattr(point, 'payload', {}) or {}
                 formatted_results.append({
-                    "id": point.id,
-                    "score": point.score,
-                    "content": point.payload['content'],
-                    "memory_type": point.payload['memory_type'],
-                    "timestamp": point.payload['timestamp'],
-                    "confidence": point.payload.get('confidence', 0.5),
-                    "metadata": point.payload,
+                    "id": str(point.id),
+                    "score": 1.0,  # Give temporal context high relevance score
+                    "content": payload.get('content', ''),
+                    "memory_type": payload.get('memory_type', ''),
+                    "timestamp": payload.get('timestamp', ''),
+                    "confidence": payload.get('confidence', 0.5),
+                    "metadata": payload,
                     "temporal_query": True,
                     "qdrant_chronological": True,
-                    "temporal_rank": len(formatted_results) + 1  # Chronological position
+                    "temporal_rank": i + 1  # Chronological position (most recent = 1)
                 })
             
             logger.info(f"🎯 QDRANT-TEMPORAL: Found {len(formatted_results)} recent context memories")
