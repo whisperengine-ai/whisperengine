@@ -14,15 +14,16 @@ logger = logging.getLogger(__name__)
 async def test_proactive_engagement_vector():
     """Test the proactive engagement engine with vector store"""
     try:
-        # Set environment variables for the test
+        # Set environment variables for the test - use correct variable names for vector memory
         os.environ['DISCORD_BOT_NAME'] = 'elena'
-        os.environ['POSTGRES_HOST'] = 'localhost'
-        os.environ['POSTGRES_PORT'] = '5433'
-        os.environ['POSTGRES_DB'] = 'whisperengine'
-        os.environ['POSTGRES_USER'] = 'whisperengine'
-        os.environ['POSTGRES_PASSWORD'] = 'whisperengine123'
-        os.environ['QDRANT_HOST'] = 'localhost'
-        os.environ['QDRANT_PORT'] = '6334'
+        os.environ['POSTGRESQL_HOST'] = 'localhost'
+        os.environ['POSTGRESQL_PORT'] = '5433'
+        os.environ['POSTGRESQL_DATABASE'] = 'whisperengine'
+        os.environ['POSTGRESQL_USERNAME'] = 'whisperengine'
+        os.environ['POSTGRESQL_PASSWORD'] = 'whisperengine123'
+        os.environ['VECTOR_QDRANT_HOST'] = 'localhost'
+        os.environ['VECTOR_QDRANT_PORT'] = '6334'
+        os.environ['VECTOR_QDRANT_GRPC_PORT'] = '6334'
         os.environ['REDIS_HOST'] = 'localhost'
         os.environ['REDIS_PORT'] = '6380'
         
