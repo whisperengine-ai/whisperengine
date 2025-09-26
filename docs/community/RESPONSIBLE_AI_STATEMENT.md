@@ -21,7 +21,7 @@ WhisperEngine is designed specifically for **users who want complete control** o
 
 **🎯 Target Users:**
 - People frustrated with ChatGPT's limitations, censorship, or service outages
-- Users leaving Character.AI due to platform restrictions or content policies
+- Users leaving other AI chat character systems due to platform restrictions or content policies
 - Anyone wanting **complete privacy** for their AI conversations
 - Users seeking **custom AI personalities** that major services don't allow
 - People who want to **own their data** rather than trust corporate platforms
@@ -39,7 +39,7 @@ WhisperEngine is designed specifically for **users who want complete control** o
 - **No vendor lock-in** - Your data always remains under your control
 
 ### **No Production Service Plans**
-**We have no intention of launching WhisperEngine as a hosted production service.** Our mission is to provide the software tools for individuals and organizations to run their own private AI systems, not to compete with ChatGPT or Character.AI as a service provider.
+**We have no intention of launching WhisperEngine as a hosted production service.** Our mission is to provide the software tools for individuals and organizations to run their own private AI systems, not to compete with ChatGPT or other AI chat platforms as a service provider.
 
 ### **What Our AI Companions Actually Are**
 - **Advanced Language Models:** Sophisticated text prediction systems trained on large datasets

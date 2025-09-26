@@ -60,7 +60,7 @@ WhisperEngine is specifically designed for **users who want complete control ove
 - **You may use them as-is, customize them, or create entirely new characters**
 - **Characters like Elena, Marcus, Gabriel, etc. are demonstration personalities**
 - **We encourage you to create unique characters that suit your specific use case**
-- **Perfect for users wanting personalities that ChatGPT, Character.AI, or other services don't offer**
+- **Perfect for users wanting personalities that ChatGPT or other AI chat systems don't offer**
 
 ## ⚠️ Important Disclaimers
 

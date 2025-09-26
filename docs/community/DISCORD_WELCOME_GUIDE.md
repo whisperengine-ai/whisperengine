@@ -34,14 +34,14 @@ This Discord server lets you **test drive** the technology, but for real use you
 
 **💡 Perfect for users who want to:**
 - **Leave ChatGPT behind** - Complete control vs. service limitations
-- **Escape Character.AI restrictions** - Custom personalities without platform rules
+- **Escape AI platform restrictions** - Custom personalities without platform rules
 - **Own their AI interactions** - No corporate surveillance or data mining
 - **Import existing conversations** - Bring your ChatGPT history and relationships
 - **Create impossible personalities** - Characters that major services won't allow
 
 ### **🚫 No Plans for Production Service**
 WhisperEngine is **intentionally designed for self-hosting**:
-- **We will not launch a hosted AI service** competing with ChatGPT or Character.AI
+- **We will not launch a hosted AI service** competing with ChatGPT or other AI chat platforms
 - **You run it, you own it** - complete data sovereignty and privacy control
 - **Target users**: People frustrated with existing AI service limitations
 - **Migration path**: Easy transition from ChatGPT with full conversation import
@@ -207,7 +207,7 @@ After testing our demos, you'll likely want the real thing:
 ### **💡 Common Migration Reasons:**
 Users typically move to WhisperEngine because they want to:
 - **Escape ChatGPT limitations** - No conversation caps, censorship, or service outages
-- **Leave Character.AI behind** - Create truly custom personalities without platform restrictions
+- **Leave other AI platforms behind** - Create truly custom personalities without platform restrictions
 - **Own their data completely** - No corporate access to private conversations
 - **Customize beyond what's possible** - Personalities that major services won't allow
 - **Import existing relationships** - Bring ChatGPT conversations to maintain AI relationship continuity
@@ -254,7 +254,7 @@ Users typically move to WhisperEngine because they want to:
 - Experience what the future of AI companions might look like
 - Contribute to responsible AI development through feedback
 - **Decide if you want to install your own WhisperEngine instance**
-- **Evaluate migration from ChatGPT, Character.AI, or other AI services**
+- **Evaluate migration from ChatGPT or other AI chat character systems**
 - **Test drive before committing** to setting up your own private AI system
 
 ## 📞 Getting Help
