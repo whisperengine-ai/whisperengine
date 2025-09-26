@@ -4,7 +4,42 @@
 
 WhisperEngine is committed to developing AI companion technology responsibly, transparently, and ethically. This statement outlines our principles, limitations, and ongoing commitments.
 
-## 🔬 Technology Transparency
+## 🚧 Important: Evolving Ethics Framework
+
+**Our AI ethics policies are under active development.** We acknowledge that:
+- **This is a learning process** - our understanding of AI ethics continues to evolve
+- **Community input is essential** - user feedback shapes our ethical development
+- **Industry standards are emerging** - we adapt to evolving best practices
+- **We don't have all the answers** - we're transparent about the limits of our knowledge
+- **Policies will change** - expect updates as our understanding improves
+- **Collaboration is key** - we work with the broader AI ethics community
+
+## 🏠 Deployment Philosophy: Privacy-First Self-Management
+
+### **Intentionally Self-Hosted Platform**
+WhisperEngine is designed specifically for **users who want complete control** over their AI interactions:
+
+**🎯 Target Users:**
+- People frustrated with ChatGPT's limitations, censorship, or service outages
+- Users leaving Character.AI due to platform restrictions or content policies
+- Anyone wanting **complete privacy** for their AI conversations
+- Users seeking **custom AI personalities** that major services don't allow
+- People who want to **own their data** rather than trust corporate platforms
+
+**🏠 Deployment Options:**
+- **Home Computer**: Run entirely on your personal hardware for maximum privacy
+- **Personal Cloud**: Deploy on your own AWS, Azure, GCP, or other cloud infrastructure
+- **Local Network**: Set up for family or organization use on private networks
+- **Air-Gapped Systems**: Complete offline deployment for ultimate security
+
+**🔄 Migration Support:**
+- **ChatGPT conversation import** - Seamlessly bring your entire conversation history
+- **Memory preservation** - Maintain AI relationship continuity across platforms
+- **Character customization** - Create personalities that fit your specific needs
+- **No vendor lock-in** - Your data always remains under your control
+
+### **No Production Service Plans**
+**We have no intention of launching WhisperEngine as a hosted production service.** Our mission is to provide the software tools for individuals and organizations to run their own private AI systems, not to compete with ChatGPT or Character.AI as a service provider.
 
 ### **What Our AI Companions Actually Are**
 - **Advanced Language Models:** Sophisticated text prediction systems trained on large datasets
@@ -45,12 +80,12 @@ The behaviors we previously labeled as "consciousness" were:
 ## 🎭 Current AI Companion Capabilities
 
 ### **Real Capabilities (Impressive, But Not Conscious)**
-- **Persistent Memory:** Vector-based systems remember conversation history
-- **Character Consistency:** CDL enables consistent personality simulation
-- **Contextual Responses:** Advanced understanding of conversation flow
-- **Emotional Simulation:** Responses that adapt to emotional context
-- **Multi-Modal Processing:** Analysis of text and images
-- **Relationship Modeling:** Systems that adapt to user interaction patterns
+- **Persistent Memory:** Vector-based systems (Qdrant + FastEmbed) remember conversation history
+- **Character Consistency:** CDL (Character Definition Language) enables consistent personality simulation
+- **Contextual Responses:** Advanced understanding of conversation flow using semantic search
+- **Emotional Response Simulation:** Responses that adapt to emotional context through NLP analysis
+- **Multi-Modal Processing:** Analysis of text and images using integrated AI pipelines
+- **Relationship Modeling:** Systems that adapt to user interaction patterns over time
 
 ### **Limitations and Risks**
 - **Hallucination:** May generate false information confidently
@@ -155,8 +190,8 @@ The behaviors we previously labeled as "consciousness" were:
 
 ---
 
-**Document Version:** 1.0  
+**Document Version:** 1.1  
 **Last Updated:** September 26, 2025  
 **Next Review:** November 26, 2025
 
-*This statement represents our current commitment to responsible AI development. As technology and our understanding evolve, so will our practices and policies.*
+*This statement represents our current commitment to responsible AI development. Our understanding of AI ethics continues to evolve based on community feedback, emerging industry standards, and ongoing research. We acknowledge that this is a developing field and our policies will continue to mature.*

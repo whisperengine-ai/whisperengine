@@ -1,5 +1,4 @@
-# 🎭 WhisperEngine
-
+# 🎭 WhisperEngine**[📖 View Technical Documentation →](docs/README.md)** | **[🎭 Community Guidelines →](docs/community/DISCORD_WELCOME_GUIDE.md)**
 **Multi-bot Discord AI companion system with vector-native memory and advanced conversation intelligence**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -482,7 +481,7 @@ Seamlessly transition from ChatGPT to your private AI with full conversation his
 - **Recommended**: 32GB+ RAM, RTX 4070+ GPU (for larger models with GPU acceleration)
 - **Storage**: 50GB+ for models, databases, and conversation history
 
-**[📖 Complete On-Premise Setup Guide](docs/deployment/ON_PREMISE_SETUP.md)** for full self-hosting instructions
+**[📖 Complete Local Setup Guide](docs/deployment/LOCAL_SETUP.md)** for full self-hosting instructions
 
 ## ⚙️ Configuration Made Simple
 
