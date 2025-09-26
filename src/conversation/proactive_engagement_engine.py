@@ -65,6 +65,20 @@ from src.intelligence.dynamic_personality_profiler import (
 
 logger = logging.getLogger(__name__)
 
+# Enable debug logging specifically for engagement features
+engagement_logger = logging.getLogger("whisperengine.engagement")
+engagement_logger.setLevel(logging.DEBUG)
+
+# Create console handler with debug level if not exists
+if not engagement_logger.handlers:
+    console_handler = logging.StreamHandler()
+    console_handler.setLevel(logging.DEBUG)
+    formatter = logging.Formatter(
+        '🤖 [ENGAGEMENT] %(asctime)s - %(levelname)s - %(message)s'
+    )
+    console_handler.setFormatter(formatter)
+    engagement_logger.addHandler(console_handler)
+
 
 class ConversationFlowState(Enum):
     """States of conversation flow for engagement analysis"""
@@ -288,29 +302,34 @@ class ProactiveConversationEngagementEngine:
         Returns:
             Comprehensive engagement analysis with proactive recommendations
         """
-        logger.info(f"🎯 ENGAGEMENT: Analyzing conversation for user {user_id} with {len(recent_messages)} recent messages")
+        engagement_logger.info("🎯 ENGAGEMENT: Starting conversation analysis for user %s with %d recent messages", user_id, len(recent_messages))
         
         # Analyze conversation flow state
         flow_analysis = await self._analyze_conversation_flow(user_id, recent_messages)
-        logger.info(f"🎯 ENGAGEMENT: Flow state: {flow_analysis['current_state'].value}, engagement score: {flow_analysis.get('engagement_score', 'N/A')}")
+        engagement_logger.info("🎯 ENGAGEMENT: Flow state: %s, engagement score: %s", 
+                              flow_analysis['current_state'].value, flow_analysis.get('engagement_score', 'N/A'))
 
         # Detect stagnation signals
         stagnation_analysis = await self._detect_stagnation_signals(user_id, recent_messages)
-        logger.info(f"🎯 ENGAGEMENT: Stagnation risk: {stagnation_analysis['risk_level']}")
+        engagement_logger.info("🎯 ENGAGEMENT: Stagnation risk: %s", stagnation_analysis['risk_level'])
 
         # Check if proactive intervention is needed
         intervention_needed = await self._assess_intervention_need(
             user_id, flow_analysis, stagnation_analysis
         )
-        logger.info(f"🎯 ENGAGEMENT: Intervention needed: {intervention_needed}")
+        engagement_logger.info("🎯 ENGAGEMENT: Intervention needed: %s", intervention_needed)
 
         # Generate proactive recommendations if needed
         recommendations = []
         if intervention_needed:
+            engagement_logger.debug("🎯 ENGAGEMENT: Generating proactive recommendations...")
             recommendations = await self._generate_proactive_recommendations(
                 user_id, context_id, recent_messages, current_thread_info
             )
-            logger.info(f"🎯 ENGAGEMENT: Generated {len(recommendations)} proactive recommendations")
+            engagement_logger.info("🎯 ENGAGEMENT: Generated %d proactive recommendations", len(recommendations))
+            for i, rec in enumerate(recommendations):
+                engagement_logger.debug("🎯 ENGAGEMENT: Recommendation %d - Type: %s, Strategy: %s", 
+                                       i+1, rec.get('type'), rec.get('strategy'))
 
         # Update conversation rhythm analysis
         await self._update_conversation_rhythm(user_id, recent_messages)
@@ -341,8 +360,10 @@ class ProactiveConversationEngagementEngine:
         self, user_id: str, recent_messages: list[dict[str, Any]]
     ) -> dict[str, Any]:
         """Analyze the current flow state of the conversation"""
+        engagement_logger.debug("📊 ENGAGEMENT: Analyzing conversation flow for user %s", user_id)
 
         if not recent_messages:
+            engagement_logger.debug("📊 ENGAGEMENT: No recent messages - conversation stagnant")
             return {
                 "current_state": ConversationFlowState.STAGNANT,
                 "trend": "declining",
@@ -372,12 +393,17 @@ class ProactiveConversationEngagementEngine:
                 time_gaps.append(gap)
 
             avg_gap = statistics.mean(time_gaps) if time_gaps else 300
+            engagement_logger.debug("📊 ENGAGEMENT: Average message gap: %.1f seconds", avg_gap)
+            
             if avg_gap < 30:  # Very quick responses
                 engagement_indicators.append(("quick_responses", 0.8))
+                engagement_logger.debug("📊 ENGAGEMENT: Quick responses detected - high engagement")
             elif avg_gap < 120:  # Normal pace
                 engagement_indicators.append(("normal_pace", 0.6))
+                engagement_logger.debug("📊 ENGAGEMENT: Normal pace detected")
             elif avg_gap > 300:  # Slow responses
                 engagement_indicators.append(("slow_responses", 0.2))
+                engagement_logger.debug("📊 ENGAGEMENT: Slow responses detected - low engagement")
 
         # Message content analysis
         recent_content = [msg.get("content", "") for msg in recent_messages[-5:]]
@@ -581,12 +607,14 @@ class ProactiveConversationEngagementEngine:
         current_thread_info: dict[str, Any] | None,
     ) -> list[dict[str, Any]]:
         """Generate proactive engagement recommendations"""
+        engagement_logger.debug("🔧 ENGAGEMENT: Generating proactive recommendations for user %s", user_id)
 
         recommendations = []
 
         # Get user personality profile for personalized recommendations
         personality_context = None
         if self.personality_profiler:
+            engagement_logger.debug("🔧 ENGAGEMENT: Fetching personality profile for personalization")
             try:
                 personality_profile = await self.personality_profiler.get_personality_profile(
                     user_id
@@ -597,15 +625,22 @@ class ProactiveConversationEngagementEngine:
                         "trust_level": personality_profile.trust_level,
                         "topics_of_interest": personality_profile.topics_of_high_engagement[:5],
                     }
+                    engagement_logger.debug("🔧 ENGAGEMENT: Got personality context - depth: %s, trust: %s", 
+                                           personality_context["relationship_depth"], 
+                                           personality_context["trust_level"])
             except Exception as e:
-                logger.warning("Failed to get personality context for recommendations: %s", e)
+                engagement_logger.warning("🔧 ENGAGEMENT: Failed to get personality context: %s", e)
 
         # Generate topic suggestions
+        engagement_logger.debug("🔧 ENGAGEMENT: Generating topic suggestions")
         topic_suggestions = await self._generate_topic_suggestions(
             user_id, recent_messages, personality_context
         )
+        engagement_logger.debug("🔧 ENGAGEMENT: Generated %d topic suggestions", len(topic_suggestions))
 
         for suggestion in topic_suggestions[:2]:  # Top 2 topic suggestions
+            engagement_logger.info("💡 ENGAGEMENT: TOPIC SUGGESTION triggered - Topic: '%s', Relevance: %s", 
+                                  suggestion.topic_title, suggestion.relevance_level.value)
             recommendations.append(
                 {
                     "type": "topic_suggestion",
@@ -619,11 +654,14 @@ class ProactiveConversationEngagementEngine:
             )
 
         # Generate conversation prompts
+        engagement_logger.debug("🔧 ENGAGEMENT: Generating conversation prompts")
         conversation_prompts = await self._generate_conversation_prompts(
             user_id, recent_messages, current_thread_info, personality_context
         )
+        engagement_logger.debug("🔧 ENGAGEMENT: Generated %d conversation prompts", len(conversation_prompts))
 
         for prompt in conversation_prompts[:2]:  # Top 2 prompts
+            engagement_logger.info("💬 ENGAGEMENT: CONVERSATION PROMPT triggered - Strategy: %s", prompt.strategy.value)
             recommendations.append(
                 {
                     "type": "conversation_prompt",
@@ -733,15 +771,21 @@ class ProactiveConversationEngagementEngine:
 
     async def _analyze_topic_coherence_vector(self, recent_content: list[str]) -> float:
         """Use vector embeddings to analyze semantic topic coherence"""
+        engagement_logger.debug("🔍 ENGAGEMENT: Starting vector-based topic coherence analysis")
+        
         if not self.memory_manager or len(recent_content) < 2:
+            engagement_logger.debug("🔍 ENGAGEMENT: Insufficient data for vector coherence analysis")
             return 0.5
 
         try:
             # Get vector store from memory manager for embedding generation
             vector_store = getattr(self.memory_manager, 'vector_store', None)
             if not vector_store:
+                engagement_logger.debug("🔍 ENGAGEMENT: No vector store available")
                 return 0.5
 
+            engagement_logger.debug("🔍 ENGAGEMENT: Generating embeddings for %d messages", len(recent_content))
+            
             # Generate embeddings for each message
             embeddings = []
             for content in recent_content:
@@ -751,6 +795,7 @@ class ProactiveConversationEngagementEngine:
                         embeddings.append(embedding)
 
             if len(embeddings) < 2:
+                engagement_logger.debug("🔍 ENGAGEMENT: Not enough valid embeddings generated")
                 return 0.5
 
             # Calculate semantic similarity between adjacent messages
@@ -762,6 +807,7 @@ class ProactiveConversationEngagementEngine:
 
             # Convert similarity to coherence score (0.0 to 1.0)
             avg_similarity = statistics.mean(similarities) if similarities else 0.0
+            engagement_logger.debug("🔍 ENGAGEMENT: Average semantic similarity: %.3f", avg_similarity)
             
             # Map similarity to coherence score
             # High similarity (>0.8) = high coherence (>0.7)
@@ -773,10 +819,13 @@ class ProactiveConversationEngagementEngine:
             else:
                 coherence_score = avg_similarity * 0.8  # Scale to 0.0-0.4
 
-            return min(1.0, max(0.0, coherence_score))
+            final_score = min(1.0, max(0.0, coherence_score))
+            engagement_logger.info("🔍 ENGAGEMENT: VECTOR COHERENCE analysis complete - Score: %.3f (similarity: %.3f)", 
+                                  final_score, avg_similarity)
+            return final_score
 
         except Exception as e:
-            logger.debug("Vector coherence analysis failed: %s", e)
+            engagement_logger.warning("🔍 ENGAGEMENT: Vector coherence analysis failed: %s", e)
             return 0.5
 
     # Additional methods for topic generation, prompt creation, etc. will be added...
@@ -995,16 +1044,19 @@ class ProactiveConversationEngagementEngine:
 
         # Try vector-based memory connections first
         if self.memory_manager:
+            engagement_logger.debug("🧠 ENGAGEMENT: Using vector memory for connection analysis")
             try:
                 vector_connections = await self._generate_vector_memory_connections(
                     user_id, recent_content
                 )
+                engagement_logger.info("🧠 ENGAGEMENT: VECTOR MEMORY triggered - Found %d memory connections", len(vector_connections))
                 connections.extend(vector_connections)
             except Exception as e:
-                logger.debug("Vector memory connections failed: %s", e)
+                engagement_logger.warning("🧠 ENGAGEMENT: Vector memory connections failed: %s", e)
 
         # Use memory moments for additional context if available
         if self.memory_moments:
+            engagement_logger.debug("🧠 ENGAGEMENT: Using memory moments for additional context")
             try:
                 # Analyze recent conversation for memory connections
                 memory_connections = (
@@ -1014,6 +1066,7 @@ class ProactiveConversationEngagementEngine:
                         message=recent_content,
                     )
                 )
+                engagement_logger.info("🧠 ENGAGEMENT: MEMORY MOMENTS triggered - Found %d memory connections", len(memory_connections))
 
                 # Convert memory connections to engagement prompts
                 for connection in memory_connections[:2]:  # Top 2 connections

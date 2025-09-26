@@ -8,8 +8,8 @@ python-multipart==0.0.18
 # Pydantic for data validation
 pydantic==2.5.0
 
-# CORS middleware
-starlette==0.47.2
+# CORS middleware (compatible with FastAPI 0.104.1)
+starlette==0.27.0
 
 # Optional: JWT authentication (for production)
 python-jose[cryptography]==3.3.0

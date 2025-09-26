@@ -568,35 +568,32 @@ class VectorMemoryStore:
             }
             
             # 🚀 QDRANT FEATURE: Named vectors for intelligent multi-dimensional search
-            # TEMP: Use only content vector to isolate the issue
             vectors = {}
             
             # Only add vectors that are valid (non-None, non-empty)
             if content_embedding and len(content_embedding) > 0:
                 vectors["content"] = content_embedding
-                logger.debug(f"UPSERT DEBUG: Content vector added: len={len(content_embedding)}")
+                logger.debug("UPSERT DEBUG: Content vector added: len=%d", len(content_embedding))
             else:
-                logger.error(f"UPSERT ERROR: Invalid content embedding: {content_embedding}")
+                logger.error("UPSERT ERROR: Invalid content embedding: %s", content_embedding)
                 
-            # TEMP: Comment out emotion and semantic vectors to isolate issue
-            # if emotion_embedding and len(emotion_embedding) > 0:
-            #     vectors["emotion"] = emotion_embedding
-            # else:
-            #     logger.error(f"UPSERT ERROR: Invalid emotion embedding: {emotion_embedding}")
+            # 🎭 EMOTION VECTOR: Enable emotion-aware search
+            if emotion_embedding and len(emotion_embedding) > 0:
+                vectors["emotion"] = emotion_embedding
+                logger.debug("UPSERT DEBUG: Emotion vector added: len=%d", len(emotion_embedding))
+            else:
+                logger.debug("UPSERT DEBUG: No emotion embedding generated")
                 
-            # if semantic_embedding and len(semantic_embedding) > 0:
-            #     vectors["semantic"] = semantic_embedding
-            # else:
-            #     logger.error(f"UPSERT ERROR: Invalid semantic embedding: {semantic_embedding}")
+            # 🧠 SEMANTIC VECTOR: Enable contradiction detection and concept clustering  
+            if semantic_embedding and len(semantic_embedding) > 0:
+                vectors["semantic"] = semantic_embedding
+                logger.debug("UPSERT DEBUG: Semantic vector added: len=%d", len(semantic_embedding))
+            else:
+                logger.debug("UPSERT DEBUG: No semantic embedding generated")
             
             # Ensure we have at least one valid vector
             if not vectors:
                 raise ValueError("No valid embeddings generated - cannot create point")
-            
-            # Debug: Log vector info before upsert
-            logger.debug(f"UPSERT DEBUG: Vector keys: {list(vectors.keys())}")
-            for name, vec in vectors.items():
-                logger.debug(f"UPSERT DEBUG: Vector '{name}': type={type(vec)}, len={len(vec) if vec else None}, is_none={vec is None}")
             
             # Store with all Qdrant advanced features
             point = PointStruct(
@@ -605,12 +602,11 @@ class VectorMemoryStore:
                 payload=qdrant_payload
             )
             
-            logger.debug(f"UPSERT DEBUG: Point ID: {point.id}, Vector keys in point: {list(point.vector.keys()) if hasattr(point, 'vector') and point.vector else 'NO VECTOR'}")
+            logger.debug("UPSERT DEBUG: Point ID: %s, Vector keys: %s", point.id, list(vectors.keys()))
             
             # 🎯 QDRANT FEATURE: Atomic operation with immediate consistency
-            logger.debug(f"UPSERT DEBUG: About to call Qdrant upsert with collection: {self.collection_name}")
-            logger.debug(f"UPSERT DEBUG: Point structure - ID: {point.id}, Vector type: {type(point.vector)}")
-            logger.debug(f"UPSERT DEBUG: Vector dict contents: {point.vector}")
+            logger.debug("UPSERT DEBUG: About to call Qdrant upsert with collection: %s", self.collection_name)
+            logger.debug("UPSERT DEBUG: Point structure - ID: %s, Vector type: %s", point.id, type(point.vector).__name__)
             
             try:
                 self.client.upsert(
@@ -1819,9 +1815,10 @@ class VectorMemoryStore:
         try:
             # Use direct Qdrant search since we're in VectorMemoryStore
             filter_conditions = [
-                models.FieldCondition(key="user_id", match=models.MatchValue(value=user_id))
+                models.FieldCondition(key="user_id", match=models.MatchValue(value=user_id)),
+                models.FieldCondition(key="bot_name", match=models.MatchValue(value=get_normalized_bot_name_from_env()))  # 🎯 FIXED: Add bot filtering
             ]
-            
+
             results = self.client.search(
                 collection_name=self.collection_name,
                 query_vector=models.NamedVector(name="content", vector=[0.0] * 384),  # Dummy vector for recent search
@@ -1829,7 +1826,7 @@ class VectorMemoryStore:
                 limit=limit,
                 with_payload=True
             )
-            
+
             memories = []
             for point in results:
                 if point.payload:
@@ -2157,34 +2154,60 @@ class VectorMemoryStore:
                 personality_embedding = await self.generate_embedding(f"personality: {personality_context}")
             
             # 🎯 QDRANT FEATURE: Multi-vector search with weighted combinations
+            current_bot_name = get_normalized_bot_name_from_env()
+            base_filter_conditions: List[models.Condition] = [
+                models.FieldCondition(key="user_id", match=models.MatchValue(value=user_id)),
+                models.FieldCondition(key="bot_name", match=models.MatchValue(value=current_bot_name))  # 🎯 FIXED: Add bot filtering
+            ]
+            
+            if memory_types:
+                base_filter_conditions.append(
+                    models.FieldCondition(key="memory_type", match=models.MatchAny(any=memory_types))
+                )
+
             if emotion_embedding and personality_embedding:
-                # Triple-vector search: content + emotion + personality
+                # 🚀 TRIPLE-VECTOR: Use emotion vector for emotional intelligence
                 logger.info("🎯 QDRANT: Using triple-vector search (content + emotion + personality)")
                 
-                # Use standard search with content vector and emotional filtering
-                results = self.client.search(
+                # Primary search with emotion vector for emotional context
+                emotion_results = self.client.search(
                     collection_name=self.collection_name,
-                    query_vector=models.NamedVector(name="content", vector=content_embedding),
-                    limit=top_k,
+                    query_vector=models.NamedVector(name="emotion", vector=emotion_embedding),  # 🎭 Use emotion vector
+                    query_filter=models.Filter(must=base_filter_conditions),
+                    limit=top_k // 2,  # Get half results from emotion vector
                     with_payload=True
                 )
                 
+                # Secondary search with content vector for semantic meaning  
+                content_results = self.client.search(
+                    collection_name=self.collection_name,
+                    query_vector=models.NamedVector(name="content", vector=content_embedding),  # 🧠 Use content vector
+                    query_filter=models.Filter(must=base_filter_conditions),
+                    limit=top_k // 2,  # Get half results from content vector
+                    with_payload=True
+                )
+                
+                # Combine and deduplicate results
+                results = list(emotion_results) + [r for r in content_results if r.id not in [e.id for e in emotion_results]]
+                
             elif emotion_embedding:
-                # Dual-vector search: content + emotion
-                logger.info("🎯 QDRANT: Using dual-vector search (content + emotion)")
+                # 🎭 DUAL-VECTOR: Prioritize emotion vector for emotional intelligence
+                logger.info("🎯 QDRANT: Using dual-vector search (emotion + content)")
                 results = self.client.search(
                     collection_name=self.collection_name,
-                    query_vector=models.NamedVector(name="content", vector=content_embedding),
+                    query_vector=models.NamedVector(name="emotion", vector=emotion_embedding),  # 🎭 Use emotion vector
+                    query_filter=models.Filter(must=base_filter_conditions),
                     limit=top_k,
                     with_payload=True
                 )
                 
             else:
-                # Single-vector fallback using named vector
+                # 🧠 SINGLE-VECTOR: Content-only fallback
                 logger.info("🎯 QDRANT: Using single-vector search (content only)")
                 results = self.client.search(
                     collection_name=self.collection_name,
-                    query_vector=models.NamedVector(name="content", vector=content_embedding),  # 🎯 NAMED VECTOR
+                    query_vector=models.NamedVector(name="content", vector=content_embedding),  # 🧠 Use content vector
+                    query_filter=models.Filter(must=base_filter_conditions),
                     limit=top_k,
                     with_payload=True
                 )
@@ -2192,21 +2215,24 @@ class VectorMemoryStore:
             # Format results with multi-vector context
             formatted_results = []
             for point in results:
-                formatted_results.append({
-                    "id": point.id,
-                    "score": point.score,
-                    "content": point.payload['content'],
-                    "memory_type": point.payload['memory_type'],
-                    "timestamp": point.payload['timestamp'],
-                    "confidence": point.payload.get('confidence', 0.5),
-                    "metadata": point.payload,
-                    "multi_vector_search": True,
-                    "vectors_used": {
-                        "content": True,
-                        "emotion": emotion_embedding is not None,
-                        "personality": personality_embedding is not None
-                    }
-                })
+                if point.payload:  # 🎯 SAFETY: Check payload exists
+                    formatted_results.append({
+                        "id": point.id,
+                        "score": point.score,
+                        "content": point.payload.get('content', ''),
+                        "memory_type": point.payload.get('memory_type', 'unknown'),
+                        "timestamp": point.payload.get('timestamp', ''),
+                        "confidence": point.payload.get('confidence', 0.5),
+                        "metadata": point.payload,
+                        "multi_vector_search": True,
+                        "vectors_used": {
+                            "content": True,
+                            "emotion": emotion_embedding is not None,
+                            "personality": personality_embedding is not None
+                        }
+                    })
+                else:
+                    logger.warning(f"🚨 QDRANT: Point {point.id} has no payload, skipping")
             
             logger.info(f"🎯 QDRANT MULTI-VECTOR: Found {len(formatted_results)} emotionally-aware memories")
             return formatted_results
@@ -2266,9 +2292,11 @@ class VectorMemoryStore:
                     collection_name=self.collection_name,
                     positive=[memory.id],
                     query_filter=models.Filter(
+                        must_not=[
+                            models.FieldCondition(key="id", match=models.MatchValue(value=memory.id))
+                        ],
                         must=[
-                            models.FieldCondition(key="user_id", match=models.MatchValue(value=user_id)),
-                            models.FieldCondition(key="id", match=models.MatchExcept(except_=[memory.id]))
+                            models.FieldCondition(key="user_id", match=models.MatchValue(value=user_id))
                         ]
                     ),
                     limit=cluster_size - 1,  # -1 because we include the seed memory
@@ -2292,15 +2320,18 @@ class VectorMemoryStore:
                 ]
                 
                 for similar in similar_memories:
-                    cluster_memories.append({
-                        "id": similar.id,
-                        "content": similar.payload['content'],
-                        "timestamp": similar.payload['timestamp'],
-                        "confidence": similar.payload.get('confidence', 0.5),
-                        "similarity_score": similar.score,
-                        "is_seed": False
-                    })
-                    processed_ids.add(similar.id)
+                    if similar.payload:  # 🎯 SAFETY: Check payload exists
+                        cluster_memories.append({
+                            "id": similar.id,
+                            "content": similar.payload.get('content', ''),
+                            "timestamp": similar.payload.get('timestamp', ''),
+                            "confidence": similar.payload.get('confidence', 0.5),
+                            "similarity_score": similar.score,
+                            "is_seed": False
+                        })
+                        processed_ids.add(similar.id)
+                    else:
+                        logger.warning(f"🚨 QDRANT: Similar memory {similar.id} has no payload, skipping")
                 
                 clusters[cluster_key] = cluster_memories
                 processed_ids.add(memory.id)
@@ -2311,7 +2342,7 @@ class VectorMemoryStore:
             
         except Exception as e:
             logger.error(f"Memory clustering failed: {e}")
-            return {"error": str(e)}
+            return {"error": [{"error": str(e)}]}  # 🎯 FIXED: Return proper type structure
 
     def _identify_cluster_theme(self, content: str) -> str:
         """Identify thematic cluster based on content for role-playing context"""
@@ -2369,21 +2400,30 @@ class VectorMemoryStore:
                 if not existing_point:
                     continue
                 
-                # Update payload while preserving vectors
-                updated_payload = existing_point.payload.copy()
-                updated_payload.update(update.get('payload_updates', {}))
+                # Update payload while preserving vectors 🎯 SAFETY: Check payload exists
+                if existing_point.payload:
+                    updated_payload = existing_point.payload.copy()
+                    updated_payload.update(update.get('payload_updates', {}))
+                else:
+                    updated_payload = update.get('payload_updates', {})
+                    logger.warning(f"🚨 QDRANT: Point {point_id} has no payload, using updates only")
                 
                 # Add batch update metadata
                 updated_payload['batch_updated_at'] = datetime.utcnow().isoformat()
                 updated_payload['update_reason'] = update.get('reason', 'batch_update')
                 
-                points_to_update.append(
-                    PointStruct(
-                        id=point_id,
-                        vector=existing_point.vector,
-                        payload=updated_payload
+                # Create point with proper vector handling
+                if existing_point.vector:
+                    points_to_update.append(
+                        PointStruct(
+                            id=point_id,
+                            vector=existing_point.vector,  # ⚠️ TODO: Fix vector type casting
+                            payload=updated_payload
+                        )
                     )
-                )
+                else:
+                    # Skip points without vectors - they can't be properly updated
+                    logger.warning(f"🚨 QDRANT: Point {point_id} has no vector, skipping update")
             
             # 🎯 QDRANT FEATURE: Efficient batch upsert
             if points_to_update:
@@ -2572,8 +2612,15 @@ class VectorMemoryStore:
             
             contradictions = []
             for point in recommendations:
+                if not point.payload:  # 🎯 SAFETY: Check payload exists
+                    logger.warning(f"🚨 QDRANT: Recommendation point {point.id} has no payload, skipping")
+                    continue
+                    
                 # Calculate content similarity to detect actual contradictions
-                existing_content = point.payload['content']
+                existing_content = point.payload.get('content', '')
+                if not existing_content:
+                    continue
+                    
                 content_similarity = await self._calculate_content_similarity(new_memory_content, existing_content)
                 
                 # High semantic similarity but low content similarity = contradiction
@@ -2582,7 +2629,7 @@ class VectorMemoryStore:
                         "existing_memory": {
                             "id": point.id,
                             "content": existing_content,
-                            "timestamp": point.payload['timestamp'],
+                            "timestamp": point.payload.get('timestamp', ''),
                             "confidence": point.payload.get('confidence', 0.5),
                             "semantic_score": point.score
                         },
@@ -2684,14 +2731,24 @@ class VectorMemoryStore:
                 logger.error(f"Memory {memory_id} not found for update")
                 return False
             
-            # Update payload
-            existing_payload = existing_points[0].payload
-            existing_payload.update({
-                "content": new_content,
-                "updated_at": datetime.utcnow().isoformat(),
-                "update_reason": reason,
-                "corrected": True
-            })
+            # Update payload 🎯 SAFETY: Check payload exists
+            existing_point = existing_points[0]
+            if existing_point.payload:
+                existing_payload = existing_point.payload.copy()
+                existing_payload.update({
+                    "content": new_content,
+                    "updated_at": datetime.utcnow().isoformat(),
+                    "update_reason": reason,
+                    "corrected": True
+                })
+            else:
+                existing_payload = {
+                    "content": new_content,
+                    "updated_at": datetime.utcnow().isoformat(),
+                    "update_reason": reason,
+                    "corrected": True
+                }
+                logger.warning(f"🚨 QDRANT: Point {memory_id} has no payload, creating new one")
             
             # Store updated version with named vectors
             # Generate multiple embeddings for named vectors  
@@ -2829,6 +2886,17 @@ class MemoryTools:
         new_value = kwargs.get('new_value')
         reason = kwargs.get('reason', 'User correction')
         
+        # 🎯 TYPE SAFETY: Validate required parameters
+        if not all([user_id, subject, old_value, new_value]):
+            return "Error: Missing required parameters (user_id, subject, old_value, new_value)"
+        
+        # Convert to strings for type safety
+        user_id = str(user_id)
+        subject = str(subject)
+        old_value = str(old_value)
+        new_value = str(new_value)
+        reason = str(reason)
+        
         try:
             # Find existing fact
             existing_memories = await self.vector_store.search_memories(
@@ -2881,6 +2949,14 @@ class MemoryTools:
         query = kwargs.get('query')
         memory_type = kwargs.get('memory_type')
         
+        # 🎯 TYPE SAFETY: Validate required parameters
+        if not all([user_id, query]):
+            return "Error: Missing required parameters (user_id, query)"
+        
+        # Convert to strings for type safety
+        user_id = str(user_id)
+        query = str(query)
+        
         try:
             memory_types = None
             if memory_type:
@@ -2912,6 +2988,15 @@ class MemoryTools:
         user_id = kwargs.get('user_id')
         content = kwargs.get('content_to_delete')
         reason = kwargs.get('reason', 'User requested deletion')
+        
+        # 🎯 TYPE SAFETY: Validate required parameters
+        if not all([user_id, content]):
+            return "Error: Missing required parameters (user_id, content_to_delete)"
+        
+        # Convert to strings for type safety
+        user_id = str(user_id)
+        content = str(content)
+        reason = str(reason)
         
         try:
             # Find memories to delete
@@ -3113,6 +3198,8 @@ class VectorMemoryManager:
             matches = re.findall(pattern, message.lower())
             for match in matches:
                 if isinstance(match, tuple):
+                    if len(match) == 0:  # 🎯 SAFETY: Handle empty tuple
+                        continue
                     if predicate == "is_named":
                         obj = match[1] if len(match) > 1 else match[0]
                         subj = match[0] if len(match) > 1 else subject
