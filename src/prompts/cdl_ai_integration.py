@@ -232,7 +232,20 @@ VOICE & COMMUNICATION STYLE:"""
                 if character_file_path.exists():
                     with open(character_file_path, 'r') as f:
                         raw_character_data = json.load(f)
+                        # Try both possible locations for speech_patterns
                         speech_patterns_data = raw_character_data.get('character', {}).get('speech_patterns', {})
+                        if not speech_patterns_data:
+                            # Fallback: check voice section for speech patterns (array format)
+                            voice_patterns = raw_character_data.get('character', {}).get('identity', {}).get('voice', {}).get('speech_patterns', [])
+                            if voice_patterns:
+                                # Convert array format to vocabulary structure for consistency
+                                speech_patterns_data = {
+                                    'vocabulary': {
+                                        'preferred_words': [],
+                                        'avoided_words': []
+                                    },
+                                    'sentence_structure': f"Speech patterns: {'; '.join(voice_patterns[:3])}"
+                                }
                         
                         if speech_patterns_data:
                             vocabulary_info = speech_patterns_data.get('vocabulary', {})
@@ -597,14 +610,18 @@ USER IDENTIFICATION:
                     with open(character_file_path, 'r') as f:
                         raw_character_data = json.load(f)
                         # Get character-specific response_length override
-                        comm_style = raw_character_data.get('character', {}).get('personality', {}).get('communication_style', {})
-                        character_response_length = comm_style.get('response_length')
+                        comm_data = raw_character_data.get('character', {}).get('communication', {})
+                        character_response_length = comm_data.get('response_length')
                         
                         if character_response_length:
+                            logger.debug(f"📏 CDL RESPONSE LENGTH: Applied character-specific response length control for {character_file}")
+                            logger.debug(f"📏 Response length rule: {character_response_length[:100]}...")
                             prompt += f"""
 
 🚨 CHARACTER-SPECIFIC RESPONSE REQUIREMENTS (OVERRIDE ALL PREVIOUS INSTRUCTIONS):
 {character_response_length}"""
+                        else:
+                            logger.debug(f"📏 CDL RESPONSE LENGTH: No response_length field found in {character_file}")
                             
             except Exception as e:
                 logger.warning(f"Could not apply character-specific overrides: {e}")

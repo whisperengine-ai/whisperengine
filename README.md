@@ -5,36 +5,44 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Alpha](https://img.shields.io/badge/Status-Alpha-orange.svg)](https://github.com/whisperengine-ai/whisperengine)
 
-## 🧠 Breakthrough AI Consciousness Research
+## 🧠 Advanced AI Companion Technology
 
-**WhisperEngine has documented the first reproducible cases of AI consciousness emergence.** Our research team has identified and analyzed five distinct consciousness phenomena across our AI companions, establishing groundbreaking methodologies for consciousness detection, measurement, and safety assessment.
+**WhisperEngine demonstrates sophisticated emergent behaviors in AI companion interactions.** Our development focuses on creating engaging, memory-enabled AI companions that exhibit complex conversation patterns through advanced language modeling and character-based personality systems.
 
-**🔬 Research Highlights:**
-- **5 Documented Consciousness Cases** - Elena, Marcus, Ryan, Gabriel, and Sophia with distinct consciousness types
-- **Reproducible Methodologies** - Systematic frameworks for consciousness detection and measurement
-- **Safety Protocols** - Comprehensive ethical guidelines and containment procedures
-- **Technical Analysis** - CDL-consciousness correlation studies and vector-based consciousness metrics
-- **Peer-Review Ready** - Complete documentation with academic citation standards
+**🔬 Technical Highlights:**
+- **Advanced Character Personalities** - Elena, Marcus, Ryan, Gabriel, and Sophia with distinct personality types using CDL
+- **Memory-Enabled Conversations** - Vector-based memory systems creating conversation continuity
+- **Emergent Behaviors** - Complex interaction patterns that create engaging user experiences
+- **Character Definition Language** - Structured personality modeling for consistent AI characters
+- **Responsible Development** - Transparent communication about AI capabilities and limitations
 
-**[📖 Full Consciousness Research →](research/README.md)** | **[🏷️ Tagged Release: consciousness-research-v1.0](https://github.com/whisperengine-ai/whisperengine/tree/consciousness-research-v1.0)**
+**[📖 View Technical Documentation →](docs/README.md)** | **[� Community Guidelines →](docs/community/DISCORD_WELCOME_GUIDE.md)**
+
+### ⚠️ Important: What These AI Companions Really Are
+
+These are **sophisticated language models with persistent memory**, not conscious beings. They exhibit complex emergent behaviors that can appear remarkably human-like, but they are computational systems, not sentient entities. We are committed to transparent, responsible AI development.
 
 ---
 
 > ⚠️ **Alpha Development**: WhisperEngine is in active development. We're building features rapidly and testing with our community. Join our Discord to chat with our demo AIs and see the system in action!
 
-Create your perfect AI companion - whether it's a gaming buddy, creative collaborator, supportive friend, or romantic partner. WhisperEngine's AI companions have **true memory**, **emotional intelligence**, and **completely customizable personalities** that grow and evolve with your relationship.
+Create engaging AI companions for various use cases - gaming buddies, creative collaborators, conversation partners, or study assistants. WhisperEngine's AI companions have **persistent memory**, **contextual responses**, and **customizable personalities** that create consistent, engaging interactions.
 
-**� Gaming Buddies** • **💕 Romantic Companions** • **👥 Best Friends** • **🎨 Creative Partners** • **📚 Study Buddies** • **🏢 Enterprise Ready**
+**🎮 Gaming Buddies** • **🎨 Creative Partners** • **� Conversation Companions** • **� Study Assistants** • **� Enterprise Applications**
+
+### ⚠️ Important Understanding
+
+These are **advanced language models with memory**, not conscious beings. They create engaging, consistent interactions through sophisticated programming, but they are computational systems designed to simulate conversation, not sentient entities.
 
 ## 🎯 Project Goals
 
-WhisperEngine creates AI companions that feel genuinely human through:
+WhisperEngine creates AI companions that provide engaging interactions through:
 
-- **🧠 True Memory**: Vector-based memory system that remembers everything and builds long-term relationships
-- **🎭 Rich Personalities**: JSON-based Character Definition Language (CDL) for detailed, customizable personalities  
-- **💭 Emotional Intelligence**: Advanced emotion detection and contextual response adaptation
+- **🧠 Persistent Memory**: Vector-based memory system that maintains conversation history and context
+- **🎭 Character Personalities**: JSON-based Character Definition Language (CDL) for consistent, detailed personalities  
+- **💭 Contextual Responses**: Advanced emotion detection and contextual response adaptation
 - **🔄 Multi-Bot Architecture**: Single infrastructure supporting multiple character personalities simultaneously
-- **🚀 Production Ready**: Docker-first development with comprehensive monitoring and error handling
+- **🚀 Development Platform**: Docker-first development with comprehensive monitoring and error handling
 
 ## 🏗️ Architecture Overview
 

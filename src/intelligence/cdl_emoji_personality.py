@@ -107,11 +107,14 @@ class CDLEmojiPersonalityReader:
             )
             
             self.emoji_profiles[character_file] = profile
-            logger.info(f"📱 Loaded CDL emoji profile for {profile.character_name}: {profile.frequency.value} frequency, {profile.preferred_combination.value} style")
+            logger.info("📱 Loaded CDL emoji profile for %s: %s frequency, %s style", 
+                       profile.character_name, profile.frequency.value, profile.preferred_combination.value)
+            logger.debug("📱 CDL EMOJI PROFILE: Full details - style=%s, age=%s, culture=%s, placement=%s", 
+                        profile.style, profile.age_demographic, profile.cultural_influence, profile.emoji_placement)
             return profile
             
         except Exception as e:
-            logger.error(f"Error loading emoji profile from {character_file}: {e}")
+            logger.error("Error loading emoji profile from %s: %s", character_file, e)
             return None
             
     def _create_default_profile(self) -> CDLEmojiProfile:
@@ -195,7 +198,7 @@ class CDLEmojiGenerator:
         final_probability = base_prob * excitement_multiplier * combination_mult
         should_add = random.random() < final_probability
         
-        logger.debug(f"📱 {profile.character_name} emoji decision: {should_add} (prob: {final_probability:.2f})")
+        logger.debug("📱 %s emoji decision: %s (prob: %.2f)", profile.character_name, should_add, final_probability)
         return should_add, final_probability
         
     def generate_emoji_response(self,
@@ -208,30 +211,47 @@ class CDLEmojiGenerator:
         profile = self.load_character_profile(character_file)
         context = context or {}
         
+        logger.debug("🎭 CDL EMOJI: Starting emoji generation for character %s", profile.character_name)
+        logger.debug("🎭 Emoji profile: frequency=%s, style=%s, combination=%s", 
+                    profile.frequency.value, profile.style, profile.preferred_combination.value)
+        logger.debug("🎭 Excitement level detected: %s", excitement_level)
+        
         # Get excitement-appropriate emoji pattern
         excitement_patterns = profile.usage_patterns.get("excitement_level", {})
-        pattern = excitement_patterns.get(excitement_level, excitement_patterns.get("medium", ""))
+        # Remove unused pattern variable
+        excitement_patterns.get(excitement_level, excitement_patterns.get("medium", ""))
         
         # Extract topic-specific emojis
         topic_emojis = self._get_topic_emojis(profile, user_message, bot_response_text)
+        logger.debug("🎭 Topic emojis detected: %s", topic_emojis)
         
         # Generate based on combination preference
         if profile.preferred_combination == EmojiCombinationType.TEXT_PLUS_EMOJI:
-            return self._generate_text_plus_emoji(profile, bot_response_text, topic_emojis, excitement_level)
+            result = self._generate_text_plus_emoji(profile, bot_response_text, topic_emojis, excitement_level)
+            logger.debug("🎭 Applied TEXT_PLUS_EMOJI style, added %d emojis", len(result.emoji_additions))
         elif profile.preferred_combination == EmojiCombinationType.TEXT_WITH_ACCENT_EMOJI:
-            return self._generate_text_with_accent(profile, bot_response_text, topic_emojis, excitement_level)
+            result = self._generate_text_with_accent(profile, bot_response_text, topic_emojis, excitement_level)
+            logger.debug("🎭 Applied TEXT_WITH_ACCENT_EMOJI style, added %d emojis", len(result.emoji_additions))
         elif profile.preferred_combination == EmojiCombinationType.MINIMAL_SYMBOLIC_EMOJI:
-            return self._generate_minimal_symbolic(profile, bot_response_text, topic_emojis, excitement_level)
+            result = self._generate_minimal_symbolic(profile, bot_response_text, topic_emojis, excitement_level)
+            logger.debug("🎭 Applied MINIMAL_SYMBOLIC_EMOJI style, added %d emojis", len(result.emoji_additions))
         elif profile.preferred_combination == EmojiCombinationType.EMOJI_ONLY:
-            return self._generate_emoji_only(profile, bot_response_text, topic_emojis, excitement_level)
+            result = self._generate_emoji_only(profile, bot_response_text, topic_emojis, excitement_level)
+            logger.debug("🎭 Applied EMOJI_ONLY style, added %d emojis", len(result.emoji_additions))
         else:
-            return EmojiResponse(
+            result = EmojiResponse(
                 response_text=bot_response_text,
                 emoji_additions=[],
                 placement_style="none",
                 confidence=0.0,
                 reasoning="TEXT_ONLY preference"
             )
+            logger.debug("🎭 Applied TEXT_ONLY style - no emojis added")
+        
+        logger.debug("🎭 CDL EMOJI: Final response confidence: %.2f, reasoning: %s", 
+                    result.confidence, result.reasoning)
+        
+        return result
             
     def _detect_excitement_level(self, user_message: str, bot_response: str) -> float:
         """Detect excitement level from message content"""
@@ -283,6 +303,8 @@ class CDLEmojiGenerator:
         
     def _generate_text_with_accent(self, profile: CDLEmojiProfile, text: str, topic_emojis: List[str], excitement: str) -> EmojiResponse:
         """Marcus style: Text with single meaningful emoji accent"""
+        # Note: excitement parameter available for future enhancement
+        _ = excitement  # Acknowledge parameter for future use
         # Select one most relevant emoji
         if topic_emojis:
             selected_emoji = [random.choice(topic_emojis)]
@@ -326,6 +348,8 @@ class CDLEmojiGenerator:
             
     def _generate_emoji_only(self, profile: CDLEmojiProfile, text: str, topic_emojis: List[str], excitement: str) -> EmojiResponse:
         """Pure emoji response (for very simple acknowledgments)"""
+        # Note: text parameter available for future content analysis
+        _ = text  # Acknowledge parameter for future use
         emoji_count = {"low": 1, "medium": 2, "high": 3}.get(excitement, 2)
         
         if topic_emojis:

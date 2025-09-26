@@ -60,14 +60,18 @@ class CDLEmojiIntegration:
             )
             
             if not should_add:
+                logger.debug("🎭 CDL EMOJI INTEGRATION: Skipping emoji enhancement - threshold not met (confidence: %.2f)", confidence)
                 return bot_response, {
                     "cdl_emoji_applied": False,
                     "reason": "cdl_personality_threshold_not_met",
                     "confidence": confidence
                 }
             
+            logger.debug("🎭 CDL EMOJI INTEGRATION: Starting emoji enhancement for %s", character_file)
+            
             # Detect excitement level for appropriate emoji intensity
             excitement = self._detect_excitement_level(user_message, bot_response, context)
+            logger.debug("🎭 CDL EMOJI INTEGRATION: Detected excitement level: %s", excitement)
             
             # Generate emoji-enhanced response
             emoji_response = self.emoji_generator.generate_emoji_response(
@@ -88,7 +92,9 @@ class CDLEmojiIntegration:
                 "excitement_level": excitement
             }
             
-            logger.debug(f"🎭 CDL emoji enhancement for {character_file}: {len(emoji_response.emoji_additions)} emojis added")
+            logger.debug("🎭 CDL EMOJI INTEGRATION: Enhancement complete - %d emojis added, confidence: %.2f", 
+                        len(emoji_response.emoji_additions), emoji_response.confidence)
+            logger.debug("🎭 CDL emoji enhancement for %s: %d emojis added", character_file, len(emoji_response.emoji_additions))
             
             return emoji_response.response_text, emoji_metadata
             

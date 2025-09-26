@@ -386,11 +386,16 @@ class EnhancedConversationContextManager:
         self, session: ConversationSession, message_content: str
     ) -> dict[str, Any]:
         """Generate conversation management guidance"""
+        response_strategy = "detailed" if session.message_count < 5 else "concise"
+        
         guidance: dict[str, Any] = {
             "context_awareness_level": "high" if session.is_long_conversation() else "normal",
-            "response_strategy": "detailed" if session.message_count < 5 else "concise",
+            "response_strategy": response_strategy,
             "topic_management": "track_closely" if len(session.topic_history) > 1 else "normal",
         }
+        
+        logger.debug("💬 CONVERSATION GUIDANCE: Generated for message #%d - strategy: %s, awareness: %s", 
+                    session.message_count, response_strategy, guidance["context_awareness_level"])
 
         # Add specific guidance based on conversation state
         if session.state == ConversationState.RESUMED:
@@ -398,8 +403,10 @@ class EnhancedConversationContextManager:
                 "acknowledge_resumption",
                 "provide_context_bridge",
             ]
+            logger.debug("💬 CONVERSATION GUIDANCE: Added resumption considerations")
         elif session.state == ConversationState.INTERRUPTED:
             guidance["special_considerations"] = ["handle_interruption_gracefully"]
+            logger.debug("💬 CONVERSATION GUIDANCE: Added interruption handling")
 
         # Add guidance based on message content
         if any(word in message_content.lower() for word in ["confused", "lost", "unclear"]):
