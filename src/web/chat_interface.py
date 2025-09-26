@@ -593,20 +593,24 @@ class WebChatApplication:
     def _load_configurations(self):
         """Load bot and API configurations"""
         # In production, load from database or config files
+        # Use bot's CDL_DEFAULT_CHARACTER if available, otherwise use standard character files
+        import os
+        default_character = os.getenv('CDL_DEFAULT_CHARACTER')
+        
         self.available_bots = {
             "elena": BotConfiguration(
                 bot_name="elena",
-                character_file="characters/examples/elena-rodriguez.json",
+                character_file=default_character if default_character else "characters/examples/elena-rodriguez.json",
                 description="Marine biologist AI companion"
             ),
             "marcus": BotConfiguration(
-                bot_name="marcus",
-                character_file="characters/examples/marcus-thompson.json",
+                bot_name="marcus", 
+                character_file=default_character if default_character else "characters/examples/marcus-thompson.json",
                 description="AI researcher companion"
             ),
             "ryan-chen": BotConfiguration(
                 bot_name="ryan-chen",
-                character_file="characters/examples/ryan-chen.json",
+                character_file=default_character if default_character else "characters/examples/ryan-chen.json",
                 description="Game developer companion"
             )
         }

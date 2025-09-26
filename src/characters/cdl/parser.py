@@ -331,7 +331,15 @@ class CDLParser:
             ]
         
         if 'daily_routine' in data:
-            current_life.daily_routine = self._parse_daily_routine(data['daily_routine'])
+            # Handle both dictionary format (structured) and string format (simple)
+            routine_data = data['daily_routine']
+            if isinstance(routine_data, str):
+                # Simple string format - create a basic routine object
+                current_life.daily_routine = DailyRoutine()
+                current_life.daily_routine.morning_routine = routine_data
+            else:
+                # Dictionary format - parse structured routine
+                current_life.daily_routine = self._parse_daily_routine(routine_data)
         
         if 'current_goals' in data:
             current_life.current_goals = [str(g) for g in data['current_goals']]
@@ -371,16 +379,26 @@ class CDLParser:
         """Parse daily routine section"""
         routine = DailyRoutine()
         
+        # Handle the correct field names that match the model
+        for field in ['morning_routine', 'work_schedule', 'evening_routine', 'sleep_schedule']:
+            if field in data:
+                setattr(routine, field, str(data[field]))
+        
+        if 'habits' in data:
+            routine.habits = [str(h) for h in data['habits']]
+        
+        # Legacy support for old format (morning, afternoon, evening as lists)
         for time_period in ['morning', 'afternoon', 'evening']:
             if time_period in data:
                 setattr(routine, time_period, [str(a) for a in data[time_period]])
         
-        for field in ['sleep_schedule', 'work_schedule']:
-            if field in data:
-                setattr(routine, field, str(data[field]))
+        # Support for weekend_activities if present
+        if 'weekend_activities' in data:
+            routine.weekend_activities = [str(a) for a in data['weekend_activities']]
         
+        # Legacy field mapping
         if 'leisure_activities' in data:
-            routine.leisure_activities = [str(a) for a in data['leisure_activities']]
+            routine.habits.extend([str(a) for a in data['leisure_activities']])
         
         return routine
     

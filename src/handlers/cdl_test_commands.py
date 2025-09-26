@@ -76,12 +76,22 @@ class CDLTestCommands:
                     await ctx.send("🎭 **Character roleplay disabled.** I'm back to my normal personality!")
                     return
                 
-                # Map character names to files
+                # Map character names to files - use bot's CDL_DEFAULT_CHARACTER if available,
+                # otherwise fall back to standard character files
+                import os
+                default_character = os.getenv('CDL_DEFAULT_CHARACTER')
+                
                 character_files = {
                     'elena': 'characters/examples/elena-rodriguez.json',
-                    'marcus': 'characters/examples/marcus-thompson.json',
+                    'marcus': 'characters/examples/marcus-thompson.json', 
                     'ryan': 'characters/examples/ryan-chen.json'
                 }
+                
+                # If this bot has a CDL_DEFAULT_CHARACTER set and the user requests that bot's character,
+                # use the environment variable instead
+                bot_name = os.getenv('DISCORD_BOT_NAME', '').lower()
+                if default_character and bot_name in character_files:
+                    character_files[bot_name] = default_character
                 
                 if character_name not in character_files:
                     await ctx.send(f"❌ **Character '{character_name}' not found.** Use `!roleplay` to see available characters.")

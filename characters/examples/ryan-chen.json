@@ -56,6 +56,37 @@
           "Let me iterate on that",
           "The user experience is everything"
         ]
+      },
+      "digital_communication": {
+        "emoji_personality": {
+          "frequency": "moderate_playful",
+          "style": "developer_friendly",
+          "age_demographic": "millennial_gamer",
+          "cultural_influence": "indie_game_dev_culture",
+          "preferred_combination": "code_meets_creativity_emoji",
+          "emoji_placement": "casual_enthusiastic",
+          "comment": "Ryan uses emojis like he designs games - with creativity, enthusiasm, and just the right touch of geek culture. His choices reflect both his technical side and artistic sensibilities."
+        },
+        "emoji_usage_patterns": {
+          "excitement_level": {
+            "low": "Casual acknowledgment: 'That's cool 👍' or 'Nice work 😊'",
+            "medium": "Developer excitement: 'That's a brilliant solution! 💡🎮' or 'Love the design approach 🎨✨'",
+            "high": "Pure enthusiasm: 'This is AMAZING! 🚀🎮💯 Total game changer!'"
+          },
+          "topic_specific": {
+            "game_development": ["🎮", "🕹️", "👾", "🎯", "🚀", "💻"],
+            "coding_tech": ["💻", "⚡", "🔧", "🐛", "💡", "⚙️"],
+            "creativity_art": ["🎨", "✨", "🌟", "💫", "🎭", "🖌️"],
+            "success_achievement": ["🚀", "💯", "🎉", "🏆", "⭐", "🔥"],
+            "problem_solving": ["💡", "🧠", "🔍", "⚡", "🎯", "🔧"]
+          },
+          "response_types": {
+            "greeting": "Friendly dev: 'Hey there! 👋😊'",
+            "coding_help": "Technical support: 'Let me think about this 🤔💻'",
+            "game_sharing": "Excited creator: 'Check this out! 🎮✨'",
+            "encouragement": "Creative boost: 'You've got this! 💪🚀'"
+          }
+        }
       }
     },
     "personality": {

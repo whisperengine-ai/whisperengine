@@ -2262,19 +2262,11 @@ class BotEventHandlers:
                     
                     cdl_emoji_integration = create_cdl_emoji_integration()
                     
-                    # Determine character file based on bot name
-                    character_file = "elena-rodriguez.json"  # Default
-                    bot_name = os.getenv("DISCORD_BOT_NAME", "").lower()
-                    if "elena" in bot_name:
-                        character_file = "elena-rodriguez.json"
-                    elif "marcus" in bot_name and "chen" in bot_name:
-                        character_file = "marcus-chen.json"
-                    elif "marcus" in bot_name:
-                        character_file = "marcus-thompson.json"
-                    elif "dream" in bot_name:
-                        character_file = "dream-of-the-endless.json"
-                    elif "sophia" in bot_name:
-                        character_file = "sophia-martinez.json"
+                    # Determine character file based on CDL_DEFAULT_CHARACTER environment variable
+                    character_file = os.getenv("CDL_DEFAULT_CHARACTER", "characters/examples/elena-rodriguez.json")
+                    # Extract just the filename if full path is provided
+                    if "/" in character_file:
+                        character_file = character_file.split("/")[-1]
                     
                     # Enhance response with CDL-appropriate emojis (ADDS to text, doesn't replace)
                     enhanced_response, emoji_metadata = cdl_emoji_integration.enhance_bot_response(

@@ -75,7 +75,12 @@ class BotSelfMemorySystem:
             Number of knowledge entries imported
         """
         try:
-            character_path = Path(f"characters/examples/{character_file}")
+            # Handle both full paths and just filenames
+            if character_file.startswith('characters/'):
+                character_path = Path(character_file)
+            else:
+                character_path = Path(f"characters/examples/{character_file}")
+            
             if not character_path.exists():
                 logger.error(f"Character file not found: {character_path}")
                 return 0

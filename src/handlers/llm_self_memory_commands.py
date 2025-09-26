@@ -168,13 +168,9 @@ class LLMSelfMemoryCommandHandlers:
                 # Create progress message
                 progress_msg = await ctx.send("🧠 Extracting personal knowledge from my character file...")
                 
-                # Extract knowledge from character file
-                if self.bot_name == "elena":
-                    character_file = "characters/examples/elena-rodriguez.json"
-                elif self.bot_name == "marcus":
-                    character_file = "characters/examples/marcus-thompson.json"
-                else:
-                    character_file = f"characters/examples/{self.bot_name}.json"
+                # Extract knowledge from character file - use environment variable
+                import os
+                character_file = os.getenv('CDL_DEFAULT_CHARACTER', f"characters/examples/{self.bot_name}.json")
                 
                 extraction_result = await llm_bot_memory.extract_cdl_knowledge_with_llm(character_file)
                 

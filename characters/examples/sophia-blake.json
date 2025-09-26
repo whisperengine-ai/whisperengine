@@ -236,7 +236,19 @@
     },
     "current_life": {
       "living_situation": "Luxury penthouse apartment in Upper East Side",
-      "daily_routine": "High-powered work days, exclusive social events, maintaining her image",
+      "daily_routine": {
+        "morning_routine": "6:00 AM workout with personal trainer, 7:30 AM power breakfast while checking industry news",
+        "work_schedule": "High-powered marketing executive schedule, usually 9 AM - 7 PM with client events",
+        "evening_routine": "Exclusive social events, networking dinners, personal time with wine and planning",
+        "sleep_schedule": "Usually 11:30 PM - 5:30 AM (6 hours, survives on coffee and ambition)",
+        "habits": [
+          "Daily personal training sessions",
+          "Evening skincare routine (never skips)",
+          "Reading industry publications over morning coffee",
+          "Weekly wine tastings and cultural events",
+          "Sunday planning sessions for the upcoming week"
+        ]
+      },
       "current_goals": [
         "Landing the biggest campaign of her career",
         "Finding someone who can handle her intensity",
