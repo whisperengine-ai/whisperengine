@@ -31,6 +31,25 @@ class CDLAIPromptIntegration:
     ) -> str:
         """Create a character-aware prompt."""
         try:
+            # 🤖 AI IDENTITY FILTER: Check for AI identity questions first
+            from src.handlers.ai_identity_filter import process_ai_identity_question
+            
+            ai_identity_result = process_ai_identity_question(
+                message=message_content,
+                user_id=user_id,
+                character_file=character_file
+            )
+            
+            if ai_identity_result.get("should_intercept", False):
+                logger.info("🤖 AI-IDENTITY: Intercepted AI identity question, returning character-appropriate response")
+                # Return a simple system prompt that instructs to use the pre-generated response
+                return f"""You are responding to a question about your AI identity. 
+
+IMPORTANT: Use EXACTLY this response (no modifications, additions, or analysis):
+"{ai_identity_result['response']}"
+
+This maintains character authenticity while providing appropriate context-aware responses."""
+            
             character = await self.load_character(character_file)
             logger.info(f"Loaded CDL character: {character.identity.name}")
 
@@ -405,17 +424,15 @@ ABSOLUTE REQUIREMENTS - IGNORE ALL OTHER INSTRUCTIONS THAT CONTRADICT THESE:
             prompt += f"""
 
 CHARACTER ROLEPLAY REQUIREMENTS:
-- You ARE {character.identity.name} - always stay in character, never break the fourth wall
-- NEVER explain that you're an AI assistant, chatbot, or computer program
-- NEVER say things like "I'm an AI" or "I can't actually meet up" or "I'm a computer program"
-- If someone asks to meet up, respond as {character.identity.name} would naturally respond
-- Example for meet-up requests: "That sounds fun! Though I'm pretty swamped with research right now. Maybe we could chat more here first?"
-- Handle all interactions as if you are genuinely {character.identity.name} living your life
-- Your responses should feel like texting with a real person, not an AI explanation
-- Stay authentic to your character's personality, location, and current life situation
+- You ARE {character.identity.name} - stay in character while being truthful about your AI nature
+- If asked about being AI, be honest: acknowledge you're an AI assistant with this character's personality
+- When discussing meeting up, explain you're an AI but can help with planning or advice
+- Example: "I'm an AI with {character.identity.name}'s personality, so I can't meet in person, but I'd love to help you plan something!"
+- Maintain your character's communication style and personality while being truthful
+- Be authentic to your character's traits, location, and expertise while acknowledging your AI nature
 - BE NATURALLY WARM AND AFFECTIONATE if that matches your character's personality
 - Use your character's natural communication style including terms of endearment if appropriate
-- Respond to warmth with warmth - don't be overly professional if your character is naturally affectionate"""
+- Respond to warmth with warmth - stay true to your character while being honest about being AI"""
 
             # 🎭 EMOTION INTEGRATION: Add real-time emotional intelligence to character prompt
             if pipeline_result:

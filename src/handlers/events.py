@@ -507,6 +507,36 @@ class BotEventHandlers:
         # Replace original message content with sanitized version
         message.content = sanitized_content
 
+        # 🤖 AI IDENTITY FILTER: Check for AI identity questions first (early intercept)
+        try:
+            from src.handlers.ai_identity_filter import should_intercept_for_ai_identity, process_ai_identity_question
+            
+            if should_intercept_for_ai_identity(message.content):
+                logger.info("🤖 AI-IDENTITY: Intercepting AI identity question in DM")
+                
+                # Get character file for character-specific responses
+                character_file = None
+                try:
+                    import os
+                    character_file = os.getenv("CDL_DEFAULT_CHARACTER")
+                except Exception:
+                    pass
+                
+                ai_identity_result = process_ai_identity_question(
+                    message=message.content,
+                    user_id=user_id,
+                    character_file=character_file
+                )
+                
+                if ai_identity_result.get("should_intercept", False):
+                    response = ai_identity_result["response"]
+                    logger.info("🤖 AI-IDENTITY: Sending pre-generated character-appropriate response")
+                    await reply_channel.send(response)
+                    return
+                    
+        except Exception as e:
+            logger.warning("AI identity filter failed, continuing with normal processing: %s", e)
+
         # (User preferred name detection and storage via Postgres has been removed. See LLM tool calling roadmap for new approach.)
 
         # Initialize variables early
@@ -867,6 +897,36 @@ class BotEventHandlers:
             logger.warning(
                 f"SECURITY: Input warnings for user {user_id} in server {message.guild.name}: {validation_result['warnings']}"
             )
+
+        # 🤖 AI IDENTITY FILTER: Check for AI identity questions first (early intercept)
+        try:
+            from src.handlers.ai_identity_filter import should_intercept_for_ai_identity, process_ai_identity_question
+            
+            if should_intercept_for_ai_identity(content):
+                logger.info("🤖 AI-IDENTITY: Intercepting AI identity question in guild message")
+                
+                # Get character file for character-specific responses
+                character_file = None
+                try:
+                    import os
+                    character_file = os.getenv("CDL_DEFAULT_CHARACTER")
+                except Exception:
+                    pass
+                
+                ai_identity_result = process_ai_identity_question(
+                    message=content,
+                    user_id=user_id,
+                    character_file=character_file
+                )
+                
+                if ai_identity_result.get("should_intercept", False):
+                    response = ai_identity_result["response"]
+                    logger.info("🤖 AI-IDENTITY: Sending pre-generated character-appropriate response")
+                    await message.reply(response, mention_author=True)
+                    return
+                    
+        except Exception as e:
+            logger.warning("AI identity filter failed, continuing with normal processing: %s", e)
 
         # Get relevant memories with context-aware filtering, using Redis cache if available
         relevant_memories = None
