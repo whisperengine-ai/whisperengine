@@ -204,6 +204,7 @@ class ProactiveConversationEngagementEngine:
         memory_moments: MemoryTriggeredMoments | None = None,
         emotional_engine: Union[EmotionalContextEngine, EnhancedVectorEmotionAnalyzer, None] = None,
         personality_profiler: DynamicPersonalityProfiler | None = None,
+        memory_manager: Any | None = None,
         stagnation_threshold_minutes: int | None = None,
         engagement_check_interval_minutes: int | None = None,
         max_proactive_suggestions_per_hour: int | None = None,
@@ -216,6 +217,7 @@ class ProactiveConversationEngagementEngine:
             memory_moments: Memory-triggered moments system
             emotional_engine: Emotional context engine or Enhanced Vector Emotion Analyzer
             personality_profiler: Dynamic personality profiler
+            memory_manager: Vector memory manager for conversation history and patterns
             stagnation_threshold_minutes: Minutes before considering conversation stagnant
             engagement_check_interval_minutes: How often to check engagement levels
             max_proactive_suggestions_per_hour: Limit proactive interventions
@@ -226,6 +228,7 @@ class ProactiveConversationEngagementEngine:
         self.memory_moments = memory_moments
         self.emotional_engine = emotional_engine
         self.personality_profiler = personality_profiler
+        self.memory_manager = memory_manager
 
         # Use environment variables with fallbacks
         stagnation_threshold_minutes = stagnation_threshold_minutes or int(
@@ -664,9 +667,16 @@ class ProactiveConversationEngagementEngine:
         return recommendations[:3]  # Return top 3 recommendations
 
     async def _analyze_topic_coherence(self, recent_content: list[str]) -> float:
-        """Analyze topic coherence in recent messages using intelligent analysis"""
+        """Analyze topic coherence using vector semantic similarity"""
         if len(recent_content) < 2:
             return 0.5
+
+        # Try vector-based coherence analysis first
+        if self.memory_manager:
+            try:
+                return await self._analyze_topic_coherence_vector(recent_content)
+            except Exception as e:
+                logger.debug("Vector topic coherence failed, using fallback: %s", e)
 
         # Use Phase 4 analysis if available for better coherence detection
         if self.personality_profiler:
@@ -720,6 +730,54 @@ class ProactiveConversationEngagementEngine:
             overlaps.append(min(1.0, coherence_score))
 
         return statistics.mean(overlaps) if overlaps else 0.3
+
+    async def _analyze_topic_coherence_vector(self, recent_content: list[str]) -> float:
+        """Use vector embeddings to analyze semantic topic coherence"""
+        if not self.memory_manager or len(recent_content) < 2:
+            return 0.5
+
+        try:
+            # Get vector store from memory manager for embedding generation
+            vector_store = getattr(self.memory_manager, 'vector_store', None)
+            if not vector_store:
+                return 0.5
+
+            # Generate embeddings for each message
+            embeddings = []
+            for content in recent_content:
+                if content.strip():
+                    embedding = await vector_store.generate_embedding(content.strip())
+                    if embedding:
+                        embeddings.append(embedding)
+
+            if len(embeddings) < 2:
+                return 0.5
+
+            # Calculate semantic similarity between adjacent messages
+            similarities = []
+            for i in range(1, len(embeddings)):
+                # Simple dot product similarity (cosine similarity for normalized vectors)
+                similarity = sum(a * b for a, b in zip(embeddings[i-1], embeddings[i]))
+                similarities.append(max(0.0, similarity))  # Ensure non-negative
+
+            # Convert similarity to coherence score (0.0 to 1.0)
+            avg_similarity = statistics.mean(similarities) if similarities else 0.0
+            
+            # Map similarity to coherence score
+            # High similarity (>0.8) = high coherence (>0.7)
+            # Low similarity (<0.3) = low coherence (<0.3)
+            if avg_similarity > 0.8:
+                coherence_score = 0.7 + (avg_similarity - 0.8) * 1.5  # Scale to 0.7-1.0
+            elif avg_similarity > 0.5:
+                coherence_score = 0.4 + (avg_similarity - 0.5) * 1.0  # Scale to 0.4-0.7
+            else:
+                coherence_score = avg_similarity * 0.8  # Scale to 0.0-0.4
+
+            return min(1.0, max(0.0, coherence_score))
+
+        except Exception as e:
+            logger.debug("Vector coherence analysis failed: %s", e)
+            return 0.5
 
     # Additional methods for topic generation, prompt creation, etc. will be added...
 
@@ -925,82 +983,123 @@ class ProactiveConversationEngagementEngine:
     async def _generate_memory_connections(
         self, user_id: str, recent_messages: list[dict[str, Any]]
     ) -> list[dict[str, Any]]:
-        """Generate memory-based conversation connections using memory moments"""
+        """Generate memory-based conversation connections using vector store and memory moments"""
 
         connections = []
 
-        if not self.memory_moments:
+        # Extract recent conversation context
+        recent_content = " ".join([msg.get("content", "") for msg in recent_messages[-3:]])
+
+        if not recent_content.strip():
             return connections
 
-        try:
-            # Extract recent conversation context
-            recent_content = " ".join([msg.get("content", "") for msg in recent_messages[-3:]])
+        # Try vector-based memory connections first
+        if self.memory_manager:
+            try:
+                vector_connections = await self._generate_vector_memory_connections(
+                    user_id, recent_content
+                )
+                connections.extend(vector_connections)
+            except Exception as e:
+                logger.debug("Vector memory connections failed: %s", e)
 
-            if not recent_content.strip():
-                return connections
+        # Use memory moments for additional context if available
+        if self.memory_moments:
+            try:
+                # Analyze recent conversation for memory connections
+                memory_connections = (
+                    await self.memory_moments.analyze_conversation_for_memories(
+                        user_id=user_id,
+                        context_id=f"proactive_engagement_{user_id}",
+                        message=recent_content,
+                    )
+                )
 
-            # Enhanced: Use memory moments for authentic memory connections
-            # Always trigger memory-based moments when available
-                try:
-                    # Analyze recent conversation for memory connections
-                    memory_connections = (
-                        await self.memory_moments.analyze_conversation_for_memories(
-                            user_id=user_id,
-                            context_id=f"proactive_engagement_{user_id}",
-                            message=recent_content,
+                # Convert memory connections to engagement prompts
+                for connection in memory_connections[:2]:  # Top 2 connections
+                    # Get a natural callback if available
+                    if hasattr(connection, "source_memory") and hasattr(
+                        connection, "connection_type"
+                    ):
+                        connection_type = getattr(connection, "connection_type", "general")
+
+                        if connection_type == "similar_topic":
+                            prompt = "This conversation reminds me of something we discussed before. Would you like to explore that connection further?"
+                        elif connection_type == "emotional_echo":
+                            prompt = "I sense a familiar emotional resonance here - it echoes something meaningful from our past conversations."
+                        elif connection_type == "personal_growth":
+                            prompt = "This seems to connect to your personal journey that we've touched on before. How has your perspective evolved?"
+                        else:
+                            prompt = "This brings back memories of our previous conversations. There might be a deeper connection here worth exploring."
+
+                        connections.append(
+                            {
+                                "prompt": prompt,
+                                "relevance_score": getattr(
+                                    connection, "connection_strength", 0.7
+                                ),
+                                "memory_context": connection_type,
+                                "memory_connection": connection,
+                            }
                         )
-                    )
 
-                    # Convert memory connections to engagement prompts
-                    for connection in memory_connections[:2]:  # Top 2 connections
-                        # Get a natural callback if available
-                        if hasattr(connection, "source_memory") and hasattr(
-                            connection, "connection_type"
-                        ):
-                            connection_type = getattr(connection, "connection_type", "general")
+            except Exception as memory_error:
+                logger.debug(
+                    "Memory moments connection failed, using simple fallback: %s", memory_error
+                )
 
-                            if connection_type == "similar_topic":
-                                prompt = "This conversation reminds me of something we discussed before. Would you like to explore that connection further?"
-                            elif connection_type == "emotional_echo":
-                                prompt = "I sense a familiar emotional resonance here - it echoes something meaningful from our past conversations."
-                            elif connection_type == "personal_growth":
-                                prompt = "This seems to connect to your personal journey that we've touched on before. How has your perspective evolved?"
-                            else:
-                                prompt = "This brings back memories of our previous conversations. There might be a deeper connection here worth exploring."
+        # If no connections found, create a simple fallback
+        if not connections:
+            connection = {
+                "prompt": "This reminds me of something we talked about before - how do you feel about revisiting that topic?",
+                "relevance_score": 0.5,
+                "memory_context": "previous_conversation",
+            }
+            connections.append(connection)
 
-                            connections.append(
-                                {
-                                    "prompt": prompt,
-                                    "relevance_score": getattr(
-                                        connection, "connection_strength", 0.7
-                                    ),
-                                    "memory_context": connection_type,
-                                    "memory_connection": connection,
-                                }
-                            )
+        return connections
 
-                except Exception as memory_error:
-                    logger.debug(
-                        f"Memory moments connection failed, using simple fallback: {memory_error}"
-                    )
-                    # Fallback to simple connection
-                    connection = {
-                        "prompt": "This reminds me of something we talked about before - how do you feel about revisiting that topic?",
-                        "relevance_score": 0.6,
-                        "memory_context": "previous_conversation",
-                    }
-                    connections.append(connection)
-            else:
-                # Fallback: Simple memory connection
-                connection = {
-                    "prompt": "This reminds me of something we talked about before - how do you feel about revisiting that topic?",
-                    "relevance_score": 0.5,
-                    "memory_context": "previous_conversation",
-                }
-                connections.append(connection)
+    async def _generate_vector_memory_connections(
+        self, user_id: str, recent_content: str
+    ) -> list[dict[str, Any]]:
+        """Generate memory connections using vector similarity search"""
+        connections = []
 
-        except (AttributeError, TypeError, KeyError) as e:
-            logger.warning("Failed to generate memory connections: %s", e)
+        try:
+            # Search for similar conversations in vector store
+            relevant_memories = await self.memory_manager.retrieve_relevant_memories(
+                user_id=user_id,
+                query=recent_content,
+                limit=5
+            )
+
+            for memory in relevant_memories[:3]:  # Top 3 similar memories
+                score = memory.get('score', 0.0)
+                
+                # Only suggest connections for high-similarity memories
+                if score > 0.7:
+                    memory_content = memory.get('content', '')
+                    
+                    # Generate contextual prompts based on memory content
+                    if 'feel' in memory_content.lower() or 'emotion' in memory_content.lower():
+                        prompt = f"This reminds me of when we discussed your feelings about similar topics. How do you feel about it now?"
+                        context_type = "emotional_connection"
+                    elif 'learn' in memory_content.lower() or 'understand' in memory_content.lower():
+                        prompt = f"We've explored similar topics before. What new insights have you gained since then?"
+                        context_type = "learning_connection"
+                    else:
+                        prompt = f"This connects to our previous conversation. Would you like to explore how your thoughts have evolved?"
+                        context_type = "topic_connection"
+                    
+                    connections.append({
+                        "prompt": prompt,
+                        "relevance_score": score,
+                        "memory_context": context_type,
+                        "source_memory": memory_content[:100] + "..." if len(memory_content) > 100 else memory_content
+                    })
+
+        except Exception as e:
+            logger.debug("Vector memory search failed: %s", e)
 
         return connections
 
@@ -1134,7 +1233,7 @@ class ConversationRhythmAnalyzer:
 
 # Convenience function for easy integration
 async def create_proactive_engagement_engine(
-    thread_manager=None, memory_moments=None, emotional_engine=None, personality_profiler=None
+    thread_manager=None, memory_moments=None, emotional_engine=None, personality_profiler=None, memory_manager=None
 ) -> ProactiveConversationEngagementEngine:
     """
     Create and initialize a proactive conversation engagement engine.
@@ -1157,6 +1256,7 @@ async def create_proactive_engagement_engine(
         memory_moments=memory_moments,
         emotional_engine=emotional_engine,
         personality_profiler=personality_profiler,
+        memory_manager=memory_manager,
     )
 
     logger.info("ProactiveConversationEngagementEngine created successfully")

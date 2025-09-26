@@ -17,7 +17,8 @@ async def create_engagement_engine(
     thread_manager: Optional[Any] = None,
     memory_moments: Optional[Any] = None,
     emotional_engine: Optional[Any] = None,
-    personality_profiler: Optional[Any] = None
+    personality_profiler: Optional[Any] = None,
+    memory_manager: Optional[Any] = None
 ) -> Any:
     """
     Factory function to create proactive engagement engine instances.
@@ -28,6 +29,7 @@ async def create_engagement_engine(
         memory_moments: Memory moments system (optional)
         emotional_engine: Emotional context engine (optional)
         personality_profiler: Personality profiler (optional)
+        memory_manager: Vector memory manager (optional)
         
     Returns:
         Engagement engine implementation
@@ -93,7 +95,8 @@ async def create_engagement_engine(
                 thread_manager=components['thread_manager'],
                 memory_moments=components['memory_moments'],
                 emotional_engine=components['emotional_engine'],
-                personality_profiler=components['personality_profiler']
+                personality_profiler=components['personality_profiler'],
+                memory_manager=memory_manager
             )
             
             logger.info("Full engagement engine initialized with available components")
@@ -117,7 +120,8 @@ async def create_engagement_engine(
                 thread_manager=None,
                 memory_moments=None,
                 emotional_engine=None,
-                personality_profiler=None
+                personality_profiler=None,
+                memory_manager=memory_manager
             )
             
             logger.info("Basic engagement engine initialized")
