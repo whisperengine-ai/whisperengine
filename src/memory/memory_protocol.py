@@ -170,7 +170,7 @@ def create_memory_manager(memory_type: str = "vector", **config) -> MemoryManage
                 'collection_name': os.getenv('QDRANT_COLLECTION_NAME', 'chat_memories')
             },
             'embeddings': {
-                'model_name': os.getenv('EMBEDDING_MODEL', ''),  # Use FastEmbed default (BAAI/bge-small-en-v1.5) - no rate limits
+                'model_name': os.getenv('EMBEDDING_MODEL', 'BAAI/bge-small-en-v1.5'),  # Use FastEmbed default (BAAI/bge-small-en-v1.5) - no rate limits
                 'device': os.getenv('EMBEDDING_DEVICE', 'cpu'),
                 'dimension': int(os.getenv('VECTOR_DIMENSION', '384'))
             },

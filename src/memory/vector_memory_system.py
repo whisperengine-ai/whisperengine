@@ -200,6 +200,45 @@ class VectorMemoryStore:
         logger.info(f"VectorMemoryStore initialized: {qdrant_host}:{qdrant_port}, "
                    f"collection={collection_name}, embedding_dim={self.embedding_dimension}")
     
+    def _extract_named_vector(self, point_vector, vector_name: str = "content"):
+        """
+        Extract a specific named vector from Qdrant point vector data.
+        
+        Args:
+            point_vector: Vector data from Qdrant point (must be dict with named vectors)
+            vector_name: Name of the vector to extract (default: "content")
+            
+        Returns:
+            List of floats representing the vector, or None if not found
+        """
+        if point_vector is None:
+            return None
+            
+        # Only handle named vectors format (current correct format)
+        if isinstance(point_vector, dict):
+            return point_vector.get(vector_name)
+        
+        # Log error for unexpected formats
+        logger.error(f"Unexpected vector format: {type(point_vector)} - only dict format supported")
+        return None
+    
+    def _create_named_vectors_dict(self, point_vector):
+        """
+        Create proper named vectors dict from point vector data.
+        
+        Args:
+            point_vector: Vector data from existing point (must be dict with named vectors)
+            
+        Returns:
+            Dict with named vectors structure, or empty dict if invalid
+        """
+        if isinstance(point_vector, dict):
+            # Already in correct named vector format
+            return point_vector
+        else:
+            logger.error(f"Cannot handle vector type {type(point_vector)} - only dict format supported")
+            return {}
+    
     def _get_multi_emotion_payload(self) -> Dict[str, Any]:
         """
         Extract multi-emotion payload from last RoBERTa analysis for storage
@@ -2476,7 +2515,7 @@ class VectorMemoryStore:
                     collection_name=self.collection_name,
                     ids=[point_id],
                     with_payload=True,
-                    with_vectors=True
+                    with_vectors=["content", "emotion", "semantic"]  # ✅ FIXED: Specify named vectors to retrieve
                 )[0]
                 
                 if not existing_point:
@@ -2494,12 +2533,15 @@ class VectorMemoryStore:
                 updated_payload['batch_updated_at'] = datetime.utcnow().isoformat()
                 updated_payload['update_reason'] = update.get('reason', 'batch_update')
                 
-                # Create point with proper vector handling
+                # Create point with proper named vector handling
                 if existing_point.vector:
+                    # Extract and reconstruct named vectors properly
+                    named_vectors = self._create_named_vectors_dict(existing_point.vector)
+                    
                     points_to_update.append(
                         PointStruct(
                             id=point_id,
-                            vector=existing_point.vector,  # ⚠️ TODO: Fix vector type casting
+                            vector=named_vectors,  # type: ignore # ✅ FIXED: Proper named vector structure
                             payload=updated_payload
                         )
                     )
@@ -4051,7 +4093,7 @@ async def test_vector_memory_system():
             'collection_name': 'whisperengine_memory'
         },
         'embeddings': {
-            'model_name': 'snowflake/snowflake-arctic-embed-xs'
+            'model_name': 'BAAI/bge-small-en-v1.5'
         }
     }
     

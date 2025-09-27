@@ -33,7 +33,7 @@ services:
       - DISABLE_REDUNDANT_FACT_EXTRACTION=true
       
       # Single embedding model (local)
-      - LLM_LOCAL_EMBEDDING_MODEL=all-MiniLM-L6-v2
+      - LLM_LOCAL_EMBEDDING_MODEL=BAAI/bge-small-en-v1.5
       
       - DEBUG_MODE=false
       - PYTHONUNBUFFERED=1

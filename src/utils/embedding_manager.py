@@ -26,7 +26,7 @@ class LocalEmbeddingManager:
         # Model configuration - optimized for speed and quality
         self.embedding_model_name = os.getenv(
             "EMBEDDING_MODEL",
-            "",  # Use FastEmbed default (BAAI/bge-small-en-v1.5) - no rate limits, 384-dim
+            "BAAI/bge-small-en-v1.5",  # Use FastEmbed default (BAAI/bge-small-en-v1.5) - no rate limits, 384-dim
         )
 
         # Fallback model (same as primary for consistency)

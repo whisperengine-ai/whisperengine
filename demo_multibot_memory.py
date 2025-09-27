@@ -52,7 +52,7 @@ class MultiBotMemoryQuerier:
         # Search WITHOUT bot_name filtering (global search)
         search_results = memory_manager.vector_store.client.search(
             collection_name=memory_manager.vector_store.collection_name,
-            query_vector=("content", query_embedding),  # 🎯 Use named vector for content search
+            query_vector=models.NamedVector(name="content", vector=query_embedding),  # ✅ FIXED: Named vector format
             query_filter=models.Filter(
                 must=[
                     models.FieldCondition(key="user_id", match=models.MatchValue(value=user_id))
@@ -106,7 +106,7 @@ class MultiBotMemoryQuerier:
         # Search with bot_name filter for specific bots
         search_results = memory_manager.vector_store.client.search(
             collection_name=memory_manager.vector_store.collection_name,
-            query_vector=("content", query_embedding),  # 🎯 Use named vector for content search
+            query_vector=models.NamedVector(name="content", vector=query_embedding),  # ✅ FIXED: Named vector format
             query_filter=models.Filter(
                 must=[
                     models.FieldCondition(key="user_id", match=models.MatchValue(value=user_id)),

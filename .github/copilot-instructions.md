@@ -17,7 +17,7 @@
 
 **UNIVERSAL IDENTITY SYSTEM**: NEW platform-agnostic user identity system in `src/identity/` allows users to interact across Discord, Web UI, and future platforms while maintaining consistent memory and conversations.
 
-**WEB INTERFACE INTEGRATION**: Complete web chat interface (`src/web/simple_chat_app.py`) with real-time WebSocket messaging, multi-bot character selection, and Universal Identity integration. Accessible at http://localhost:8081.
+**WEB INTERFACE INTEGRATION**: Complete web chat interface (`src/web/simple_chat_app.py`) with real-time WebSocket messaging, multi-bot character selection, and Universal Identity integration. Accessible at http://localhost:8080 (Docker deployment) or http://localhost:8081 (standalone).
 
 **PYTHON VIRTUAL ENVIRONMENT**: Always use `.venv/bin/activate` for Python commands:
 ```bash
@@ -35,7 +35,7 @@ python scripts/generate_multi_bot_config.py  # Example: configuration generation
 
 **NO NEO4J**: We don't use Neo4j anymore - everything is vector-native with Qdrant. Delete any Neo4j references, imports, or graph database code.
 
-**DYNAMIC MULTI-BOT SYSTEM**: Bot configurations are auto-discovered from `.env.*` files. No hardcoded bot names - everything is generated dynamically by `scripts/generate_multi_bot_config.py`.
+**DYNAMIC MULTI-BOT SYSTEM**: Bot configurations are auto-discovered from `.env.*` files. No hardcoded bot names - everything is generated dynamically by `scripts/generate_multi_bot_config.py`. Currently active bots: Elena, Marcus, Jake, Dream, Aethys, Ryan, Gabriel, Sophia.
 
 ## Architecture Overview
 
@@ -116,9 +116,10 @@ identity_manager = create_identity_manager(postgres_pool)
 ```
 
 **Infrastructure Versions (Pinned)**:
-- PostgreSQL: `postgres:16.4-alpine` (pinned for stability)
-- Redis: `redis:7.4-alpine` (pinned for stability)  
-- Qdrant: `qdrant/qdrant:v1.15.4` (pinned for vector stability)
+- PostgreSQL: `postgres:16.4-alpine` (pinned for stability) - Port 5433
+- Redis: `redis:7.4-alpine` (pinned for stability) - Port 6380
+- Qdrant: `qdrant/qdrant:v1.15.4` (pinned for vector stability) - Port 6334
+- Web Interface: Available at http://localhost:8080 (Docker) or http://localhost:8081 (standalone)
 
 ### Web Interface Development
 
@@ -131,10 +132,13 @@ identity_manager = create_identity_manager(postgres_pool)
 export POSTGRES_HOST=localhost POSTGRES_PORT=5433 POSTGRES_DB=whisperengine 
 export POSTGRES_USER=whisperengine POSTGRES_PASSWORD=whisperengine123
 
-# Start web interface
+# Start web interface (standalone)
 source .venv/bin/activate
 python src/web/simple_chat_app.py
-# Accessible at http://localhost:8081
+# Accessible at http://localhost:8081 (standalone)
+
+# OR use Docker-based web interface (included in multi-bot)
+# Already running at http://localhost:8080 when using ./multi-bot.sh start all
 ```
 
 **Web UI Features**:
@@ -194,6 +198,72 @@ await memory_manager.store_conversation(
     user_message=user_message, 
     bot_response=bot_response,
     pre_analyzed_emotion_data=emotion_data
+)
+```
+
+**🚨 CRITICAL: Vector Storage Design Patterns**
+
+**ALWAYS use Named Vectors** - Never use single vectors:
+```python
+# ✅ CORRECT: Named vectors for multi-dimensional search
+vectors = {
+    "content": content_embedding,      # Main semantic content (384D)
+    "emotion": emotion_embedding,      # Emotional context (384D)
+    "semantic": semantic_embedding     # Concept/personality context (384D)
+}
+
+point = PointStruct(
+    id=memory.id,
+    vector=vectors,  # Named vectors dict
+    payload=qdrant_payload
+)
+
+# ✅ CORRECT: Query with named vectors
+results = client.search(
+    collection_name=collection_name,
+    query_vector=models.NamedVector(name="content", vector=query_embedding),
+    limit=top_k
+)
+
+# ❌ WRONG: Single vector (legacy format)
+point = PointStruct(id=memory.id, vector=embedding, payload=payload)
+```
+
+**ALWAYS use Bot Segmentation** - Filter by bot_name:
+```python
+# ✅ CORRECT: All operations must filter by bot_name
+must_conditions = [
+    models.FieldCondition(key="user_id", match=models.MatchValue(value=user_id)),
+    models.FieldCondition(key="bot_name", match=models.MatchValue(value=get_normalized_bot_name_from_env()))
+]
+
+# ✅ CORRECT: Store with bot segmentation
+payload = {
+    "user_id": user_id,
+    "bot_name": get_normalized_bot_name_from_env(),  # CRITICAL: Bot isolation
+    "content": content,
+    "memory_type": memory_type
+}
+
+# ❌ WRONG: Missing bot_name segmentation
+payload = {"user_id": user_id, "content": content}  # Will leak across bots!
+```
+
+**Vector Retrieval Patterns** - Handle named vector responses:
+```python
+# ✅ CORRECT: Extract vectors from named vector responses
+def _extract_named_vector(self, point_vector, vector_name: str = "content"):
+    if isinstance(point_vector, dict):
+        return point_vector.get(vector_name)  # Named vector format
+    elif isinstance(point_vector, list):
+        return point_vector  # Legacy single vector
+    return None
+
+# ✅ CORRECT: Use specific named vectors in queries
+scroll_result = client.scroll(
+    collection_name=collection_name,
+    with_vectors=["content"],  # Specify which named vector
+    limit=batch_size
 )
 ```
 
@@ -324,7 +394,7 @@ WhisperEngine implements conversation intelligence through integrated systems:
 ## Character Definition Language (CDL)
 
 **CDL System**: Modern JSON-based character personalities replacing legacy markdown prompts:
-- `characters/examples/*.json` - Character definitions (elena-rodriguez.json, marcus-thompson.json, etc.)
+- `characters/examples/*.json` - Character definitions (elena-rodriguez.json, marcus-thompson.json, jake-sterling.json, dream_of_the_endless.json, aethys-omnipotent-entity.json, ryan-chen.json, gabriel.json, sophia-blake.json)
 - `src/characters/cdl/parser.py` - CDL parser and validator
 - `src/prompts/cdl_ai_integration.py` - Integrates CDL with AI pipeline and emotional intelligence
 - Each character has unique personality, occupation, communication style, and values
@@ -348,6 +418,7 @@ system_prompt = await cdl_integration.create_character_aware_prompt(
 - Defaults to `MEMORY_SYSTEM_TYPE=vector` in `src/core/bot.py`
 - Protocol system (`src/memory/memory_protocol.py`) enables A/B testing
 - **ALWAYS use vector/semantic search before manual Python analysis**
+- **🚨 CRITICAL**: Follow Named Vectors + Bot Segmentation patterns (see Vector Storage Design Patterns above)
 - Memory-triggered moments create long-term relationship continuity
 
 **Key Files**:
@@ -389,7 +460,12 @@ conversation_history = await memory_manager.get_conversation_history(
 ```bash
 ./multi-bot.sh start elena        # Start Elena bot (marine biologist)
 ./multi-bot.sh start marcus       # Start Marcus bot (AI researcher) 
-./multi-bot.sh start marcus-chen  # Start Marcus Chen bot (game developer)
+./multi-bot.sh start jake         # Start Jake bot (game developer)
+./multi-bot.sh start dream        # Start Dream bot (mythological entity)
+./multi-bot.sh start aethys       # Start Aethys bot (omnipotent entity)
+./multi-bot.sh start ryan         # Start Ryan bot (software engineer)
+./multi-bot.sh start gabriel      # Start Gabriel bot (archangel)
+./multi-bot.sh start sophia       # Start Sophia bot (neuroscientist)
 ./multi-bot.sh start all          # Start all configured bots
 ./multi-bot.sh stop               # Stop all bots
 ./multi-bot.sh logs elena         # View Elena's logs
@@ -427,9 +503,41 @@ python demo_vector_emoji_intelligence.py  # Example: testing demos
 **Bot Configuration**: Each bot requires individual environment files:
 - `.env.elena` - Elena Rodriguez (Marine Biologist)
 - `.env.marcus` - Marcus Thompson (AI Researcher)  
-- `.env.marcus-chen` - Marcus Chen (Game Developer)
+- `.env.jake` - Jake Sterling (Game Developer)
 - `.env.dream` - Dream of the Endless (Mythological)
+- `.env.aethys` - Aethys (Omnipotent Entity)
+- `.env.ryan` - Ryan Chen (Software Engineer)
+- `.env.gabriel` - Gabriel (Archangel)
+- `.env.sophia` - Sophia Blake (Neuroscientist)
 - Each file needs unique `DISCORD_BOT_TOKEN` and `HEALTH_CHECK_PORT`
+
+## Current System Status
+
+**Active Infrastructure** (as of current deployment):
+- ✅ **Multi-Bot System**: 8+ character bots running simultaneously (Elena, Marcus, Jake, Dream, Aethys, Ryan, Gabriel, Sophia)
+- ✅ **Web Interface**: Real-time chat at http://localhost:8080 with cross-platform identity
+- ✅ **Vector Memory**: Qdrant-powered with 384D embeddings, named vector support, bot-specific isolation
+- ✅ **Universal Identity**: Platform-agnostic user management with account discovery
+- ✅ **CDL Character System**: JSON-based personality definitions, integrated AI identity filtering
+- ✅ **Health Monitoring**: Container health checks, graceful shutdown, performance monitoring
+
+**Tested Working Features**:
+- Multi-bot Discord conversations with persistent memory
+- Real-time web chat interface with bot selection
+- Vector-based semantic memory retrieval across conversations
+- CDL-driven character personality responses
+- Bot-specific memory isolation (Elena's memories stay with Elena)
+- Cross-platform user identity (Discord users can use web interface)
+- Health endpoints for container orchestration
+- Template-based configuration management
+
+**Development Commands Verified Working**:
+```bash
+./multi-bot.sh start all     # ✅ Starts all 8+ bots + infrastructure
+./multi-bot.sh status        # ✅ Shows container health status
+./multi-bot.sh logs elena    # ✅ Real-time bot logs
+http://localhost:8080        # ✅ Web interface with real-time chat
+```
 
 ## Phase 4 Integration
 
@@ -445,17 +553,25 @@ python demo_vector_emoji_intelligence.py  # Example: testing demos
 ## Handler System
 
 **Modular Handler Architecture**: All Discord commands use handler classes in `src/handlers/`:
-- `AdminCommandHandlers` - Admin operations and backups
-- `MemoryCommandHandlers` - Memory system commands
-- `VoiceCommandHandlers` - Voice functionality
+- `BotEventHandlers` - Core Discord event handling
+- `HelpCommandHandlers` - Help system and command documentation
 - `StatusCommandHandlers` - Health and status monitoring
-- `MultiEntityCommandHandlers` - Character management
-- `CDLTestCommands` - Character definition testing
+- `VoiceCommandHandlers` - Voice functionality
+- `PrivacyCommandHandlers` - Privacy and data management
 - `MonitoringCommands` - System monitoring and performance
+- `PerformanceCommands` - Performance analysis and optimization
+- `LLMToolCommandHandlers` - LLM-powered tool commands (conditionally enabled)
+- `LLMSelfMemoryHandlers` - Self-memory analysis commands (conditionally enabled)
+- `WebSearchCommandHandlers` - Web search integration (available)
+
+**Currently Disabled** (over-engineered or obsolete):
+- `AdminCommandHandlers` - Disabled (over-engineered)
+- `MemoryCommandHandlers` - Disabled (obsolete API)
+- `CDLTestCommands` - Disabled (dev testing only)
 
 **Handler Registration Pattern**:
 ```python
-# In src/main.py ModularBotManager
+# In src.main.py ModularBotManager
 handler = HandlerClass(bot, memory_manager, llm_client)
 await handler.register_commands()
 ```
@@ -519,6 +635,15 @@ memories = await memory_manager.retrieve_relevant_memories(
 - Feature flags must default to "true" in development (we're in alpha - no production users)
 - Integration testing required before marking features "complete"
 - Document integration points, not just implementation files
+
+**🚨 CRITICAL: Vector Storage Compliance** - ALL vector operations must follow these patterns:
+- **ALWAYS use Named Vectors**: Never single vector format - use `{"content": embedding}` structure
+- **ALWAYS use Bot Segmentation**: Every payload must include `bot_name` for isolation
+- **ALWAYS extract with helpers**: Use `_extract_named_vector()` when retrieving vectors
+- **ALWAYS query with NamedVector**: Use `models.NamedVector(name="content", vector=embedding)`
+- **NEVER bypass bot isolation**: All searches must filter by `bot_name` + `user_id`
+- Vector retrieval code must handle dictionary format from Qdrant named vectors
+- When in doubt, check `src/memory/vector_memory_system.py` for reference patterns
 
 ## Key Directories
 
