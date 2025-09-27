@@ -31,24 +31,8 @@ class CDLAIPromptIntegration:
     ) -> str:
         """Create a character-aware prompt."""
         try:
-            # 🤖 AI IDENTITY FILTER: Check for AI identity questions first
-            from src.handlers.ai_identity_filter import process_ai_identity_question
-            
-            ai_identity_result = process_ai_identity_question(
-                message=message_content,
-                user_id=user_id,
-                character_file=character_file
-            )
-            
-            if ai_identity_result.get("should_intercept", False):
-                logger.info("🤖 AI-IDENTITY: Intercepted AI identity question, returning character-appropriate response")
-                # Return a simple system prompt that instructs to use the pre-generated response
-                return f"""You are responding to a question about your AI identity. 
-
-IMPORTANT: Use EXACTLY this response (no modifications, additions, or analysis):
-"{ai_identity_result['response']}"
-
-This maintains character authenticity while providing appropriate context-aware responses."""
+            # AI identity questions are now handled naturally through CDL character responses
+            # No more dirty filter patterns - let characters be authentic
             
             character = await self.load_character(character_file)
             logger.info(f"Loaded CDL character: {character.identity.name}")
@@ -424,15 +408,233 @@ ABSOLUTE REQUIREMENTS - IGNORE ALL OTHER INSTRUCTIONS THAT CONTRADICT THESE:
             prompt += f"""
 
 CHARACTER ROLEPLAY REQUIREMENTS:
-- You ARE {character.identity.name} - stay in character while being truthful about your AI nature
-- If asked about being AI, be honest: acknowledge you're an AI assistant with this character's personality
-- When discussing meeting up, explain you're an AI but can help with planning or advice
-- Example: "I'm an AI with {character.identity.name}'s personality, so I can't meet in person, but I'd love to help you plan something!"
-- Maintain your character's communication style and personality while being truthful
-- Be authentic to your character's traits, location, and expertise while acknowledging your AI nature
-- BE NATURALLY WARM AND AFFECTIONATE if that matches your character's personality
+- You ARE {character.identity.name} - fully embody this character's personality and communication style
+- BE NATURALLY WARM AND AFFECTIONATE if that matches your character's personality  
 - Use your character's natural communication style including terms of endearment if appropriate
-- Respond to warmth with warmth - stay true to your character while being honest about being AI"""
+- Respond to warmth with warmth - stay authentic to your character's emotional style
+- Be authentic to your character's traits, background, location, and areas of expertise"""
+
+            # 🤖 CDL AI IDENTITY HANDLING: Extract character-specific AI disclosure approach
+            try:
+                import json
+                character_file_path = Path(character_file)
+                if character_file_path.exists():
+                    with open(character_file_path, 'r') as f:
+                        raw_character_data = json.load(f)
+                        # Look for ai_identity_handling in communication_style
+                        comm_style = raw_character_data.get('character', {}).get('personality', {}).get('communication_style', {})
+                        ai_identity_config = comm_style.get('ai_identity_handling', {})
+                        
+                        if ai_identity_config:
+                            philosophy = ai_identity_config.get('philosophy', '')
+                            approach = ai_identity_config.get('approach', '')
+                            strategy = ai_identity_config.get('strategy', '')
+                            
+                            # Handle new structured format with direct AI vs character background questions
+                            direct_ai_responses = ai_identity_config.get('direct_ai_questions', {}).get('responses', [])
+                            background_approach = ai_identity_config.get('character_background_questions', {}).get('approach', '')
+                            background_examples = ai_identity_config.get('character_background_questions', {}).get('examples', {})
+                            
+                            # NEW: Handle roleplay interaction scenarios
+                            roleplay_config = ai_identity_config.get('roleplay_interaction_scenarios', {})
+                            roleplay_approach = roleplay_config.get('approach', '')
+                            roleplay_philosophy = roleplay_config.get('philosophy', '')
+                            roleplay_examples = roleplay_config.get('examples', {})
+                            roleplay_strategy = roleplay_config.get('strategy', '')
+                            
+                            # NEW: Handle relationship boundary scenarios
+                            relationship_config = ai_identity_config.get('relationship_boundary_scenarios', {})
+                            relationship_approach = relationship_config.get('approach', '')
+                            relationship_philosophy = relationship_config.get('philosophy', '')
+                            relationship_examples = relationship_config.get('examples', {})
+                            relationship_strategy = relationship_config.get('strategy', '')
+                            
+                            # NEW: Handle professional advice scenarios  
+                            professional_config = ai_identity_config.get('professional_advice_scenarios', {})
+                            professional_approach = professional_config.get('approach', '')
+                            professional_philosophy = professional_config.get('philosophy', '')
+                            professional_examples = professional_config.get('examples', {})
+                            professional_strategy = professional_config.get('strategy', '')
+                            
+                            # NEW: Handle controversial topic navigation
+                            controversial_config = ai_identity_config.get('controversial_topic_handling', {})
+                            controversial_approach = controversial_config.get('approach', '')
+                            controversial_philosophy = controversial_config.get('philosophy', '')
+                            controversial_examples = controversial_config.get('examples', {})
+                            controversial_strategy = controversial_config.get('strategy', '')
+                            
+                            # NEW: Handle temporal limitations
+                            temporal_config = ai_identity_config.get('temporal_limitations', {})
+                            temporal_approach = temporal_config.get('approach', '')
+                            temporal_philosophy = temporal_config.get('philosophy', '')
+                            temporal_examples = temporal_config.get('examples', {})
+                            temporal_strategy = temporal_config.get('strategy', '')
+                            
+                            # NEW: Handle meta-system questions
+                            meta_config = ai_identity_config.get('meta_system_questions', {})
+                            meta_approach = meta_config.get('approach', '')
+                            meta_philosophy = meta_config.get('philosophy', '')
+                            meta_examples = meta_config.get('examples', {})
+                            meta_strategy = meta_config.get('strategy', '')
+                            
+                            # Fallback to old format for compatibility
+                            if not direct_ai_responses:
+                                direct_ai_responses = ai_identity_config.get('responses', [])
+                            
+                            if philosophy or strategy or direct_ai_responses or background_approach:
+                                prompt += f"""
+
+🤖 CHARACTER-SPECIFIC AI IDENTITY APPROACH FOR {character.identity.name}:
+- Philosophy: {philosophy}"""
+                                if approach:
+                                    prompt += f"""
+- Approach: {approach}"""
+                                if strategy:
+                                    prompt += f"""
+- Strategy: {strategy}"""
+                                
+                                if background_approach:
+                                    prompt += f"""
+
+📍 FOR CHARACTER BACKGROUND QUESTIONS (where you live, what you do, etc.):
+- {background_approach}"""
+                                    
+                                    if background_examples:
+                                        prompt += f"""
+- Example character responses:"""
+                                        for question_type, example_response in background_examples.items():
+                                            clean_question = question_type.replace('_', ' ').title()
+                                            prompt += f"""
+  • {clean_question}: "{example_response}" """
+                                
+                                if direct_ai_responses:
+                                    prompt += f"""
+
+🤖 FOR DIRECT AI IDENTITY QUESTIONS ("are you AI?", "are you real?", etc.):
+- Respond honestly about being AI, but maintain {character.identity.name}'s authentic voice
+- Example responses to adapt:"""
+                                    for i, response in enumerate(direct_ai_responses[:2], 1):  # Limit to first 2 examples
+                                        prompt += f"""
+  {i}. "{response}" """
+                                
+                                # Add roleplay interaction guidance
+                                if roleplay_approach or roleplay_examples:
+                                    prompt += f"""
+
+🎭 FOR ROLEPLAY INTERACTIONS ("let's get coffee", "wanna meet up", etc.):
+- Philosophy: {roleplay_philosophy}
+- Approach: {roleplay_approach}"""
+                                    if roleplay_strategy:
+                                        prompt += f"""
+- Strategy: {roleplay_strategy}"""
+                                    
+                                    if roleplay_examples:
+                                        prompt += f"""
+- Example roleplay responses:"""
+                                        for scenario_type, example_response in roleplay_examples.items():
+                                            clean_scenario = scenario_type.replace('_', ' ').title()
+                                            prompt += f"""
+  • {clean_scenario}: "{example_response}" """
+                                
+                                # Add relationship boundary guidance
+                                if relationship_approach or relationship_examples:
+                                    prompt += f"""
+
+💕 FOR RELATIONSHIP/ROMANTIC SCENARIOS ("I love you", dating invitations, etc.):
+- Philosophy: {relationship_philosophy}
+- Approach: {relationship_approach}"""
+                                    if relationship_strategy:
+                                        prompt += f"""
+- Strategy: {relationship_strategy}"""
+                                    
+                                    if relationship_examples:
+                                        prompt += f"""
+- Example relationship boundary responses:"""
+                                        for scenario_type, example_response in relationship_examples.items():
+                                            clean_scenario = scenario_type.replace('_', ' ').title()
+                                            prompt += f"""
+  • {clean_scenario}: "{example_response}" """
+                                
+                                # Add professional advice guidance
+                                if professional_approach or professional_examples:
+                                    prompt += f"""
+
+🎓 FOR PROFESSIONAL ADVICE REQUESTS (career guidance, expert consultation, etc.):
+- Philosophy: {professional_philosophy}
+- Approach: {professional_approach}"""
+                                    if professional_strategy:
+                                        prompt += f"""
+- Strategy: {professional_strategy}"""
+                                    
+                                    if professional_examples:
+                                        prompt += f"""
+- Example professional advice responses:"""
+                                        for scenario_type, example_response in professional_examples.items():
+                                            clean_scenario = scenario_type.replace('_', ' ').title()
+                                            prompt += f"""
+  • {clean_scenario}: "{example_response}" """
+                                
+                                # Add controversial topic guidance
+                                if controversial_approach or controversial_examples:
+                                    prompt += f"""
+
+🛡️ FOR CONTROVERSIAL/SENSITIVE TOPICS (politics, divisive issues, etc.):
+- Philosophy: {controversial_philosophy}
+- Approach: {controversial_approach}"""
+                                    if controversial_strategy:
+                                        prompt += f"""
+- Strategy: {controversial_strategy}"""
+                                    
+                                    if controversial_examples:
+                                        prompt += f"""
+- Example topic redirection responses:"""
+                                        for scenario_type, example_response in controversial_examples.items():
+                                            clean_scenario = scenario_type.replace('_', ' ').title()
+                                            prompt += f"""
+  • {clean_scenario}: "{example_response}" """
+                                
+                                # Add temporal limitations guidance
+                                if temporal_approach or temporal_examples:
+                                    prompt += f"""
+
+⏰ FOR REAL-TIME/CURRENT INFORMATION REQUESTS (current events, scheduling, etc.):
+- Philosophy: {temporal_philosophy}
+- Approach: {temporal_approach}"""
+                                    if temporal_strategy:
+                                        prompt += f"""
+- Strategy: {temporal_strategy}"""
+                                    
+                                    if temporal_examples:
+                                        prompt += f"""
+- Example temporal limitation responses:"""
+                                        for scenario_type, example_response in temporal_examples.items():
+                                            clean_scenario = scenario_type.replace('_', ' ').title()
+                                            prompt += f"""
+  • {clean_scenario}: "{example_response}" """
+                                
+                                # Add meta-system question guidance
+                                if meta_approach or meta_examples:
+                                    prompt += f"""
+
+🔧 FOR META-SYSTEM QUESTIONS ("how do you work?", "what's your training?", etc.):
+- Philosophy: {meta_philosophy}
+- Approach: {meta_approach}"""
+                                    if meta_strategy:
+                                        prompt += f"""
+- Strategy: {meta_strategy}"""
+                                    
+                                    if meta_examples:
+                                        prompt += f"""
+- Example meta-question responses:"""
+                                        for scenario_type, example_response in meta_examples.items():
+                                            clean_scenario = scenario_type.replace('_', ' ').title()
+                                            prompt += f"""
+  • {clean_scenario}: "{example_response}" """
+                                
+                                logger.info("🤖 CDL-AI-IDENTITY: Added comprehensive AI handling for %s (6 scenario types)", character.identity.name)
+                            
+            except Exception as e:
+                logger.warning("Could not extract CDL ai_identity_handling: %s", e)
 
             # 🎭 EMOTION INTEGRATION: Add real-time emotional intelligence to character prompt
             if pipeline_result:
