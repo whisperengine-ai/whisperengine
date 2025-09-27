@@ -85,7 +85,7 @@ docker-compose restart whisperengine
 - **Phase 4 Human-Like Intelligence** - Advanced conversation adaptation and emotional awareness
 - **🚀 4-Tier Hierarchical Memory** - 50-200x performance improvement with intelligent storage
 - **Multi-Modal Support** - Text, voice, and image processing
-- **Sophisticated Memory** - ChromaDB vector memory + PostgreSQL persistence + Redis caching
+- **Sophisticated Memory** - Qdrant vector memory + PostgreSQL persistence + Redis caching
 - **Personality Templates** - Multiple pre-built AI personalities with hot-reload
 - **Enterprise Ready** - Production-grade Docker deployment with standard components
 - **Local & Cloud LLM Support** - Works with LM Studio, Ollama, OpenAI, OpenRouter, and more

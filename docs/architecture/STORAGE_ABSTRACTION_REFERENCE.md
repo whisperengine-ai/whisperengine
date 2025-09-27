@@ -32,7 +32,7 @@ WhisperEngine's **Storage Abstraction Layer** provides a unified interface for a
 ┌─────────────────────┴───────────────────────────────────────┐
 │              Storage Backends                               │
 │  ┌─────────────┐ ┌─────────────┐ ┌─────────────┐          │
-│  │ SQLite      │ │ PostgreSQL  │ │ ChromaDB    │   ...    │
+│  │ SQLite      │ │ PostgreSQL  │ │ Qdrant      │   ...    │
 │  │ Redis       │ │ Neo4j       │ │ Memory      │          │
 │  └─────────────┘ └─────────────┘ └─────────────┘          │
 └─────────────────────────────────────────────────────────────┘
@@ -149,9 +149,9 @@ class VectorDatabaseManager:
 #### **Implementation Mapping**
 | **Deployment Mode** | **Backend** | **Manager Class** | **Connection** |
 |---------------------|-------------|-------------------|----------------|
-| Desktop | Local ChromaDB | `LocalChromaDBManager` | Embedded PersistentClient |
-| Docker Compose | HTTP ChromaDB | `HTTPChromaDBManager` | HTTP client to container |
-| Kubernetes | Distributed ChromaDB | `DistributedChromaDBManager` | Load-balanced HTTP clients |
+| Desktop | Local Qdrant | `LocalQdrantManager` | Embedded QdrantClient |
+| Docker Compose | HTTP Qdrant | `HTTPQdrantManager` | HTTP client to container |  
+| Kubernetes | Distributed Qdrant | `DistributedQdrantManager` | Load-balanced HTTP clients |
 
 #### **Collection Strategy**
 ```python
@@ -346,7 +346,7 @@ Users can override automatic detection:
 ```bash
 # Force specific storage backends
 WHISPERENGINE_DATABASE_TYPE=sqlite
-WHISPERENGINE_VECTOR_DB_TYPE=local_chromadb
+WHISPERENGINE_VECTOR_DB_TYPE=local_qdrant
 WHISPERENGINE_CACHE_TYPE=memory
 WHISPERENGINE_GRAPH_DB_TYPE=disabled
 
@@ -362,7 +362,7 @@ REDIS_PORT=6379
 REDIS_DB=0
 REDIS_PASSWORD=redis_password
 
-CHROMADB_HOST=custom-chromadb.example.com
+QDRANT_HOST=custom-qdrant.example.com
 CHROMADB_PORT=8000
 
 NEO4J_HOST=custom-neo4j.example.com

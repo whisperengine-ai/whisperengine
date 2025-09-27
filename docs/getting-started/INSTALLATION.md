@@ -7,7 +7,7 @@ This comprehensive guide covers detailed installation, configuration, troublesho
 ### System Requirements
 - **Python 3.8+** (3.9+ recommended)
 - **8GB+ RAM** (for local LLM models)
-- **2GB+ free storage** (for ChromaDB data and backups)
+- **2GB+ free storage** (for Qdrant vector data and backups)
 - **Internet connection** (for Discord and cloud AI services)
 
 ### Platform Support
@@ -15,9 +15,22 @@ This comprehensive guide covers detailed installation, configuration, troublesho
 - ✅ **macOS** (Intel & Apple Silicon)
 - ✅ **Linux** (Ubuntu, Debian, CentOS, etc.)
 
-## 🚀 Installation Steps
+## 🚀 Installation #### 4. Memory/Qdrant Issues
 
-### 1. Install Python Dependencies
+**Symptoms**: Memory commands fail, can't store conversations, vector search errors
+
+**Solutions**:
+```bash
+# Check Qdrant container health
+docker-compose exec qdrant curl http://localhost:6333/health
+
+# Check Qdrant collections
+curl http://localhost:6333/collections
+
+# Reset Qdrant data (⚠️ This deletes all memories!)
+docker-compose down
+docker volume rm whisperengine_qdrant-data
+docker-compose up -d1. Install Python Dependencies
 
 ```bash
 # Clone the repository
@@ -206,7 +219,7 @@ LLM_SUPPORTS_VISION=false    # Set to true if using vision model
 LLM_VISION_MAX_IMAGES=5
 
 # Data paths (will be created automatically)
-CHROMADB_PATH=./chromadb_data
+QDRANT_COLLECTION_NAME=whisperengine_memory
 BACKUP_PATH=./backups
 
 # Logging
@@ -225,7 +238,11 @@ LLM_MODEL_NAME=llama3.2:3b
 # LLM_MODEL_NAME=llava:latest      # For vision support
 
 # Data paths
-CHROMADB_PATH=./chromadb_data
+OPENAI_API_KEY=your_openai_api_key_here
+LLM_MODEL_NAME=gpt-4o-mini
+
+# Data paths
+QDRANT_COLLECTION_NAME=whisperengine_memory
 BACKUP_PATH=./backups
 
 # Logging
@@ -246,7 +263,7 @@ LLM_MODEL_NAME=anthropic/claude-3.5-sonnet
 # LLM_MODEL_NAME=google/gemini-pro-1.5       # Multimodal
 
 # Data paths
-CHROMADB_PATH=./chromadb_data
+QDRANT_COLLECTION_NAME=whisperengine_memory
 BACKUP_PATH=./backups
 
 # Logging

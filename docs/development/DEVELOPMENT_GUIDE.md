@@ -25,7 +25,7 @@ python run.py
 - ✅ Easy dependency management
 
 **How it works:**
-- Infrastructure services (PostgreSQL, Redis, ChromaDB) run in containers
+- Infrastructure services (PostgreSQL, Redis, Qdrant) run in containers
 - Bot code runs natively on your machine
 - Bot connects to containerized services via localhost
 
@@ -64,7 +64,7 @@ docker-compose -f docker-compose.yml -f docker-compose.dev.yml up
 | File | Purpose | Bot Location | Service Hosts |
 |------|---------|--------------|---------------|
 | `.env.development` | Native bot development | Host machine | `localhost` |
-| `.env.production` | Containerized deployment | Container | `redis`, `postgres`, `chromadb` |
+| `.env.production` | Containerized deployment | Container | `redis`, `postgres`, `qdrant` |
 | `.env` | Active configuration | Auto-detected | Auto-selected |
 
 ## 🔧 **Environment Auto-Detection**
@@ -131,8 +131,8 @@ docker-compose exec redis redis-cli ping
 # PostgreSQL
 docker-compose exec postgres pg_isready -U bot_user
 
-# ChromaDB
-curl http://localhost:8000/api/v1/heartbeat
+# Qdrant Vector Database
+curl http://localhost:6333/health
 
 # All at once
 python env_manager.py --mode development --info
@@ -180,8 +180,8 @@ docker-compose exec postgres psql -U bot_user -d discord_bot
 # Check Redis
 docker-compose exec redis redis-cli
 
-# View ChromaDB collections
-curl http://localhost:8000/api/v1/collections
+# View Qdrant collections
+curl http://localhost:6333/collections
 ```
 
 ### **Troubleshooting:**
@@ -189,7 +189,7 @@ curl http://localhost:8000/api/v1/collections
 **"Connection refused" errors:**
 - Check if services are running: `docker-compose ps`
 - Verify correct .env file is loaded
-- Check port conflicts: `lsof -i :6379` (Redis), `:5432` (PostgreSQL), `:8000` (ChromaDB)
+- Check port conflicts: `lsof -i :6379` (Redis), `:5432` (PostgreSQL), `:6333` (Qdrant)
 
 **Import errors:**
 - Ensure virtual environment is activated

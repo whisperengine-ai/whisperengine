@@ -26,12 +26,13 @@ Welcome to the WhisperEngine documentation hub. This directory contains comprehe
 
 ### **Available Characters**
 - **Elena Rodriguez** - Marine biologist passionate about ocean conservation
-- **Dr. Marcus Thompson** - AI researcher exploring technology's impact
-- **Marcus Chen** - Game developer and tech enthusiast  
-- **Gabriel** - British gentleman with refined tastes
-- **Dream of the Endless** - Mythological character from Sandman
-- **Sophia Blake** - Creative artist with emotional depth
-- **Jake Sterling** - Environmental activist and outdoor guide
+- **Dr. Marcus Thompson** - AI researcher exploring technology's impact  
+- **Jake Sterling** - Game developer and tech enthusiast
+- **Ryan Chen** - Software engineer with analytical mindset
+- **Gabriel** - British gentleman with refined tastes and philosophical insights
+- **Dream of the Endless** - Mythological character with otherworldly wisdom
+- **Sophia Blake** - Neuroscientist with creative and emotional depth
+- **Aethys** - Omnipotent entity with cosmic perspective
 
 ## 🏗️ Architecture & Development
 
@@ -63,16 +64,16 @@ Welcome to the WhisperEngine documentation hub. This directory contains comprehe
 ## 🧠 AI Features
 
 ### **Core AI Systems**
-- **[Vector Memory System](ai-systems/MEMORY_SYSTEM_README.md)** - Vector memory deep dive
-- **[Emotion Analysis](ai-features/)** - Emotional intelligence systems
-- **[Conversation Management](ai-systems/)** - Advanced conversation handling
-- **[LLM Integration](ai-systems/)** - Language model integration patterns
+- **[Vector Memory System](memory/MEMORY_ARCHITECTURE_V2.md)** - Qdrant-based vector memory architecture
+- **[Emotion Analysis](ai-systems/ADVANCED_EMOTIONAL_INTELLIGENCE.md)** - Vector-based emotional intelligence systems
+- **[Conversation Management](ai-systems/CONCURRENT_CONVERSATION_INTEGRATION.md)** - Advanced conversation handling
+- **[LLM Integration](architecture/LLM_STRATEGY.md)** - Multi-provider language model integration patterns
 
 ### **Advanced Features**
-- **[Voice Integration](voice/)** - Voice chat capabilities
-- **[Web Search](ai-features/)** - Web search integration
-- **[Multi-Modal AI](ai-features/)** - Text, image, and voice processing
-- **[Proactive Engagement](ai-features/)** - AI-initiated conversations
+- **[Web Interface](development/WEB_CHAT_INTERFACE_PLAN.md)** - Real-time web chat with Universal Identity
+- **[Universal Identity System](../src/identity/universal_identity.py)** - Cross-platform user identity management
+- **[Multi-Bot Architecture](multi-bot/MULTI_BOT_SETUP.md)** - Multiple character deployment
+- **[Named Vector Operations](memory/MEMORY_ARCHITECTURE_V2.md)** - Advanced vector search and storage
 
 ## 📊 Research & Analysis
 
@@ -101,9 +102,9 @@ Welcome to the WhisperEngine documentation hub. This directory contains comprehe
 ## 🔧 Configuration & Setup
 
 ### **Environment Setup**
-- **[Environment Configuration](environment/)** - Environment variables and settings
-- **[Database Setup](database/)** - PostgreSQL, Redis, and Qdrant configuration
-- **[LLM Provider Setup](configuration/)** - OpenAI, Anthropic, OpenRouter configuration
+- **[API Key Configuration](configuration/API_KEY_CONFIGURATION.md)** - OpenRouter, Anthropic, OpenAI, Ollama setup
+- **[Database Setup](../vector_memory_data_architecture.md)** - Qdrant, PostgreSQL, and Redis configuration
+- **[LLM Provider Setup](configuration/)** - Multi-provider LLM configuration
 
 ### **Migration & Maintenance**
 - **[Migration Guides](migration/)** - System migration procedures
@@ -160,8 +161,8 @@ This documentation is actively maintained and updated. If you find broken links,
 
 ---
 
-**Last Updated**: September 26, 2025  
-**Documentation Version**: 2.0  
-**WhisperEngine Version**: Alpha Development
+**Last Updated**: September 27, 2025  
+**Documentation Version**: 2.1  
+**WhisperEngine Version**: Alpha Development (Multi-Bot + Web Interface)
 
 *For the most up-to-date information, check our GitHub repository and Discord community.*

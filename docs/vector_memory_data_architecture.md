@@ -95,12 +95,12 @@ The `scripts/restore_qdrant.sh` script handles recovery:
 
 ## Migrating from Previous Systems
 
-### ChromaDB to Qdrant Migration
-A specialized migration script `scripts/migrate_to_vector_memory.py` handles:
-1. Reading all memory data from ChromaDB
-2. Preserving embeddings and metadata
-3. Restructuring for Qdrant's data model
-4. Validating migration success
+### Legacy ChromaDB to Qdrant Migration
+The migration from ChromaDB to Qdrant vector memory has been completed. All memory data now uses:
+1. Qdrant collections with named vectors (content, emotion, semantic)
+2. FastEmbed local embeddings with sentence-transformers/all-MiniLM-L6-v2  
+3. Bot-specific memory segmentation and isolation
+4. Advanced vector similarity search with performance optimizations
 
 ## Monitoring and Maintenance
 

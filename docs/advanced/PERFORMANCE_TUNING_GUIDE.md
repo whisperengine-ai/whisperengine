@@ -102,7 +102,7 @@ LLM_MAX_TOKENS_CHAT=8192           # Extended token limits
 CONVERSATION_CACHE_TIMEOUT=1800     # 30-minute cache
 MEMORY_THREAD_POOL_SIZE=8           # High concurrency
 EMBEDDING_BATCH_SIZE=500            # Large batch processing
-CHROMADB_CONNECTION_POOL_SIZE=20    # Database optimization
+QDRANT_CONNECTION_POOL_SIZE=20      # Database optimization
 ```
 
 **Expected Performance:**
@@ -435,8 +435,18 @@ max_connections = 100               # Match your connection pool
 
 #### **ChromaDB Vector Database Optimization**
 ```bash
-# .env configuration for ChromaDB performance
-CHROMADB_HOST=localhost             # Use localhost for minimal latency
+#### **Qdrant Vector Database Optimization**
+
+```bash  
+# .env configuration for Qdrant performance
+QDRANT_HOST=localhost               # Use localhost for minimal latency
+QDRANT_PORT=6333                   # Standard HTTP port
+QDRANT_COLLECTION_NAME=whisperengine_memory
+QDRANT_VECTOR_SIZE=384             # sentence-transformers/all-MiniLM-L6-v2
+VECTOR_DIMENSION=384               # Match embedding model
+EMBEDDING_MODEL=sentence-transformers/all-MiniLM-L6-v2  # High-quality local model
+EMBEDDING_DEVICE=cpu               # Use GPU if available
+FASTEMBED_CACHE_PATH=/root/.cache/fastembed  # Persistent cache
 USE_EXTERNAL_EMBEDDINGS=false       # Local embeddings are faster
 EMBEDDING_BATCH_SIZE=100            # Batch requests for efficiency
 ```
@@ -864,7 +874,7 @@ LLM_FACTS_MODEL_NAME=gpt-3.5-turbo    # Cheaper model for facts
 ### **Database and Cache Optimization**
 - [ ] Configure PostgreSQL connection pools appropriately
 - [ ] Verify Redis cache is working with reasonable timeouts
-- [ ] ChromaDB automatically uses HTTP client for optimal performance
+- [ ] Qdrant automatically uses HTTP client for optimal performance with named vector support
 - [ ] Disable `ENABLE_GRAPH_DATABASE` unless specifically needed
 
 ### **Advanced AI Features Management**
