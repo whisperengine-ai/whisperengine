@@ -76,6 +76,48 @@ class EmotionAnalysisResult:
     vector_similarity: float = 0.0
     embedding_confidence: float = 0.0
     pattern_match_score: float = 0.0
+    
+    @property
+    def mixed_emotions(self) -> List[Tuple[str, float]]:
+        """
+        🎭 MIXED EMOTION ENHANCEMENT: Return significant secondary emotions
+        
+        Returns emotions above 20% threshold (excluding primary) as mixed emotions.
+        This allows for richer emotional representation like "joy with surprise" or "anger with sadness".
+        """
+        if not self.all_emotions:
+            return []
+        
+        # Get emotions above 20% threshold, excluding primary emotion
+        significant_emotions = [
+            (emotion, score) for emotion, score in self.all_emotions.items()
+            if score >= 0.20 and emotion != self.primary_emotion
+        ]
+        
+        # Sort by score descending
+        return sorted(significant_emotions, key=lambda x: x[1], reverse=True)[:3]  # Max 3 mixed emotions
+    
+    @property
+    def emotion_description(self) -> str:
+        """
+        🎭 MIXED EMOTION ENHANCEMENT: Create natural language description
+        
+        Returns descriptions like:
+        - "joy" (single emotion)
+        - "joy with surprise" (mixed emotions)
+        - "anger with sadness and frustration" (complex mix)
+        """
+        if not self.mixed_emotions:
+            return self.primary_emotion
+        
+        mixed_names = [emotion for emotion, _ in self.mixed_emotions]
+        if len(mixed_names) == 1:
+            return f"{self.primary_emotion} with {mixed_names[0]}"
+        elif len(mixed_names) == 2:
+            return f"{self.primary_emotion} with {mixed_names[0]} and {mixed_names[1]}"
+        else:
+            others = ", ".join(mixed_names[:-1])
+            return f"{self.primary_emotion} with {others}, and {mixed_names[-1]}"
 
 
 class EnhancedVectorEmotionAnalyzer:
@@ -261,11 +303,17 @@ class EnhancedVectorEmotionAnalyzer:
                 pattern_match_score=vector_emotions.get('pattern_match_score', 0.0)
             )
             
+            # 🎭 MIXED EMOTION ENHANCEMENT: Log mixed emotions if present
+            if result.mixed_emotions:
+                mixed_desc = ", ".join([f"{emotion} ({score:.2f})" for emotion, score in result.mixed_emotions])
+                logger.info(f"  - Mixed emotions detected: {mixed_desc}")
+                logger.info(f"  - Complex emotion description: '{result.emotion_description}'")
+            
             logger.info(
                 "🎭 ENHANCED EMOTION ANALYSIS COMPLETE for user %s: "
                 "%s (confidence: %.3f, intensity: %.3f) "
                 "in %dms",
-                user_id, primary_emotion, confidence, intensity, analysis_time_ms
+                user_id, result.emotion_description, confidence, intensity, analysis_time_ms
             )
             
             return result
@@ -730,6 +778,10 @@ class EnhancedVectorEmotionAnalyzer:
                 "emotional_trajectory": emotion_result.emotional_trajectory,
                 "context_emotions": emotion_result.context_emotions,
                 "analysis_method": "enhanced_vector_native",
+                
+                # 🎭 MIXED EMOTION ENHANCEMENT: Include mixed emotion properties
+                "mixed_emotions": emotion_result.mixed_emotions,
+                "emotion_description": emotion_result.emotion_description,
                 "analysis_time_ms": emotion_result.analysis_time_ms,
                 
                 # Enhanced features not available in legacy system

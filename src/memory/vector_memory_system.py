@@ -574,10 +574,23 @@ class VectorMemoryStore:
                 **(memory.metadata if memory.metadata else {})
             }
             
-            logger.info(f"🎭 DEBUG: Payload emotional_context set to: '{qdrant_payload['emotional_context']}' for memory {memory.id}")
-            logger.info(f"🎭 DEBUG: Full payload keys: {list(qdrant_payload.keys())}")
+            # 🧠 AUDIT: Check if metadata contains emotion_data and add to payload
+            if memory.metadata and 'emotion_data' in memory.metadata:
+                emotion_data = memory.metadata['emotion_data']
+                logger.info(f"🧠 EMOTION AUDIT: Found emotion_data in metadata: {list(emotion_data.keys()) if emotion_data else 'null'}")
+                if emotion_data:
+                    qdrant_payload.update({
+                        'pre_analyzed_primary_emotion': emotion_data.get('primary_emotion'),
+                        'pre_analyzed_mixed_emotions': emotion_data.get('mixed_emotions'),
+                        'pre_analyzed_emotion_description': emotion_data.get('emotion_description'),
+                        'pre_analyzed_context_provided': emotion_data.get('context_provided', False)
+                    })
+                    logger.info(f"🧠 EMOTION AUDIT: Added pre-analyzed fields to payload")
+            else:
+                logger.info(f"🧠 EMOTION AUDIT: No emotion_data found in memory metadata")
             
-            # 🚀 QDRANT FEATURE: Named vectors for intelligent multi-dimensional search
+            logger.info(f"🎭 DEBUG: Payload emotional_context set to: '{qdrant_payload['emotional_context']}' for memory {memory.id}")
+            logger.info(f"🎭 DEBUG: Full payload keys: {list(qdrant_payload.keys())}")            # 🚀 QDRANT FEATURE: Named vectors for intelligent multi-dimensional search
             vectors = {}
             
             # Only add vectors that are valid (non-None, non-empty)
@@ -2199,6 +2212,7 @@ class VectorMemoryStore:
                                       emotional_query: Optional[str] = None,
                                       personality_context: Optional[str] = None,
                                       user_id: str = None,
+                                      memory_types: Optional[List[str]] = None,
                                       top_k: int = 10) -> List[Dict[str, Any]]:
         """
         🚀 QDRANT MULTI-VECTOR: Search using multiple vector spaces for role-playing AI
@@ -3376,6 +3390,14 @@ class VectorMemoryManager:
         """Store a conversation exchange between user and bot."""
         try:
             logger.debug(f"MEMORY MANAGER DEBUG: store_conversation called for user {user_id}")
+            
+            # 🧠 AUDIT: Log emotional data being stored
+            if pre_analyzed_emotion_data:
+                logger.info(f"🧠 EMOTION AUDIT: Storing conversation with pre-analyzed emotion data: {list(pre_analyzed_emotion_data.keys())}")
+                logger.info(f"🧠 EMOTION AUDIT: Primary emotion: {pre_analyzed_emotion_data.get('primary_emotion', 'unknown')}")
+                logger.info(f"🧠 EMOTION AUDIT: Mixed emotions: {pre_analyzed_emotion_data.get('mixed_emotions', 'none')}")
+            else:
+                logger.info(f"🧠 EMOTION AUDIT: No pre-analyzed emotion data provided for user {user_id}")
             
             # Store user message
             user_memory = VectorMemory(

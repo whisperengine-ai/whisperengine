@@ -59,6 +59,7 @@ from src.utils.production_error_handler import (
 )
 
 # Vector-native prompt integration - REMOVED: unused final_integration import
+from src.intelligence.vector_emoji_intelligence import EmojiResponseIntegration, EmojiResponseContext
 
 logger = logging.getLogger(__name__)
 
@@ -154,7 +155,6 @@ class BotEventHandlers:
         )
         
         # Initialize Vector-Based Emoji Response Intelligence 
-        from src.intelligence.vector_emoji_intelligence import EmojiResponseIntegration, EmojiResponseContext
         self.emoji_response_intelligence = EmojiResponseIntegration(
             memory_manager=self.memory_manager
         )
@@ -1636,6 +1636,30 @@ class BotEventHandlers:
             else:
                 logger.info(f"🎭 EVENT HANDLER: No significant emoji reaction context (confidence: {emoji_reaction_context.get('confidence', 0.0):.3f})")
 
+            # 🧠 CONTEXT FIX: Add conversation history to phase2_context
+            # Get recent conversation messages for context-aware emotion analysis
+            try:
+                recent_messages = await self.conversation_cache.get_user_conversation_context(
+                    user_id, max_context_tokens=2000
+                )
+                if recent_messages:
+                    # Convert to the format expected by emotion analyzer
+                    phase2_context["messages"] = [
+                        {
+                            "role": "user" if not msg.get("is_bot", False) else "assistant", 
+                            "content": msg.get("content", "")
+                        } 
+                        for msg in recent_messages[-10:]  # Last 10 messages for context
+                        if msg.get("content")  # Only include messages with actual content
+                    ]
+                    logger.info(f"🧠 CONTEXT: Added {len(phase2_context['messages'])} conversation messages to emotion context")
+                else:
+                    phase2_context["messages"] = []
+                    logger.info("🧠 CONTEXT: No recent conversation history available")
+            except Exception as context_error:
+                logger.warning(f"🧠 CONTEXT: Failed to get conversation history: {context_error}")
+                phase2_context["messages"] = []
+
             logger.info(f"🎭 EVENT HANDLER: Starting Phase 2 emotion processing for user {user_id}")
             logger.info(f"🎭 EVENT HANDLER: Message to analyze: '{content[:100]}{'...' if len(content) > 100 else ''}'")
             logger.info(f"🎭 EVENT HANDLER: Context available: conversation={bool(phase2_context)}, emoji_reactions={bool(emoji_reaction_context)}")
@@ -2511,7 +2535,7 @@ class BotEventHandlers:
 
             logger.info(f"💾 Storing conversation for user {user_id}: '{storage_content[:100]}...' → '{response[:100]}...'")
 
-            # Prepare emotion metadata
+            # Prepare emotion metadata - use phase2_context if current_emotion_data is None
             emotion_metadata = None
             if current_emotion_data:
                 logger.info(f"🎭 EVENT HANDLER: Processing current emotion data for storage")
@@ -2538,8 +2562,13 @@ class BotEventHandlers:
                 logger.debug(
                     f"Passing pre-analyzed emotion data to storage: {emotion_profile.detected_emotion.value if emotion_profile.detected_emotion else 'unknown'}"
                 )
+            elif phase2_context:
+                # 🧠 ENHANCED: Use phase2_context emotional data if current_emotion_data is None
+                logger.info(f"🎭 EVENT HANDLER: Using phase2_context emotion data for storage")
+                emotion_metadata = phase2_context.copy()  # Use all the rich emotional analysis from phase2
+                logger.info(f"🎭 EVENT HANDLER: Phase2 emotion metadata for storage: {list(emotion_metadata.keys())}")
             else:
-                logger.info(f"🎭 EVENT HANDLER: No current emotion data available for storage")
+                logger.info(f"🎭 EVENT HANDLER: No current emotion data or phase2 context available for storage")
 
             # Perform personality analysis
             personality_metadata = await self._analyze_personality_for_storage(

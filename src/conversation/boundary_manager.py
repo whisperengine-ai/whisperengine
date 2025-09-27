@@ -845,10 +845,14 @@ Topics discussed: {content_text}
 
 Summary:"""
 
-            # Generate summary using LLM
-            response = await self.llm_client.generate_chat_completion([
-                {"role": "user", "content": summary_prompt}
-            ], max_tokens=80, temperature=0.3)  # Low temperature for consistent summaries
+            # Generate summary using LLM (use async safe method)
+            try:
+                response = await self.llm_client.generate_chat_completion_safe([
+                    {"role": "user", "content": summary_prompt}
+                ], max_tokens=80, temperature=0.3)  # Low temperature for consistent summaries
+            except Exception as llm_error:
+                logger.warning("LLM client error: %s, falling back to basic summary", str(llm_error))
+                return f"Conversation spanning {session.get_duration_minutes():.1f} minutes with {session.message_count} messages"
             
             # Extract content from response
             if isinstance(response, dict) and "choices" in response and len(response["choices"]) > 0:

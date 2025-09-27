@@ -204,6 +204,14 @@ class SimplifiedEmotionManager:
             # Use conversation_context or create minimal context
             context = conversation_context or {"messages": []}
             
+            # 🧠 DEBUG: Log conversation context for debugging
+            logger.info(f"🧠 CONTEXT DEBUG: conversation_context type: {type(conversation_context)}")
+            logger.info(f"🧠 CONTEXT DEBUG: conversation_context keys: {list(conversation_context.keys()) if isinstance(conversation_context, dict) else 'Not a dict'}")
+            if isinstance(conversation_context, dict) and "messages" in conversation_context:
+                logger.info(f"🧠 CONTEXT DEBUG: Found {len(conversation_context['messages'])} messages in conversation context")
+            else:
+                logger.info(f"🧠 CONTEXT DEBUG: No messages found in conversation context")
+            
             # Get comprehensive emotional assessment
             assessment = await self.emotion_integration.comprehensive_emotional_assessment(
                 user_id=user_id,
@@ -222,6 +230,11 @@ class SimplifiedEmotionManager:
                 "analysis_method": "enhanced_vector",
                 "timestamp": assessment.get("timestamp"),
                 
+                # 🎭 MIXED EMOTION ENHANCEMENT: Add mixed emotion information
+                "mixed_emotions": assessment.get("mixed_emotions", []),
+                "emotion_description": assessment.get("emotion_description", assessment.get("primary_emotion", "neutral")),
+                "all_emotions": assessment.get("all_emotions", {}),
+                
                 # Simplified emotion intelligence data for compatibility
                 "emotional_intelligence": {
                     "primary_emotion": assessment.get("primary_emotion", "neutral"),
@@ -229,12 +242,14 @@ class SimplifiedEmotionManager:
                     "stress_indicators": assessment.get("stress_indicators", []),
                     "mood_trend": assessment.get("historical_patterns", {}).get("mood_trend", "stable"),
                     "support_recommendations": assessment.get("recommendations", []),
-                    "analysis_complete": True
+                    "analysis_complete": True,
+                    # 🎭 MIXED EMOTION ENHANCEMENT: Include in emotional intelligence
+                    "mixed_emotions": assessment.get("mixed_emotions", []),
+                    "emotion_description": assessment.get("emotion_description", assessment.get("primary_emotion", "neutral"))
                 }
             }
             
-            logger.debug("Emotion analysis completed for user %s: %s (%.2f confidence)", 
-                        user_id, emotion_data["primary_emotion"], emotion_data["confidence"])
+            logger.info("🎭 SIMPLIFIED EMOTION MANAGER: Base emotion result: %s", emotion_data)
             
             return emotion_data
             
