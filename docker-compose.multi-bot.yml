@@ -299,75 +299,6 @@ services:
       - redis
       - qdrant
 
-  ryan-chen-bot:
-    build:
-      context: .
-      dockerfile: Dockerfile.bundled-models
-      target: production
-    image: whisperengine-bot:${VERSION:-latest}
-    container_name: whisperengine-ryan-chen-bot
-    restart: unless-stopped
-    env_file:
-      - .env.ryan-chen
-    environment:
-      - DISCORD_BOT_NAME=Ryan Chen
-      - POSTGRES_HOST=postgres
-      - REDIS_HOST=redis
-      - QDRANT_HOST=qdrant
-      - MODEL_CACHE_DIR=/app/models
-      - DISABLE_MODEL_DOWNLOAD=true
-      - HF_HUB_OFFLINE=false
-      - TRANSFORMERS_OFFLINE=0
-      - LOG_LEVEL=${LOG_LEVEL:-INFO}
-      - DEBUG_MODE=false
-      - PYTHONUNBUFFERED=1
-      - HEALTH_CHECK_PORT=9093
-      - HEALTH_CHECK_HOST=0.0.0.0
-      - CDL_DEFAULT_CHARACTER=characters/examples/ryan-chen.json
-    ports:
-      - "9093:9093"
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
-        tag: "ryan-chen-{.ImageName}-{.Name}-{.ID}"
-    deploy:
-      resources:
-        limits:
-          memory: 4G
-          cpus: "4.0"
-        reservations:
-          memory: 2G
-          cpus: "2.0"
-    healthcheck:
-      test:
-        - CMD-SHELL
-        - curl -f http://localhost:9093/health || exit 1
-      interval: 30s
-      timeout: 10s
-      retries: 3
-    volumes:
-      - ryan-chen_backups:/app/backups
-      - ryan-chen_privacy:/app/privacy
-      - ryan-chen_temp:/app/temp
-      - ./sql:/app/sql:ro
-      # Live code mounting for development (no rebuild needed)
-      - ./src:/app/src
-      - ./scripts:/app/scripts
-      - ./characters:/app/characters
-      - ./config:/app/config
-      - ./validate_config.py:/app/validate_config.py
-      - ./run.py:/app/run.py
-      - ./env_manager.py:/app/env_manager.py
-      # Note: Using Docker logging instead of mounted log volumes
-    networks:
-      - bot_network
-    depends_on:
-      - postgres
-      - redis
-      - qdrant
-
   elena-bot:
     build:
       context: .
@@ -420,6 +351,75 @@ services:
       - elena_backups:/app/backups
       - elena_privacy:/app/privacy
       - elena_temp:/app/temp
+      - ./sql:/app/sql:ro
+      # Live code mounting for development (no rebuild needed)
+      - ./src:/app/src
+      - ./scripts:/app/scripts
+      - ./characters:/app/characters
+      - ./config:/app/config
+      - ./validate_config.py:/app/validate_config.py
+      - ./run.py:/app/run.py
+      - ./env_manager.py:/app/env_manager.py
+      # Note: Using Docker logging instead of mounted log volumes
+    networks:
+      - bot_network
+    depends_on:
+      - postgres
+      - redis
+      - qdrant
+
+  ryan-bot:
+    build:
+      context: .
+      dockerfile: Dockerfile.bundled-models
+      target: production
+    image: whisperengine-bot:${VERSION:-latest}
+    container_name: whisperengine-ryan-bot
+    restart: unless-stopped
+    env_file:
+      - .env.ryan
+    environment:
+      - DISCORD_BOT_NAME=Ryan
+      - POSTGRES_HOST=postgres
+      - REDIS_HOST=redis
+      - QDRANT_HOST=qdrant
+      - MODEL_CACHE_DIR=/app/models
+      - DISABLE_MODEL_DOWNLOAD=true
+      - HF_HUB_OFFLINE=false
+      - TRANSFORMERS_OFFLINE=0
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - DEBUG_MODE=false
+      - PYTHONUNBUFFERED=1
+      - HEALTH_CHECK_PORT=9093
+      - HEALTH_CHECK_HOST=0.0.0.0
+      - CDL_DEFAULT_CHARACTER=characters/examples/ryan-chen.json
+    ports:
+      - "9093:9093"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+        tag: "ryan-{.ImageName}-{.Name}-{.ID}"
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+          cpus: "4.0"
+        reservations:
+          memory: 2G
+          cpus: "2.0"
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - curl -f http://localhost:9093/health || exit 1
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    volumes:
+      - ryan_backups:/app/backups
+      - ryan_privacy:/app/privacy
+      - ryan_temp:/app/temp
       - ./sql:/app/sql:ro
       # Live code mounting for development (no rebuild needed)
       - ./src:/app/src
@@ -615,14 +615,6 @@ volumes:
     name: whisperengine-multi_dream_temp
   dream_logs:
     name: whisperengine-multi_dream_logs
-  ryan-chen_backups:
-    name: whisperengine-multi_ryan-chen_backups
-  ryan-chen_privacy:
-    name: whisperengine-multi_ryan-chen_privacy
-  ryan-chen_temp:
-    name: whisperengine-multi_ryan-chen_temp
-  ryan-chen_logs:
-    name: whisperengine-multi_ryan-chen_logs
   elena_backups:
     name: whisperengine-multi_elena_backups
   elena_privacy:
@@ -631,6 +623,14 @@ volumes:
     name: whisperengine-multi_elena_temp
   elena_logs:
     name: whisperengine-multi_elena_logs
+  ryan_backups:
+    name: whisperengine-multi_ryan_backups
+  ryan_privacy:
+    name: whisperengine-multi_ryan_privacy
+  ryan_temp:
+    name: whisperengine-multi_ryan_temp
+  ryan_logs:
+    name: whisperengine-multi_ryan_logs
   gabriel_backups:
     name: whisperengine-multi_gabriel_backups
   gabriel_privacy:

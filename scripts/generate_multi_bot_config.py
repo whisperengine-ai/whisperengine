@@ -59,7 +59,7 @@ class BotConfigDiscovery:
                     "health_port": health_port,
                     "service_name": f"{bot_name}-bot",
                     "container_name": f"whisperengine-{bot_name}-bot",
-                    "display_name": bot_name.replace("-", " ").title()
+                    "display_name": self._get_display_name(bot_name)
                 }
                 
         return bot_configs
@@ -103,6 +103,8 @@ class BotConfigDiscovery:
             f"{bot_name}_of_the_endless" if bot_name == "dream" else None,
             f"{bot_name}-blake" if bot_name == "sophia" else None,
             f"{bot_name}-sterling" if bot_name == "jake" else None,
+            # Special case for ryan -> ryan-chen character file migration
+            "ryan-chen" if bot_name == "ryan" else None,
         ]
         
         # Filter out None values
@@ -114,6 +116,18 @@ class BotConfigDiscovery:
                 return str(character_file)
                 
         return None
+    
+    def _get_display_name(self, bot_name: str) -> str:
+        """
+        Get the display name for a bot, handling special cases.
+        Special mapping for ryan-chen -> ryan migration.
+        """
+        # Special case for ryan-chen -> ryan migration
+        if bot_name == "ryan-chen":
+            return "ryan"
+        
+        # Default: convert dashes to spaces and title case
+        return bot_name.replace("-", " ").title()
 
     def generate_bot_service_yaml(self, bot_name: str, config: Dict) -> str:
         """Generate YAML for a single bot service."""

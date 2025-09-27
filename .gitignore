@@ -138,3 +138,4 @@ docker-data/
 .env.jake
 .env.sophia
 characters/examples/gabriel.json
+.env.ryan
