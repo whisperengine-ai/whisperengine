@@ -1,0 +1,171 @@
+# Production Docker Compose for WhisperEngine
+# Uses pre-built images from DockerHub instead of building locally
+# 
+# Usage:
+#   1. Replace DOCKERHUB_USERNAME with your actual DockerHub username
+#   2. Update VERSION to match your pushed image version
+#   3. Run: docker-compose -f docker-compose.production.yml up
+
+version: '3.8'
+
+services:
+  # ===== INFRASTRUCTURE SERVICES =====
+  postgres:
+    image: postgres:16.4-alpine
+    container_name: whisperengine-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: whisperengine
+      POSTGRES_USER: whisperengine
+      POSTGRES_PASSWORD: whisperengine_password
+      POSTGRES_HOST_AUTH_METHOD: trust
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - bot_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U whisperengine -d whisperengine"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  redis:
+    image: redis:7.4-alpine
+    container_name: whisperengine-redis
+    restart: unless-stopped
+    ports:
+      - "6380:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - bot_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  qdrant:
+    image: qdrant/qdrant:v1.15.4
+    container_name: whisperengine-qdrant
+    restart: unless-stopped
+    ports:
+      - "6334:6333"
+    volumes:
+      - qdrant_data:/qdrant/storage
+    networks:
+      - bot_network
+
+  # ===== WEB INTERFACE =====
+  whisperengine-web:
+    image: DOCKERHUB_USERNAME/whisperengine-web:VERSION  # Replace with your DockerHub username and version
+    container_name: whisperengine-web-interface
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      - DATABASE_URL=postgresql://whisperengine:whisperengine_password@postgres:5432/whisperengine
+      - REDIS_URL=redis://redis:6379/0
+      - QDRANT_URL=http://qdrant:6333
+      - WEB_UI_HOST=0.0.0.0
+      - WEB_UI_PORT=8080
+      - PYTHONPATH=/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      qdrant:
+        condition: service_started
+    networks:
+      - bot_network
+    volumes:
+      - ./characters:/app/characters:ro
+      - ./logs:/app/logs
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ===== BOT SERVICES =====
+  # Example bot service - duplicate and modify for each bot
+  elena-bot:
+    image: DOCKERHUB_USERNAME/whisperengine-bot:VERSION  # Replace with your DockerHub username and version
+    container_name: whisperengine-elena-bot
+    restart: unless-stopped
+    env_file:
+      - .env.elena
+    environment:
+      - DISCORD_BOT_NAME=Elena
+      - POSTGRES_HOST=postgres
+      - REDIS_HOST=redis
+      - QDRANT_HOST=qdrant
+      - MODEL_CACHE_DIR=/app/models
+      - DISABLE_MODEL_DOWNLOAD=true
+      - HF_HUB_OFFLINE=false
+      - TRANSFORMERS_OFFLINE=0
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - DEBUG_MODE=false
+      - PYTHONUNBUFFERED=1
+      - HEALTH_CHECK_PORT=9091
+      - HEALTH_CHECK_HOST=0.0.0.0
+      - CDL_DEFAULT_CHARACTER=characters/examples/elena-rodriguez.json
+    ports:
+      - "9091:9091"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+        tag: "elena-{.ImageName}-{.Name}-{.ID}"
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+          cpus: "4.0"
+        reservations:
+          memory: 2G
+          cpus: "2.0"
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - curl -f http://localhost:9091/health || exit 1
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    volumes:
+      - elena_backups:/app/backups
+      - elena_privacy:/app/privacy
+      - elena_temp:/app/temp
+      - ./sql:/app/sql:ro
+      - ./characters:/app/characters
+    networks:
+      - bot_network
+    depends_on:
+      - postgres
+      - redis
+      - qdrant
+
+# ===== NETWORKS =====
+networks:
+  bot_network:
+    name: whisperengine_bot_network
+    driver: bridge
+
+# ===== VOLUMES =====
+volumes:
+  postgres_data:
+    name: whisperengine_postgres_data
+  redis_data:
+    name: whisperengine_redis_data
+  qdrant_data:
+    name: whisperengine_qdrant_data
+  elena_backups:
+    name: whisperengine_elena_backups
+  elena_privacy:
+    name: whisperengine_elena_privacy
+  elena_temp:
+    name: whisperengine_elena_temp

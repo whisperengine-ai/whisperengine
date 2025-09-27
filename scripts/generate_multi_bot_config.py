@@ -155,10 +155,6 @@ class BotConfigDiscovery:
             environment_vars.append(f"CDL_DEFAULT_CHARACTER={config['character_file']}")
         
         service_yaml = f"""  {config['service_name']}:
-    build:
-      context: .
-      dockerfile: Dockerfile.bundled-models
-      target: production
     image: whisperengine-bot:${{VERSION:-latest}}
     container_name: {config['container_name']}
     restart: unless-stopped

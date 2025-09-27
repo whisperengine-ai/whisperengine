@@ -5,7 +5,7 @@
 set -e
 
 # Discovered bot configurations
-AVAILABLE_BOTS=("jake" "marcus" "dream" "elena" "aethys" "ryan" "gabriel" "test-concurrent" "sophia")
+AVAILABLE_BOTS=("jake" "marcus" "dream" "elena" "aethys" "ryan" "gabriel" "sophia")
 PROJECT_NAME="whisperengine-multi"
 COMPOSE_FILE="docker-compose.multi-bot.yml"
 
@@ -30,7 +30,7 @@ show_usage() {
     echo "  status                  Show status of all containers"
     echo "  health                  Check health of all services"
     echo ""
-    echo "Available bots: jake marcus dream elena aethys ryan gabriel test-concurrent sophia"
+    echo "Available bots: jake marcus dream elena aethys ryan gabriel sophia"
     echo ""
     echo "Examples:"
     echo "  $0 list"
@@ -53,7 +53,7 @@ validate_bot_name() {
     done
     
     echo -e "${RED}Error: Invalid bot name '$bot_name'${NC}"
-    echo -e "Available bots: jake marcus dream elena aethys ryan gabriel test-concurrent sophia"
+    echo -e "Available bots: jake marcus dream elena aethys ryan gabriel sophia"
     return 1
 }
 

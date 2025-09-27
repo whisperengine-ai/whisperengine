@@ -91,6 +91,18 @@ services:
       timeout: 10s
       retries: 3
 
+  # ===== SHARED BOT IMAGE BUILD =====
+  whisperengine-bot-builder:
+    build:
+      context: .
+      dockerfile: Dockerfile.bundled-models
+      target: production
+    image: whisperengine-bot:${VERSION:-latest}
+    profiles:
+      - build-only
+    # This service is only used for building the shared image
+    # It doesn't run as a container - just builds the image
+
   # ===== BOT SERVICES (populated dynamically) =====
   # BOT_SERVICES_PLACEHOLDER
 
