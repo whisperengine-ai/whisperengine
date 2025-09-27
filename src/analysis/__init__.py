@@ -3,7 +3,6 @@
 Advanced analysis modules for AI memory enhancement.
 
 This package contains:
-- AdvancedTopicExtractor: Enhanced NLP topic extraction
 - PersonalityProfiler: User personality analysis
 - PatternDetector: Cross-reference pattern detection
 """

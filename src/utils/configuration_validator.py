@@ -159,13 +159,7 @@ class ConfigurationValidator:
                 'suggestion': 'Enable batch emotion processing (resource intensive)',
                 'format': 'true or false'
             },
-            'ENABLE_ADVANCED_EMOTION_DETECTOR': {
-                'category': ConfigCategory.FEATURES,
-                'level': ValidationLevel.OPTIONAL,
-                'validator': self._validate_boolean,
-                'suggestion': 'Enable multi-modal emotion detection',
-                'format': 'true or false'
-            },
+
             'ENABLE_PROACTIVE_ENGAGEMENT_ENGINE': {
                 'category': ConfigCategory.FEATURES,
                 'level': ValidationLevel.OPTIONAL,
@@ -187,13 +181,7 @@ class ConfigurationValidator:
                 'suggestion': 'Enable parallel conversation handling',
                 'format': 'true or false'
             },
-            'ENABLE_ADVANCED_TOPIC_EXTRACTOR': {
-                'category': ConfigCategory.FEATURES,
-                'level': ValidationLevel.OPTIONAL,
-                'validator': self._validate_boolean,
-                'suggestion': 'Enable sophisticated topic analysis',
-                'format': 'true or false'
-            },
+
             
             # Phantom Feature Performance Settings
             'VECTORIZED_EMOTION_MAX_WORKERS': {
