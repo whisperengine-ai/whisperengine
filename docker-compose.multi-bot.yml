@@ -368,6 +368,75 @@ services:
       - redis
       - qdrant
 
+  aethys-bot:
+    build:
+      context: .
+      dockerfile: Dockerfile.bundled-models
+      target: production
+    image: whisperengine-bot:${VERSION:-latest}
+    container_name: whisperengine-aethys-bot
+    restart: unless-stopped
+    env_file:
+      - .env.aethys
+    environment:
+      - DISCORD_BOT_NAME=Aethys
+      - POSTGRES_HOST=postgres
+      - REDIS_HOST=redis
+      - QDRANT_HOST=qdrant
+      - MODEL_CACHE_DIR=/app/models
+      - DISABLE_MODEL_DOWNLOAD=true
+      - HF_HUB_OFFLINE=false
+      - TRANSFORMERS_OFFLINE=0
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - DEBUG_MODE=false
+      - PYTHONUNBUFFERED=1
+      - HEALTH_CHECK_PORT=3007
+      - HEALTH_CHECK_HOST=0.0.0.0
+      - CDL_DEFAULT_CHARACTER=characters/examples/aethys-omnipotent-entity.json
+    ports:
+      - "3007:3007"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+        tag: "aethys-{.ImageName}-{.Name}-{.ID}"
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+          cpus: "4.0"
+        reservations:
+          memory: 2G
+          cpus: "2.0"
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - curl -f http://localhost:3007/health || exit 1
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    volumes:
+      - aethys_backups:/app/backups
+      - aethys_privacy:/app/privacy
+      - aethys_temp:/app/temp
+      - ./sql:/app/sql:ro
+      # Live code mounting for development (no rebuild needed)
+      - ./src:/app/src
+      - ./scripts:/app/scripts
+      - ./characters:/app/characters
+      - ./config:/app/config
+      - ./validate_config.py:/app/validate_config.py
+      - ./run.py:/app/run.py
+      - ./env_manager.py:/app/env_manager.py
+      # Note: Using Docker logging instead of mounted log volumes
+    networks:
+      - bot_network
+    depends_on:
+      - postgres
+      - redis
+      - qdrant
+
   ryan-bot:
     build:
       context: .
@@ -506,6 +575,74 @@ services:
       - redis
       - qdrant
 
+  test-concurrent-bot:
+    build:
+      context: .
+      dockerfile: Dockerfile.bundled-models
+      target: production
+    image: whisperengine-bot:${VERSION:-latest}
+    container_name: whisperengine-test-concurrent-bot
+    restart: unless-stopped
+    env_file:
+      - .env.test-concurrent
+    environment:
+      - DISCORD_BOT_NAME=Test Concurrent
+      - POSTGRES_HOST=postgres
+      - REDIS_HOST=redis
+      - QDRANT_HOST=qdrant
+      - MODEL_CACHE_DIR=/app/models
+      - DISABLE_MODEL_DOWNLOAD=true
+      - HF_HUB_OFFLINE=false
+      - TRANSFORMERS_OFFLINE=0
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - DEBUG_MODE=false
+      - PYTHONUNBUFFERED=1
+      - HEALTH_CHECK_PORT=9586
+      - HEALTH_CHECK_HOST=0.0.0.0
+    ports:
+      - "9586:9586"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+        tag: "test-concurrent-{.ImageName}-{.Name}-{.ID}"
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+          cpus: "4.0"
+        reservations:
+          memory: 2G
+          cpus: "2.0"
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - curl -f http://localhost:9586/health || exit 1
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    volumes:
+      - test-concurrent_backups:/app/backups
+      - test-concurrent_privacy:/app/privacy
+      - test-concurrent_temp:/app/temp
+      - ./sql:/app/sql:ro
+      # Live code mounting for development (no rebuild needed)
+      - ./src:/app/src
+      - ./scripts:/app/scripts
+      - ./characters:/app/characters
+      - ./config:/app/config
+      - ./validate_config.py:/app/validate_config.py
+      - ./run.py:/app/run.py
+      - ./env_manager.py:/app/env_manager.py
+      # Note: Using Docker logging instead of mounted log volumes
+    networks:
+      - bot_network
+    depends_on:
+      - postgres
+      - redis
+      - qdrant
+
   sophia-bot:
     build:
       context: .
@@ -623,6 +760,14 @@ volumes:
     name: whisperengine-multi_elena_temp
   elena_logs:
     name: whisperengine-multi_elena_logs
+  aethys_backups:
+    name: whisperengine-multi_aethys_backups
+  aethys_privacy:
+    name: whisperengine-multi_aethys_privacy
+  aethys_temp:
+    name: whisperengine-multi_aethys_temp
+  aethys_logs:
+    name: whisperengine-multi_aethys_logs
   ryan_backups:
     name: whisperengine-multi_ryan_backups
   ryan_privacy:
@@ -639,6 +784,14 @@ volumes:
     name: whisperengine-multi_gabriel_temp
   gabriel_logs:
     name: whisperengine-multi_gabriel_logs
+  test-concurrent_backups:
+    name: whisperengine-multi_test-concurrent_backups
+  test-concurrent_privacy:
+    name: whisperengine-multi_test-concurrent_privacy
+  test-concurrent_temp:
+    name: whisperengine-multi_test-concurrent_temp
+  test-concurrent_logs:
+    name: whisperengine-multi_test-concurrent_logs
   sophia_backups:
     name: whisperengine-multi_sophia_backups
   sophia_privacy:

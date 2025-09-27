@@ -139,3 +139,4 @@ docker-data/
 .env.sophia
 characters/examples/gabriel.json
 .env.ryan
+.env.aethys

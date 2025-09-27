@@ -1633,9 +1633,16 @@ class BotEventHandlers:
             if emoji_reaction_context.get("confidence", 0.0) > 0.3:
                 logger.debug(f"🎭 Integrating emoji reaction context: {emoji_reaction_context.get('emotional_context')} (confidence: {emoji_reaction_context.get('confidence', 0.0):.2f})")
                 phase2_context["emoji_reaction_context"] = emoji_reaction_context
+            else:
+                logger.info(f"🎭 EVENT HANDLER: No significant emoji reaction context (confidence: {emoji_reaction_context.get('confidence', 0.0):.3f})")
+
+            logger.info(f"🎭 EVENT HANDLER: Starting Phase 2 emotion processing for user {user_id}")
+            logger.info(f"🎭 EVENT HANDLER: Message to analyze: '{content[:100]}{'...' if len(content) > 100 else ''}'")
+            logger.info(f"🎭 EVENT HANDLER: Context available: conversation={bool(phase2_context)}, emoji_reactions={bool(emoji_reaction_context)}")
 
             # Enhanced emotion processing with multimodal intelligence
             if hasattr(self.phase2_integration, 'analyze_message_emotion_with_reactions'):
+                logger.info(f"🎭 EVENT HANDLER: Using enhanced multimodal emotion analysis method")
                 # Use enhanced method that combines text and emoji reactions
                 phase2_results = await self.phase2_integration.analyze_message_emotion_with_reactions(
                     user_id=user_id, 
@@ -1643,15 +1650,16 @@ class BotEventHandlers:
                     conversation_context=phase2_context,
                     emoji_reaction_context=emoji_reaction_context
                 )
-                logger.debug("🎭 Enhanced multimodal emotion analysis completed")
+                logger.info(f"🎭 EVENT HANDLER: Enhanced multimodal emotion analysis completed: {phase2_results}")
             else:
+                logger.info(f"🎭 EVENT HANDLER: Using fallback standard emotion processing")
                 # Fallback to standard emotion processing
                 phase2_results = (
                     await self.phase2_integration.process_message_with_emotional_intelligence(
                         user_id=user_id, message=content, conversation_context=phase2_context
                     )
                 )
-                logger.debug("Phase 2 emotional intelligence analysis completed")
+                logger.info(f"🎭 EVENT HANDLER: Phase 2 emotional intelligence analysis completed: {phase2_results}")
             return phase2_results, None  # Return results and placeholder for current_emotion_data
 
         except Exception as e:
@@ -2506,23 +2514,32 @@ class BotEventHandlers:
             # Prepare emotion metadata
             emotion_metadata = None
             if current_emotion_data:
+                logger.info(f"🎭 EVENT HANDLER: Processing current emotion data for storage")
                 user_profile, emotion_profile = current_emotion_data
                 emotion_metadata = {}
 
                 if emotion_profile.detected_emotion:
                     emotion_metadata["detected_emotion"] = emotion_profile.detected_emotion.value
+                    logger.info(f"🎭 EVENT HANDLER: Detected emotion for storage: {emotion_profile.detected_emotion.value}")
                 if emotion_profile.confidence is not None:
                     emotion_metadata["confidence"] = float(emotion_profile.confidence)
+                    logger.info(f"🎭 EVENT HANDLER: Emotion confidence: {emotion_profile.confidence:.3f}")
                 if emotion_profile.intensity is not None:
                     emotion_metadata["intensity"] = float(emotion_profile.intensity)
+                    logger.info(f"🎭 EVENT HANDLER: Emotion intensity: {emotion_profile.intensity:.3f}")
                 if user_profile.relationship_level:
                     emotion_metadata["relationship_level"] = user_profile.relationship_level.value
+                    logger.info(f"🎭 EVENT HANDLER: Relationship level: {user_profile.relationship_level.value}")
                 if user_profile.interaction_count is not None:
                     emotion_metadata["interaction_count"] = int(user_profile.interaction_count)
+                    logger.info(f"🎭 EVENT HANDLER: Interaction count: {user_profile.interaction_count}")
 
+                logger.info(f"🎭 EVENT HANDLER: Complete emotion metadata for storage: {emotion_metadata}")
                 logger.debug(
                     f"Passing pre-analyzed emotion data to storage: {emotion_profile.detected_emotion.value if emotion_profile.detected_emotion else 'unknown'}"
                 )
+            else:
+                logger.info(f"🎭 EVENT HANDLER: No current emotion data available for storage")
 
             # Perform personality analysis
             personality_metadata = await self._analyze_personality_for_storage(

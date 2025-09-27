@@ -159,14 +159,19 @@ class VectorMemoryStore:
                  qdrant_host: str = "localhost",
                  qdrant_port: int = 6333,
                  collection_name: str = "whisperengine_memory",
-                 embedding_model: str = "snowflake/snowflake-arctic-embed-xs"):
+                 embedding_model: str = ""):  # Use FastEmbed default (BAAI/bge-small-en-v1.5)
         
         # Initialize Qdrant (Local Vector DB in Docker)
         self.client = QdrantClient(host=qdrant_host, port=qdrant_port)
         self.collection_name = collection_name
         
-        # Initialize fastembed (Local embedding model)
-        self.embedder = TextEmbedding(model_name=embedding_model)
+        # Initialize fastembed (Local embedding model) with proper cache configuration
+        cache_dir = os.environ.get('FASTEMBED_CACHE_PATH', '/root/.cache/fastembed')
+        if embedding_model:
+            self.embedder = TextEmbedding(model_name=embedding_model, cache_dir=cache_dir)
+        else:
+            # Use default model (BAAI/bge-small-en-v1.5) - no rate limit issues
+            self.embedder = TextEmbedding(cache_dir=cache_dir)
         # Get embedding dimension from the model
         test_embedding = list(self.embedder.embed(["test"]))[0]
         self.embedding_dimension = len(test_embedding)
@@ -476,6 +481,8 @@ class VectorMemoryStore:
             
             # Create emotional embedding for sentiment-aware search  
             emotional_context, emotional_intensity = await self._extract_emotional_context(memory.content, memory.user_id)
+            logger.info(f"🎭 DEBUG: Storing memory with emotion '{emotional_context}' (intensity: {emotional_intensity:.3f}) for user {memory.user_id}")
+            logger.info(f"🎭 DEBUG: Content being stored: '{memory.content[:100]}...'")
             emotion_embedding = await self.generate_embedding(f"emotion {emotional_context}: {memory.content}")
             logger.debug(f"Generated emotion embedding: {type(emotion_embedding)}, length: {len(emotion_embedding) if emotion_embedding else None}")
             
@@ -566,6 +573,9 @@ class VectorMemoryStore:
                 # Handle metadata safely
                 **(memory.metadata if memory.metadata else {})
             }
+            
+            logger.info(f"🎭 DEBUG: Payload emotional_context set to: '{qdrant_payload['emotional_context']}' for memory {memory.id}")
+            logger.info(f"🎭 DEBUG: Full payload keys: {list(qdrant_payload.keys())}")
             
             # 🚀 QDRANT FEATURE: Named vectors for intelligent multi-dimensional search
             vectors = {}
@@ -690,9 +700,12 @@ class VectorMemoryStore:
     async def _extract_emotional_context(self, content: str, user_id: str = "unknown") -> tuple[str, float]:
         """Extract emotional context using Enhanced Vector Emotion Analyzer for superior accuracy"""
         try:
+            logger.debug(f"🎭 DEBUG: Extracting emotion from content: '{content[:100]}...' for user {user_id}")
+            
             # Try to use Enhanced Vector Emotion Analyzer first (much better than keywords)
             if self._enhanced_emotion_analyzer:
                 try:
+                    logger.debug(f"🎭 DEBUG: Using Enhanced Vector Emotion Analyzer")
                     analysis_result = await self._enhanced_emotion_analyzer.analyze_emotion(
                         content=content,
                         user_id=user_id
@@ -707,12 +720,17 @@ class VectorMemoryStore:
                         "is_multi_emotion": len(analysis_result.all_emotions) > 1
                     }
                     
+                    logger.info(f"🎭 DEBUG: Enhanced analyzer result: {analysis_result.primary_emotion} "
+                               f"(intensity: {analysis_result.intensity:.3f}, confidence: {analysis_result.confidence:.3f})")
+                    
                     # Return primary emotion and intensity (backward compatibility)
                     return analysis_result.primary_emotion, analysis_result.intensity
                     
                 except Exception as e:
-                    logger.warning(f"Enhanced emotion analyzer failed, falling back to keywords: {e}")
+                    logger.warning(f"🎭 DEBUG: Enhanced emotion analyzer failed, falling back to keywords: {e}")
                     self._last_emotion_analysis = None
+            else:
+                logger.debug(f"🎭 DEBUG: Enhanced Vector Emotion Analyzer not available, using keyword analysis")
             
             # Fallback to keyword analysis if Enhanced Vector Emotion Analyzer unavailable
             content_lower = content.lower()
@@ -775,8 +793,11 @@ class VectorMemoryStore:
             if emotion_scores:
                 best_emotion = max(emotion_scores.items(), key=lambda x: x[1])
                 intensity = min(best_emotion[1] * 0.3, 1.0)  # Scale intensity
+                logger.info(f"🎭 DEBUG: Keyword analysis result: {best_emotion[0]} "
+                           f"(matches: {best_emotion[1]}, intensity: {intensity:.3f})")
                 return best_emotion[0], intensity
             else:
+                logger.info(f"🎭 DEBUG: Keyword analysis found no emotional keywords, defaulting to neutral")
                 return 'neutral', 0.1
                 
         except Exception as e:
@@ -798,8 +819,10 @@ class VectorMemoryStore:
             # Get recent emotional states from last 10 conversation memories
             recent_emotions = await self.get_recent_emotional_states(user_id, limit=10)
             
-            if len(recent_emotions) < 2:
-                # Not enough data for trajectory analysis
+            if len(recent_emotions) < 1:
+                # No recent emotional data at all
+                logger.info(f"🎭 TRAJECTORY INFO: User {user_id} has no recent emotions in last 7 days. "
+                           f"Returning stable default values.")
                 return {
                     "emotional_trajectory": [current_emotion],
                     "emotional_velocity": 0.0,
@@ -808,8 +831,36 @@ class VectorMemoryStore:
                     "emotional_momentum": "neutral",
                     "pattern_detected": None
                 }
+            elif len(recent_emotions) == 1:
+                # Only one recent emotion - compare with current
+                single_emotion = recent_emotions[0]
+                logger.info(f"🎭 TRAJECTORY INFO: User {user_id} has only 1 recent emotion: '{single_emotion}'. "
+                           f"Current emotion: '{current_emotion}'. Computing limited trajectory.")
+                
+                # Simple comparison between single past emotion and current
+                if single_emotion == current_emotion:
+                    direction = "stable"
+                    velocity = 0.0
+                    momentum = "neutral"
+                    stability = 1.0
+                else:
+                    direction = "changing"
+                    velocity = 0.3  # Moderate change
+                    momentum = "shifting"
+                    stability = 0.7  # Less stable due to change
+                
+                return {
+                    "emotional_trajectory": [single_emotion, current_emotion],
+                    "emotional_velocity": velocity,
+                    "emotional_stability": stability,
+                    "trajectory_direction": direction,
+                    "emotional_momentum": momentum,
+                    "pattern_detected": None
+                }
             
             # Calculate emotional momentum and velocity
+            logger.info(f"🎭 TRAJECTORY INFO: User {user_id} has {len(recent_emotions)} recent emotions. "
+                       f"Performing full trajectory analysis. Emotions: {recent_emotions[:5]}...")
             emotional_velocity = self.calculate_emotional_momentum(recent_emotions)
             emotional_stability = self.calculate_emotional_stability(recent_emotions)
             trajectory_direction = self.determine_trajectory_direction(recent_emotions)
@@ -840,8 +891,17 @@ class VectorMemoryStore:
         """Get recent emotional states from conversation memories"""
         try:
             # Use Qdrant to get recent conversation memories with emotional context
-            recent_cutoff = datetime.utcnow() - timedelta(hours=24)  # Last 24 hours
+            # 🔧 FIX: Extended time window from 24 hours to 7 days for better trajectory analysis
+            recent_cutoff = datetime.utcnow() - timedelta(days=7)  # Last 7 days instead of 24 hours
             recent_timestamp = recent_cutoff.timestamp()
+            
+            logger.info(f"🔍 DEBUG: Getting recent emotional states for user {user_id}")
+            logger.info(f"🔍 DEBUG: Time window: {recent_cutoff.isoformat()} to now ({recent_timestamp})")
+            logger.info(f"🔍 DEBUG: Collection: {self.collection_name}")
+            
+            # Show what bot name is being used for filtering
+            current_bot_name = get_normalized_bot_name_from_env()
+            logger.info(f"🔍 DEBUG: Filtering by bot_name: '{current_bot_name}'")
             
             scroll_result = self.client.scroll(
                 collection_name=self.collection_name,
@@ -859,12 +919,27 @@ class VectorMemoryStore:
                 order_by=models.OrderBy(key="timestamp_unix", direction=Direction.DESC)
             )
             
+            logger.info(f"🔍 DEBUG: Qdrant query conditions:")
+            logger.info(f"  - user_id: {user_id}")
+            logger.info(f"  - bot_name: {current_bot_name}")
+            logger.info(f"  - memory_type: conversation")
+            logger.info(f"  - timestamp_unix >= {recent_timestamp}")
+            logger.info(f"🔍 DEBUG: Found {len(scroll_result[0])} conversation memories")
+            
             emotions = []
-            for point in scroll_result[0]:
+            for i, point in enumerate(scroll_result[0]):
                 emotion = point.payload.get('emotional_context', 'neutral')
+                content_preview = point.payload.get('content', 'NO CONTENT')[:50]
+                timestamp = point.payload.get('timestamp', 'NO TIMESTAMP')
+                role = point.payload.get('role', 'UNKNOWN')
+                
+                logger.info(f"🔍 DEBUG: Memory {i+1}: emotion='{emotion}', role='{role}', "
+                           f"content='{content_preview}...', timestamp={timestamp}")
                 emotions.append(emotion)
             
-            return emotions if emotions else ['neutral']
+            final_emotions = emotions if emotions else ['neutral']
+            logger.info(f"🔍 DEBUG: Final emotions list: {final_emotions}")
+            return final_emotions
             
         except Exception as e:
             logger.error(f"Error getting recent emotional states: {e}")
@@ -872,7 +947,10 @@ class VectorMemoryStore:
     
     def calculate_emotional_momentum(self, emotions: List[str]) -> float:
         """Calculate emotional momentum (rate of emotional change)"""
+        logger.info(f"🎭 DEBUG: Calculating momentum for emotions: {emotions}")
+        
         if len(emotions) < 2:
+            logger.info(f"🎭 DEBUG: Less than 2 emotions, returning momentum = 0.0")
             return 0.0
         
         # Map emotions to numerical values for momentum calculation
@@ -901,7 +979,10 @@ class VectorMemoryStore:
     
     def calculate_emotional_stability(self, emotions: List[str]) -> float:
         """Calculate emotional stability (consistency over time)"""
+        logger.info(f"🎭 DEBUG: Calculating stability for emotions: {emotions}")
+        
         if len(emotions) < 2:
+            logger.info(f"🎭 DEBUG: Less than 2 emotions, returning stability = 1.0")
             return 1.0
         
         # Map emotions to values and calculate variance
@@ -912,6 +993,7 @@ class VectorMemoryStore:
         }
         
         values = [emotion_values.get(emotion, 0.0) for emotion in emotions]
+        logger.info(f"🎭 DEBUG: Emotion values: {values}")
         
         # Calculate standard deviation as measure of stability
         mean_val = sum(values) / len(values)
@@ -3031,11 +3113,12 @@ class VectorMemoryManager:
         if not embeddings_config:
             raise ValueError("Missing 'embeddings' configuration in vector memory config")
         
-        embedding_model = embeddings_config.get('model_name')
-        if not embedding_model:
+        embedding_model = embeddings_config.get('model_name', '')
+        # Empty string means use FastEmbed default model (BAAI/bge-small-en-v1.5)
+        if embedding_model is None:
             raise ValueError("Missing 'model_name' in embeddings configuration")
             
-        logger.info(f"[VECTOR-MEMORY-DEBUG] Using embedding model: {embedding_model}")
+        logger.info(f"[VECTOR-MEMORY-DEBUG] Using embedding model: '{embedding_model}' (empty = FastEmbed default)")
         logger.info(f"[VECTOR-MEMORY-DEBUG] Full embeddings config: {embeddings_config}")
         logger.info(f"[VECTOR-MEMORY-DEBUG] Full vector config: {config}")
         

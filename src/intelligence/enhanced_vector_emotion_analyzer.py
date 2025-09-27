@@ -194,36 +194,59 @@ class EnhancedVectorEmotionAnalyzer:
         """
         start_time = time.perf_counter()
         
+        logger.info(f"🎭 EMOTION ANALYZER: Starting comprehensive emotion analysis for user {user_id}")
+        logger.info(f"🎭 EMOTION ANALYZER: Content to analyze: '{content[:100]}{'...' if len(content) > 100 else ''}'")
+        logger.info(f"🎭 EMOTION ANALYZER: Context provided: {bool(conversation_context)}, Recent emotions: {recent_emotions}")
+        
         try:
             # VECTOR-NATIVE ANALYSIS WITH KEYWORD FALLBACK
             
             # Step 1: Vector-based semantic emotion analysis using the actual message content
+            logger.debug(f"🎭 STEP 1: Starting vector-based semantic emotion analysis")
             vector_emotions = await self._analyze_vector_emotions(user_id, content)
+            logger.info(f"🎭 STEP 1 RESULT: Vector emotions: {vector_emotions}")
             
             # Step 2: Context-aware emotion analysis using vector memory
+            logger.debug(f"🎭 STEP 2: Starting context-aware emotion analysis")
             context_emotions = await self._analyze_context_emotions(
                 conversation_context, recent_emotions
             )
+            logger.info(f"🎭 STEP 2 RESULT: Context emotions: {context_emotions}")
             
             # Step 3: Keyword-based fallback analysis (essential for new users)
+            logger.debug(f"🎭 STEP 3: Starting keyword-based fallback analysis")
             keyword_emotions = self._analyze_keyword_emotions(content)
+            logger.info(f"🎭 STEP 3 RESULT: Keyword emotions: {keyword_emotions}")
             
             # Step 4: Emotional intensity analysis
+            logger.debug(f"🎭 STEP 4: Analyzing emotional intensity")
             intensity = self._analyze_emotional_intensity(content)
+            logger.info(f"🎭 STEP 4 RESULT: Emotional intensity: {intensity:.3f}")
             
             # Step 5: Emotional trajectory analysis
+            logger.debug(f"🎭 STEP 5: Analyzing emotional trajectory")
             trajectory = self._analyze_emotional_trajectory(content, recent_emotions)
+            logger.info(f"🎭 STEP 5 RESULT: Emotional trajectory: {trajectory}")
             
             # Step 6: Combine all emotion analyses
+            logger.debug(f"🎭 STEP 6: Combining all emotion analyses")
             final_emotions = self._combine_emotion_analyses(
                 keyword_emotions, vector_emotions, context_emotions
             )
+            logger.info(f"🎭 STEP 6 RESULT: Final combined emotions: {final_emotions}")
             
             # Step 7: Determine primary emotion and confidence
             primary_emotion, confidence = self._determine_primary_emotion(final_emotions)
             
             # Calculate performance metrics
             analysis_time_ms = int((time.perf_counter() - start_time) * 1000)
+            
+            logger.info(f"🎭 FINAL RESULT: Creating EmotionAnalysisResult with:")
+            logger.info(f"  - Primary emotion: {primary_emotion}")
+            logger.info(f"  - Confidence: {confidence:.3f}")
+            logger.info(f"  - Intensity: {intensity:.3f}")
+            logger.info(f"  - All emotions: {final_emotions}")
+            logger.info(f"  - Analysis time: {analysis_time_ms}ms")
             
             result = EmotionAnalysisResult(
                 primary_emotion=primary_emotion,
@@ -239,7 +262,7 @@ class EnhancedVectorEmotionAnalyzer:
             )
             
             logger.info(
-                "Enhanced emotion analysis completed for user %s: "
+                "🎭 ENHANCED EMOTION ANALYSIS COMPLETE for user %s: "
                 "%s (confidence: %.3f, intensity: %.3f) "
                 "in %dms",
                 user_id, primary_emotion, confidence, intensity, analysis_time_ms
@@ -248,10 +271,10 @@ class EnhancedVectorEmotionAnalyzer:
             return result
             
         except (AttributeError, ValueError, TypeError) as e:
-            logger.error("Enhanced emotion analysis failed for user %s: %s", user_id, e)
+            logger.error("🎭 ENHANCED EMOTION ANALYSIS FAILED for user %s: %s", user_id, e)
             
             # Fallback to basic analysis
-            return EmotionAnalysisResult(
+            fallback_result = EmotionAnalysisResult(
                 primary_emotion="neutral",
                 confidence=0.3,
                 intensity=0.5,
@@ -263,6 +286,9 @@ class EnhancedVectorEmotionAnalyzer:
                 embedding_confidence=0.0,
                 pattern_match_score=0.0
             )
+            
+            logger.info(f"🎭 FALLBACK RESULT: Returning neutral fallback due to error: {fallback_result}")
+            return fallback_result
     
     # KEYWORD ANALYSIS - Essential fallback for new users!
     
@@ -271,8 +297,11 @@ class EnhancedVectorEmotionAnalyzer:
         Multi-layer emotion analysis: RoBERTa (primary) → VADER (fallback) → Keywords (backup).
         This is the core emotion detection method with state-of-art accuracy.
         """
+        logger.info(f"🔍 KEYWORD ANALYSIS: Starting multi-layer emotion analysis for: '{content[:50]}{'...' if len(content) > 50 else ''}'")
+        
         try:
             if not content:
+                logger.info(f"🔍 KEYWORD ANALYSIS: Empty content, returning empty emotions")
                 return {}
             
             content_lower = content.lower()
@@ -280,20 +309,22 @@ class EnhancedVectorEmotionAnalyzer:
             
             # LAYER 1: RoBERTa Transformer Analysis (PRIMARY - State-of-art accuracy)
             if ROBERTA_AVAILABLE:
+                logger.info(f"🤖 ROBERTA ANALYSIS: RoBERTa transformer available, starting analysis")
                 try:
                     # Initialize RoBERTa classifier if not already done
                     if not hasattr(self, '_roberta_classifier') or self._roberta_classifier is None:
-                        logger.info("Initializing RoBERTa emotion classifier...")
+                        logger.info("🤖 ROBERTA ANALYSIS: Initializing RoBERTa emotion classifier...")
                         self._roberta_classifier = pipeline(
                             "text-classification",
                             model="j-hartmann/emotion-english-distilroberta-base",
                             return_all_scores=True
                         )
-                        logger.info("✅ RoBERTa emotion classifier initialized")
+                        logger.info("🤖 ROBERTA ANALYSIS: ✅ RoBERTa emotion classifier initialized")
                     
                     # Analyze emotions with RoBERTa
+                    logger.debug(f"🤖 ROBERTA ANALYSIS: Running RoBERTa inference on content")
                     results = self._roberta_classifier(content)
-                    logger.debug("RoBERTa emotion analysis completed with %d results", len(results[0]))
+                    logger.info(f"🤖 ROBERTA ANALYSIS: RoBERTa completed with {len(results[0])} emotion results")
                     
                     # Process RoBERTa results
                     for result in results[0]:  # First (only) text result
@@ -302,51 +333,59 @@ class EnhancedVectorEmotionAnalyzer:
                         
                         # Map RoBERTa labels to our emotion dimensions
                         emotion_scores[emotion_label] = confidence
-                        logger.debug("RoBERTa detected %s: %.3f", emotion_label, confidence)
+                        logger.info(f"🤖 ROBERTA ANALYSIS: RoBERTa detected {emotion_label}: {confidence:.3f}")
                     
                     # If RoBERTa found strong emotions, prioritize them
                     if any(score > 0.6 for score in emotion_scores.values()):
-                        logger.info("RoBERTa detected strong emotions - using as primary analysis")
+                        logger.info(f"🤖 ROBERTA ANALYSIS: Strong emotions detected (>0.6), using RoBERTa as primary: {emotion_scores}")
                         return emotion_scores  # Return RoBERTa results directly
+                    else:
+                        logger.info(f"🤖 ROBERTA ANALYSIS: No strong emotions, continuing to VADER analysis")
                         
                 except Exception as roberta_error:
-                    logger.warning("RoBERTa analysis failed: %s", roberta_error)
-                    # Continue to VADER fallback
+                    logger.warning(f"🤖 ROBERTA ANALYSIS: RoBERTa analysis failed: {roberta_error}")
             else:
-                logger.debug("RoBERTa not available - falling back to VADER + keywords")
+                logger.info(f"🤖 ROBERTA ANALYSIS: RoBERTa not available, skipping to VADER")
             
             # LAYER 2: VADER Sentiment Analysis (FALLBACK)
             if VADER_AVAILABLE:
+                logger.info(f"😊 VADER ANALYSIS: VADER sentiment analyzer available, starting analysis")
                 try:
                     if not hasattr(self, '_vader_analyzer') or self._vader_analyzer is None:
                         self._vader_analyzer = SentimentIntensityAnalyzer()
-                        logger.debug("VADER sentiment analyzer initialized")
+                        logger.info(f"😊 VADER ANALYSIS: VADER sentiment analyzer initialized")
                     
                     scores = self._vader_analyzer.polarity_scores(content)
+                    logger.info(f"😊 VADER ANALYSIS: VADER scores: {scores}")
                     
                     # Map VADER scores to our emotion categories
                     if scores['pos'] > 0.3:  # Positive sentiment
                         emotion_scores['joy'] = max(emotion_scores.get('joy', 0.0), scores['pos'])
+                        logger.info(f"😊 VADER ANALYSIS: Positive sentiment detected, joy score: {emotion_scores['joy']:.3f}")
                     if scores['neg'] > 0.3:  # Negative sentiment  
                         # Determine if it's anger or sadness based on keywords
                         if any(word in content_lower for word in ['angry', 'mad', 'furious', 'hate', 'rage']):
                             emotion_scores['anger'] = max(emotion_scores.get('anger', 0.0), scores['neg'])
+                            logger.info(f"😊 VADER ANALYSIS: Anger keywords detected, anger score: {emotion_scores['anger']:.3f}")
                         else:
                             emotion_scores['sadness'] = max(emotion_scores.get('sadness', 0.0), scores['neg'])
+                            logger.info(f"😊 VADER ANALYSIS: Negative sentiment without anger keywords, sadness score: {emotion_scores['sadness']:.3f}")
                     
                     # Use compound score for overall intensity
                     if abs(scores['compound']) > 0.1:  # Significant emotion detected
                         intensity_multiplier = min(abs(scores['compound']) + 1.0, 2.0)
                         # Boost all detected emotions based on VADER intensity
+                        original_scores = emotion_scores.copy()
                         for emotion in emotion_scores:
                             emotion_scores[emotion] *= intensity_multiplier
+                        logger.info(f"😊 VADER ANALYSIS: Applied intensity multiplier {intensity_multiplier:.2f}, scores before: {original_scores}, after: {emotion_scores}")
                     
-                    logger.debug("VADER analysis: %s, multiplier: %s", scores, 
-                               locals().get('intensity_multiplier', 1.0))
-                        
+                    logger.info(f"😊 VADER ANALYSIS: Final VADER-enhanced emotions: {emotion_scores}")
+                    
                 except Exception as vader_error:
-                    logger.warning("VADER analysis failed: %s", vader_error)
-                    # Continue to keyword fallback
+                    logger.warning(f"😊 VADER ANALYSIS: VADER analysis failed: {vader_error}")
+            else:
+                logger.info(f"😊 VADER ANALYSIS: VADER not available, proceeding to keyword analysis")
             
             # LAYER 3: Keyword Analysis (BACKUP - Always available)
             # Check for emotion keywords

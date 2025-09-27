@@ -26,13 +26,20 @@ ENV FASTEMBED_CACHE_PATH=/root/.cache/fastembed
 # Create cache directories explicitly
 RUN mkdir -p /root/.cache/huggingface /root/.cache/fastembed
 
-# Download all models during build (network required only at build time)
+# Download all models during build (network required only at build time)  
+# Using FastEmbed default model - no rate limit issues
 RUN python download_models.py
 
 # Verify models were downloaded
 RUN ls -la /app/models/ && \
     echo "📊 Model bundle contents:" && \
-    du -sh /app/models/* || echo "No models found"
+    du -sh /app/models/* || echo "No models found in /app/models"
+
+# Check cache directories
+RUN echo "📁 FastEmbed cache:" && \
+    ls -la /root/.cache/fastembed/ || echo "FastEmbed cache empty" && \
+    echo "📁 HuggingFace cache:" && \
+    ls -la /root/.cache/huggingface/ || echo "HuggingFace cache empty"
 
 # Stage 2: Development Runtime
 FROM python:3.13-slim as development
@@ -96,8 +103,10 @@ RUN apt-get update && apt-get install -y \
 
 # Copy pre-downloaded models from builder stage
 COPY --from=model-downloader /app/models /app/models
-# Copy HuggingFace cache (RoBERTa models) - FastEmbed cache not needed (embedded directly)  
+# Copy HuggingFace cache (RoBERTa models)
 COPY --from=model-downloader /root/.cache/huggingface /root/.cache/huggingface
+# Copy FastEmbed cache (embedding models) - required for offline operation
+COPY --from=model-downloader /root/.cache/fastembed /root/.cache/fastembed
 
 # Copy and install Python dependencies using multi-tier structure
 COPY requirements-core.txt requirements-platform.txt requirements-discord.txt requirements-vector-memory.txt ./
@@ -124,10 +133,11 @@ RUN pip install --no-cache-dir asyncpg
 
 # Set environment for offline model usage
 ENV MODEL_CACHE_DIR=/app/models
-ENV TRANSFORMERS_OFFLINE=1
-ENV HF_DATASETS_OFFLINE=1
+ENV HF_HOME=/root/.cache/huggingface
+ENV TRANSFORMERS_CACHE=/root/.cache/huggingface
 ENV SENTENCE_TRANSFORMERS_HOME=/app/models
 ENV FASTEMBED_CACHE_PATH=/root/.cache/fastembed
+# Note: Not setting TRANSFORMERS_OFFLINE=1 or HF_HUB_OFFLINE=1 as FastEmbed needs to validate cache
 
 # Verify models are accessible
 RUN python -c "\
@@ -138,7 +148,9 @@ config = json.load(open(config_path)) if os.path.exists(config_path) else {}; \
 print('✅ Model configuration loaded' if config else '❌ Model configuration not found'); \
 print(f'📁 Models available: {list(config.get(\"embedding_models\", {}).keys())}' if config else ''); \
 exit(0 if config else 1) \
-"
+" && \
+echo "✅ FastEmbed cache copied and ready for use" && \
+ls -la /root/.cache/fastembed/
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \

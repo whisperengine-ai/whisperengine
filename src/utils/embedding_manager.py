@@ -26,7 +26,7 @@ class LocalEmbeddingManager:
         # Model configuration - optimized for speed and quality
         self.embedding_model_name = os.getenv(
             "EMBEDDING_MODEL",
-            "snowflake/snowflake-arctic-embed-xs",  # 384-dim, optimal for real-time chat
+            "",  # Use FastEmbed default (BAAI/bge-small-en-v1.5) - no rate limits, 384-dim
         )
 
         # Fallback model (same as primary for consistency)
@@ -81,6 +81,9 @@ class LocalEmbeddingManager:
             loop = asyncio.get_event_loop()
             
             def load_model_safely():
+                # Get FastEmbed cache directory
+                fastembed_cache_dir = os.getenv("FASTEMBED_CACHE_PATH", "/root/.cache/fastembed")
+                
                 # Check for pre-bundled models first (Docker environment)
                 model_cache_dir = os.getenv("MODEL_CACHE_DIR", "/app/models")
                 bundled_model_path = os.path.join(model_cache_dir, "embeddings")
@@ -88,17 +91,25 @@ class LocalEmbeddingManager:
                 # Initialize fastembed model with proper cache configuration
                 if os.path.exists(bundled_model_path):
                     logger.info("✅ Using pre-bundled models from: %s", bundled_model_path)
-                    # Use the bundled models directory as cache
-                    model = TextEmbedding(
-                        model_name=self.embedding_model_name,
-                        cache_dir=model_cache_dir
-                    )
+                    # Use the FastEmbed cache directory
+                    if self.embedding_model_name:
+                        model = TextEmbedding(
+                            model_name=self.embedding_model_name,
+                            cache_dir=fastembed_cache_dir
+                        )
+                    else:
+                        # Use FastEmbed default model
+                        model = TextEmbedding(cache_dir=fastembed_cache_dir)
                 elif os.path.exists(self.embedding_model_name):
                     logger.info("Loading local model from: %s", self.embedding_model_name)
-                    model = TextEmbedding(model_name=self.embedding_model_name, cache_dir=self.embedding_model_name)
+                    model = TextEmbedding(model_name=self.embedding_model_name, cache_dir=fastembed_cache_dir)
                 else:
                     logger.warning("⚠️  No pre-bundled models found, downloading at runtime: %s", self.embedding_model_name)
-                    model = TextEmbedding(model_name=self.embedding_model_name)
+                    if self.embedding_model_name:
+                        model = TextEmbedding(model_name=self.embedding_model_name, cache_dir=fastembed_cache_dir)
+                    else:
+                        # Use FastEmbed default model
+                        model = TextEmbedding(cache_dir=fastembed_cache_dir)
                 
                 return model
             

@@ -82,7 +82,6 @@ class HelpCommandHandlers:
         commands = [
             f"`!ping{name_suffix}` - Test connectivity",
             f"`!bot_status{name_suffix}` - Bot health check",
-            f"`!llm_status{name_suffix}` - LLM service & model info", 
             f"`!join{name_suffix}` - Join voice channel",
             f"`!leave{name_suffix}` - Leave voice channel"
         ]

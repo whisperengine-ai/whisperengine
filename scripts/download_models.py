@@ -15,10 +15,12 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 def download_embedding_models():
-    """Download fastembed embedding models - ONLY vector-native models needed"""
+    """Download fastembed embedding models - Using default model to avoid rate limits"""
+    import time
+    import os
+    
     try:
         from fastembed import TextEmbedding
-        import os
         
         models_dir = Path("/app/models/embeddings")
         models_dir.mkdir(parents=True, exist_ok=True)
@@ -28,12 +30,15 @@ def download_embedding_models():
         os.makedirs(fastembed_cache, exist_ok=True)
         logger.info(f"📁 FastEmbed cache directory: {fastembed_cache}")
         
-        # Primary embedding model (fastembed approach)
-        model_name = "snowflake/snowflake-arctic-embed-xs"
-        logger.info(f"📥 Downloading vector-native embedding model ({model_name})...")
+        # Use FastEmbed default model (BAAI/bge-small-en-v1.5) - no rate limiting issues
+        # This model has 384 dimensions (same as snowflake-arctic-embed-xs) but is more reliable
+        logger.info("📥 Downloading vector-native embedding model (default: BAAI/bge-small-en-v1.5)...")
         
-        # Initialize fastembed model (this downloads it to cache)
-        embedding_model = TextEmbedding(model_name=model_name)
+        # Initialize fastembed model with default (most reliable)
+        embedding_model = TextEmbedding()  # Uses default model - no rate limit issues
+        model_name = embedding_model.model_name
+        
+        logger.info(f"✅ Successfully loaded default model: {model_name}")
         
         # Verify cache was created
         if os.path.exists(fastembed_cache) and os.listdir(fastembed_cache):
@@ -53,7 +58,9 @@ def download_embedding_models():
             "cache_location": fastembed_cache,
             "model_type": "fastembed",
             "architecture": "vector_native",
-            "verified": True
+            "verified": True,
+            "is_default_model": True,
+            "no_rate_limit_issues": True
         }
         
         import json
@@ -62,6 +69,7 @@ def download_embedding_models():
         
         logger.info(f"✅ Vector-native embedding model ready: {model_name}")
         logger.info(f"📊 Embedding dimension: {len(test_embedding)}")
+        logger.info(f"🚀 Using default model - no HuggingFace rate limiting!")
         
         return True
     except Exception as e:
@@ -128,9 +136,12 @@ def create_model_config():
     """Create configuration file for hybrid model architecture"""
     config = {
         "embedding_models": {
-            "primary": "snowflake/snowflake-arctic-embed-xs",
+            "primary": "BAAI/bge-small-en-v1.5",  # FastEmbed default - no rate limits
             "type": "fastembed",
-            "cache_dir": "~/.cache/fastembed"
+            "cache_dir": "~/.cache/fastembed",
+            "dimensions": 384,
+            "size_gb": 0.067,
+            "rate_limit_free": True
         },
         "emotion_models": {
             "primary": "j-hartmann/emotion-english-distilroberta-base",
@@ -145,7 +156,8 @@ def create_model_config():
         "model_cache_dir": "/app/models",
         "legacy_nlp_removed": True,
         "docker_optimized": True,
-        "build_time_download": True
+        "build_time_download": True,
+        "default_fastembed_model": True
     }
     
     import json

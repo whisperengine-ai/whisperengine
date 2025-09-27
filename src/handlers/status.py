@@ -53,12 +53,6 @@ class StatusCommandHandlers:
             )
             await ctx.send("Pong!")
 
-        @self.bot.command(name="llm_status")
-        @bot_name_filter()
-        async def llm_status(ctx):
-            """Check if the LLM server is running and show configuration"""
-            await status_handler_instance._llm_status_handler(ctx)
-
         @self.bot.command(name="bot_status")
         @bot_name_filter()
         async def bot_status(ctx):
@@ -68,97 +62,6 @@ class StatusCommandHandlers:
         # Removed the other hidden status commands Copilot added:
         # cache_stats, vision_status, voice_status, test_image, health_status
         # Users don't need detailed technical diagnostic commands
-
-    async def _llm_status_handler(self, ctx):
-        """Handle LLM status command"""
-        logger.debug(f"LLM status command called by {ctx.author.name}")
-
-        embed = discord.Embed(
-            title="🤖 LLM Server Status",
-            color=0x27AE60 if self.llm_client.check_connection() else 0xE74C3C,
-        )
-
-        if self.llm_client.check_connection():
-            logger.debug("LLM status check: Connected")
-            embed.add_field(
-                name="Connection Status",
-                value="✅ **Connected** - Server is running and responding",
-                inline=False,
-            )
-
-            # Show main service configuration
-            api_key_status = "✅ Configured" if self.llm_client.api_key else "❌ Not set"
-            embed.add_field(
-                name="🤖 Main Chat Service",
-                value=f"• Service: **{self.llm_client.service_name}**\n• API URL: **{self.llm_client.api_url}**\n• API Key: **{api_key_status}**\n• Model: **{self.llm_client.default_model_name}**\n• Max tokens: **{self.llm_client.default_max_tokens_chat:,}**",
-                inline=False,
-            )
-
-            # Show emotion analysis service configuration
-            emotion_api_key_status = (
-                "✅ Configured" if self.llm_client.emotion_api_key else "❌ Not set"
-            )
-            emotion_same_endpoint = self.llm_client.emotion_api_url == self.llm_client.api_url
-            emotion_info = (
-                "Same as main service"
-                if emotion_same_endpoint
-                else f"• Service: **{self.llm_client.emotion_service_name}**\n• API URL: **{self.llm_client.emotion_api_url}**\n• API Key: **{emotion_api_key_status}**"
-            )
-
-            embed.add_field(
-                name="😊 Emotion Analysis Service",
-                value=f"{emotion_info}\n• Model: **{self.llm_client.emotion_model_name}**\n• Max tokens (emotion): **{self.llm_client.max_tokens_emotion}**",
-                inline=False,
-            )
-
-            # Show facts analysis service configuration
-            facts_api_key_status = (
-                "✅ Configured" if self.llm_client.facts_api_key else "❌ Not set"
-            )
-            facts_same_endpoint = self.llm_client.facts_api_url == self.llm_client.api_url
-            facts_info = (
-                "Same as main service"
-                if facts_same_endpoint
-                else f"• Service: **{self.llm_client.facts_service_name}**\n• API URL: **{self.llm_client.facts_api_url}**\n• API Key: **{facts_api_key_status}**"
-            )
-
-            embed.add_field(
-                name="📝 Facts Analysis Service",
-                value=f"{facts_info}\n• Model: **{self.llm_client.facts_model_name}**\n• Max tokens (facts): **{self.llm_client.max_tokens_fact_extraction}**\n• Max tokens (personal): **{self.llm_client.max_tokens_personal_info}**\n• Max tokens (user facts): **{self.llm_client.max_tokens_user_facts}**",
-                inline=False,
-            )
-
-            # Show timeout configuration
-            embed.add_field(
-                name="⏱️ Timeout Configuration",
-                value=f"• Request timeout: **{self.llm_client.request_timeout}s**\n• Connection timeout: **{self.llm_client.connection_timeout}s**",
-                inline=False,
-            )
-
-            # Show vision support
-            vision_status = "✅ Enabled" if self.llm_client.supports_vision else "❌ Disabled"
-            vision_details = f"**{vision_status}**"
-            if self.llm_client.supports_vision:
-                vision_config = self.llm_client.get_vision_config()
-                if vision_config and "max_images" in vision_config:
-                    vision_details += f"\n• Max images: **{vision_config['max_images']}**"
-            embed.add_field(name="Vision Support", value=vision_details, inline=False)
-        else:
-            logger.warning("LLM status check: Disconnected")
-            embed.add_field(
-                name="Connection Status",
-                value="❌ **Disconnected** - Server is not responding",
-                inline=False,
-            )
-            # Different troubleshooting based on service type
-            if self.llm_client.is_openrouter:
-                troubleshooting = "• Check your OPENROUTER_API_KEY is valid\n• Verify your OpenRouter account has credits\n• Ensure the model name is correct"
-            else:
-                troubleshooting = "• Make sure your LLM provider (LM Studio/Ollama/etc.) is running\n• Check that the server is accessible\n• Verify the API endpoint configuration"
-
-            embed.add_field(name="Troubleshooting", value=troubleshooting, inline=False)
-
-        await ctx.send(embed=embed)
 
     async def _bot_status_handler(self, ctx):
         """Handle bot status command"""
@@ -599,7 +502,7 @@ class StatusCommandHandlers:
 
         # Add helpful footer
         embed.set_footer(
-            text="💡 Use !bot_status, !llm_status, !voice_status for detailed component info"
+            text="💡 Use !bot_status, !voice_status for detailed component info"
         )
 
         await ctx.send(embed=embed)

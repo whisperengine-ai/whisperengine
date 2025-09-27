@@ -105,6 +105,8 @@ class BotConfigDiscovery:
             f"{bot_name}-sterling" if bot_name == "jake" else None,
             # Special case for ryan -> ryan-chen character file migration
             "ryan-chen" if bot_name == "ryan" else None,
+            # Special case for aethys -> aethys-omnipotent-entity character file
+            f"{bot_name}-omnipotent-entity" if bot_name == "aethys" else None,
         ]
         
         # Filter out None values

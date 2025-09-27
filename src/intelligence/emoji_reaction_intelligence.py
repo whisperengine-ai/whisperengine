@@ -344,14 +344,23 @@ class EmojiReactionIntelligence:
         Returns:
             Emotional context for response generation
         """
+        logger.info(f"😀 EMOJI REACTION INTELLIGENCE: Getting emotional context for user {user_id}")
+        
         if user_id not in self.reaction_history:
+            logger.info(f"😀 EMOJI REACTION INTELLIGENCE: No reaction history for user {user_id}, returning neutral")
             return {"emotional_context": "neutral", "confidence": 0.0}
         
         # Get recent reactions (last 10)
         recent_reactions = self.reaction_history[user_id][-10:]
+        logger.info(f"😀 EMOJI REACTION INTELLIGENCE: Found {len(recent_reactions)} recent reactions for analysis")
         
         if not recent_reactions:
+            logger.info(f"😀 EMOJI REACTION INTELLIGENCE: No recent reactions, returning neutral")
             return {"emotional_context": "neutral", "confidence": 0.0}
+        
+        # Log the reactions being analyzed
+        for i, reaction in enumerate(recent_reactions):
+            logger.info(f"😀 EMOJI REACTION INTELLIGENCE: Reaction {i+1}: {reaction.emoji_name} -> {reaction.reaction_type.value} (confidence: {reaction.confidence_score:.3f})")
         
         # Weight recent reactions more heavily
         weighted_scores = {}
@@ -366,8 +375,13 @@ class EmojiReactionIntelligence:
                 weighted_scores[emotion_type] = 0
             weighted_scores[emotion_type] += weight
             total_weight += weight
+            
+            logger.debug(f"😀 EMOJI REACTION INTELLIGENCE: Weighted reaction {i+1}: {emotion_type} += {weight:.3f}")
+        
+        logger.info(f"😀 EMOJI REACTION INTELLIGENCE: Weighted emotion scores: {weighted_scores}, total weight: {total_weight:.3f}")
         
         if total_weight == 0:
+            logger.info(f"😀 EMOJI REACTION INTELLIGENCE: Zero total weight, returning neutral")
             return {"emotional_context": "neutral", "confidence": 0.0}
         
         # Normalize scores
@@ -376,12 +390,18 @@ class EmojiReactionIntelligence:
             for emotion, score in weighted_scores.items()
         }
         
+        logger.info(f"😀 EMOJI REACTION INTELLIGENCE: Normalized emotion scores: {normalized_scores}")
+        
         # Get dominant emotion
         dominant_emotion = max(normalized_scores.items(), key=lambda x: x[1])
         
-        return {
+        result = {
             "emotional_context": dominant_emotion[0],
             "confidence": dominant_emotion[1],
-            "recent_patterns": normalized_scores,
-            "sample_size": len(recent_reactions)
+            "sample_size": len(recent_reactions),
+            "all_emotions": normalized_scores
         }
+        
+        logger.info(f"😀 EMOJI REACTION INTELLIGENCE: Final emotional context result: {result}")
+        
+        return result

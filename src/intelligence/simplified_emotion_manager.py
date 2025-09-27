@@ -59,17 +59,27 @@ class SimplifiedEmotionManager:
         Returns:
             Enhanced emotion analysis with multimodal intelligence
         """
+        logger.info(f"🎭 SIMPLIFIED EMOTION MANAGER: Starting emotion analysis with reactions for user {user_id}")
+        logger.info(f"🎭 SIMPLIFIED EMOTION MANAGER: Message: '{message[:100]}{'...' if len(message) > 100 else ''}'")
+        logger.info(f"🎭 SIMPLIFIED EMOTION MANAGER: Has conversation context: {bool(conversation_context)}")
+        logger.info(f"🎭 SIMPLIFIED EMOTION MANAGER: Has emoji reaction context: {bool(emoji_reaction_context)}")
+        
         # Get base emotion analysis
+        logger.info(f"🎭 SIMPLIFIED EMOTION MANAGER: Getting base emotion analysis")
         base_emotion = await self.analyze_message_emotion(user_id, message, conversation_context)
+        logger.info(f"🎭 SIMPLIFIED EMOTION MANAGER: Base emotion result: {base_emotion}")
         
         # Enhance with emoji reaction data if available
         if emoji_reaction_context and emoji_reaction_context.get("emotional_context") != "neutral":
             reaction_emotion = emoji_reaction_context.get("emotional_context", "neutral")
             reaction_confidence = emoji_reaction_context.get("confidence", 0.0)
             
+            logger.info(f"🎭 SIMPLIFIED EMOTION MANAGER: Enhancing with emoji reactions - emotion: {reaction_emotion}, confidence: {reaction_confidence:.3f}")
+            
             # Blend text-based emotion with reaction-based emotion
             # Reactions are immediate feedback, so weight them highly for recent context
             if reaction_confidence > 0.5:
+                logger.info(f"🎭 SIMPLIFIED EMOTION MANAGER: Strong reaction confidence (>0.5), blending emotions")
                 # Strong reaction confidence - blend emotions
                 enhanced_emotion = self._blend_emotions(
                     text_emotion=base_emotion.get("primary_emotion", "neutral"),
@@ -77,6 +87,8 @@ class SimplifiedEmotionManager:
                     reaction_emotion=reaction_emotion,
                     reaction_confidence=reaction_confidence
                 )
+                
+                logger.info(f"🎭 SIMPLIFIED EMOTION MANAGER: Blended emotion result: {enhanced_emotion}")
                 
                 base_emotion.update({
                     "primary_emotion": enhanced_emotion["emotion"],
@@ -98,7 +110,11 @@ class SimplifiedEmotionManager:
                         "confidence_boost": reaction_confidence
                     })
                 
-                logger.info(f"🎭 Enhanced emotion analysis with reactions: {enhanced_emotion['emotion']} (confidence: {enhanced_emotion['confidence']:.2f})")
+                logger.info(f"🎭 SIMPLIFIED EMOTION MANAGER: Enhanced emotion with reactions: {base_emotion}")
+            else:
+                logger.info(f"🎭 SIMPLIFIED EMOTION MANAGER: Weak reaction confidence (<0.5), keeping base emotion")
+        else:
+            logger.info(f"🎭 SIMPLIFIED EMOTION MANAGER: No emoji reaction context or neutral reaction, using base emotion only")
         
         return base_emotion
     

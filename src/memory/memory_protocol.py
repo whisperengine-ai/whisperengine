@@ -163,32 +163,36 @@ def create_memory_manager(memory_type: str = "vector", **config) -> MemoryManage
         
         # Create vector config from environment and overrides
         import os
-        vector_config = {
+        config = {
             'qdrant': {
-                'host': os.getenv('VECTOR_QDRANT_HOST', 'qdrant'),
-                'port': int(os.getenv('VECTOR_QDRANT_PORT', '6333')),
-                'grpc_port': int(os.getenv('VECTOR_QDRANT_GRPC_PORT', '6334')),
-                'collection_name': os.getenv('VECTOR_QDRANT_COLLECTION', 'whisperengine_memory'),
-                'vector_size': int(os.getenv('VECTOR_EMBEDDING_SIZE', '384'))
+                'host': os.getenv('QDRANT_HOST', 'localhost'),
+                'port': int(os.getenv('QDRANT_PORT', '6333')),
+                'collection_name': os.getenv('QDRANT_COLLECTION_NAME', 'chat_memories')
             },
             'embeddings': {
-                'model_name': os.getenv('EMBEDDING_MODEL', 'snowflake/snowflake-arctic-embed-xs'),
-                'device': os.getenv('VECTOR_EMBEDDING_DEVICE', 'cpu')
+                'model_name': os.getenv('EMBEDDING_MODEL', ''),  # Use FastEmbed default (BAAI/bge-small-en-v1.5) - no rate limits
+                'device': os.getenv('EMBEDDING_DEVICE', 'cpu'),
+                'dimension': int(os.getenv('VECTOR_DIMENSION', '384'))
             },
             'postgresql': {
-                'url': f"postgresql://{os.getenv('POSTGRESQL_USERNAME', 'bot_user')}:{os.getenv('POSTGRESQL_PASSWORD', 'securepassword123')}@{os.getenv('POSTGRESQL_HOST', 'postgres')}:{os.getenv('POSTGRESQL_PORT', '5432')}/{os.getenv('POSTGRESQL_DATABASE', 'whisper_engine')}"
+                'host': os.getenv('POSTGRES_HOST', 'localhost'),
+                'port': int(os.getenv('POSTGRES_PORT', '5432')),
+                'database': os.getenv('POSTGRES_DB', 'whisperengine'),
+                'user': os.getenv('POSTGRES_USER', 'whisperengine'),
+                'password': os.getenv('POSTGRES_PASSWORD', 'whisperengine_password')
             },
             'redis': {
-                'url': f"redis://{os.getenv('REDIS_HOST', 'redis')}:{os.getenv('REDIS_PORT', '6379')}",
+                'host': os.getenv('REDIS_HOST', 'localhost'),
+                'port': int(os.getenv('REDIS_PORT', '6379')),
                 'ttl': int(os.getenv('REDIS_TTL', '1800'))
             }
         }
         
-        # Apply any config overrides
-        vector_config.update(config)
+        # Apply any config overrides if provided
+        # (config parameter would be passed from calling function)
         
         # Create and return the vector memory manager
-        return VectorMemoryManager(vector_config)
+        return VectorMemoryManager(config)
     
     elif memory_type == "experimental_v2":
         # Future: Next-generation memory system
