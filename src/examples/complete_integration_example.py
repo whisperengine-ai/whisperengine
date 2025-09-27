@@ -275,7 +275,7 @@ class CompleteIntegratedBot:
             self.memory_manager.retrieve_relevant_memories("test_user", "test", limit=1)
             status["components"]["memory_manager"] = {
                 "status": "healthy",
-                "embedding_model": os.getenv("EMBEDDING_MODEL", "BAAI/bge-small-en-v1.5"),
+                "embedding_model": os.getenv("EMBEDDING_MODEL", "sentence-transformers/all-MiniLM-L6-v2"),
             }
         except Exception as e:
             status["components"]["memory_manager"] = {"status": "error", "error": str(e)}

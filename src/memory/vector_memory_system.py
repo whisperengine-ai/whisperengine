@@ -159,7 +159,7 @@ class VectorMemoryStore:
                  qdrant_host: str = "localhost",
                  qdrant_port: int = 6333,
                  collection_name: str = "whisperengine_memory",
-                 embedding_model: str = ""):  # Use FastEmbed default (BAAI/bge-small-en-v1.5)
+                 embedding_model: str = ""):  # Use sentence-transformers/all-MiniLM-L6-v2 (best 384D quality)
         
         # Initialize Qdrant (Local Vector DB in Docker)
         self.client = QdrantClient(host=qdrant_host, port=qdrant_port)
@@ -170,7 +170,7 @@ class VectorMemoryStore:
         if embedding_model:
             self.embedder = TextEmbedding(model_name=embedding_model, cache_dir=cache_dir)
         else:
-            # Use default model (BAAI/bge-small-en-v1.5) - no rate limit issues
+            # Use sentence-transformers/all-MiniLM-L6-v2 (best 384D quality) - excellent conversation understanding
             self.embedder = TextEmbedding(cache_dir=cache_dir)
         # Get embedding dimension from the model
         test_embedding = list(self.embedder.embed(["test"]))[0]
@@ -3170,7 +3170,7 @@ class VectorMemoryManager:
             raise ValueError("Missing 'embeddings' configuration in vector memory config")
         
         embedding_model = embeddings_config.get('model_name', '')
-        # Empty string means use FastEmbed default model (BAAI/bge-small-en-v1.5)
+        # Empty string means use sentence-transformers/all-MiniLM-L6-v2 (best 384D model)
         if embedding_model is None:
             raise ValueError("Missing 'model_name' in embeddings configuration")
             

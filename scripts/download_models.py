@@ -30,12 +30,12 @@ def download_embedding_models():
         os.makedirs(fastembed_cache, exist_ok=True)
         logger.info(f"📁 FastEmbed cache directory: {fastembed_cache}")
         
-        # Use FastEmbed default model (BAAI/bge-small-en-v1.5) - no rate limiting issues
-        # This model has 384 dimensions (same as snowflake-arctic-embed-xs) but is more reliable
-        logger.info("📥 Downloading vector-native embedding model (default: BAAI/bge-small-en-v1.5)...")
+        # Use sentence-transformers/all-MiniLM-L6-v2 - best 384D quality model
+        # This model has 384 dimensions and excellent conversation understanding
+        logger.info("📥 Downloading vector-native embedding model: sentence-transformers/all-MiniLM-L6-v2...")
         
-        # Initialize fastembed model with default (most reliable)
-        embedding_model = TextEmbedding()  # Uses default model - no rate limit issues
+        # Initialize fastembed model with the new quality-optimized model
+        embedding_model = TextEmbedding(model_name="sentence-transformers/all-MiniLM-L6-v2")
         model_name = embedding_model.model_name
         
         logger.info(f"✅ Successfully loaded default model: {model_name}")
@@ -59,8 +59,9 @@ def download_embedding_models():
             "model_type": "fastembed",
             "architecture": "vector_native",
             "verified": True,
-            "is_default_model": True,
-            "no_rate_limit_issues": True
+            "is_quality_optimized": True,
+            "conversation_understanding": "excellent",
+            "upgrade_from": "BAAI/bge-small-en-v1.5"
         }
         
         import json
@@ -69,7 +70,7 @@ def download_embedding_models():
         
         logger.info(f"✅ Vector-native embedding model ready: {model_name}")
         logger.info(f"📊 Embedding dimension: {len(test_embedding)}")
-        logger.info(f"🚀 Using default model - no HuggingFace rate limiting!")
+        logger.info(f"🚀 Using sentence-transformers/all-MiniLM-L6-v2 - excellent conversation quality!")
         
         return True
     except Exception as e:
@@ -136,12 +137,13 @@ def create_model_config():
     """Create configuration file for hybrid model architecture"""
     config = {
         "embedding_models": {
-            "primary": "BAAI/bge-small-en-v1.5",  # FastEmbed default - no rate limits
+            "primary": "sentence-transformers/all-MiniLM-L6-v2",  # Best 384D quality model
             "type": "fastembed",
             "cache_dir": "~/.cache/fastembed",
             "dimensions": 384,
             "size_gb": 0.067,
-            "rate_limit_free": True
+            "quality_optimized": True,
+            "conversation_understanding": "excellent"
         },
         "emotion_models": {
             "primary": "j-hartmann/emotion-english-distilroberta-base",
@@ -157,7 +159,8 @@ def create_model_config():
         "legacy_nlp_removed": True,
         "docker_optimized": True,
         "build_time_download": True,
-        "default_fastembed_model": True
+        "quality_optimized_model": True,
+        "embedding_model_upgrade": "sentence-transformers/all-MiniLM-L6-v2"
     }
     
     import json
