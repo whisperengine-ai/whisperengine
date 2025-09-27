@@ -464,7 +464,7 @@ conversation_history = await memory_manager.get_conversation_history(
 ./multi-bot.sh start dream        # Start Dream bot (mythological entity)
 ./multi-bot.sh start aethys       # Start Aethys bot (omnipotent entity)
 ./multi-bot.sh start ryan         # Start Ryan bot (software engineer)
-./multi-bot.sh start gabriel      # Start Gabriel bot (archangel)
+./multi-bot.sh start gabriel      # Start Gabriel bot
 ./multi-bot.sh start sophia       # Start Sophia bot (neuroscientist)
 ./multi-bot.sh start all          # Start all configured bots
 ./multi-bot.sh stop               # Stop all bots

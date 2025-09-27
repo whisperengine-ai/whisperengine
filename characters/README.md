@@ -27,7 +27,7 @@ Deploy each character as its own dedicated bot instance with persistent memory:
 ./multi-bot.sh start elena    # Elena Rodriguez bot (marine biologist)
 ./multi-bot.sh start marcus   # Marcus Thompson bot (AI researcher)
 ./multi-bot.sh start jake     # Jake Sterling bot (game developer)
-./multi-bot.sh start gabriel  # Gabriel bot (archangel)
+./multi-bot.sh start gabriel  # Gabriel bot
 ./multi-bot.sh start all      # Start all available character bots
 ```
 

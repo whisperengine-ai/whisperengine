@@ -23,7 +23,7 @@ Each character runs as a dedicated bot with isolated memory:
 # Dedicated character bots with persistent relationships
 ./multi-bot.sh start elena    # Elena Rodriguez (marine biologist)  
 ./multi-bot.sh start marcus   # Marcus Thompson (AI researcher)
-./multi-bot.sh start gabriel  # Gabriel (archangel)
+./multi-bot.sh start gabriel  # Gabriel
 ```
 
 ### **Single-Bot Character Switching**  

@@ -20,7 +20,7 @@ When we say "demo characters," we mean the Discord AI personalities clearly mark
 - **Username Labels**: All our demo characters display **[AI DEMO]** in their Discord usernames
 - **Account Type**: Discord shows these as **"APP"** account types (not regular user accounts)  
 - **BOT Badge**: Discord automatically adds a "BOT" badge next to their names
-- **Creative Personalities**: Each has distinct personality traits - Elena (marine biologist), Marcus (AI researcher), Gabriel (archangel), etc.
+- **Creative Personalities**: Each has distinct personality traits - Elena (marine biologist), Marcus (AI researcher), Gabriel, etc.
 
 **🎨 Demo Character Purpose:**
 - **Explore personality diversity** - See how different character types interact
