@@ -110,6 +110,9 @@ class DiscordBotCore:
         self.multi_entity_manager = None
         self.ai_self_bridge = None
 
+        # Concurrent Conversation Management
+        self.conversation_manager = None
+
         # Add properties for batch initialization
         self._batched_memory_manager = None
         self._needs_batch_init = False
@@ -868,6 +871,77 @@ class DiscordBotCore:
         except Exception as e:
             self.logger.error(f"Failed to register cleanup functions: {e}")
 
+    async def initialize_conversation_manager(self):
+        """Initialize concurrent conversation manager if enabled."""
+        if os.getenv("ENABLE_CONCURRENT_CONVERSATION_MANAGER", "false").lower() != "true":
+            self.conversation_manager = None
+            self.logger.info("ConcurrentConversationManager disabled")
+            return
+
+        try:
+            from src.conversation.concurrent_conversation_manager import create_concurrent_conversation_manager
+            
+            # Get configuration from environment with sensible defaults
+            max_sessions = int(os.getenv("MAX_CONCURRENT_SESSIONS", "1000"))
+            max_threads = int(os.getenv("MAX_WORKER_THREADS", "0")) or None  # Auto-detect if 0
+            max_processes = int(os.getenv("MAX_WORKER_PROCESSES", "0")) or None  # Auto-detect if 0
+            session_timeout = int(os.getenv("SESSION_TIMEOUT_MINUTES", "30"))
+            
+            self.logger.info(f"Initializing ConcurrentConversationManager (sessions: {max_sessions}, timeout: {session_timeout}min)")
+            
+            # Get available components for integration
+            advanced_thread_manager = getattr(self, 'advanced_thread_manager', None)
+            emotion_engine = None
+            
+            # Try to use enhanced emotion analyzer as emotion engine
+            if hasattr(self, 'enhanced_emotion_analyzer') and self.enhanced_emotion_analyzer:
+                class EmotionEngineAdapter:
+                    """Adapter to make EnhancedVectorEmotionAnalyzer compatible with ConcurrentConversationManager"""
+                    def __init__(self, enhanced_analyzer):
+                        self.enhanced_analyzer = enhanced_analyzer
+                        self.logger = logging.getLogger(__name__)
+                    
+                    async def analyze_emotion(self, message: str, user_id: str):
+                        """Adapt enhanced analyzer to expected interface"""
+                        try:
+                            result = await self.enhanced_analyzer.analyze_emotion(message, user_id)
+                            return {
+                                "emotion": getattr(result, 'primary_emotion', 'neutral'),
+                                "intensity": getattr(result, 'intensity', 0.5),
+                                "confidence": getattr(result, 'confidence', 0.1),
+                                "valence": getattr(result, 'valence', 0.0),
+                            }
+                        except Exception as e:
+                            self.logger.warning(f"Emotion analysis failed in adapter: {e}")
+                            return {"emotion": "neutral", "intensity": 0.5, "confidence": 0.1}
+                
+                emotion_engine = EmotionEngineAdapter(self.enhanced_emotion_analyzer)
+                self.logger.info("✅ Using EnhancedVectorEmotionAnalyzer with adapter")
+            
+            # Create concurrent conversation manager
+            self.conversation_manager = await create_concurrent_conversation_manager(
+                advanced_thread_manager=advanced_thread_manager,
+                memory_batcher=None,  # Could integrate with memory system later
+                emotion_engine=emotion_engine,
+                max_concurrent_sessions=max_sessions,
+                max_workers_threads=max_threads,
+                max_workers_processes=max_processes,
+                session_timeout_minutes=session_timeout
+            )
+            
+            # Register cleanup
+            if self.shutdown_manager:
+                self.shutdown_manager.register_cleanup(
+                    self.conversation_manager.stop, priority=70
+                )
+            
+            self.logger.info("✅ ConcurrentConversationManager initialized successfully")
+            
+        except Exception as e:
+            self.logger.error(f"Failed to initialize ConcurrentConversationManager: {e}")
+            self.logger.warning("Bot will continue without concurrent conversation management")
+            self.conversation_manager = None
+
     def initialize_all(self):
         """Initialize all bot components in the correct order."""
         self.logger.info("Starting bot core initialization...")
@@ -900,6 +974,9 @@ class DiscordBotCore:
         self.initialize_production_optimization()
         self.initialize_multi_entity_system()
         self.initialize_postgres_config()
+
+        # Schedule async initialization of concurrent conversation manager
+        asyncio.create_task(self.initialize_conversation_manager())
 
         # Cleanup registration
         self.register_cleanup_functions()
@@ -942,4 +1019,5 @@ class DiscordBotCore:
             "production_adapter": self.production_adapter,
             "multi_entity_manager": self.multi_entity_manager,
             "ai_self_bridge": self.ai_self_bridge,
+            "conversation_manager": self.conversation_manager,
         }
