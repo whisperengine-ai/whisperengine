@@ -7,6 +7,8 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Alpha](https://img.shields.io/badge/Status-Alpha-orange.svg)](https://github.com/whisperengine-ai/whisperengine)
 
+> 📋 **New to WhisperEngine?** Read our [Discord Welcome Guide](docs/community/DISCORD_WELCOME_GUIDE.md) and [Responsible AI Statement](docs/community/RESPONSIBLE_AI_STATEMENT.md) to understand our inclusive approach to AI companion interactions.
+
 ## 🧠 Creative AI Companion Technology
 
 **WhisperEngine is a creative experiment in AI companion interactions.** Born from a desire to build something more personal and engaging than corporate productivity AI, our development focuses on creating memory-enabled AI companions that facilitate meaningful conversations and creative collaboration.
@@ -27,6 +29,21 @@ These are **sophisticated language models with persistent memory** - computation
 ---
 
 > ⚠️ **Alpha Development**: WhisperEngine is in active development. We're building features rapidly and testing with our community. Join our Discord to chat with our demo AIs and see the system in action!
+
+## 💬 Join Our Creative Community
+
+**🎭 Experience WhisperEngine First-Hand**
+- **Chat with Demo Characters**: Elena, Marcus, Jake, Gabriel, Sophia, Dream, Aethys, and Ryan
+- **Explore Different Perspectives**: Technical, creative, social, curious, and spiritual approaches to AI
+- **Test Character Personalities**: See how persistent memory and relationship building works
+- **Get Installation Support**: Community help for setting up your own instance
+
+**📖 Important Community Resources:**
+- **[Discord Welcome Guide](docs/community/DISCORD_WELCOME_GUIDE.md)** - How to explore our creative AI experiment
+- **[Responsible AI Statement](docs/community/RESPONSIBLE_AI_STATEMENT.md)** - Our inclusive approach to AI ethics
+- **[Character Creation Guide](docs/characters/CHARACTER_AUTHORING_GUIDE.md)** - Build your own AI personalities
+
+*[Discord invite link coming soon - we're in alpha testing!]*
 
 Create engaging AI companions for various use cases - gaming buddies, creative collaborators, conversation partners, or study assistants. WhisperEngine's AI companions have **persistent memory**, **contextual responses**, and **customizable personalities** that create consistent, engaging interactions.
 
@@ -330,16 +347,22 @@ Vector Memory Storage ← Named Vector Embedding ← Emotional Context ← User 
 
 ## 🚀 Quick Start
 
-### Try Our Demo AIs
+### 🎭 Try Our Demo Characters
 
-Join our Discord server to chat with our demo characters:
-- **Elena Rodriguez** - Marine biologist with warm, empathetic personality
-- **Marcus Thompson** - AI researcher with academic, professional communication  
-- **Jake Sterling** - Game developer with creative, collaborative style
-- **Ryan Chen** - Software engineer with analytical, helpful approach
-- **Gabriel** - British gentleman with refined tastes and philosophical insights
-- **Dream of the Endless** - Mythological entity with profound, otherworldly expression
-- **Sophia Blake** - Neuroscientist with creative and emotional depth
+**Join our Discord server to experience WhisperEngine's creative AI personalities:**
+- **🧬 Elena Rodriguez** - Marine biologist with warm, empathetic personality
+- **🤖 Marcus Thompson** - AI researcher with academic, professional communication  
+- **🎮 Jake Sterling** - Game developer with creative, collaborative style
+- **💻 Ryan Chen** - Software engineer with analytical, helpful approach
+- **✨ Gabriel** - Archangel with spiritual wisdom and moral guidance
+- **💭 Dream of the Endless** - Mythological entity with profound, otherworldly expression
+- **🧠 Sophia Blake** - Neuroscientist exploring consciousness and creativity
+- **🌟 Aethys** - Omnipotent entity for philosophical exploration
+
+**📋 Before You Join:**
+- **Read our [Discord Welcome Guide](docs/community/DISCORD_WELCOME_GUIDE.md)** - Learn how to interact with characters respectfully
+- **Review [Community Guidelines](docs/community/DISCORD_WELCOME_GUIDE.md#-community-guidelines)** - Understand our inclusive approach to AI experiences
+- **Check [Responsible AI Statement](docs/community/RESPONSIBLE_AI_STATEMENT.md)** - Our ethical framework and technical transparency
 
 *[Discord invite link coming soon - we're in alpha testing!]*
 
@@ -783,10 +806,26 @@ We believe technology becomes meaningful through the relationships and intention
 
 ## 🤝 **Community & Support**
 
-### **Getting Help**
-- **📖 [Complete Documentation](docs/)** - Comprehensive guides and tutorials
-- **🐛 [Report Issues](https://github.com/whisperengine-ai/whisperengine/issues)** - Bug reports and feature requests  
-- **💬 [Discussions](https://github.com/whisperengine-ai/whisperengine/discussions)** - Community chat and support
+### **💬 Join Our Discord Community**
+Experience WhisperEngine first-hand and connect with fellow creators:
+
+- **🎭 [Discord Welcome Guide](docs/community/DISCORD_WELCOME_GUIDE.md)** - How to explore our creative AI experiment
+- **⚖️ [Community Guidelines](docs/community/DISCORD_WELCOME_GUIDE.md#-community-guidelines)** - Respectful interaction with diverse perspectives
+- **🔬 [Responsible AI Statement](docs/community/RESPONSIBLE_AI_STATEMENT.md)** - Our inclusive approach to AI ethics and technical transparency
+- **🎨 [Character Creation Guide](docs/characters/CHARACTER_AUTHORING_GUIDE.md)** - Build your own AI personalities
+
+*Chat with Elena, Marcus, Jake, Gabriel, Sophia, Dream, Aethys, and Ryan - each showcasing different possibilities for AI companion interactions.*
+
+### **📖 Documentation & Resources**
+- **� [Complete Documentation](docs/)** - Comprehensive guides and tutorials
+- **� [Quick Start Guide](docs/getting-started/QUICK_START.md)** - Get running in minutes
+- **🎭 [CDL Character System](docs/characters/cdl-specification.md)** - Create custom AI personalities
+- **🏗️ [Architecture Overview](docs/architecture/)** - Technical deep-dive into WhisperEngine
+
+### **🆘 Getting Help**
+- **💬 Discord Community** - Real-time support and discussion (*invite link coming soon*)
+- **�🐛 [Report Issues](https://github.com/whisperengine-ai/whisperengine/issues)** - Bug reports and feature requests  
+- **� [GitHub Discussions](https://github.com/whisperengine-ai/whisperengine/discussions)** - Community chat and questions
 - **🔧 [Contributing Guide](docs/development/CONTRIBUTING.md)** - Help improve WhisperEngine
 
 ### **What People Are Building**
