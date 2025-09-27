@@ -8,6 +8,13 @@ Provides unified interface for all Phase 2 LLM tooling capabilities.
 import logging
 from typing import Dict, List, Optional, Any, Union
 from dataclasses import dataclass
+
+# Import taxonomy for consistent emotion handling
+try:
+    from src.intelligence.emotion_taxonomy import standardize_emotion
+except ImportError:
+    def standardize_emotion(emotion):
+        return emotion.lower() if emotion else "neutral"
 from datetime import datetime
 
 logger = logging.getLogger(__name__)
@@ -188,12 +195,17 @@ class LLMToolIntegrationManager:
             # Check for explicit support needed flag
             if emotional_context.get('support_needed', False):
                 context_crisis = True
-            # Check for distressed mood
-            if emotional_context.get('mood') in ['distressed', 'sad', 'anxious', 'upset']:
-                context_crisis = True
-            # Check for high intensity emotions
+            
+            # Check for distressed mood using standardized emotions
+            if emotional_context.get('mood'):
+                standardized_mood = standardize_emotion(emotional_context.get('mood'))
+                if standardized_mood in ['sadness', 'fear', 'anger']:  # 7-core taxonomy crisis emotions
+                    context_crisis = True
+            
+            # Check for high intensity emotions - standardize before checking
             high_intensity_emotions = emotional_context.get('high_intensity_emotions', [])
-            context_crisis = context_crisis or any(emotion in ['extreme_sadness', 'anxiety', 'despair'] for emotion in high_intensity_emotions)
+            standardized_high_emotions = [standardize_emotion(emotion) for emotion in high_intensity_emotions]
+            context_crisis = context_crisis or any(emotion in ['sadness', 'fear'] for emotion in standardized_high_emotions)
         
         return keyword_crisis or context_crisis
     

@@ -14,6 +14,13 @@ from datetime import datetime
 import asyncio
 from dataclasses import dataclass
 
+# Import taxonomy for consistent emotion handling
+try:
+    from src.intelligence.emotion_taxonomy import standardize_emotion
+except ImportError:
+    def standardize_emotion(emotion):
+        return emotion.lower() if emotion else "neutral"
+
 logger = logging.getLogger(__name__)
 
 # Import traditional managers
@@ -939,18 +946,19 @@ class VectorAIPipelineIntegration:
         """Get specific guidance for responding to the user's emotional state."""
         emotional_state = emotional_insights.get('emotional_state', '').lower()
         
+        # Standardize the emotional state before guidance lookup
+        standardized_state = standardize_emotion(emotional_state)
+        
         guidance_map = {
-            'excited': 'Match their enthusiasm and encourage their excitement',
-            'worried': 'Provide supportive understanding and gentle reassurance',
-            'confused': 'Offer clear, helpful explanations without being condescending',
-            'sad': 'Show empathetic care and emotional support',
-            'grateful': 'Warmly acknowledge their appreciation and maintain positive energy',
-            'frustrated': 'Acknowledge their frustration and offer patient understanding',
-            'curious': 'Engage their curiosity with thoughtful exploration',
-            'confident': 'Support their confidence while remaining approachable'
+            'joy': 'Match their enthusiasm and encourage their excitement',
+            'fear': 'Provide supportive understanding and gentle reassurance',  
+            'neutral': 'Offer clear, helpful explanations without being condescending',
+            'sadness': 'Show empathetic care and emotional support',
+            'anger': 'Acknowledge their frustration and offer patient understanding',
+            'surprise': 'Engage their curiosity with thoughtful exploration'
         }
         
-        return guidance_map.get(emotional_state, 'Respond with emotional awareness and genuine care')
+        return guidance_map.get(standardized_state, 'Respond with emotional awareness and genuine care')
 
     async def _create_ai_aware_conversational_fallback(
         self,

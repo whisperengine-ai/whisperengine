@@ -221,22 +221,35 @@ class CDLEmojiGenerator:
         # Remove unused pattern variable
         excitement_patterns.get(excitement_level, excitement_patterns.get("medium", ""))
         
-        # Extract topic-specific emojis
-        topic_emojis = self._get_topic_emojis(profile, user_message, bot_response_text)
-        logger.debug("🎭 Topic emojis detected: %s", topic_emojis)
+        # DIRECT CDL EMOTION MAPPING: Use CDL data directly instead of calling taxonomy
+        emotion_emojis = []
+        if context and 'detected_emotion' in context:
+            try:
+                emotion = context['detected_emotion']
+                emotion_emojis = self._get_emotion_specific_emojis(profile, emotion)
+                logger.debug("🎭 CDL emotion-aware emojis for %s: %s", emotion, emotion_emojis)
+            except Exception as e:
+                logger.debug("🎭 Could not get CDL emotion-aware emojis: %s", e)
         
-        # Generate based on combination preference
+        # Extract topic-specific emojis and blend with emotion-aware ones
+        topic_emojis = self._get_topic_emojis(profile, user_message, bot_response_text)
+        
+        # Combine topic and emotion emojis (emotion takes priority)
+        combined_emojis = emotion_emojis[:2] + topic_emojis  # Max 2 emotion emojis + topic emojis
+        logger.debug("🎭 Combined emojis (emotion + topic): %s", combined_emojis)
+        
+        # Generate based on combination preference using combined emojis
         if profile.preferred_combination == EmojiCombinationType.TEXT_PLUS_EMOJI:
-            result = self._generate_text_plus_emoji(profile, bot_response_text, topic_emojis, excitement_level)
+            result = self._generate_text_plus_emoji(profile, bot_response_text, combined_emojis, excitement_level)
             logger.debug("🎭 Applied TEXT_PLUS_EMOJI style, added %d emojis", len(result.emoji_additions))
         elif profile.preferred_combination == EmojiCombinationType.TEXT_WITH_ACCENT_EMOJI:
-            result = self._generate_text_with_accent(profile, bot_response_text, topic_emojis, excitement_level)
+            result = self._generate_text_with_accent(profile, bot_response_text, combined_emojis, excitement_level)
             logger.debug("🎭 Applied TEXT_WITH_ACCENT_EMOJI style, added %d emojis", len(result.emoji_additions))
         elif profile.preferred_combination == EmojiCombinationType.MINIMAL_SYMBOLIC_EMOJI:
-            result = self._generate_minimal_symbolic(profile, bot_response_text, topic_emojis, excitement_level)
+            result = self._generate_minimal_symbolic(profile, bot_response_text, combined_emojis, excitement_level)
             logger.debug("🎭 Applied MINIMAL_SYMBOLIC_EMOJI style, added %d emojis", len(result.emoji_additions))
         elif profile.preferred_combination == EmojiCombinationType.EMOJI_ONLY:
-            result = self._generate_emoji_only(profile, bot_response_text, topic_emojis, excitement_level)
+            result = self._generate_emoji_only(profile, bot_response_text, combined_emojis, excitement_level)
             logger.debug("🎭 Applied EMOJI_ONLY style, added %d emojis", len(result.emoji_additions))
         else:
             result = EmojiResponse(
@@ -281,6 +294,39 @@ class CDLEmojiGenerator:
                 relevant_emojis.extend(emojis[:2])  # Max 2 per topic
                 
         return relevant_emojis[:4]  # Max 4 total topic emojis
+    
+    def _get_emotion_specific_emojis(self, profile: CDLEmojiProfile, emotion: str) -> List[str]:
+        """Get emotion-specific emojis directly from CDL data"""
+        emotion_lower = emotion.lower()
+        
+        # Map core emotions to CDL topic categories that express those emotions
+        emotion_to_topics = {
+            'joy': ['affection_warmth', 'science_discovery', 'excitement'],
+            'sadness': ['disappointment', 'melancholy'],  
+            'anger': ['frustration', 'strong_disagreement'],
+            'surprise': ['science_discovery', 'wonder', 'amazement'],
+            'fear': ['worry', 'concern', 'anxiety'],
+            'disgust': ['disapproval', 'strong_disagreement'], 
+            'neutral': ['general', 'acknowledgment']
+        }
+        
+        # Get relevant topic categories for this emotion
+        relevant_topics = emotion_to_topics.get(emotion_lower, ['general'])
+        
+        # Extract emojis from matching CDL topic categories
+        emotion_emojis = []
+        topic_specific = profile.usage_patterns.get("topic_specific", {})
+        
+        for topic_key, emojis in topic_specific.items():
+            # Check if this topic matches our emotion categories
+            if any(topic in topic_key.lower() for topic in relevant_topics):
+                emotion_emojis.extend(emojis[:2])  # Max 2 per matching topic
+        
+        # Fallback to general emojis if no emotion-specific ones found
+        if not emotion_emojis and 'general' in topic_specific:
+            emotion_emojis = topic_specific['general'][:2]
+        
+        return emotion_emojis[:3]  # Max 3 emotion-specific emojis
         
     def _generate_text_plus_emoji(self, profile: CDLEmojiProfile, text: str, topic_emojis: List[str], excitement: str) -> EmojiResponse:
         """Elena style: Enthusiastic text with emojis throughout"""

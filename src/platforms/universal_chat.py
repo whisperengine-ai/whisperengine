@@ -20,8 +20,14 @@ from src.database.database_integration import DatabaseIntegrationManager
 # Import character definition system
 try:
     from src.prompts.cdl_ai_integration import CDLAIPromptIntegration
+    from src.intelligence.emotion_taxonomy import standardize_emotion, get_emoji_for_roberta_emotion
 except ImportError:
     CDLAIPromptIntegration = None
+    # Define stub functions if taxonomy import fails
+    def standardize_emotion(emotion):
+        return emotion.lower() if emotion else "neutral"
+    def get_emoji_for_roberta_emotion(emotion, character="general", confidence=1.0):
+        return "😊" if emotion == "joy" else "😐"
 
 
 class ChatPlatform(Enum):
@@ -1042,23 +1048,26 @@ class UniversalChatOrchestrator:
                                             )
 
                                             # Add adaptation guidance based on patterns
+                                            # Standardize emotions before pattern matching
+                                            standardized_emotions = [standardize_emotion(emotion) for emotion in recent_emotions]
+                                            
                                             if any(
-                                                emotion in ["frustrated", "angry", "disappointed"]
-                                                for emotion in recent_emotions
+                                                emotion in ["anger"]  # Use 7-core taxonomy
+                                                for emotion in standardized_emotions
                                             ):
                                                 context_parts.append(
                                                     "📋 **Adaptation Strategy:** Use supportive, calming tone. Acknowledge frustration and offer help."
                                                 )
                                             elif any(
-                                                emotion in ["excited", "happy", "grateful"]
-                                                for emotion in recent_emotions
+                                                emotion in ["joy"]  # Use 7-core taxonomy
+                                                for emotion in standardized_emotions
                                             ):
                                                 context_parts.append(
                                                     "📋 **Adaptation Strategy:** Match positive energy while maintaining helpful focus."
                                                 )
                                             elif any(
-                                                emotion in ["worried", "sad"]
-                                                for emotion in recent_emotions
+                                                emotion in ["sadness", "fear"]  # Use 7-core taxonomy
+                                                for emotion in standardized_emotions
                                             ):
                                                 context_parts.append(
                                                     "📋 **Adaptation Strategy:** Provide gentle encouragement and emotional support."
@@ -1079,23 +1088,26 @@ class UniversalChatOrchestrator:
                                         )
 
                                         # Add adaptation guidance based on patterns
+                                        # Standardize emotions before pattern matching
+                                        standardized_emotions = [standardize_emotion(emotion) for emotion in recent_emotions]
+                                        
                                         if any(
-                                            emotion in ["frustrated", "angry", "disappointed"]
-                                            for emotion in recent_emotions
+                                            emotion in ["anger"]  # Use 7-core taxonomy
+                                            for emotion in standardized_emotions
                                         ):
                                             context_parts.append(
                                                 "📋 **Adaptation Strategy:** Use supportive, calming tone. Acknowledge frustration and offer help."
                                             )
                                         elif any(
-                                            emotion in ["excited", "happy", "grateful"]
-                                            for emotion in recent_emotions
+                                            emotion in ["joy"]  # Use 7-core taxonomy  
+                                            for emotion in standardized_emotions
                                         ):
                                             context_parts.append(
                                                 "📋 **Adaptation Strategy:** Match positive energy while maintaining helpful focus."
                                             )
                                         elif any(
-                                            emotion in ["worried", "sad"]
-                                            for emotion in recent_emotions
+                                            emotion in ["sadness", "fear"]  # Use 7-core taxonomy
+                                            for emotion in standardized_emotions
                                         ):
                                             context_parts.append(
                                                 "📋 **Adaptation Strategy:** Provide gentle encouragement and emotional support."

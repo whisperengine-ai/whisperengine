@@ -255,43 +255,52 @@ class EnhancedVectorEmotionAnalyzer:
             )
             logger.info(f"🎭 STEP 2 RESULT: Context emotions: {context_emotions}")
             
-            # Step 3: Keyword-based fallback analysis (essential for new users)
-            logger.debug(f"🎭 STEP 3: Starting keyword-based fallback analysis")
+            # Step 3: Emoji-based emotion analysis (for enhanced accuracy)
+            logger.debug(f"🎭 STEP 3: Starting emoji-based emotion analysis")
+            emoji_emotions = self._analyze_emoji_emotions(content)
+            logger.info(f"🎭 STEP 3 RESULT: Emoji emotions: {emoji_emotions}")
+            
+            # Step 4: Keyword-based fallback analysis (essential for new users)
+            logger.debug(f"🎭 STEP 4: Starting keyword-based fallback analysis")
             keyword_emotions = self._analyze_keyword_emotions(content)
-            logger.info(f"🎭 STEP 3 RESULT: Keyword emotions: {keyword_emotions}")
+            logger.info(f"🎭 STEP 4 RESULT: Keyword emotions: {keyword_emotions}")
             
-            # Step 4: Emotional intensity analysis
-            logger.debug(f"🎭 STEP 4: Analyzing emotional intensity")
+            # Step 5: Emotional intensity analysis
+            logger.debug(f"🎭 STEP 5: Analyzing emotional intensity")
             intensity = self._analyze_emotional_intensity(content)
-            logger.info(f"🎭 STEP 4 RESULT: Emotional intensity: {intensity:.3f}")
+            logger.info(f"🎭 STEP 5 RESULT: Emotional intensity: {intensity:.3f}")
             
-            # Step 5: Emotional trajectory analysis
-            logger.debug(f"🎭 STEP 5: Analyzing emotional trajectory")
+            # Step 6: Emotional trajectory analysis
+            logger.debug(f"🎭 STEP 6: Analyzing emotional trajectory")
             trajectory = self._analyze_emotional_trajectory(content, recent_emotions)
-            logger.info(f"🎭 STEP 5 RESULT: Emotional trajectory: {trajectory}")
+            logger.info(f"🎭 STEP 6 RESULT: Emotional trajectory: {trajectory}")
             
-            # Step 6: Combine all emotion analyses
-            logger.debug(f"🎭 STEP 6: Combining all emotion analyses")
+            # Step 7: Combine all emotion analyses (including emoji analysis)
+            logger.debug(f"🎭 STEP 7: Combining all emotion analyses")
             final_emotions = self._combine_emotion_analyses(
-                keyword_emotions, vector_emotions, context_emotions
+                keyword_emotions, vector_emotions, context_emotions, emoji_emotions
             )
             logger.info(f"🎭 STEP 6 RESULT: Final combined emotions: {final_emotions}")
             
             # Step 7: Determine primary emotion and confidence
             primary_emotion, confidence = self._determine_primary_emotion(final_emotions)
             
+            # SURGICAL FIX: Standardize primary emotion to universal taxonomy
+            from src.intelligence.emotion_taxonomy import standardize_emotion
+            standardized_primary = standardize_emotion(primary_emotion)
+            
             # Calculate performance metrics
             analysis_time_ms = int((time.perf_counter() - start_time) * 1000)
             
             logger.info(f"🎭 FINAL RESULT: Creating EmotionAnalysisResult with:")
-            logger.info(f"  - Primary emotion: {primary_emotion}")
+            logger.info(f"  - Primary emotion: {standardized_primary} (standardized from {primary_emotion})")
             logger.info(f"  - Confidence: {confidence:.3f}")
             logger.info(f"  - Intensity: {intensity:.3f}")
             logger.info(f"  - All emotions: {final_emotions}")
             logger.info(f"  - Analysis time: {analysis_time_ms}ms")
             
             result = EmotionAnalysisResult(
-                primary_emotion=primary_emotion,
+                primary_emotion=standardized_primary,  # Use standardized emotion
                 confidence=confidence,
                 intensity=intensity,
                 all_emotions=final_emotions,
@@ -680,7 +689,8 @@ class EnhancedVectorEmotionAnalyzer:
         self,
         keyword_emotions: Dict[str, Any],
         vector_emotions: Dict[str, Any], 
-        context_emotions: Dict[str, float]
+        context_emotions: Dict[str, float],
+        emoji_emotions: Optional[Dict[str, float]] = None
     ) -> Dict[str, float]:
         """Combine multiple emotion analysis results with weighted scoring"""
         combined_emotions = {}
@@ -689,6 +699,7 @@ class EnhancedVectorEmotionAnalyzer:
         keyword_weight = self.keyword_weight
         vector_weight = self.semantic_weight
         context_weight = self.context_weight
+        emoji_weight = 0.4  # Strong weight for emoji analysis since emojis are explicit emotional indicators
         
         # Combine keyword emotions
         for emotion, score in keyword_emotions.items():
@@ -703,6 +714,11 @@ class EnhancedVectorEmotionAnalyzer:
         # Combine context emotions
         for emotion, score in context_emotions.items():
             combined_emotions[emotion] = combined_emotions.get(emotion, 0.0) + (score * context_weight)
+        
+        # Combine emoji emotions (high weight since emojis are explicit emotional signals)
+        if emoji_emotions:
+            for emotion, score in emoji_emotions.items():
+                combined_emotions[emotion] = combined_emotions.get(emotion, 0.0) + (score * emoji_weight)
         
         # Ensure neutral emotion if no others detected
         if not combined_emotions:

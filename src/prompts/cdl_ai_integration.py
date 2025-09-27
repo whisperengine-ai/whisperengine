@@ -479,28 +479,25 @@ CHARACTER ROLEPLAY REQUIREMENTS:
                                 if isinstance(rec, str) and len(rec) < 100:  # Keep recommendations concise
                                     prompt += f"\n- Guidance: {rec}"
                         
-                        # Enhanced emotion-appropriate response guidance
+                        # Enhanced emotion-appropriate response guidance with taxonomy standardization
+                        from src.intelligence.emotion_taxonomy import standardize_emotion
+                        
+                        # Standardize emotion before guidance lookup
+                        standardized_emotion = standardize_emotion(primary_emotion)
+                        
                         emotion_guidance = {
                             'joy': 'Share in their positive energy and enthusiasm',
-                            'excitement': 'Match their enthusiasm while staying authentic to your character',
-                            'happiness': 'Celebrate their positive mood with warmth',
-                            'sadness': 'Show empathy and support while remaining genuine',
-                            'melancholy': 'Offer gentle understanding and compassionate presence',
-                            'frustration': 'Acknowledge their feelings and offer perspective',
-                            'anxiety': 'Provide calm, reassuring responses',
-                            'worry': 'Offer gentle reassurance and practical support',
+                            'sadness': 'Show empathy and support while remaining genuine', 
                             'anger': 'Stay calm and avoid escalating the situation',
-                            'irritation': 'Be patient and understanding',
                             'fear': 'Offer gentle reassurance and support',
-                            'stress': 'Provide calming, supportive responses',
-                            'overwhelmed': 'Break things down into manageable parts',
-                            'neutral': 'Maintain your natural conversational style',
-                            'contemplative': 'Engage thoughtfully with their reflections',
-                            'curious': 'Encourage their exploration and questions'
+                            'surprise': 'Engage with their sense of discovery and wonder',
+                            'disgust': 'Be understanding and avoid judgment',
+                            'neutral': 'Maintain your natural conversational style'
                         }
                         
-                        guidance = emotion_guidance.get(primary_emotion, 'Respond naturally and authentically')
+                        guidance = emotion_guidance.get(standardized_emotion, 'Respond naturally and authentically')
                         prompt += f"\n- Response approach: {guidance}"
+                        logger.debug("  - Applied emotion guidance for %s: %s", standardized_emotion, guidance)
                         
                         # Add emotional intelligence context if available
                         if 'emotional_intelligence' in mood_data:

@@ -366,16 +366,18 @@ class VectorEmojiIntelligence:
                     
                 return emotions
             
-            # Fallback to simple keyword detection if enhanced analyzer unavailable
+            # Fallback to simple keyword detection using standardized taxonomy
+            from src.intelligence.emotion_taxonomy import standardize_emotion
+            
             emotion_keywords = {
                 "joy": ["happy", "excited", "great", "awesome", "amazing", "wonderful", "fantastic", "love", "😀", "😁", "😂", "😃", "😄", "😆", "🤩", "❤️"],
                 "sadness": ["sad", "crying", "upset", "down", "depressed", "😢", "😭", "😔", "💔", "😞"],
                 "anger": ["angry", "mad", "furious", "annoyed", "frustrated", "😠", "😡", "🤬"],
                 "fear": ["scared", "afraid", "worried", "anxious", "nervous", "😰", "😱", "😨"],
                 "surprise": ["surprised", "shocked", "wow", "omg", "😲", "😱", "🤯"],
-                "gratitude": ["thank", "grateful", "appreciate", "thanks", "🙏", "💝"],
-                "excitement": ["excited", "thrilled", "pumped", "stoked", "🤩", "🎉", "🔥"],
-                "curiosity": ["curious", "wondering", "question", "how", "why", "what", "🤔", "❓"]
+                "neutral": ["okay", "sure", "maybe", "alright", "fine", "🤔", "�"],
+                "disgust": ["gross", "disgusting", "awful", "terrible", "yuck", "🤢", "�"]
+                # Note: Extended emotions like gratitude, excitement map to core emotions via taxonomy
             }
             
             message_lower = user_message.lower()
@@ -383,7 +385,10 @@ class VectorEmojiIntelligence:
             
             for emotion, keywords in emotion_keywords.items():
                 if any(keyword in message_lower for keyword in keywords):
-                    detected_emotions.append(emotion)
+                    # Standardize emotion to core taxonomy
+                    standardized_emotion = standardize_emotion(emotion)
+                    if standardized_emotion not in detected_emotions:
+                        detected_emotions.append(standardized_emotion)
             
             return detected_emotions if detected_emotions else ["neutral"]
             
@@ -1016,9 +1021,23 @@ class VectorEmojiIntelligence:
             else:
                 return "❤️", EmojiResponseContext.EMOTIONAL_OVERWHELM
         
-        # Priority 3: High emotional intensity
+        # Priority 3: High emotional intensity - use universal taxonomy
         if emotional_state.get("intensity", 0.5) > 0.7:
             current_emotion = emotional_state.get("current_emotion", "neutral")
+            
+            # Import universal taxonomy for character-aware emoji selection
+            from src.intelligence.emotion_taxonomy import get_emoji_for_roberta_emotion
+            
+            taxonomy_emoji = get_emoji_for_roberta_emotion(
+                current_emotion, 
+                character=bot_character, 
+                confidence=emotional_state.get("intensity", 0.5)
+            )
+            
+            if taxonomy_emoji:
+                return taxonomy_emoji, EmojiResponseContext.EMOTIONAL_OVERWHELM
+            
+            # Fallback to existing logic if taxonomy doesn't have mapping
             character_emojis = self.character_emoji_sets.get(bot_character, self.character_emoji_sets["general"])
             
             if current_emotion in ["joy", "excitement", "wonder"]:
