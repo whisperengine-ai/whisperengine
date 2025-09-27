@@ -423,7 +423,27 @@ Explore our demo characters to understand CDL capabilities:
 - **Marcus Chen** (`characters/examples/marcus-chen.json`) - Game developer with creative enthusiasm
 - **Dream** (`characters/examples/dream_of_the_endless.json`) - Mythological entity with profound wisdom
 
-## 📚 Documentation
+## � Behavioral Analysis Documentation
+
+We document interesting emergent behavioral patterns observed during WhisperEngine AI interactions. This research focuses on observational analysis of complex behaviors that arise from our CDL character system and vector memory architecture.
+
+### 📊 **[Research Documentation](research/)**
+Our research section contains **objective behavioral analysis** documenting complex interaction patterns observed in WhisperEngine systems:
+
+- **Emergent Behavior Observations** - Documentation of surprising or complex behavioral patterns
+- **Character Development Analysis** - How CDL personalities evolve through interactions  
+- **Memory System Effects** - Impact of vector memory on conversation continuity
+- **Cross-Character Pattern Analysis** - Behavioral consistency across different personalities
+
+**⚠️ Important Context**: These are **observational studies of emergent behaviors** in sophisticated language model systems. We document what we observe without making claims about consciousness, sentience, or attempting to induce emergence. Our research maintains scientific objectivity about AI system capabilities while documenting genuinely interesting behavioral phenomena.
+
+**Key Research Areas:**
+- CDL personality consistency and development over time
+- Vector memory effects on relationship building and context retention
+- Unexpected response patterns and their technical origins
+- User interaction effects on character behavioral evolution
+
+## �📚 Documentation
 
 For detailed technical information, setup guides, and development documentation:
 

@@ -83,7 +83,7 @@ Our Discord server hosts several **creative AI companions**, each exploring diff
 After testing our demo bots, you'll want to set up your own WhisperEngine:
 - **[📖 Installation Guide](../getting-started/INSTALLATION.md)** - Complete setup instructions
 - **[🚀 Quick Start](../getting-started/QUICK_START.md)** - Get running fast
-- **[🎭 Character Creation](../characters/cdl-specification.md)** - Build custom personalities
+- **[🎭 Character Creation](../characters/CHARACTER_AUTHORING_GUIDE.md)** - Build custom personalities
 
 ## 🎯 What to Expect
 
@@ -227,8 +227,8 @@ Our community welcomes people with diverse perspectives on AI interaction:
 After testing our demos, you'll likely want the real thing:
 - **[📖 Installation Guide](../getting-started/INSTALLATION.md)** - Complete setup walkthrough
 - **[🐳 Docker Setup](../deployment/LOCAL_SETUP.md)** - Easiest installation method  
-- **[🎭 Character Guide](../characters/cdl-specification.md)** - Create your perfect AI companion
-- **[🔄 ChatGPT Migration](../migration/)** - Import your existing ChatGPT conversations and memories
+- **[🎭 Character Guide](../characters/CHARACTER_AUTHORING_GUIDE.md)** - Create your perfect AI companion
+- **[🔄 ChatGPT Migration](../../scripts/chatgpt_import/README.md)** - Import your existing ChatGPT conversations and memories
 
 ### **💡 Common Migration Reasons:**
 Users typically move to WhisperEngine because they want to:
