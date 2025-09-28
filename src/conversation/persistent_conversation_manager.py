@@ -696,6 +696,24 @@ class PersistentConversationManager:
                         
                         if state_data:
                             parsed_data = json.loads(state_data) if isinstance(state_data, str) else state_data
+                            
+                            # Reconstruct PendingQuestion objects from serialized data
+                            pending_questions = []
+                            for q_data in parsed_data.get("pending_questions", []):
+                                pending_question = PendingQuestion(
+                                    question_id=q_data["question_id"],
+                                    question_text=q_data["question_text"],
+                                    question_type=QuestionType(q_data["question_type"]),
+                                    priority=QuestionPriority(q_data["priority"]),
+                                    original_topic=q_data["original_topic"],
+                                    asked_at=datetime.fromisoformat(q_data["asked_at"]),
+                                    reminder_count=q_data["reminder_count"],
+                                    is_resolved=q_data["is_resolved"]
+                                )
+                                pending_questions.append(pending_question)
+                            
+                            # Create state with reconstructed objects
+                            parsed_data["pending_questions"] = pending_questions
                             self.user_states[user_id] = ConversationState(**parsed_data)
                         else:
                             self.user_states[user_id] = ConversationState(user_id=user_id)

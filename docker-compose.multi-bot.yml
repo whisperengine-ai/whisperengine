@@ -124,7 +124,7 @@ services:
       - PYTHONUNBUFFERED=1
       - HEALTH_CHECK_PORT=9097
       - HEALTH_CHECK_HOST=0.0.0.0
-      - CDL_DEFAULT_CHARACTER=characters/examples/jake-sterling.json
+      - CDL_DEFAULT_CHARACTER=characters/examples/jake.json
     ports:
       - "9097:9097"
     logging:
@@ -189,7 +189,7 @@ services:
       - PYTHONUNBUFFERED=1
       - HEALTH_CHECK_PORT=9092
       - HEALTH_CHECK_HOST=0.0.0.0
-      - CDL_DEFAULT_CHARACTER=characters/examples/marcus-thompson.json
+      - CDL_DEFAULT_CHARACTER=characters/examples/marcus.json
     ports:
       - "9092:9092"
     logging:
@@ -254,7 +254,7 @@ services:
       - PYTHONUNBUFFERED=1
       - HEALTH_CHECK_PORT=9094
       - HEALTH_CHECK_HOST=0.0.0.0
-      - CDL_DEFAULT_CHARACTER=characters/examples/dream_of_the_endless.json
+      - CDL_DEFAULT_CHARACTER=characters/examples/dream.json
     ports:
       - "9094:9094"
     logging:
@@ -319,7 +319,7 @@ services:
       - PYTHONUNBUFFERED=1
       - HEALTH_CHECK_PORT=9091
       - HEALTH_CHECK_HOST=0.0.0.0
-      - CDL_DEFAULT_CHARACTER=characters/examples/elena-rodriguez.json
+      - CDL_DEFAULT_CHARACTER=characters/examples/elena.json
     ports:
       - "9091:9091"
     logging:
@@ -384,7 +384,7 @@ services:
       - PYTHONUNBUFFERED=1
       - HEALTH_CHECK_PORT=3007
       - HEALTH_CHECK_HOST=0.0.0.0
-      - CDL_DEFAULT_CHARACTER=characters/examples/aethys-omnipotent-entity.json
+      - CDL_DEFAULT_CHARACTER=characters/examples/aethys.json
     ports:
       - "3007:3007"
     logging:
@@ -449,7 +449,7 @@ services:
       - PYTHONUNBUFFERED=1
       - HEALTH_CHECK_PORT=9093
       - HEALTH_CHECK_HOST=0.0.0.0
-      - CDL_DEFAULT_CHARACTER=characters/examples/ryan-chen.json
+      - CDL_DEFAULT_CHARACTER=characters/examples/ryan.json
     ports:
       - "9093:9093"
     logging:
@@ -579,7 +579,7 @@ services:
       - PYTHONUNBUFFERED=1
       - HEALTH_CHECK_PORT=9096
       - HEALTH_CHECK_HOST=0.0.0.0
-      - CDL_DEFAULT_CHARACTER=characters/examples/sophia-blake.json
+      - CDL_DEFAULT_CHARACTER=characters/examples/sophia.json
     ports:
       - "9096:9096"
     logging:

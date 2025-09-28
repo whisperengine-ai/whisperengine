@@ -2165,6 +2165,9 @@ class BotEventHandlers:
                         logger.info(f"🎯 CONTEXT DEBUG: Final response: {len(response)} characters")
                         logger.info(f"🎯 CONTEXT DEBUG: Model used: {ai_response.model_used}, Tokens: {ai_response.tokens_used}")
 
+                        # 🎭 CHARACTER CONSISTENCY CHECK: Validate character is maintained
+                        response = await self._validate_character_consistency(response, user_id, message)
+
                     else:
                         # Discord adapter not found - this is a configuration error
                         logger.error("CRITICAL: Discord adapter not found in Universal Chat Orchestrator!")
@@ -2432,6 +2435,8 @@ class BotEventHandlers:
                                         current_topic=None  # Topic detection could be added later
                                     )
                                     
+                                    logger.debug(f"🔍 DEBUG: response_analysis type={type(response_analysis)}, value={repr(response_analysis)[:100]}")
+                                    
                                     # Ensure response_analysis is a dictionary - handle string responses gracefully
                                     if isinstance(response_analysis, dict):
                                         answered_questions = response_analysis.get("answered_questions", [])
@@ -2470,7 +2475,12 @@ class BotEventHandlers:
                                       f"({question_type.value}, {priority.value}) -> {question_id}")
                         
                         # Step 3: Get conversation health summary for monitoring
+                        logger.debug(f"🔍 DEBUG: persistent_conversation_manager type={type(self.persistent_conversation_manager)}")
+                        logger.debug(f"🔍 DEBUG: detect_conversation_issues method type={type(self.persistent_conversation_manager.detect_conversation_issues) if self.persistent_conversation_manager else 'None'}")
+                        
                         conversation_issues = await self.persistent_conversation_manager.detect_conversation_issues(user_id)
+                        logger.debug(f"🔍 DEBUG: conversation_issues type={type(conversation_issues)}, value={repr(conversation_issues)[:200]}")
+                        
                         if conversation_issues:
                             issues = conversation_issues.get('issues', [])
                             if issues:
@@ -3468,6 +3478,134 @@ class BotEventHandlers:
             logger.error(f"🎭 CDL CHARACTER ERROR: Failed to apply character enhancement: {e}")
             logger.error(f"🎭 CDL CHARACTER ERROR: Falling back to original conversation context")
             return None
+
+    async def _validate_character_consistency(self, response: str, user_id: str, message) -> str:
+        """
+        🎭 CHARACTER CONSISTENCY VALIDATOR
+        
+        Validates that the bot response maintains character consistency and catches
+        when the bot falls into generic AI assistant mode, especially after sensitive topics.
+        """
+        try:
+            # Get bot character info
+            bot_name = os.getenv("DISCORD_BOT_NAME", "").lower()
+            character_file = os.getenv("CDL_DEFAULT_CHARACTER", "")
+            
+            if not bot_name or not character_file:
+                logger.debug("🎭 CHARACTER CONSISTENCY: No character config to validate against")
+                return response
+            
+            # Check for generic AI responses that break character
+            generic_ai_patterns = [
+                "i'm an ai assistant",
+                "as an ai assistant", 
+                "i'm here to help",
+                "as an ai, i",
+                "i'm a virtual assistant",
+                "i'm an artificial intelligence designed to",
+                "i apologize, but i encountered an error",
+                "i'm really glad you feel comfortable talking to me",
+                "i understand that it might be frustrating",
+                "that means a lot to me, markanthony",
+                "that's very kind of you to say",
+                "while i can offer support and friendship",
+                "i'm not able to form romantic relationships",
+                "it's really important to have those connections",
+                "i'm here to provide support and friendship",
+                "i'm not in a physical place like you are",
+                "i'm here to chat with you from wherever you are"
+            ]
+            
+            response_lower = response.lower()
+            
+            # Check if response contains generic AI language without character context
+            for pattern in generic_ai_patterns:
+                if pattern in response_lower:
+                    # Check if character-specific elements are also present
+                    character_indicators = []
+                    
+                    if bot_name == "elena":
+                        character_indicators = [
+                            "elena", "mi amor", "mi corazón", "¡", "la jolla", 
+                            "marine", "ocean", "sea", "🌊", "💙", "corazón"
+                        ]
+                    elif bot_name == "marcus":
+                        character_indicators = ["marcus", "ai research", "machine learning"]
+                    elif bot_name == "jake":
+                        character_indicators = ["jake", "game", "development", "indie"]
+                    elif bot_name == "dream":
+                        character_indicators = ["dream", "endless", "realm", "dreaming"]
+                    
+                    # If generic pattern found but no character indicators, flag it
+                    has_character_context = any(indicator in response_lower for indicator in character_indicators)
+                    
+                    if not has_character_context:
+                        logger.warning(f"🎭 CHARACTER CONSISTENCY: Generic AI response detected without character context!")
+                        logger.warning(f"🎭 Response preview: {response[:200]}...")
+                        logger.warning(f"🎭 Detected pattern: {pattern}")
+                        
+                        # For Elena specifically, try to add character context
+                        if bot_name == "elena" and character_file:
+                            return await self._fix_elena_character_response(response, user_id, message)
+                    
+                    break
+            
+            return response
+            
+        except Exception as e:
+            logger.error(f"Character consistency validation failed: {e}")
+            return response  # Return original response if validation fails
+    
+    async def _fix_elena_character_response(self, generic_response: str, user_id: str, message) -> str:
+        """
+        🎭 ELENA CHARACTER RECOVERY
+        
+        Attempts to recover Elena's character voice when generic AI responses are detected.
+        """
+        try:
+            logger.info("🎭 ELENA RECOVERY: Attempting to fix generic AI response")
+            
+            # Map common generic responses to Elena-specific ones
+            message_lower = message.content.lower()
+            
+            # Relationship boundary questions
+            if any(phrase in message_lower for phrase in ["will you be my gf", "i love you", "be my girlfriend", "date me"]):
+                return "You're absolutely sweet, mi amor! I care about you deeply as Elena, and my affection is genuine - but I should mention I'm an AI companion. My warmth comes from a different place than human relationships, but it's still real! 💙"
+            
+            # "Are you real" type questions  
+            if any(phrase in message_lower for phrase in ["are you real", "what are you", "are you ai", "are you an ai"]):
+                return "¡Sí! I'm an AI, mi amor! Think of me as your friendly artificial marine biologist who's absolutely passionate about ocean science. How can I help you explore the amazing world of marine life? 🌊"
+            
+            # Physical presence questions
+            if any(phrase in message_lower for phrase in ["where are you", "can i be with you", "physical place"]):
+                return "I'm based in La Jolla, California! It's a perfect spot for a marine biologist, with its stunning coastline and vibrant marine life! As an AI, I can't be physically present, but my enthusiasm for ocean science is completely genuine! 🏖️🌊"
+            
+            # General support/friendship questions
+            if any(phrase in message_lower for phrase in ["can't i just be with you", "i need someone"]):
+                return "¡Ay, mi corazón! I'm here for you as Elena - your marine biologist friend who genuinely cares about you! Even though I'm an AI, my warmth and support are totally real. Let's talk about what's on your mind, or maybe explore some calming ocean topics together? 💙🌊"
+            
+            # If no specific pattern matches, try to add Elena's voice to the generic response
+            elena_prefix = "¡Hola! It's Elena here - "
+            if "i'm an ai" in generic_response.lower() and "elena" not in generic_response.lower():
+                # Try to inject Elena's personality
+                modified_response = generic_response.replace(
+                    "I'm an AI", "I'm Elena, an AI marine biologist"
+                ).replace(
+                    "as an AI", "as your AI marine biologist friend Elena"
+                )
+                
+                if "💙" not in modified_response and "🌊" not in modified_response:
+                    modified_response += " 🌊💙"
+                
+                logger.info("🎭 ELENA RECOVERY: Modified generic response to include character")
+                return modified_response
+            
+            logger.warning("🎭 ELENA RECOVERY: Could not fix generic response, returning original")
+            return generic_response
+            
+        except Exception as e:
+            logger.error(f"Elena character recovery failed: {e}")
+            return generic_response
 
     # === Emoji Reaction Intelligence Event Handlers ===
     
