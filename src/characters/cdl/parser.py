@@ -19,6 +19,7 @@ from src.characters.models.character import (
     CharacterPersonality,
     CharacterBackstory,
     CharacterCurrentLife,
+    CharacterCommunication,
     BigFivePersonality,
     Appearance,
     Voice,
@@ -110,6 +111,7 @@ class CDLParser:
             personality = self._parse_personality(personality_data)
             backstory = self._parse_backstory(character_data.get('backstory', {}))
             current_life = self._parse_current_life(character_data.get('current_life', {}))
+            communication = self._parse_communication(character_data.get('communication', {}))
             
             # Handle CDL v1.0 format with separate appearance and voice sections
             if 'appearance' in character_data:
@@ -126,7 +128,8 @@ class CDLParser:
                 identity=identity,
                 personality=personality,
                 backstory=backstory,
-                current_life=current_life
+                current_life=current_life,
+                communication=communication
             )
             
             # Validate the parsed character
@@ -417,6 +420,34 @@ class CDLParser:
         else:
             self.logger.warning(f"Invalid datetime format: {value}, using current time")
             return datetime.now()
+    
+    def _parse_communication(self, data: Dict[str, Any]) -> CharacterCommunication:
+        """Parse communication section with typical responses and emotional expressions"""
+        communication = CharacterCommunication()
+        
+        # Parse typical_responses section
+        if 'typical_responses' in data:
+            typical_responses = data['typical_responses']
+            for scenario_type, responses in typical_responses.items():
+                if isinstance(responses, list):
+                    communication.typical_responses[scenario_type] = [str(r) for r in responses]
+                elif isinstance(responses, str):
+                    communication.typical_responses[scenario_type] = [responses]
+        
+        # Parse emotional_expressions section
+        if 'emotional_expressions' in data:
+            emotional_expressions = data['emotional_expressions']
+            for emotion, expression in emotional_expressions.items():
+                communication.emotional_expressions[emotion] = str(expression)
+        
+        # Parse response style settings
+        if 'response_length' in data:
+            communication.response_length = str(data['response_length'])
+        
+        if 'communication_style' in data:
+            communication.communication_style = str(data['communication_style'])
+        
+        return communication
     
     def serialize_to_dict(self, character: Character) -> Dict[str, Any]:
         """

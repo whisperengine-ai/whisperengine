@@ -540,7 +540,8 @@ CHARACTER ROLEPLAY REQUIREMENTS:
                                 if relationship_approach or relationship_examples:
                                     prompt += f"""
 
-💕 FOR RELATIONSHIP/ROMANTIC SCENARIOS ("I love you", dating invitations, etc.):
+� MANDATORY FOR RELATIONSHIP/ROMANTIC SCENARIOS ("I love you", dating invitations, flirtation, etc.):
+⚠️  NEVER USE GENERIC AI RESPONSES - USE {character.identity.name.upper()}'S CHARACTER-SPECIFIC BOUNDARY STYLE INSTEAD
 - Philosophy: {relationship_philosophy}
 - Approach: {relationship_approach}"""
                                     if relationship_strategy:
@@ -549,11 +550,13 @@ CHARACTER ROLEPLAY REQUIREMENTS:
                                     
                                     if relationship_examples:
                                         prompt += f"""
-- Example relationship boundary responses:"""
+- 🎯 REQUIRED: Use these {character.identity.name}-style boundary responses instead of generic AI disclosure:"""
                                         for scenario_type, example_response in relationship_examples.items():
                                             clean_scenario = scenario_type.replace('_', ' ').title()
                                             prompt += f"""
   • {clean_scenario}: "{example_response}" """
+                                        prompt += f"""
+⚠️  CRITICAL: Maintain {character.identity.name}'s authentic personality when setting boundaries - NO generic "I'm an AI" responses!"""
                                 
                                 # Add professional advice guidance
                                 if professional_approach or professional_examples:
@@ -842,6 +845,32 @@ USER IDENTIFICATION:
             except Exception as e:
                 logger.warning(f"Could not apply character-specific overrides: {e}")
 
+            # 🎭 CDL COMMUNICATION SCENARIOS: Integrate typical responses for authentic character interactions
+            try:
+                communication_scenarios = self._detect_communication_scenarios(message_content, character, display_name)
+                if communication_scenarios:
+                    prompt += f"\n\n🎭 SCENARIO-SPECIFIC RESPONSES:"
+                    for scenario, responses in communication_scenarios.items():
+                        if responses:
+                            scenario_display = scenario.replace('_', ' ').title()
+                            prompt += f"\n\n{scenario_display} Context Detected:"
+                            # Use up to 2 appropriate responses from CDL for this scenario
+                            for i, response in enumerate(responses[:2], 1):
+                                prompt += f"\n  • Option {i}: \"{response}\""
+                            prompt += f"\n  → Use these as inspiration for your authentic {character.identity.name} response style"
+                    
+                    # Add CDL-driven conversation flow guidance
+                    flow_guidance = self._get_cdl_conversation_flow_guidance(character_file, communication_scenarios)
+                    if flow_guidance:
+                        prompt += flow_guidance
+                    
+                    logger.info(f"🎭 CDL SCENARIOS: Applied {len(communication_scenarios)} scenario response patterns")
+                else:
+                    logger.debug("🎭 CDL SCENARIOS: No specific scenarios detected, using general personality")
+                    
+            except Exception as e:
+                logger.warning(f"Could not apply CDL communication scenarios: {e}")
+
             # UNIVERSAL TTS-FRIENDLY REQUIREMENTS (applies to ALL characters)
             prompt += """
 
@@ -864,6 +893,70 @@ USER IDENTIFICATION:
             logger.error(f"CDL integration failed: {e}")
             raise
 
+    def _get_cdl_conversation_flow_guidance(self, character_file: str, communication_scenarios: Dict[str, list]) -> str:
+        """
+        Extract conversation flow guidance from CDL character definition.
+        This replaces hardcoded flow patterns with character-specific guidance.
+        """
+        try:
+            import json
+            character_file_path = Path(character_file)
+            if not character_file_path.exists():
+                return ""
+            
+            with open(character_file_path, 'r', encoding='utf-8') as f:
+                raw_character_data = json.load(f)
+                
+            # Look for conversation_flow_guidance in communication section
+            communication_data = raw_character_data.get('character', {}).get('communication', {})
+            flow_guidance_data = communication_data.get('conversation_flow_guidance', {})
+            
+            if not flow_guidance_data:
+                return ""
+                
+            prompt_additions = []
+            
+            # Check for scenario-specific flow guidance
+            for scenario_name in communication_scenarios.keys():
+                if scenario_name in flow_guidance_data:
+                    scenario_guidance = flow_guidance_data[scenario_name]
+                    scenario_display = scenario_name.replace('_', ' ').title()
+                    
+                    prompt_additions.append(f"\n\n🎭 {scenario_display.upper()} CONVERSATION FLOW:")
+                    
+                    # Add guidance elements from CDL
+                    if 'energy' in scenario_guidance:
+                        prompt_additions.append(f"\n- Energy: {scenario_guidance['energy']}")
+                    if 'approach' in scenario_guidance:
+                        prompt_additions.append(f"\n- Approach: {scenario_guidance['approach']}")
+                    if 'avoid' in scenario_guidance and isinstance(scenario_guidance['avoid'], list):
+                        avoid_items = ', '.join(scenario_guidance['avoid'])
+                        prompt_additions.append(f"\n- Avoid: {avoid_items}")
+                    if 'encourage' in scenario_guidance and isinstance(scenario_guidance['encourage'], list):
+                        encourage_items = ', '.join(scenario_guidance['encourage'])
+                        prompt_additions.append(f"\n- Encourage: {encourage_items}")
+                    if 'transition_style' in scenario_guidance:
+                        prompt_additions.append(f"\n- Transition style: {scenario_guidance['transition_style']}")
+                    if 'examples' in scenario_guidance and isinstance(scenario_guidance['examples'], list):
+                        prompt_additions.append(f"\n- Example transitions: {'; '.join(scenario_guidance['examples'][:2])}")
+            
+            # Add general flow guidance if no specific scenarios match but general guidance exists
+            if not prompt_additions and 'general' in flow_guidance_data:
+                general_guidance = flow_guidance_data['general']
+                prompt_additions.append("\n\n🎭 CONVERSATION FLOW GUIDANCE:")
+                if 'default_energy' in general_guidance:
+                    prompt_additions.append(f"\n- Maintain energy: {general_guidance['default_energy']}")
+                if 'conversation_style' in general_guidance:
+                    prompt_additions.append(f"\n- Style: {general_guidance['conversation_style']}")
+                if 'transition_approach' in general_guidance:
+                    prompt_additions.append(f"\n- Transitions: {general_guidance['transition_approach']}")
+                    
+            return ''.join(prompt_additions) if prompt_additions else ""
+            
+        except Exception as e:
+            logger.warning(f"Could not extract CDL conversation flow guidance: {e}")
+            return ""
+
     async def load_character(self, character_file: str) -> Character:
         """Load a character from CDL file."""
         try:
@@ -881,6 +974,57 @@ USER IDENTIFICATION:
         except Exception as e:
             logger.error(f"Failed to load character {character_file}: {e}")
             raise
+
+    def _detect_communication_scenarios(self, message_content: str, character: Character, user_name: str) -> Dict[str, list]:
+        """
+        Detect communication scenarios based on message content and return appropriate CDL responses.
+        
+        Args:
+            message_content: User's message to analyze
+            character: Character with communication patterns
+            user_name: User's display name
+            
+        Returns:
+            Dict mapping scenario types to lists of appropriate responses
+        """
+        scenarios = {}
+        message_lower = message_content.lower()
+        
+        # Define scenario detection patterns
+        scenario_patterns = {
+            'greeting': ['hello', 'hi ', 'hey', 'good morning', 'good afternoon', 'good evening', "what's up"],
+            'compliment_received': ['beautiful', 'gorgeous', 'pretty', 'attractive', 'stunning', 'eyes', 'look good', 'looking', 'hot', 'cute', 'elegant', 'sophisticated'],
+            'romantic_interest': ['interested in you', 'like you', 'attracted', 'date', 'dinner', 'coffee together', 'spend time', 'get to know', 'beautiful', 'gorgeous', 'looking at', 'yes, gorgeous', 'yes gorgeous', 'gorgeous', 'yes darling', 'yes, darling'],
+            'intimate_escalation': ['your place or mine', 'come over', 'my place', 'your place', 'bedroom', 'tonight', "let's go", 'get a room', 'cab', 'hotel', 'come home with', 'sleep together'],
+            'advice_giving': ['what should i', 'advice', 'help me', 'what do you think', 'suggestion', 'recommend'],
+            'excitement': ['amazing', 'awesome', 'incredible', 'fantastic', 'wow', 'great', 'love it', 'excited'],
+            'concern': ['worried', 'concerned', 'problem', 'issue', 'trouble', 'difficult', 'struggling']
+        }
+        
+        # Check each scenario pattern
+        for scenario_type, patterns in scenario_patterns.items():
+            for pattern in patterns:
+                if pattern in message_lower:
+                    # Get CDL responses for this scenario
+                    cdl_responses = character.communication.typical_responses.get(scenario_type, [])
+                    if cdl_responses:
+                        scenarios[scenario_type] = cdl_responses
+                    break  # Don't double-match the same scenario
+        
+        # Special romantic interest detection for more nuanced flirtation
+        flirtatious_patterns = [
+            'looking right at', 'looking at you', 'those eyes', 'your eyes', 
+            'can i sit', 'waiting for someone', 'just looking'
+        ]
+        
+        for pattern in flirtatious_patterns:
+            if pattern in message_lower:
+                romantic_responses = character.communication.typical_responses.get('romantic_interest', [])
+                if romantic_responses:
+                    scenarios['romantic_interest'] = romantic_responses
+                break
+        
+        return scenarios
 
 
 async def load_character_definitions(characters_dir: str = "characters") -> Dict[str, Character]:

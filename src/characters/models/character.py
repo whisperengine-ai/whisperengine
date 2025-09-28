@@ -193,6 +193,39 @@ class CharacterIdentity:
 
 
 @dataclass
+class CharacterCommunication:
+    """Character communication patterns and typical responses"""
+    typical_responses: Dict[str, List[str]] = field(default_factory=dict)
+    emotional_expressions: Dict[str, str] = field(default_factory=dict)
+    response_length: str = "moderate"
+    communication_style: str = "adaptive"
+    
+    def __post_init__(self):
+        """Initialize default typical responses if empty"""
+        if not self.typical_responses:
+            self.typical_responses = {
+                "greeting": [],
+                "compliment_received": [],
+                "advice_giving": [],
+                "romantic_interest": [],
+                "farewell": [],
+                "confusion": [],
+                "excitement": [],
+                "concern": []
+            }
+        
+        if not self.emotional_expressions:
+            self.emotional_expressions = {
+                "happiness": "Warm and genuine expression",
+                "sadness": "Thoughtful and empathetic",
+                "anger": "Controlled but firm",
+                "surprise": "Open and curious",
+                "fear": "Cautious but brave",
+                "disgust": "Politely dismissive"
+            }
+
+
+@dataclass
 class Character:
     """Complete character definition following CDL specification"""
     metadata: CharacterMetadata = field(default_factory=CharacterMetadata)
@@ -200,6 +233,7 @@ class Character:
     personality: CharacterPersonality = field(default_factory=CharacterPersonality)
     backstory: CharacterBackstory = field(default_factory=CharacterBackstory)
     current_life: CharacterCurrentLife = field(default_factory=CharacterCurrentLife)
+    communication: CharacterCommunication = field(default_factory=CharacterCommunication)
     
     # Runtime state (not serialized)
     _runtime_state: Dict[str, Any] = field(default_factory=dict, init=False, repr=False)

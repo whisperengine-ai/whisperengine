@@ -2432,7 +2432,7 @@ class BotEventHandlers:
                                         current_topic=None  # Topic detection could be added later
                                     )
                                     
-                                    # Ensure response_analysis is a dictionary
+                                    # Ensure response_analysis is a dictionary - handle string responses gracefully
                                     if isinstance(response_analysis, dict):
                                         answered_questions = response_analysis.get("answered_questions", [])
                                         if answered_questions:
@@ -2440,6 +2440,9 @@ class BotEventHandlers:
                                             for q in answered_questions:
                                                 logger.info(f"🔗 CONVERSATION CONTINUITY: Resolved '{q.question_text[:50]}...' "
                                                           f"(quality: {q.resolution_quality:.2f})")
+                                    elif isinstance(response_analysis, str):
+                                        # Handle case where response_analysis is returned as a string
+                                        logger.debug(f"🔗 CONVERSATION CONTINUITY: Received string response: {response_analysis[:100]}...")
                                     else:
                                         logger.warning("🔗 CONVERSATION CONTINUITY: Unexpected response format from process_user_response: %s", type(response_analysis))
                                 except Exception as e:
