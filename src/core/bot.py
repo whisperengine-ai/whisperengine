@@ -889,6 +889,7 @@ class DiscordBotCore:
         self.initialize_bot()
         self.initialize_llm_client()
         self.initialize_memory_system()
+        self.initialize_hybrid_emotion_analyzer()
         
         # LLM Tool Integration removed - memory system simplified
 

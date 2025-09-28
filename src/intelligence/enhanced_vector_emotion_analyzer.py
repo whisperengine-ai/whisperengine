@@ -131,6 +131,9 @@ class EnhancedVectorEmotionAnalyzer:
     - Real-time emotional state tracking
     """
     
+    # 🔥 PERFORMANCE: Shared RoBERTa classifier to avoid loading model multiple times
+    _shared_roberta_classifier = None
+    
     def __init__(self, vector_memory_manager=None):
         """Initialize the enhanced emotion analyzer"""
         self.vector_memory_manager = vector_memory_manager
@@ -140,7 +143,7 @@ class EnhancedVectorEmotionAnalyzer:
         self.keyword_weight = float(os.getenv("ENHANCED_EMOTION_KEYWORD_WEIGHT", "0.3"))
         self.semantic_weight = float(os.getenv("ENHANCED_EMOTION_SEMANTIC_WEIGHT", "0.4"))
         self.context_weight = float(os.getenv("ENHANCED_EMOTION_CONTEXT_WEIGHT", "0.3"))
-        self.confidence_threshold = float(os.getenv("ENHANCED_EMOTION_CONFIDENCE_THRESHOLD", "0.6"))
+        self.confidence_threshold = float(os.getenv("ENHANCED_EMOTION_CONFIDENCE_THRESHOLD", "0.4"))
         
         logger.info("Enhanced Vector Emotion Analyzer initialized: enabled=%s, "
                    "weights=[keyword=%s, semantic=%s, context=%s], threshold=%s",
@@ -368,15 +371,19 @@ class EnhancedVectorEmotionAnalyzer:
             if ROBERTA_AVAILABLE:
                 logger.info(f"🤖 ROBERTA ANALYSIS: RoBERTa transformer available, starting analysis")
                 try:
-                    # Initialize RoBERTa classifier if not already done
-                    if not hasattr(self, '_roberta_classifier') or self._roberta_classifier is None:
-                        logger.info("🤖 ROBERTA ANALYSIS: Initializing RoBERTa emotion classifier...")
-                        self._roberta_classifier = pipeline(
+                    # 🔥 PERFORMANCE FIX: Initialize RoBERTa classifier as class variable to avoid repeated loading
+                    if not hasattr(self.__class__, '_shared_roberta_classifier') or self.__class__._shared_roberta_classifier is None:
+                        logger.info("🤖 ROBERTA ANALYSIS: Initializing shared RoBERTa emotion classifier...")
+                        self.__class__._shared_roberta_classifier = pipeline(
                             "text-classification",
                             model="j-hartmann/emotion-english-distilroberta-base",
-                            return_all_scores=True
+                            return_all_scores=True,
+                            device=-1  # Force CPU to avoid GPU issues
                         )
-                        logger.info("🤖 ROBERTA ANALYSIS: ✅ RoBERTa emotion classifier initialized")
+                        logger.info("🤖 ROBERTA ANALYSIS: ✅ RoBERTa emotion classifier initialized and cached")
+                    
+                    # Use shared classifier
+                    self._roberta_classifier = self.__class__._shared_roberta_classifier
                     
                     # Analyze emotions with RoBERTa
                     logger.debug(f"🤖 ROBERTA ANALYSIS: Running RoBERTa inference on content")
@@ -385,19 +392,32 @@ class EnhancedVectorEmotionAnalyzer:
                     
                     # Process RoBERTa results
                     for result in results[0]:  # First (only) text result
-                        emotion_label = result["label"].lower()
+                        raw_label = result["label"]
                         confidence = result["score"]
+                        
+                        # 🔥 CRITICAL FIX: j-hartmann model returns actual emotion names, not LABEL_0 format
+                        # Map j-hartmann emotion labels to standardized names
+                        emotion_label = self._map_roberta_emotion_label(raw_label)
                         
                         # Map RoBERTa labels to our emotion dimensions
                         emotion_scores[emotion_label] = confidence
-                        logger.info(f"🤖 ROBERTA ANALYSIS: RoBERTa detected {emotion_label}: {confidence:.3f}")
+                        logger.info(f"🤖 ROBERTA ANALYSIS: RoBERTa detected {raw_label} → {emotion_label}: {confidence:.3f}")
                     
-                    # If RoBERTa found strong emotions, prioritize them
-                    if any(score > 0.6 for score in emotion_scores.values()):
-                        logger.info(f"🤖 ROBERTA ANALYSIS: Strong emotions detected (>0.6), using RoBERTa as primary: {emotion_scores}")
+                    # 🔥 ENHANCED: Apply conversation context adjustments for better emotional detection
+                    emotion_scores = self._apply_conversation_context_adjustments(content, emotion_scores)
+                    
+                    # 🔥 ENHANCED: Better threshold logic for emotion detection
+                    max_non_neutral = max((score for emotion, score in emotion_scores.items() if emotion != 'neutral'), default=0.0)
+                    neutral_score = emotion_scores.get('neutral', 0.0)
+                    has_strong_emotion = any(score > 0.3 for emotion, score in emotion_scores.items() if emotion != 'neutral')
+                    has_competitive_emotion = max_non_neutral > 0.12 and neutral_score < 0.88
+                    
+                    # Use RoBERTa if we have significant non-neutral emotions
+                    if has_strong_emotion or has_competitive_emotion:
+                        logger.info(f"🤖 ROBERTA ANALYSIS: Significant emotions detected (strong={has_strong_emotion}, competitive={has_competitive_emotion}), using RoBERTa: {emotion_scores}")
                         return emotion_scores  # Return RoBERTa results directly
                     else:
-                        logger.info(f"🤖 ROBERTA ANALYSIS: No strong emotions, continuing to VADER analysis")
+                        logger.info(f"🤖 ROBERTA ANALYSIS: No significant emotions (max_non_neutral={max_non_neutral:.3f}, neutral={neutral_score:.3f}), continuing to VADER")
                         
                 except Exception as roberta_error:
                     logger.warning(f"🤖 ROBERTA ANALYSIS: RoBERTa analysis failed: {roberta_error}")
@@ -1245,6 +1265,86 @@ class EnhancedVectorEmotionAnalyzer:
             "confidence_adjustment": 0.1 if response_data.get('effective') else -0.1,
             "user_specific_learning": f"User {user_id} response patterns updated"
         }
+
+    def _apply_conversation_context_adjustments(self, content: str, emotion_scores: Dict[str, float]) -> Dict[str, float]:
+        """
+        Apply conversation context adjustments to improve emotion detection accuracy.
+        Addresses issues where RoBERTa over-detects neutral for passionate/caring content.
+        """
+        adjusted_scores = emotion_scores.copy()
+        content_lower = content.lower()
+        
+        # Detect passion/caring contexts that RoBERTa might miss
+        passion_keywords = [
+            'passionate', 'care about', 'feel about', 'love', 'adore', 'devoted to',
+            'crucial', 'important', 'vital', 'essential', 'critical for',
+            'heart', 'mission', 'future', 'protect', 'preserve', 'conservation',
+            'amazing', 'incredible', 'fascinating', 'wonderful', 'exciting'
+        ]
+        
+        excitement_keywords = [
+            'excited', 'thrilled', 'amazing', 'fantastic', 'awesome', 'brilliant',
+            'wonderful', 'incredible', 'fascinating', 'discovery', 'explore'
+        ]
+        
+        care_keywords = [
+            'worried', 'concerned', 'care', 'important', 'future', 'protect',
+            'conservation', 'preserve', 'save', 'crucial', 'vital'
+        ]
+        
+        # Count keyword matches
+        passion_matches = sum(1 for keyword in passion_keywords if keyword in content_lower)
+        excitement_matches = sum(1 for keyword in excitement_keywords if keyword in content_lower)  
+        care_matches = sum(1 for keyword in care_keywords if keyword in content_lower)
+        
+        # Apply adjustments if neutral is dominating but we have emotional keywords
+        if adjusted_scores.get('neutral', 0) > 0.65:  # Lowered from 0.7 for more aggressive redistribution
+            if passion_matches >= 1 or excitement_matches >= 1:  # More sensitive - only need 1 match
+                # Redistribute some neutral to joy
+                neutral_reduction = min(0.35, adjusted_scores.get('neutral', 0) * 0.5)  # More aggressive redistribution
+                adjusted_scores['neutral'] = adjusted_scores.get('neutral', 0) - neutral_reduction
+                adjusted_scores['joy'] = adjusted_scores.get('joy', 0) + neutral_reduction
+                logger.info(f"🎭 CONTEXT ADJUSTMENT: Detected passion/excitement - redistributed {neutral_reduction:.3f} from neutral to joy")
+            
+            elif care_matches >= 1:  # More sensitive - only need 1 match
+                # Redistribute some neutral to a caring emotion mix  
+                neutral_reduction = min(0.3, adjusted_scores.get('neutral', 0) * 0.4)  # More aggressive
+                adjusted_scores['neutral'] = adjusted_scores.get('neutral', 0) - neutral_reduction
+                # Mix of joy (caring/positive) and slight concern
+                adjusted_scores['joy'] = adjusted_scores.get('joy', 0) + neutral_reduction * 0.7
+                adjusted_scores['sadness'] = adjusted_scores.get('sadness', 0) + neutral_reduction * 0.3
+                logger.info(f"🎭 CONTEXT ADJUSTMENT: Detected caring/concern - redistributed {neutral_reduction:.3f} from neutral")
+        
+        return adjusted_scores
+
+    def _map_roberta_emotion_label(self, raw_label: str) -> str:
+        """
+        Map j-hartmann RoBERTa emotion labels to standardized emotion names.
+        
+        j-hartmann/emotion-english-distilroberta-base returns:
+        - anger, disgust, fear, joy, neutral, sadness, surprise
+        
+        This method normalizes them to our emotion taxonomy.
+        """
+        label_mapping = {
+            "anger": "anger",
+            "disgust": "disgust", 
+            "fear": "fear",
+            "joy": "joy",
+            "neutral": "neutral",
+            "sadness": "sadness",
+            "surprise": "surprise"
+        }
+        
+        # Normalize to lowercase and map
+        normalized_label = raw_label.lower().strip()
+        mapped_emotion = label_mapping.get(normalized_label, normalized_label)
+        
+        # Log mapping for debugging
+        if normalized_label != mapped_emotion:
+            logger.debug(f"🎭 EMOTION MAPPING: {raw_label} → {mapped_emotion}")
+            
+        return mapped_emotion
 
     async def _count_total_assessments(self) -> int:
         """Count total assessments in system"""

@@ -11,6 +11,7 @@ import os
 import time
 import traceback
 from datetime import UTC, datetime
+from typing import List
 
 import discord
 
@@ -40,6 +41,7 @@ from src.utils.context_size_manager import (
     count_context_tokens,
 )
 from src.conversation.boundary_manager import ConversationBoundaryManager
+from src.conversation.persistent_conversation_manager import PersistentConversationManager
 
 from src.utils.helpers import (
     add_debug_info_to_response,
@@ -143,6 +145,17 @@ class BotEventHandlers:
             llm_client=self.llm_client,  # Pass LLM client for intelligent summarization
             redis_client=redis_client    # Pass Redis client for session persistence
         )
+        
+        # Initialize Persistent Conversation Manager for question tracking and follow-up continuity
+        try:
+            self.persistent_conversation_manager = PersistentConversationManager(
+                memory_manager=self.memory_manager,
+                bot_core=bot_core  # Pass bot_core for vector intelligence access
+            )
+            logger.info("✅ Persistent Conversation Manager initialized successfully")
+        except Exception as e:
+            logger.error(f"❌ Failed to initialize Persistent Conversation Manager: {e}")
+            self.persistent_conversation_manager = None
 
         # Configuration flags - unified AI system always enabled
         self.voice_support_enabled = getattr(bot_core, "voice_support_enabled", False)
@@ -1397,6 +1410,39 @@ class BotEventHandlers:
             )
             conversation_context.append({"role": "system", "content": consolidated})
 
+        # ✨ PERSISTENT CONVERSATION CONTEXT: Check for pending questions that need gentle follow-up
+        try:
+            # Safety check for persistent conversation manager
+            if not self.persistent_conversation_manager:
+                logger.debug(f"🔗 CONVERSATION CONTINUITY: Persistent conversation manager not available for user {user_id}")
+                return conversation_context
+                
+            logger.info(f"🔗 CONVERSATION CONTINUITY: Checking for pending questions for user {user_id}")
+            
+            # Get natural reminder suggestions from the conversation manager
+            reminder_suggestions = await self.persistent_conversation_manager.get_reminder_suggestions(user_id)
+            
+            if reminder_suggestions:
+                # Add the most relevant reminder as context (limit to avoid overwhelming)
+                primary_reminder = reminder_suggestions[0] if reminder_suggestions else None
+                
+                if primary_reminder and primary_reminder.strip():
+                    # Add as a subtle system instruction for natural integration
+                    conversation_context.append({
+                        "role": "system", 
+                        "content": f"Conversation continuity note: {primary_reminder.strip()}"
+                    })
+                    logger.info(f"🔗 CONVERSATION CONTINUITY: Added natural reminder context")
+                    logger.debug(f"🔗 CONVERSATION CONTINUITY: Reminder: {primary_reminder[:100]}...")
+                else:
+                    logger.debug(f"🔗 CONVERSATION CONTINUITY: No usable reminder content")
+            else:
+                logger.debug(f"🔗 CONVERSATION CONTINUITY: No pending questions need reminders for user {user_id}")
+                
+        except Exception as e:
+            logger.error(f"🔗 CONVERSATION CONTINUITY: Error checking pending questions for user {user_id}: {e}")
+            # Don't fail context building if conversation tracking fails
+
         # Add recent messages with proper alternation
         user_assistant_messages = []
         # FIX: Don't reverse again - recent_messages should already be in chronological order
@@ -2366,6 +2412,74 @@ class BotEventHandlers:
                 # Use reply format for guild mentions, regular send for DMs
                 reference_message = message if message.guild else None
                 await self._send_response_chunks(reply_channel, response_with_debug, reference_message)
+
+                # ✨ PERSISTENT CONVERSATION TRACKING: Handle follow-up questions and continuity
+                try:
+                    # Safety check for persistent conversation manager
+                    if not self.persistent_conversation_manager:
+                        logger.debug(f"🔗 CONVERSATION CONTINUITY: Persistent conversation manager not available for user {user_id}")
+                    else:
+                        try:
+                            logger.info(f"🔗 CONVERSATION CONTINUITY: Processing conversation state for user {user_id}")
+                            
+                            # Step 1: Process user's response to check if any pending questions were answered
+                            user_message_content = original_content or message.content
+                            if user_message_content:
+                                try:
+                                    response_analysis = await self.persistent_conversation_manager.process_user_response(
+                                        user_id=user_id,
+                                        user_message=user_message_content,
+                                        current_topic=None  # Topic detection could be added later
+                                    )
+                                    
+                                    # Ensure response_analysis is a dictionary
+                                    if isinstance(response_analysis, dict):
+                                        answered_questions = response_analysis.get("answered_questions", [])
+                                        if answered_questions:
+                                            logger.info(f"🔗 CONVERSATION CONTINUITY: User answered {len(answered_questions)} pending questions")
+                                            for q in answered_questions:
+                                                logger.info(f"🔗 CONVERSATION CONTINUITY: Resolved '{q.question_text[:50]}...' "
+                                                          f"(quality: {q.resolution_quality:.2f})")
+                                    else:
+                                        logger.warning("🔗 CONVERSATION CONTINUITY: Unexpected response format from process_user_response: %s", type(response_analysis))
+                                except Exception as e:
+                                    logger.error("🔗 CONVERSATION CONTINUITY: Error processing user response for user %s: %s", user_id, e)
+                        except Exception as e:
+                            logger.error("🔗 CONVERSATION CONTINUITY: Error processing conversation state for user %s: %s", user_id, e)
+                        
+                        # Step 2: Extract and track any questions from the bot's response
+                        bot_questions = self._extract_questions_from_response(response)
+                        
+                        for question_text in bot_questions:
+                            # Determine question type and priority based on content
+                            question_type, priority = self._classify_question(question_text)
+                            
+                            question_id = await self.persistent_conversation_manager.track_bot_question(
+                                user_id=user_id,
+                                question_text=question_text,
+                                question_type=question_type,
+                                priority=priority,
+                                current_topic=None,  # Topic detection could be added
+                                user_context=user_message_content[:200] if user_message_content else ""
+                            )
+                            
+                            logger.info(f"🔗 CONVERSATION CONTINUITY: Tracked question '{question_text[:50]}...' "
+                                      f"({question_type.value}, {priority.value}) -> {question_id}")
+                        
+                        # Step 3: Get conversation health summary for monitoring
+                        conversation_issues = await self.persistent_conversation_manager.detect_conversation_issues(user_id)
+                        if conversation_issues:
+                            issues = conversation_issues.get('issues', [])
+                            if issues:
+                                logger.info(f"🔗 CONVERSATION CONTINUITY: Detected {len(issues)} conversation issues")
+                                for issue in issues[:2]:  # Log first 2 issues
+                                    logger.info(f"🔗 CONVERSATION CONTINUITY: Issue - {issue.get('type', 'unknown')}: {issue.get('description', 'no description')[:100]}")
+                        
+                        logger.info(f"🔗 CONVERSATION CONTINUITY: Successfully processed conversation state for user {user_id}")
+                    
+                except Exception as e:
+                    logger.error(f"🔗 CONVERSATION CONTINUITY: Error processing conversation state for user {user_id}: {e}")
+                    # Don't fail the response if conversation tracking fails - it's an enhancement
 
                 # CRITICAL FIX: Add bot response to conversation cache after sending
                 if self.conversation_cache:
@@ -3433,3 +3547,94 @@ class BotEventHandlers:
         except Exception as e:
             logger.error(f"Error getting recent emotional feedback: {e}")
             return {"emotional_context": "neutral", "confidence": 0.0}
+    
+    # ✨ PERSISTENT CONVERSATION TRACKING: Helper methods for question extraction and classification
+    
+    def _extract_questions_from_response(self, response: str) -> List[str]:
+        """
+        Extract questions from bot response using simple pattern matching.
+        Could be enhanced with LLM analysis for better accuracy.
+        
+        Args:
+            response: Bot response text
+            
+        Returns:
+            List of question strings found in the response
+        """
+        import re
+        
+        questions = []
+        
+        # Split response into sentences
+        sentences = re.split(r'[.!]\s+', response)
+        
+        for sentence in sentences:
+            sentence = sentence.strip()
+            if not sentence:
+                continue
+                
+            # Check if sentence ends with question mark or contains question words
+            if (sentence.endswith('?') or 
+                any(word in sentence.lower() for word in ['what', 'how', 'why', 'when', 'where', 'which', 'would you', 'do you', 'have you', 'can you'])):
+                
+                # Clean up the question
+                clean_question = sentence.rstrip('.!') + ('?' if not sentence.endswith('?') else '')
+                if len(clean_question) > 10:  # Filter out very short questions
+                    questions.append(clean_question)
+        
+        logger.debug(f"🔗 QUESTION EXTRACTION: Found {len(questions)} questions in response")
+        for i, q in enumerate(questions):
+            logger.debug(f"🔗 QUESTION EXTRACTION: Q{i+1}: {q[:100]}...")
+            
+        return questions
+    
+    def _classify_question(self, question_text: str) -> tuple:
+        """
+        Classify a question by type and priority using simple heuristics.
+        Could be enhanced with LLM classification for better accuracy.
+        
+        Args:
+            question_text: The question to classify
+            
+        Returns:
+            Tuple of (QuestionType, QuestionPriority)
+        """
+        from src.conversation.persistent_conversation_manager import QuestionType, QuestionPriority
+        
+        question_lower = question_text.lower()
+        
+        # Determine question type based on content patterns
+        question_type = QuestionType.FOLLOWUP  # Default
+        
+        if any(word in question_lower for word in ['what do you mean', 'clarify', 'explain']):
+            question_type = QuestionType.CLARIFICATION
+        elif any(word in question_lower for word in ['how do you feel', 'what was that like', 'how did you']):
+            question_type = QuestionType.PERSONAL
+        elif any(word in question_lower for word in ['when', 'where', 'how many', 'what time']):
+            question_type = QuestionType.FACTUAL
+        elif any(word in question_lower for word in ['favorite', 'prefer', 'think about', 'opinion']):
+            question_type = QuestionType.OPINION
+        elif any(word in question_lower for word in ['would you rather', 'choose', 'option', 'or']):
+            question_type = QuestionType.CHOICE
+        elif any(word in question_lower for word in ['tell me more', 'what else', 'anything else']):
+            question_type = QuestionType.FOLLOWUP
+        
+        # Determine priority based on question type and urgency indicators
+        priority = QuestionPriority.MEDIUM  # Default
+        
+        if question_type in [QuestionType.CLARIFICATION]:
+            priority = QuestionPriority.HIGH  # Clarifications are important
+        elif question_type in [QuestionType.PERSONAL, QuestionType.OPINION]:
+            priority = QuestionPriority.MEDIUM  # Personal questions are good for engagement
+        elif question_type in [QuestionType.FACTUAL, QuestionType.CHOICE]:
+            priority = QuestionPriority.MEDIUM  # Factual questions are useful
+        elif question_type == QuestionType.FOLLOWUP:
+            priority = QuestionPriority.LOW  # Follow-ups are nice but not critical
+            
+        # Boost priority for urgent-sounding questions
+        if any(word in question_lower for word in ['important', 'urgent', 'need to know']):
+            priority = QuestionPriority.HIGH
+        
+        logger.debug(f"🔗 QUESTION CLASSIFICATION: '{question_text[:50]}...' -> {question_type.value}, {priority.value}")
+        
+        return question_type, priority

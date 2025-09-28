@@ -159,16 +159,16 @@ class DynamicPersonalityProfiler:
     def __init__(
         self,
         analysis_window_days: int = 30,
-        min_conversations_for_confidence: int = 5,
-        trait_update_threshold: float = 0.1,
+        min_conversations_for_confidence: int = 3,
+        trait_update_threshold: float = 0.08,
     ):
         """
         Initialize the personality profiler.
 
         Args:
             analysis_window_days: Days of conversation history to consider
-            min_conversations_for_confidence: Minimum conversations needed for confident trait assessment
-            trait_update_threshold: Minimum change required to update a trait
+            min_conversations_for_confidence: Minimum conversations needed for confident trait assessment (reduced to 3 for faster adaptation)
+            trait_update_threshold: Minimum change required to update a trait (reduced to 0.08 for more sensitive updates)
         """
         self.analysis_window = timedelta(days=analysis_window_days)
         self.min_conversations = min_conversations_for_confidence
@@ -326,21 +326,25 @@ class DynamicPersonalityProfiler:
         return topics
 
     def _analyze_formality(self, message: str) -> float:
-        """Analyze formality level of a message (-1.0=formal, 1.0=casual)"""
+        """Analyze formality level of a message (0.0=casual, 1.0=formal)"""
         formal_indicators = [
             "please",
-            "thank you",
+            "thank you", 
             "would you",
             "could you",
             "may I",
             "I would appreciate",
             "sincerely",
             "regards",
+            "explain the process",
+            "how does",
+            "what is the",
+            "can you describe"
         ]
 
         casual_indicators = [
             "hey",
-            "hi",
+            "hi", 
             "yeah",
             "ok",
             "cool",
@@ -353,6 +357,9 @@ class DynamicPersonalityProfiler:
             "wanna",
             "dunno",
             "kinda",
+            "what's your",
+            "how do you feel",
+            "favorite"
         ]
 
         message_lower = message.lower()
@@ -363,13 +370,25 @@ class DynamicPersonalityProfiler:
         # Normalize by message length
         message_words = len(message.split())
         if message_words == 0:
-            return 0.0
+            return 0.5  # Neutral default
 
         formal_score = formal_count / message_words
         casual_score = casual_count / message_words
 
-        # Return difference, scaled to -1.0 to 1.0
-        return min(1.0, max(-1.0, (casual_score - formal_score) * 10))
+        # 🔥 FIXED: Return 0.0-1.0 scale where 1.0 = formal, 0.0 = casual
+        # Base formality on indicators, with reasonable defaults
+        if formal_count > casual_count:
+            return min(1.0, 0.6 + (formal_score * 5))  # Formal bias
+        elif casual_count > formal_count:
+            return max(0.0, 0.4 - (casual_score * 5))  # Casual bias  
+        else:
+            # No strong indicators - analyze sentence structure and length
+            if len(message) > 100 and '?' in message and any(word in message_lower for word in ['explain', 'process', 'how does']):
+                return 0.8  # Long technical questions are more formal
+            elif len(message) < 50 and any(word in message_lower for word in ['what\'s', 'how do you', 'feel']):
+                return 0.3  # Short personal questions are more casual
+            else:
+                return 0.5  # Neutral
 
     def _analyze_detail_preference(self, message: str) -> float:
         """Analyze preference for detailed vs brief communication"""
