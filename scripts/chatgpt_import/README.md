@@ -54,7 +54,7 @@ This tool imports your ChatGPT conversations into WhisperEngine, allowing the AI
 ls -la /path/to/conversations.json
 
 # If file exists, try full path
-./bot.sh import-chatgpt /full/path/to/conversations.json 672814231002939413
+./multi-bot.sh import-chatgpt /full/path/to/conversations.json 672814231002939413
 ```
 
 ### Problem: "Permission denied" Error
@@ -64,7 +64,7 @@ ls -la /path/to/conversations.json
 chmod +x bot.sh
 
 # Try with sudo if needed (be careful!)
-sudo ./bot.sh import-chatgpt /path/to/conversations.json 672814231002939413
+sudo ./multi-bot.sh import-chatgpt /path/to/conversations.json 672814231002939413
 ```
 
 ### Problem: "Docker not running" Error
@@ -115,7 +115,7 @@ docker compose up -d
 sleep 60
 
 # Try import again
-./bot.sh import-chatgpt /path/to/conversations.json 672814231002939413
+./multi-bot.sh import-chatgpt /path/to/conversations.json 672814231002939413
 ```
 
 ### Problem: File Format Issues
@@ -203,7 +203,7 @@ cd /path/to/whisperengine
 
 **Step 2**: Run the import using our bot management script:
 ```bash
-./bot.sh import-chatgpt /path/to/conversations.json 672814231002939413
+./multi-bot.sh import-chatgpt /path/to/conversations.json 672814231002939413
 ```
 
 **Replace these parts:**
@@ -213,13 +213,13 @@ cd /path/to/whisperengine
 **Example with real paths:**
 ```bash
 # If your file is on Desktop (Mac/Linux)
-./bot.sh import-chatgpt ~/Desktop/conversations.json 672814231002939413
+./multi-bot.sh import-chatgpt ~/Desktop/conversations.json 672814231002939413
 
 # If your file is in Downloads (Mac/Linux)  
-./bot.sh import-chatgpt ~/Downloads/conversations.json 672814231002939413
+./multi-bot.sh import-chatgpt ~/Downloads/conversations.json 672814231002939413
 
 # Windows example
-./bot.sh import-chatgpt "C:\Users\YourName\Desktop\conversations.json" 672814231002939413
+./multi-bot.sh import-chatgpt "C:\Users\YourName\Desktop\conversations.json" 672814231002939413
 ```
 
 ### Method 2: Direct Docker Command (More Control)
@@ -443,15 +443,15 @@ Imported conversations integrate seamlessly with WhisperEngine:
 
 ```bash
 # Import only 2024 conversations
-./bot.sh import-chatgpt conversations.json 672814231002939413 \
+./multi-bot.sh import-chatgpt conversations.json 672814231002939413 \
   --start-date 2024-01-01 --end-date 2024-12-31
 
 # Skip very short conversations (less than 3 messages)
-./bot.sh import-chatgpt conversations.json 672814231002939413 \
+./multi-bot.sh import-chatgpt conversations.json 672814231002939413 \
   --min-messages 3
 
 # Process in smaller batches (good for slow computers)
-./bot.sh import-chatgpt conversations.json 672814231002939413 \
+./multi-bot.sh import-chatgpt conversations.json 672814231002939413 \
   --batch-size 25 --verbose
 ```
 
@@ -550,7 +550,7 @@ With your ChatGPT history imported, WhisperEngine can:
 
 1. **Get your file**: Export from ChatGPT → download → unzip → find `conversations.json`
 2. **Get your Discord ID**: Discord Settings → Advanced → Developer Mode → Right-click username → Copy User ID
-3. **Run one command**: `./bot.sh import-chatgpt /path/to/conversations.json YOUR_DISCORD_ID`
+3. **Run one command**: `./multi-bot.sh import-chatgpt /path/to/conversations.json YOUR_DISCORD_ID`
 4. **Wait patiently**: Large files take time, but you'll see progress messages
 5. **Test it works**: Ask WhisperEngine about something from your ChatGPT history
 

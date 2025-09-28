@@ -60,13 +60,13 @@ check_containers() {
     
     if [[ $running_containers -eq 0 ]]; then
         print_error "No WhisperEngine containers are running"
-        echo "Start the services first with: ./bot.sh start"
+        echo "Start the services first with: ./multi-bot.sh start all"
         exit 1
     fi
     
     if [[ $running_containers -lt 4 ]]; then
         print_warning "Only $running_containers/4 services are running"
-        echo "Some backups may fail. Consider starting all services with: ./bot.sh start"
+        echo "Some backups may fail. Consider starting all services with: ./multi-bot.sh start all"
     fi
 }
 
@@ -246,7 +246,7 @@ show_backup_summary() {
     
     echo ""
     echo "🔄 To restore from this backup:"
-    echo "   ./bot.sh backup restore $TIMESTAMP"
+    echo "   ./multi-bot.sh backup restore $TIMESTAMP"
     echo ""
     echo "📁 To browse backup contents:"
     echo "   ls -la $BACKUP_DIR/"
@@ -265,7 +265,7 @@ restore_postgresql() {
     
     if ! $COMPOSE_CMD ps -q postgres 2>/dev/null | grep -q .; then
         print_error "PostgreSQL container not running"
-        echo "Start the services first with: ./bot.sh start"
+        echo "Start the services first with: ./multi-bot.sh start all"
         return 1
     fi
     
@@ -295,7 +295,7 @@ restore_redis() {
     
     if ! $COMPOSE_CMD ps -q redis 2>/dev/null | grep -q .; then
         print_error "Redis container not running"
-        echo "Start the services first with: ./bot.sh start"
+        echo "Start the services first with: ./multi-bot.sh start all"
         return 1
     fi
     
@@ -345,7 +345,7 @@ restore_chromadb() {
     
     if ! $COMPOSE_CMD ps -q chromadb 2>/dev/null | grep -q .; then
         print_error "ChromaDB container not running"
-        echo "Start the services first with: ./bot.sh start"
+        echo "Start the services first with: ./multi-bot.sh start all"
         return 1
     fi
     
@@ -393,7 +393,7 @@ restore_neo4j() {
     
     if ! $COMPOSE_CMD ps -q neo4j 2>/dev/null | grep -q .; then
         print_error "Neo4j container not running"
-        echo "Start the services first with: ./bot.sh start"
+        echo "Start the services first with: ./multi-bot.sh start all"
         return 1
     fi
     
@@ -489,7 +489,7 @@ perform_restore() {
         echo "Some services may not have been restored. Check the logs above for details."
     else
         print_error "Restore failed for all services!"
-        echo "Your original data should still be intact. Check container status with: ./bot.sh status"
+        echo "Your original data should still be intact. Check container status with: ./multi-bot.sh status"
         exit 1
     fi
 }
@@ -586,7 +586,7 @@ list_backups() {
     
     if [[ ! -d "$BACKUP_BASE_DIR" ]]; then
         print_warning "No backup directory found: $BACKUP_BASE_DIR"
-        echo "Create your first backup with: ./bot.sh backup create"
+        echo "Create your first backup with: ./multi-bot.sh backup create"
         return 0
     fi
     
@@ -615,10 +615,10 @@ list_backups() {
     
     if [[ $backup_count -eq 0 ]]; then
         print_warning "No backups found in $BACKUP_BASE_DIR"
-        echo "Create your first backup with: ./bot.sh backup create"
+        echo "Create your first backup with: ./multi-bot.sh backup create"
     else
         print_status "Found $backup_count backup(s)"
-        echo "To restore a backup: ./bot.sh backup restore TIMESTAMP"
+        echo "To restore a backup: ./multi-bot.sh backup restore TIMESTAMP"
     fi
 }
 
