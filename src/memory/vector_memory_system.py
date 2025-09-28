@@ -3654,7 +3654,7 @@ class VectorMemoryManager:
                     for r in results:
                         r_metadata = r.get("metadata", {})
                         if (r_metadata.get("role") == "assistant" and 
-                            abs(r.get("timestamp", 0) - result.get("timestamp", 0)) < 60):  # Within 1 minute
+                            abs(r.get("timestamp", 0) - result.get("timestamp", 0)) < 86400):  # Within 24 hours - much more reasonable for conversation context
                             bot_response = r.get("content", "")
                             break
                     
