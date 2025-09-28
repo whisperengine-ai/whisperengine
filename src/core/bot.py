@@ -229,69 +229,8 @@ class DiscordBotCore:
                 self.logger.error("❌ No emotion analyzer available: %s", fallback_e)
                 self.hybrid_emotion_analyzer = None
     
-    def initialize_llm_tool_integration(self):
-        """Initialize LLM Tool Integration Manager for Phase 1-4 features.
-        
-        Phase 1: Memory Tools - Memory storage, retrieval and search capabilities
-        Phase 2: Character Evolution & Emotional Intelligence - Personality adaptation and emotion response
-        Phase 3: Multi-Dimensional Memory Networks - Pattern detection and memory analysis
-        Phase 4: Proactive Intelligence & Tool Orchestration - Complex workflows and autonomous planning
-        """
-        
-        # ALWAYS initialize LLM tool calling in development - no environment flags!
-        try:
-            # Import the factory function
-            from src.memory.memory_protocol import create_llm_tool_integration_manager
-            
-            # Check if we have required components
-            if not hasattr(self, 'memory_manager') or self.memory_manager is None:
-                self.logger.warning("Memory manager not available for LLM tool integration")
-                self.llm_tool_manager = None
-                return
-                
-            if not hasattr(self, 'llm_client') or self.llm_client is None:
-                self.logger.warning("LLM client not available for LLM tool integration")
-                self.llm_tool_manager = None
-                return
-            
-            # For now, use a simple character manager placeholder
-            # TODO: Replace with actual CDL character manager when available
-            character_manager = getattr(self, 'character_manager', None)
-            
-            # Create the LLM tool integration manager
-            self.llm_tool_manager = create_llm_tool_integration_manager(
-                self.memory_manager, 
-                character_manager,
-                self.llm_client
-            )
-            
-            if self.llm_tool_manager:
-                self.logger.info("✅ LLM Tool Integration Manager initialized successfully")
-                
-                # Log enabled features - always enabled in development!
-                features = [
-                    "Phase 1 Memory Tools", 
-                    "Phase 2 Character Evolution", 
-                    "Phase 2 Emotional Intelligence",
-                    "Phase 3 Multi-Dimensional Memory Networks",
-                    "Phase 4 Proactive Intelligence & Tool Orchestration"
-                ]
-                self.logger.info("Available LLM Tool Categories: %s", ", ".join(features))
-                
-                # Get tools summary for logging
-                try:
-                    tools_summary = self.llm_tool_manager.get_available_tools_summary()
-                    total_tools = tools_summary.get("total_tools_available", 0)
-                    self.logger.info("Total LLM tools available: %d", total_tools)
-                except Exception as e:
-                    self.logger.debug("Could not get tools summary: %s", e)
-                    
-            else:
-                self.logger.warning("⚠️ LLM Tool Integration Manager creation returned None")
-                
-        except Exception as e:
-            self.logger.error("Failed to initialize LLM tool integration: %s", str(e))
-            self.llm_tool_manager = None
+    # LLM Tool Integration removed as part of memory system simplification
+    # Complex memory tools have been removed to focus on core vector memory functionality
             
     # REMOVED: Legacy memory optimizer - replaced by vector-native memory system
 
@@ -951,8 +890,7 @@ class DiscordBotCore:
         self.initialize_llm_client()
         self.initialize_memory_system()
         
-        # Initialize LLM Tool Integration (Phase 2)
-        self.initialize_llm_tool_integration()
+        # LLM Tool Integration removed - memory system simplified
 
         # Schedule async initialization of batch optimizer
         if self._needs_batch_init:
@@ -997,7 +935,7 @@ class DiscordBotCore:
             "bot": self.bot,
             "llm_client": self.llm_client,
             "memory_manager": self.memory_manager,
-            "llm_tool_manager": getattr(self, "llm_tool_manager", None),  # Phase 2 LLM Tool Integration
+            "llm_tool_manager": None,  # LLM tool manager removed in memory system simplification
             "conversation_cache": self.conversation_cache,
             "image_processor": self.image_processor,
             "health_monitor": self.health_monitor,

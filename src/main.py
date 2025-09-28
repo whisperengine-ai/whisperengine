@@ -296,26 +296,9 @@ class ModularBotManager:
             await self.command_handlers["llm_self_memory"].register_commands()
             logger.info("✅ LLM-Powered Self-Memory commands enabled (CDL extraction available)")
             
-            # LLM Tool Calling Commands (Phase 1 & 2)
-            components = self.bot_core.get_components()
-            llm_tool_manager = components.get("llm_tool_manager")
-            
-            # LLM Tool Calling Commands (Phase 1 & 2) - always enabled in development!
-            if llm_tool_manager:
-                from src.handlers.llm_tool_commands import LLMToolCommandHandlers
-                self.command_handlers["llm_tools"] = LLMToolCommandHandlers(
-                    bot=self.bot,
-                    memory_manager=components.get("memory_manager"),
-                    llm_tool_manager=llm_tool_manager
-                )
-                await self.command_handlers["llm_tools"].register_commands()
-                logger.info("✅ LLM Tool Calling command handlers registered")
-                
-                # Web Search Integration - works automatically in conversation, no extra commands needed!
-                logger.info("✅ Web Search integration enabled (automatic in conversation)")
-            else:
-                logger.info("ℹ️ LLM Tool Calling commands disabled (feature flag or component unavailable)")
-                logger.info("ℹ️ Web Search integration disabled (requires LLM tool integration)")
+            # Memory Management Tool Commands - REMOVED as part of memory system simplification
+            # Complex LLM-powered memory tools have been removed to focus on core functionality
+            logger.info("ℹ️ Memory Management Tool commands removed (memory system simplified)")
             
             # Store command handlers on bot instance for access by events handler
             self.bot.command_handlers = self.command_handlers
