@@ -907,9 +907,23 @@ USER IDENTIFICATION:
             with open(character_file_path, 'r', encoding='utf-8') as f:
                 raw_character_data = json.load(f)
                 
-            # Look for conversation_flow_guidance in communication section
-            communication_data = raw_character_data.get('character', {}).get('communication', {})
-            flow_guidance_data = communication_data.get('conversation_flow_guidance', {})
+            # Look for conversation_flow_guidance in multiple locations
+            flow_guidance_data = {}
+            
+            # Location 1: character.personality.communication_style.conversation_flow_guidance
+            guidance_1 = (raw_character_data.get('character', {})
+                         .get('personality', {})
+                         .get('communication_style', {})
+                         .get('conversation_flow_guidance', {}))
+            
+            # Location 2: character.communication.conversation_flow_guidance
+            guidance_2 = (raw_character_data.get('character', {})
+                         .get('communication', {})
+                         .get('conversation_flow_guidance', {}))
+            
+            # Merge both locations (location 1 takes precedence)
+            flow_guidance_data.update(guidance_2)
+            flow_guidance_data.update(guidance_1)
             
             if not flow_guidance_data:
                 return ""
@@ -1010,21 +1024,110 @@ USER IDENTIFICATION:
                     if cdl_responses:
                         scenarios[scenario_type] = cdl_responses
                     break  # Don't double-match the same scenario
-        
-        # Special romantic interest detection for more nuanced flirtation
-        flirtatious_patterns = [
-            'looking right at', 'looking at you', 'those eyes', 'your eyes', 
-            'can i sit', 'waiting for someone', 'just looking'
-        ]
-        
-        for pattern in flirtatious_patterns:
-            if pattern in message_lower:
-                romantic_responses = character.communication.typical_responses.get('romantic_interest', [])
-                if romantic_responses:
-                    scenarios['romantic_interest'] = romantic_responses
-                break
-        
+
+        # NEW: Dynamic detection of custom conversation flow patterns from CDL
+        custom_scenarios = self._detect_custom_flow_patterns(message_content, character)
+        scenarios.update(custom_scenarios)
+
         return scenarios
+
+    def _detect_custom_flow_patterns(self, message_content: str, character: Character) -> Dict[str, list]:
+        """
+        Dynamically detect custom conversation flow patterns from CDL character definitions.
+        
+        This analyzes the message content against character-specific conversation flow patterns
+        defined in the CDL file, enabling sophisticated pattern matching beyond basic scenarios.
+        
+        Args:
+            message_content: User's message to analyze
+            character: Character with potential custom flow patterns
+            
+        Returns:
+            Dict mapping custom pattern types to appropriate responses
+        """
+        custom_scenarios = {}
+        message_lower = message_content.lower()
+        
+        try:
+            # Load the character's CDL file to get conversation flow patterns
+            character_file_path = self._find_character_file()
+            if not character_file_path:
+                return custom_scenarios
+                
+            import json
+            with open(character_file_path, 'r', encoding='utf-8') as f:
+                character_data = json.load(f)
+            
+            # Get conversation flow patterns from standardized CDL location
+            # STANDARDIZED: All conversation flow data is in character.communication
+            communication_data = character_data.get('character', {}).get('communication', {})
+            
+            flow_guidance = communication_data.get('conversation_flow_guidance', {})
+            message_triggers = communication_data.get('message_pattern_triggers', {})
+            
+            if not flow_guidance or not message_triggers:
+                return custom_scenarios
+            
+            # Check each trigger pattern defined in the character's CDL
+            for trigger_name, trigger_config in message_triggers.items():
+                if trigger_name in flow_guidance:  # Only process if flow guidance exists for this trigger
+                    keywords = trigger_config.get('keywords', [])
+                    phrases = trigger_config.get('phrases', [])
+                    
+                    # Check for keyword matches
+                    for keyword in keywords:
+                        if keyword.lower() in message_lower:
+                            custom_scenarios[trigger_name] = [f"Triggered by keyword: {keyword}"]
+                            logger.info("🎭 Detected pattern '%s' via keyword '%s' for %s", 
+                                      trigger_name, keyword, character.identity.name)
+                            break
+                    
+                    # Check for phrase matches (if keyword didn't match)
+                    if trigger_name not in custom_scenarios:
+                        for phrase in phrases:
+                            if phrase.lower() in message_lower:
+                                custom_scenarios[trigger_name] = [f"Triggered by phrase: {phrase}"]
+                                logger.info("🎭 Detected pattern '%s' via phrase '%s' for %s", 
+                                          trigger_name, phrase, character.identity.name)
+                                break
+            
+            return custom_scenarios
+            
+        except (FileNotFoundError, json.JSONDecodeError, KeyError) as e:
+            logger.warning("Failed to detect custom flow patterns: %s", e)
+            return custom_scenarios
+
+    def _find_character_file(self, character_name: str = "") -> str:
+        """Find the CDL file using the bot name from environment variables."""
+        import os
+        
+        # Get bot name from environment (standardized approach)
+        bot_name = os.getenv('DISCORD_BOT_NAME', '').lower()
+        
+        if bot_name:
+            # Use bot name for standardized file lookup
+            possible_paths = [
+                f"characters/examples/{bot_name}.json",
+                f"characters/{bot_name}.json"
+            ]
+            
+            for path in possible_paths:
+                if Path(path).exists():
+                    return path
+        
+        # Fallback: if no bot name in env, try character name approach
+        if character_name:
+            standardized_name = character_name.lower().replace(' ', '-').replace('.', '')
+            fallback_paths = [
+                f"characters/examples/{standardized_name}.json",
+                f"characters/{standardized_name}.json"
+            ]
+            
+            for path in fallback_paths:
+                if Path(path).exists():
+                    return path
+        
+        return ""
 
 
 async def load_character_definitions(characters_dir: str = "characters") -> Dict[str, Character]:
