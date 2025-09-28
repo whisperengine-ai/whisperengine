@@ -14,6 +14,8 @@ and persistent question tracking for improved conversation continuity.
 import logging
 import random
 import statistics
+import asyncio
+import json
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from enum import Enum
@@ -38,7 +40,6 @@ try:
     PERSONALITY_PROFILER_AVAILABLE = True
 except ImportError:
     PERSONALITY_PROFILER_AVAILABLE = False
-import json
 
 logger = logging.getLogger(__name__)
 
@@ -165,6 +166,9 @@ class PersistentConversationManager:
         self.memory_manager = memory_manager
         self.bot_core = bot_core
         self.user_states: Dict[str, ConversationState] = {}
+        # Add concurrency protection for user states
+        self._state_locks: Dict[str, asyncio.Lock] = {}
+        self._global_lock = asyncio.Lock()
         
         # Integration with existing WhisperEngine vector systems
         self.emotion_analyzer = None
@@ -661,40 +665,47 @@ class PersistentConversationManager:
         return max(0.0, min(1.0, health))
     
     async def _get_conversation_state(self, user_id: str) -> ConversationState:
-        """Get or create conversation state for user"""
-        if user_id not in self.user_states:
-            # Try to load from memory storage
-            try:
-                stored_state = await self.memory_manager.retrieve_relevant_memories(
-                    user_id=f"conversation_state_{user_id}",
-                    query="conversation_state",
-                    limit=1
-                )
-                if stored_state and len(stored_state) > 0:
-                    # Handle different memory return formats
-                    memory_item = stored_state[0]
-                    state_data = None
-                    
-                    # Try different ways to access metadata
-                    if hasattr(memory_item, 'metadata') and memory_item.metadata:
-                        state_data = memory_item.metadata.get("state_data")
-                    elif isinstance(memory_item, dict) and "metadata" in memory_item:
-                        state_data = memory_item["metadata"].get("state_data")
-                    elif isinstance(memory_item, dict) and "state_data" in memory_item:
-                        state_data = memory_item.get("state_data")
-                    
-                    if state_data:
-                        parsed_data = json.loads(state_data) if isinstance(state_data, str) else state_data
-                        self.user_states[user_id] = ConversationState(**parsed_data)
+        """Get or create conversation state for user - thread-safe"""
+        # Use per-user locking to prevent race conditions
+        async with self._global_lock:
+            if user_id not in self._state_locks:
+                self._state_locks[user_id] = asyncio.Lock()
+            user_lock = self._state_locks[user_id]
+        
+        async with user_lock:
+            if user_id not in self.user_states:
+                # Try to load from memory storage
+                try:
+                    stored_state = await self.memory_manager.retrieve_relevant_memories(
+                        user_id=f"conversation_state_{user_id}",
+                        query="conversation_state",
+                        limit=1
+                    )
+                    if stored_state and len(stored_state) > 0:
+                        # Handle different memory return formats
+                        memory_item = stored_state[0]
+                        state_data = None
+                        
+                        # Try different ways to access metadata
+                        if hasattr(memory_item, 'metadata') and memory_item.metadata:
+                            state_data = memory_item.metadata.get("state_data")
+                        elif isinstance(memory_item, dict) and "metadata" in memory_item:
+                            state_data = memory_item["metadata"].get("state_data")
+                        elif isinstance(memory_item, dict) and "state_data" in memory_item:
+                            state_data = memory_item.get("state_data")
+                        
+                        if state_data:
+                            parsed_data = json.loads(state_data) if isinstance(state_data, str) else state_data
+                            self.user_states[user_id] = ConversationState(**parsed_data)
+                        else:
+                            self.user_states[user_id] = ConversationState(user_id=user_id)
                     else:
                         self.user_states[user_id] = ConversationState(user_id=user_id)
-                else:
+                except Exception as e:
+                    logger.warning("Could not load conversation state for %s: %s", user_id, e)
                     self.user_states[user_id] = ConversationState(user_id=user_id)
-            except Exception as e:
-                logger.warning("Could not load conversation state for %s: %s", user_id, e)
-                self.user_states[user_id] = ConversationState(user_id=user_id)
-        
-        return self.user_states[user_id]
+            
+            return self.user_states[user_id]
     
     async def _save_conversation_state(self, user_id: str, state: ConversationState):
         """Persist conversation state to memory"""
