@@ -2491,6 +2491,178 @@ class VectorMemoryStore:
         
         return 'general'
 
+    async def get_conversation_summary_with_recommendations(
+        self, 
+        user_id: str, 
+        conversation_history: List[Dict[str, Any]], 
+        limit: int = 5
+    ) -> Dict[str, str]:
+        """
+        🚀 QDRANT RECOMMENDATION: Zero-LLM conversation summarization using vector similarity
+        
+        Benefits:
+        - 100% LLM call reduction vs traditional summarization
+        - Uses semantic vector relationships for topic detection
+        - Leverages existing recommendation API infrastructure
+        - Provides thematic conversation context without AI generation costs
+        
+        Args:
+            user_id: User identifier for bot-specific filtering
+            conversation_history: Recent conversation messages
+            limit: Number of related conversations to analyze for patterns
+            
+        Returns:
+            Dict with 'topic_summary' and 'conversation_themes' keys
+        """
+        try:
+            if not conversation_history:
+                return {
+                    "topic_summary": "Starting new conversation",
+                    "conversation_themes": "initial_contact",
+                    "recommendation_method": "empty_history"
+                }
+            
+            # Extract the most recent meaningful message for pattern matching
+            recent_content = ""
+            recent_message_id = None
+            
+            for msg in reversed(conversation_history):
+                content = msg.get('content', '').strip()
+                if content and len(content) > 10:  # Skip very short messages
+                    recent_content = content
+                    recent_message_id = msg.get('id')
+                    break
+            
+            if not recent_content:
+                return {
+                    "topic_summary": "Continuing conversation",
+                    "conversation_themes": "general",
+                    "recommendation_method": "no_meaningful_content"
+                }
+            
+            # 🎯 QDRANT RECOMMENDATION: Find semantically similar conversations
+            current_bot_name = get_normalized_bot_name_from_env()
+            
+            if recent_message_id:
+                # Use existing message ID for recommendation
+                try:
+                    related_conversations = self.client.recommend(
+                        collection_name=self.collection_name,
+                        positive=[recent_message_id],
+                        query_filter=models.Filter(
+                            must=[
+                                models.FieldCondition(key="user_id", match=models.MatchValue(value=user_id)),
+                                models.FieldCondition(key="bot_name", match=models.MatchValue(value=current_bot_name)),
+                                models.FieldCondition(key="memory_type", match=models.MatchValue(value="conversation"))
+                            ]
+                        ),
+                        limit=limit,
+                        score_threshold=0.5,  # Lower threshold for broader topic detection
+                        with_payload=True,
+                        using="semantic"  # Use semantic vector for topic similarity
+                    )
+                except Exception as e:
+                    logger.debug("Recommendation by ID failed, falling back to content search: %s", str(e))
+                    related_conversations = []
+            else:
+                related_conversations = []
+            
+            # Fallback: Search by content if recommendation by ID fails
+            if not related_conversations:
+                content_embedding = await self.generate_embedding(recent_content)
+                related_conversations = self.client.search(
+                    collection_name=self.collection_name,
+                    query_vector=models.NamedVector(name="semantic", vector=content_embedding),
+                    query_filter=models.Filter(
+                        must=[
+                            models.FieldCondition(key="user_id", match=models.MatchValue(value=user_id)),
+                            models.FieldCondition(key="bot_name", match=models.MatchValue(value=current_bot_name)),
+                            models.FieldCondition(key="memory_type", match=models.MatchValue(value="conversation"))
+                        ]
+                    ),
+                    limit=limit,
+                    score_threshold=0.4,
+                    with_payload=True
+                )
+            
+            # 🎯 ZERO-LLM ANALYSIS: Extract themes using pattern recognition
+            themes = set()
+            topic_keywords = set()
+            
+            # Analyze current message
+            current_theme = self._identify_cluster_theme(recent_content)
+            themes.add(current_theme)
+            
+            # Extract keywords from current content (simple but effective)
+            content_words = recent_content.lower().split()
+            meaningful_words = [word for word in content_words 
+                             if len(word) > 3 and word not in self._get_stop_words()]
+            topic_keywords.update(meaningful_words[:3])  # Top 3 meaningful words
+            
+            # Analyze related conversations for patterns
+            for point in related_conversations:
+                if hasattr(point, 'payload') and point.payload:
+                    content = point.payload.get('content', '')
+                    if content:
+                        # Extract theme using existing method
+                        theme = self._identify_cluster_theme(content)
+                        themes.add(theme)
+                        
+                        # Extract additional keywords
+                        words = content.lower().split()
+                        keywords = [word for word in words 
+                                  if len(word) > 3 and word not in self._get_stop_words()]
+                        topic_keywords.update(keywords[:2])  # Top 2 from each related conversation
+            
+            # 🎯 TEMPLATE-BASED SUMMARY: Generate summary without LLM
+            if len(themes) > 1:
+                themes.discard('general')  # Remove generic theme if we have specific ones
+            
+            theme_list = list(themes)[:3]  # Top 3 themes
+            keyword_list = list(topic_keywords)[:5]  # Top 5 keywords
+            
+            # Create natural summary using templates
+            if theme_list:
+                primary_theme = theme_list[0]
+                if len(theme_list) > 1:
+                    topic_summary = f"Discussing {primary_theme} and {', '.join(theme_list[1:])}"
+                else:
+                    topic_summary = f"Focused on {primary_theme}"
+            else:
+                topic_summary = "General conversation"
+            
+            # Add keyword context if available
+            if keyword_list:
+                topic_summary += f" (topics: {', '.join(keyword_list[:3])})"
+            
+            return {
+                "topic_summary": topic_summary,
+                "conversation_themes": ", ".join(theme_list) if theme_list else "general",
+                "recommendation_method": "qdrant_semantic",
+                "related_conversations_found": len(related_conversations),
+                "themes_detected": len(themes)
+            }
+            
+        except Exception as e:
+            logger.error("Recommendation-based conversation summary failed: %s", str(e))
+            # Graceful fallback
+            return {
+                "topic_summary": "Continuing previous conversation",
+                "conversation_themes": "general",
+                "recommendation_method": "error_fallback",
+                "error": str(e)
+            }
+    
+    def _get_stop_words(self) -> set:
+        """Get common stop words for keyword extraction"""
+        return {
+            'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for',
+            'of', 'with', 'by', 'is', 'are', 'was', 'were', 'be', 'been', 'being',
+            'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could', 'should',
+            'this', 'that', 'these', 'those', 'i', 'you', 'he', 'she', 'it', 'we', 'they',
+            'me', 'him', 'her', 'us', 'them', 'my', 'your', 'his', 'her', 'its', 'our', 'their'
+        }
+
     async def batch_update_memories_with_qdrant(self, updates: List[Dict[str, Any]]) -> Dict[str, Any]:
         """
         🚀 QDRANT BATCH: Efficient batch operations for memory updates

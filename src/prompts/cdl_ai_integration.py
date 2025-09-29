@@ -10,6 +10,7 @@ from pathlib import Path
 
 from src.characters.models.character import Character
 from src.characters.cdl.parser import load_character
+from src.prompts.optimized_prompt_builder import create_optimized_prompt_builder
 
 logger = logging.getLogger(__name__)
 
@@ -17,9 +18,89 @@ logger = logging.getLogger(__name__)
 class CDLAIPromptIntegration:
     """Integrates CDL character definitions with AI pipeline results."""
 
-    def __init__(self, vector_memory_manager=None):
+    def __init__(self, vector_memory_manager=None, llm_client=None):
         self.memory_manager = vector_memory_manager
         self.characters_cache = {}
+        # OPTIMIZATION: Create optimized prompt builder with conversation summarizer and vector memory if available
+        self.optimized_builder = create_optimized_prompt_builder(
+            max_words=1000, 
+            llm_client=llm_client, 
+            memory_manager=vector_memory_manager
+        )
+
+    async def create_optimized_character_prompt(
+        self,
+        character_file: str,
+        user_id: str,
+        message_content: str,
+        pipeline_result=None,
+        user_name: Optional[str] = None
+    ) -> str:
+        """Create an optimized, minimal character prompt based on context analysis."""
+        try:
+            # Load character using existing CDL system
+            character = await self.load_character(character_file)
+            logger.info("Loaded CDL character: %s", character.identity.name)
+
+            # Get user's preferred name
+            preferred_name = None
+            if self.memory_manager and user_name:
+                try:
+                    from src.utils.user_preferences import get_user_preferred_name
+                    preferred_name = await get_user_preferred_name(user_id, self.memory_manager, user_name)
+                except Exception as e:
+                    logger.debug("Could not retrieve preferred name: %s", e)
+
+            display_name = preferred_name or user_name or "User"
+            
+            # Gather minimal context data (only if needed based on message analysis)
+            context = {}
+            
+            # Only fetch memory if message indicates it's needed
+            if any(keyword in message_content.lower() for keyword in ['remember', 'we talked', 'last time', 'before']):
+                if self.memory_manager:
+                    try:
+                        # Get minimal memory context
+                        relevant_memories = await self.memory_manager.retrieve_relevant_memories(
+                            user_id=user_id, query=message_content, limit=3  # Reduced from 10
+                        )
+                        conversation_history = await self.memory_manager.get_conversation_history(
+                            user_id=user_id, limit=3  # Reduced from 5
+                        )
+                        
+                        context = {
+                            'relevant_memories': relevant_memories,
+                            'conversation_history': conversation_history,
+                            'user_name': display_name
+                        }
+                        logger.info("🧠 OPTIMIZED-MEMORY: Retrieved minimal context (%d memories, %d history)", 
+                                   len(relevant_memories), len(conversation_history))
+                    except Exception as e:
+                        logger.warning("Could not retrieve memory context: %s", e)
+            
+            # Add emotional context if available
+            if pipeline_result and hasattr(pipeline_result, 'emotion'):
+                emotion_data = pipeline_result.emotion
+                if emotion_data and hasattr(emotion_data, 'primary_emotion'):
+                    context['emotion'] = {
+                        'primary': emotion_data.primary_emotion,
+                        'confidence': getattr(emotion_data, 'confidence', 0.0)
+                    }
+            
+            # Use optimized prompt builder
+            optimized_prompt = self.optimized_builder.build_character_prompt(
+                character=character,
+                message_content=message_content,
+                context=context
+            )
+            
+            logger.info("🚀 OPTIMIZED PROMPT: Generated focused prompt for %s", character.identity.name)
+            return optimized_prompt
+            
+        except Exception as e:
+            logger.error("Optimized CDL integration failed: %s", e)
+            # Fallback to basic prompt
+            return f"You are {character.identity.name}. Respond naturally to: {message_content}"
 
     async def create_character_aware_prompt(
         self,
@@ -39,12 +120,12 @@ class CDLAIPromptIntegration:
 
             # Check for user's preferred name in memory with Discord username fallback
             preferred_name = None
-            if self.memory_manager:
+            if self.memory_manager and user_name:
                 try:
                     from src.utils.user_preferences import get_user_preferred_name
                     preferred_name = await get_user_preferred_name(user_id, self.memory_manager, user_name)
                 except Exception as e:
-                    logger.debug(f"Could not retrieve preferred name: {e}")
+                    logger.debug("Could not retrieve preferred name: %s", e)
 
             # Determine the best name to use (priority: preferred > discord fallback already handled)
             display_name = preferred_name or user_name or "User"

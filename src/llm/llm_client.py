@@ -811,6 +811,10 @@ class LLMClient:
             "temperature": temperature,
             "max_tokens": max_tokens,
             "stream": stream,
+            # REPETITION PREVENTION: Add penalties to prevent text loops
+            "frequency_penalty": 0.6,  # Penalize frequent tokens
+            "presence_penalty": 0.3,   # Penalize repeated content
+            "repetition_penalty": 1.1, # Additional repetition penalty (if supported)
         }
 
         try:
@@ -909,6 +913,10 @@ class LLMClient:
                 "temperature": temperature,
                 "max_tokens": max_tokens,
                 "stream": True,  # Enable streaming
+                # REPETITION PREVENTION: Add penalties to prevent text loops
+                "frequency_penalty": 0.6,  # Penalize frequent tokens
+                "presence_penalty": 0.3,   # Penalize repeated content
+                "repetition_penalty": 1.1, # Additional repetition penalty (if supported)
             }
             
             headers = {"Content-Type": "application/json"}
@@ -1032,6 +1040,10 @@ class LLMClient:
             "temperature": temperature,
             "max_tokens": max_tokens,
             "stream": stream,
+            # REPETITION PREVENTION: Add penalties to prevent text loops
+            "frequency_penalty": 0.6,  # Penalize frequent tokens
+            "presence_penalty": 0.3,   # Penalize repeated content
+            "repetition_penalty": 1.1, # Additional repetition penalty (if supported)
         }
 
         # Add tool calling parameters if tools are provided
@@ -1423,6 +1435,7 @@ class LLMClient:
         stream: bool = False,
     ) -> dict[str, Any]:
         """
+        DEPRECATED: Legacy facts analysis functionality - returning no-op response
         Generate a chat completion response using the facts analysis endpoint
         This allows using a different service/model for fact extraction tasks
 
@@ -1436,6 +1449,16 @@ class LLMClient:
         Returns:
             The response from the facts analysis API
         """
+        # DEPRECATED: Legacy functionality disabled - return no-op response
+        self.logger.warning("generate_facts_chat_completion is deprecated and disabled")
+        return {
+            "choices": [{
+                "message": {
+                    "content": '{"status": "deprecated", "message": "Facts analysis functionality has been disabled"}'
+                }
+            }]
+        }
+        
         # Use facts model if not specified
         if model is None:
             model = self.facts_model_name
@@ -1913,6 +1936,7 @@ JSON Response:""",
 
     def extract_personal_info(self, message: str) -> dict[str, Any]:
         """
+        DEPRECATED: Legacy personal info extraction functionality - returning no-op response
         Use LLM to extract personal information from a message
 
         Args:
@@ -1921,6 +1945,14 @@ JSON Response:""",
         Returns:
             Dict containing extracted personal information
         """
+        # DEPRECATED: Legacy functionality disabled - return no-op response
+        self.logger.warning("extract_personal_info is deprecated and disabled")
+        return {
+            "personal_info": {},
+            "status": "deprecated",
+            "message": "Personal info extraction functionality has been disabled"
+        }
+        
         try:
             messages = [
                 {

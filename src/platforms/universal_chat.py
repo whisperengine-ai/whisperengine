@@ -469,6 +469,15 @@ class UniversalChatOrchestrator:
         """Set the bot instance to access command handlers for CDL character integration"""
         self.bot_core = bot_instance
         logging.info(f"🎭 UNIVERSAL CHAT: Bot core set, command handlers available: {list(getattr(bot_instance, 'command_handlers', {}).keys())}")
+        
+        # Reinitialize character system with LLM client access
+        if CDLAIPromptIntegration:
+            try:
+                llm_client = getattr(bot_instance, 'llm_client', None)
+                self.character_system = CDLAIPromptIntegration(llm_client=llm_client)
+                logging.info("✅ Character Definition Language (CDL) system reinitialized with LLM client")
+            except Exception as e:
+                logging.warning(f"Failed to reinitialize CDL character system: {e}")
 
     def _load_platform_configs(self) -> dict[ChatPlatform, dict[str, Any]]:
         """Load platform-specific configurations"""
@@ -1232,7 +1241,7 @@ class UniversalChatOrchestrator:
                             if character_file:
                                 # Create character-aware prompt using CDL system
                                 logging.info(f"🎭 CDL CHARACTER: Calling CDL system for {message.user_id}")
-                                cdl_prompt = await self.bot_core.character_system.create_character_aware_prompt(
+                                cdl_prompt = await self.bot_core.character_system.create_optimized_character_prompt(
                                     character_file=character_file,
                                     user_id=message.user_id,
                                     message_content=message.content,
@@ -1329,7 +1338,7 @@ class UniversalChatOrchestrator:
                 else:
                     logging.info(f"🎭 UNIVERSAL CHAT: User {user_id} has active character: {character_file}")
                     
-                character_prompt = await self.character_system.create_character_aware_prompt(
+                character_prompt = await self.character_system.create_optimized_character_prompt(
                     character_file=character_file,
                     user_id=user_id,
                     message_content=""  # No current message in this context
@@ -1773,7 +1782,7 @@ class UniversalChatOrchestrator:
                 else:
                     logging.info(f"🎭 UNIVERSAL CHAT: User {user_id} has active character: {character_file}")
                 
-                character_prompt = await self.character_system.create_character_aware_prompt(
+                character_prompt = await self.character_system.create_optimized_character_prompt(
                     character_file=character_file,
                     user_id=user_id,
                     message_content=current_message

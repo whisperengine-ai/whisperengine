@@ -3,10 +3,10 @@
   "character": "Marine Biologist",
   "port": 9091,
   "container": "whisperengine-elena-bot",
-  "test_user_id": "smoke_test_3c94cee6",
-  "test_start": "2025-09-29T13:53:49.351223",
-  "test_end": "2025-09-29T13:55:51.652796",
-  "test_duration_seconds": 122.301573,
+  "test_user_id": "smoke_test_694f083c",
+  "test_start": "2025-09-29T15:52:54.849634",
+  "test_end": "2025-09-29T15:53:27.068829",
+  "test_duration_seconds": 32.219195,
   "test_results": {
     "CDL Validation": true,
     "Health Check": true,
@@ -21,14 +21,12 @@
   },
   "log_analysis": {
     "success": true,
-    "warnings": 4,
-    "errors": 60,
-    "raw_errors": 72,
-    "config_warnings": 12,
-    "critical_issues": [
-      "Vector storage system failures detected"
-    ],
-    "log_lines": 5986
+    "warnings": 5,
+    "errors": 0,
+    "raw_errors": 0,
+    "config_warnings": 0,
+    "critical_issues": [],
+    "log_lines": 9819
   },
   "summary": {
     "total_tests": 10,
