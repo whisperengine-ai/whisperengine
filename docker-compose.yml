@@ -25,134 +25,135 @@ services:
     networks:
       - whisperengine-network
 
-  redis:
-    image: redis:7-alpine
-    container_name: whisperengine-redis
-    ports:
-      - "${REDIS_PORT:-6379}:6379"
-    volumes:
-      - redis_data:/data
-    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    restart: unless-stopped
-    networks:
-      - whisperengine-network
-    deploy:
-      resources:
-        limits:
-          memory: 1G
-          cpus: '1.0'
-        reservations:
-          memory: 512M
-          cpus: '0.5'
-
-  qdrant:
-    image: qdrant/qdrant:latest
-    container_name: whisperengine-qdrant
-    ports:
-      - "${QDRANT_HTTP_PORT:-6333}:6333"
-      - "${QDRANT_GRPC_PORT:-6334}:6334"
-    volumes:
-      - qdrant_data:/qdrant/storage
-    environment:
-      - QDRANT__SERVICE__HTTP_PORT=6333
-      - QDRANT__SERVICE__GRPC_PORT=6334
-      - QDRANT__LOG_LEVEL=INFO
-    healthcheck:
-      test: ["CMD-SHELL", "timeout 5 bash -c '</dev/tcp/localhost/6333' || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
-    restart: unless-stopped
-    networks:
-      - whisperengine-network
-    deploy:
-      resources:
-        limits:
-          memory: 4G
-          cpus: '2.0'
-        reservations:
-          memory: 2G
-          cpus: '1.0'
-
-    # Elena Rodriguez - Marine Biologist Bot
-  elena-bot:
-    build:
-      context: .
-      dockerfile: Dockerfile.bundled-models
-      target: production
-    image: whisperengine-bot:${VERSION:-latest}
-    container_name: whisperengine-elena-bot
-    restart: unless-stopped
-    
-    # Elena-specific environment
-    env_file:
-      - .env.elena    # Elena-specific Discord token and configuration
-    environment:
-      # Bot identification
-      - DISCORD_BOT_NAME=Elena
-      - CDL_DEFAULT_CHARACTER=characters/examples/elena-rodriguez.json
-      - CONTAINER_NAME=elena-bot
-      # Shared infrastructure endpoints
-      - POSTGRES_HOST=postgresql
-      - REDIS_HOST=redis
-      - QDRANT_HOST=qdrant
-      # Model configuration (pre-downloaded)
-      - MODEL_CACHE_DIR=/app/models
-      - DISABLE_MODEL_DOWNLOAD=true
-      - HF_HUB_OFFLINE=false
-      - TRANSFORMERS_OFFLINE=0
-      # Production defaults
-      - LOG_LEVEL=${LOG_LEVEL:-INFO}
-      - DEBUG_MODE=false
-      - PYTHONUNBUFFERED=1
-      - HEALTH_CHECK_PORT=9091
-      - HEALTH_CHECK_HOST=0.0.0.0
-      
-    ports:
-      - "9091:9091"  # Elena health check endpoint
-      
-    # Resource limits
-    deploy:
-      resources:
-        limits:
-          memory: 4G
-          cpus: '4.0'
-        reservations:
-          memory: 2G
-          cpus: '2.0'
-    
-    # Health check
-    healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:9091/health || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
-    
-    # Shared volumes with bot-specific subdirectories
-    volumes:
-      - elena_backups:/app/backups
-      - elena_privacy:/app/privacy_data
-      - elena_temp:/app/temp_images
-      - elena_logs:/app/logs
-      # Shared configuration (read-only)
-      - ./characters:/app/characters:ro
-      - ./config:/app/config:ro
-      # Shared pre-downloaded models (read-only)
-      - shared_models:/app/models:ro
-      
-    networks:
-      - whisperengine-network
-      
-    depends_on:
-      redis:
-        condition: service_healthy
+  # Redis - Commented out since we're using vector-native memory with Qdrant only
+      #   # redis:
+      #   #   image: redis:7-alpine
+      #   #   container_name: whisperengine-redis
+      #   #   ports:
+      #   #     - "${REDIS_PORT:-6379}:6379"
+      #   #   volumes:
+      #   #     - redis_data:/data
+      #   #   command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
+      #   #   healthcheck:
+      #   #     test: ["CMD", "redis-cli", "ping"]
+      #   #     interval: 10s
+      #   #     timeout: 5s
+      #   #     retries: 5
+      #   #   restart: unless-stopped
+      #   #   networks:
+      #   #     - whisperengine-network
+      #   #   deploy:
+      #   #     resources:
+      #   #       limits:
+      #   #         memory: 1G
+      #   #         cpus: '1.0'
+      #   #       reservations:
+      #   #         memory: 512M
+      #   #         cpus: '0.5'
+      # 
+      #   qdrant:
+      #     image: qdrant/qdrant:latest
+      #     container_name: whisperengine-qdrant
+      #     ports:
+      #       - "${QDRANT_HTTP_PORT:-6333}:6333"
+      #       - "${QDRANT_GRPC_PORT:-6334}:6334"
+      #     volumes:
+      #       - qdrant_data:/qdrant/storage
+      #     environment:
+      #       - QDRANT__SERVICE__HTTP_PORT=6333
+      #       - QDRANT__SERVICE__GRPC_PORT=6334
+      #       - QDRANT__LOG_LEVEL=INFO
+      #     healthcheck:
+      #       test: ["CMD-SHELL", "timeout 5 bash -c '</dev/tcp/localhost/6333' || exit 1"]
+      #       interval: 30s
+      #       timeout: 10s
+      #       retries: 3
+      #       start_period: 40s
+      #     restart: unless-stopped
+      #     networks:
+      #       - whisperengine-network
+      #     deploy:
+      #       resources:
+      #         limits:
+      #           memory: 4G
+      #           cpus: '2.0'
+      #         reservations:
+      #           memory: 2G
+      #           cpus: '1.0'
+      # 
+      #     # Elena Rodriguez - Marine Biologist Bot
+      #   elena-bot:
+      #     build:
+      #       context: .
+      #       dockerfile: Dockerfile.bundled-models
+      #       target: production
+      #     image: whisperengine-bot:${VERSION:-latest}
+      #     container_name: whisperengine-elena-bot
+      #     restart: unless-stopped
+      #     
+      #     # Elena-specific environment
+      #     env_file:
+      #       - .env.elena    # Elena-specific Discord token and configuration
+      #     environment:
+      #       # Bot identification
+      #       - DISCORD_BOT_NAME=Elena
+      #       - CDL_DEFAULT_CHARACTER=characters/examples/elena-rodriguez.json
+      #       - CONTAINER_NAME=elena-bot
+      #       # Shared infrastructure endpoints
+      #       - POSTGRES_HOST=postgresql
+      #       # - REDIS_HOST=redis  # Commented out - using vector-native memory only
+      #       - QDRANT_HOST=qdrant
+      #       # Model configuration (pre-downloaded)
+      #       - MODEL_CACHE_DIR=/app/models
+      #       - DISABLE_MODEL_DOWNLOAD=true
+      #       - HF_HUB_OFFLINE=false
+      #       - TRANSFORMERS_OFFLINE=0
+      #       # Production defaults
+      #       - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      #       - DEBUG_MODE=false
+      #       - PYTHONUNBUFFERED=1
+      #       - HEALTH_CHECK_PORT=9091
+      #       - HEALTH_CHECK_HOST=0.0.0.0
+      #       
+      #     ports:
+      #       - "9091:9091"  # Elena health check endpoint
+      #       
+      #     # Resource limits
+      #     deploy:
+      #       resources:
+      #         limits:
+      #           memory: 4G
+      #           cpus: '4.0'
+      #         reservations:
+      #           memory: 2G
+      #           cpus: '2.0'
+      #     
+      #     # Health check
+      #     healthcheck:
+      #       test: ["CMD-SHELL", "curl -f http://localhost:9091/health || exit 1"]
+      #       interval: 30s
+      #       timeout: 10s
+      #       retries: 3
+      #       start_period: 40s
+      #     
+      #     # Shared volumes with bot-specific subdirectories
+      #     volumes:
+      #       - elena_backups:/app/backups
+      #       - elena_privacy:/app/privacy_data
+      #       - elena_temp:/app/temp_images
+      #       - elena_logs:/app/logs
+      #       # Shared configuration (read-only)
+      #       - ./characters:/app/characters:ro
+      #       - ./config:/app/config:ro
+      #       # Shared pre-downloaded models (read-only)
+      #       - shared_models:/app/models:ro
+      #       
+      #     networks:
+      #       - whisperengine-network
+      #       
+      #     depends_on:
+      #       # redis:
+      #       #   condition: service_healthy
       postgresql:
         condition: service_healthy
 
@@ -173,7 +174,7 @@ services:
       - CDL_DEFAULT_CHARACTER=characters/examples/marcus-thompson.json
       - CONTAINER_NAME=marcus-bot
       - POSTGRES_HOST=postgresql
-      - REDIS_HOST=redis
+      # - REDIS_HOST=redis  # Commented out - using vector-native memory only
       - QDRANT_HOST=qdrant
       - MODEL_CACHE_DIR=/app/models
       - DISABLE_MODEL_DOWNLOAD=true
@@ -217,8 +218,8 @@ services:
       - whisperengine-network
       
     depends_on:
-      redis:
-        condition: service_healthy
+      #       redis:
+      #         condition: service_healthy
       postgresql:
         condition: service_healthy
       qdrant:
@@ -241,7 +242,7 @@ services:
       - CDL_DEFAULT_CHARACTER=characters/examples/marcus-chen.json
       - CONTAINER_NAME=marcus-chen-bot
       - POSTGRES_HOST=postgresql
-      - REDIS_HOST=redis
+      # - REDIS_HOST=redis  # Commented out - using vector-native memory only
       - QDRANT_HOST=qdrant
       - MODEL_CACHE_DIR=/app/models
       - DISABLE_MODEL_DOWNLOAD=true
@@ -285,8 +286,8 @@ services:
       - whisperengine-network
       
     depends_on:
-      redis:
-        condition: service_healthy
+      #       redis:
+      #         condition: service_healthy
       postgresql:
         condition: service_healthy
       qdrant:
@@ -309,7 +310,7 @@ services:
       - CDL_DEFAULT_CHARACTER=characters/examples/dream.json
       - CONTAINER_NAME=dream-bot
       - POSTGRES_HOST=postgresql
-      - REDIS_HOST=redis
+      # - REDIS_HOST=redis  # Commented out - using vector-native memory only
       - QDRANT_HOST=qdrant
       - MODEL_CACHE_DIR=/app/models
       - DISABLE_MODEL_DOWNLOAD=true
@@ -353,8 +354,8 @@ services:
       - whisperengine-network
       
     depends_on:
-      redis:
-        condition: service_healthy
+      #       redis:
+      #         condition: service_healthy
       postgresql:
         condition: service_healthy
       qdrant:
@@ -377,7 +378,7 @@ services:
       - CDL_DEFAULT_CHARACTER=characters/examples/gabriel-tether.json
       - CONTAINER_NAME=gabriel-bot
       - POSTGRES_HOST=postgresql
-      - REDIS_HOST=redis
+      # - REDIS_HOST=redis  # Commented out - using vector-native memory only
       - QDRANT_HOST=qdrant
       - MODEL_CACHE_DIR=/app/models
       - DISABLE_MODEL_DOWNLOAD=true
@@ -421,8 +422,8 @@ services:
       - whisperengine-network
       
     depends_on:
-      redis:
-        condition: service_healthy
+      #       redis:
+      #         condition: service_healthy
       postgresql:
         condition: service_healthy
       qdrant:
@@ -439,8 +440,8 @@ volumes:
   # Shared infrastructure volumes
   postgresql_data:
     driver: local
-  redis_data:
-    driver: local
+  # redis_data:  # Commented out - using vector-native memory only
+  #   driver: local
   qdrant_data:
     driver: local
   shared_models:

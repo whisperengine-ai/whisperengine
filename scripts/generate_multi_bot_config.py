@@ -137,7 +137,7 @@ class BotConfigDiscovery:
         environment_vars = [
             f"DISCORD_BOT_NAME={config['display_name']}",
             "POSTGRES_HOST=postgres",
-            "REDIS_HOST=redis", 
+            # "REDIS_HOST=redis",  # Commented out - using vector-native memory only
             "QDRANT_HOST=qdrant",
             "MODEL_CACHE_DIR=/app/models",
             "DISABLE_MODEL_DOWNLOAD=true",
@@ -207,7 +207,7 @@ class BotConfigDiscovery:
       - bot_network
     depends_on:
       - postgres
-      - redis
+      # - redis  # Commented out - using vector-native memory only
       - qdrant"""
         
         return service_yaml

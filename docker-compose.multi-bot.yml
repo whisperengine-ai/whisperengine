@@ -25,21 +25,22 @@ services:
       timeout: 10s
       retries: 3
 
-  redis:
-    image: redis:7.4-alpine
-    container_name: whisperengine-multi-redis
-    restart: unless-stopped
-    ports:
-      - "6380:6379"
-    volumes:
-      - redis_data:/data
-    networks:
-      - bot_network
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+  # Redis - Commented out since we're using vector-native memory with Qdrant only
+  # redis:
+  #   image: redis:7.4-alpine
+  #   container_name: whisperengine-multi-redis
+  #   restart: unless-stopped
+  #   ports:
+  #     - "6380:6379"
+  #   volumes:
+  #     - redis_data:/data
+  #   networks:
+  #     - bot_network
+  #   healthcheck:
+  #     test: ["CMD", "redis-cli", "ping"]
+  #     interval: 30s
+  #     timeout: 10s
+  #     retries: 3
 
   qdrant:
     image: qdrant/qdrant:v1.15.4
@@ -68,7 +69,7 @@ services:
       - "8080:8080"
     environment:
       - DATABASE_URL=postgresql://whisperengine:whisperengine_password@postgres:5432/whisperengine
-      - REDIS_URL=redis://redis:6379/0
+      # - REDIS_URL=redis://redis:6379/0  # Commented out - using vector-native memory only
       - QDRANT_URL=http://qdrant:6333
       - WEB_UI_HOST=0.0.0.0
       - WEB_UI_PORT=8080
@@ -76,8 +77,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      redis:
-        condition: service_started
+      # redis:
+      #   condition: service_started
       qdrant:
         condition: service_started
     networks:
@@ -113,7 +114,6 @@ services:
     environment:
       - DISCORD_BOT_NAME=Jake
       - POSTGRES_HOST=postgres
-      - REDIS_HOST=redis
       - QDRANT_HOST=qdrant
       - MODEL_CACHE_DIR=/app/models
       - DISABLE_MODEL_DOWNLOAD=true
@@ -166,7 +166,7 @@ services:
       - bot_network
     depends_on:
       - postgres
-      - redis
+      # - redis  # Commented out - using vector-native memory only
       - qdrant
 
   marcus-bot:
@@ -178,7 +178,6 @@ services:
     environment:
       - DISCORD_BOT_NAME=Marcus
       - POSTGRES_HOST=postgres
-      - REDIS_HOST=redis
       - QDRANT_HOST=qdrant
       - MODEL_CACHE_DIR=/app/models
       - DISABLE_MODEL_DOWNLOAD=true
@@ -231,7 +230,7 @@ services:
       - bot_network
     depends_on:
       - postgres
-      - redis
+      # - redis  # Commented out - using vector-native memory only
       - qdrant
 
   dream-bot:
@@ -243,7 +242,6 @@ services:
     environment:
       - DISCORD_BOT_NAME=Dream
       - POSTGRES_HOST=postgres
-      - REDIS_HOST=redis
       - QDRANT_HOST=qdrant
       - MODEL_CACHE_DIR=/app/models
       - DISABLE_MODEL_DOWNLOAD=true
@@ -296,7 +294,7 @@ services:
       - bot_network
     depends_on:
       - postgres
-      - redis
+      # - redis  # Commented out - using vector-native memory only
       - qdrant
 
   elena-bot:
@@ -308,7 +306,6 @@ services:
     environment:
       - DISCORD_BOT_NAME=Elena
       - POSTGRES_HOST=postgres
-      - REDIS_HOST=redis
       - QDRANT_HOST=qdrant
       - MODEL_CACHE_DIR=/app/models
       - DISABLE_MODEL_DOWNLOAD=true
@@ -361,7 +358,7 @@ services:
       - bot_network
     depends_on:
       - postgres
-      - redis
+      # - redis  # Commented out - using vector-native memory only
       - qdrant
 
   aethys-bot:
@@ -373,7 +370,6 @@ services:
     environment:
       - DISCORD_BOT_NAME=Aethys
       - POSTGRES_HOST=postgres
-      - REDIS_HOST=redis
       - QDRANT_HOST=qdrant
       - MODEL_CACHE_DIR=/app/models
       - DISABLE_MODEL_DOWNLOAD=true
@@ -426,7 +422,7 @@ services:
       - bot_network
     depends_on:
       - postgres
-      - redis
+      # - redis  # Commented out - using vector-native memory only
       - qdrant
 
   ryan-bot:
@@ -438,7 +434,6 @@ services:
     environment:
       - DISCORD_BOT_NAME=Ryan
       - POSTGRES_HOST=postgres
-      - REDIS_HOST=redis
       - QDRANT_HOST=qdrant
       - MODEL_CACHE_DIR=/app/models
       - DISABLE_MODEL_DOWNLOAD=true
@@ -491,7 +486,7 @@ services:
       - bot_network
     depends_on:
       - postgres
-      - redis
+      # - redis  # Commented out - using vector-native memory only
       - qdrant
 
   gabriel-bot:
@@ -503,7 +498,6 @@ services:
     environment:
       - DISCORD_BOT_NAME=Gabriel
       - POSTGRES_HOST=postgres
-      - REDIS_HOST=redis
       - QDRANT_HOST=qdrant
       - MODEL_CACHE_DIR=/app/models
       - DISABLE_MODEL_DOWNLOAD=true
@@ -556,7 +550,7 @@ services:
       - bot_network
     depends_on:
       - postgres
-      - redis
+      # - redis  # Commented out - using vector-native memory only
       - qdrant
 
   sophia-bot:
@@ -568,7 +562,6 @@ services:
     environment:
       - DISCORD_BOT_NAME=Sophia
       - POSTGRES_HOST=postgres
-      - REDIS_HOST=redis
       - QDRANT_HOST=qdrant
       - MODEL_CACHE_DIR=/app/models
       - DISABLE_MODEL_DOWNLOAD=true
@@ -621,7 +614,7 @@ services:
       - bot_network
     depends_on:
       - postgres
-      - redis
+      # - redis  # Commented out - using vector-native memory only
       - qdrant
 
 # ===== NETWORKS =====
@@ -634,8 +627,8 @@ networks:
 volumes:
   postgres_data:
     name: whisperengine-multi_postgres_data
-  redis_data:
-    name: whisperengine-multi_redis_data
+  # redis_data:  # Commented out - using vector-native memory only
+  #   name: whisperengine-multi_redis_data
   qdrant_data:
     name: whisperengine-multi_qdrant_data
   

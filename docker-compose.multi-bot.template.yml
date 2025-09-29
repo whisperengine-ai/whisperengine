@@ -25,21 +25,22 @@ services:
       timeout: 10s
       retries: 3
 
-  redis:
-    image: redis:7.4-alpine
-    container_name: whisperengine-multi-redis
-    restart: unless-stopped
-    ports:
-      - "6380:6379"
-    volumes:
-      - redis_data:/data
-    networks:
-      - bot_network
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+  # Redis - Commented out since we're using vector-native memory with Qdrant only
+  # redis:
+  #   image: redis:7.4-alpine
+  #   container_name: whisperengine-multi-redis
+  #   restart: unless-stopped
+  #   ports:
+  #     - "6380:6379"
+  #   volumes:
+  #     - redis_data:/data
+  #   networks:
+  #     - bot_network
+  #   healthcheck:
+  #     test: ["CMD", "redis-cli", "ping"]
+  #     interval: 30s
+  #     timeout: 10s
+  #     retries: 3
 
   qdrant:
     image: qdrant/qdrant:v1.15.4
@@ -68,7 +69,7 @@ services:
       - "8080:8080"
     environment:
       - DATABASE_URL=postgresql://whisperengine:whisperengine_password@postgres:5432/whisperengine
-      - REDIS_URL=redis://redis:6379/0
+      # - REDIS_URL=redis://redis:6379/0  # Commented out - using vector-native memory only
       - QDRANT_URL=http://qdrant:6333
       - WEB_UI_HOST=0.0.0.0
       - WEB_UI_PORT=8080
@@ -76,8 +77,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      redis:
-        condition: service_started
+      # redis:
+      #   condition: service_started
       qdrant:
         condition: service_started
     networks:
@@ -116,8 +117,8 @@ networks:
 volumes:
   postgres_data:
     name: whisperengine-multi_postgres_data
-  redis_data:
-    name: whisperengine-multi_redis_data
+  # redis_data:  # Commented out - using vector-native memory only
+  #   name: whisperengine-multi_redis_data
   qdrant_data:
     name: whisperengine-multi_qdrant_data
   
