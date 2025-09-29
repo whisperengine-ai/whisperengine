@@ -1741,7 +1741,8 @@ class UniversalChatOrchestrator:
                 logging.info(f"🎭 UNIVERSAL CHAT DEBUG: User {user_id} active character: {character_file}")
                 return character_file
             else:
-                logging.warning(f"🎭 UNIVERSAL CHAT DEBUG: CDL handler not found in bot_core.command_handlers")
+                # CDL test commands are disabled in production - this is expected behavior
+                logging.debug(f"🎭 UNIVERSAL CHAT DEBUG: CDL test commands disabled (production mode)")
                 logging.info(f"🎭 UNIVERSAL CHAT DEBUG: Available handlers: {list(getattr(self.bot_core, 'command_handlers', {}).keys())}")
         except Exception as e:
             logging.warning(f"Failed to get user active character: {e}")

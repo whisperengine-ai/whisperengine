@@ -652,11 +652,20 @@ class VectorAIPipelineIntegration:
         if emotional_insights:
             emotion_context = []
             
-            # Primary emotional state
-            if emotional_insights.get('emotional_state'):
+            # 🎭 ENHANCED: Primary emotional state with emotion description support
+            emotion_desc = emotional_insights.get('emotion_description')
+            if emotion_desc and emotion_desc != emotional_insights.get('primary_emotion'):
+                emotion_context.append(f"Emotional state: {emotion_desc}")
+            elif emotional_insights.get('emotional_state'):
                 emotion_context.append(f"Current mood: {emotional_insights['emotional_state']}")
             elif emotional_insights.get('primary_emotion'):
                 emotion_context.append(f"Primary emotion: {emotional_insights['primary_emotion']}")
+            
+            # 🎭 MIXED EMOTIONS: Add secondary emotion awareness
+            mixed_emotions = emotional_insights.get('mixed_emotions', [])
+            if mixed_emotions:
+                secondary = [emotion for emotion, _ in mixed_emotions[:2]]
+                emotion_context.append(f"secondary: {', '.join(secondary)}")
             
             # Confidence and intensity for response guidance
             confidence = emotional_insights.get('confidence')
@@ -680,6 +689,23 @@ class VectorAIPipelineIntegration:
                 
                 if analysis.get('mood_trend') and analysis['mood_trend'] != 'stable':
                     emotion_context.append(f"trend: {analysis['mood_trend']}")
+                    
+                # 🎭 TRAJECTORY: Add emotional progression if available
+                trajectory = analysis.get('emotional_trajectory', [])
+                if trajectory and len(trajectory) > 1:
+                    recent_trajectory = trajectory[-3:]  # Last 3 emotions
+                    emotion_context.append(f"progression: {' → '.join(recent_trajectory)}")
+            
+            # 🎭 SPECTRUM: Add emotional complexity from all_emotions
+            all_emotions = emotional_insights.get('all_emotions', {})
+            if all_emotions and len(all_emotions) > 1:
+                primary = emotional_insights.get('primary_emotion', '')
+                significant = {k: v for k, v in all_emotions.items() 
+                             if v > 0.15 and k != primary}
+                if significant:
+                    top_secondary = sorted(significant.items(), key=lambda x: x[1], reverse=True)[:2]
+                    complexity_desc = [f"{emotion}({score:.1f})" for emotion, score in top_secondary]
+                    emotion_context.append(f"complexity: {', '.join(complexity_desc)}")
             
             if emotion_context:
                 context_parts.append(f"Emotional state: {', '.join(emotion_context)}")
@@ -882,11 +908,16 @@ class VectorAIPipelineIntegration:
         if isinstance(pipeline_result.mood_assessment, dict):
             emotion_data = pipeline_result.mood_assessment
             
-            # Extract primary emotion analysis
+            # 🎭 ENHANCED: Extract advanced emotional fields
             if 'primary_emotion' in emotion_data:
                 insights['primary_emotion'] = emotion_data['primary_emotion']
                 insights['confidence'] = emotion_data.get('confidence', 0.5)
                 insights['intensity'] = emotion_data.get('intensity', 0.5)
+                
+                # 🎭 MIXED EMOTIONS: Extract mixed emotion data
+                insights['mixed_emotions'] = emotion_data.get('mixed_emotions', [])
+                insights['emotion_description'] = emotion_data.get('emotion_description', emotion_data['primary_emotion'])
+                insights['all_emotions'] = emotion_data.get('all_emotions', {})
             
             # Extract support recommendations
             if 'recommendations' in emotion_data:
@@ -901,7 +932,9 @@ class VectorAIPipelineIntegration:
                 insights['detailed_analysis'] = {
                     'stress_indicators': ei_data.get('stress_indicators', []),
                     'mood_trend': ei_data.get('mood_trend', 'stable'),
-                    'analysis_complete': ei_data.get('analysis_complete', False)
+                    'analysis_complete': ei_data.get('analysis_complete', False),
+                    # 🎭 TRAJECTORY: Include emotional trajectory if available
+                    'emotional_trajectory': ei_data.get('emotional_trajectory', [])
                 }
         
         # Add comprehensive debug logging
@@ -910,6 +943,12 @@ class VectorAIPipelineIntegration:
         logger.debug("  - Primary emotion: %s (confidence: %.2f)", 
                     insights.get('primary_emotion', 'None'), 
                     insights.get('confidence', 0.0))
+        
+        # 🎭 ENHANCED DEBUG: Log advanced emotional fields
+        logger.debug("  - Emotion description: %s", insights.get('emotion_description', 'None'))
+        logger.debug("  - Mixed emotions count: %d", len(insights.get('mixed_emotions', [])))
+        logger.debug("  - All emotions count: %d", len(insights.get('all_emotions', {})))
+        
         logger.debug("  - Support needed: %s", insights.get('support_needed', False))
         logger.debug("  - Recommendations count: %d", 
                     len(insights.get('support_recommendations', [])))
@@ -917,6 +956,7 @@ class VectorAIPipelineIntegration:
             analysis = insights['detailed_analysis']
             logger.debug("  - Stress indicators: %d", len(analysis.get('stress_indicators', [])))
             logger.debug("  - Mood trend: %s", analysis.get('mood_trend', 'unknown'))
+            logger.debug("  - Trajectory length: %d", len(analysis.get('emotional_trajectory', [])))
         
         return insights
 

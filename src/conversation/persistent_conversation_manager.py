@@ -341,39 +341,51 @@ class PersistentConversationManager:
         Returns:
             Analysis of conversation health and suggestions
         """
-        state = await self._get_conversation_state(user_id)
-        
-        issues = []
-        suggestions = []
-        
-        # Too many unanswered questions
-        if len(state.pending_questions) > 2:
-            issues.append("too_many_pending_questions")
-            suggestions.append("Focus on one key question and let others naturally fade")
-        
-        # Low answer ratio (user not engaging with bot questions)
-        answer_ratio = self._calculate_answer_ratio(state)
-        if answer_ratio < 0.3 and state.total_questions_asked > 5:
-            issues.append("low_question_engagement")
-            suggestions.append("Ask fewer questions, focus on statements and observations")
-        
-        # Topic jumping (user avoiding deeper conversation)
-        if state.topic_transition_abruptness > 0.7:
-            issues.append("topic_avoidance")
-            suggestions.append("Follow user's lead more, ask fewer probing questions")
-        
-        # Stagnation risk
-        if state.stagnation_risk_score > 0.8:
-            issues.append("conversation_stagnation")
-            suggestions.append("Introduce fresh topic or ask about user's current interests")
-        
-        return {
-            "issues": issues,
-            "suggestions": suggestions,
-            "health_score": self._calculate_conversation_health(state),
-            "answer_ratio": answer_ratio,
-            "pending_count": len(state.pending_questions)
-        }
+        try:
+            state = await self._get_conversation_state(user_id)
+            
+            issues = []
+            suggestions = []
+            
+            # Too many unanswered questions
+            if len(state.pending_questions) > 2:
+                issues.append("too_many_pending_questions")
+                suggestions.append("Focus on one key question and let others naturally fade")
+            
+            # Low answer ratio (user not engaging with bot questions)
+            answer_ratio = self._calculate_answer_ratio(state)
+            if answer_ratio < 0.3 and state.total_questions_asked > 5:
+                issues.append("low_question_engagement")
+                suggestions.append("Ask fewer questions, focus on statements and observations")
+            
+            # Topic jumping (user avoiding deeper conversation)
+            if state.topic_transition_abruptness > 0.7:
+                issues.append("topic_avoidance")
+                suggestions.append("Follow user's lead more, ask fewer probing questions")
+            
+            # Stagnation risk
+            if state.stagnation_risk_score > 0.8:
+                issues.append("conversation_stagnation")
+                suggestions.append("Introduce fresh topic or ask about user's current interests")
+            
+            return {
+                "issues": issues,
+                "suggestions": suggestions,
+                "health_score": self._calculate_conversation_health(state),
+                "answer_ratio": answer_ratio,
+                "pending_count": len(state.pending_questions)
+            }
+            
+        except Exception as e:
+            logger.error(f"Error in detect_conversation_issues for user {user_id}: {e}")
+            # Return valid default structure instead of error string
+            return {
+                "issues": [],
+                "suggestions": [],
+                "health_score": 0.5,
+                "answer_ratio": 0.5,
+                "pending_count": 0
+            }
     
     # Helper methods for natural conversation flow
     

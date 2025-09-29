@@ -1666,7 +1666,36 @@ class BotEventHandlers:
                     conversation_context=phase2_context,
                     emoji_reaction_context=emoji_reaction_context
                 )
-                logger.info(f"🎭 EVENT HANDLER: Enhanced multimodal emotion analysis completed: {phase2_results}")
+                logger.info(f"🎭 EVENT HANDLER: Enhanced multimodal emotion analysis completed")
+                
+                # 🎭 ENHANCED DEBUG: Log detailed emotion analysis results
+                if phase2_results:
+                    primary = phase2_results.get('primary_emotion', 'None')
+                    confidence = phase2_results.get('confidence', 0)
+                    description = phase2_results.get('emotion_description', 'None')
+                    mixed = phase2_results.get('mixed_emotions', [])
+                    all_emotions = phase2_results.get('all_emotions', {})
+                    trajectory = phase2_results.get('emotional_trajectory', [])
+                    
+                    logger.info(f"🎭 ENHANCED EMOTION DEBUG:")
+                    logger.info(f"  - Primary: {primary} (confidence: {confidence:.3f})")
+                    logger.info(f"  - Description: '{description}'")
+                    logger.info(f"  - Mixed emotions: {len(mixed)} detected -> {mixed}")
+                    logger.info(f"  - All emotions: {len(all_emotions)} categories -> {list(all_emotions.keys())}")
+                    logger.info(f"  - Trajectory: {trajectory}")
+                    
+                    # Check for advanced emotional intelligence data
+                    ei_data = phase2_results.get('emotional_intelligence', {})
+                    if ei_data:
+                        ei_mixed = ei_data.get('mixed_emotions', [])
+                        ei_desc = ei_data.get('emotion_description', 'None')
+                        ei_trajectory = ei_data.get('emotional_trajectory', [])
+                        logger.info(f"  - EI mixed emotions: {ei_mixed}")
+                        logger.info(f"  - EI description: '{ei_desc}'")
+                        logger.info(f"  - EI trajectory: {ei_trajectory}")
+                else:
+                    logger.warning(f"🎭 EVENT HANDLER: No emotion results received!")
+                    
             else:
                 logger.info(f"🎭 EVENT HANDLER: Using fallback standard emotion processing")
                 # Fallback to standard emotion processing
@@ -2429,6 +2458,7 @@ class BotEventHandlers:
                             user_message_content = original_content or message.content
                             if user_message_content:
                                 try:
+                                    logger.debug(f"🔍 DEBUG: About to call process_user_response for user {user_id}")
                                     response_analysis = await self.persistent_conversation_manager.process_user_response(
                                         user_id=user_id,
                                         user_message=user_message_content,
@@ -2440,11 +2470,33 @@ class BotEventHandlers:
                                     # Ensure response_analysis is a dictionary - handle string responses gracefully
                                     if isinstance(response_analysis, dict):
                                         answered_questions = response_analysis.get("answered_questions", [])
+                                        logger.debug(f"🔍 DEBUG: answered_questions type={type(answered_questions)}, length={len(answered_questions) if hasattr(answered_questions, '__len__') else 'unknown'}")
                                         if answered_questions:
                                             logger.info(f"🔗 CONVERSATION CONTINUITY: User answered {len(answered_questions)} pending questions")
-                                            for q in answered_questions:
-                                                logger.info(f"🔗 CONVERSATION CONTINUITY: Resolved '{q.question_text[:50]}...' "
-                                                          f"(quality: {q.resolution_quality:.2f})")
+                                            for i, q in enumerate(answered_questions):
+                                                logger.debug(f"🔍 DEBUG: Processing answered question {i}: type={type(q)}, repr={repr(q)[:50]}")
+                                                # Safely handle both object and dict formats for questions
+                                                try:
+                                                    if hasattr(q, 'question_text') and hasattr(q, 'resolution_quality'):
+                                                        # Object format - this is the expected format for PendingQuestion objects
+                                                        logger.info(f"🔗 CONVERSATION CONTINUITY: Resolved '{q.question_text[:50]}...' "
+                                                                  f"(quality: {q.resolution_quality:.2f})")
+                                                    elif isinstance(q, dict) and 'question_text' in q:
+                                                        # Dictionary format fallback - safely extract with fallbacks
+                                                        question_text = q.get('question_text', 'Unknown question')
+                                                        quality = q.get('resolution_quality', 0.0)
+                                                        logger.info(f"🔗 CONVERSATION CONTINUITY: Resolved '{question_text[:50]}...' "
+                                                                  f"(quality: {quality:.2f})")
+                                                    elif isinstance(q, str):
+                                                        # String format - just log the string content
+                                                        logger.info(f"🔗 CONVERSATION CONTINUITY: Resolved question: {q[:100]}")
+                                                    else:
+                                                        # Unknown format - safe fallback
+                                                        logger.info(f"🔗 CONVERSATION CONTINUITY: Resolved question: {repr(q)[:100]}")
+                                                except Exception as q_error:
+                                                    logger.error(f"🔗 CONVERSATION CONTINUITY: Error processing answered question {i}: {q_error}, question type: {type(q)}")
+                                                    import traceback
+                                                    logger.error(f"🔍 DEBUG: Full traceback: {traceback.format_exc()}")
                                     elif isinstance(response_analysis, str):
                                         # Handle case where response_analysis is returned as a string
                                         logger.debug(f"🔗 CONVERSATION CONTINUITY: Received string response: {response_analysis[:100]}...")
@@ -2452,6 +2504,8 @@ class BotEventHandlers:
                                         logger.warning("🔗 CONVERSATION CONTINUITY: Unexpected response format from process_user_response: %s", type(response_analysis))
                                 except Exception as e:
                                     logger.error("🔗 CONVERSATION CONTINUITY: Error processing user response for user %s: %s", user_id, e)
+                                    import traceback
+                                    logger.error(f"🔍 DEBUG: Full traceback in process_user_response: {traceback.format_exc()}")
                         except Exception as e:
                             logger.error("🔗 CONVERSATION CONTINUITY: Error processing conversation state for user %s: %s", user_id, e)
                         
@@ -2478,15 +2532,31 @@ class BotEventHandlers:
                         logger.debug(f"🔍 DEBUG: persistent_conversation_manager type={type(self.persistent_conversation_manager)}")
                         logger.debug(f"🔍 DEBUG: detect_conversation_issues method type={type(self.persistent_conversation_manager.detect_conversation_issues) if self.persistent_conversation_manager else 'None'}")
                         
-                        conversation_issues = await self.persistent_conversation_manager.detect_conversation_issues(user_id)
-                        logger.debug(f"🔍 DEBUG: conversation_issues type={type(conversation_issues)}, value={repr(conversation_issues)[:200]}")
-                        
-                        if conversation_issues:
-                            issues = conversation_issues.get('issues', [])
-                            if issues:
-                                logger.info(f"🔗 CONVERSATION CONTINUITY: Detected {len(issues)} conversation issues")
-                                for issue in issues[:2]:  # Log first 2 issues
-                                    logger.info(f"🔗 CONVERSATION CONTINUITY: Issue - {issue.get('type', 'unknown')}: {issue.get('description', 'no description')[:100]}")
+                        try:
+                            logger.debug(f"🔍 DEBUG: About to call detect_conversation_issues for user {user_id}")
+                            conversation_issues = await self.persistent_conversation_manager.detect_conversation_issues(user_id)
+                            logger.debug(f"🔍 DEBUG: conversation_issues type={type(conversation_issues)}, value={repr(conversation_issues)[:200]}")
+                            
+                            if conversation_issues and isinstance(conversation_issues, dict):
+                                logger.debug(f"🔍 DEBUG: conversation_issues is valid dict, extracting issues...")
+                                issues = conversation_issues.get('issues', [])
+                                logger.debug(f"🔍 DEBUG: issues extracted successfully, type={type(issues)}, length={len(issues) if hasattr(issues, '__len__') else 'unknown'}")
+                                if issues and isinstance(issues, list):
+                                    logger.info(f"🔗 CONVERSATION CONTINUITY: Detected {len(issues)} conversation issues")
+                                    for i, issue in enumerate(issues[:2]):  # Log first 2 issues
+                                        logger.debug(f"🔍 DEBUG: Processing issue {i}: type={type(issue)}, repr={repr(issue)[:50]}")
+                                        if isinstance(issue, str):
+                                            logger.info(f"🔗 CONVERSATION CONTINUITY: Issue {i+1} - {issue}")
+                                        else:
+                                            logger.info(f"🔗 CONVERSATION CONTINUITY: Issue {i+1} - {repr(issue)[:100]}")
+                                else:
+                                    logger.debug("🔗 CONVERSATION CONTINUITY: No conversation issues detected")
+                            else:
+                                logger.warning("🔗 CONVERSATION CONTINUITY: Unexpected conversation_issues format - expected dict, got: %s", type(conversation_issues))
+                        except Exception as issues_error:
+                            logger.error(f"🔗 CONVERSATION CONTINUITY: Error in detect_conversation_issues step: {issues_error}")
+                            import traceback
+                            logger.error(f"🔍 DEBUG: Full traceback in detect_conversation_issues: {traceback.format_exc()}")
                         
                         logger.info(f"🔗 CONVERSATION CONTINUITY: Successfully processed conversation state for user {user_id}")
                     

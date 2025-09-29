@@ -235,6 +235,9 @@ class SimplifiedEmotionManager:
                 "emotion_description": assessment.get("emotion_description", assessment.get("primary_emotion", "neutral")),
                 "all_emotions": assessment.get("all_emotions", {}),
                 
+                # 🎭 TRAJECTORY: Add emotional trajectory information
+                "emotional_trajectory": assessment.get("emotional_trajectory", []),
+                
                 # Simplified emotion intelligence data for compatibility
                 "emotional_intelligence": {
                     "primary_emotion": assessment.get("primary_emotion", "neutral"),
@@ -245,7 +248,9 @@ class SimplifiedEmotionManager:
                     "analysis_complete": True,
                     # 🎭 MIXED EMOTION ENHANCEMENT: Include in emotional intelligence
                     "mixed_emotions": assessment.get("mixed_emotions", []),
-                    "emotion_description": assessment.get("emotion_description", assessment.get("primary_emotion", "neutral"))
+                    "emotion_description": assessment.get("emotion_description", assessment.get("primary_emotion", "neutral")),
+                    # 🎭 TRAJECTORY: Include emotional trajectory in EI data
+                    "emotional_trajectory": assessment.get("emotional_trajectory", [])
                 }
             }
             

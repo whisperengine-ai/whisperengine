@@ -655,66 +655,103 @@ CHARACTER ROLEPLAY REQUIREMENTS:
                 # Enhanced emotion analysis integration
                 if pipeline_result.mood_assessment and isinstance(pipeline_result.mood_assessment, dict):
                     mood_data = pipeline_result.mood_assessment
-                    logger.debug("  - Processing mood_assessment data with keys: %s", 
+                    logger.info("🎭 CDL PROMPT DEBUG: Processing mood_assessment with keys: %s", 
                                list(mood_data.keys()) if mood_data else [])
                     
-                    # Use primary emotion from comprehensive analysis
+                    # 🎭 ENHANCED: Use emotion description for mixed emotions or fallback to primary
+                    emotion_description = mood_data.get('emotion_description')
                     primary_emotion = mood_data.get('primary_emotion')
                     confidence = mood_data.get('confidence', 0)
                     
-                    if primary_emotion and confidence > 0.5:
-                        prompt += f"\n- Detected emotion: {primary_emotion} (confidence: {confidence:.1f})"
-                        logger.debug("  - Added primary emotion to prompt: %s (%.2f)", primary_emotion, confidence)
+                    logger.info("🎭 CDL PROMPT DEBUG: Emotion data extracted:")
+                    logger.info("  - Primary emotion: %s", primary_emotion)
+                    logger.info("  - Emotion description: %s", emotion_description)
+                    logger.info("  - Confidence: %.3f", confidence)
+                    
+                    if confidence > 0.5:
+                        # Use rich emotion description when available (includes mixed emotions)
+                        if emotion_description and emotion_description != primary_emotion:
+                            prompt += f"\n- Emotional state: {emotion_description} (confidence: {confidence:.1f})"
+                            logger.info("🎭 CDL PROMPT: ✅ Added emotion description to prompt: '%s' (%.2f)", emotion_description, confidence)
+                        elif primary_emotion:
+                            prompt += f"\n- Detected emotion: {primary_emotion} (confidence: {confidence:.1f})"
+                            logger.info("🎭 CDL PROMPT: ✅ Added primary emotion to prompt: '%s' (%.2f)", primary_emotion, confidence)
+                        
+                        # 🎭 MIXED EMOTIONS: Add context for complex emotional states
+                        mixed_emotions = mood_data.get('mixed_emotions', [])
+                        logger.info("🎭 CDL PROMPT DEBUG: Mixed emotions data: %s", mixed_emotions)
+                        if mixed_emotions and len(mixed_emotions) > 0:
+                            # Get up to 2 strongest secondary emotions
+                            secondary_emotions = [emotion for emotion, score in mixed_emotions[:2] if score > 0.2]
+                            logger.info("🎭 CDL PROMPT DEBUG: Secondary emotions after filtering: %s", secondary_emotions)
+                            if secondary_emotions:
+                                prompt += f"\n- Complex emotions present: {', '.join(secondary_emotions)}"
+                                logger.info("🎭 CDL PROMPT: ✅ Added mixed emotions to prompt: %s", secondary_emotions)
                         
                         # Add intensity context if available
                         intensity = mood_data.get('intensity')
+                        logger.info("🎭 CDL PROMPT DEBUG: Intensity data: %s", intensity)
                         if intensity and isinstance(intensity, (int, float)) and intensity > 0.6:
                             prompt += f"\n- Emotional intensity: {intensity:.1f} (strong emotional state)"
+                            logger.info("🎭 CDL PROMPT: ✅ Added emotional intensity to prompt: %.2f", intensity)
                         
                         # Add support recommendations if needed
-                        if mood_data.get('support_needed'):
+                        support_needed = mood_data.get('support_needed')
+                        logger.info("🎭 CDL PROMPT DEBUG: Support needed flag: %s", support_needed)
+                        if support_needed:
                             prompt += "\n- User may need emotional support and understanding"
+                            logger.info("🎭 CDL PROMPT: ✅ Added support needed context to prompt")
                         
                         # Include specific recommendations from emotion analysis
                         recommendations = mood_data.get('recommendations')
+                        logger.info("🎭 CDL PROMPT DEBUG: Recommendations data: %s", recommendations)
                         if recommendations and isinstance(recommendations, list) and len(recommendations) > 0:
                             # Take up to 2 most relevant recommendations
                             relevant_recs = recommendations[:2]
+                            logger.info("🎭 CDL PROMPT DEBUG: Filtered recommendations: %s", relevant_recs)
                             for rec in relevant_recs:
                                 if isinstance(rec, str) and len(rec) < 100:  # Keep recommendations concise
                                     prompt += f"\n- Guidance: {rec}"
+                                    logger.info("🎭 CDL PROMPT: ✅ Added recommendation to prompt: '%s'", rec)
                         
                         # Enhanced emotion-appropriate response guidance with taxonomy standardization
                         from src.intelligence.emotion_taxonomy import standardize_emotion
                         
-                        # Standardize emotion before guidance lookup
-                        standardized_emotion = standardize_emotion(primary_emotion)
-                        
-                        emotion_guidance = {
-                            'joy': 'Share in their positive energy and enthusiasm',
-                            'sadness': 'Show empathy and support while remaining genuine', 
-                            'anger': 'Stay calm and avoid escalating the situation',
-                            'fear': 'Offer gentle reassurance and support',
-                            'surprise': 'Engage with their sense of discovery and wonder',
-                            'disgust': 'Be understanding and avoid judgment',
-                            'neutral': 'Maintain your natural conversational style'
-                        }
-                        
-                        guidance = emotion_guidance.get(standardized_emotion, 'Respond naturally and authentically')
-                        prompt += f"\n- Response approach: {guidance}"
-                        logger.debug("  - Applied emotion guidance for %s: %s", standardized_emotion, guidance)
+                        # Standardize emotion before guidance lookup (use primary emotion for guidance)
+                        emotion_for_guidance = primary_emotion or emotion_description
+                        if emotion_for_guidance:
+                            standardized_emotion = standardize_emotion(emotion_for_guidance)
+                            
+                            emotion_guidance = {
+                                'joy': 'Share in their positive energy and enthusiasm',
+                                'sadness': 'Show empathy and support while remaining genuine', 
+                                'anger': 'Stay calm and avoid escalating the situation',
+                                'fear': 'Offer gentle reassurance and support',
+                                'surprise': 'Engage with their sense of discovery and wonder',
+                                'disgust': 'Be understanding and avoid judgment',
+                                'neutral': 'Maintain your natural conversational style'
+                            }
+                            
+                            guidance = emotion_guidance.get(standardized_emotion, 'Respond naturally and authentically')
+                            prompt += f"\n- Response approach: {guidance}"
+                            logger.info("🎭 CDL PROMPT: ✅ Applied emotion guidance for %s: %s", standardized_emotion, guidance)
                         
                         # Add emotional intelligence context if available
-                        if 'emotional_intelligence' in mood_data:
-                            ei_data = mood_data['emotional_intelligence']
+                        ei_data = mood_data.get('emotional_intelligence')
+                        logger.info("🎭 CDL PROMPT DEBUG: Emotional intelligence data: %s", 
+                                  list(ei_data.keys()) if ei_data and isinstance(ei_data, dict) else ei_data)
+                        if ei_data and isinstance(ei_data, dict):
                             
                             # Include stress indicators for context
                             stress_indicators = ei_data.get('stress_indicators', [])
+                            logger.info("🎭 CDL PROMPT DEBUG: Stress indicators: %s", stress_indicators)
                             if stress_indicators and len(stress_indicators) > 0:
                                 prompt += f"\n- Stress indicators detected: {len(stress_indicators)} signals present"
+                                logger.info("🎭 CDL PROMPT: ✅ Added stress indicators to prompt: %d signals", len(stress_indicators))
                             
                             # Include mood trend for response adaptation
                             mood_trend = ei_data.get('mood_trend', 'stable')
+                            logger.info("🎭 CDL PROMPT DEBUG: Mood trend: %s", mood_trend)
                             if mood_trend != 'stable':
                                 trend_guidance = {
                                     'improving': 'Build on their positive momentum',
@@ -723,6 +760,36 @@ CHARACTER ROLEPLAY REQUIREMENTS:
                                 }
                                 trend_advice = trend_guidance.get(mood_trend, 'Monitor their emotional needs')
                                 prompt += f"\n- Mood trend ({mood_trend}): {trend_advice}"
+                                logger.info("🎭 CDL PROMPT: ✅ Added mood trend guidance to prompt: %s -> %s", mood_trend, trend_advice)
+                            
+                            # 🎭 EMOTIONAL TRAJECTORY: Add progression context if available
+                            trajectory = ei_data.get('emotional_trajectory', [])
+                            logger.info("🎭 CDL PROMPT DEBUG: Emotional trajectory data: %s", trajectory)
+                            if trajectory and len(trajectory) > 1:
+                                # Show last 3 emotions in progression
+                                recent_trajectory = trajectory[-3:]
+                                trajectory_str = " → ".join(recent_trajectory)
+                                prompt += f"\n- Emotional progression: {trajectory_str}"
+                                logger.info("🎭 CDL PROMPT: ✅ Added emotional trajectory to prompt: %s", trajectory_str)
+                
+                # 🎭 FULL SPECTRUM: Add emotional complexity from all_emotions if available  
+                if pipeline_result.mood_assessment and isinstance(pipeline_result.mood_assessment, dict):
+                    mood_data = pipeline_result.mood_assessment
+                    all_emotions = mood_data.get('all_emotions', {})
+                    logger.info("🎭 CDL PROMPT DEBUG: All emotions data: %s", all_emotions)
+                    if all_emotions and len(all_emotions) > 1:
+                        # Get significant secondary emotions (>15% threshold, excluding primary)
+                        primary_emotion = mood_data.get('primary_emotion', '')
+                        significant_emotions = {k: v for k, v in all_emotions.items() 
+                                              if v > 0.15 and k != primary_emotion}
+                        logger.info("🎭 CDL PROMPT DEBUG: Significant emotions (>0.15, non-primary): %s", significant_emotions)
+                        if significant_emotions:
+                            # Get top 2 secondary emotions
+                            secondary_list = sorted(significant_emotions.items(), 
+                                                  key=lambda x: x[1], reverse=True)[:2]
+                            secondary_desc = [f"{emotion} ({score:.1f})" for emotion, score in secondary_list]
+                            prompt += f"\n- Emotional complexity: {', '.join(secondary_desc)}"
+                            logger.info("🎭 CDL PROMPT: ✅ Added emotional complexity to prompt: %s", secondary_desc)
                 
                 # Add personality context if available
                 if pipeline_result.personality_profile and isinstance(pipeline_result.personality_profile, dict):
@@ -737,6 +804,11 @@ CHARACTER ROLEPLAY REQUIREMENTS:
                         prompt += f"\n- Conversation mode: {conversation_mode}"
                         
                 prompt += f"\n\nADAPT your response style to be emotionally appropriate while staying true to {character.identity.name}'s personality."
+                
+                # 🎭 FINAL DEBUG: Show complete emotion-enhanced prompt section
+                logger.info("🎭 CDL PROMPT: === EMOTION INTEGRATION COMPLETE ===")
+                logger.info("🎭 CDL PROMPT: Final emotion-enhanced prompt section added to character prompt")
+                logger.info("🎭 CDL PROMPT: Prompt length after emotion integration: %d characters", len(prompt))
 
             # MEMORY INTEGRATION: Add conversation history and relevant memories  
             if relevant_memories or conversation_history:

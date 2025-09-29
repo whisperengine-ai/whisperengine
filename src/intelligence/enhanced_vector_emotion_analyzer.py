@@ -80,18 +80,31 @@ class EmotionAnalysisResult:
     @property
     def mixed_emotions(self) -> List[Tuple[str, float]]:
         """
-        🎭 MIXED EMOTION ENHANCEMENT: Return significant secondary emotions
+        🎭 MIXED EMOTION ENHANCEMENT: Return significant secondary emotions with dynamic thresholding
         
-        Returns emotions above 20% threshold (excluding primary) as mixed emotions.
-        This allows for richer emotional representation like "joy with surprise" or "anger with sadness".
+        Uses adaptive threshold based on primary emotion confidence:
+        - If primary emotion is very dominant (>95%), use 10% threshold for secondary
+        - If primary emotion is strong (80-95%), use 15% threshold  
+        - If primary emotion is moderate (<80%), use 20% threshold
+        
+        This captures emotional complexity even when one emotion dominates.
         """
         if not self.all_emotions:
             return []
         
-        # Get emotions above 20% threshold, excluding primary emotion
+        # Dynamic threshold based on primary emotion strength
+        primary_strength = max(self.all_emotions.values()) if self.all_emotions else 1.0
+        if primary_strength > 0.95:
+            threshold = 0.10  # Very dominant primary - lower threshold for secondary
+        elif primary_strength > 0.80:
+            threshold = 0.15  # Strong primary - medium threshold
+        else:
+            threshold = 0.20  # Moderate primary - original threshold
+        
+        # Get emotions above dynamic threshold, excluding primary emotion
         significant_emotions = [
             (emotion, score) for emotion, score in self.all_emotions.items()
-            if score >= 0.20 and emotion != self.primary_emotion
+            if score >= threshold and emotion != self.primary_emotion
         ]
         
         # Sort by score descending
