@@ -21,6 +21,7 @@ class StatusCommandHandlers:
         bot,
         bot_name,
         llm_client,
+        memory_manager,
         voice_manager,
         voice_support_enabled,
         image_processor,
@@ -31,6 +32,7 @@ class StatusCommandHandlers:
         self.bot = bot
         self.bot_name = bot_name
         self.llm_client = llm_client
+        self.memory_manager = memory_manager
         self.voice_manager = voice_manager
         self.voice_support_enabled = voice_support_enabled
         self.image_processor = image_processor
@@ -58,6 +60,12 @@ class StatusCommandHandlers:
         async def bot_status(ctx):
             """Check and refresh the bot's Discord presence"""
             await status_handler_instance._bot_status_handler(ctx)
+
+        @self.bot.command(name="llm_status")
+        @bot_name_filter()
+        async def llm_status(ctx):
+            """Check LLM service status and configuration"""
+            await status_handler_instance._llm_status_handler(ctx)
 
         # Removed the other hidden status commands Copilot added:
         # cache_stats, vision_status, voice_status, test_image, health_status
@@ -121,6 +129,74 @@ class StatusCommandHandlers:
             name="If bot still appears offline:",
             value="• Try refreshing Discord (Ctrl+R)\n• Restart your Discord client\n• Check bot permissions in server settings\n• Wait 1-2 minutes for Discord to update",
             inline=False,
+        )
+
+        await ctx.send(embed=embed)
+
+    async def _llm_status_handler(self, ctx):
+        """Handle LLM status command"""
+        logger.debug(f"LLM status command called by {ctx.author.name}")
+
+        embed = discord.Embed(title="🧠 LLM Service Status", color=0x3498DB)
+
+        # Check LLM connection
+        try:
+            connection_ok = self.llm_client.check_connection()
+            if connection_ok:
+                embed.add_field(
+                    name="🟢 Connection Status",
+                    value="✅ **Connected** - LLM service is responding",
+                    inline=False,
+                )
+            else:
+                embed.add_field(
+                    name="🔴 Connection Status",
+                    value="❌ **Disconnected** - LLM service is not responding",
+                    inline=False,
+                )
+                embed.color = 0xE74C3C  # Red color for connection issues
+        except Exception as e:
+            embed.add_field(
+                name="🔴 Connection Status",
+                value=f"❌ **Error** - Failed to check connection: {str(e)}",
+                inline=False,
+            )
+            embed.color = 0xE74C3C
+
+        # Show service information
+        embed.add_field(
+            name="🏢 Service Configuration",
+            value=f"• Service: **{self.llm_client.service_name}**\n• Model: **{self.llm_client.default_model_name}**",
+            inline=False,
+        )
+
+        # Show vision capabilities if available
+        try:
+            vision_config = self.llm_client.get_vision_config()
+            if vision_config and vision_config.get("supports_vision", False):
+                vision_status = "✅ **Enabled** - Vision model support available"
+                vision_model = vision_config.get("vision_model", "Unknown")
+                embed.add_field(
+                    name="👁️ Vision Support",
+                    value=f"{vision_status}\n• Vision Model: **{vision_model}**",
+                    inline=False,
+                )
+            else:
+                embed.add_field(
+                    name="👁️ Vision Support",
+                    value="❌ **Not Available** - Text-only model",
+                    inline=False,
+                )
+        except Exception as e:
+            embed.add_field(
+                name="👁️ Vision Support",
+                value=f"⚠️ **Unknown** - Could not check vision support: {str(e)}",
+                inline=False,
+            )
+
+        # Add helpful footer
+        embed.set_footer(
+            text="💡 Use !bot_status for overall bot health"
         )
 
         await ctx.send(embed=embed)

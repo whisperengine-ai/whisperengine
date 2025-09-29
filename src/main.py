@@ -33,8 +33,7 @@ from src.utils.enhanced_health_server import create_enhanced_health_server
 
 # Enhanced production systems
 from src.utils.production_error_handler import (
-    ErrorCategory, ErrorSeverity, handle_errors, 
-    error_handler
+    ErrorCategory, ErrorSeverity, handle_errors
 )
 
 # Logging is already configured by the root launcher
@@ -187,6 +186,7 @@ class ModularBotManager:
                 bot=self.bot,
                 bot_name=os.getenv("DISCORD_BOT_NAME", ""),
                 llm_client=components["llm_client"],
+                memory_manager=components.get("memory_manager"),
                 voice_manager=components.get("voice_manager"),
                 voice_support_enabled=getattr(self.bot_core, "voice_support_enabled", False),
                 image_processor=components.get("image_processor"),

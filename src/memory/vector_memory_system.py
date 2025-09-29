@@ -3200,65 +3200,6 @@ class VectorMemoryManager:
         
         logger.info("VectorMemoryManager initialized - local-first single source of truth ready")
     
-    async def process_user_message(self, 
-                                 user_id: str,
-                                 message_content: str) -> Dict[str, Any]:
-        """
-        Process user message for memory operations
-        
-        This replaces the complex hierarchical memory processing.
-        """
-        start_time = time.time()
-        
-        try:
-            # 1. Check for contradiction with existing memories
-            contradictions = await self.vector_store.detect_contradictions(
-                new_content=message_content,
-                user_id=user_id
-            )
-            
-            # 2. Store conversation memory
-            conversation_memory = VectorMemory(
-                id=str(uuid4()),  # Pure UUID for Qdrant compatibility
-                user_id=user_id,
-                memory_type=MemoryType.CONVERSATION,
-                content=message_content,
-                source="user_message",
-                metadata={
-                    "processed_at": datetime.utcnow().isoformat(),
-                    "contradictions_found": len(contradictions)
-                }
-            )
-            
-            await self.vector_store.store_memory(conversation_memory)
-            
-            # 3. Extract and store facts (simple pattern matching for now)
-            facts = await self._extract_facts(message_content, user_id)
-            for fact in facts:
-                await self.vector_store.store_memory(fact)
-            
-            # 4. Get relevant context for response
-            context = await self.get_conversation_context(user_id, message_content)
-            
-            processing_time = time.time() - start_time
-            
-            return {
-                "success": True,
-                "contradictions": contradictions,
-                "facts_extracted": len(facts),
-                "context": context,
-                "processing_time_ms": processing_time * 1000,
-                "memory_id": conversation_memory.id
-            }
-            
-        except Exception as e:
-            logger.error(f"Message processing failed for user {user_id}: {e}")
-            return {
-                "success": False,
-                "error": str(e),
-                "processing_time_ms": (time.time() - start_time) * 1000
-            }
-    
     async def get_conversation_context(self, 
                                      user_id: str,
                                      current_message: str,
@@ -3305,53 +3246,6 @@ class VectorMemoryManager:
         except Exception as e:
             logger.error(f"Context assembly failed: {e}")
             return ""
-    
-    async def _extract_facts(self, message: str, user_id: str) -> List[VectorMemory]:
-        """Extract facts from message (simplified for initial implementation)"""
-        facts = []
-        
-        # Simple pattern matching (will be enhanced with NLP)
-        patterns = [
-            (r"my (\w+) is (?:named|called) (\w+)", "pet", "is_named"),
-            (r"i (?:like|love|enjoy) (\w+)", "user", "likes"),
-            (r"i (?:have|own) a (\w+)", "user", "owns"),
-            (r"my name is (\w+)", "user", "is_named"),
-        ]
-        
-        import re
-        for pattern, subject, predicate in patterns:
-            matches = re.findall(pattern, message.lower())
-            for match in matches:
-                if isinstance(match, tuple):
-                    if len(match) == 0:  # 🎯 SAFETY: Handle empty tuple
-                        continue
-                    if predicate == "is_named":
-                        obj = match[1] if len(match) > 1 else match[0]
-                        subj = match[0] if len(match) > 1 else subject
-                    else:
-                        obj = match[0]
-                        subj = subject
-                else:
-                    obj = match
-                    subj = subject
-                
-                fact = VectorMemory(
-                    id=f"fact_{user_id}_{uuid4()}",
-                    user_id=user_id,
-                    memory_type=MemoryType.FACT,
-                    content=f"{subj} {predicate} {obj}",
-                    confidence=0.8,
-                    source="extracted_from_message",
-                    metadata={
-                        "subject": subj,
-                        "predicate": predicate,
-                        "object": obj,
-                        "extracted_from": message[:100]
-                    }
-                )
-                facts.append(fact)
-        
-        return facts
     
     async def handle_user_correction(self, 
                                    user_id: str,
@@ -4101,35 +3995,21 @@ async def test_vector_memory_system():
     
     user_id = "test_user_123"
     
-    # Test 1: Store initial fact
-    result1 = await memory_manager.process_user_message(
-        user_id=user_id,
-        message_content="My goldfish is named Orion"
-    )
-    print(f"Initial fact stored: {result1}")
-    
-    # Test 2: User correction (this would detect contradiction)
-    result2 = await memory_manager.process_user_message(
-        user_id=user_id,
-        message_content="Actually, my goldfish is named Bubbles"
-    )
-    print(f"Correction processed: {result2}")
-    
-    # Test 3: Handle explicit correction
+    # Test: Handle explicit correction
     correction_result = await memory_manager.handle_user_correction(
         user_id=user_id,
         correction_message="My goldfish is Bubbles, not Orion"
     )
     print(f"Explicit correction: {correction_result}")
     
-    # Test 4: Get context (should now show correct name)
+    # Test: Get context (should now show correct name)
     context = await memory_manager.get_conversation_context(
         user_id=user_id,
         current_message="Tell me about my goldfish"
     )
     print(f"Current context: {context}")
     
-    # Test 5: Health stats
+    # Test: Health stats
     stats = await memory_manager.get_health_stats()
     print(f"System health: {stats}")
 

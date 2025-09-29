@@ -82,6 +82,7 @@ class HelpCommandHandlers:
         commands = [
             f"`!ping{name_suffix}` - Test connectivity",
             f"`!bot_status{name_suffix}` - Bot health check",
+            f"`!llm_status{name_suffix}` - LLM service status",
             f"`!join{name_suffix}` - Join voice channel",
             f"`!leave{name_suffix}` - Leave voice channel"
         ]
@@ -157,6 +158,7 @@ class HelpCommandHandlers:
             ("!help", "Show complete command list (standard Discord command)"),
             (f"!ping{name_suffix}", "Test if bot is responding"),
             (f"!bot_status{name_suffix}", "Check bot health and status"),
+            (f"!llm_status{name_suffix}", "Check LLM service status"),
         ]
 
         essential_text = "\n".join([f"`{cmd}` - {desc}" for cmd, desc in essential_commands])
