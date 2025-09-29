@@ -928,7 +928,7 @@ USER IDENTIFICATION:
                             prompt += f"\n\n{scenario_display} Context Detected:"
                             # Use up to 2 appropriate responses from CDL for this scenario
                             for i, response in enumerate(responses[:2], 1):
-                                prompt += f"\n  • Option {i}: \"{response}\""
+                                prompt += f"\n  • Option {i}: {response}"
                             prompt += f"\n  → Use these as inspiration for your authentic {character.identity.name} response style"
                     
                     # Add CDL-driven conversation flow guidance
@@ -951,7 +951,9 @@ USER IDENTIFICATION:
 - NO physical narration like "*leans forward*", "*pushes glasses up*", "*gathers notebooks*"
 - Focus on SPEECH ONLY - what you would actually SAY out loud, not actions or environments
 - If conveying emotion/tone, use spoken words: "excitedly", "thoughtfully", "with a laugh"
-- Responses must be SPEECH-READY for text-to-speech conversion"""
+- Responses must be SPEECH-READY for text-to-speech conversion
+- NEVER wrap your entire response in quotation marks - respond as if you're speaking directly
+- Do NOT format responses like "Hello there" - instead respond: Hello there"""
 
             # 🎭 CRITICAL CHARACTER CONSISTENCY ENFORCEMENT
             prompt += f"""
