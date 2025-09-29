@@ -582,41 +582,19 @@ class DiscordBotCore:
             self.logger.warning("⚠️ Continuing without Phase 4 human-like intelligence features")
 
     def initialize_conversation_cache(self):
-        """Initialize the conversation cache system."""
-        self.logger.info("Initializing conversation cache")
+        """Initialize vector-native conversation context (Redis removed for simplification)."""
+        self.logger.info("Using vector-native conversation context (Redis disabled)")
 
         try:
-            cache_timeout = int(os.getenv("CONVERSATION_CACHE_TIMEOUT_MINUTES", "15"))
-            bootstrap_limit = int(os.getenv("CONVERSATION_CACHE_BOOTSTRAP_LIMIT", "20"))
-            max_local_messages = int(os.getenv("CONVERSATION_CACHE_MAX_LOCAL", "50"))
-
-            use_redis = os.getenv("USE_REDIS_CACHE", "true").lower() == "true"
-
-            if use_redis:
-                self.logger.info("Attempting to initialize Redis-based conversation cache")
-                self.conversation_cache = RedisConversationCache(
-                    cache_timeout_minutes=cache_timeout,
-                    bootstrap_limit=bootstrap_limit,
-                    max_local_messages=max_local_messages,
-                )
-                # Initialize RedisProfileAndMemoryCache for personality/memory caching
-                self.profile_memory_cache = RedisProfileAndMemoryCache(cache_timeout_minutes=cache_timeout)
-                self.logger.info(
-                    "Redis conversation cache initialized (connection will be established on bot start)"
-                )
-            else:
-                self.logger.info("Using in-memory conversation cache (Redis disabled)")
-                self.conversation_cache = HybridConversationCache(
-                    cache_timeout_minutes=cache_timeout,
-                    bootstrap_limit=bootstrap_limit,
-                    max_local_messages=max_local_messages,
-                )
-                self.profile_memory_cache = None
-
-            self.logger.info("Conversation cache initialized successfully")
+            # Use vector memory system for conversation context instead of Redis cache
+            # This provides smarter semantic context rather than just chronological cache
+            self.conversation_cache = None  # Disabled - using vector memory directly
+            self.profile_memory_cache = None  # Disabled - vector memory handles this
+            
+            self.logger.info("✅ Vector-native conversation context enabled (Redis cache disabled)")
 
         except Exception as e:
-            self.logger.error(f"Failed to initialize conversation cache: {e}")
+            self.logger.error(f"Failed to initialize conversation context: {e}")
             self.conversation_cache = None
             self.profile_memory_cache = None
 

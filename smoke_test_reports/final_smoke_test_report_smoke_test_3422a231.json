@@ -1,0 +1,345 @@
+{
+  "test_suite": "WhisperEngine Smoke Test",
+  "timestamp": "2025-09-29T13:44:13.022358",
+  "test_user_id": "smoke_test_3422a231",
+  "parallel_mode": true,
+  "overall_duration_seconds": 215.754795,
+  "bots_tested": [
+    "elena",
+    "marcus",
+    "ryan",
+    "dream",
+    "gabriel",
+    "sophia",
+    "jake",
+    "aethys"
+  ],
+  "individual_reports": {
+    "elena": {
+      "bot_name": "elena",
+      "character": "Marine Biologist",
+      "port": 9091,
+      "container": "whisperengine-elena-bot",
+      "test_user_id": "smoke_test_3422a231",
+      "test_start": "2025-09-29T13:44:13.022412",
+      "test_end": "2025-09-29T13:46:33.331637",
+      "test_duration_seconds": 140.309225,
+      "test_results": {
+        "Health Check": true,
+        "Bot Info": true,
+        "Basic Conversation": true,
+        "Personality Traits": true,
+        "Memory Storage & Recall": true,
+        "Conversation Context": true,
+        "Emotional Intelligence": true,
+        "Performance": true,
+        "Log Analysis": true
+      },
+      "log_analysis": {
+        "success": true,
+        "warnings": 5,
+        "errors": 60,
+        "raw_errors": 72,
+        "config_warnings": 12,
+        "critical_issues": [
+          "Vector storage system failures detected"
+        ],
+        "log_lines": 6756
+      },
+      "summary": {
+        "total_tests": 9,
+        "passed_tests": 9,
+        "failed_tests": 0,
+        "success_rate": 100.0
+      }
+    },
+    "marcus": {
+      "bot_name": "marcus",
+      "character": "AI Researcher",
+      "port": 9092,
+      "container": "whisperengine-marcus-bot",
+      "test_user_id": "smoke_test_3422a231",
+      "test_start": "2025-09-29T13:44:21.223277",
+      "test_end": "2025-09-29T13:46:43.870542",
+      "test_duration_seconds": 142.647265,
+      "test_results": {
+        "Health Check": true,
+        "Bot Info": true,
+        "Basic Conversation": true,
+        "Personality Traits": true,
+        "Memory Storage & Recall": true,
+        "Conversation Context": true,
+        "Emotional Intelligence": true,
+        "Performance": true,
+        "Log Analysis": true
+      },
+      "log_analysis": {
+        "success": true,
+        "warnings": 5,
+        "errors": 68,
+        "raw_errors": 80,
+        "config_warnings": 12,
+        "critical_issues": [
+          "Vector storage system failures detected"
+        ],
+        "log_lines": 8394
+      },
+      "summary": {
+        "total_tests": 9,
+        "passed_tests": 9,
+        "failed_tests": 0,
+        "success_rate": 100.0
+      }
+    },
+    "ryan": {
+      "bot_name": "ryan",
+      "character": "Indie Game Developer",
+      "port": 9093,
+      "container": "whisperengine-ryan-bot",
+      "test_user_id": "smoke_test_3422a231",
+      "test_start": "2025-09-29T13:44:31.412952",
+      "test_end": "2025-09-29T13:46:46.947743",
+      "test_duration_seconds": 135.534791,
+      "test_results": {
+        "Health Check": true,
+        "Bot Info": true,
+        "Basic Conversation": true,
+        "Personality Traits": true,
+        "Memory Storage & Recall": true,
+        "Conversation Context": true,
+        "Emotional Intelligence": true,
+        "Performance": true,
+        "Log Analysis": true
+      },
+      "log_analysis": {
+        "success": true,
+        "warnings": 5,
+        "errors": 68,
+        "raw_errors": 80,
+        "config_warnings": 12,
+        "critical_issues": [
+          "Vector storage system failures detected"
+        ],
+        "log_lines": 4614
+      },
+      "summary": {
+        "total_tests": 9,
+        "passed_tests": 9,
+        "failed_tests": 0,
+        "success_rate": 100.0
+      }
+    },
+    "dream": {
+      "bot_name": "dream",
+      "character": "Mythological Entity",
+      "port": 9094,
+      "container": "whisperengine-dream-bot",
+      "test_user_id": "smoke_test_3422a231",
+      "test_start": "2025-09-29T13:44:34.889906",
+      "test_end": "2025-09-29T13:46:54.021664",
+      "test_duration_seconds": 139.131758,
+      "test_results": {
+        "Health Check": true,
+        "Bot Info": true,
+        "Basic Conversation": true,
+        "Personality Traits": true,
+        "Memory Storage & Recall": true,
+        "Conversation Context": true,
+        "Emotional Intelligence": true,
+        "Performance": true,
+        "Log Analysis": true
+      },
+      "log_analysis": {
+        "success": true,
+        "warnings": 6,
+        "errors": 60,
+        "raw_errors": 72,
+        "config_warnings": 12,
+        "critical_issues": [
+          "Vector storage system failures detected"
+        ],
+        "log_lines": 6349
+      },
+      "summary": {
+        "total_tests": 9,
+        "passed_tests": 9,
+        "failed_tests": 0,
+        "success_rate": 100.0
+      }
+    },
+    "gabriel": {
+      "bot_name": "gabriel",
+      "character": "Archangel",
+      "port": 9095,
+      "container": "whisperengine-gabriel-bot",
+      "test_user_id": "smoke_test_3422a231",
+      "test_start": "2025-09-29T13:44:47.336168",
+      "test_end": "2025-09-29T13:47:10.496140",
+      "test_duration_seconds": 143.159972,
+      "test_results": {
+        "Health Check": true,
+        "Bot Info": true,
+        "Basic Conversation": true,
+        "Personality Traits": true,
+        "Memory Storage & Recall": true,
+        "Conversation Context": true,
+        "Emotional Intelligence": true,
+        "Performance": true,
+        "Log Analysis": true
+      },
+      "log_analysis": {
+        "success": true,
+        "warnings": 14,
+        "errors": 60,
+        "raw_errors": 72,
+        "config_warnings": 12,
+        "critical_issues": [
+          "Vector storage system failures detected"
+        ],
+        "log_lines": 8466
+      },
+      "summary": {
+        "total_tests": 9,
+        "passed_tests": 9,
+        "failed_tests": 0,
+        "success_rate": 100.0
+      }
+    },
+    "sophia": {
+      "bot_name": "sophia",
+      "character": "Marketing Executive",
+      "port": 9096,
+      "container": "whisperengine-sophia-bot",
+      "test_user_id": "smoke_test_3422a231",
+      "test_start": "2025-09-29T13:45:02.347659",
+      "test_end": "2025-09-29T13:47:16.224772",
+      "test_duration_seconds": 133.877113,
+      "test_results": {
+        "Health Check": true,
+        "Bot Info": true,
+        "Basic Conversation": true,
+        "Personality Traits": true,
+        "Memory Storage & Recall": true,
+        "Conversation Context": true,
+        "Emotional Intelligence": true,
+        "Performance": true,
+        "Log Analysis": true
+      },
+      "log_analysis": {
+        "success": true,
+        "warnings": 6,
+        "errors": 68,
+        "raw_errors": 80,
+        "config_warnings": 12,
+        "critical_issues": [
+          "Vector storage system failures detected"
+        ],
+        "log_lines": 6217
+      },
+      "summary": {
+        "total_tests": 9,
+        "passed_tests": 9,
+        "failed_tests": 0,
+        "success_rate": 100.0
+      }
+    },
+    "jake": {
+      "bot_name": "jake",
+      "character": "Adventure Photographer",
+      "port": 9097,
+      "container": "whisperengine-jake-bot",
+      "test_user_id": "smoke_test_3422a231",
+      "test_start": "2025-09-29T13:45:15.788709",
+      "test_end": "2025-09-29T13:47:21.401518",
+      "test_duration_seconds": 125.612809,
+      "test_results": {
+        "Health Check": true,
+        "Bot Info": true,
+        "Basic Conversation": true,
+        "Personality Traits": true,
+        "Memory Storage & Recall": true,
+        "Conversation Context": true,
+        "Emotional Intelligence": true,
+        "Performance": true,
+        "Log Analysis": true
+      },
+      "log_analysis": {
+        "success": true,
+        "warnings": 7,
+        "errors": 60,
+        "raw_errors": 72,
+        "config_warnings": 12,
+        "critical_issues": [
+          "Vector storage system failures detected"
+        ],
+        "log_lines": 5205
+      },
+      "summary": {
+        "total_tests": 9,
+        "passed_tests": 9,
+        "failed_tests": 0,
+        "success_rate": 100.0
+      }
+    },
+    "aethys": {
+      "bot_name": "aethys",
+      "character": "Omnipotent Entity",
+      "port": 3007,
+      "container": "whisperengine-aethys-bot",
+      "test_user_id": "smoke_test_3422a231",
+      "test_start": "2025-09-29T13:45:21.168253",
+      "test_end": "2025-09-29T13:47:48.776623",
+      "test_duration_seconds": 147.60837,
+      "test_results": {
+        "Health Check": true,
+        "Bot Info": true,
+        "Basic Conversation": true,
+        "Personality Traits": true,
+        "Memory Storage & Recall": true,
+        "Conversation Context": true,
+        "Emotional Intelligence": true,
+        "Performance": true,
+        "Log Analysis": true
+      },
+      "log_analysis": {
+        "success": true,
+        "warnings": 56,
+        "errors": 60,
+        "raw_errors": 72,
+        "config_warnings": 12,
+        "critical_issues": [
+          "Vector storage system failures detected"
+        ],
+        "log_lines": 14894
+      },
+      "summary": {
+        "total_tests": 9,
+        "passed_tests": 9,
+        "failed_tests": 0,
+        "success_rate": 100.0
+      }
+    }
+  },
+  "overall_summary": {
+    "total_bots_tested": 8,
+    "bots_fully_passed": 8,
+    "total_tests_run": 72,
+    "total_tests_passed": 72,
+    "total_tests_failed": 0,
+    "overall_success_rate": 100.0,
+    "log_analysis_summary": {
+      "total_warnings": 104,
+      "total_errors": 504,
+      "total_raw_errors": 600,
+      "total_config_warnings": 96,
+      "unique_critical_issues": [
+        "Vector storage system failures detected"
+      ]
+    }
+  },
+  "recommendations": [
+    "Performance optimization needed for: elena, marcus, ryan, dream, gabriel, sophia, jake, aethys",
+    "Review error logs for: elena, marcus, ryan, dream, gabriel, sophia, jake, aethys",
+    "Address critical issues in: elena, marcus, ryan, dream, gabriel, sophia, jake, aethys"
+  ]
+}

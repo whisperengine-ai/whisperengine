@@ -1,0 +1,39 @@
+{
+  "bot_name": "sophia",
+  "character": "Marketing Executive",
+  "port": 9096,
+  "container": "whisperengine-sophia-bot",
+  "test_user_id": "smoke_test_3c94cee6",
+  "test_start": "2025-09-29T13:54:31.736068",
+  "test_end": "2025-09-29T13:56:36.883032",
+  "test_duration_seconds": 125.146964,
+  "test_results": {
+    "CDL Validation": true,
+    "Health Check": true,
+    "Bot Info": true,
+    "Basic Conversation": true,
+    "Personality Traits": true,
+    "Memory Storage & Recall": true,
+    "Conversation Context": true,
+    "Emotional Intelligence": true,
+    "Performance": true,
+    "Log Analysis": true
+  },
+  "log_analysis": {
+    "success": true,
+    "warnings": 5,
+    "errors": 68,
+    "raw_errors": 80,
+    "config_warnings": 12,
+    "critical_issues": [
+      "Vector storage system failures detected"
+    ],
+    "log_lines": 6193
+  },
+  "summary": {
+    "total_tests": 10,
+    "passed_tests": 10,
+    "failed_tests": 0,
+    "success_rate": 100.0
+  }
+}

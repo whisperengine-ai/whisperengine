@@ -3046,7 +3046,7 @@ class MemoryTools:
             else:
                 # Create new fact
                 new_memory = VectorMemory(
-                    id=f"fact_{user_id}_{uuid4()}",
+                    id=str(uuid4()),  # Pure UUID for Qdrant compatibility
                     user_id=user_id,
                     memory_type=MemoryType.FACT,
                     content=f"{subject} is {new_value}",
@@ -3584,7 +3584,7 @@ class VectorMemoryManager:
         """Store a fact for the user."""
         try:
             fact_memory = VectorMemory(
-                id=f"fact_{user_id}_{uuid4()}",
+                id=str(uuid4()),  # Pure UUID for Qdrant compatibility
                 user_id=user_id,
                 memory_type=MemoryType.FACT,
                 content=fact,
@@ -3639,7 +3639,7 @@ class VectorMemoryManager:
             # Store profile data as preference memories
             for key, value in profile_data.items():
                 preference_memory = VectorMemory(
-                    id=f"profile_{user_id}_{key}_{uuid4()}",
+                    id=str(uuid4()),  # Pure UUID for Qdrant compatibility
                     user_id=user_id,
                     memory_type=MemoryType.PREFERENCE,
                     content=f"{key}: {value}",
@@ -3744,7 +3744,7 @@ class VectorMemoryManager:
         """Update emotional context for the user."""
         try:
             emotion_memory = VectorMemory(
-                id=f"emotion_{user_id}_{uuid4()}",
+                id=str(uuid4()),  # Pure UUID for Qdrant compatibility
                 user_id=user_id,
                 memory_type=MemoryType.CONTEXT,
                 content=f"Emotional state: {emotion_data}",

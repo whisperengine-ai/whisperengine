@@ -1,0 +1,69 @@
+{
+  "test_suite": "WhisperEngine Smoke Test",
+  "timestamp": "2025-09-29T13:14:20.704025",
+  "test_user_id": "smoke_test_9b94a648",
+  "parallel_mode": false,
+  "overall_duration_seconds": 24.927202,
+  "bots_tested": [
+    "elena"
+  ],
+  "individual_reports": {
+    "elena": {
+      "bot_name": "elena",
+      "character": "Marine Biologist",
+      "port": 9091,
+      "container": "whisperengine-elena-bot",
+      "test_user_id": "smoke_test_9b94a648",
+      "test_start": "2025-09-29T13:14:20.704032",
+      "test_end": "2025-09-29T13:14:45.630820",
+      "test_duration_seconds": 24.926788,
+      "test_results": {
+        "Health Check": true,
+        "Bot Info": true,
+        "Basic Conversation": true,
+        "Personality Traits": true,
+        "Memory Storage & Recall": true,
+        "Conversation Context": true,
+        "Emotional Intelligence": true,
+        "Performance": true,
+        "Log Analysis": true
+      },
+      "log_analysis": {
+        "success": true,
+        "warnings": 0,
+        "errors": 76,
+        "critical_issues": [
+          "Vector/Memory system issues detected",
+          "Discord API issues detected"
+        ],
+        "log_lines": 7031
+      },
+      "summary": {
+        "total_tests": 9,
+        "passed_tests": 9,
+        "failed_tests": 0,
+        "success_rate": 100.0
+      }
+    }
+  },
+  "overall_summary": {
+    "total_bots_tested": 1,
+    "bots_fully_passed": 1,
+    "total_tests_run": 9,
+    "total_tests_passed": 9,
+    "total_tests_failed": 0,
+    "overall_success_rate": 100.0,
+    "log_analysis_summary": {
+      "total_warnings": 0,
+      "total_errors": 76,
+      "unique_critical_issues": [
+        "Vector/Memory system issues detected",
+        "Discord API issues detected"
+      ]
+    }
+  },
+  "recommendations": [
+    "Review error logs for: elena",
+    "Address critical issues in: elena"
+  ]
+}

@@ -256,21 +256,25 @@ class BotEventHandlers:
     def _register_events(self):
         """Register event handlers with the Discord bot."""
 
+        # Store instance reference to avoid naming conflicts
+        event_handler_instance = self
+
         @self.bot.event
         async def on_ready():
-            return await self.on_ready()
+            return await event_handler_instance.on_ready()
 
         @self.bot.event
         async def on_message(message):
-            return await self.on_message(message)
+            # Call the instance method without naming collision
+            return await event_handler_instance.on_message(message)
         
         @self.bot.event
         async def on_reaction_add(reaction, user):
-            return await self.on_reaction_add(reaction, user)
+            return await event_handler_instance.on_reaction_add(reaction, user)
         
         @self.bot.event
         async def on_reaction_remove(reaction, user):
-            return await self.on_reaction_remove(reaction, user)
+            return await event_handler_instance.on_reaction_remove(reaction, user)
 
     async def on_ready(self):
         """
@@ -541,17 +545,19 @@ class BotEventHandlers:
                     f"DM context classified: {message_context.context_type.value} (security: {message_context.security_level.value})"
                 )
 
-                # Try Redis cache first
-                if self.profile_memory_cache:
-                    try:
-                        if not self.profile_memory_cache.redis:
-                            await self.profile_memory_cache.initialize()
-                        relevant_memories = await self.profile_memory_cache.get_memory_retrieval(user_id, message.content)
-                        if relevant_memories:
-                            logger.debug(f"[CACHE] Memory retrieval cache hit for user {user_id}")
-                    except Exception as e:
-                        logger.debug(f"Cache lookup failed, proceeding with DB: {e}")
-                        relevant_memories = None
+                # Redis cache disabled - using vector-native memory directly
+                # if self.profile_memory_cache:
+                #     try:
+                #         if not self.profile_memory_cache.redis:
+                #             await self.profile_memory_cache.initialize()
+                #         relevant_memories = await self.profile_memory_cache.get_memory_retrieval(user_id, message.content)
+                #         if relevant_memories:
+                #             logger.debug(f"[CACHE] Memory retrieval cache hit for user {user_id}")
+                #     except Exception as e:
+                #         logger.debug(f"Cache lookup failed, proceeding with DB: {e}")
+                #         relevant_memories = None
+                # Use vector memory directly instead
+                relevant_memories = None
                 if not relevant_memories:
                     logger.info(f"🔍 MEMORY DEBUG: Retrieving memories for user {user_id} with query: '{message.content[:50]}...'")
                     
@@ -1206,11 +1212,13 @@ class BotEventHandlers:
                     user_filtered_messages.append(msg)
 
             user_filtered_messages.reverse()
-            return (
+            final_messages = (
                 user_filtered_messages[-15:]
                 if len(user_filtered_messages) >= 15
                 else user_filtered_messages
             )
+            # Standardize Discord Message objects to dict format
+            return [_standardize_message_object(msg) for msg in final_messages]
 
     async def _build_conversation_context(
         self,

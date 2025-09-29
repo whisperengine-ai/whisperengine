@@ -1,0 +1,353 @@
+{
+  "test_suite": "WhisperEngine Smoke Test",
+  "timestamp": "2025-09-29T13:53:49.351165",
+  "test_user_id": "smoke_test_3c94cee6",
+  "parallel_mode": true,
+  "overall_duration_seconds": 190.983244,
+  "bots_tested": [
+    "elena",
+    "marcus",
+    "ryan",
+    "dream",
+    "gabriel",
+    "sophia",
+    "jake",
+    "aethys"
+  ],
+  "individual_reports": {
+    "elena": {
+      "bot_name": "elena",
+      "character": "Marine Biologist",
+      "port": 9091,
+      "container": "whisperengine-elena-bot",
+      "test_user_id": "smoke_test_3c94cee6",
+      "test_start": "2025-09-29T13:53:49.351223",
+      "test_end": "2025-09-29T13:55:51.652796",
+      "test_duration_seconds": 122.301573,
+      "test_results": {
+        "CDL Validation": true,
+        "Health Check": true,
+        "Bot Info": true,
+        "Basic Conversation": true,
+        "Personality Traits": true,
+        "Memory Storage & Recall": true,
+        "Conversation Context": true,
+        "Emotional Intelligence": true,
+        "Performance": true,
+        "Log Analysis": true
+      },
+      "log_analysis": {
+        "success": true,
+        "warnings": 4,
+        "errors": 60,
+        "raw_errors": 72,
+        "config_warnings": 12,
+        "critical_issues": [
+          "Vector storage system failures detected"
+        ],
+        "log_lines": 5986
+      },
+      "summary": {
+        "total_tests": 10,
+        "passed_tests": 10,
+        "failed_tests": 0,
+        "success_rate": 100.0
+      }
+    },
+    "marcus": {
+      "bot_name": "marcus",
+      "character": "AI Researcher",
+      "port": 9092,
+      "container": "whisperengine-marcus-bot",
+      "test_user_id": "smoke_test_3c94cee6",
+      "test_start": "2025-09-29T13:53:54.971043",
+      "test_end": "2025-09-29T13:56:03.484384",
+      "test_duration_seconds": 128.513341,
+      "test_results": {
+        "CDL Validation": true,
+        "Health Check": true,
+        "Bot Info": true,
+        "Basic Conversation": true,
+        "Personality Traits": true,
+        "Memory Storage & Recall": true,
+        "Conversation Context": true,
+        "Emotional Intelligence": true,
+        "Performance": true,
+        "Log Analysis": true
+      },
+      "log_analysis": {
+        "success": true,
+        "warnings": 4,
+        "errors": 68,
+        "raw_errors": 80,
+        "config_warnings": 12,
+        "critical_issues": [
+          "Vector storage system failures detected"
+        ],
+        "log_lines": 8789
+      },
+      "summary": {
+        "total_tests": 10,
+        "passed_tests": 10,
+        "failed_tests": 0,
+        "success_rate": 100.0
+      }
+    },
+    "ryan": {
+      "bot_name": "ryan",
+      "character": "Indie Game Developer",
+      "port": 9093,
+      "container": "whisperengine-ryan-bot",
+      "test_user_id": "smoke_test_3c94cee6",
+      "test_start": "2025-09-29T13:54:04.126042",
+      "test_end": "2025-09-29T13:56:07.034994",
+      "test_duration_seconds": 122.908952,
+      "test_results": {
+        "CDL Validation": true,
+        "Health Check": true,
+        "Bot Info": true,
+        "Basic Conversation": true,
+        "Personality Traits": true,
+        "Memory Storage & Recall": true,
+        "Conversation Context": true,
+        "Emotional Intelligence": true,
+        "Performance": true,
+        "Log Analysis": true
+      },
+      "log_analysis": {
+        "success": true,
+        "warnings": 5,
+        "errors": 68,
+        "raw_errors": 80,
+        "config_warnings": 12,
+        "critical_issues": [
+          "Vector storage system failures detected"
+        ],
+        "log_lines": 4783
+      },
+      "summary": {
+        "total_tests": 10,
+        "passed_tests": 10,
+        "failed_tests": 0,
+        "success_rate": 100.0
+      }
+    },
+    "dream": {
+      "bot_name": "dream",
+      "character": "Mythological Entity",
+      "port": 9094,
+      "container": "whisperengine-dream-bot",
+      "test_user_id": "smoke_test_3c94cee6",
+      "test_start": "2025-09-29T13:54:09.740359",
+      "test_end": "2025-09-29T13:56:12.722924",
+      "test_duration_seconds": 122.982565,
+      "test_results": {
+        "CDL Validation": true,
+        "Health Check": true,
+        "Bot Info": true,
+        "Basic Conversation": true,
+        "Personality Traits": true,
+        "Memory Storage & Recall": true,
+        "Conversation Context": true,
+        "Emotional Intelligence": true,
+        "Performance": true,
+        "Log Analysis": true
+      },
+      "log_analysis": {
+        "success": true,
+        "warnings": 5,
+        "errors": 60,
+        "raw_errors": 72,
+        "config_warnings": 12,
+        "critical_issues": [
+          "Vector storage system failures detected"
+        ],
+        "log_lines": 5945
+      },
+      "summary": {
+        "total_tests": 10,
+        "passed_tests": 10,
+        "failed_tests": 0,
+        "success_rate": 100.0
+      }
+    },
+    "gabriel": {
+      "bot_name": "gabriel",
+      "character": "Archangel",
+      "port": 9095,
+      "container": "whisperengine-gabriel-bot",
+      "test_user_id": "smoke_test_3c94cee6",
+      "test_start": "2025-09-29T13:54:15.597228",
+      "test_end": "2025-09-29T13:56:29.808672",
+      "test_duration_seconds": 134.211444,
+      "test_results": {
+        "CDL Validation": true,
+        "Health Check": true,
+        "Bot Info": true,
+        "Basic Conversation": true,
+        "Personality Traits": true,
+        "Memory Storage & Recall": true,
+        "Conversation Context": true,
+        "Emotional Intelligence": true,
+        "Performance": true,
+        "Log Analysis": true
+      },
+      "log_analysis": {
+        "success": true,
+        "warnings": 13,
+        "errors": 60,
+        "raw_errors": 72,
+        "config_warnings": 12,
+        "critical_issues": [
+          "Vector storage system failures detected"
+        ],
+        "log_lines": 9199
+      },
+      "summary": {
+        "total_tests": 10,
+        "passed_tests": 10,
+        "failed_tests": 0,
+        "success_rate": 100.0
+      }
+    },
+    "sophia": {
+      "bot_name": "sophia",
+      "character": "Marketing Executive",
+      "port": 9096,
+      "container": "whisperengine-sophia-bot",
+      "test_user_id": "smoke_test_3c94cee6",
+      "test_start": "2025-09-29T13:54:31.736068",
+      "test_end": "2025-09-29T13:56:36.883032",
+      "test_duration_seconds": 125.146964,
+      "test_results": {
+        "CDL Validation": true,
+        "Health Check": true,
+        "Bot Info": true,
+        "Basic Conversation": true,
+        "Personality Traits": true,
+        "Memory Storage & Recall": true,
+        "Conversation Context": true,
+        "Emotional Intelligence": true,
+        "Performance": true,
+        "Log Analysis": true
+      },
+      "log_analysis": {
+        "success": true,
+        "warnings": 5,
+        "errors": 68,
+        "raw_errors": 80,
+        "config_warnings": 12,
+        "critical_issues": [
+          "Vector storage system failures detected"
+        ],
+        "log_lines": 6193
+      },
+      "summary": {
+        "total_tests": 10,
+        "passed_tests": 10,
+        "failed_tests": 0,
+        "success_rate": 100.0
+      }
+    },
+    "jake": {
+      "bot_name": "jake",
+      "character": "Adventure Photographer",
+      "port": 9097,
+      "container": "whisperengine-jake-bot",
+      "test_user_id": "smoke_test_3c94cee6",
+      "test_start": "2025-09-29T13:54:38.351102",
+      "test_end": "2025-09-29T13:56:41.908357",
+      "test_duration_seconds": 123.557255,
+      "test_results": {
+        "CDL Validation": true,
+        "Health Check": true,
+        "Bot Info": true,
+        "Basic Conversation": true,
+        "Personality Traits": true,
+        "Memory Storage & Recall": true,
+        "Conversation Context": true,
+        "Emotional Intelligence": true,
+        "Performance": true,
+        "Log Analysis": true
+      },
+      "log_analysis": {
+        "success": true,
+        "warnings": 6,
+        "errors": 60,
+        "raw_errors": 72,
+        "config_warnings": 12,
+        "critical_issues": [
+          "Vector storage system failures detected"
+        ],
+        "log_lines": 4165
+      },
+      "summary": {
+        "total_tests": 10,
+        "passed_tests": 10,
+        "failed_tests": 0,
+        "success_rate": 100.0
+      }
+    },
+    "aethys": {
+      "bot_name": "aethys",
+      "character": "Omnipotent Entity",
+      "port": 3007,
+      "container": "whisperengine-aethys-bot",
+      "test_user_id": "smoke_test_3c94cee6",
+      "test_start": "2025-09-29T13:54:43.134211",
+      "test_end": "2025-09-29T13:57:00.333962",
+      "test_duration_seconds": 137.199751,
+      "test_results": {
+        "CDL Validation": true,
+        "Health Check": true,
+        "Bot Info": true,
+        "Basic Conversation": true,
+        "Personality Traits": true,
+        "Memory Storage & Recall": true,
+        "Conversation Context": true,
+        "Emotional Intelligence": true,
+        "Performance": true,
+        "Log Analysis": true
+      },
+      "log_analysis": {
+        "success": true,
+        "warnings": 6,
+        "errors": 110,
+        "raw_errors": 122,
+        "config_warnings": 12,
+        "critical_issues": [
+          "Vector storage system failures detected"
+        ],
+        "log_lines": 16464
+      },
+      "summary": {
+        "total_tests": 10,
+        "passed_tests": 10,
+        "failed_tests": 0,
+        "success_rate": 100.0
+      }
+    }
+  },
+  "overall_summary": {
+    "total_bots_tested": 8,
+    "bots_fully_passed": 8,
+    "total_tests_run": 80,
+    "total_tests_passed": 80,
+    "total_tests_failed": 0,
+    "overall_success_rate": 100.0,
+    "log_analysis_summary": {
+      "total_warnings": 48,
+      "total_errors": 554,
+      "total_raw_errors": 650,
+      "total_config_warnings": 96,
+      "unique_critical_issues": [
+        "Vector storage system failures detected"
+      ]
+    }
+  },
+  "recommendations": [
+    "Performance optimization needed for: elena, marcus, ryan, dream, gabriel, sophia, jake, aethys",
+    "Review error logs for: elena, marcus, ryan, dream, gabriel, sophia, jake, aethys",
+    "Address critical issues in: elena, marcus, ryan, dream, gabriel, sophia, jake, aethys"
+  ]
+}

@@ -1,0 +1,39 @@
+{
+  "bot_name": "marcus",
+  "character": "AI Researcher",
+  "port": 9092,
+  "container": "whisperengine-marcus-bot",
+  "test_user_id": "smoke_test_3c94cee6",
+  "test_start": "2025-09-29T13:53:54.971043",
+  "test_end": "2025-09-29T13:56:03.484384",
+  "test_duration_seconds": 128.513341,
+  "test_results": {
+    "CDL Validation": true,
+    "Health Check": true,
+    "Bot Info": true,
+    "Basic Conversation": true,
+    "Personality Traits": true,
+    "Memory Storage & Recall": true,
+    "Conversation Context": true,
+    "Emotional Intelligence": true,
+    "Performance": true,
+    "Log Analysis": true
+  },
+  "log_analysis": {
+    "success": true,
+    "warnings": 4,
+    "errors": 68,
+    "raw_errors": 80,
+    "config_warnings": 12,
+    "critical_issues": [
+      "Vector storage system failures detected"
+    ],
+    "log_lines": 8789
+  },
+  "summary": {
+    "total_tests": 10,
+    "passed_tests": 10,
+    "failed_tests": 0,
+    "success_rate": 100.0
+  }
+}

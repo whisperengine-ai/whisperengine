@@ -1,0 +1,39 @@
+{
+  "bot_name": "elena",
+  "character": "Marine Biologist",
+  "port": 9091,
+  "container": "whisperengine-elena-bot",
+  "test_user_id": "smoke_test_3c94cee6",
+  "test_start": "2025-09-29T13:53:49.351223",
+  "test_end": "2025-09-29T13:55:51.652796",
+  "test_duration_seconds": 122.301573,
+  "test_results": {
+    "CDL Validation": true,
+    "Health Check": true,
+    "Bot Info": true,
+    "Basic Conversation": true,
+    "Personality Traits": true,
+    "Memory Storage & Recall": true,
+    "Conversation Context": true,
+    "Emotional Intelligence": true,
+    "Performance": true,
+    "Log Analysis": true
+  },
+  "log_analysis": {
+    "success": true,
+    "warnings": 4,
+    "errors": 60,
+    "raw_errors": 72,
+    "config_warnings": 12,
+    "critical_issues": [
+      "Vector storage system failures detected"
+    ],
+    "log_lines": 5986
+  },
+  "summary": {
+    "total_tests": 10,
+    "passed_tests": 10,
+    "failed_tests": 0,
+    "success_rate": 100.0
+  }
+}
