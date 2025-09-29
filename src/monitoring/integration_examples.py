@@ -55,19 +55,9 @@ class MonitoringIntegration:
         return self.monitoring_manager
     
     def register_monitoring_commands(self, bot):
-        """Register monitoring commands with the bot."""
-        from .handlers.monitoring_commands import MonitoringCommands
-        
-        # Create monitoring commands handler
-        monitoring_commands = MonitoringCommands(bot)
-        
-        # Register with admin check function
-        def is_admin(ctx):
-            # Replace with actual admin check logic
-            return ctx.author.guild_permissions.administrator
-        
-        monitoring_commands.register_commands(None, is_admin)
-        logging.info("Monitoring commands registered")
+        """Register monitoring commands with the bot. (DISABLED - commands deleted)"""
+        # Monitoring commands have been deleted as they were unused bloat
+        logging.info("⚠️ Monitoring commands disabled - handlers were deleted")
     
     async def track_user_interaction(self, user_id: str, interaction_type: str, 
                                    command_name: Optional[str] = None,

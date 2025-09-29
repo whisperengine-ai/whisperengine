@@ -23,14 +23,10 @@ import sys
 from src.core.bot import DiscordBotCore
 from src.core.bot_launcher import start_bot
 # from src.handlers.admin import AdminCommandHandlers  # Disabled - over-engineered
-# from src.handlers.cdl_test_commands import CDLTestCommands  # Disabled - dev testing only
 from src.handlers.events import BotEventHandlers
 from src.handlers.help import HelpCommandHandlers
 # from src.handlers.memory import MemoryCommandHandlers  # Disabled - obsolete API
-from src.handlers.monitoring_commands import MonitoringCommands
 # Multi-entity handlers removed - using vector-native memory
-from src.handlers.performance_commands import create_performance_commands
-from src.handlers.privacy import PrivacyCommandHandlers
 from src.handlers.status import StatusCommandHandlers
 from src.handlers.voice import VoiceCommandHandlers
 from src.utils.enhanced_health_server import create_enhanced_health_server
@@ -241,10 +237,7 @@ class ModularBotManager:
             # self.command_handlers["admin"].register_commands(is_admin)
             logger.info("ℹ️ Admin command handlers disabled (over-engineered - use Docker/system tools for admin tasks)")
 
-            # Privacy commands - DISABLED (likely unused, adding complexity)
-            # self.command_handlers["privacy"] = PrivacyCommandHandlers(bot=self.bot)
-            # self.command_handlers["privacy"].register_commands()
-            logger.info("ℹ️ Privacy command handlers disabled (unused functionality)")
+            logger.info("ℹ️ Deleted obsolete command handlers: Privacy, CDL Test, Monitoring")
 
             # Voice commands (if voice support is available)
             if components.get("voice_manager") is not None:
@@ -272,18 +265,7 @@ class ModularBotManager:
 
             # ℹ️ Multi-entity handlers removed - using vector-native memory approach
 
-            # CDL Character Test Commands - DISABLED (development testing only, not needed in production)
-            # self.command_handlers["cdl_test"] = CDLTestCommands(bot=self.bot)
-            # self.command_handlers["cdl_test"].register_commands()
-            logger.info("ℹ️ CDL character test commands disabled (development testing only)")
-
-            # Monitoring commands - DISABLED (AI-generated enterprise dashboard bloat)
-            # self.command_handlers["monitoring"] = MonitoringCommands(
-            #     bot=self.bot,
-            #     is_admin=is_admin
-            # )
-            # self.command_handlers["monitoring"].register_commands(bot_name_filter, is_admin)
-            logger.info("ℹ️ Monitoring commands disabled (AI-generated enterprise dashboard bloat)")
+            logger.info("ℹ️ Deleted obsolete command handlers: CDL Test, Monitoring")
 
             # LLM-Powered Self-Memory Commands - ENABLED for CDL knowledge extraction
             from src.handlers.llm_self_memory_commands import create_llm_self_memory_handlers
