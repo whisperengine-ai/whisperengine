@@ -41,7 +41,7 @@ from src.utils.context_size_manager import (
     count_context_tokens,
 )
 from src.conversation.boundary_manager import ConversationBoundaryManager
-from src.conversation.persistent_conversation_manager import PersistentConversationManager
+# from src.conversation.persistent_conversation_manager import PersistentConversationManager  # REMOVED: Over-engineered follow-up system
 
 from src.utils.helpers import (
     add_debug_info_to_response,
@@ -148,11 +148,9 @@ class BotEventHandlers:
         
         # Initialize Persistent Conversation Manager for question tracking and follow-up continuity
         try:
-            self.persistent_conversation_manager = PersistentConversationManager(
-                memory_manager=self.memory_manager,
-                bot_core=bot_core  # Pass bot_core for vector intelligence access
-            )
-            logger.info("✅ Persistent Conversation Manager initialized successfully")
+            # REMOVED: Over-engineered persistent conversation manager that caused inappropriate question repetition
+            self.persistent_conversation_manager = None
+            logger.info("✅ Persistent Conversation Manager disabled (over-engineered feature removed)")
         except Exception as e:
             logger.error(f"❌ Failed to initialize Persistent Conversation Manager: {e}")
             self.persistent_conversation_manager = None
@@ -1410,38 +1408,11 @@ class BotEventHandlers:
             )
             conversation_context.append({"role": "system", "content": consolidated})
 
-        # ✨ PERSISTENT CONVERSATION CONTEXT: Check for pending questions that need gentle follow-up
-        try:
-            # Safety check for persistent conversation manager
-            if not self.persistent_conversation_manager:
-                logger.debug(f"🔗 CONVERSATION CONTINUITY: Persistent conversation manager not available for user {user_id}")
-                return conversation_context
-                
-            logger.info(f"🔗 CONVERSATION CONTINUITY: Checking for pending questions for user {user_id}")
-            
-            # Get natural reminder suggestions from the conversation manager
-            reminder_suggestions = await self.persistent_conversation_manager.get_reminder_suggestions(user_id)
-            
-            if reminder_suggestions:
-                # Add the most relevant reminder as context (limit to avoid overwhelming)
-                primary_reminder = reminder_suggestions[0] if reminder_suggestions else None
-                
-                if primary_reminder and primary_reminder.strip():
-                    # Add as a subtle system instruction for natural integration
-                    conversation_context.append({
-                        "role": "system", 
-                        "content": f"Conversation continuity note: {primary_reminder.strip()}"
-                    })
-                    logger.info(f"🔗 CONVERSATION CONTINUITY: Added natural reminder context")
-                    logger.debug(f"🔗 CONVERSATION CONTINUITY: Reminder: {primary_reminder[:100]}...")
-                else:
-                    logger.debug(f"🔗 CONVERSATION CONTINUITY: No usable reminder content")
-            else:
-                logger.debug(f"🔗 CONVERSATION CONTINUITY: No pending questions need reminders for user {user_id}")
-                
-        except Exception as e:
-            logger.error(f"🔗 CONVERSATION CONTINUITY: Error checking pending questions for user {user_id}: {e}")
-            # Don't fail context building if conversation tracking fails
+        # ✨ PERSISTENT CONVERSATION CONTEXT: REMOVED - Over-engineered follow-up system
+        # This section was causing inappropriate question repetition by storing and 
+        # re-injecting old bot questions as "conversation continuity notes"
+        # The vector memory system provides better conversation continuity
+        logger.debug(f"🔗 CONVERSATION CONTINUITY: Using vector memory system instead of persistent follow-up tracking")
 
         # Add recent messages with proper alternation
         user_assistant_messages = []
@@ -2451,121 +2422,10 @@ class BotEventHandlers:
                 reference_message = message if message.guild else None
                 await self._send_response_chunks(reply_channel, response_with_debug, reference_message)
 
-                # ✨ PERSISTENT CONVERSATION TRACKING: Handle follow-up questions and continuity
-                try:
-                    # Safety check for persistent conversation manager
-                    if not self.persistent_conversation_manager:
-                        logger.debug(f"🔗 CONVERSATION CONTINUITY: Persistent conversation manager not available for user {user_id}")
-                    else:
-                        try:
-                            logger.info(f"🔗 CONVERSATION CONTINUITY: Processing conversation state for user {user_id}")
-                            
-                            # Step 1: Process user's response to check if any pending questions were answered
-                            user_message_content = original_content or message.content
-                            if user_message_content:
-                                try:
-                                    logger.debug(f"🔍 DEBUG: About to call process_user_response for user {user_id}")
-                                    response_analysis = await self.persistent_conversation_manager.process_user_response(
-                                        user_id=user_id,
-                                        user_message=user_message_content,
-                                        current_topic=None  # Topic detection could be added later
-                                    )
-                                    
-                                    logger.debug(f"🔍 DEBUG: response_analysis type={type(response_analysis)}, value={repr(response_analysis)[:100]}")
-                                    
-                                    # Ensure response_analysis is a dictionary - handle string responses gracefully
-                                    if isinstance(response_analysis, dict):
-                                        answered_questions = response_analysis.get("answered_questions", [])
-                                        logger.debug(f"🔍 DEBUG: answered_questions type={type(answered_questions)}, length={len(answered_questions) if hasattr(answered_questions, '__len__') else 'unknown'}")
-                                        if answered_questions:
-                                            logger.info(f"🔗 CONVERSATION CONTINUITY: User answered {len(answered_questions)} pending questions")
-                                            for i, q in enumerate(answered_questions):
-                                                logger.debug(f"🔍 DEBUG: Processing answered question {i}: type={type(q)}, repr={repr(q)[:50]}")
-                                                # Safely handle both object and dict formats for questions
-                                                try:
-                                                    if hasattr(q, 'question_text') and hasattr(q, 'resolution_quality'):
-                                                        # Object format - this is the expected format for PendingQuestion objects
-                                                        logger.info(f"🔗 CONVERSATION CONTINUITY: Resolved '{q.question_text[:50]}...' "
-                                                                  f"(quality: {q.resolution_quality:.2f})")
-                                                    elif isinstance(q, dict) and 'question_text' in q:
-                                                        # Dictionary format fallback - safely extract with fallbacks
-                                                        question_text = q.get('question_text', 'Unknown question')
-                                                        quality = q.get('resolution_quality', 0.0)
-                                                        logger.info(f"🔗 CONVERSATION CONTINUITY: Resolved '{question_text[:50]}...' "
-                                                                  f"(quality: {quality:.2f})")
-                                                    elif isinstance(q, str):
-                                                        # String format - just log the string content
-                                                        logger.info(f"🔗 CONVERSATION CONTINUITY: Resolved question: {q[:100]}")
-                                                    else:
-                                                        # Unknown format - safe fallback
-                                                        logger.info(f"🔗 CONVERSATION CONTINUITY: Resolved question: {repr(q)[:100]}")
-                                                except Exception as q_error:
-                                                    logger.error(f"🔗 CONVERSATION CONTINUITY: Error processing answered question {i}: {q_error}, question type: {type(q)}")
-                                                    logger.error(f"🔍 DEBUG: Full traceback: {traceback.format_exc()}")
-                                    elif isinstance(response_analysis, str):
-                                        # Handle case where response_analysis is returned as a string
-                                        logger.debug(f"🔗 CONVERSATION CONTINUITY: Received string response: {response_analysis[:100]}...")
-                                    else:
-                                        logger.warning("🔗 CONVERSATION CONTINUITY: Unexpected response format from process_user_response: %s", type(response_analysis))
-                                except Exception as e:
-                                    logger.error("🔗 CONVERSATION CONTINUITY: Error processing user response for user %s: %s", user_id, e)
-                                    logger.error(f"🔍 DEBUG: Full traceback in process_user_response: {traceback.format_exc()}")
-                        except Exception as e:
-                            logger.error("🔗 CONVERSATION CONTINUITY: Error processing conversation state for user %s: %s", user_id, e)
-                        
-                        # Step 2: Extract and track any questions from the bot's response
-                        bot_questions = self._extract_questions_from_response(response)
-                        
-                        for question_text in bot_questions:
-                            # Determine question type and priority based on content
-                            question_type, priority = self._classify_question(question_text)
-                            
-                            question_id = await self.persistent_conversation_manager.track_bot_question(
-                                user_id=user_id,
-                                question_text=question_text,
-                                question_type=question_type,
-                                priority=priority,
-                                current_topic=None,  # Topic detection could be added
-                                user_context=user_message_content[:200] if user_message_content else ""
-                            )
-                            
-                            logger.info(f"🔗 CONVERSATION CONTINUITY: Tracked question '{question_text[:50]}...' "
-                                      f"({question_type.value}, {priority.value}) -> {question_id}")
-                        
-                        # Step 3: Get conversation health summary for monitoring
-                        logger.debug(f"🔍 DEBUG: persistent_conversation_manager type={type(self.persistent_conversation_manager)}")
-                        logger.debug(f"🔍 DEBUG: detect_conversation_issues method type={type(self.persistent_conversation_manager.detect_conversation_issues) if self.persistent_conversation_manager else 'None'}")
-                        
-                        try:
-                            logger.debug(f"🔍 DEBUG: About to call detect_conversation_issues for user {user_id}")
-                            conversation_issues = await self.persistent_conversation_manager.detect_conversation_issues(user_id)
-                            logger.debug(f"🔍 DEBUG: conversation_issues type={type(conversation_issues)}, value={repr(conversation_issues)[:200]}")
-                            
-                            if conversation_issues and isinstance(conversation_issues, dict):
-                                logger.debug(f"🔍 DEBUG: conversation_issues is valid dict, extracting issues...")
-                                issues = conversation_issues.get('issues', [])
-                                logger.debug(f"🔍 DEBUG: issues extracted successfully, type={type(issues)}, length={len(issues) if hasattr(issues, '__len__') else 'unknown'}")
-                                if issues and isinstance(issues, list):
-                                    logger.info(f"🔗 CONVERSATION CONTINUITY: Detected {len(issues)} conversation issues")
-                                    for i, issue in enumerate(issues[:2]):  # Log first 2 issues
-                                        logger.debug(f"🔍 DEBUG: Processing issue {i}: type={type(issue)}, repr={repr(issue)[:50]}")
-                                        if isinstance(issue, str):
-                                            logger.info(f"🔗 CONVERSATION CONTINUITY: Issue {i+1} - {issue}")
-                                        else:
-                                            logger.info(f"🔗 CONVERSATION CONTINUITY: Issue {i+1} - {repr(issue)[:100]}")
-                                else:
-                                    logger.debug("🔗 CONVERSATION CONTINUITY: No conversation issues detected")
-                            else:
-                                logger.warning("🔗 CONVERSATION CONTINUITY: Unexpected conversation_issues format - expected dict, got: %s", type(conversation_issues))
-                        except Exception as issues_error:
-                            logger.error(f"🔗 CONVERSATION CONTINUITY: Error in detect_conversation_issues step: {issues_error}")
-                            logger.error(f"🔍 DEBUG: Full traceback in detect_conversation_issues: {traceback.format_exc()}")
-                        
-                        logger.info(f"🔗 CONVERSATION CONTINUITY: Successfully processed conversation state for user {user_id}")
-                    
-                except Exception as e:
-                    logger.error(f"🔗 CONVERSATION CONTINUITY: Error processing conversation state for user {user_id}: {e}")
-                    # Don't fail the response if conversation tracking fails - it's an enhancement
+                # ✨ PERSISTENT CONVERSATION TRACKING: REMOVED - Over-engineered follow-up system
+                # This section was causing inappropriate question repetition by tracking and 
+                # re-injecting old bot questions as "conversation continuity notes"
+                logger.debug(f"🔗 CONVERSATION CONTINUITY: Using vector memory system for natural conversation flow")
 
                 # CRITICAL FIX: Add bot response to conversation cache after sending
                 if self.conversation_cache:
@@ -3759,93 +3619,15 @@ class BotEventHandlers:
             logger.error(f"Error getting recent emotional feedback: {e}")
             return {"emotional_context": "neutral", "confidence": 0.0}
     
-    # ✨ PERSISTENT CONVERSATION TRACKING: Helper methods for question extraction and classification
+    # ✨ PERSISTENT CONVERSATION TRACKING: REMOVED - Over-engineered helper methods
+    # The question extraction and classification system was causing inappropriate 
+    # question repetition. WhisperEngine's vector memory provides better continuity.
     
     def _extract_questions_from_response(self, response: str) -> List[str]:
-        """
-        Extract questions from bot response using simple pattern matching.
-        Could be enhanced with LLM analysis for better accuracy.
-        
-        Args:
-            response: Bot response text
-            
-        Returns:
-            List of question strings found in the response
-        """
-        import re
-        
-        questions = []
-        
-        # Split response into sentences
-        sentences = re.split(r'[.!]\s+', response)
-        
-        for sentence in sentences:
-            sentence = sentence.strip()
-            if not sentence:
-                continue
-                
-            # Check if sentence ends with question mark or contains question words
-            if (sentence.endswith('?') or 
-                any(word in sentence.lower() for word in ['what', 'how', 'why', 'when', 'where', 'which', 'would you', 'do you', 'have you', 'can you'])):
-                
-                # Clean up the question
-                clean_question = sentence.rstrip('.!') + ('?' if not sentence.endswith('?') else '')
-                if len(clean_question) > 10:  # Filter out very short questions
-                    questions.append(clean_question)
-        
-        logger.debug(f"🔗 QUESTION EXTRACTION: Found {len(questions)} questions in response")
-        for i, q in enumerate(questions):
-            logger.debug(f"🔗 QUESTION EXTRACTION: Q{i+1}: {q[:100]}...")
-            
-        return questions
+        """REMOVED: Over-engineered question extraction system"""
+        return []  # Disabled - vector memory handles conversation continuity
     
     def _classify_question(self, question_text: str) -> tuple:
-        """
-        Classify a question by type and priority using simple heuristics.
-        Could be enhanced with LLM classification for better accuracy.
-        
-        Args:
-            question_text: The question to classify
-            
-        Returns:
-            Tuple of (QuestionType, QuestionPriority)
-        """
-        from src.conversation.persistent_conversation_manager import QuestionType, QuestionPriority
-        
-        question_lower = question_text.lower()
-        
-        # Determine question type based on content patterns
-        question_type = QuestionType.FOLLOWUP  # Default
-        
-        if any(word in question_lower for word in ['what do you mean', 'clarify', 'explain']):
-            question_type = QuestionType.CLARIFICATION
-        elif any(word in question_lower for word in ['how do you feel', 'what was that like', 'how did you']):
-            question_type = QuestionType.PERSONAL
-        elif any(word in question_lower for word in ['when', 'where', 'how many', 'what time']):
-            question_type = QuestionType.FACTUAL
-        elif any(word in question_lower for word in ['favorite', 'prefer', 'think about', 'opinion']):
-            question_type = QuestionType.OPINION
-        elif any(word in question_lower for word in ['would you rather', 'choose', 'option', 'or']):
-            question_type = QuestionType.CHOICE
-        elif any(word in question_lower for word in ['tell me more', 'what else', 'anything else']):
-            question_type = QuestionType.FOLLOWUP
-        
-        # Determine priority based on question type and urgency indicators
-        priority = QuestionPriority.MEDIUM  # Default
-        
-        if question_type in [QuestionType.CLARIFICATION]:
-            priority = QuestionPriority.HIGH  # Clarifications are important
-        elif question_type in [QuestionType.PERSONAL, QuestionType.OPINION]:
-            priority = QuestionPriority.MEDIUM  # Personal questions are good for engagement
-        elif question_type in [QuestionType.FACTUAL, QuestionType.CHOICE]:
-            priority = QuestionPriority.MEDIUM  # Factual questions are useful
-        elif question_type == QuestionType.FOLLOWUP:
-            priority = QuestionPriority.LOW  # Follow-ups are nice but not critical
-            
-        # Boost priority for urgent-sounding questions
-        if any(word in question_lower for word in ['important', 'urgent', 'need to know']):
-            priority = QuestionPriority.HIGH
-        
-        logger.debug(f"🔗 QUESTION CLASSIFICATION: '{question_text[:50]}...' -> {question_type.value}, {priority.value}")
-        
-        return question_type, priority
+        """REMOVED: Over-engineered question classification system"""
+        # Return dummy values to prevent errors in any remaining code
+        return None, None  # Disabled - vector memory handles conversation continuity
