@@ -222,20 +222,7 @@ class ModularBotManager:
             # self.command_handlers["memory"].register_commands(is_admin, bot_name_filter)
             logger.info("ℹ️ Memory command handlers disabled (obsolete API - calls non-existent methods)")
 
-            # Admin commands - DISABLED (over-engineered, backup via Discord is impractical)
-            # self.command_handlers["admin"] = AdminCommandHandlers(
-            #     bot=self.bot,
-            #     llm_client=components["llm_client"],
-            #     memory_manager=components["memory_manager"],
-            #     backup_manager=components.get("backup_manager"),
-            #     conversation_history=components.get("conversation_history"),
-            #     health_monitor=components.get("health_monitor"),
-            #     job_scheduler=getattr(self.bot_core, "job_scheduler", None),
-            #     context_memory_manager=getattr(self.bot_core, "context_memory_manager", None),
-            #     phase2_integration=components.get("phase2_integration"),
-            # )
-            # self.command_handlers["admin"].register_commands(is_admin)
-            logger.info("ℹ️ Admin command handlers disabled (over-engineered - use Docker/system tools for admin tasks)")
+            logger.info("ℹ️ Admin command handlers deleted (obsolete PostgreSQL-based features)")
 
             logger.info("ℹ️ Deleted obsolete command handlers: Privacy, CDL Test, Monitoring")
 

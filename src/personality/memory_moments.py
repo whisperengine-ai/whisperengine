@@ -28,7 +28,7 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from enum import Enum
-from typing import Any
+from typing import Any, List
 
 # Import existing systems for integration
 try:
@@ -51,12 +51,62 @@ except ImportError:
 
 # Memory tier system removed for performance optimization
 
-try:
-    from src.memory.personality_facts import PersonalityFactClassifier
+# Legacy personality facts replaced by vector-native intelligence
+PERSONALITY_FACTS_AVAILABLE = False
 
-    PERSONALITY_FACTS_AVAILABLE = True
-except ImportError:
-    PERSONALITY_FACTS_AVAILABLE = False
+# Using vector memory intelligence instead of deprecated PersonalityFactClassifier
+class VectorPersonalityIntelligence:
+    """Vector-native replacement for PersonalityFactClassifier using semantic search"""
+    def __init__(self, memory_manager=None, personality_profiler=None):
+        self.memory_manager = memory_manager
+        self.personality_profiler = personality_profiler
+    
+    async def classify_memory_relevance(self, text: str, user_id: str) -> float:
+        """Use vector search to determine personality relevance of memories"""
+        if not self.memory_manager:
+            return 0.0
+        
+        try:
+            # Use vector memory to find personality-related patterns
+            results = await self.memory_manager.search_memories_with_qdrant_intelligence(
+                query=f"personality character traits values interests: {text}",
+                user_id=user_id,
+                top_k=5,
+                min_score=0.6
+            )
+            return min(len(results) / 5.0, 1.0)  # Normalize to 0-1
+        except Exception:
+            return 0.0
+    
+    async def get_personality_facts_from_memory(self, user_id: str, context: str = "") -> List[str]:
+        """Extract personality-relevant facts from user's memory using vector search"""
+        if not self.memory_manager:
+            return []
+        
+        try:
+            # Search for personality-relevant memories
+            results = await self.memory_manager.search_memories_with_qdrant_intelligence(
+                query=f"personality preferences values traits communication style {context}",
+                user_id=user_id,
+                top_k=10,
+                min_score=0.7
+            )
+            
+            # Extract personality insights from memories
+            facts = []
+            for result in results:
+                if 'content' in result:
+                    content = result['content']
+                    # Simple heuristic to identify personality-relevant content
+                    if any(keyword in content.lower() for keyword in [
+                        'like', 'prefer', 'love', 'hate', 'always', 'never', 
+                        'usually', 'personality', 'character', 'style', 'way'
+                    ]):
+                        facts.append(content)
+            
+            return facts[:5]  # Limit to top 5 personality facts
+        except Exception:
+            return []
 
 logger = logging.getLogger(__name__)
 
@@ -221,7 +271,7 @@ class MemoryTriggeredMoments:
         emotional_context_engine: EmotionalContextEngine | None = None,
         personality_profiler: DynamicPersonalityProfiler | None = None,
         memory_manager: Any | None = None,
-        personality_fact_classifier: PersonalityFactClassifier | None = None,
+        personality_fact_classifier: Any | None = None,  # Deprecated - using vector memory intelligence
         connection_retention_days: int = 365,
         max_connections_per_user: int = 1000,
         moment_cooldown_hours: int = 24,
@@ -242,6 +292,12 @@ class MemoryTriggeredMoments:
         self.personality_profiler = personality_profiler
         self.memory_manager = memory_manager
         self.personality_fact_classifier = personality_fact_classifier
+
+        # Create vector-native personality intelligence as replacement for legacy classifier
+        self.vector_personality_intelligence = VectorPersonalityIntelligence(
+            memory_manager=memory_manager,
+            personality_profiler=personality_profiler
+        )
 
         self.retention_period = timedelta(days=connection_retention_days)
         self.max_connections = max_connections_per_user

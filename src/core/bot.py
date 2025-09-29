@@ -181,21 +181,8 @@ class DiscordBotCore:
             # This enables easy A/B testing: just change MEMORY_SYSTEM_TYPE
             memory_manager = create_memory_manager(memory_type)
             
-            # Wrap with Universal Identity Adapter for Discord ID compatibility
-            try:
-                from src.identity.universal_identity_adapter import UniversalIdentityAdapter
-                postgres_pool = getattr(self, 'postgres_pool', None)
-                
-                if postgres_pool:
-                    # Wrap memory manager with Universal Identity Adapter
-                    memory_manager = UniversalIdentityAdapter(memory_manager, postgres_pool)
-                    self.logger.info("✅ Memory manager wrapped with Universal Identity Adapter")
-                else:
-                    self.logger.warning("⚠️ No PostgreSQL pool available - Universal Identity Adapter disabled")
-            except ImportError:
-                self.logger.warning("⚠️ Universal Identity Adapter not available")
-            except Exception as e:
-                self.logger.warning("⚠️ Failed to initialize Universal Identity Adapter: %s", e)
+            # Universal Identity Adapter removed - Discord-only operation uses direct vector storage
+            # (Can be re-enabled later for web UI integration)
             
             # Set as THE memory manager (clean, simple)
             self.safe_memory_manager = memory_manager
@@ -792,31 +779,9 @@ class DiscordBotCore:
             self.multi_entity_manager = None
             self.ai_self_bridge = None
 
-    def initialize_postgres_config(self):
-        """Initialize PostgreSQL configuration for job scheduler."""
-        self.logger.info("Setting up PostgreSQL configuration")
-
-        try:
-            import asyncpg
-
-            self.postgres_config = {
-                "host": os.getenv("POSTGRES_HOST", "localhost"),
-                "port": int(os.getenv("POSTGRES_PORT", "5432")),
-                "database": os.getenv("POSTGRES_DB", "discord_bot"),
-                "user": os.getenv("POSTGRES_USER", "bot_user"),
-                "password": os.getenv("POSTGRES_PASSWORD", "bot_password_change_me"),
-                "min_size": int(os.getenv("POSTGRES_MIN_CONNECTIONS", "5")),
-                "max_size": int(os.getenv("POSTGRES_MAX_CONNECTIONS", "20")),
-            }
-
-            self.logger.info("PostgreSQL configuration prepared for async initialization")
-
-        except ImportError:
-            self.logger.warning("asyncpg not available, PostgreSQL features disabled")
-            self.postgres_config = None
-        except Exception as e:
-            self.logger.error(f"Failed to prepare PostgreSQL configuration: {e}")
-            self.postgres_config = None
+        # PostgreSQL configuration removed - using vector-native storage only
+        self.postgres_pool = None
+        self.postgres_config = None
 
     def initialize_supporting_systems(self):
         """Initialize supporting systems like heartbeat monitor and conversation history."""
@@ -989,7 +954,7 @@ class DiscordBotCore:
         self.initialize_voice_system()
         self.initialize_production_optimization()
         self.initialize_multi_entity_system()
-        self.initialize_postgres_config()
+        # PostgreSQL initialization removed - using vector-native storage only
 
         # Schedule async initialization of concurrent conversation manager
         asyncio.create_task(self.initialize_conversation_manager())

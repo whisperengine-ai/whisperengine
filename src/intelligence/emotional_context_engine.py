@@ -31,7 +31,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from enum import Enum
-from typing import Any
+from typing import Any, Dict
 
 # Import existing systems for integration
 # Using vector-native emotion analysis - no external APIs needed
@@ -47,12 +47,40 @@ try:
 except ImportError:
     PERSONALITY_PROFILER_AVAILABLE = False
 
-try:
-    from src.memory.personality_facts import PersonalityFactClassifier
+# Legacy personality facts replaced by vector-native intelligence
+PERSONALITY_FACTS_AVAILABLE = False
 
-    PERSONALITY_FACTS_AVAILABLE = True
-except ImportError:
-    PERSONALITY_FACTS_AVAILABLE = False
+# Using vector memory intelligence instead of deprecated PersonalityFactClassifier
+class VectorPersonalityIntelligence:
+    """Vector-native replacement for PersonalityFactClassifier using semantic search"""
+    def __init__(self, memory_manager=None):
+        self.memory_manager = memory_manager
+    
+    async def classify_personality_relevance(self, text: str, user_id: str) -> Dict[str, Any]:
+        """Use vector search to determine personality relevance of text"""
+        if not self.memory_manager:
+            return {"personality_score": 0.0, "categories": []}
+        
+        # Use vector memory to find similar personality-related memories
+        try:
+            results = await self.memory_manager.search_memories_with_qdrant_intelligence(
+                query=f"personality traits values preferences: {text}",
+                user_id=user_id,
+                top_k=5,
+                min_score=0.6
+            )
+            
+            personality_score = len(results) / 5.0  # Normalize to 0-1 based on matches
+            categories = ["personality_insight"] if results else []
+            
+            return {
+                "personality_score": personality_score,
+                "categories": categories,
+                "vector_matches": len(results)
+            }
+        except Exception as e:
+            logger.warning(f"Vector personality classification failed: {e}")
+            return {"personality_score": 0.0, "categories": []}
 
 logger = logging.getLogger(__name__)
 
@@ -201,7 +229,7 @@ class EmotionalContextEngine:
         self,
         emotional_ai: Any | None = None,  # Legacy parameter - LocalEmotionEngine removed
         personality_profiler: DynamicPersonalityProfiler | None = None,
-        personality_fact_classifier: PersonalityFactClassifier | None = None,
+        personality_fact_classifier: Any | None = None,  # Deprecated - using vector memory intelligence
         emotional_memory_retention_days: int = 90,
         pattern_detection_threshold: int = 3,
     ):

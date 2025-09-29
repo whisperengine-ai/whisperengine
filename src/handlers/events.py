@@ -287,33 +287,11 @@ class BotEventHandlers:
             try:
                 logger.info("Initializing PostgreSQL connection pool for Universal Identity...")
                 # Use environment variables for PostgreSQL connection
-                import asyncpg
-                import os
-                
-                # Create connection pool directly without deprecated user profile DB
-                self.postgres_pool = await asyncpg.create_pool(
-                    host=os.getenv("POSTGRES_HOST", "whisperengine-multi-postgres"),
-                    port=int(os.getenv("POSTGRES_PORT", 5432)), 
-                    database=os.getenv("POSTGRES_DB", "whisperengine"),
-                    user=os.getenv("POSTGRES_USER", "whisperengine"),
-                    password=os.getenv("POSTGRES_PASSWORD", "whisperengine123"),
-                    min_size=1,
-                    max_size=10
-                )
-
-                # Update bot_core reference
-                self.bot_core.postgres_pool = self.postgres_pool
-
-                logger.info("✅ PostgreSQL connection pool initialized successfully")
-
-                # Initialize Universal Identity tables
-                try:
-                    from src.identity.universal_identity import create_identity_manager
-                    identity_manager = create_identity_manager(self.postgres_pool)
-                    # Universal Identity manager handles its own table initialization
-                    logger.info("✅ Universal Identity system initialized")
-                except Exception as e:
-                    logger.warning(f"Universal Identity initialization failed: {e}")
+                # PostgreSQL initialization removed - using vector-native storage only
+                # (Can be re-enabled later for web UI Universal Identity integration)
+                self.postgres_pool = None
+                self.bot_core.postgres_pool = None
+                logger.info("ℹ️ PostgreSQL disabled - using vector-native storage for Discord-only operation")
 
             except ConnectionError as e:
                 # Clean error message for PostgreSQL connection failures

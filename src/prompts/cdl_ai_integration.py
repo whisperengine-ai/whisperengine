@@ -430,10 +430,52 @@ CHARACTER ROLEPLAY REQUIREMENTS:
                             approach = ai_identity_config.get('approach', '')
                             strategy = ai_identity_config.get('strategy', '')
                             
+                            # 🎯 GENERIC USER-SPECIFIC BEHAVIOR: Check for user-specific configuration
+                            user_specific_config = ai_identity_config.get('user_specific_behavior', {})
+                            current_user_config = None
+                            
+                            if user_specific_config:
+                                # Check if there's a specific config for this user ID
+                                if user_id in user_specific_config:
+                                    current_user_config = user_specific_config[user_id]
+                                    logger.info(f"🎯 USER-SPECIFIC CONFIG: Found specific config for user {user_id}: {current_user_config.get('description', 'No description')}")
+                                elif 'default' in user_specific_config:
+                                    current_user_config = user_specific_config['default']
+                                    logger.info(f"🎯 USER-SPECIFIC CONFIG: Using default config for user {user_id}: {current_user_config.get('description', 'No description')}")
+                            
                             # Handle new structured format with direct AI vs character background questions
                             direct_ai_responses = ai_identity_config.get('direct_ai_questions', {}).get('responses', [])
+                            generic_ai_responses = ai_identity_config.get('direct_ai_questions', {}).get('generic_responses', [])
                             background_approach = ai_identity_config.get('character_background_questions', {}).get('approach', '')
                             background_examples = ai_identity_config.get('character_background_questions', {}).get('examples', {})
+                            generic_background_examples = ai_identity_config.get('character_background_questions', {}).get('generic_examples', {})
+                            
+                            # Override with user-specific responses if available
+                            if current_user_config:
+                                user_ai_responses = current_user_config.get('response_examples', {}).get('ai_identity', [])
+                                user_background_examples = current_user_config.get('response_examples', {}).get('background_questions', {})
+                                
+                                # Check if this is a specific user or default user behavior
+                                if user_id in user_specific_config and user_ai_responses:
+                                    direct_ai_responses = user_ai_responses
+                                    logger.info(f"🎯 USER-SPECIFIC: Using custom AI identity responses for specific user {user_id}")
+                                elif user_id not in user_specific_config and user_ai_responses:
+                                    # This is a default user, use the generic responses instead
+                                    direct_ai_responses = user_ai_responses  # These should be the generic ones from default config
+                                    logger.info(f"🎯 USER-SPECIFIC: Using default AI identity responses for user {user_id}")
+                                
+                                if user_id in user_specific_config and user_background_examples:
+                                    background_examples = user_background_examples
+                                    logger.info(f"🎯 USER-SPECIFIC: Using custom background responses for specific user {user_id}")
+                                elif user_id not in user_specific_config and user_background_examples:
+                                    # This is a default user, use the generic responses
+                                    background_examples = user_background_examples  # These should be the generic ones from default config
+                                    logger.info(f"🎯 USER-SPECIFIC: Using default background responses for user {user_id}")
+                                
+                                # Handle user-specific custom introduction
+                                if current_user_config.get('custom_introduction'):
+                                    custom_introduction = current_user_config['custom_introduction']
+                                    logger.info(f"🎯 USER-SPECIFIC: Using custom introduction for user {user_id}")
                             
                             # NEW: Handle roleplay interaction scenarios
                             roleplay_config = ai_identity_config.get('roleplay_interaction_scenarios', {})
@@ -499,21 +541,32 @@ CHARACTER ROLEPLAY REQUIREMENTS:
 📍 FOR CHARACTER BACKGROUND QUESTIONS (where you live, what you do, etc.):
 - {background_approach}"""
                                     
-                                    if background_examples:
+                                    # Use appropriate examples based on user-specific config
+                                    examples_to_use = background_examples
+                                    if not examples_to_use and generic_background_examples:
+                                        examples_to_use = generic_background_examples  # Fallback to generic if no specific
+                                    
+                                    if examples_to_use:
                                         prompt += f"""
 - Example character responses:"""
-                                        for question_type, example_response in background_examples.items():
+                                        for question_type, example_response in examples_to_use.items():
                                             clean_question = question_type.replace('_', ' ').title()
                                             prompt += f"""
   • {clean_question}: "{example_response}" """
                                 
-                                if direct_ai_responses:
+                                if direct_ai_responses or generic_ai_responses:
                                     prompt += f"""
 
 🤖 FOR DIRECT AI IDENTITY QUESTIONS ("are you AI?", "are you real?", etc.):
 - Respond honestly about being AI, but maintain {character.identity.name}'s authentic voice
 - Example responses to adapt:"""
-                                    for i, response in enumerate(direct_ai_responses[:2], 1):  # Limit to first 2 examples
+                                    
+                                    # Use appropriate responses based on user-specific config
+                                    responses_to_use = direct_ai_responses
+                                    if not responses_to_use and generic_ai_responses:
+                                        responses_to_use = generic_ai_responses  # Fallback to generic if no specific
+                                    
+                                    for i, response in enumerate(responses_to_use[:2], 1):  # Limit to first 2 examples
                                         prompt += f"""
   {i}. "{response}" """
                                 
@@ -892,6 +945,23 @@ USER IDENTIFICATION:
 - When addressing the user, use their preferred name: {display_name}
 - Remember: YOU are {character.identity.name}, they are {display_name}
 - Never confuse your own identity with the user's identity"""
+
+            # Add user-specific behavior instructions if configured
+            if ai_identity_config and ai_identity_config.get('user_specific_behavior'):
+                user_specific_config = ai_identity_config['user_specific_behavior']
+                current_user_config = user_specific_config.get(user_id) or user_specific_config.get('default')
+                
+                if current_user_config:
+                    prompt += f"""
+
+🎯 USER-SPECIFIC BEHAVIOR CONFIGURATION:
+- Current user context: {current_user_config.get('description', 'Standard user')}
+- Speaking style adjustments:"""
+                    
+                    speaking_overrides = current_user_config.get('speaking_style_overrides', [])
+                    for override in speaking_overrides:
+                        prompt += f"""
+  • {override}"""
 
             # CHARACTER-SPECIFIC OVERRIDES (take precedence over category defaults)
             try:
