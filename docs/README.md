@@ -27,11 +27,11 @@ Welcome to the WhisperEngine documentation hub. This directory contains comprehe
 ### **Available Characters**
 - **Elena Rodriguez** - Marine biologist passionate about ocean conservation
 - **Dr. Marcus Thompson** - AI researcher exploring technology's impact  
-- **Jake Sterling** - Game developer and tech enthusiast
-- **Ryan Chen** - Software engineer with analytical mindset
+- **Jake Sterling** - Adventure photographer and survival instructor
+- **Ryan Chen** - Independent game developer with perfectionist approach
 - **Gabriel** - British gentleman with refined tastes and philosophical insights
 - **Dream of the Endless** - Mythological character with otherworldly wisdom
-- **Sophia Blake** - Neuroscientist with creative and emotional depth
+- **Sophia Blake** - Marketing executive with sophisticated style and wit
 - **Aethys** - Omnipotent entity with cosmic perspective
 
 ## 🏗️ Architecture & Development

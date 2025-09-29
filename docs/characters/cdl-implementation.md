@@ -9,7 +9,7 @@
 # Deploy dedicated character bots with persistent memory
 ./multi-bot.sh start elena    # Elena Rodriguez bot (marine biologist)
 ./multi-bot.sh start marcus   # Marcus Thompson bot (AI researcher)
-./multi-bot.sh start jake     # Jake Sterling bot (game developer)
+./multi-bot.sh start jake     # Jake Sterling bot (adventure photographer)
 ./multi-bot.sh start all      # Start all configured character bots
 ```
 
@@ -33,12 +33,12 @@ characters/
 ├── examples/                    # Included character personalities
 │   ├── elena-rodriguez.json     # Marine biologist (passionate scientist)
 │   ├── marcus-thompson.json     # AI researcher (philosophical tech expert)
-│   ├── jake-sterling.json       # Game developer (creative collaborator)  
+│   ├── jake.json                # Adventure photographer (survival instructor)
 │   ├── gabriel.json             # Archangel (spiritual wisdom)
-│   ├── sophia-blake.json        # Neuroscientist (consciousness explorer)
+│   ├── sophia-blake.json        # Marketing Executive (sophisticated lifestyle)
 │   ├── dream_of_the_endless.json # Mythological figure (Sandman series)
 │   ├── aethys-omnipotent-entity.json # Omnipotent entity (philosophical)
-│   └── ryan-chen.json           # Software engineer (elegant solutions)
+│   └── ryan.json                # Independent game developer (perfectionist)
 ├── custom/                      # Your custom characters
 │   └── your-character.json
 └── default_assistant.json       # Fallback assistant personality

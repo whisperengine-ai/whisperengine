@@ -17,7 +17,7 @@
 
 **UNIVERSAL IDENTITY SYSTEM**: NEW platform-agnostic user identity system in `src/identity/` allows users to interact across Discord, Web UI, and future platforms while maintaining consistent memory and conversations.
 
-**WEB INTERFACE INTEGRATION**: Complete web chat interface (`src/web/simple_chat_app.py`) with real-time WebSocket messaging, multi-bot character selection, and Universal Identity integration. Accessible at http://localhost:8080 (Docker deployment) or http://localhost:8081 (standalone).
+**WEB INTERFACE STATUS**: The web chat interface (`src/web/simple_chat_app.py`) is currently not functional. **For HTTP API chat access, use individual bot API endpoints directly** (see Bot API Endpoints section below).
 
 **PYTHON VIRTUAL ENVIRONMENT**: Always use `.venv/bin/activate` for Python commands:
 ```bash
@@ -87,10 +87,10 @@ identity_manager = create_identity_manager(postgres_pool)
 - Async initialization for heavy components
 
 **Web Interface**: `src/web/simple_chat_app.py` → `SimpleWebChatApp` class
-- FastAPI-based ChatGPT-like interface
-- WebSocket real-time messaging
-- Universal Identity integration for cross-platform user management
-- Enhanced account discovery with bot-specific memory information
+- FastAPI-based ChatGPT-like interface (CURRENTLY NOT FUNCTIONAL)
+- WebSocket real-time messaging (disabled)
+- Universal Identity integration for cross-platform user management (disabled)
+- Enhanced account discovery with bot-specific memory information (disabled)
 
 ## Development Workflow
 
@@ -119,11 +119,49 @@ identity_manager = create_identity_manager(postgres_pool)
 - PostgreSQL: `postgres:16.4-alpine` (pinned for stability) - Port 5433
 - Redis: `redis:7.4-alpine` (pinned for stability) - Port 6380
 - Qdrant: `qdrant/qdrant:v1.15.4` (pinned for vector stability) - Port 6334
-- Web Interface: Available at http://localhost:8080 (Docker) or http://localhost:8081 (standalone)
+
+### Bot API Endpoints
+
+**Individual Bot APIs**: Each bot exposes HTTP API endpoints for direct chat access:
+
+**Bot Health Check Ports**:
+- Elena (Marine Biologist): http://localhost:9091
+- Marcus (AI Researcher): http://localhost:9092  
+- Ryan (Indie Game Developer): http://localhost:9093
+- Dream (Mythological): http://localhost:9094
+- Gabriel (Archangel): http://localhost:9095
+- Sophia (Marketing Executive): http://localhost:9096
+- Jake (Adventure Photographer): http://localhost:9097
+- Aethys (Omnipotent): http://localhost:3007
+
+**API Endpoints**:
+```bash
+# Health check
+curl http://localhost:9091/health
+
+# Bot information
+curl http://localhost:9091/api/bot-info
+
+# Send chat message
+curl -X POST -H "Content-Type: application/json" \
+  -d '{"message": "Hello!", "user_id": "your_user_id"}' \
+  http://localhost:9091/api/chat
+```
+
+**Example Response**:
+```json
+{
+  "response": "¡Hola! How can I help you today? 🌊",
+  "timestamp": "2025-09-29T05:02:16.906209",
+  "message_id": "web_1759122135.930857",
+  "bot_name": "Elena Rodriguez [AI DEMO]",
+  "success": true
+}
+```
 
 ### Web Interface Development
 
-**Web UI Setup**: Run the web interface independently:
+**Web UI Setup**: Run the web interface independently (CURRENTLY NOT WORKING):
 ```bash
 # Start infrastructure first (PostgreSQL on port 5433, Redis on 6380, Qdrant on 6334)
 ./multi-bot.sh start all
@@ -142,10 +180,10 @@ python src/web/simple_chat_app.py
 ```
 
 **Web UI Features**:
-- Real-time WebSocket chat with multiple bot personalities
-- Universal Identity account discovery (prevents duplicate accounts)
-- Bot-specific memory isolation and conversation history
-- Enhanced UX for Discord users migrating to web interface
+- Real-time WebSocket chat with multiple bot personalities (disabled)
+- Universal Identity account discovery (prevents duplicate accounts) (disabled)
+- Bot-specific memory isolation and conversation history (disabled)
+- Enhanced UX for Discord users migrating to web interface (disabled)
 
 ### Adding New Bots
 ```bash
@@ -356,7 +394,7 @@ prompt = await cdl_integration.create_character_aware_prompt(
 - `src/handlers/` - Discord command handlers (modular architecture)
 - `src/prompts/` - CDL integration and prompt management
 - `src/identity/` - Universal Identity system (NEW) - platform-agnostic user management
-- `src/web/` - Web chat interface (NEW) - FastAPI-based real-time chat
+- `src/web/` - Web chat interface (NEW) - FastAPI-based real-time chat (CURRENTLY NOT FUNCTIONAL)
 - `characters/examples/` - CDL character definitions (JSON)
 - `scripts/` - Configuration generation and utilities
 - `.env.*` files - Bot-specific configurations (auto-discovered)
@@ -460,12 +498,12 @@ conversation_history = await memory_manager.get_conversation_history(
 ```bash
 ./multi-bot.sh start elena        # Start Elena bot (marine biologist)
 ./multi-bot.sh start marcus       # Start Marcus bot (AI researcher) 
-./multi-bot.sh start jake         # Start Jake bot (game developer)
+./multi-bot.sh start jake         # Start Jake bot (adventure photographer)
 ./multi-bot.sh start dream        # Start Dream bot (mythological entity)
 ./multi-bot.sh start aethys       # Start Aethys bot (omnipotent entity)
-./multi-bot.sh start ryan         # Start Ryan bot (software engineer)
+./multi-bot.sh start ryan         # Start Ryan bot (indie game developer)
 ./multi-bot.sh start gabriel      # Start Gabriel bot
-./multi-bot.sh start sophia       # Start Sophia bot (neuroscientist)
+./multi-bot.sh start sophia       # Start Sophia bot (marketing executive)
 ./multi-bot.sh start all          # Start all configured bots
 ./multi-bot.sh stop               # Stop all bots
 ./multi-bot.sh logs elena         # View Elena's logs
@@ -503,19 +541,20 @@ python demo_vector_emoji_intelligence.py  # Example: testing demos
 **Bot Configuration**: Each bot requires individual environment files:
 - `.env.elena` - Elena Rodriguez (Marine Biologist)
 - `.env.marcus` - Marcus Thompson (AI Researcher)  
-- `.env.jake` - Jake Sterling (Game Developer)
+- `.env.jake` - Jake Sterling (Adventure Photographer)
 - `.env.dream` - Dream of the Endless (Mythological)
 - `.env.aethys` - Aethys (Omnipotent Entity)
-- `.env.ryan` - Ryan Chen (Software Engineer)
+- `.env.ryan` - Ryan Chen (Indie Game Developer)
 - `.env.gabriel` - Gabriel (Archangel)
-- `.env.sophia` - Sophia Blake (Neuroscientist)
+- `.env.sophia` - Sophia Blake (Marketing Executive)
 - Each file needs unique `DISCORD_BOT_TOKEN` and `HEALTH_CHECK_PORT`
 
 ## Current System Status
 
 **Active Infrastructure** (as of current deployment):
 - ✅ **Multi-Bot System**: 8+ character bots running simultaneously (Elena, Marcus, Jake, Dream, Aethys, Ryan, Gabriel, Sophia)
-- ✅ **Web Interface**: Real-time chat at http://localhost:8080 with cross-platform identity
+- ❌ **Web Interface**: Web chat interface at http://localhost:8080 is currently not functional
+- ✅ **Individual Bot APIs**: Each bot has working HTTP API endpoints for direct chat access
 - ✅ **Vector Memory**: Qdrant-powered with 384D embeddings, named vector support, bot-specific isolation
 - ✅ **Universal Identity**: Platform-agnostic user management with account discovery
 - ✅ **CDL Character System**: JSON-based personality definitions, integrated AI identity filtering
@@ -523,11 +562,10 @@ python demo_vector_emoji_intelligence.py  # Example: testing demos
 
 **Tested Working Features**:
 - Multi-bot Discord conversations with persistent memory
-- Real-time web chat interface with bot selection
+- Individual bot HTTP API endpoints for programmatic chat access
 - Vector-based semantic memory retrieval across conversations
 - CDL-driven character personality responses
 - Bot-specific memory isolation (Elena's memories stay with Elena)
-- Cross-platform user identity (Discord users can use web interface)
 - Health endpoints for container orchestration
 - Template-based configuration management
 
@@ -536,7 +574,7 @@ python demo_vector_emoji_intelligence.py  # Example: testing demos
 ./multi-bot.sh start all     # ✅ Starts all 8+ bots + infrastructure
 ./multi-bot.sh status        # ✅ Shows container health status
 ./multi-bot.sh logs elena    # ✅ Real-time bot logs
-http://localhost:8080        # ✅ Web interface with real-time chat
+curl http://localhost:9091/api/chat  # ✅ Individual bot API endpoints
 ```
 
 ## Phase 4 Integration

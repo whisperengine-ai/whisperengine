@@ -83,12 +83,12 @@ All 8 comprehensive AI scenario controls working perfectly:
 ### **Currently Running Bots** (All Healthy ✅)
 - 🌊 **Elena Rodriguez** (Marine Biologist) - Port 9091
 - 👔 **Gabriel** (British Companion) - Port 9095  
-- 🎮 **Jake Sterling** (Game Developer) - Port 9097
+- 📸 **Jake Sterling** (Adventure Photographer) - Port 9097
 - 🧠 **Marcus Thompson** (AI Researcher) - Port 9092
 - 🌟 **Aethys** (Omnipotent Entity) - Port 3007
 - 💫 **Dream** (Mythological) - Port 9094
-- 💻 **Ryan Chen** (Software Engineer) - Port 9093
-- 🧬 **Sophia Blake** (Neuroscientist) - Port 9096
+- 🎮 **Ryan Chen** (Indie Game Developer) - Port 9093
+- 💼 **Sophia Blake** (Marketing Executive) - Port 9096
 - 🌐 **Web Interface** - http://localhost:8080
 
 ### **Ready for Real Testing**

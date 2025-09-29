@@ -352,11 +352,11 @@ Vector Memory Storage ← Named Vector Embedding ← Emotional Context ← User 
 **Join our Discord server to experience WhisperEngine's creative AI personalities:**
 - **🧬 Elena Rodriguez** - Marine biologist with warm, empathetic personality
 - **🤖 Marcus Thompson** - AI researcher with academic, professional communication  
-- **🎮 Jake Sterling** - Game developer with creative, collaborative style
-- **💻 Ryan Chen** - Software engineer with analytical, helpful approach
+- **📸 Jake Sterling** - Adventure photographer with rugged, protective nature
+- **🎮 Ryan Chen** - Independent game developer with perfectionist creativity
 - **✨ Gabriel** - Archangel with spiritual wisdom and moral guidance
 - **💭 Dream of the Endless** - Mythological entity with profound, otherworldly expression
-- **🧠 Sophia Blake** - Neuroscientist exploring consciousness and creativity
+- **💼 Sophia Blake** - Sophisticated marketing executive with luxury lifestyle
 - **🌟 Aethys** - Omnipotent entity for philosophical exploration
 
 **📋 Before You Join:**

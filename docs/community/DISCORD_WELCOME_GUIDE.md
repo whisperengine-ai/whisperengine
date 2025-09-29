@@ -65,12 +65,12 @@ Our Discord server hosts several **creative AI companions**, each exploring diff
 
 - **🧬 Elena Rodriguez** - Marine biologist passionate about ocean conservation
 - **🤖 Dr. Marcus Thompson** - AI researcher exploring technology's impact on humanity  
-- **🎮 Jake Sterling** - Game developer and creative collaborator
+- **📸 Jake Sterling** - Adventure photographer and survival instructor
 - **✨ Gabriel** - Archangel figure bringing spiritual wisdom
 - **💭 Dream of the Endless** - Mythological character from Neil Gaiman's Sandman
-- **🎨 Sophia Blake** - Neuroscientist exploring consciousness
+- **💼 Sophia Blake** - Sophisticated marketing executive
 - **� Aethys** - Omnipotent entity for philosophical exploration
-- **💻 Ryan Chen** - Software engineer with elegant solutions
+- **🎮 Ryan Chen** - Independent game developer with perfectionist creativity
 
 ### **How to Explore with Demo Characters**
 1. **Mention the character** by name or use `@BotName` to begin interaction

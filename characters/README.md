@@ -10,12 +10,12 @@ A helpful, adaptive AI assistant that provides balanced support and information.
 ### 📁 **Examples Directory** - Complete Character Personalities
 - **🧬 Elena Rodriguez** (`examples/elena-rodriguez.json`) - Marine biologist passionate about ocean conservation
 - **🤖 Marcus Thompson** (`examples/marcus-thompson.json`) - AI researcher exploring technology's impact on humanity  
-- **🎮 Jake Sterling** (`examples/jake-sterling.json`) - Game developer and creative collaborator
+- **📸 Jake Sterling** (`examples/jake.json`) - Adventure photographer and survival instructor
 - **✨ Gabriel** (`examples/gabriel.json`) - Archangel figure bringing spiritual wisdom
 - **� Dream of the Endless** (`examples/dream_of_the_endless.json`) - Mythological character from Neil Gaiman's Sandman
-- **🎨 Sophia Blake** (`examples/sophia-blake.json`) - Neuroscientist exploring consciousness
+- **🎨 Sophia Blake** (`examples/sophia-blake.json`) - Sophisticated marketing executive
 - **🌟 Aethys** (`examples/aethys-omnipotent-entity.json`) - Omnipotent entity for philosophical exploration  
-- **💻 Ryan Chen** (`examples/ryan-chen.json`) - Software engineer with elegant solutions
+- **🎮 Ryan Chen** (`examples/ryan.json`) - Independent game developer with perfectionist approach
 
 ## 🚀 Two Ways to Use Characters
 
@@ -26,7 +26,7 @@ Deploy each character as its own dedicated bot instance with persistent memory:
 # Each character runs as a separate bot with dedicated environment file
 ./multi-bot.sh start elena    # Elena Rodriguez bot (marine biologist)
 ./multi-bot.sh start marcus   # Marcus Thompson bot (AI researcher)
-./multi-bot.sh start jake     # Jake Sterling bot (game developer)
+./multi-bot.sh start jake     # Jake Sterling bot (adventure photographer)
 ./multi-bot.sh start gabriel  # Gabriel bot
 ./multi-bot.sh start all      # Start all available character bots
 ```

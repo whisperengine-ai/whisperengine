@@ -25,7 +25,7 @@ cp characters/examples/elena-rodriguez.json characters/custom/my-character.json
 - **Marcus Thompson** - Intellectual, philosophical, technology-oriented  
 - **Jake Sterling** - Creative, energetic, collaborative
 - **Gabriel** - Wise, spiritual, guidance-focused
-- **Sophia Blake** - Academic, analytical, consciousness-focused
+- **Sophia Blake** - Sophisticated, confident, marketing-focused
 
 ### **3. Customize Core Identity**
 
@@ -307,7 +307,7 @@ Study our included characters for different approaches:
 - **Marcus Thompson** - Intellectual explorer balancing technology and humanity
 - **Jake Sterling** - Creative collaborator with entrepreneurial energy
 - **Gabriel** - Spiritual guide with wisdom and moral clarity
-- **Sophia Blake** - Academic researcher fascinated by consciousness
+- **Sophia Blake** - Sophisticated marketing executive with luxury lifestyle
 
 ### **Documentation References**
 

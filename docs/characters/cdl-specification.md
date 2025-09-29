@@ -348,12 +348,12 @@ See the `characters/examples/` directory for complete implementations:
 
 - **🧬 elena-rodriguez.json** - Passionate marine biologist with environmental focus
 - **🤖 marcus-thompson.json** - Philosophical AI researcher exploring technology's impact  
-- **🎮 jake-sterling.json** - Creative game developer and collaborative partner
+- **📸 jake.json** - Adventure photographer and survival instructor
 - **✨ gabriel.json** - Archangel figure providing spiritual wisdom and guidance
-- **🧠 sophia-blake.json** - Neuroscientist exploring consciousness and cognition
+- **💼 sophia-blake.json** - Marketing Executive with sophisticated lifestyle
 - **💭 dream_of_the_endless.json** - Mythological character from Neil Gaiman's universe
 - **🌟 aethys-omnipotent-entity.json** - Omnipotent entity for philosophical exploration
-- **💻 ryan-chen.json** - Software engineer focused on elegant technical solutions
+- **🎮 ryan.json** - Independent game developer with perfectionist approach
 
 ## Version History
 
