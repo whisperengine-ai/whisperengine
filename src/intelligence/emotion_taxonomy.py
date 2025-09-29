@@ -259,6 +259,57 @@ class UniversalEmotionTaxonomy:
         }
         
         return extended_mappings.get(emotion_lower, "neutral")
+    
+    @classmethod
+    def vader_sentiment_to_emotions(
+        cls, 
+        vader_scores: Dict[str, float]
+    ) -> List[tuple[CoreEmotion, float, float]]:
+        """
+        Convert VADER sentiment scores to core emotions with intensity and confidence.
+        
+        Args:
+            vader_scores: VADER polarity scores dict with keys: pos, neg, neu, compound
+            
+        Returns:
+            List of tuples (CoreEmotion, intensity, confidence)
+        """
+        results = []
+        
+        pos_score = vader_scores.get("pos", 0.0)
+        neg_score = vader_scores.get("neg", 0.0)
+        neu_score = vader_scores.get("neu", 0.0)
+        compound = vader_scores.get("compound", 0.0)
+        
+        # Positive emotions mapping
+        if pos_score > 0.2:  # Lower threshold for better coverage
+            intensity = min(pos_score, 1.0)
+            if compound > 0.5:  # Strong positive = joy
+                results.append((CoreEmotion.JOY, intensity, 0.75))
+            elif compound > 0.1:  # Mild positive could be surprise (pleasant)
+                results.append((CoreEmotion.SURPRISE, intensity * 0.8, 0.65))
+        
+        # Negative emotions mapping with better discrimination
+        if neg_score > 0.2:
+            intensity = min(neg_score, 1.0)
+            if compound <= -0.6:  # Very negative = sadness
+                results.append((CoreEmotion.SADNESS, intensity, 0.7))
+            elif compound <= -0.2:  # Moderate negative = anger
+                results.append((CoreEmotion.ANGER, intensity * 0.9, 0.65))
+            else:  # Mild negative = fear/concern
+                results.append((CoreEmotion.FEAR, intensity * 0.7, 0.6))
+        
+        # Neutral handling
+        if abs(compound) <= 0.15 or neu_score > 0.6:
+            intensity = max(neu_score, 0.3)
+            confidence = 0.8 if neu_score > 0.7 else 0.6
+            results.append((CoreEmotion.NEUTRAL, intensity, confidence))
+        
+        # Ensure we always return at least one emotion
+        if not results:
+            results.append((CoreEmotion.NEUTRAL, 0.5, 0.5))
+            
+        return results
 
 
 # Convenience functions for existing code integration
@@ -274,3 +325,8 @@ def map_reaction_to_emotion(reaction_type: str) -> str:
     """Surgical integration: Map emoji reaction to standard emotion."""
     core_emotion = UniversalEmotionTaxonomy.emoji_reaction_to_core_emotion(reaction_type)
     return core_emotion.value if core_emotion else "neutral"
+
+def vader_to_emotion_results(vader_scores: Dict[str, float]) -> List[tuple[str, float, float]]:
+    """Surgical integration: Convert VADER scores to emotion results."""
+    emotion_tuples = UniversalEmotionTaxonomy.vader_sentiment_to_emotions(vader_scores)
+    return [(emotion.value, intensity, confidence) for emotion, intensity, confidence in emotion_tuples]

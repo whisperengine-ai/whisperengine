@@ -160,16 +160,42 @@ class FailFastEmotionAnalyzer:
             
             scores = self._vader_analyzer.polarity_scores(message)
             
-            # Map VADER to basic emotions (MUCH LESS ACCURATE)
-            if scores['pos'] > scores['neg'] and scores['pos'] > 0.3:
-                primary_emotion = "joy"
-                confidence = scores['pos']
-            elif scores['neg'] > 0.3:
-                primary_emotion = "sadness"  # Oversimplified!
-                confidence = scores['neg']
-            else:
-                primary_emotion = "neutral"
-                confidence = abs(scores['neu'])
+            # Use Universal Emotion Taxonomy for consistent VADER mapping
+            try:
+                from src.intelligence.emotion_taxonomy import UniversalEmotionTaxonomy
+                
+                emotion_tuples = UniversalEmotionTaxonomy.vader_sentiment_to_emotions(scores)
+                
+                if emotion_tuples:
+                    # Get primary emotion (highest intensity)
+                    primary_emotion_obj, primary_intensity, primary_confidence = max(
+                        emotion_tuples, key=lambda x: x[1]
+                    )
+                    primary_emotion = primary_emotion_obj.value
+                    confidence = primary_confidence
+                    
+                    # Build all emotions dict
+                    all_emotions = {emotion_obj.value: intensity 
+                                  for emotion_obj, intensity, _ in emotion_tuples}
+                else:
+                    primary_emotion = "neutral"
+                    confidence = 0.5
+                    all_emotions = {"neutral": 0.5}
+                    
+            except Exception as taxonomy_error:
+                logger.warning(f"Taxonomy mapping failed, using legacy VADER: {taxonomy_error}")
+                # Legacy mapping as fallback
+                if scores['pos'] > scores['neg'] and scores['pos'] > 0.3:
+                    primary_emotion = "joy"
+                    confidence = scores['pos']
+                elif scores['neg'] > 0.3:
+                    primary_emotion = "sadness"  # Oversimplified!
+                    confidence = scores['neg']
+                else:
+                    primary_emotion = "neutral"
+                    confidence = abs(scores['neu'])
+                
+                all_emotions = {primary_emotion: confidence}
             
             processing_time = (time.time() - start_time) * 1000
             self.quality_stats["vader_fallbacks"] += 1
@@ -177,7 +203,7 @@ class FailFastEmotionAnalyzer:
             return QualityAwareResult(
                 primary_emotion=primary_emotion,
                 confidence=confidence * 0.6,  # Reduce confidence for fallback
-                all_emotions={primary_emotion: confidence},
+                all_emotions=all_emotions,
                 analysis_quality=AnalysisQuality.MEDIUM_QUALITY,
                 quality_score=0.6,  # Explicitly lower quality
                 fallback_reason="RoBERTa analysis failed",

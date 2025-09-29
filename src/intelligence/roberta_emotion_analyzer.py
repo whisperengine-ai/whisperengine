@@ -15,6 +15,8 @@ Architecture: RoBERTa Primary + VADER Fallback + Keywords Backup
 
 import asyncio
 import logging
+import time
+from concurrent.futures import ThreadPoolExecutor
 from typing import Dict, List, Tuple, Optional
 from dataclasses import dataclass
 from enum import Enum
@@ -78,6 +80,12 @@ class RoBertaEmotionAnalyzer:
         self.roberta_classifier = None
         self.vader_analyzer = None
         self.initialization_complete = False
+        
+        # Performance optimization: Dedicated thread pool for blocking transformer operations
+        self._transformer_executor = ThreadPoolExecutor(
+            max_workers=2, 
+            thread_name_prefix="roberta_transformer"
+        )
         
         # Initialize immediately in sync context
         self._init_analyzers()
@@ -182,20 +190,37 @@ class RoBertaEmotionAnalyzer:
         return sorted_emotions[:5]  # Return top 5 emotions
     
     async def _analyze_with_roberta(self, text: str) -> List[EmotionResult]:
-        """Analyze emotions using RoBERTa transformer model."""
+        """Analyze emotions using RoBERTa transformer model (non-blocking)."""
         results = []
         
+        if not self.roberta_classifier:
+            return results
+        
         try:
-            # RoBERTa inference (may be slow on first run due to model download)
-            classifications = self.roberta_classifier(text)
+            # PERFORMANCE FIX: Run blocking transformer inference in thread pool
+            # This prevents the 2-10s transformer operation from blocking the event loop
+            # Add timeout to prevent hanging
+            loop = asyncio.get_event_loop()
+            classifications = await asyncio.wait_for(
+                loop.run_in_executor(
+                    self._transformer_executor,
+                    self._sync_roberta_inference,
+                    text
+                ),
+                timeout=15.0  # 15 second timeout for RoBERTa inference
+            )
             
             for result in classifications[0]:  # First (only) text result
                 label = result["label"].lower()
                 score = result["score"]
                 
-                # Map to our emotion dimensions
+                # Use Universal Emotion Taxonomy for consistent emotion mapping
+                from src.intelligence.emotion_taxonomy import standardize_emotion
+                
+                # Map to our emotion dimensions using standardized labels
                 try:
-                    emotion_dim = EmotionDimension(label)
+                    standardized_label = standardize_emotion(label)
+                    emotion_dim = EmotionDimension(standardized_label)
                     results.append(EmotionResult(
                         dimension=emotion_dim,
                         intensity=score,
@@ -204,13 +229,26 @@ class RoBertaEmotionAnalyzer:
                     ))
                 except ValueError:
                     # Unknown emotion label from model
-                    logger.debug(f"Unknown RoBERTa emotion label: {label}")
+                    logger.debug(f"Unknown RoBERTa emotion label: {label} -> {standardized_label}")
                     continue
             
+        except asyncio.TimeoutError:
+            logger.warning(f"RoBERTa analysis timeout (15s) for text: {text[:100]}...")
+            return results  # Return empty results on timeout
         except Exception as e:
             logger.error(f"RoBERTa analysis error: {e}")
         
         return results
+    
+    def _sync_roberta_inference(self, text: str):
+        """Synchronous RoBERTa inference - runs in thread pool to avoid blocking."""
+        return self.roberta_classifier(text)
+    
+    def cleanup(self):
+        """Cleanup thread pool resources."""
+        if hasattr(self, '_transformer_executor'):
+            self._transformer_executor.shutdown(wait=True)
+            logger.debug("RoBERTa thread pool cleaned up")
     
     async def _analyze_with_vader(self, text: str) -> List[EmotionResult]:
         """Analyze emotions using VADER sentiment analysis."""
@@ -219,48 +257,28 @@ class RoBertaEmotionAnalyzer:
         try:
             scores = self.vader_analyzer.polarity_scores(text)
             
-            # Convert VADER sentiment to emotion dimensions
-            pos_score = scores["pos"]
-            neg_score = scores["neg"]
-            compound = scores["compound"]
+            # Use Universal Emotion Taxonomy for consistent VADER mapping
+            from src.intelligence.emotion_taxonomy import UniversalEmotionTaxonomy
             
-            # Map sentiment to emotions
-            if pos_score > 0.3:
+            emotion_tuples = UniversalEmotionTaxonomy.vader_sentiment_to_emotions(scores)
+            
+            for core_emotion, intensity, confidence in emotion_tuples:
                 results.append(EmotionResult(
-                    dimension=EmotionDimension.JOY,
-                    intensity=pos_score,
-                    confidence=0.7,
+                    dimension=EmotionDimension(core_emotion.value),
+                    intensity=intensity,
+                    confidence=confidence,
                     method="vader"
                 ))
             
-            if neg_score > 0.3:
-                # Negative sentiment could be sadness or anger
-                if compound <= -0.5:
-                    results.append(EmotionResult(
-                        dimension=EmotionDimension.SADNESS,
-                        intensity=neg_score,
-                        confidence=0.6,
-                        method="vader"
-                    ))
-                else:
-                    results.append(EmotionResult(
-                        dimension=EmotionDimension.ANGER,
-                        intensity=neg_score * 0.8,
-                        confidence=0.5,
-                        method="vader"
-                    ))
-            
-            # Neutral handling
-            if abs(compound) < 0.1:
-                results.append(EmotionResult(
-                    dimension=EmotionDimension.NEUTRAL,
-                    intensity=scores["neu"],
-                    confidence=0.6,
-                    method="vader"
-                ))
-                
         except Exception as e:
             logger.error(f"VADER analysis error: {e}")
+            # Return neutral fallback on error
+            results.append(EmotionResult(
+                dimension=EmotionDimension.NEUTRAL,
+                intensity=0.5,
+                confidence=0.3,
+                method="vader_error"
+            ))
         
         return results
     
@@ -272,8 +290,8 @@ class RoBertaEmotionAnalyzer:
         for emotion_dim, keywords in self.emotion_keywords.items():
             matches = sum(1 for keyword in keywords if keyword in text_lower)
             if matches > 0:
-                # Calculate intensity based on keyword density
-                intensity = min(matches / len(keywords.split()), 1.0)
+                # Calculate intensity based on keyword density (keywords is already a list)
+                intensity = min(matches / len(keywords), 1.0)
                 results.append(EmotionResult(
                     dimension=emotion_dim,
                     intensity=intensity,

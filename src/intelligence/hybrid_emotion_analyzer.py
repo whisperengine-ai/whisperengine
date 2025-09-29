@@ -233,36 +233,55 @@ class HybridEmotionAnalyzer:
         """VADER analysis - fast, good accuracy"""
         scores = self._vader_analyzer.polarity_scores(message)
         
-        # Map VADER scores to emotions
-        if scores['pos'] > max(scores['neg'], scores['neu']) and scores['pos'] > 0.3:
-            primary_emotion = "joy"
-            confidence = scores['pos']
-        elif scores['neg'] > max(scores['pos'], scores['neu']) and scores['neg'] > 0.3:
-            if scores['neg'] > 0.7:
-                primary_emotion = "anger"  # Strong negative
+        # Use Universal Emotion Taxonomy for consistent VADER mapping
+        try:
+            from src.intelligence.emotion_taxonomy import UniversalEmotionTaxonomy
+            
+            emotion_tuples = UniversalEmotionTaxonomy.vader_sentiment_to_emotions(scores)
+            
+            if not emotion_tuples:
+                # Fallback to neutral
+                return {
+                    'primary_emotion': "neutral",
+                    'confidence': 0.5,
+                    'all_emotions': {"neutral": 0.5}
+                }
+            
+            # Get primary emotion (highest intensity)
+            primary_emotion_obj, primary_intensity, primary_confidence = max(
+                emotion_tuples, key=lambda x: x[1]
+            )
+            primary_emotion = primary_emotion_obj.value
+            
+            # Build emotion distribution
+            emotions = {}
+            for emotion_obj, intensity, confidence in emotion_tuples:
+                emotions[emotion_obj.value] = intensity
+            
+            return {
+                'primary_emotion': primary_emotion,
+                'confidence': primary_confidence,
+                'all_emotions': emotions
+            }
+            
+        except Exception as e:
+            logger.error(f"VADER taxonomy mapping failed: {e}")
+            # Fallback to legacy mapping
+            if scores['pos'] > max(scores['neg'], scores['neu']) and scores['pos'] > 0.3:
+                primary_emotion = "joy"
+                confidence = scores['pos']
+            elif scores['neg'] > max(scores['pos'], scores['neu']) and scores['neg'] > 0.3:
+                primary_emotion = "sadness" if scores['neg'] < 0.7 else "anger"
+                confidence = scores['neg']
             else:
-                primary_emotion = "sadness"  # Mild negative
-            confidence = scores['neg']
-        else:
-            primary_emotion = "neutral"
-            confidence = scores['neu']
-        
-        # Create emotion distribution
-        emotions = {
-            primary_emotion: confidence,
-            "neutral": scores['neu']
-        }
-        
-        if scores['pos'] > 0.2:
-            emotions["joy"] = scores['pos']
-        if scores['neg'] > 0.2:
-            emotions["sadness"] = scores['neg']
-        
-        return {
-            'primary_emotion': primary_emotion,
-            'confidence': confidence,
-            'all_emotions': emotions
-        }
+                primary_emotion = "neutral"
+                confidence = scores['neu']
+            
+            return {
+                'primary_emotion': primary_emotion,
+                'confidence': confidence,
+                'all_emotions': {primary_emotion: confidence}
+            }
     
     def _analyze_with_keywords(self, message: str) -> Dict[str, Any]:
         """Keyword analysis - always reliable, basic accuracy"""

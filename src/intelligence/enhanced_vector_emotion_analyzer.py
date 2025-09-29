@@ -448,29 +448,47 @@ class EnhancedVectorEmotionAnalyzer:
                     scores = self._vader_analyzer.polarity_scores(content)
                     logger.info(f"😊 VADER ANALYSIS: VADER scores: {scores}")
                     
-                    # Map VADER scores to our emotion categories
-                    if scores['pos'] > 0.3:  # Positive sentiment
-                        emotion_scores['joy'] = max(emotion_scores.get('joy', 0.0), scores['pos'])
-                        logger.info(f"😊 VADER ANALYSIS: Positive sentiment detected, joy score: {emotion_scores['joy']:.3f}")
-                    if scores['neg'] > 0.3:  # Negative sentiment  
-                        # Determine if it's anger or sadness based on keywords
-                        if any(word in content_lower for word in ['angry', 'mad', 'furious', 'hate', 'rage']):
-                            emotion_scores['anger'] = max(emotion_scores.get('anger', 0.0), scores['neg'])
-                            logger.info(f"😊 VADER ANALYSIS: Anger keywords detected, anger score: {emotion_scores['anger']:.3f}")
-                        else:
-                            emotion_scores['sadness'] = max(emotion_scores.get('sadness', 0.0), scores['neg'])
-                            logger.info(f"😊 VADER ANALYSIS: Negative sentiment without anger keywords, sadness score: {emotion_scores['sadness']:.3f}")
-                    
-                    # Use compound score for overall intensity
-                    if abs(scores['compound']) > 0.1:  # Significant emotion detected
-                        intensity_multiplier = min(abs(scores['compound']) + 1.0, 2.0)
-                        # Boost all detected emotions based on VADER intensity
-                        original_scores = emotion_scores.copy()
-                        for emotion in emotion_scores:
-                            emotion_scores[emotion] *= intensity_multiplier
-                        logger.info(f"😊 VADER ANALYSIS: Applied intensity multiplier {intensity_multiplier:.2f}, scores before: {original_scores}, after: {emotion_scores}")
-                    
-                    logger.info(f"😊 VADER ANALYSIS: Final VADER-enhanced emotions: {emotion_scores}")
+                    # Use Universal Emotion Taxonomy for consistent VADER mapping
+                    try:
+                        from src.intelligence.emotion_taxonomy import UniversalEmotionTaxonomy
+                        
+                        emotion_tuples = UniversalEmotionTaxonomy.vader_sentiment_to_emotions(scores)
+                        
+                        # Apply VADER results to emotion scores
+                        for emotion_obj, intensity, confidence in emotion_tuples:
+                            emotion_name = emotion_obj.value
+                            # Use max to combine with existing scores, weighted by confidence
+                            weighted_intensity = intensity * confidence
+                            emotion_scores[emotion_name] = max(
+                                emotion_scores.get(emotion_name, 0.0), 
+                                weighted_intensity
+                            )
+                            logger.info(f"😊 VADER ANALYSIS: {emotion_name} enhanced to {emotion_scores[emotion_name]:.3f}")
+                        
+                        # Apply compound score intensity multiplier 
+                        if abs(scores['compound']) > 0.1:  # Significant emotion detected
+                            intensity_multiplier = min(abs(scores['compound']) + 1.0, 2.0)
+                            # Boost all detected emotions based on VADER intensity
+                            original_scores = emotion_scores.copy()
+                            for emotion in emotion_scores:
+                                if emotion_scores[emotion] > 0.1:  # Only boost significant emotions
+                                    emotion_scores[emotion] *= intensity_multiplier
+                            logger.info(f"😊 VADER ANALYSIS: Applied intensity multiplier {intensity_multiplier:.2f}")
+                        
+                        logger.info(f"😊 VADER ANALYSIS: Final VADER-enhanced emotions: {emotion_scores}")
+                        
+                    except Exception as taxonomy_error:
+                        logger.warning(f"😊 VADER ANALYSIS: Taxonomy mapping failed, using legacy: {taxonomy_error}")
+                        # Legacy mapping as fallback
+                        if scores['pos'] > 0.3:  # Positive sentiment
+                            emotion_scores['joy'] = max(emotion_scores.get('joy', 0.0), scores['pos'])
+                            logger.info(f"😊 VADER ANALYSIS: Legacy positive sentiment, joy score: {emotion_scores['joy']:.3f}")
+                        if scores['neg'] > 0.3:  # Negative sentiment  
+                            # Determine if it's anger or sadness based on keywords
+                            if any(word in content_lower for word in ['angry', 'mad', 'furious', 'hate', 'rage']):
+                                emotion_scores['anger'] = max(emotion_scores.get('anger', 0.0), scores['neg'])
+                            else:
+                                emotion_scores['sadness'] = max(emotion_scores.get('sadness', 0.0), scores['neg'])
                     
                 except Exception as vader_error:
                     logger.warning(f"😊 VADER ANALYSIS: VADER analysis failed: {vader_error}")
