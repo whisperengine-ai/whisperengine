@@ -1633,7 +1633,9 @@ class LLMClient:
             # Reserve 50% of max tokens for system message, convert tokens to characters with 4:1 ratio
             import os
 
-            max_tokens_for_system = self.default_max_tokens_chat // 2  # 50% allocation
+            # Increased allocation for advanced conversation features (CDL, context switching, empathy)
+            # Advanced AI features require more detailed system prompts
+            max_tokens_for_system = int(self.default_max_tokens_chat * 0.7)  # 70% allocation for rich AI features
             calculated_char_limit = (
                 max_tokens_for_system * 4
             )  # 4 characters per token approximation

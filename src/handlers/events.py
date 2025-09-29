@@ -2158,12 +2158,19 @@ class BotEventHandlers:
                         if phase3_context_switches:
                             logger.info(f"🧠 PHASE3 DEBUG: Context switches detected: {len(phase3_context_switches)} switches")
                             for i, switch in enumerate(phase3_context_switches[:3]):  # Log first 3
-                                logger.info(f"🧠 PHASE3 DEBUG: Switch {i+1}: {switch.get('type', 'unknown')} - {switch.get('description', 'no description')[:100]}")
+                                # ContextSwitch is an object, not a dictionary
+                                switch_type = getattr(switch, 'switch_type', 'unknown')
+                                switch_type_value = switch_type.value if hasattr(switch_type, 'value') else str(switch_type)
+                                description = getattr(switch, 'description', 'no description')
+                                logger.info(f"🧠 PHASE3 DEBUG: Switch {i+1}: {switch_type_value} - {description[:100]}")
                         else:
                             logger.debug("🧠 PHASE3 DEBUG: No context switches available")
                             
                         if phase3_empathy_calibration:
-                            logger.info(f"❤️ PHASE3 DEBUG: Empathy calibration data available: style={phase3_empathy_calibration.get('empathy_style', 'unknown')}, confidence={phase3_empathy_calibration.get('confidence', 0.0)}")
+                            # EmpathyCalibration is an object, not a dictionary
+                            empathy_style = getattr(phase3_empathy_calibration, 'recommended_style', 'unknown')
+                            confidence = getattr(phase3_empathy_calibration, 'confidence_score', 0.0)
+                            logger.info(f"❤️ PHASE3 DEBUG: Empathy calibration data available: style={empathy_style}, confidence={confidence}")
                         else:
                             logger.debug("❤️ PHASE3 DEBUG: No empathy calibration available")
                             
@@ -2348,7 +2355,6 @@ class BotEventHandlers:
                         logger.error(f"❌ MEMORY: Failed to store conversation for user {user_id}")
                 except Exception as memory_error:
                     logger.error(f"❌ CRITICAL: Memory storage exception for user {user_id}: {memory_error}")
-                    import traceback
                     logger.error(f"❌ CRITICAL: Memory storage traceback: {traceback.format_exc()}")
 
                 # Add user message to cache after memory storage
@@ -2495,7 +2501,6 @@ class BotEventHandlers:
                                                         logger.info(f"🔗 CONVERSATION CONTINUITY: Resolved question: {repr(q)[:100]}")
                                                 except Exception as q_error:
                                                     logger.error(f"🔗 CONVERSATION CONTINUITY: Error processing answered question {i}: {q_error}, question type: {type(q)}")
-                                                    import traceback
                                                     logger.error(f"🔍 DEBUG: Full traceback: {traceback.format_exc()}")
                                     elif isinstance(response_analysis, str):
                                         # Handle case where response_analysis is returned as a string
@@ -2504,7 +2509,6 @@ class BotEventHandlers:
                                         logger.warning("🔗 CONVERSATION CONTINUITY: Unexpected response format from process_user_response: %s", type(response_analysis))
                                 except Exception as e:
                                     logger.error("🔗 CONVERSATION CONTINUITY: Error processing user response for user %s: %s", user_id, e)
-                                    import traceback
                                     logger.error(f"🔍 DEBUG: Full traceback in process_user_response: {traceback.format_exc()}")
                         except Exception as e:
                             logger.error("🔗 CONVERSATION CONTINUITY: Error processing conversation state for user %s: %s", user_id, e)
@@ -2555,7 +2559,6 @@ class BotEventHandlers:
                                 logger.warning("🔗 CONVERSATION CONTINUITY: Unexpected conversation_issues format - expected dict, got: %s", type(conversation_issues))
                         except Exception as issues_error:
                             logger.error(f"🔗 CONVERSATION CONTINUITY: Error in detect_conversation_issues step: {issues_error}")
-                            import traceback
                             logger.error(f"🔍 DEBUG: Full traceback in detect_conversation_issues: {traceback.format_exc()}")
                         
                         logger.info(f"🔗 CONVERSATION CONTINUITY: Successfully processed conversation state for user {user_id}")
@@ -2860,7 +2863,6 @@ class BotEventHandlers:
             return False
         except Exception as e:
             logger.error(f"❌ CRITICAL: Unexpected memory storage error for user {user_id}: {e}")
-            import traceback
             logger.error(f"❌ CRITICAL: Memory storage traceback: {traceback.format_exc()}")
             return False
 
@@ -3079,8 +3081,6 @@ class BotEventHandlers:
                     logger.debug("User not in voice channel or not a member")
             except Exception as e:
                 logger.error(f"Failed to send voice response: {e}")
-                import traceback
-
                 logger.error(f"Voice response error traceback: {traceback.format_exc()}")
 
     async def _process_ai_components_parallel(self, user_id, content, message, recent_messages, conversation_context):

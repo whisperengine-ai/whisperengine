@@ -298,6 +298,83 @@ class DiscordBotCore:
         except Exception as e:
             self.logger.error(f"Error during Phase 4 component initialization: {e}")
 
+    async def _integrate_advanced_components(self):
+        """🚀 CRITICAL INTEGRATION: Attach advanced conversation components to Discord bot instance.
+        
+        This method bridges the gap between initialized components in bot_core and 
+        the event handlers which expect them on the Discord bot instance.
+        
+        Without this integration, advanced features are initialized but dormant.
+        """
+        try:
+            # Small delay to ensure Phase 4 components are fully initialized
+            await asyncio.sleep(2)
+            
+            self.logger.info("🔗 Integrating advanced conversation components with Discord bot...")
+            
+            # Phase 3: Context Switch Detection & Empathy
+            if hasattr(self, 'context_switch_detector') and self.context_switch_detector:
+                self.bot.context_switch_detector = self.context_switch_detector
+                self.logger.info("✅ Context Switch Detector integrated with Discord bot")
+            else:
+                self.logger.warning("⚠️ Context Switch Detector not available for integration")
+                
+            if hasattr(self, 'empathy_calibrator') and self.empathy_calibrator:
+                self.bot.empathy_calibrator = self.empathy_calibrator
+                self.logger.info("✅ Empathy Calibrator integrated with Discord bot")
+            else:
+                self.logger.warning("⚠️ Empathy Calibrator not available for integration")
+            
+            # Phase 4.1: Memory-Triggered Moments
+            if hasattr(self, 'memory_moments') and self.memory_moments:
+                self.bot.memory_moments = self.memory_moments
+                self.logger.info("✅ Memory-Triggered Moments integrated with Discord bot")
+            else:
+                self.logger.warning("⚠️ Memory-Triggered Moments not available for integration")
+            
+            # Phase 4.2: Advanced Thread Manager
+            if hasattr(self, 'thread_manager') and self.thread_manager:
+                self.bot.thread_manager = self.thread_manager
+                self.logger.info("✅ Advanced Thread Manager integrated with Discord bot")
+            else:
+                self.logger.warning("⚠️ Advanced Thread Manager not available for integration")
+            
+            # Phase 4.3: Proactive Engagement Engine
+            if hasattr(self, 'engagement_engine') and self.engagement_engine:
+                self.bot.engagement_engine = self.engagement_engine
+                self.logger.info("✅ Proactive Engagement Engine integrated with Discord bot")
+            else:
+                self.logger.warning("⚠️ Proactive Engagement Engine not available for integration")
+            
+            # Additional components for comprehensive integration
+            if hasattr(self, 'dynamic_personality_profiler') and self.dynamic_personality_profiler:
+                self.bot.dynamic_personality_profiler = self.dynamic_personality_profiler
+                self.logger.info("✅ Dynamic Personality Profiler integrated with Discord bot")
+                
+            if hasattr(self, 'conversation_manager') and self.conversation_manager:
+                self.bot.conversation_manager = self.conversation_manager
+                self.logger.info("✅ Concurrent Conversation Manager integrated with Discord bot")
+                
+            # Log final integration status
+            active_features = []
+            if hasattr(self.bot, 'context_switch_detector') and self.bot.context_switch_detector:
+                active_features.append("Context Switch Detection")
+            if hasattr(self.bot, 'engagement_engine') and self.bot.engagement_engine:
+                active_features.append("Proactive Engagement")
+            if hasattr(self.bot, 'memory_moments') and self.bot.memory_moments:
+                active_features.append("Memory-Triggered Moments")
+            if hasattr(self.bot, 'thread_manager') and self.bot.thread_manager:
+                active_features.append("Advanced Thread Management")
+                
+            if active_features:
+                self.logger.info(f"🎉 Advanced Conversation Features ACTIVE: {', '.join(active_features)}")
+            else:
+                self.logger.warning("⚠️ No advanced conversation features available - using basic conversation mode")
+                
+        except Exception as e:
+            self.logger.error(f"Failed to integrate advanced components: {e}")
+            self.logger.warning("Bot will continue with basic conversation features only")
+
     async def _update_emotional_context_dependencies(self):
         """Update emotional context engine with dependencies after they're initialized"""
         try:
@@ -916,6 +993,10 @@ class DiscordBotCore:
 
         # Schedule async initialization of concurrent conversation manager
         asyncio.create_task(self.initialize_conversation_manager())
+
+        # 🚀 CRITICAL FIX: Attach advanced conversation components to Discord bot instance
+        # This enables the sophisticated conversation features in event handlers
+        asyncio.create_task(self._integrate_advanced_components())
 
         # Cleanup registration
         self.register_cleanup_functions()

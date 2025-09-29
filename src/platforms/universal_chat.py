@@ -1165,19 +1165,25 @@ class UniversalChatOrchestrator:
                     if phase3_context_switches:
                         context_parts.append(f"- **Context Switches Detected:** {len(phase3_context_switches)} switches")
                         for switch in phase3_context_switches[:2]:  # Show top 2 switches
-                            switch_type = switch.get('switch_type', 'unknown')
-                            strength = switch.get('strength', 'unknown')
-                            description = switch.get('description', 'no description')[:100]
-                            context_parts.append(f"  - {switch_type} ({strength}): {description}")
+                            # ContextSwitch is an object, not a dictionary
+                            switch_type = getattr(switch, 'switch_type', 'unknown')
+                            switch_type_value = switch_type.value if hasattr(switch_type, 'value') else str(switch_type)
+                            strength = getattr(switch, 'strength', 'unknown')
+                            strength_value = strength.value if hasattr(strength, 'value') else str(strength)
+                            description = getattr(switch, 'description', 'no description')[:100]
+                            context_parts.append(f"  - {switch_type_value} ({strength_value}): {description}")
                             
-                            # Add adaptation strategy if available
-                            if switch.get('adaptation_strategy'):
-                                context_parts.append(f"    Strategy: {switch.get('adaptation_strategy')}")
+                            # Add evidence if available
+                            evidence = getattr(switch, 'evidence', [])
+                            if evidence and len(evidence) > 0:
+                                context_parts.append(f"    Evidence: {evidence[0][:80]}")
                     
                     if phase3_empathy_calibration:
-                        empathy_style = phase3_empathy_calibration.get('empathy_style', 'unknown')
-                        confidence = phase3_empathy_calibration.get('confidence', 0.0)
-                        context_parts.append(f"- **Empathy Calibration:** Style: {empathy_style}, Confidence: {confidence:.2f}")
+                        # EmpathyCalibration is also an object, not a dictionary
+                        empathy_style = getattr(phase3_empathy_calibration, 'recommended_style', 'unknown')
+                        empathy_style_value = empathy_style.value if hasattr(empathy_style, 'value') else str(empathy_style)
+                        confidence = getattr(phase3_empathy_calibration, 'confidence_score', 0.0)
+                        context_parts.append(f"- **Empathy Calibration:** Style: {empathy_style_value}, Confidence: {confidence:.2f}")
                         
                         # Add empathy guidance if available
                         if phase3_empathy_calibration.get('guidance'):
