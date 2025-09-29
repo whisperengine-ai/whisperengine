@@ -153,6 +153,7 @@ class VoiceCommandHandlers:
             await self._voice_settings_handler(ctx)
 
         @self.bot.command(name="voice_test", aliases=["vtest"])
+        @bot_name_filter()
         async def voice_test(ctx):
             """
             Test voice functionality
@@ -161,6 +162,7 @@ class VoiceCommandHandlers:
             await self._voice_test_handler(ctx)
 
         @self.bot.command(name="voice_chat_test", aliases=["vctest"])
+        @bot_name_filter()
         async def voice_chat_test(ctx):
             """
             Test voice chat functionality
@@ -169,6 +171,7 @@ class VoiceCommandHandlers:
             await self._voice_chat_test_handler(ctx)
 
         @self.bot.command(name="voice_connection_status", aliases=["vcs"])
+        @bot_name_filter()
         async def voice_connection_status(ctx):
             """
             Show voice connection status

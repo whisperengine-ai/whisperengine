@@ -43,10 +43,15 @@ class LLMSelfMemoryCommandHandlers:
         return self._llm_bot_memory
 
     @handle_errors(category=ErrorCategory.MEMORY_SYSTEM, severity=ErrorSeverity.MEDIUM)
-    async def register_commands(self):
+    async def register_commands(self, bot_name_filter=None):
         """Register LLM self-memory commands"""
         
+        # Import bot_name_filter if not provided
+        if bot_name_filter is None:
+            from src.core.bot_launcher import bot_name_filter
+        
         @self.bot.command(name="ask_me", aliases=["personal", "about_me"])
+        @bot_name_filter()
         async def ask_personal_question(ctx, *, question: str):
             """Ask me a personal question and I'll answer from my own knowledge!
             
@@ -226,6 +231,7 @@ class LLMSelfMemoryCommandHandlers:
                 logger.error(f"Knowledge extraction command failed: {e}")
 
         @self.bot.command(name="self_reflection", aliases=["reflect", "self_eval"])
+        @bot_name_filter()
         async def show_self_reflection(ctx):
             """Show my recent self-reflections and learning insights"""
             try:

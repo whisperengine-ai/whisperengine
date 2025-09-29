@@ -35,8 +35,9 @@ class HelpCommandHandlers:
         # Capture self reference for nested functions
         help_handler_instance = self
 
-        # Standard help command (following Discord conventions - works without bot name)
+        # Standard help command (following Discord conventions - requires bot name for multi-bot)
         @self.bot.command(name="help")
+        @bot_name_filter()
         async def help_command(ctx):
             """Show all available bot commands (standard Discord help command)"""
             logger.debug(f"Help command called by {ctx.author.name} - standard Discord help")
@@ -51,20 +52,23 @@ class HelpCommandHandlers:
 
         # Short alias following Discord conventions
         @self.bot.command(name="h")
+        @bot_name_filter()
         async def help_short(ctx):
             """Quick help command (short alias)"""
             await help_handler_instance._custom_help_handler(ctx, is_admin)
 
         # Discovery help commands (alternative names for discoverability)
         @self.bot.command(name="bot_help", aliases=["bothelp"])
+        @bot_name_filter()
         async def discovery_help(ctx):
-            """Show bot commands (works without bot name for discovery)"""
+            """Show bot commands (requires bot name in multi-bot environment)"""
             logger.debug(f"Discovery help command called by {ctx.author.name}")
             await help_handler_instance._discovery_help_handler(ctx, is_admin)
 
         @self.bot.command(name="bot_commands", aliases=["botcommands"])
+        @bot_name_filter()
         async def discovery_commands(ctx):
-            """Show bot commands (works without bot name for discovery)"""
+            """Show bot commands (requires bot name in multi-bot environment)"""
             await help_handler_instance._discovery_help_handler(ctx, is_admin)
 
     async def _custom_help_handler(self, ctx, is_admin):

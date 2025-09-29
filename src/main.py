@@ -262,7 +262,7 @@ class ModularBotManager:
                 memory_manager=components.get("memory_manager"),
                 bot_name=bot_name
             )
-            await self.command_handlers["llm_self_memory"].register_commands()
+            await self.command_handlers["llm_self_memory"].register_commands(bot_name_filter)
             logger.info("✅ LLM-Powered Self-Memory commands enabled (CDL extraction available)")
             
             # Memory Management Tool Commands - REMOVED as part of memory system simplification
