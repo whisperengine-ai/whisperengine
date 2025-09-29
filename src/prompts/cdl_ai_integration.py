@@ -37,16 +37,16 @@ class CDLAIPromptIntegration:
             character = await self.load_character(character_file)
             logger.info(f"Loaded CDL character: {character.identity.name}")
 
-            # Check for user's preferred name in memory
+            # Check for user's preferred name in memory with Discord username fallback
             preferred_name = None
             if self.memory_manager:
                 try:
                     from src.utils.user_preferences import get_user_preferred_name
-                    preferred_name = await get_user_preferred_name(user_id, self.memory_manager)
+                    preferred_name = await get_user_preferred_name(user_id, self.memory_manager, user_name)
                 except Exception as e:
                     logger.debug(f"Could not retrieve preferred name: {e}")
 
-            # Determine the best name to use (priority: preferred > user_name > User)
+            # Determine the best name to use (priority: preferred > discord fallback already handled)
             display_name = preferred_name or user_name or "User"
             
             logger.info(f"Using display name: {display_name} (preferred: {preferred_name}, discord: {user_name})")

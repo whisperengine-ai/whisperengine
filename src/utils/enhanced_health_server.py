@@ -180,6 +180,25 @@ class EnhancedHealthServer:
             
             logger.info(f"🌐 Chat API: Received message from {user_id}: {message_content[:50]}...")
             
+            # Auto-detect and store user name if present
+            try:
+                from src.utils.automatic_name_storage import create_automatic_name_storage
+                from src.llm.llm_protocol import create_llm_client
+                
+                # Create name storage system if memory manager available
+                memory_manager = None
+                if self.bot_manager and hasattr(self.bot_manager, 'event_handlers'):
+                    memory_manager = getattr(self.bot_manager.event_handlers, 'memory_manager', None)
+                
+                if memory_manager:
+                    llm_client = create_llm_client() if hasattr(self, 'bot') else None
+                    name_storage = create_automatic_name_storage(memory_manager, llm_client)
+                    detected_name = await name_storage.process_message_for_names(user_id, message_content)
+                    if detected_name:
+                        logger.info(f"🏷️ Auto-detected name '{detected_name}' for user {user_id}")
+            except Exception as e:
+                logger.debug(f"Name detection failed: {e}")
+            
             # Create universal message
             universal_message = Message(
                 message_id=f"web_{datetime.now().timestamp()}",
@@ -209,6 +228,24 @@ class EnhancedHealthServer:
                     await orchestrator.store_conversation_pair(
                         user_id, "web_chat", message_content, response_content
                     )
+                    
+                    # CRITICAL FIX: Also store directly through memory manager if available
+                    # This ensures proper vector storage regardless of orchestrator issues
+                    if self.bot_manager and hasattr(self.bot_manager, 'event_handlers') and self.bot_manager.event_handlers.memory_manager:
+                        try:
+                            await self.bot_manager.event_handlers.memory_manager.store_conversation(
+                                user_id=user_id,
+                                user_message=message_content, 
+                                bot_response=response_content,
+                                metadata={
+                                    "platform": "web_api",
+                                    "channel_id": "web_chat",
+                                    "timestamp": datetime.now().isoformat()
+                                }
+                            )
+                            logger.info("✅ Stored conversation directly in vector memory for user %s", user_id)
+                        except Exception as e:
+                            logger.warning("Direct memory storage failed: %s", e)
                     
                     logger.info(f"✅ Chat API: Generated response for {user_id}")
                     

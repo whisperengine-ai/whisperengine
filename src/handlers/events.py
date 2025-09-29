@@ -282,27 +282,38 @@ class BotEventHandlers:
         logger.info(f"{self.bot.user} has connected to Discord!")
         logger.info(f"Bot is connected to {len(self.bot.guilds)} guilds")
 
-        # Initialize PostgreSQL pool if not already done
+        # Initialize PostgreSQL pool for Universal Identity (NOT for user profiles - those use vector memory)
         if self.postgres_pool is None:
             try:
-                logger.info("Initializing PostgreSQL connection pool...")
-                from src.utils.postgresql_user_db import PostgreSQLUserDB
-
-                postgres_db = PostgreSQLUserDB()
-                await postgres_db.initialize()
-                self.postgres_pool = postgres_db.pool
+                logger.info("Initializing PostgreSQL connection pool for Universal Identity...")
+                # Use environment variables for PostgreSQL connection
+                import asyncpg
+                import os
+                
+                # Create connection pool directly without deprecated user profile DB
+                self.postgres_pool = await asyncpg.create_pool(
+                    host=os.getenv("POSTGRES_HOST", "whisperengine-multi-postgres"),
+                    port=int(os.getenv("POSTGRES_PORT", 5432)), 
+                    database=os.getenv("POSTGRES_DB", "whisperengine"),
+                    user=os.getenv("POSTGRES_USER", "whisperengine"),
+                    password=os.getenv("POSTGRES_PASSWORD", "whisperengine123"),
+                    min_size=1,
+                    max_size=10
+                )
 
                 # Update bot_core reference
                 self.bot_core.postgres_pool = self.postgres_pool
 
-                # Also update memory managers that might need the pool
-                if hasattr(self.bot_core, "context_memory_manager"):
-                    self.bot_core.context_memory_manager.postgres_pool = self.postgres_pool
-
                 logger.info("✅ PostgreSQL connection pool initialized successfully")
 
-                # Database tables are automatically initialized by PostgreSQLUserDB.initialize()
-                logger.info("✅ Database tables initialized/verified")
+                # Initialize Universal Identity tables
+                try:
+                    from src.identity.universal_identity import create_identity_manager
+                    identity_manager = create_identity_manager(self.postgres_pool)
+                    # Universal Identity manager handles its own table initialization
+                    logger.info("✅ Universal Identity system initialized")
+                except Exception as e:
+                    logger.warning(f"Universal Identity initialization failed: {e}")
 
             except ConnectionError as e:
                 # Clean error message for PostgreSQL connection failures
@@ -517,6 +528,20 @@ class BotEventHandlers:
 
         # Replace original message content with sanitized version
         message.content = sanitized_content
+
+        # 🏷️ AUTO-DETECT USER NAMES: Process message for name information
+        try:
+            from src.utils.automatic_name_storage import create_automatic_name_storage
+            from src.llm.llm_protocol import create_llm_client
+            
+            if self.memory_manager:
+                llm_client = create_llm_client()
+                name_storage = create_automatic_name_storage(self.memory_manager, llm_client)
+                detected_name = await name_storage.process_message_for_names(user_id, message.content)
+                if detected_name:
+                    logger.info("🏷️ Auto-detected name '%s' for user %s in DM", detected_name, user_id)
+        except Exception as e:
+            logger.debug("Name detection failed in DM: %s", e)
 
         # AI identity questions are now handled naturally through CDL character responses
         # No more dirty filter patterns - let characters respond authentically

@@ -10,27 +10,59 @@ from typing import Optional, Dict, Any
 logger = logging.getLogger(__name__)
 
 
-async def get_user_preferred_name(user_id: str, memory_manager=None) -> Optional[str]:
-    """Get user's preferred name using vector memory search."""
+async def get_user_preferred_name(user_id: str, memory_manager=None, discord_username: str = None) -> Optional[str]:
+    """
+    Get user's preferred name using vector memory search.
+    
+    Args:
+        user_id: The user's ID
+        memory_manager: Memory manager for vector search
+        discord_username: Discord username as fallback if no stored name found
+        
+    Returns:
+        Preferred name if found, discord_username as fallback, or None
+    """
     if not memory_manager:
         logger.debug("No memory manager available for preferred name lookup")
-        return None
+        return discord_username
     
     try:
-        # Use vector search to find name-related memories
-        name_memories = await memory_manager.retrieve_relevant_memories(
-            user_id=user_id,
-            query="my name is, call me, I am, preferred name, introduce",
-            limit=10
-        )
+        # Use vector search to find name-related memories and facts
+        search_queries = [
+            "my name is, call me, I am, preferred name, introduce",
+            "name fact user preferred",
+            "user name introduction"
+        ]
         
-        if not name_memories:
-            logger.debug(f"No name-related memories found for user {user_id}")
-            return None
+        all_memories = []
+        for query in search_queries:
+            memories = await memory_manager.retrieve_relevant_memories(
+                user_id=user_id,
+                query=query,
+                limit=15
+            )
+            all_memories.extend(memories)
+        
+        # Also search for facts specifically
+        if hasattr(memory_manager, 'retrieve_facts'):
+            try:
+                facts = await memory_manager.retrieve_facts(
+                    user_id=user_id,
+                    query="name preferred user",
+                    limit=10
+                )
+                all_memories.extend(facts)
+            except Exception as e:
+                logger.debug("Facts retrieval failed: %s", e)
+        
+        if not all_memories:
+            logger.debug("No name-related memories found for user %s, using Discord username: %s", 
+                        user_id, discord_username)
+            return discord_username
         
         # Look for the most recent/relevant name information
         # Sort memories by timestamp (most recent first) for conflict resolution
-        sorted_memories = _sort_memories_by_timestamp(name_memories)
+        sorted_memories = _sort_memories_by_timestamp(all_memories)
         
         detected_names = []
         for memory in sorted_memories:
@@ -67,20 +99,20 @@ async def get_user_preferred_name(user_id: str, memory_manager=None) -> Optional
             if len(detected_names) > 1:
                 other_names = [n['name'] for n in detected_names[1:] if n['name'] != most_recent['name']]
                 if other_names:
-                    logger.warning(f"Name conflict detected for user {user_id}: "
-                                 f"Current='{most_recent['name']}', Previous={other_names}. "
-                                 f"Using most recent. LLM conflict resolution needed.")
+                    logger.warning("Name conflict detected for user %s: Current='%s', Previous=%s. Using most recent", 
+                                 user_id, most_recent['name'], other_names)
             
-            logger.info(f"Found preferred name '{most_recent['name']}' for user {user_id} "
-                       f"from {most_recent['source']} (timestamp: {most_recent['timestamp']})")
+            logger.info("Found preferred name '%s' for user %s from %s", 
+                       most_recent['name'], user_id, most_recent['source'])
             return most_recent['name']
         
-        logger.debug(f"No preferred name found in vector memories for user {user_id}")
-        return None
+        logger.debug("No preferred name found in vector memories for user %s, using Discord username: %s", 
+                    user_id, discord_username)
+        return discord_username
         
-    except Exception as e:
-        logger.warning(f"Failed to retrieve preferred name from vector memory for user {user_id}: {e}")
-        return None
+    except (ValueError, RuntimeError, OSError) as e:
+        logger.warning("Failed to retrieve preferred name from vector memory for user %s: %s", user_id, e)
+        return discord_username
 
 
 def _extract_name_from_text(text: str) -> Optional[str]:

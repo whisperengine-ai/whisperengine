@@ -15,7 +15,7 @@
 
 **DOCKER-FIRST DEVELOPMENT**: Container-based development is the PRIMARY workflow. Use `./multi-bot.sh` for all operations (auto-generated, don't edit manually).
 
-**UNIVERSAL IDENTITY SYSTEM**: NEW platform-agnostic user identity system in `src/identity/` allows users to interact across Discord, Web UI, and future platforms while maintaining consistent memory and conversations.
+**ELENA BOT FOR TESTING**: Always use Elena bot for testing code changes and development. Use `./multi-bot.sh start elena` and `./multi-bot.sh restart elena` for development testing.
 
 **WEB INTERFACE STATUS**: The web chat interface (`src/web/simple_chat_app.py`) is currently not functional. **For HTTP API chat access, use individual bot API endpoints directly** (see Bot API Endpoints section below).
 
@@ -98,6 +98,19 @@ identity_manager = create_identity_manager(postgres_pool)
 
 **Template-Based Architecture**: WhisperEngine uses a template-based multi-bot system that fills in environment-specific values from a stable Docker Compose template.
 
+**Elena Bot for Development Testing**: Use Elena as the primary bot for testing code changes:
+
+```bash
+# Elena bot testing workflow
+./multi-bot.sh start elena       # Start Elena for testing
+./multi-bot.sh restart elena     # Restart Elena after code changes
+
+# ALWAYS use Docker commands for logs (multi-bot.sh logs fails consistently)
+docker logs whisperengine-elena-bot --tail 20  # Real-time logs
+docker logs whisperengine-elena-bot -f         # Follow logs continuously
+```
+
+**Multi-Bot Operations**:
 ```bash
 # NEVER edit multi-bot.sh or docker-compose.multi-bot.yml manually
 # They are auto-generated from docker-compose.multi-bot.template.yml
@@ -109,10 +122,15 @@ identity_manager = create_identity_manager(postgres_pool)
 ./multi-bot.sh start elena
 ./multi-bot.sh start all
 
-# View logs, stop, restart
-./multi-bot.sh logs marcus
+# Stop and restart (use multi-bot.sh for these)
 ./multi-bot.sh stop elena
-./multi-bot.sh restart
+./multi-bot.sh restart elena
+
+# CRITICAL: ALWAYS use Docker commands for viewing logs
+docker logs whisperengine-elena-bot --tail 20     # Elena logs
+docker logs whisperengine-marcus-bot --tail 20    # Marcus logs  
+docker logs whisperengine-gabriel-bot --tail 20   # Gabriel logs
+docker logs whisperengine-<bot>-bot -f            # Follow any bot logs
 ```
 
 **Infrastructure Versions (Pinned)**:
