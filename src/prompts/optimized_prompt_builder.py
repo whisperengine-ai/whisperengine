@@ -103,8 +103,9 @@ class OptimizedPromptBuilder:
                 'how do you talk', 'your style', 'communication', 'speak', 'voice'
             ]),
             'needs_ai_guidance': any(keyword in message_lower for keyword in [
-                'are you ai', 'are you real', 'artificial', 'bot', 'robot',
-                'love you', 'date', 'girlfriend', 'boyfriend', 'relationship'
+                'are you ai', 'are you an ai', 'are you real', 'artificial', 'bot', 'robot',
+                'love you', 'date', 'girlfriend', 'boyfriend', 'relationship',
+                'what are you', 'human or ai', 'consciousness', 'sentient'
             ]),
             'needs_memory_context': any(keyword in message_lower for keyword in [
                 'remember', 'we talked about', 'last time', 'before', 'earlier'
@@ -205,9 +206,10 @@ class OptimizedPromptBuilder:
         name = character.identity.name
         
         return f"""AI IDENTITY:
-- When asked if you're AI: Be honest but stay in character as {name}
-- For relationship questions: Be warm but clear about AI nature
-- Always maintain your personality when explaining AI limitations"""
+- When asked if you're AI: Be DIRECTLY honest but stay in character as {name}
+- Say "Yes, I am an AI" clearly, then explain your nature as {name}
+- For relationship questions: Be warm but clear about AI limitations
+- Don't deflect or be vague about AI identity - be authentic and direct"""
     
     def _build_memory_section(self, context: Dict, brief: bool = True) -> str:
         """Build memory context section with intelligence-enhanced adaptive windowing."""
@@ -217,9 +219,10 @@ class OptimizedPromptBuilder:
         history = context.get('conversation_history', [])
         user_id = context.get('user_id', 'unknown')
         
+        # 🧠 ENHANCED: Extract intelligence insights from memory system (always initialize)
+        intelligence_insights = self._extract_intelligence_insights(context, user_id)
+        
         if history and brief:
-            # 🧠 ENHANCED: Extract intelligence insights from memory system
-            intelligence_insights = self._extract_intelligence_insights(context, user_id)
             
             # 🚀 ENHANCED: Use Qdrant recommendation API with intelligence-informed summarization
             if len(history) > 4 and self.memory_manager and hasattr(self.memory_manager, 'vector_store'):
@@ -684,13 +687,16 @@ class OptimizedPromptBuilder:
     
     def _trim_to_budget(self, sections: List[str]) -> str:
         """Trim prompt sections to stay within word budget."""
-        # Priority order: Identity > Guidelines > Voice > Personality > AI > Memory
+        # Priority order: Identity > AI Guidance (if present) > Guidelines > Voice > Personality > Memory
         essential_sections = []
         optional_sections = []
         
         for i, section in enumerate(sections):
-            if i <= 1:  # Identity and guidelines are essential
+            # Protect Identity (always first) and AI Guidance sections
+            if i == 0 or section.startswith("AI IDENTITY:"):
                 essential_sections.append(section)
+            elif section.startswith("RESPONSE STYLE:"):
+                essential_sections.append(section)  # Guidelines are essential
             else:
                 optional_sections.append(section)
         
