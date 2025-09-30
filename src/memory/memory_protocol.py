@@ -51,6 +51,27 @@ class MemoryManagerProtocol(Protocol):
         """Retrieve memories relevant to the given query."""
         ...
     
+    async def retrieve_relevant_memories_fidelity_first(
+        self,
+        user_id: str,
+        query: str,
+        limit: int = 10,
+        full_fidelity: bool = True,
+        intelligent_ranking: bool = True,
+        graduated_filtering: bool = True,
+        preserve_character_nuance: bool = True
+    ) -> List[Dict[str, Any]]:
+        """
+        Retrieve memories with fidelity-first approach.
+        
+        This method implements character authenticity preservation:
+        - Start with complete context preservation
+        - Use intelligent semantic ranking instead of arbitrary truncation
+        - Apply graduated filtering only when context limits are exceeded
+        - Preserve character-specific memory nuance throughout
+        """
+        ...
+    
     async def retrieve_context_aware_memories(
         self,
         user_id: str,

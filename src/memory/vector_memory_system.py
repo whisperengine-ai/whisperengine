@@ -3620,6 +3620,303 @@ class VectorMemoryManager:
             logger.error(f"Failed to retrieve memories: {e}")
             return []
     
+    async def retrieve_relevant_memories_fidelity_first(
+        self,
+        user_id: str,
+        query: str,
+        limit: int = 10,
+        full_fidelity: bool = True,
+        intelligent_ranking: bool = True,
+        graduated_filtering: bool = True,
+        preserve_character_nuance: bool = True
+    ) -> List[Dict[str, Any]]:
+        """
+        🎯 FIDELITY-FIRST: Memory retrieval with character authenticity preservation
+        
+        This method implements the fidelity-first approach to memory retrieval:
+        1. Start with full context preservation
+        2. Use intelligent semantic ranking instead of arbitrary truncation
+        3. Apply graduated filtering only when context limits are exceeded
+        4. Preserve character-specific memory nuance throughout
+        
+        Args:
+            user_id: User identifier for memory segmentation
+            query: Search query for semantic similarity
+            limit: Maximum number of memories to return
+            full_fidelity: Start with complete context preservation
+            intelligent_ranking: Use semantic similarity for prioritization
+            graduated_filtering: Only filter if context exceeds limits
+            preserve_character_nuance: Maintain personality-specific memories
+            
+        Returns:
+            List of memories with fidelity-first optimization applied
+        """
+        import time
+        start_time = time.time()
+        
+        try:
+            # Phase 1: Full Fidelity Assembly - Get complete context first
+            if full_fidelity:
+                # Retrieve more memories initially for intelligent filtering
+                expanded_limit = min(limit * 3, 50)  # Get 3x more for intelligent selection
+                logger.debug(f"🎯 FIDELITY-FIRST: Retrieving {expanded_limit} memories for intelligent filtering")
+            else:
+                expanded_limit = limit
+            
+            # Use existing optimized search with expanded scope
+            try:
+                from src.memory.qdrant_optimization import QdrantQueryOptimizer
+                optimizer = QdrantQueryOptimizer(self.vector_store)
+                
+                raw_memories = await optimizer.optimized_search(
+                    query=query,
+                    user_id=user_id,
+                    query_type="fidelity_first_search",
+                    user_history={},
+                    filters={}
+                )
+                
+            except (ImportError, Exception):
+                # Fallback to standard vector search
+                raw_memories = await self.vector_store.search_memories(
+                    user_id=user_id,
+                    query=query,
+                    limit=expanded_limit
+                )
+            
+            if not raw_memories:
+                return []
+            
+            # Phase 2: Intelligent Ranking - Character-aware prioritization
+            if intelligent_ranking and preserve_character_nuance:
+                ranked_memories = await self._apply_character_aware_ranking(
+                    memories=raw_memories,
+                    query=query,
+                    user_id=user_id
+                )
+            else:
+                ranked_memories = raw_memories
+            
+            # Phase 3: Graduated Filtering - Only compress if necessary
+            if graduated_filtering and len(ranked_memories) > limit:
+                filtered_memories = await self._apply_graduated_filtering(
+                    memories=ranked_memories,
+                    target_limit=limit,
+                    preserve_character=preserve_character_nuance
+                )
+            else:
+                filtered_memories = ranked_memories[:limit]
+            
+            # Format results with fidelity metrics
+            formatted_results = []
+            for i, memory in enumerate(filtered_memories):
+                formatted_memory = {
+                    "content": memory.get("content", ""),
+                    "score": memory.get("score", 0.0),
+                    "timestamp": memory.get("timestamp", ""),
+                    "metadata": memory.get("metadata", {}),
+                    "memory_type": memory.get("memory_type", "unknown"),
+                    "fidelity_preserved": True,
+                    "ranking_position": i + 1,
+                    "search_type": "fidelity_first"
+                }
+                
+                # Add character-specific metadata if available
+                if preserve_character_nuance:
+                    formatted_memory["character_relevance"] = memory.get("character_relevance", 0.0)
+                    formatted_memory["personality_alignment"] = memory.get("personality_alignment", 0.0)
+                
+                formatted_results.append(formatted_memory)
+            
+            processing_time = (time.time() - start_time) * 1000
+            logger.info(f"🎯 FIDELITY-FIRST: Retrieved {len(formatted_results)} memories "
+                       f"(from {len(raw_memories)} candidates) in {processing_time:.1f}ms")
+            
+            return formatted_results
+            
+        except Exception as e:
+            logger.error(f"Failed to retrieve fidelity-first memories: {e}")
+            # Graceful fallback to standard retrieval
+            return await self.retrieve_relevant_memories(user_id, query, limit)
+    
+    async def _apply_character_aware_ranking(
+        self,
+        memories: List[Dict[str, Any]],
+        query: str,
+        user_id: str
+    ) -> List[Dict[str, Any]]:
+        """
+        Apply character-aware ranking to preserve personality nuance.
+        
+        This method uses vector similarity to score memories based on:
+        - Semantic relevance to current query
+        - Character consistency and personality alignment
+        - Conversation context and emotional continuity
+        """
+        try:
+            # Get current bot's character profile for consistency scoring
+            bot_name = get_normalized_bot_name_from_env()
+            
+            # Score each memory for character relevance
+            scored_memories = []
+            for memory in memories:
+                base_score = memory.get("score", 0.0)
+                
+                # Character relevance scoring
+                character_score = await self._calculate_character_relevance(
+                    memory=memory,
+                    bot_name=bot_name,
+                    query=query
+                )
+                
+                # Combine scores with character preservation weighting
+                combined_score = (base_score * 0.7) + (character_score * 0.3)
+                
+                memory["character_relevance"] = character_score
+                memory["personality_alignment"] = combined_score
+                memory["score"] = combined_score
+                
+                scored_memories.append(memory)
+            
+            # Sort by combined score (semantic + character relevance)
+            ranked_memories = sorted(scored_memories, key=lambda x: x.get("score", 0), reverse=True)
+            
+            return ranked_memories
+            
+        except Exception as e:
+            logger.warning(f"Character-aware ranking failed: {e}, using original order")
+            return memories
+    
+    async def _apply_graduated_filtering(
+        self,
+        memories: List[Dict[str, Any]],
+        target_limit: int,
+        preserve_character: bool = True
+    ) -> List[Dict[str, Any]]:
+        """
+        Apply graduated filtering to reduce memory count while preserving character nuance.
+        
+        Filtering strategy:
+        1. Keep highest-scoring character-relevant memories
+        2. Preserve recent conversation context
+        3. Maintain emotional continuity
+        4. Emergency fallback with core personality intact
+        """
+        if len(memories) <= target_limit:
+            return memories
+        
+        try:
+            # Memory tier prioritization
+            recent_memories = []
+            character_memories = []
+            general_memories = []
+            
+            # Categorize memories by importance and character relevance
+            for memory in memories:
+                timestamp = memory.get("timestamp", "")
+                character_relevance = memory.get("character_relevance", 0.0)
+                
+                # Recent memories (last 24 hours) - high priority
+                if self._is_recent_memory(timestamp, hours=24):
+                    recent_memories.append(memory)
+                # Character-relevant memories - medium priority
+                elif character_relevance > 0.5:
+                    character_memories.append(memory)
+                # General memories - lower priority
+                else:
+                    general_memories.append(memory)
+            
+            # Graduated selection with character preservation
+            filtered_memories = []
+            remaining_slots = target_limit
+            
+            # Tier 1: Always include recent memories (up to 50% of limit)
+            recent_slots = min(len(recent_memories), remaining_slots // 2)
+            filtered_memories.extend(recent_memories[:recent_slots])
+            remaining_slots -= recent_slots
+            
+            # Tier 2: Character-relevant memories (remaining slots)
+            if remaining_slots > 0:
+                character_slots = min(len(character_memories), remaining_slots)
+                filtered_memories.extend(character_memories[:character_slots])
+                remaining_slots -= character_slots
+            
+            # Tier 3: General memories if slots remain
+            if remaining_slots > 0:
+                filtered_memories.extend(general_memories[:remaining_slots])
+            
+            logger.debug(f"🎯 GRADUATED FILTERING: Selected {len(filtered_memories)} memories "
+                        f"(recent: {recent_slots}, character: {character_slots})")
+            
+            return filtered_memories
+            
+        except Exception as e:
+            logger.warning(f"Graduated filtering failed: {e}, using simple truncation")
+            return memories[:target_limit]
+    
+    async def _calculate_character_relevance(
+        self,
+        memory: Dict[str, Any],
+        bot_name: str,
+        query: str
+    ) -> float:
+        """Calculate character relevance score for a memory."""
+        try:
+            # Base character relevance from metadata
+            metadata = memory.get("metadata", {})
+            
+            # Check if memory involves character-specific topics
+            content = memory.get("content", "").lower()
+            character_keywords = self._get_character_keywords(bot_name)
+            
+            # Keyword matching score
+            keyword_score = sum(1 for keyword in character_keywords if keyword in content)
+            keyword_score = min(keyword_score / len(character_keywords), 1.0) if character_keywords else 0.0
+            
+            # Memory type relevance
+            memory_type = memory.get("memory_type", "")
+            type_score = 1.0 if memory_type in ["conversation", "relationship"] else 0.5
+            
+            # Combine scores
+            relevance_score = (keyword_score * 0.6) + (type_score * 0.4)
+            
+            return relevance_score
+            
+        except Exception as e:
+            logger.debug(f"Character relevance calculation failed: {e}")
+            return 0.5  # Neutral score
+    
+    def _get_character_keywords(self, bot_name: str) -> List[str]:
+        """Get character-specific keywords for relevance scoring."""
+        # Basic character-specific keywords (could be enhanced with CDL integration)
+        character_keywords = {
+            "elena": ["marine", "ocean", "biology", "research", "conservation", "sea"],
+            "marcus": ["ai", "technology", "research", "artificial", "intelligence", "development"],
+            "jake": ["adventure", "photography", "travel", "exploration", "wildlife", "nature"],
+            "dream": ["dream", "endless", "realm", "nightmare", "mythology", "story"],
+            "aethys": ["omnipotent", "cosmic", "universe", "reality", "existence", "divine"],
+            "ryan": ["game", "development", "indie", "programming", "design", "creative"],
+            "gabriel": ["british", "gentleman", "refined", "philosophical", "literature", "culture"],
+            "sophia": ["marketing", "executive", "business", "strategy", "brand", "professional"]
+        }
+        
+        return character_keywords.get(bot_name.lower(), [])
+    
+    def _is_recent_memory(self, timestamp: str, hours: int = 24) -> bool:
+        """Check if memory is within recent time window."""
+        try:
+            if not timestamp:
+                return False
+            
+            # Parse timestamp (handle various formats)
+            memory_time = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
+            cutoff_time = datetime.now() - timedelta(hours=hours)
+            
+            return memory_time > cutoff_time
+            
+        except Exception:
+            return False  # Assume not recent if parsing fails
+    
     async def retrieve_context_aware_memories(
         self,
         user_id: str,

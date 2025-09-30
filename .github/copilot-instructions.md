@@ -10,12 +10,24 @@
 - **NEVER use feature flags for LOCAL code dependencies** - this creates spaghetti conditionals and silent failures
 - We are in ALPHA - all LOCAL features should be enabled and testable immediately
 - Environment variables are for infrastructure config ONLY (database URLs, API keys, etc.)
-- When implementing features with LOCAL dependencies, make them work directly - don't hide them behind flags
+- When implementing LOCAL dependencies, make them work directly - don't hide them behind flags
 - Use stubs/no-op implementations for missing EXTERNAL dependencies, not feature flags
+
+**🚨 CRITICAL ARCHITECTURE RULE: NO CHARACTER-SPECIFIC HARDCODED LOGIC!**
+- **NEVER hardcode character names, personalities, or bot-specific behavior in Python code**
+- **ALL character data must come from CDL JSON files** (`characters/examples/*.json`)
+- **ALL bot identification must use environment variables** (`DISCORD_BOT_NAME`, `CHARACTER_FILE`)
+- **USE dynamic discovery and configuration generation** via `scripts/generate_multi_bot_config.py`
+- **NO hardcoded bot lists, character references, or personality assumptions**
+- **Character logic flows through CDL system ONLY** - never embed personality traits in code
+- **Bot names are discovered dynamically** from `.env.*` files - never maintain static lists
+- **Multi-bot architecture requires complete character agnosticism** in all Python components
+- When adding features, ensure they work for ANY character via CDL integration
+- Use `get_normalized_bot_name_from_env()` for bot identification, never literal strings
 
 **DOCKER-FIRST DEVELOPMENT**: Container-based development is the PRIMARY workflow. Use `./multi-bot.sh` for all operations (auto-generated, don't edit manually).
 
-**ELENA BOT FOR TESTING**: Always use Elena bot for testing code changes and development. Use `./multi-bot.sh start elena` and `./multi-bot.sh restart elena` for development testing.
+**ELENA BOT FOR TESTING**: Always use Elena bot for testing code changes and development. Elena is THE PRIMARY test bot with the latest fidelity-first memory implementation. Use `./multi-bot.sh start elena` and `./multi-bot.sh restart elena` for development testing. Other bots may not have the latest code updates.
 
 **WEB INTERFACE STATUS**: The web chat interface (`src/web/simple_chat_app.py`) is currently not functional. **For HTTP API chat access, use individual bot API endpoints directly** (see Bot API Endpoints section below).
 
@@ -35,7 +47,9 @@ python scripts/generate_multi_bot_config.py  # Example: configuration generation
 
 **NO NEO4J**: We don't use Neo4j anymore - everything is vector-native with Qdrant. Delete any Neo4j references, imports, or graph database code.
 
-**DYNAMIC MULTI-BOT SYSTEM**: Bot configurations are auto-discovered from `.env.*` files. No hardcoded bot names - everything is generated dynamically by `scripts/generate_multi_bot_config.py`. Currently active bots: Elena, Marcus, Jake, Dream, Aethys, Ryan, Gabriel, Sophia.
+**DYNAMIC MULTI-BOT SYSTEM**: Bot configurations are auto-discovered from `.env.*` files. No hardcoded bot names - everything is generated dynamically by `scripts/generate_multi_bot_config.py`. Currently active bots: elena, marcus, jake, dream, aethys, ryan, gabriel, sophia.
+
+**REDIS STATUS**: Redis is CURRENTLY DISABLED in multi-bot setup. Only PostgreSQL (port 5433) and Qdrant (port 6334) are active. Redis references remain in code for potential future re-enabling.
 
 ## Architecture Overview
 
@@ -152,8 +166,8 @@ docker logs whisperengine-<bot>-bot -f            # Follow any bot logs
 
 **Infrastructure Versions (Pinned)**:
 - PostgreSQL: `postgres:16.4-alpine` (pinned for stability) - Port 5433
-- Redis: `redis:7.4-alpine` (pinned for stability) - Port 6380
 - Qdrant: `qdrant/qdrant:v1.15.4` (pinned for vector stability) - Port 6334
+- Redis: Currently DISABLED in multi-bot setup (references remain in code)
 
 ### Bot API Endpoints
 
@@ -198,7 +212,7 @@ curl -X POST -H "Content-Type: application/json" \
 
 **Web UI Setup**: Run the web interface independently (CURRENTLY NOT WORKING):
 ```bash
-# Start infrastructure first (PostgreSQL on port 5433, Redis on 6380, Qdrant on 6334)
+# Start infrastructure first (PostgreSQL on port 5433, Qdrant on 6334)
 ./multi-bot.sh start all
 
 # Export correct PostgreSQL configuration
@@ -256,6 +270,41 @@ python scripts/generate_multi_bot_config.py  # Regenerate config
 docker exec whisperengine-elena-bot python -m pytest tests/unit/
 ```
 
+## Debugging & Validation
+
+**Environment Validation**: Critical for troubleshooting setup issues:
+```bash
+# Validate complete environment setup
+source .venv/bin/activate
+python scripts/verify_environment.py  # Tests LLM endpoints, DB connections, Redis, Qdrant
+
+# Quick bot health testing (all bots)
+./scripts/quick_bot_test.sh        # HTTP API health checks for all running bots
+```
+
+**Debug Utilities**: Located in `utilities/` directory (NOT in main application flow):
+```bash
+# Debug memory system issues
+cd utilities/debug && python debug_memory_manager.py
+
+# Debug relationship issues  
+cd utilities/debug && python debug_relationships.py
+
+# Performance benchmarking
+cd utilities/performance && python performance_comparison.py
+```
+
+**CDL Character Validation**: For character definition troubleshooting:
+```bash
+# Validate character file structure and content
+python src/validation/validate_cdl.py structure characters/examples/elena.json
+python src/validation/validate_cdl.py audit characters/examples/elena.json  
+python src/validation/validate_cdl.py patterns characters/examples/elena.json
+
+# Run complete CDL demo validation
+python src/validation/demo_validation_system.py
+```
+
 ## Memory System (Critical)
 
 **Vector-Native Architecture**: Qdrant vector memory with fastembed is THE PRIMARY memory system:
@@ -263,6 +312,16 @@ docker exec whisperengine-elena-bot python -m pytest tests/unit/
 # ALWAYS use vector/semantic search before manual Python analysis
 memories = await memory_manager.retrieve_relevant_memories(
     user_id=user_id, query=message, limit=10
+)
+
+# NEW: Fidelity-first memory retrieval with graduated filtering (Elena bot has this)
+memories = await memory_manager.retrieve_relevant_memories_fidelity_first(
+    user_id=user_id, 
+    query=message, 
+    top_k=15,
+    full_fidelity=True,
+    intelligent_ranking=True,
+    preserve_character_nuance=True
 )
 
 # Store with emotional context for future retrieval  
@@ -450,7 +509,7 @@ existing_users = await identity_manager.find_users_by_username(username)
 from src.prompts.cdl_ai_integration import CDLAIPromptIntegration
 cdl_integration = CDLAIPromptIntegration()
 prompt = await cdl_integration.create_character_aware_prompt(
-    character_file='characters/examples/elena-rodriguez.json',
+    character_file=character_file,  # DYNAMIC: Load from environment/config
     user_id=user_id,
     message_content=message
 )
@@ -473,6 +532,10 @@ prompt = await cdl_integration.create_character_aware_prompt(
 - ❌ Features that are "implemented" but require special configuration to work
 - ❌ Silent fallbacks that mask real failures
 - ❌ "Phantom features" that exist in code but aren't accessible to users
+- ❌ **CHARACTER-SPECIFIC HARDCODED LOGIC** (bot names, personalities, character assumptions)
+- ❌ Hardcoded bot lists or character references in Python code
+- ❌ Embedding personality traits directly in code instead of using CDL system
+- ❌ Static character assumptions that break multi-bot architecture
 
 **Vector-First Analysis**: Before writing manual analysis code:
 - ✅ Check if vector memory can provide insights via semantic search
@@ -546,7 +609,7 @@ WhisperEngine implements conversation intelligence through integrated systems:
 ## Character Definition Language (CDL)
 
 **CDL System**: Modern JSON-based character personalities replacing legacy markdown prompts:
-- `characters/examples/*.json` - Character definitions (elena-rodriguez.json, marcus-thompson.json, jake-sterling.json, dream_of_the_endless.json, aethys-omnipotent-entity.json, ryan-chen.json, gabriel.json, sophia-blake.json)
+- `characters/examples/*.json` - Character definitions (elena.json, marcus.json, jake.json, dream.json, aethys.json, ryan.json, gabriel.json, sophia.json)
 - `src/characters/cdl/parser.py` - CDL parser and validator
 - `src/prompts/cdl_ai_integration.py` - Integrates CDL with AI pipeline and emotional intelligence
 - Each character has unique personality, occupation, communication style, and values
@@ -556,7 +619,7 @@ WhisperEngine implements conversation intelligence through integrated systems:
 from src.prompts.cdl_ai_integration import CDLAIPromptIntegration
 cdl_integration = CDLAIPromptIntegration()
 system_prompt = await cdl_integration.create_character_aware_prompt(
-    character_file='characters/examples/elena-rodriguez.json',
+    character_file=character_file,  # DYNAMIC: Load from environment/config
     user_id=user_id,
     message_content=message,
     pipeline_result=emotion_analysis  # Optional emotional intelligence context
@@ -794,6 +857,13 @@ async def memory_operation():
 
 **Import Safety**: Use try/except for optional dependencies, fall back to no-op implementations.
 
+**Character Agnosticism**: ALL Python components must be character-agnostic:
+- Use `get_normalized_bot_name_from_env()` for bot identification
+- Load character data dynamically from CDL JSON files
+- Never hardcode character names, personalities, or bot-specific behavior
+- Features must work for ANY character via CDL integration
+- Use environment variables for bot identification, never literal strings
+
 **Fidelity-First Development Patterns**: Core architectural implementations:
 
 ```python
@@ -857,6 +927,59 @@ context_result = context_detector.detect_context_patterns(
 - Vector retrieval code must handle dictionary format from Qdrant named vectors
 - When in doubt, check `src/memory/vector_memory_system.py` for reference patterns
 
+**Error Handling Patterns**: All async operations use production error handling:
+```python
+from src.utils.production_error_handler import handle_errors, ErrorCategory, ErrorSeverity
+
+@handle_errors(category=ErrorCategory.MEMORY, severity=ErrorSeverity.HIGH)
+async def memory_operation():
+    # Automatic error handling, logging, and graceful degradation
+```
+
+**Configuration Pattern**: Use TYPE-based environment variables, not boolean flags:
+```python
+# ✅ CORRECT: Type-based configuration
+MEMORY_SYSTEM_TYPE=vector           # "vector", "hierarchical", "test_mock"
+LLM_CLIENT_TYPE=openrouter         # "openrouter", "local", "mock"
+
+# ❌ WRONG: Boolean feature flags for local code
+ENABLE_MEMORY_SYSTEM=true          # Creates phantom features
+```
+
+**Testing Commands**: Essential testing and validation workflows:
+```bash
+# Environment validation (CRITICAL for troubleshooting)
+source .venv/bin/activate && python scripts/verify_environment.py
+
+# Bot health testing (all running bots)
+./scripts/quick_bot_test.sh
+
+# Container-based testing (recommended)
+docker exec whisperengine-elena-bot python -m pytest tests/unit/
+
+# Quick test commands for specific components
+python tests/QUICK_TEST_COMMANDS.md  # See file for component testing
+```
+
+**Error Handling Patterns**: All async operations use production error handling:
+```python
+from src.utils.production_error_handler import handle_errors, ErrorCategory, ErrorSeverity
+
+@handle_errors(category=ErrorCategory.MEMORY, severity=ErrorSeverity.HIGH)
+async def memory_operation():
+    # Automatic error handling, logging, and graceful degradation
+```
+
+**Configuration Pattern**: Use TYPE-based environment variables, not boolean flags:
+```python
+# ✅ CORRECT: Type-based configuration
+MEMORY_SYSTEM_TYPE=vector           # "vector", "hierarchical", "test_mock"
+LLM_CLIENT_TYPE=openrouter         # "openrouter", "local", "mock"
+
+# ❌ WRONG: Boolean feature flags for local code
+ENABLE_MEMORY_SYSTEM=true          # Creates phantom features
+```
+
 ## Key Directories
 
 - `src/core/` - Bot initialization and Discord integration
@@ -871,6 +994,8 @@ context_result = context_detector.detect_context_patterns(
 - `src/utils/` - Cross-cutting concerns and monitoring
 - `src/characters/` - CDL character system and parsers
 - `src/prompts/` - CDL integration and prompt management
+- `utilities/` - Debug and performance tools (NOT in main app flow)
+- `scripts/` - Configuration generation and environment validation
 
 ## Recent Major Changes
 
@@ -889,5 +1014,7 @@ context_result = context_detector.detect_context_patterns(
 **Factory Pattern Adoption**: All major systems now use factory pattern for dependency injection and environment flexibility.
 
 **Fidelity-First Prompt Building Architecture** (NEW): Implemented graduated optimization system that preserves character nuance and conversation quality as primary design constraint. Includes OptimizedPromptBuilder with intelligent context assembly, HybridContextDetector with vector-enhanced pattern recognition, and vector-first analysis patterns that leverage existing Qdrant infrastructure instead of building separate NLP pipelines.
+
+**Phase 2.1 Fidelity-First Memory Management** (Complete): Implemented and tested comprehensive fidelity-first memory retrieval with graduated filtering, character-aware ranking, and intelligent memory tier management. Elena bot has the latest implementation - other bots may not have these updates yet. Use Elena for testing memory-related features.
 
 **Phase 4 Integration** (Complete): Advanced conversation intelligence with production optimization components fully integrated and operational.
