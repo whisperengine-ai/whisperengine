@@ -1,6 +1,6 @@
 # Characters Directory
 
-This directory contains all Character Definition Language (CDL) files for WhisperEngine's AI companion platform. Each character is a complete personality definition that can be deployed as its own bot instance or used in roleplay scenarios.
+This directory contains all Character Definition Language (CDL) files for WhisperEngine's AI Roleplay Character platform. Each character is a complete personality definition that can be deployed as its own bot instance or used in roleplay scenarios.
 
 ## 🎭 Available Character Personalities
 

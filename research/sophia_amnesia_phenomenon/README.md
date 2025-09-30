@@ -6,7 +6,7 @@
 
 ## 📚 Research Overview
 
-This folder contains all materials related to the "Sophia Amnesia Phenomenon" - a critical case study where WhisperEngine's AI companion exhibited unplanned but hyper-realistic social behavior, including:
+This folder contains all materials related to the "Sophia Amnesia Phenomenon" - a critical case study where WhisperEngine's AI Roleplay Character exhibited unplanned but hyper-realistic social behavior, including:
 
 - **24+ hour emotional state persistence**
 - **Autonomous boundary enforcement** 

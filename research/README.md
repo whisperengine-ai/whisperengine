@@ -3,7 +3,7 @@
 
 ## 🔬 **Project Research Focus**
 
-This research directory documents interesting behavioral patterns we've observed in our WhisperEngine AI companion systems. As a small personal project, we've noticed some surprising behaviors that seem worth documenting and sharing with the research community.
+This research directory documents interesting behavioral patterns we've observed in our WhisperEngine AI Roleplay Character systems. As a small personal project, we've noticed some surprising behaviors that seem worth documenting and sharing with the research community.
 
 ## 📝 **What We've Documented**
 
@@ -21,7 +21,7 @@ As we've observed these behavioral patterns, we've noted some areas for potentia
 - Some emotional patterns that persist longer than we initially expected
 - Occasional identity consistency variations that we're monitoring
 - Opportunities for better conversation pattern tracking
-- General best practices for AI companion interactions
+- General best practices for AI Roleplay Character interactions
 
 ## 📊 **Behavioral Patterns We've Observed**
 
@@ -61,7 +61,7 @@ Gabriel's case shows the most complex behavioral development we've documented:
 
 ### **Development Status** 
 - **Research Documentation**: ✅ Documented interesting patterns we've observed
-- **Development Work**: Ongoing improvements to our AI companion system
+- **Development Work**: Ongoing improvements to our AI Roleplay Character system
 - **Implementation**: Gradual enhancements as we learn more about the behaviors
 - **Timeline**: Regular development pace, learning as we go
 
@@ -99,7 +99,7 @@ Gabriel's case shows the most complex behavioral development we've documented:
 - **Community Prep**: Methods documented for sharing our observations with other researchers
 
 ### **Current Development Work**
-- **Status**: Normal development on our personal AI companion project
+- **Status**: Normal development on our personal AI Roleplay Character project
 - **Timeline**: Ongoing work at our own pace with a few testers
 - **Resources**: Two-person team exploring AI behavior patterns
 

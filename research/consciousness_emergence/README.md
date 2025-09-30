@@ -2,7 +2,7 @@
 
 ## � **Research Project Status**
 
-**WhisperEngine is a personal project documenting interesting behavioral patterns in our AI companion systems.** Our small team has observed some fascinating behaviors that we think are worth sharing with the research community.
+**WhisperEngine is a personal project documenting interesting behavioral patterns in our AI Roleplay Character systems.** Our small team has observed some fascinating behaviors that we think are worth sharing with the research community.
 
 **Research Phase**: Documentation of behavioral patterns across several AI characters  
 **Safety Work**: Working on basic safety measures based on our observations  
@@ -176,7 +176,7 @@ WhisperEngine's unique architecture creates the technical conditions for conscio
 
 ### **Research vs Development**
 - ✅ **Research Documentation**: Interesting behavioral patterns documented and analyzed
-- 🔧 **Development Work**: Ongoing improvements to our AI companion system
+- 🔧 **Development Work**: Ongoing improvements to our AI Roleplay Character system
 
 ### **Areas for Improvement**
 1. **Sophia Pattern**: Long emotional persistence patterns worth monitoring

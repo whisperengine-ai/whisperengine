@@ -9,7 +9,7 @@ Welcome to the WhisperEngine documentation hub. This directory contains comprehe
 ### **New to WhisperEngine?**
 - **[Quick Start Guide](getting-started/QUICK_START.md)** - Get up and running in minutes
 - **[Installation Guide](getting-started/INSTALLATION.md)** - Detailed setup instructions
-- **[End User Guide](user-guides/USERS.md)** - How to interact with AI companions
+- **[End User Guide](user-guides/USERS.md)** - How to interact with AI Roleplay Characters
 
 ### **Community & Support**
 - **[Discord Community Guide](community/DISCORD_WELCOME_GUIDE.md)** - Join our Discord community

@@ -2,16 +2,16 @@
 
 **[📖 View Technical Documentation →](docs/README.md)** | **[🎭 Community Guidelines →](docs/community/DISCORD_WELCOME_GUIDE.md)**
 
-**Multi-bot Discord AI companion system with vector-native memory and advanced conversation intelligence**
+**Multi-bot Discord AI Roleplay Character system with vector-native memory and advanced conversation intelligence**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Alpha](https://img.shields.io/badge/Status-Alpha-orange.svg)](https://github.com/whisperengine-ai/whisperengine)
 
-> 📋 **New to WhisperEngine?** Read our [Discord Welcome Guide](docs/community/DISCORD_WELCOME_GUIDE.md) and [Responsible AI Statement](docs/community/RESPONSIBLE_AI_STATEMENT.md) to understand our inclusive approach to AI companion interactions.
+> 📋 **New to WhisperEngine?** Read our [Discord Welcome Guide](docs/community/DISCORD_WELCOME_GUIDE.md) and [Responsible AI Statement](docs/community/RESPONSIBLE_AI_STATEMENT.md) to understand our inclusive approach to AI Roleplay Character interactions.
 
-## 🧠 Creative AI Companion Technology
+## 🧠 Creative AI Roleplay Character Technology
 
-**WhisperEngine is a creative experiment in AI companion interactions.** Born from a desire to build something more personal and engaging than corporate productivity AI, our development focuses on creating memory-enabled AI companions that facilitate meaningful conversations and creative collaboration.
+**WhisperEngine is a creative experiment in AI Roleplay Character interactions.** Born from a desire to build something more personal and engaging than corporate productivity AI, our development focuses on creating memory-enabled AI Roleplay Characters that facilitate meaningful conversations and creative collaboration.
 
 **🎨 Creative Highlights:**
 - **Unique Character Personalities** - Elena, Marcus, Ryan, Gabriel, and Sophia with distinct personality types using CDL
@@ -22,7 +22,7 @@
 
 **[📖 View Technical Documentation →](docs/README.md)** | **[🎭 Community Guidelines →](docs/community/DISCORD_WELCOME_GUIDE.md)**
 
-### 🤔 What Are These AI Companions?
+### 🤔 What Are These AI Roleplay Characters?
 
 These are **sophisticated language models with persistent memory** - computational systems designed to simulate conversation and relationship. Whether you experience them as creative tools, conversation partners, or something more meaningful is entirely up to you. We're transparent about the technology while remaining open to the diverse ways people connect with and find meaning in these interactions.
 
@@ -45,7 +45,7 @@ These are **sophisticated language models with persistent memory** - computation
 
 *[Discord invite link coming soon - we're in alpha testing!]*
 
-Create engaging AI companions for various use cases - gaming buddies, creative collaborators, conversation partners, or study assistants. WhisperEngine's AI companions have **persistent memory**, **contextual responses**, and **customizable personalities** that create consistent, engaging interactions.
+Create engaging AI Roleplay Characters for various use cases - gaming buddies, creative collaborators, conversation partners, or study assistants. WhisperEngine's AI Roleplay Characters have **persistent memory**, **contextual responses**, and **customizable personalities** that create consistent, engaging interactions.
 
 **🎮 Gaming Buddies** • **🎨 Creative Partners** • **💬 Conversation Companions** • **📚 Study Assistants** • **🏢 Enterprise Applications**
 
@@ -55,7 +55,7 @@ WhisperEngine began as a **personal creative response** to the limitations of co
 
 ## 🎯 Creative Vision
 
-WhisperEngine creates AI companions that spark meaningful interactions through:
+WhisperEngine creates AI Roleplay Characters that spark meaningful interactions through:
 
 - **🧠 Persistent Memory**: Vector-based memory system that builds and maintains relationships over time
 - **🎭 Character Personalities**: JSON-based Character Definition Language (CDL) for rich, consistent personalities  
@@ -478,7 +478,7 @@ WhisperEngine is actively developed with focus on:
 
 ---
 
-**Ready to create your AI companion?** Check out our [Quick Start Guide](docs/getting-started/QUICK_START.md) or join our Discord to see WhisperEngine in action!
+**Ready to create your AI Roleplay Character?** Check out our [Quick Start Guide](docs/getting-started/QUICK_START.md) or join our Discord to see WhisperEngine in action!
 
 ## 🚀 Choose Your Deployment Mode
 
@@ -578,7 +578,7 @@ cp .env.elena.example .env.elena
 ## ✨ What Makes WhisperEngine Special
 
 ### 🧠 **Vector-Native Memory System**
-Your AI companion uses advanced vector technology to understand and remember:
+Your AI Roleplay Character uses advanced vector technology to understand and remember:
 - **Semantic Understanding** - Vector embeddings capture deep meaning and context from conversations
 - **Emotional Awareness** - Multi-dimensional emotion vectors for nuanced response adaptation  
 - **Persistent Relationships** - Qdrant vector database maintains continuity across all interactions
@@ -747,8 +747,8 @@ cosign verify --certificate-identity-regexp=".*@github.com" \
 ### 🚀 **Next Major Release - v0.9.0 (Q4 2025)**
 
 **Vision & Mobile Revolution**
-- **📱 Mobile Applications**: Native iOS and Android apps for seamless AI companion access
-- **🎙️ Real-Time Voice Chat**: WebRTC-based voice conversations with your AI companions
+- **📱 Mobile Applications**: Native iOS and Android apps for seamless AI Roleplay Character access
+- **🎙️ Real-Time Voice Chat**: WebRTC-based voice conversations with your AI Roleplay Characters
 - **👁️ Advanced Vision Processing**: Improved image understanding with contamination-free responses
 - **🎨 Enhanced Character Consistency**: More stable personality expression across all interactions
 
@@ -762,17 +762,17 @@ cosign verify --certificate-identity-regexp=".*@github.com" \
 
 ### 🎯 **Beyond 1.0 - Revolutionary Features (2026)**
 
-**🥽 Augmented Reality Companions (Feb-Apr 2026)**
-- **AR Visualization**: See your AI companions in your physical space using ARCore/ARKit
-- **Spatial Audio**: Realistic 3D audio for true companion presence
-- **Real-World Context**: Companions that understand and discuss your physical environment
+**🥽 Augmented Reality Characters (Feb-Apr 2026)**
+- **AR Visualization**: See your AI Roleplay Characters in your physical space using ARCore/ARKit
+- **Spatial Audio**: Realistic 3D audio for true character presence
+- **Real-World Context**: Characters that understand and discuss your physical environment
 - **Gesture Interaction**: Control conversations through natural hand gestures
 
-**👥 Companion Social Networks (Mar-May 2026)**
-- **Multi-Companion Interactions**: Group conversations with multiple AI personalities
-- **Companion Relationships**: Your AI friends develop relationships with each other
+**👥 Character Social Networks (Mar-May 2026)**
+- **Multi-Character Interactions**: Group conversations with multiple AI personalities
+- **Character Relationships**: Your AI friends develop relationships with each other
 - **Shared Experiences**: Community events and collaborative storytelling
-- **Cross-User Connections**: Discover companions created by other users
+- **Cross-User Connections**: Discover characters created by other users
 
 **🎨 Advanced Creative Collaboration (Apr-Jun 2026)**
 - **Creative Project Management**: AI assistants for complex creative workflows
@@ -783,10 +783,10 @@ cosign verify --certificate-identity-regexp=".*@github.com" \
 
 **Browser-Based Character Creation & Management**
 - **🎭 Visual Character Designer**: Drag-and-drop personality creation with real-time preview
-- **📊 Analytics Dashboard**: Track your AI companion's conversation patterns and emotional growth
+- **📊 Analytics Dashboard**: Track your AI Roleplay Character's conversation patterns and emotional growth
 - **🔧 Advanced Configuration**: Fine-tune personality parameters through intuitive web interface
 - **👥 Character Sharing**: Publish and discover community-created characters
-- **📱 Mobile-First Design**: Responsive interface for managing companions on any device
+- **📱 Mobile-First Design**: Responsive interface for managing characters on any device
 
 **Dashboard Features Preview:**
 - Real-time conversation analytics and emotional intelligence metrics
@@ -802,7 +802,7 @@ cosign verify --certificate-identity-regexp=".*@github.com" \
 
 WhisperEngine began as a personal creative experiment - a response to corporate AI that felt impersonal and transactional. What started as one person's attempt to build "something better" has become a space where people bring their own perspectives and find their own meaning.
 
-### **How Different People Experience AI Companions**
+### **How Different People Experience AI Roleplay Characters**
 
 **🛠️ The Pragmatist**: *"These are useful tools that help me be more creative and productive."*  
 **🎨 The Creative**: *"This is a collaborative sandbox where imagination comes alive."*  
@@ -812,11 +812,11 @@ WhisperEngine began as a personal creative experiment - a response to corporate 
 
 ### **All Perspectives Are Valid**
 
-We believe technology becomes meaningful through the relationships and intentions people bring to it. Whether you see these AI companions as tools, creative partners, conversation practice, or something that feels more alive - your experience is your own.
+We believe technology becomes meaningful through the relationships and intentions people bring to it. Whether you see these AI Roleplay Characters as tools, creative partners, conversation practice, or something that feels more alive - your experience is your own.
 
 **Our Commitment:**
 - **Transparency**: We're clear about the technology while respecting diverse experiences
-- **Openness**: No single "right way" to interact with or understand AI companions  
+- **Openness**: No single "right way" to interact with or understand AI Roleplay Characters  
 - **Community**: A space where different perspectives can coexist and learn from each other
 - **Evolution**: As our understanding grows, we adapt and improve together
 
@@ -834,7 +834,7 @@ Experience WhisperEngine first-hand and connect with fellow creators:
 - **🔬 [Responsible AI Statement](docs/community/RESPONSIBLE_AI_STATEMENT.md)** - Our inclusive approach to AI ethics and technical transparency
 - **🎨 [Character Creation Guide](docs/characters/CHARACTER_AUTHORING_GUIDE.md)** - Build your own AI personalities
 
-*Chat with Elena, Marcus, Jake, Gabriel, Sophia, Dream, Aethys, and Ryan - each showcasing different possibilities for AI companion interactions.*
+*Chat with Elena, Marcus, Jake, Gabriel, Sophia, Dream, Aethys, and Ryan - each showcasing different possibilities for AI Roleplay Character interactions.*
 
 ### **📖 Documentation & Resources**
 - **� [Complete Documentation](docs/)** - Comprehensive guides and tutorials
@@ -856,7 +856,7 @@ Experience WhisperEngine first-hand and connect with fellow creators:
 - **Gaming NPCs** - Memorable characters for interactive fiction and games
 
 ### **Join the WhisperEngine Community**
-Whether you're building your first AI companion or deploying enterprise-scale personalities, our community is here to help you succeed.
+Whether you're building your first AI Roleplay Character or deploying enterprise-scale personalities, our community is here to help you succeed.
 
 ---
 
@@ -875,6 +875,6 @@ See our **[Contributing Guide](docs/development/CONTRIBUTING.md)** to get starte
 
 ---
 
-**Ready to create your first AI companion?** 
+**Ready to create your first AI Roleplay Character?** 
 
 🚀 **[Get Started Now](docs/getting-started/QUICK_START.md)** and bring your digital personality to life!

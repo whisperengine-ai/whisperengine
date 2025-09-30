@@ -2,21 +2,21 @@
 
 ## 📋 Community Guidelines and Policies
 
-This directory contains all community-related documentation for WhisperEngine users and Discord community members exploring creative AI companion interactions.
+This directory contains all community-related documentation for WhisperEngine users and Discord community members exploring creative AI Roleplay Character interactions.
 
 ## 📄 Available Documents
 
 ### **🎭 [Discord Welcome Guide](DISCORD_WELCOME_GUIDE.md)**
 Complete guide for new Discord community members including:
 - How to explore our creative AI experiment respectfully
-- Different perspectives on AI companion interactions (technical, creative, curious, spiritual)
+- Different perspectives on AI Roleplay Character interactions (technical, creative, curious, spiritual)
 - Understanding our demo characters and their personalities
 - Community guidelines that welcome diverse viewpoints
 - Installation guidance for your own creative AI platform
 
 ### **📋 [Discord Community Policy](DISCORD_COMMUNITY_POLICY.md)**
 Official community policies and guidelines including:
-- Inclusive approach to AI companion experiences  
+- Inclusive approach to AI Roleplay Character experiences  
 - Community guidelines supporting diverse perspectives
 - Privacy and data sovereignty information
 - Moderation policies that respect different viewpoints
@@ -42,7 +42,7 @@ Our inclusive approach to AI ethics including:
 ### **Community Values**
 - **Inclusive Exploration** welcoming technical, creative, social, curious, and spiritual perspectives
 - **Technical Transparency** honest about how our systems work without dismissing user experiences
-- **Creative Freedom** supporting AI companion experiences corporate platforms don't allow
+- **Creative Freedom** supporting AI Roleplay Character experiences corporate platforms don't allow
 - **User Agency** empowering people to create exactly the AI experience they want
 - **Community-driven Ethics** user feedback shapes our responsible AI development
 
