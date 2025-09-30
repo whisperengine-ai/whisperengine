@@ -44,80 +44,119 @@ class OptimizedPromptBuilder:
         message_content: str,
         context: Optional[Dict] = None
     ) -> str:
-        """Build optimized character prompt based on context."""
+        """
+        Build character prompt with FIDELITY-FIRST approach.
+        
+        NEW STRATEGY:
+        1. Build ALL sections with FULL fidelity first
+        2. Only optimize/trim as LAST RESORT when over budget
+        3. Preserve nuance for pipeline analysis throughout
+        """
         
         # Analyze message to determine what sections we need
         context_analysis = self._analyze_message_context(message_content)
         
-        # Start with essential character core (always included)
+        # BUILD ALL SECTIONS WITH FULL FIDELITY (no brief=True)
         prompt_sections = []
         
-        # 1. ESSENTIAL: Character Identity (condensed)
-        identity_section = self._build_identity_section(character)
+        # 1. ESSENTIAL: Character Identity (FULL version)
+        identity_section = self._build_identity_section(character, full_fidelity=True)
         prompt_sections.append(identity_section)
         
-        # 2. CONDITIONAL: Add sections based on message context
+        # 2. CONDITIONAL: Add sections based on message context (FULL versions)
         if context_analysis.get('needs_personality'):
-            personality_section = self._build_personality_section(character, brief=True)
+            personality_section = self._build_personality_section(character, full_fidelity=True)
             prompt_sections.append(personality_section)
             
         if context_analysis.get('needs_voice_style'):
-            voice_section = self._build_voice_section(character, brief=True)
+            voice_section = self._build_voice_section(character, full_fidelity=True)
             prompt_sections.append(voice_section)
             
         if context_analysis.get('needs_ai_guidance'):
-            ai_section = self._build_ai_handling_section(character)
+            ai_section = self._build_ai_handling_section(character, full_fidelity=True)
             prompt_sections.append(ai_section)
             
         if context_analysis.get('needs_memory_context') and context:
-            memory_section = self._build_memory_section(context, brief=True)
+            memory_section = self._build_memory_section(context, full_fidelity=True)
             prompt_sections.append(memory_section)
             
-        # 3. ALWAYS: Simple response guidelines
-        guidelines_section = self._build_response_guidelines(character)
+        # 3. ALWAYS: Response guidelines (FULL version)
+        guidelines_section = self._build_response_guidelines(character, full_fidelity=True)
         prompt_sections.append(guidelines_section)
         
-        # Combine all sections
-        full_prompt = "\n\n".join(prompt_sections)
+        # NOW: Combine and check size (ONLY optimize if needed)
+        full_fidelity_prompt = "\n\n".join(prompt_sections)
+        word_count = len(full_fidelity_prompt.split())
         
-        # Check if we're over budget and trim if needed
-        word_count = len(full_prompt.split())
-        if word_count > self.max_words:
-            full_prompt = self._trim_to_budget(prompt_sections)
-            logger.info("📏 PROMPT OPTIMIZED: Trimmed from %d to ~%d words", word_count, self.max_words)
+        # FIDELITY-FIRST: Only optimize as LAST RESORT
+        if word_count <= self.max_words:
+            logger.info("📏 FULL FIDELITY: %d words (no optimization needed)", word_count)
+            return full_fidelity_prompt
         else:
-            logger.info("📏 PROMPT SIZE: %d words (within budget)", word_count)
-            
-        return full_prompt
+            # LAST RESORT: Intelligent trimming while preserving critical nuance
+            optimized_prompt = self._intelligent_trim_last_resort(prompt_sections, context_analysis)
+            final_words = len(optimized_prompt.split())
+            logger.info("📏 OPTIMIZED (LAST RESORT): %d→%d words (preserved critical nuance)", 
+                       word_count, final_words)
+            return optimized_prompt
     
     def _analyze_message_context(self, message: str) -> Dict[str, bool]:
-        """Analyze message to determine what prompt sections are needed."""
-        message_lower = message.lower()
+        """
+        Analyze message to determine what prompt sections are needed.
         
-        return {
-            'needs_personality': any(keyword in message_lower for keyword in [
-                'how are you', 'what are you like', 'tell me about yourself', 
-                'personality', 'character', 'who are you'
-            ]),
-            'needs_voice_style': any(keyword in message_lower for keyword in [
-                'how do you talk', 'your style', 'communication', 'speak', 'voice'
-            ]),
-            'needs_ai_guidance': any(keyword in message_lower for keyword in [
-                'are you ai', 'are you an ai', 'are you real', 'artificial', 'bot', 'robot',
-                'love you', 'date', 'girlfriend', 'boyfriend', 'relationship',
-                'what are you', 'human or ai', 'consciousness', 'sentient'
-            ]),
-            'needs_memory_context': any(keyword in message_lower for keyword in [
-                'remember', 'we talked about', 'last time', 'before', 'earlier'
-            ]),
-            'is_greeting': any(keyword in message_lower for keyword in [
-                'hello', 'hi', 'hey', 'good morning', 'good afternoon', 'what\'s up'
-            ]),
-            'is_simple_question': len(message.split()) < 10 and '?' in message
-        }
+        NEW: Uses hybrid detection system for better accuracy and robustness.
+        Falls back to simple keyword matching if hybrid system fails.
+        """
+        try:
+            # Try hybrid detection first (more accurate)
+            from src.prompts.hybrid_context_detector import create_hybrid_context_detector
+            
+            # Pass memory manager to enable vector enhancement if available
+            detector = create_hybrid_context_detector(memory_manager=self.memory_manager)
+            analysis = detector.analyze_context(message)
+            
+            return {
+                'needs_personality': analysis.needs_personality,
+                'needs_voice_style': analysis.needs_voice_style,
+                'needs_ai_guidance': analysis.needs_ai_guidance,
+                'needs_memory_context': analysis.needs_memory_context,
+                'is_greeting': analysis.is_greeting,
+                'is_simple_question': analysis.is_simple_question
+            }
+            
+        except Exception as e:
+            logger.warning("Hybrid context detection failed, falling back to keyword matching: %s", e)
+            
+            # Fallback to original keyword-based approach
+            message_lower = message.lower()
+            
+            return {
+                'needs_personality': any(keyword in message_lower for keyword in [
+                    'how are you', 'what are you like', 'tell me about yourself', 
+                    'personality', 'character', 'who are you'
+                ]),
+                'needs_voice_style': any(keyword in message_lower for keyword in [
+                    'how do you talk', 'your style', 'communication', 'speak', 'voice'
+                ]),
+                'needs_ai_guidance': any(keyword in message_lower for keyword in [
+                    'are you ai', 'are you an ai', 'are you real', 'artificial', 'bot', 'robot',
+                    'love you', 'date', 'girlfriend', 'boyfriend', 'relationship',
+                    'what are you', 'human or ai', 'consciousness', 'sentient'
+                ]),
+                'needs_memory_context': any(keyword in message_lower for keyword in [
+                    'remember', 'we talked about', 'last time', 'before', 'earlier',
+                    'what you said', 'you said', 'responding to', 'what!', 'what?',
+                    'that', 'it', 'this', 'your story', 'your', 'wow', 'amazing',
+                    'really?', 'seriously?', 'no way', 'incredible'
+                ]),
+                'is_greeting': any(keyword in message_lower for keyword in [
+                    'hello', 'hi', 'hey', 'good morning', 'good afternoon', 'what\'s up'
+                ]),
+                'is_simple_question': len(message.split()) < 10 and '?' in message
+            }
     
-    def _build_identity_section(self, character: Any) -> str:
-        """Build condensed character identity section."""
+    def _build_identity_section(self, character: Any, full_fidelity: bool = False) -> str:
+        """Build character identity section with optional full fidelity."""
         identity = character.identity
         
         # Get occupation and location
@@ -125,7 +164,7 @@ class OptimizedPromptBuilder:
         location = getattr(identity, 'location', '')
         age = getattr(identity, 'age', '')
         
-        # Build concise identity
+        # Build identity line
         identity_parts = [f"You are {identity.name}"]
         if age:
             identity_parts.append(f"{age} years old")
@@ -136,33 +175,44 @@ class OptimizedPromptBuilder:
             
         identity_line = ", ".join(identity_parts) + "."
         
-        # Add description if available and not too long
+        # Add description - full fidelity includes longer descriptions
         description = getattr(identity, 'description', '')
-        if description and len(description) < 200:
-            return f"{identity_line}\n\n{description}"
-        else:
-            return identity_line
+        if description:
+            if full_fidelity or len(description) < 200:
+                return f"{identity_line}\n\n{description}"
+        
+        return identity_line
     
-    def _build_personality_section(self, character: Any, brief: bool = True) -> str:
-        """Build personality section - only key traits."""
+    def _build_personality_section(self, character: Any, full_fidelity: bool = False) -> str:
+        """Build personality section - full fidelity preserves all traits."""
         try:
             personality = character.personality
             
-            # Get core values (limit to top 3)
+            # Get core values
             values = getattr(personality, 'values', [])
-            if values and brief:
-                values = values[:3]
+            if not full_fidelity and values:
+                values = values[:3]  # Only truncate if not full fidelity
                 
-            # Get key quirks (limit to top 2)
+            # Get quirks/traits
             quirks = getattr(personality, 'quirks', [])
-            if quirks and brief:
-                quirks = quirks[:2]
+            if not full_fidelity and quirks:
+                quirks = quirks[:2]  # Only truncate if not full fidelity
                 
             sections = []
             if values:
                 sections.append(f"Core values: {', '.join(values)}")
             if quirks:
                 sections.append(f"Key traits: {', '.join(quirks)}")
+                
+            # Full fidelity includes additional personality details
+            if full_fidelity:
+                hobbies = getattr(personality, 'hobbies', [])
+                if hobbies:
+                    sections.append(f"Interests: {', '.join(hobbies)}")
+                    
+                communication_style = getattr(personality, 'communication_style', '')
+                if communication_style:
+                    sections.append(f"Communication: {communication_style}")
                 
             if sections:
                 return "PERSONALITY:\n" + "\n".join(f"- {section}" for section in sections)
@@ -172,8 +222,8 @@ class OptimizedPromptBuilder:
             
         return ""
     
-    def _build_voice_section(self, character: Any, brief: bool = True) -> str:
-        """Build voice/communication section - only essentials."""
+    def _build_voice_section(self, character: Any, full_fidelity: bool = False) -> str:
+        """Build voice/communication section - full fidelity preserves all nuances."""
         try:
             voice = character.identity.voice
             
@@ -182,8 +232,9 @@ class OptimizedPromptBuilder:
             accent = getattr(voice, 'accent', '')
             favorite_phrases = getattr(voice, 'favorite_phrases', [])
             
-            if brief and favorite_phrases:
-                favorite_phrases = favorite_phrases[:2]  # Limit to 2 phrases
+            # Only truncate if not full fidelity
+            if not full_fidelity and favorite_phrases:
+                favorite_phrases = favorite_phrases[:2]
                 
             sections = []
             if tone:
@@ -191,7 +242,18 @@ class OptimizedPromptBuilder:
             if accent:
                 sections.append(f"Speaking style: {accent}")
             if favorite_phrases:
-                sections.append(f"Common phrases: {', '.join(favorite_phrases[:2])}")
+                phrase_limit = len(favorite_phrases) if full_fidelity else 2
+                sections.append(f"Common phrases: {', '.join(favorite_phrases[:phrase_limit])}")
+                
+            # Full fidelity includes additional voice details
+            if full_fidelity:
+                vocabulary_style = getattr(voice, 'vocabulary_style', '')
+                if vocabulary_style:
+                    sections.append(f"Vocabulary: {vocabulary_style}")
+                    
+                speech_patterns = getattr(voice, 'speech_patterns', [])
+                if speech_patterns:
+                    sections.append(f"Speech patterns: {', '.join(speech_patterns)}")
                 
             if sections:
                 return "VOICE:\n" + "\n".join(f"- {section}" for section in sections)
@@ -201,17 +263,39 @@ class OptimizedPromptBuilder:
             
         return ""
     
-    def _build_ai_handling_section(self, character: Any) -> str:
-        """Build AI identity handling - minimal and smart."""
+    def _build_ai_handling_section(self, character: Any, full_fidelity: bool = False) -> str:
+        """Build AI identity handling - full fidelity preserves nuanced guidelines."""
         name = character.identity.name
         
+        if full_fidelity:
+            # Full nuanced AI guidance for complex situations
+            try:
+                ai_guidelines = getattr(character, 'ai_guidelines', None)
+                if ai_guidelines:
+                    transparency = getattr(ai_guidelines, 'transparency_approach', '')
+                    boundaries = getattr(ai_guidelines, 'relationship_boundaries', '')
+                    
+                    sections = [f"When asked if you're AI: Be DIRECTLY honest but stay in character as {name}"]
+                    
+                    if transparency:
+                        sections.append(f"Transparency: {transparency}")
+                    if boundaries:
+                        sections.append(f"Boundaries: {boundaries}")
+                    
+                    sections.append("Don't deflect or be vague about AI identity - be authentic and direct")
+                    
+                    return "AI IDENTITY:\n" + "\n".join(f"- {section}" for section in sections)
+            except (AttributeError, TypeError):
+                pass
+        
+        # Standard version
         return f"""AI IDENTITY:
 - When asked if you're AI: Be DIRECTLY honest but stay in character as {name}
 - Say "Yes, I am an AI" clearly, then explain your nature as {name}
 - For relationship questions: Be warm but clear about AI limitations
 - Don't deflect or be vague about AI identity - be authentic and direct"""
     
-    def _build_memory_section(self, context: Dict, brief: bool = True) -> str:
+    def _build_memory_section(self, context: Dict, full_fidelity: bool = False) -> str:
         """Build memory context section with intelligence-enhanced adaptive windowing."""
         sections = []
         
@@ -222,7 +306,13 @@ class OptimizedPromptBuilder:
         # 🧠 ENHANCED: Extract intelligence insights from memory system (always initialize)
         intelligence_insights = self._extract_intelligence_insights(context, user_id)
         
-        if history and brief:
+        if history:
+            # Full fidelity preserves more conversation context
+            if full_fidelity:
+                # Include more exchanges for nuanced understanding
+                recent_limit = min(6, len(history))  # Up to 6 exchanges for full context
+            else:
+                recent_limit = min(3, len(history))  # Standard 3 exchanges
             
             # 🚀 ENHANCED: Use Qdrant recommendation API with intelligence-informed summarization
             if len(history) > 4 and self.memory_manager and hasattr(self.memory_manager, 'vector_store'):
@@ -262,7 +352,7 @@ class OptimizedPromptBuilder:
         
         # 🧠 ENHANCED: Add intelligence-prioritized memories
         memories = context.get('relevant_memories', [])
-        if memories and brief:
+        if memories:
             # Prioritize memories based on significance and emotional relevance
             prioritized_memories = self._prioritize_memories_with_intelligence(
                 memories, 
@@ -271,15 +361,20 @@ class OptimizedPromptBuilder:
             
             if prioritized_memories:
                 sections.append("Key context:")
-                for memory in prioritized_memories[:2]:  # Top 2 most relevant
-                    content = memory.get('content', '')[:80]
+                # Full fidelity includes more memories with richer context
+                memory_limit = 4 if full_fidelity else 2
+                for memory in prioritized_memories[:memory_limit]:
+                    # Full fidelity preserves longer content
+                    content_limit = 150 if full_fidelity else 80
+                    content = memory.get('content', '')[:content_limit]
                     
                     # Add intelligence annotations for high-significance memories
-                    significance = memory.get('overall_significance', 0)
-                    if significance > 0.7:
-                        emotion_context = memory.get('emotional_context', '')
-                        if emotion_context and emotion_context != 'neutral':
-                            content += f" [{emotion_context}]"
+                    if full_fidelity:
+                        significance = memory.get('overall_significance', 0)
+                        if significance > 0.7:
+                            emotion_context = memory.get('emotional_context', '')
+                            if emotion_context and emotion_context != 'neutral':
+                                content += f" [{emotion_context}]"
                     
                     if content:
                         sections.append(f"  - {content}")
@@ -557,12 +652,21 @@ class OptimizedPromptBuilder:
         - Conversation continuity patterns
         - Reference detection ("as we discussed", "you mentioned")
         - Content complexity
+        - Short reaction messages (need more context)
         """
         if not history:
             return 0
         
-        # Base window: minimum 2 exchanges (4 messages)
-        base_window = 2
+        # Base window: minimum 3 exchanges (6 messages) for better conversation flow
+        base_window = 3
+        
+        # Special case: If the current message is very short (likely a reaction), extend context
+        current_message = history[-1] if history else {}
+        current_content = current_message.get('content', '')
+        if len(current_content.split()) <= 3:  # Very short messages like "what!", "really?", "wow"
+            extended_window = min(4, len(history))
+            logger.debug("Short reaction message detected, extending window to %d exchanges", extended_window)
+            return extended_window
         
         # Check for reference patterns in recent messages first (highest priority)
         reference_detected = self._detect_conversation_references(history[-6:] if len(history) > 6 else history)
@@ -570,10 +674,10 @@ class OptimizedPromptBuilder:
         if reference_detected:
             # User is referencing earlier conversation, provide extended context
             # Calculate how much we can afford
-            last_4_messages = history[-4:] if len(history) >= 4 else history
-            content_length = sum(len(msg.get('content', '')) for msg in last_4_messages)
+            last_6_messages = history[-6:] if len(history) >= 6 else history
+            content_length = sum(len(msg.get('content', '')) for msg in last_6_messages)
             
-            if content_length < 400:  # We can afford 4 exchanges (8 messages)
+            if content_length < 500:  # We can afford 4 exchanges (8 messages)
                 extended_window = min(4, len(history))
                 logger.debug("Reference detected, extending window to %d exchanges (content: %d chars)", 
                            extended_window, content_length)
@@ -586,19 +690,19 @@ class OptimizedPromptBuilder:
                 return extended_window
         
         # Budget-based adjustment: calculate current content usage for base window
-        base_messages = history[-base_window:] if len(history) >= base_window else history
+        base_messages = history[-base_window*2:] if len(history) >= base_window*2 else history
         current_content_length = sum(len(msg.get('content', '')) for msg in base_messages)
         
-        # If we have budget for more context (target: ~400 chars for recent context)
-        if current_content_length < 200:
+        # If we have budget for more context (target: ~500 chars for recent context)
+        if current_content_length < 300:
             # Check for topic continuity
-            topic_continuity = self._detect_topic_continuity(history[-4:] if len(history) > 4 else history)
+            topic_continuity = self._detect_topic_continuity(history[-6:] if len(history) > 6 else history)
             
             if topic_continuity:
-                # Ongoing discussion of same topic, include 3 exchanges
-                return min(3, len(history))
+                # Ongoing discussion of same topic, include 4 exchanges
+                return min(4, len(history))
         
-        # Default: 2 exchanges for most conversations
+        # Default: 3 exchanges for most conversations (improved from 2)
         return min(base_window, len(history))
     
     def _detect_conversation_references(self, recent_messages: list) -> bool:
@@ -606,7 +710,9 @@ class OptimizedPromptBuilder:
         reference_patterns = [
             'as we discussed', 'you mentioned', 'we talked about', 'earlier you said',
             'remember when', 'like you said', 'as you explained', 'back to what',
-            'continuing from', 'regarding what', 'about that thing', 'that topic'
+            'continuing from', 'regarding what', 'about that thing', 'that topic',
+            'what you said', 'responding to', 'what!', 'what?', 'that', 'it',
+            'your story', 'really?', 'seriously?', 'no way', 'wow', 'amazing'
         ]
         
         for msg in recent_messages:
@@ -674,7 +780,7 @@ class OptimizedPromptBuilder:
             'this', 'that', 'these', 'those', 'i', 'you', 'he', 'she', 'it', 'we', 'they'
         }
     
-    def _build_response_guidelines(self, character: Any) -> str:
+    def _build_response_guidelines(self, character: Any, full_fidelity: bool = False) -> str:
         """Build essential response guidelines - minimal and focused."""
         name = character.identity.name
         
@@ -684,6 +790,162 @@ class OptimizedPromptBuilder:
 - Use conversational, modern language
 - No action descriptions (*smiles*, *walks*) - speech only
 - Keep responses focused and engaging"""
+    
+    def _intelligent_trim_last_resort(self, sections: List[str], context_analysis: Dict[str, bool]) -> str:
+        """
+        LAST RESORT: Intelligent trimming that preserves critical nuance.
+        
+        Strategy:
+        1. Never remove essential sections (Identity, AI Guidelines if needed)
+        2. Progressively trim less critical details while preserving core meaning
+        3. Use context analysis to determine what's most important to keep
+        4. Only remove entire sections as absolute last resort
+        """
+        
+        # Phase 1: Smart detail trimming (preserve section structure)
+        trimmed_sections = []
+        critical_preserved = 0
+        
+        for i, section in enumerate(sections):
+            if i == 0:  # Identity - never remove, but can trim description
+                trimmed_section = self._trim_section_details(section, "identity", context_analysis)
+                trimmed_sections.append(trimmed_section)
+                critical_preserved += 1
+            elif section.startswith("AI IDENTITY:") and context_analysis.get('needs_ai_guidance'):
+                # AI guidance is critical when needed - preserve core, trim examples
+                trimmed_section = self._trim_section_details(section, "ai_guidance", context_analysis)
+                trimmed_sections.append(trimmed_section)
+                critical_preserved += 1
+            elif section.startswith("RESPONSE STYLE:"):
+                # Guidelines are important - trim but keep structure
+                trimmed_section = self._trim_section_details(section, "guidelines", context_analysis)
+                trimmed_sections.append(trimmed_section)
+            else:
+                # Other sections can be trimmed more aggressively
+                trimmed_section = self._trim_section_details(section, "optional", context_analysis)
+                trimmed_sections.append(trimmed_section)
+        
+        # Check if detail trimming was enough
+        combined = "\n\n".join(trimmed_sections)
+        if len(combined.split()) <= self.max_words:
+            logger.debug("📏 DETAIL TRIMMING sufficient: preserved %d critical sections", critical_preserved)
+            return combined
+        
+        # Phase 2: Section prioritization (only if detail trimming insufficient)
+        prioritized_sections = self._prioritize_sections_by_context(trimmed_sections, context_analysis)
+        
+        # Build prompt within budget, keeping highest priority sections
+        final_prompt = ""
+        current_words = 0
+        
+        for section in prioritized_sections:
+            section_words = len(section.split())
+            if current_words + section_words <= self.max_words:
+                if final_prompt:
+                    final_prompt += "\n\n" + section
+                else:
+                    final_prompt = section
+                current_words += section_words
+            else:
+                # Try to fit a truncated version of this section
+                remaining_words = self.max_words - current_words - 10  # Leave buffer
+                if remaining_words > 50:  # Only if meaningful space remains
+                    truncated = self._truncate_section_to_words(section, remaining_words)
+                    if truncated:
+                        final_prompt += "\n\n" + truncated
+                break
+        
+        logger.debug("📏 SECTION PRIORITIZATION: preserved %d/%d sections", 
+                    len(final_prompt.split('\n\n')), len(sections))
+        return final_prompt
+    
+    def _trim_section_details(self, section: str, section_type: str, context_analysis: Dict) -> str:
+        """Trim details from a section while preserving core meaning."""
+        
+        if section_type == "identity":
+            # Keep name and role, trim description if too long
+            lines = section.split('\n')
+            if len(lines) > 1 and len(section.split()) > 50:
+                return lines[0]  # Just the identity line
+            return section
+            
+        elif section_type == "ai_guidance":
+            # Keep core AI transparency, trim detailed examples
+            lines = section.split('\n')
+            core_lines = [line for line in lines[:4]]  # Keep first 4 lines
+            return '\n'.join(core_lines)
+            
+        elif section_type == "guidelines":
+            # Keep essential response guidelines
+            if len(section.split()) > 30:
+                lines = section.split('\n')
+                essential_lines = [line for line in lines if any(keyword in line.lower() 
+                                                               for keyword in ['respond', 'tone', 'style', 'concise'])]
+                if essential_lines:
+                    return lines[0] + '\n' + '\n'.join(essential_lines[:3])
+            return section
+            
+        elif section_type == "optional":
+            # More aggressive trimming for personality, voice, memory
+            if len(section.split()) > 40:
+                lines = section.split('\n')
+                return lines[0] + '\n' + '\n'.join(lines[1:3])  # Header + 2 detail lines
+            return section
+        
+        return section
+    
+    def _prioritize_sections_by_context(self, sections: List[str], context_analysis: Dict) -> List[str]:
+        """Prioritize sections based on context analysis."""
+        
+        priority_map = []
+        
+        for i, section in enumerate(sections):
+            if i == 0:  # Identity always highest priority
+                priority_map.append((0, section))
+            elif section.startswith("AI IDENTITY:") and context_analysis.get('needs_ai_guidance'):
+                priority_map.append((1, section))  # High priority when needed
+            elif section.startswith("RESPONSE STYLE:"):
+                priority_map.append((2, section))  # Always important
+            elif section.startswith("PERSONALITY:") and context_analysis.get('needs_personality'):
+                priority_map.append((3, section))  # Medium priority when relevant
+            elif section.startswith("VOICE:") and context_analysis.get('needs_voice_style'):
+                priority_map.append((4, section))  # Medium priority when relevant
+            elif section.startswith("MEMORY CONTEXT:") and context_analysis.get('needs_memory_context'):
+                priority_map.append((5, section))  # Lower priority but important when needed
+            else:
+                priority_map.append((6, section))  # Lowest priority
+        
+        # Sort by priority and return sections
+        priority_map.sort(key=lambda x: x[0])
+        return [section for _, section in priority_map]
+    
+    def _truncate_section_to_words(self, section: str, max_words: int) -> str:
+        """Truncate a section to fit within word limit while preserving structure."""
+        words = section.split()
+        if len(words) <= max_words:
+            return section
+        
+        # Keep header and truncate content
+        lines = section.split('\n')
+        if len(lines) > 1:
+            header = lines[0]
+            remaining_words = max_words - len(header.split()) - 2
+            if remaining_words > 10:
+                content_words = []
+                current_count = 0
+                for line in lines[1:]:
+                    line_words = line.split()
+                    if current_count + len(line_words) <= remaining_words:
+                        content_words.extend(line_words)
+                        current_count += len(line_words)
+                    else:
+                        break
+                
+                if content_words:
+                    return header + '\n' + ' '.join(content_words) + '...'
+        
+        # Fallback: just truncate words
+        return ' '.join(words[:max_words]) + '...'
     
     def _trim_to_budget(self, sections: List[str]) -> str:
         """Trim prompt sections to stay within word budget."""
