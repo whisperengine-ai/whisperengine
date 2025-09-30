@@ -1,8 +1,8 @@
-# 🚀 WhisperEngine: Next-Generation AI Companion Tooling
+# 🚀 WhisperEngine: Next-Generation AI Roleplay Character Tooling
 
 ## The Future of AI Conversations is Here
 
-**WhisperEngine** isn't just another chatbot. It's a sophisticated AI companion system with **26 advanced LLM tools** that enable truly intelligent, emotionally-aware, and evolving conversations.
+**WhisperEngine** isn't just another chatbot. It's a sophisticated AI Roleplay Character system with **26 advanced LLM tools** that enable truly intelligent, emotionally-aware, and evolving conversations.
 
 ---
 
@@ -17,7 +17,7 @@
 - 🎯 **Context Awareness** - Maintains conversation flow across topics
 - ⚡ **Memory Optimization** - Self-managing storage for peak performance
 
-*"Your AI companion remembers what matters to you."*
+*"Your AI Roleplay Character remembers what matters to you."*
 
 ---
 
@@ -118,7 +118,7 @@
 **Traditional AI**: Static responses, no memory, no growth
 **WhisperEngine**: Dynamic personality, persistent memory, emotional intelligence
 
-This isn't just better chatbot technology—it's the foundation for **genuine AI companionship**.
+This isn't just better chatbot technology—it's the foundation for **genuine AI Roleplay Character relationships**.
 
 ---
 

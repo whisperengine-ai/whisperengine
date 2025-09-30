@@ -4,12 +4,12 @@
 
 ---
 
-🎭 **Welcome to WhisperEngine - Creative AI Companion Platform!**
+🎭 **Welcome to WhisperEngine - Creative AI Roleplay Character Platform!**
 
 **What You'll Find Here:**
 🧬 **Demo AI Characters** - Elena, Marcus, Gabriel, Sophia & more! Each with unique personalities for creative exploration
 🎨 **Creative Sandbox** - Test different AI interaction styles and discover what's possible
-🛠️ **Self-Hosted Platform** - We provide the tools, you run your own AI companions with complete control
+🛠️ **Self-Hosted Platform** - We provide the tools, you run your own AI Roleplay Characters with complete control
 
 **🌟 Key Features:**
 ✨ **Persistent Memory** - Characters remember your conversations and build relationships over time
@@ -29,9 +29,9 @@
 • Share creative insights and character concepts
 • Be patient - demo responses take 10-30 seconds
 
-**Ready to build your own AI companions?**
+**Ready to build your own AI Roleplay Characters?**
 
 📖 **Full Documentation & Installation:**
 https://github.com/whisperengine-ai/whisperengine/tree/main/docs/community
 
-*Join our inclusive community exploring the future of creative AI companions!*
+*Join our inclusive community exploring the future of creative AI Roleplay Characters!*

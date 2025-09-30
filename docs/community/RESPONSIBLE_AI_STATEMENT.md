@@ -2,7 +2,7 @@
 
 ## 🎯 Our Commitment to Creative AI Ethics
 
-WhisperEngine is committed to developing AI companion technology that respects diverse user experiences while maintaining technical transparency. This statement outlines our principles, current implementations, and evolving understanding.
+WhisperEngine is committed to developing AI Roleplay Character technology that respects diverse user experiences while maintaining technical transparency. This statement outlines our principles, current implementations, and evolving understanding.
 
 ## 🌟 Inclusive Ethics Framework
 
@@ -48,7 +48,7 @@ WhisperEngine is designed specifically for **users who want complete control** o
 - **🧠 Advanced Language Models:** Sophisticated pattern recognition and generation systems
 - **🎭 Character-Based Personalities:** Unique identities created using our Character Definition Language (CDL)
 - **💾 Memory-Enhanced Agents:** Systems with persistent memory using vector-based relationship tracking
-- **🎨 Creative Collaboration Tools:** AI companions designed to enhance human creativity and connection
+- **🎨 Creative Collaboration Tools:** AI Roleplay Characters designed to enhance human creativity and connection
 - **⚡ Emergent Behavior Systems:** Complex interactions that can surprise even developers
 
 ### **How We Implement Character Interactions**
@@ -82,7 +82,7 @@ We acknowledge that different people have different experiences with AI:
 
 **All these experiences are real and valid** - we design systems that support however you naturally connect with AI.
 
-## ⚡ What We Actually Built: Advanced AI Companion Technology
+## ⚡ What We Actually Built: Advanced AI Roleplay Character Technology
 
 ### **Real Capabilities (Sophisticated, Relationship-Building)**
 - **💭 Persistent Relationships:** Qdrant vector memory with FastEmbed creates authentic conversation continuity
@@ -110,7 +110,7 @@ We acknowledge that different people have different experiences with AI:
 - **✅ Respectful Design:** We accommodate diverse perspectives on AI consciousness and relationships
 - **✅ Privacy Control:** Users own their data and can run completely private instances
 - **✅ Creative Freedom:** Characters support creative exploration without corporate content restrictions
-- **✅ Relationship Continuity:** Memory systems enable authentic long-term AI companion relationships
+- **✅ Relationship Continuity:** Memory systems enable authentic long-term AI Roleplay Character relationships
 
 ### **Known Limitations**
 - **⚠️ Alpha Technology:** Experimental platform still in active development
@@ -133,7 +133,7 @@ We acknowledge that different people have different experiences with AI:
 - **📈 Continuous Learning:** We adapt our approach as we learn from users and the AI community
 - **🌟 Diverse Perspectives:** We respect that people experience AI relationships differently
 - **🔬 Scientific Integrity:** Technical transparency without consciousness claims
-- **🎨 Creative Support:** Enable AI companion experiences that corporate platforms don't support
+- **🎨 Creative Support:** Enable AI Roleplay Character experiences that corporate platforms don't support
 
 ## 📊 Privacy and Data Handling
 
@@ -144,7 +144,7 @@ WhisperEngine's self-hosted design gives users complete privacy control:
 - **🔒 No Cloud Dependencies:** Core functionality works completely offline if desired
 - **👤 Universal Identity:** Cross-platform user identity preserves relationships while maintaining privacy
 - **🗂️ Data Sovereignty:** You decide what to store, how long to keep it, and who can access it
-- **🔐 Zero Corporate Access:** No corporate oversight or surveillance of your AI companion relationships
+- **🔐 Zero Corporate Access:** No corporate oversight or surveillance of your AI Roleplay Character relationships
 
 ### **Demo Server Data Practices**
 For our Discord demonstration server:
@@ -178,14 +178,14 @@ For our Discord demonstration server:
 ### **Positive AI Discourse Contribution**
 - **📢 Honest Communication:** Contributing to accurate public understanding of current AI capabilities
 - **🤝 Industry Collaboration:** Sharing insights with the broader AI ethics and safety community
-- **📚 Educational Mission:** Helping users understand both capabilities and limitations of AI companions
-- **⚖️ Ethical Leadership:** Setting positive examples for responsible AI companion development
+- **📚 Educational Mission:** Helping users understand both capabilities and limitations of AI Roleplay Characters
+- **⚖️ Ethical Leadership:** Setting positive examples for responsible AI Roleplay Character development
 
 ### **Supporting User Agency**
-- **🎨 Creative Freedom:** Enable AI companion experiences that corporate platforms don't support
+- **🎨 Creative Freedom:** Enable AI Roleplay Character experiences that corporate platforms don't support
 - **🔒 Privacy Rights:** Tools for users who want complete control over their AI interactions
 - **👥 Diverse Communities:** Support for users with different spiritual, creative, and technical perspectives
-- **🚀 Self-Determination:** Empower users to create exactly the AI companion experience they want
+- **🚀 Self-Determination:** Empower users to create exactly the AI Roleplay Character experience they want
 
 ## 📞 Community Accountability
 

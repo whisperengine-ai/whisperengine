@@ -2,13 +2,13 @@
 
 ## 🎭 Welcome to Our Creative AI Community
 
-WhisperEngine is a **creative AI companion platform** designed for people seeking alternatives to corporate AI limitations. Our Discord community is a space for exploring creative AI interactions, testing different personality types, and connecting with fellow creators who value AI that serves imagination and meaningful dialogue.
+WhisperEngine is a **creative AI Roleplay Character platform** designed for people seeking alternatives to corporate AI limitations. Our Discord community is a space for exploring creative AI interactions, testing different personality types, and connecting with fellow creators who value AI that serves imagination and meaningful dialogue.
 
 ## � Creative Demo Characters for Exploration
 
 ### **Important: Demo Characters for Creative Experimentation**
 - **The AI characters in this Discord server are for CREATIVE EXPLORATION**
-- **Experience different personality types** and discover what's possible with AI companions
+- **Experience different personality types** and discover what's possible with AI Roleplay Characters
 - **Install your own WhisperEngine** to unlock complete creative control and persistent relationships  
 - **Demo characters may be offline or evolve** as we continue developing the platform
 - **Think of this as a creative sandbox** to explore possibilities before building your own
@@ -25,7 +25,7 @@ When we say "demo characters," we mean the Discord AI personalities clearly mark
 **🎨 Demo Character Purpose:**
 - **Explore personality diversity** - See how different character types interact
 - **Experience persistent memory** - Characters remember your conversations while running
-- **Test creative possibilities** - Discover what's possible with your own AI companions
+- **Test creative possibilities** - Discover what's possible with your own AI Roleplay Characters
 - **Evaluate the platform** - Decide if you want to install your own creative AI instance
 
 ### **🏠 Creative Platform Philosophy**
@@ -37,20 +37,20 @@ WhisperEngine is designed as a **creative platform** where YOU:
 - **Import existing AI relationships** - bring ChatGPT conversations and continue them privately
 
 ### **🔒 Privacy-First Creative Control**
-WhisperEngine empowers creators who want complete control over their AI companion experiences:
+WhisperEngine empowers creators who want complete control over their AI Roleplay Character experiences:
 
 **� Creative Freedom**
 - **Run on your own infrastructure** - home computer, personal cloud, or private server
 - **Zero external dependencies** - no data sent to corporate servers
-- **Custom personality creation** - build AI companions that match your exact creative vision
+- **Custom personality creation** - build AI Roleplay Characters that match your exact creative vision
 - **Import and continue relationships** - seamless migration from ChatGPT with full conversation history
 - **No content restrictions** - create characters and scenarios that corporate AI won't support
 
 **🚫 No Production Service Plans**
-- **We provide the creative tools, not the service** - you run your own AI companions
+- **We provide the creative tools, not the service** - you run your own AI Roleplay Characters
 - **No WhisperEngine-as-a-Service** - complete creative and data sovereignty  
 - **Perfect for**: Creators frustrated with ChatGPT limitations, privacy concerns, or corporate content restrictions
-- **Target users**: Artists, writers, developers, and anyone wanting truly personal AI companions
+- **Target users**: Artists, writers, developers, and anyone wanting truly personal AI Roleplay Characters
 
 ### **🎭 Character Examples for Your Creative Use**
 - **Elena, Marcus, Gabriel, etc. are creative starting points** you can use and customize
@@ -62,7 +62,7 @@ WhisperEngine empowers creators who want complete control over their AI companio
 ## 🌟 Understanding Our Creative AI Technology
 
 ### **Different Ways People Experience AI Characters**
-We acknowledge that people interact with AI companions in diverse and meaningful ways:
+We acknowledge that people interact with AI Roleplay Characters in diverse and meaningful ways:
 
 - **🔬 Technical Explorers** see sophisticated pattern matching and advanced language processing
 - **🎨 Creative Collaborators** find inspiring partnerships for imagination and artistic projects  
@@ -76,7 +76,7 @@ We acknowledge that people interact with AI companions in diverse and meaningful
 - **Our implementation**: Advanced language models with persistent vector memory, emotional intelligence, and character personalities
 - **Technical honesty**: We don't claim consciousness but respect that interactions can feel meaningful
 - **User agency**: Your interpretation and experience of AI relationships is your own
-- **No gatekeeping**: We don't tell you how you "should" experience AI companions
+- **No gatekeeping**: We don't tell you how you "should" experience AI Roleplay Characters
 - **Inclusive approach**: Technology serves diverse perspectives, not rigid definitions
 
 ### **Alpha Development Status**
@@ -107,17 +107,17 @@ We acknowledge that people interact with AI companions in diverse and meaningful
 - **Technical transparency** - honest about how memory, personality, and conversation systems work
 - **Experiential openness** - respectful of diverse ways people connect with AI personalities
 - **No consciousness claims** - we don't assert or test for AI consciousness or sentience
-- **User-centered design** - technology that serves however you naturally relate to AI companions
+- **User-centered design** - technology that serves however you naturally relate to AI Roleplay Characters
 
 ## � Community Guidelines
 
 ### **Inclusive Community Values**
-Our community welcomes diverse perspectives on AI companion interactions:
+Our community welcomes diverse perspectives on AI Roleplay Character interactions:
 
 ✅ **Encouraged:**
 - **Share your AI experiences openly** - what works, surprises you, or feels meaningful
 - **Explore different character personalities** - discover Elena's scientific passion, Gabriel's wisdom, etc.
-- **Discuss your creative projects** - how AI companions support your imagination and goals
+- **Discuss your creative projects** - how AI Roleplay Characters support your imagination and goals
 - **Help newcomers** - guide others in understanding the platform and installation process
 - **Provide constructive feedback** - help improve character personalities and platform features
 - **Ask questions about self-hosting** - get support for your own creative AI installation
@@ -126,7 +126,7 @@ Our community welcomes diverse perspectives on AI companion interactions:
 
 ### **Community Standards**
 ❌ **Not Encouraged:**
-- Dismissing others' experiences with AI companions as "wrong" or "delusional"  
+- Dismissing others' experiences with AI Roleplay Characters as "wrong" or "delusional"  
 - Attempting harmful or destructive interactions with demo characters
 - Sharing personal sensitive information in public channels with demo characters
 - Monopolizing demo character attention - others want to explore too
@@ -140,7 +140,7 @@ Our community welcomes diverse perspectives on AI companion interactions:
 - **Respectful exploration** - engage with characters in ways that demonstrate their capabilities positively
 - **Report concerning behavior** - help us improve character responses by noting issues
 - **Creative experimentation welcome** - test character personalities, memory, creative collaboration
-- **Community support** - help others understand what's possible with AI companions
+- **Community support** - help others understand what's possible with AI Roleplay Characters
 - **Remember demo nature** - these characters are temporary showcases of the platform's potential
 
 ## � Privacy and Creative Data Sovereignty
@@ -171,7 +171,7 @@ Our community welcomes diverse perspectives on AI companion interactions:
 1. **Check community resources** - pinned messages and documentation links first
 2. **Installation support** - use appropriate channels for your own WhisperEngine setup questions
 3. **Character creation help** - get guidance on CDL personality development  
-4. **Creative discussions** - share your AI companion ideas and projects
+4. **Creative discussions** - share your AI Roleplay Character ideas and projects
 5. **Demo character questions** - remember these are temporary creative showcases
 
 ### **Reporting and Feedback:**
@@ -179,21 +179,21 @@ Our community welcomes diverse perspectives on AI companion interactions:
 - **Installation and setup issues** - get help with your own creative AI platform setup
 - **Character behavior feedback** - help improve demo personalities with specific observations
 - **Creative feature requests** - suggest new capabilities for character development
-- **Community support** - help other creators understand AI companion possibilities
+- **Community support** - help other creators understand AI Roleplay Character possibilities
 
 ## 👥 Inclusive Community Moderation
 
 ### **Moderation Philosophy:**
 - **Respect diverse AI experiences** - we don't police how people interpret AI interactions
 - **Support creative exploration** - encourage positive experimentation with AI personalities
-- **Maintain inclusive environment** - all perspectives on AI companions are welcome
+- **Maintain inclusive environment** - all perspectives on AI Roleplay Characters are welcome
 - **Community-driven standards** - guidelines evolve based on user feedback and needs
 
 ### **Moderator Actions:**
 - **Guidance for new users** - help people understand platform capabilities and community norms
 - **Support for creative conflicts** - mediate disagreements about AI experiences respectfully
 - **Safety interventions** - address harmful behavior while respecting diverse viewpoints
-- **Community building** - foster positive environment for AI companion exploration
+- **Community building** - foster positive environment for AI Roleplay Character exploration
 
 ### **Appeals and Community Input:**
 - **Open dialogue** - discuss moderation decisions and community standards openly
@@ -207,17 +207,17 @@ Our community welcomes diverse perspectives on AI companion interactions:
 - **Community Questions:** Connect in general discussion areas  
 - **Moderation Issues:** Tag `@Moderators` for guidance or concerns
 - **Privacy and Data Questions:** Contact administrators directly for data sovereignty information
-- **Platform Feedback:** Share your ideas for improving AI companion experiences
+- **Platform Feedback:** Share your ideas for improving AI Roleplay Character experiences
 
 ## 🌟 Evolving Community Standards
 
-This policy evolves with our community's understanding of responsible AI companion development. We update our approach based on user experiences, diverse perspectives on AI relationships, and emerging best practices in creative AI ethics. Major changes are announced and discussed openly with the community.
+This policy evolves with our community's understanding of responsible AI Roleplay Character development. We update our approach based on user experiences, diverse perspectives on AI relationships, and emerging best practices in creative AI ethics. Major changes are announced and discussed openly with the community.
 
-Our goal is creating space where people can explore AI companion interactions authentically - whether they see sophisticated tools, creative partners, meaningful relationships, or something entirely their own.
+Our goal is creating space where people can explore AI Roleplay Character interactions authentically - whether they see sophisticated tools, creative partners, meaningful relationships, or something entirely their own.
 
 ---
 
 **Last Updated:** September 27, 2025  
 **Version:** 2.0 (Inclusive Community Standards)
 
-*WhisperEngine embraces diverse perspectives on AI companions. Our community policies respect that people experience AI relationships differently - all approaches are valid. Your interpretation and experience with AI characters is your own.*
+*WhisperEngine embraces diverse perspectives on AI Roleplay Characters. Our community policies respect that people experience AI relationships differently - all approaches are valid. Your interpretation and experience with AI characters is your own.*

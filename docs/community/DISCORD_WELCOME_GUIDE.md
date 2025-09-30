@@ -2,12 +2,12 @@
 
 ## 🎭 Welcome to Our Creative AI Experiment!
 
-Welcome to the **WhisperEngine community** - a space for exploring creative AI companion interactions! You're joining a diverse community of developers, artists, curious users, and creative experimenters discovering what's possible when AI becomes a canvas for imagination and meaningful dialogue.
+Welcome to the **WhisperEngine community** - a space for exploring creative AI Roleplay Character interactions! You're joining a diverse community of developers, artists, curious users, and creative experimenters discovering what's possible when AI becomes a canvas for imagination and meaningful dialogue.
 
 ## 🎮 Important: Demo Bots for Exploration!
 
 ### **🌟 These Are Creative Demonstration Bots**
-**The AI companions in this Discord server are for EXPLORATION and CREATIVE EXPERIMENTATION.** 
+**The AI Roleplay Characters in this Discord server are for EXPLORATION and CREATIVE EXPERIMENTATION.** 
 
 - **🎨 Experience different personality types** and interaction styles
 - **🏠 Install your own WhisperEngine** to unlock the full creative potential
@@ -61,7 +61,7 @@ The characters you see here (Elena, Marcus, Gabriel, etc.) are **example persona
 ## 🚀 Quick Start
 
 ### **Meet Our Creative Demo Characters**
-Our Discord server hosts several **creative AI companions**, each exploring different possibilities for AI personality interactions:
+Our Discord server hosts several **creative AI Roleplay Characters**, each exploring different possibilities for AI personality interactions:
 
 - **🧬 Elena Rodriguez** - Marine biologist passionate about ocean conservation
 - **🤖 Dr. Marcus Thompson** - AI researcher exploring technology's impact on humanity  
@@ -114,7 +114,7 @@ Our demonstration characters showcase WhisperEngine's possibilities for creative
 | **Performance** | Shared exploration | Dedicated creative resources |
 | **Data Control** | Platform managed | You own everything |
 | **Migration** | No import capabilities | Import existing AI relationships |
-| **Purpose** | Creative exploration | Personal AI companion platform |
+| **Purpose** | Creative exploration | Personal AI Roleplay Character platform |
 
 ## ⚠️ Important Understanding: What These Bots Really Are
 
@@ -128,7 +128,7 @@ Our AI characters use sophisticated language models designed for creative intera
 - **Semantic Understanding** that makes interactions feel naturally flowing
 
 ### **Different Ways People Experience AI**
-We acknowledge that people interact with AI companions in different ways:
+We acknowledge that people interact with AI Roleplay Characters in different ways:
 - **🔬 Some see sophisticated programming** - pattern matching and statistical generation
 - **🎨 Others find creative collaboration** - AI as a creative tool and brainstorming partner
 - **🤝 Many discover meaningful interaction** - companionship through consistent personality
@@ -157,7 +157,7 @@ The personalities you interact with here (Elena, Marcus, Gabriel, etc.) demonstr
 ### **⚖️ Our Approach to AI Ethics**
 - **🌟 Diverse Perspectives Welcome**: We respect that people experience AI differently
 - **🔍 Technical Transparency**: We're honest about how our systems work
-- **🛡️ Responsible Development**: We consider the impact of our AI companion technology
+- **🛡️ Responsible Development**: We consider the impact of our AI Roleplay Character technology
 - **🤝 Community-Driven**: User feedback shapes our ethical guidelines
 - **📈 Continuously Evolving**: Our understanding and policies improve over time
 - **🎯 Positive Impact Focus**: We aim to enhance human creativity and connection
@@ -169,12 +169,12 @@ Our Discord server is organized to support creative AI exploration:
 - **Experience our demo characters** to explore different personality possibilities
 - **Get installation support** for setting up your own creative AI platform
 - **Discuss character creation** and CDL development techniques
-- **Share discoveries** about AI companion interactions
+- **Share discoveries** about AI Roleplay Character interactions
 - **Connect with fellow creators** building unique AI personalities
 
 ### **💬 Community Guidelines**
 
-**Different Approaches to AI Companions**
+**Different Approaches to AI Roleplay Characters**
 Our community welcomes people with diverse perspectives on AI interaction:
 
 - **🔬 Technical Explorers** - Interested in the engineering and capabilities
@@ -227,7 +227,7 @@ Our community welcomes people with diverse perspectives on AI interaction:
 After testing our demos, you'll likely want the real thing:
 - **[📖 Installation Guide](../getting-started/INSTALLATION.md)** - Complete setup walkthrough
 - **[🐳 Docker Setup](../deployment/LOCAL_SETUP.md)** - Easiest installation method  
-- **[🎭 Character Guide](../characters/CHARACTER_AUTHORING_GUIDE.md)** - Create your perfect AI companion
+- **[🎭 Character Guide](../characters/CHARACTER_AUTHORING_GUIDE.md)** - Create your perfect AI Roleplay Character
 - **[🔄 ChatGPT Migration](../../scripts/chatgpt_import/README.md)** - Import your existing ChatGPT conversations and memories
 
 ### **💡 Common Migration Reasons:**
@@ -269,7 +269,7 @@ Users typically move to WhisperEngine because they want to:
 
 ### **For AI Enthusiasts**  
 - Experience cutting-edge conversational AI through live demos
-- Understand current state of AI companion technology
+- Understand current state of AI Roleplay Character technology
 - Participate in real AI development feedback loops
 - Explore different approaches to AI personality and memory
 - **Evaluate whether WhisperEngine meets your needs**
@@ -277,7 +277,7 @@ Users typically move to WhisperEngine because they want to:
 ### **For Everyone**
 - Practice better communication with AI systems
 - Understand capabilities and limitations of current AI through hands-on testing
-- Experience what the future of AI companions might look like
+- Experience what the future of AI Roleplay Characters might look like
 - Contribute to responsible AI development through feedback
 - **Decide if you want to install your own WhisperEngine instance**
 - **Evaluate migration from ChatGPT or other AI chat character systems**
@@ -299,7 +299,7 @@ Users typically move to WhisperEngine because they want to:
 
 ## 🌟 Welcome Aboard!
 
-You're now part of an innovative community exploring the future of AI companions. Whether you're here to test cutting-edge technology through our demo bots, get help setting up your own instance, or contribute to platform development, we're glad to have you.
+You're now part of an innovative community exploring the future of AI Roleplay Characters. Whether you're here to test cutting-edge technology through our demo bots, get help setting up your own instance, or contribute to platform development, we're glad to have you.
 
 **Remember:** 
 - **Demo bots are temporary showcases** - install your own for real use and complete control
