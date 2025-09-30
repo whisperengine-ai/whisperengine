@@ -58,6 +58,30 @@ services:
     #   timeout: 10s
     #   retries: 3
 
+  influxdb:
+    image: influxdb:2.7-alpine
+    container_name: whisperengine-multi-influxdb
+    restart: unless-stopped
+    environment:
+      DOCKER_INFLUXDB_INIT_MODE: setup
+      DOCKER_INFLUXDB_INIT_USERNAME: whisperengine
+      DOCKER_INFLUXDB_INIT_PASSWORD: whisperengine_metrics
+      DOCKER_INFLUXDB_INIT_ORG: whisperengine
+      DOCKER_INFLUXDB_INIT_BUCKET: performance_metrics
+      DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: whisperengine-fidelity-first-metrics-token
+    ports:
+      - "8086:8086"
+    volumes:
+      - influxdb_data:/var/lib/influxdb2
+      - influxdb_config:/etc/influxdb2
+    networks:
+      - bot_network
+    healthcheck:
+      test: ["CMD", "influx", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
   # ===== WEB INTERFACE =====
   whisperengine-web:
     build:
@@ -66,7 +90,7 @@ services:
     container_name: whisperengine-web-interface
     restart: unless-stopped
     ports:
-      - "8080:8080"
+      - "8081:8080"  # Changed from 8080 to 8081 to free up 8080 for monitoring dashboard
     environment:
       - DATABASE_URL=postgresql://whisperengine:whisperengine_password@postgres:5432/whisperengine
       # - REDIS_URL=redis://redis:6379/0  # Commented out - using vector-native memory only
@@ -631,6 +655,10 @@ volumes:
   #   name: whisperengine-multi_redis_data
   qdrant_data:
     name: whisperengine-multi_qdrant_data
+  influxdb_data:
+    name: whisperengine-multi_influxdb_data
+  influxdb_config:
+    name: whisperengine-multi_influxdb_config
   
   # Bot-specific volumes (populated dynamically)
   jake_backups:

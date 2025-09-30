@@ -2020,7 +2020,7 @@ class VectorMemoryStore:
                                                       user_id: str,
                                                       memory_types: Optional[List[str]] = None,
                                                       top_k: int = 10,
-                                                      min_score: float = 0.7,
+                                                      min_score: float = 0.3,  # 🔧 TUNING: Lowered from 0.7 to 0.3 for better recall
                                                       emotional_context: Optional[str] = None,
                                                       prefer_recent: bool = True) -> List[Dict[str, Any]]:
         """
@@ -2213,7 +2213,7 @@ class VectorMemoryStore:
 
     async def _fallback_basic_search(self, query: str, user_id: str, memory_types: Optional[List[str]], 
                                    top_k: int, min_score: float) -> List[Dict[str, Any]]:
-        """Fallback to basic Qdrant search if advanced features fail"""
+        """Fallback to basic Qdrant search if advanced features fail with progressive threshold lowering"""
         try:
             query_embedding = await self.generate_embedding(query)
             filter_conditions = [models.FieldCondition(key="user_id", match=models.MatchValue(value=user_id))]
@@ -2223,24 +2223,35 @@ class VectorMemoryStore:
                     models.FieldCondition(key="memory_type", match=models.MatchAny(any=memory_types))  # memory_types is already a list of strings
                 )
             
-            results = self.client.search(
-                collection_name=self.collection_name,
-                query_vector=models.NamedVector(name="content", vector=query_embedding),  # 🎯 NAMED VECTOR
-                query_filter=models.Filter(must=filter_conditions),
-                limit=top_k,
-                score_threshold=min_score
-            )
+            # 🔧 TUNING: Progressive threshold lowering for better recall
+            thresholds_to_try = [min_score, 0.2, 0.1, 0.05]  # Try progressively lower thresholds
             
-            return [{
-                "id": point.id,
-                "score": point.score,
-                "content": point.payload['content'],
-                "memory_type": point.payload['memory_type'],
-                "timestamp": point.payload['timestamp'],
-                "confidence": point.payload.get('confidence', 0.5),
-                "metadata": point.payload,
-                "fallback_used": True
-            } for point in results]
+            for threshold in thresholds_to_try:
+                results = self.client.search(
+                    collection_name=self.collection_name,
+                    query_vector=models.NamedVector(name="content", vector=query_embedding),  # 🎯 NAMED VECTOR
+                    query_filter=models.Filter(must=filter_conditions),
+                    limit=top_k,
+                    score_threshold=threshold
+                )
+                
+                if results:  # If we got results, return them
+                    logger.info(f"🔧 FALLBACK: Retrieved {len(results)} memories with threshold {threshold}")
+                    return [{
+                        "id": point.id,
+                        "score": point.score,
+                        "content": point.payload['content'],
+                        "memory_type": point.payload['memory_type'],
+                        "timestamp": point.payload['timestamp'],
+                        "confidence": point.payload.get('confidence', 0.5),
+                        "metadata": point.payload,
+                        "fallback_used": True,
+                        "threshold_used": threshold
+                    } for point in results]
+            
+            # If no results with any threshold, log warning
+            logger.warning(f"🔧 FALLBACK: No memories found for user {user_id} with query '{query}' even with lowest threshold")
+            return []
             
         except Exception as e:
             logger.error(f"Fallback search also failed: {e}")
@@ -3148,7 +3159,7 @@ class VectorMemoryStore:
             user_id=user_id,
             memory_types=vector_memory_types,  # Already strings, no conversion needed
             top_k=limit,  # Convert limit to top_k for internal method
-            min_score=0.7,
+            min_score=0.3,  # 🔧 TUNING: Lowered from 0.7 to 0.3 for better recall
             prefer_recent=True
         )
 

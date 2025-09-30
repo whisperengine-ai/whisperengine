@@ -240,15 +240,11 @@ class ModularBotManager:
             # Visual emotion commands - REMOVED: superseded by vector-native multimodal approach
             logger.info("ℹ️ Visual emotion handlers removed - using vector-native multimodal approach")
 
-            # Performance monitoring commands - DISABLED (AI-generated bloat nobody asked for)
-            # self.command_handlers["performance"] = create_performance_commands(
-            #     bot=self.bot,
-            #     llm_client=components["llm_client"],
-            #     memory_manager=components["memory_manager"],
-            #     emotion_manager=components.get("emotion_manager")
-            # )
-            # self.command_handlers["performance"].register_commands(bot_name_filter, is_admin)
-            logger.info("ℹ️ Performance monitoring commands disabled (AI-generated enterprise bloat)")
+            # Simple Performance monitoring commands - ENABLED (no circular dependencies)
+            from src.handlers.simple_performance_commands import create_simple_performance_commands
+            self.command_handlers["performance"] = create_simple_performance_commands(self.bot)
+            await self.command_handlers["performance"].register_commands()
+            logger.info("✅ Simple performance monitoring commands enabled (basic metrics available)")
 
             # ℹ️ Multi-entity handlers removed - using vector-native memory approach
 

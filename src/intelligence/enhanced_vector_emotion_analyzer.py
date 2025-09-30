@@ -156,7 +156,7 @@ class EnhancedVectorEmotionAnalyzer:
         self.keyword_weight = float(os.getenv("ENHANCED_EMOTION_KEYWORD_WEIGHT", "0.3"))
         self.semantic_weight = float(os.getenv("ENHANCED_EMOTION_SEMANTIC_WEIGHT", "0.4"))
         self.context_weight = float(os.getenv("ENHANCED_EMOTION_CONTEXT_WEIGHT", "0.3"))
-        self.confidence_threshold = float(os.getenv("ENHANCED_EMOTION_CONFIDENCE_THRESHOLD", "0.4"))
+        self.confidence_threshold = float(os.getenv("ENHANCED_EMOTION_CONFIDENCE_THRESHOLD", "0.3"))  # 🔧 TUNING: Lowered from 0.4 to 0.3
         
         logger.info("Enhanced Vector Emotion Analyzer initialized: enabled=%s, "
                    "weights=[keyword=%s, semantic=%s, context=%s], threshold=%s",
@@ -423,7 +423,8 @@ class EnhancedVectorEmotionAnalyzer:
                     max_non_neutral = max((score for emotion, score in emotion_scores.items() if emotion != 'neutral'), default=0.0)
                     neutral_score = emotion_scores.get('neutral', 0.0)
                     has_strong_emotion = any(score > 0.3 for emotion, score in emotion_scores.items() if emotion != 'neutral')
-                    has_competitive_emotion = max_non_neutral > 0.12 and neutral_score < 0.88
+                    # 🔧 TUNING: Lowered neutral threshold from 0.88 to 0.75 for less neutral bias
+                    has_competitive_emotion = max_non_neutral > 0.08 and neutral_score < 0.75
                     
                     # Use RoBERTa if we have significant non-neutral emotions
                     if has_strong_emotion or has_competitive_emotion:
@@ -1329,7 +1330,8 @@ class EnhancedVectorEmotionAnalyzer:
         care_matches = sum(1 for keyword in care_keywords if keyword in content_lower)
         
         # Apply adjustments if neutral is dominating but we have emotional keywords
-        if adjusted_scores.get('neutral', 0) > 0.65:  # Lowered from 0.7 for more aggressive redistribution
+        # 🔧 TUNING: Lowered neutral threshold from 0.65 to 0.55 for more emotion detection
+        if adjusted_scores.get('neutral', 0) > 0.55:  # More aggressive non-neutral detection
             if passion_matches >= 1 or excitement_matches >= 1:  # More sensitive - only need 1 match
                 # Redistribute some neutral to joy
                 neutral_reduction = min(0.35, adjusted_scores.get('neutral', 0) * 0.5)  # More aggressive redistribution

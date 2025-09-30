@@ -155,6 +155,20 @@ class QdrantQueryOptimizer:
                 limit=limit
             )
             
+            # 🔧 TUNING: Add debug logging for zero results
+            if not results:
+                logger.warning(f"🔧 QDRANT-OPTIMIZATION: No results found for query '{query}' (optimized: '{optimized_query}') - user_id: {user_id}")
+                # Try a broader search with no filters as diagnostic
+                try:
+                    diagnostic_results = await self._search_with_vector_store(query=query, user_id=user_id, limit=5)
+                    logger.info(f"🔧 DIAGNOSTIC: Broader search found {len(diagnostic_results)} results")
+                except Exception as diag_e:
+                    logger.error(f"🔧 DIAGNOSTIC: Broader search also failed: {diag_e}")
+            else:
+                # Log similarity scores for debugging
+                top_scores = [r.get('score', 0.0) for r in results[:3]]
+                logger.debug(f"🔧 SEARCH SCORES: Top 3 similarity scores: {top_scores}")
+            
             # Re-rank if user history available
             if user_history:
                 results = self.rerank_results(results, user_history)

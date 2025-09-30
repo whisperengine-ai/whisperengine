@@ -28,6 +28,9 @@ numpy==2.3.3  # Updated from 2.3.2 - Required for vector memory system
 # spacy==3.8.7  # REMOVED: Replaced by vector-native approach + local patterns
 textblob==0.18.0.post0  # Lightweight sentiment analysis (replaces RoBERTa/transformers)
 
+# Time Series Monitoring (Fidelity-First Performance)
+influxdb-client==1.46.0  # Time series database for performance metrics
+
 # Redis Dependencies
 redis==6.4.0  # Updated from 5.2.1
 
