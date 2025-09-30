@@ -147,6 +147,13 @@ def create_memory_manager(memory_type: str = "vector", **config) -> MemoryManage
             async def retrieve_relevant_memories(self, user_id: str, query: str, limit: int = 10) -> List[Dict[str, Any]]:
                 return []
             
+            async def retrieve_relevant_memories_fidelity_first(
+                self, user_id: str, query: str, limit: int = 10,
+                full_fidelity: bool = True, intelligent_ranking: bool = True,
+                graduated_filtering: bool = True, preserve_character_nuance: bool = True
+            ) -> List[Dict[str, Any]]:
+                return []
+            
             async def store_fact(self, user_id: str, fact: str, context: str, 
                                confidence: float = 1.0, metadata: Optional[Dict[str, Any]] = None) -> bool:
                 return True
