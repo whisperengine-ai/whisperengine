@@ -255,7 +255,7 @@ async def initialize_conversation_manager(self):
 ### **Phase 3: Configuration** (Zero Risk)
 ```bash
 # Add to .env.template (optional configuration)
-ENABLE_CONCURRENT_CONVERSATION_MANAGER=false  # Default disabled
+ENABLE_CONCURRENT_CONVERSATION_MANAGER=true   # Default enabled (performance optimization)
 MAX_CONCURRENT_SESSIONS=1000                  # Conservative default
 MAX_WORKER_THREADS=8                          # Auto-detected if not set
 SESSION_TIMEOUT_MINUTES=30                    # Standard timeout
