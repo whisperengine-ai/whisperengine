@@ -137,16 +137,36 @@ class CDLAIPromptIntegration:
         if hasattr(character, 'personality') and hasattr(character.personality, 'big_five'):
             big_five = character.personality.big_five
             prompt += f"\n\n🧬 PERSONALITY PROFILE:\n"
+            
+            # Helper function to get trait description (handles both float and object formats)
+            def get_trait_info(trait_obj, trait_name):
+                if hasattr(trait_obj, 'trait_description'):
+                    # New object format
+                    return f"{trait_obj.trait_description} (Score: {trait_obj.score if hasattr(trait_obj, 'score') else 'N/A'})"
+                elif isinstance(trait_obj, (float, int)):
+                    # Legacy float format
+                    score = trait_obj
+                    trait_descriptions = {
+                        'openness': f"Openness to experience: {'High' if score > 0.7 else 'Moderate' if score > 0.4 else 'Low'} ({score})",
+                        'conscientiousness': f"Conscientiousness: {'High' if score > 0.7 else 'Moderate' if score > 0.4 else 'Low'} ({score})", 
+                        'extraversion': f"Extraversion: {'High' if score > 0.7 else 'Moderate' if score > 0.4 else 'Low'} ({score})",
+                        'agreeableness': f"Agreeableness: {'High' if score > 0.7 else 'Moderate' if score > 0.4 else 'Low'} ({score})",
+                        'neuroticism': f"Neuroticism: {'High' if score > 0.7 else 'Moderate' if score > 0.4 else 'Low'} ({score})"
+                    }
+                    return trait_descriptions.get(trait_name, f"{trait_name}: {score}")
+                else:
+                    return f"{trait_name}: Unknown format"
+            
             if hasattr(big_five, 'openness'):
-                prompt += f"- Openness: {big_five.openness.trait_description}\n"
+                prompt += f"- {get_trait_info(big_five.openness, 'openness')}\n"
             if hasattr(big_five, 'conscientiousness'):
-                prompt += f"- Conscientiousness: {big_five.conscientiousness.trait_description}\n"
+                prompt += f"- {get_trait_info(big_five.conscientiousness, 'conscientiousness')}\n"
             if hasattr(big_five, 'extraversion'):
-                prompt += f"- Extraversion: {big_five.extraversion.trait_description}\n"
+                prompt += f"- {get_trait_info(big_five.extraversion, 'extraversion')}\n"
             if hasattr(big_five, 'agreeableness'):
-                prompt += f"- Agreeableness: {big_five.agreeableness.trait_description}\n"
+                prompt += f"- {get_trait_info(big_five.agreeableness, 'agreeableness')}\n"
             if hasattr(big_five, 'neuroticism'):
-                prompt += f"- Neuroticism: {big_five.neuroticism.trait_description}\n"
+                prompt += f"- {get_trait_info(big_five.neuroticism, 'neuroticism')}\n"
 
         # Add personal knowledge sections (relationships, family, career, etc.)
         try:

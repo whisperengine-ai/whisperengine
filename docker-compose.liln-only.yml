@@ -1,0 +1,76 @@
+# Custom Multi-Bot Docker Compose for liln bot only
+# Uses existing Qdrant container, creates minimal infrastructure
+
+services:
+  # ===== INFRASTRUCTURE SERVICES =====
+  postgres:
+    image: postgres:16.4-alpine
+    container_name: whisperengine-liln-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: whisperengine
+      POSTGRES_USER: whisperengine
+      POSTGRES_PASSWORD: whisperengine123
+      POSTGRES_HOST_AUTH_METHOD: trust
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_liln_data:/var/lib/postgresql/data
+    networks:
+      - whisperengine-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U whisperengine -d whisperengine"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ===== BOT SERVICES =====
+  liln-bot:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    container_name: whisperengine-liln-bot
+    restart: unless-stopped
+    user: root
+    env_file:
+      - .env.liln
+    environment:
+      # Override for existing Qdrant
+      - QDRANT_HOST=qdrant
+      - QDRANT_PORT=6333
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=whisperengine
+      - POSTGRES_USER=whisperengine
+      - POSTGRES_PASSWORD=whisperengine123
+      - FASTEMBED_CACHE_PATH=/tmp/fastembed
+    ports:
+      - "9098:9090"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./src:/app/src:ro
+      - ./characters:/app/characters:ro
+      - ./config:/app/config:ro
+      - fastembed_cache:/tmp/fastembed
+    networks:
+      - whisperengine-network
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:9090/health', timeout=10)"]
+      interval: 60s
+      timeout: 15s
+      retries: 3
+      start_period: 60s
+
+# ===== NETWORKS =====
+networks:
+  whisperengine-network:
+    external: true
+
+# ===== VOLUMES =====
+volumes:
+  postgres_liln_data:
+    driver: local
+  fastembed_cache:
+    driver: local

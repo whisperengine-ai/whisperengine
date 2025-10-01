@@ -98,6 +98,10 @@ class DiscordBotCore:
         self.personality_profiler = None
         self.graph_personality_manager = None
         self.phase2_integration = None
+        
+        # Character system components
+        self.character_system = None
+        self.character_file = None
         self.phase3_memory_networks = None
         self.context_switch_detector = None  # Phase 3 Advanced Intelligence
         self.empathy_calibrator = None  # Phase 3 Advanced Intelligence
@@ -196,6 +200,25 @@ class DiscordBotCore:
         except Exception as e:
             self.logger.debug("Memory system initialization failed: %s", str(e))
             raise
+    
+    def initialize_character_system(self):
+        """Initialize CDL character system for personality-driven responses."""
+        try:
+            from src.prompts.cdl_ai_integration import CDLAIPromptIntegration
+            
+            # Get character file from environment
+            self.character_file = os.getenv('CDL_DEFAULT_CHARACTER')
+            
+            if self.character_file:
+                # Initialize CDL AI integration system
+                self.character_system = CDLAIPromptIntegration()
+                self.logger.info(f"✅ Character system initialized with file: {self.character_file}")
+            else:
+                self.logger.warning("⚠️ No CDL_DEFAULT_CHARACTER specified - character system disabled")
+                
+        except Exception as e:
+            self.logger.error(f"❌ Character system initialization failed: {e}")
+            # Don't raise - character system is optional
     
     def initialize_hybrid_emotion_analyzer(self):
         """🚀 FAST TRACK: Initialize hybrid emotion analyzer for optimal performance"""
@@ -844,6 +867,7 @@ class DiscordBotCore:
         self.initialize_bot()
         self.initialize_llm_client()
         self.initialize_memory_system()
+        self.initialize_character_system()
         self.initialize_hybrid_emotion_analyzer()
         
         # LLM Tool Integration removed - memory system simplified
