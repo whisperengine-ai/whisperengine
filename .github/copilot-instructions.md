@@ -10,6 +10,15 @@
 - **Character-based system** not "bot-based system"
 - This is a foundational branding and positioning distinction
 
+**🚨 CRITICAL DOCUMENTATION TONE DIRECTIVE:**
+- **MAINTAIN CASUAL TECHNICAL TONE** in all documentation and communications
+- **AVOID SENSATIONAL LANGUAGE** - no "revolutionary", "breakthrough", "groundbreaking" claims
+- **NO SCIENTIFIC CLAIMS** - avoid "scientific validation", "empirical proof", "research findings"
+- **USE TECHNICAL PRECISION** with humble, measured language
+- **FRAME AS DEVELOPMENT PROGRESS** not academic research or commercial breakthroughs
+- **FOCUS ON IMPLEMENTATION DETAILS** rather than broad claims or implications
+- This reflects WhisperEngine's pragmatic engineering approach
+
 **ALPHA/DEV PHASE**: WhisperEngine is in active development. Prioritize working features over production optimization. No production users yet - we can freely iterate and change.
 
 **🚨 CRITICAL DEV RULE: NO FEATURE FLAGS FOR LOCAL CODE!** 
