@@ -2,6 +2,14 @@
 
 ## 🚨 CRITICAL DEVELOPMENT CONTEXT 🚨
 
+**🚨 CRITICAL TERMINOLOGY DIRECTIVE:**
+- **WhisperEngine uses "AI Roleplay Characters" NOT "AI Companions"**
+- **ALWAYS use "AI roleplay characters" or "AI characters" in all documentation, code comments, and communications**
+- **NEVER use "companions", "assistants", or "bots" when referring to character entities**
+- **Multi-character architecture** not "multi-bot architecture"
+- **Character-based system** not "bot-based system"
+- This is a foundational branding and positioning distinction
+
 **ALPHA/DEV PHASE**: WhisperEngine is in active development. Prioritize working features over production optimization. No production users yet - we can freely iterate and change.
 
 **🚨 CRITICAL DEV RULE: NO FEATURE FLAGS FOR LOCAL CODE!** 
@@ -14,26 +22,26 @@
 - Use stubs/no-op implementations for missing EXTERNAL dependencies, not feature flags
 
 **🚨 CRITICAL ARCHITECTURE RULE: NO CHARACTER-SPECIFIC HARDCODED LOGIC!**
-- **NEVER hardcode character names, personalities, or bot-specific behavior in Python code**
+- **NEVER hardcode character names, personalities, or character-specific behavior in Python code**
 - **ALL character data must come from CDL JSON files** (`characters/examples/*.json`)
 - **ALL bot identification must use environment variables** (`DISCORD_BOT_NAME`, `CHARACTER_FILE`)
 - **USE dynamic discovery and configuration generation** via `scripts/generate_multi_bot_config.py`
 - **NO hardcoded bot lists, character references, or personality assumptions**
 - **Character logic flows through CDL system ONLY** - never embed personality traits in code
 - **Bot names are discovered dynamically** from `.env.*` files - never maintain static lists
-- **Multi-bot architecture requires complete character agnosticism** in all Python components
+- **Multi-character architecture requires complete character agnosticism** in all Python components
 - When adding features, ensure they work for ANY character via CDL integration
 - Use `get_normalized_bot_name_from_env()` for bot identification, never literal strings
 
 **DOCKER-FIRST DEVELOPMENT**: Container-based development is the PRIMARY workflow. Use `./multi-bot.sh` for all operations (auto-generated, don't edit manually).
 
-**BOT TESTING STRATEGY**: Use different bots for specific testing scenarios:
-- **MEMORY TESTING**: Use Jake or Ryan bots - they have minimal personality complexity, making memory issues easier to isolate
-- **PERSONALITY/CDL TESTING**: Use Elena bot - she has the richest and most extensive CDL personality for testing emotional intelligence, character responses, and CDL pipeline functionality
-- **CODE CHANGES**: Use `./multi-bot.sh restart <bot>` for code changes, but `./multi-bot.sh stop <bot> && ./multi-bot.sh start <bot>` for environment changes
-- **START/STOP AS NEEDED**: Only run the specific bot(s) needed for testing to reduce resource usage and isolate issues
+**AI CHARACTER TESTING STRATEGY**: Use different AI roleplay characters for specific testing scenarios:
+- **MEMORY TESTING**: Use Jake or Ryan characters - they have minimal personality complexity, making memory issues easier to isolate
+- **PERSONALITY/CDL TESTING**: Use Elena character - she has the richest and most extensive CDL personality for testing emotional intelligence, character responses, and CDL pipeline functionality
+- **CODE CHANGES**: Use `./multi-bot.sh restart <character>` for code changes, but `./multi-bot.sh stop <character> && ./multi-bot.sh start <character>` for environment changes
+- **START/STOP AS NEEDED**: Only run the specific character(s) needed for testing to reduce resource usage and isolate issues
 
-**WEB INTERFACE STATUS**: The web chat interface (`src/web/simple_chat_app.py`) is currently not functional. **For HTTP API chat access, use individual bot API endpoints directly** (see Bot API Endpoints section below).
+**WEB INTERFACE STATUS**: The web chat interface (`src/web/simple_chat_app.py`) is currently not functional. **For HTTP API chat access, use individual character API endpoints directly** (see Character API Endpoints section below).
 
 **PYTHON VIRTUAL ENVIRONMENT**: Always use `.venv/bin/activate` for Python commands:
 ```bash
@@ -51,13 +59,13 @@ python scripts/generate_multi_bot_config.py  # Example: configuration generation
 
 **NO NEO4J**: We don't use Neo4j anymore - everything is vector-native with Qdrant. Delete any Neo4j references, imports, or graph database code.
 
-**DYNAMIC MULTI-BOT SYSTEM**: Bot configurations are auto-discovered from `.env.*` files. No hardcoded bot names - everything is generated dynamically by `scripts/generate_multi_bot_config.py`. Currently active bots: elena, marcus, jake, dream, aethys, ryan, gabriel, sophia.
+**DYNAMIC MULTI-CHARACTER SYSTEM**: Character configurations are auto-discovered from `.env.*` files. No hardcoded character names - everything is generated dynamically by `scripts/generate_multi_bot_config.py`. Currently active characters: elena, marcus, jake, dream, aethys, ryan, gabriel, sophia.
 
 **REDIS STATUS**: Redis is CURRENTLY DISABLED in multi-bot setup. Only PostgreSQL (port 5433) and Qdrant (port 6334) are active. Redis references remain in code for potential future re-enabling.
 
 ## Architecture Overview
 
-WhisperEngine is a **multi-bot Discord AI companion system** with vector-native memory, CDL (Character Definition Language) personalities, Universal Identity system, and protocol-based dependency injection.
+WhisperEngine is a **multi-character Discord AI roleplay system** with vector-native memory, CDL (Character Definition Language) personalities, Universal Identity system, and protocol-based dependency injection.
 
 ## 🎯 FIDELITY-FIRST ARCHITECTURE PRIORITY
 
