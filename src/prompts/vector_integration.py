@@ -119,8 +119,8 @@ async def integrate_with_events_handler(
         cdl_integration = CDLAIPromptIntegration(vector_memory)
         default_character = os.getenv('CDL_DEFAULT_CHARACTER', 'characters/default_assistant.json')
         
-        # Create character-aware prompt using CDL
-        return await cdl_integration.create_character_aware_prompt(
+        # Create character-aware prompt using unified CDL method
+        return await cdl_integration.create_unified_character_prompt(
             character_file=default_character,
             user_id=user_id,
             message_content=message_content

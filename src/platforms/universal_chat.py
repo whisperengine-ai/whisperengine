@@ -1241,7 +1241,7 @@ class UniversalChatOrchestrator:
                             if character_file:
                                 # Create character-aware prompt using CDL system
                                 logging.info(f"🎭 CDL CHARACTER: Calling CDL system for {message.user_id}")
-                                cdl_prompt = await self.bot_core.character_system.create_optimized_character_prompt(
+                                cdl_prompt = await self.bot_core.character_system.create_unified_character_prompt(
                                     character_file=character_file,
                                     user_id=message.user_id,
                                     message_content=message.content,
@@ -1338,7 +1338,7 @@ class UniversalChatOrchestrator:
                 else:
                     logging.info(f"🎭 UNIVERSAL CHAT: User {user_id} has active character: {character_file}")
                     
-                character_prompt = await self.character_system.create_optimized_character_prompt(
+                character_prompt = await self.character_system.create_unified_character_prompt(
                     character_file=character_file,
                     user_id=user_id,
                     message_content=""  # No current message in this context
@@ -1782,7 +1782,7 @@ class UniversalChatOrchestrator:
                 else:
                     logging.info(f"🎭 UNIVERSAL CHAT: User {user_id} has active character: {character_file}")
                 
-                character_prompt = await self.character_system.create_optimized_character_prompt(
+                character_prompt = await self.character_system.create_unified_character_prompt(
                     character_file=character_file,
                     user_id=user_id,
                     message_content=current_message

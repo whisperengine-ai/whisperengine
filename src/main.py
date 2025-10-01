@@ -248,18 +248,12 @@ class ModularBotManager:
 
             # ℹ️ Multi-entity handlers removed - using vector-native memory approach
 
-            logger.info("ℹ️ Deleted obsolete command handlers: CDL Test, Monitoring")
+            logger.info("ℹ️ Deleted obsolete command handlers: CDL Test, Monitoring, LLM Self-Memory")
 
-            # LLM-Powered Self-Memory Commands - ENABLED for CDL knowledge extraction
-            from src.handlers.llm_self_memory_commands import create_llm_self_memory_handlers
-            bot_name = os.getenv("DISCORD_BOT_NAME", "unknown")
-            self.command_handlers["llm_self_memory"] = create_llm_self_memory_handlers(
-                bot=self.bot,
-                memory_manager=components.get("memory_manager"),
-                bot_name=bot_name
-            )
-            await self.command_handlers["llm_self_memory"].register_commands(bot_name_filter)
-            logger.info("✅ LLM-Powered Self-Memory commands enabled (CDL extraction available)")
+            # LLM-Powered Self-Memory Commands - REMOVED as architectural cleanup
+            # Replaced with simpler CDL query helper approach - no redundant LLM calls needed
+            # Character knowledge comes directly from CDL files (single source of truth)
+            logger.info("ℹ️ LLM Self-Memory commands removed (replaced with CDL query helper)")
             
             # Memory Management Tool Commands - REMOVED as part of memory system simplification
             # Complex LLM-powered memory tools have been removed to focus on core functionality

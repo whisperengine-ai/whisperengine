@@ -3457,8 +3457,8 @@ class BotEventHandlers:
             # Get user's display name for better identification
             user_display_name = getattr(message.author, 'display_name', None) or getattr(message.author, 'name', None)
             
-            # 🚀 OPTIMIZATION: Use optimized prompt for better performance and less repetition loops
-            character_prompt = await cdl_integration.create_optimized_character_prompt(
+            # 🚀 FULL INTELLIGENCE: Use complete character-aware prompt with all emotional intelligence
+            character_prompt = await cdl_integration.create_unified_character_prompt(
                 character_file=character_file,
                 user_id=user_id,
                 message_content=message.content,

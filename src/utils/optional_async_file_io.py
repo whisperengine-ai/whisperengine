@@ -163,10 +163,10 @@ class AsyncSystemPromptLoader:
             default_character = os.getenv('CDL_DEFAULT_CHARACTER', 'characters/default_assistant.json')
             
             # Create a basic character-aware prompt
-            prompt = await cdl_integration.create_character_aware_prompt(
-                character_file=default_character,
-                user_id="system",
-                message_content="System initialization"
+            prompt = await cdl_integration.create_unified_character_prompt(
+                character_file=character_file,
+                user_id=user_id,
+                message_content=content
             )
             return prompt
             

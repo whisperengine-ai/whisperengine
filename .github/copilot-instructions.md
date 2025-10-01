@@ -91,6 +91,10 @@ llm_client = create_llm_client(llm_client_type="openrouter")
 # Universal Identity (NEW)
 from src.identity.universal_identity import create_identity_manager
 identity_manager = create_identity_manager(postgres_pool)
+
+# Structured CDL Personal Knowledge (NEW) - Integrated into prompt building
+# Personal knowledge is extracted directly in CDL AI Integration during prompt building
+# No separate helper needed - question type detection pulls relevant CDL sections
 ```
 
 **Multi-Bot Architecture**: Single infrastructure supports multiple character bots:
@@ -810,17 +814,17 @@ curl http://localhost:9091/api/chat  # ✅ Individual bot API endpoints
 - `HelpCommandHandlers` - Help system and command documentation
 - `StatusCommandHandlers` - Health and status monitoring
 - `VoiceCommandHandlers` - Voice functionality
-- `PrivacyCommandHandlers` - Privacy and data management
-- `MonitoringCommands` - System monitoring and performance
 - `PerformanceCommands` - Performance analysis and optimization
-- `LLMToolCommandHandlers` - LLM-powered tool commands (conditionally enabled)
-- `LLMSelfMemoryHandlers` - Self-memory analysis commands (conditionally enabled)
 - `WebSearchCommandHandlers` - Web search integration (available)
 
 **Currently Disabled** (over-engineered or obsolete):
 - `AdminCommandHandlers` - Disabled (over-engineered)
 - `MemoryCommandHandlers` - Disabled (obsolete API)
 - `CDLTestCommands` - Disabled (dev testing only)
+- `PrivacyCommandHandlers` - Disabled (privacy and data management)
+- `MonitoringCommands` - Disabled (system monitoring and performance)
+- `LLMToolCommandHandlers` - Disabled (LLM-powered tool commands)
+- `LLMSelfMemoryHandlers` - **REMOVED** (replaced with structured CDL personal knowledge integration)
 
 **Handler Registration Pattern**:
 ```python
@@ -863,6 +867,13 @@ async def memory_operation():
 - Never hardcode character names, personalities, or bot-specific behavior
 - Features must work for ANY character via CDL integration
 - Use environment variables for bot identification, never literal strings
+
+**CDL Personal Knowledge Integration**: For personal questions (relationships, family, career, etc.):
+- Use structured CDL section extraction in `src/prompts/cdl_ai_integration.py`
+- Question type detection categorizes queries and pulls relevant CDL sections
+- Structured data integration follows same patterns as Big Five personality, life phases
+- NO separate CDL Query Helper - personal knowledge is integrated into prompt building
+- Zero latency direct JSON access, no LLM API calls for character knowledge
 
 **Fidelity-First Development Patterns**: Core architectural implementations:
 

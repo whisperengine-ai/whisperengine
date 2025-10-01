@@ -820,8 +820,13 @@ class OptimizedPromptBuilder:
                 # Guidelines are important - trim but keep structure
                 trimmed_section = self._trim_section_details(section, "guidelines", context_analysis)
                 trimmed_sections.append(trimmed_section)
+            elif section.startswith("MEMORY CONTEXT:") and context_analysis.get('needs_memory_context'):
+                # 🎯 MEMORY gets balanced trimming - preserve conversation flow
+                trimmed_section = self._trim_section_details(section, "memory", context_analysis)
+                trimmed_sections.append(trimmed_section)
+                critical_preserved += 1
             else:
-                # Other sections can be trimmed more aggressively
+                # Static sections (personality, voice) can be trimmed more aggressively
                 trimmed_section = self._trim_section_details(section, "optional", context_analysis)
                 trimmed_sections.append(trimmed_section)
         
@@ -885,8 +890,16 @@ class OptimizedPromptBuilder:
                     return lines[0] + '\n' + '\n'.join(essential_lines[:3])
             return section
             
+        elif section_type == "memory":
+            # 🎯 BALANCED trimming for memory context - preserve conversation flow
+            if len(section.split()) > 60:  # More generous limit than "optional"
+                lines = section.split('\n')
+                # Keep header + up to 4 conversation lines (vs 2 for optional)
+                return lines[0] + '\n' + '\n'.join(lines[1:5])  # Header + 4 detail lines
+            return section
+            
         elif section_type == "optional":
-            # More aggressive trimming for personality, voice, memory
+            # More aggressive trimming for static content (personality, voice)
             if len(section.split()) > 40:
                 lines = section.split('\n')
                 return lines[0] + '\n' + '\n'.join(lines[1:3])  # Header + 2 detail lines
@@ -895,23 +908,23 @@ class OptimizedPromptBuilder:
         return section
     
     def _prioritize_sections_by_context(self, sections: List[str], context_analysis: Dict) -> List[str]:
-        """Prioritize sections based on context analysis."""
+        """Prioritize sections based on context analysis - BALANCED for conversation continuity."""
         
         priority_map = []
         
         for i, section in enumerate(sections):
             if i == 0:  # Identity always highest priority
                 priority_map.append((0, section))
-            elif section.startswith("AI IDENTITY:") and context_analysis.get('needs_ai_guidance'):
-                priority_map.append((1, section))  # High priority when needed
             elif section.startswith("RESPONSE STYLE:"):
-                priority_map.append((2, section))  # Always important
-            elif section.startswith("PERSONALITY:") and context_analysis.get('needs_personality'):
-                priority_map.append((3, section))  # Medium priority when relevant
-            elif section.startswith("VOICE:") and context_analysis.get('needs_voice_style'):
-                priority_map.append((4, section))  # Medium priority when relevant
+                priority_map.append((1, section))  # Always important - keeps response quality
             elif section.startswith("MEMORY CONTEXT:") and context_analysis.get('needs_memory_context'):
-                priority_map.append((5, section))  # Lower priority but important when needed
+                priority_map.append((2, section))  # 🎯 HIGHER PRIORITY - conversation continuity critical
+            elif section.startswith("AI IDENTITY:") and context_analysis.get('needs_ai_guidance'):
+                priority_map.append((3, section))  # Important when needed but less dynamic
+            elif section.startswith("PERSONALITY:") and context_analysis.get('needs_personality'):
+                priority_map.append((4, section))  # Static content - can be trimmed more aggressively
+            elif section.startswith("VOICE:") and context_analysis.get('needs_voice_style'):
+                priority_map.append((5, section))  # Static content - can be trimmed more aggressively
             else:
                 priority_map.append((6, section))  # Lowest priority
         
