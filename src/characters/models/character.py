@@ -125,7 +125,9 @@ class CurrentProject:
     status: str = "active"
     priority: str = "medium"
     deadline: Optional[datetime] = None
-    progress: str = ""
+    progress: float = 0.0  # Changed from str to float to match parser expectations
+    importance: str = ""  # Added field that parser expects
+    daily_time_allocation: str = ""  # Added field that parser expects
     challenges: List[str] = field(default_factory=list)
 
 
@@ -193,12 +195,30 @@ class CharacterIdentity:
 
 
 @dataclass
+class AIIdentityHandling:
+    """AI identity handling configuration for character responses"""
+    philosophy: str = ""
+    approach: str = ""
+    direct_ai_questions: Dict[str, Any] = field(default_factory=dict)
+    character_background_questions: Dict[str, Any] = field(default_factory=dict)
+
+@dataclass  
+class CommunicationStyle:
+    """Communication style configuration"""
+    tone: str = "adaptive"
+    formality: str = "moderate" 
+    humor: str = "situational"
+    empathy_level: str = "high"
+    directness: str = "balanced"
+    ai_identity_handling: AIIdentityHandling = field(default_factory=AIIdentityHandling)
+
+@dataclass
 class CharacterCommunication:
     """Character communication patterns and typical responses"""
     typical_responses: Dict[str, List[str]] = field(default_factory=dict)
     emotional_expressions: Dict[str, str] = field(default_factory=dict)
     response_length: str = "moderate"
-    communication_style: str = "adaptive"
+    communication_style: CommunicationStyle = field(default_factory=CommunicationStyle)
     
     def __post_init__(self):
         """Initialize default typical responses if empty"""
