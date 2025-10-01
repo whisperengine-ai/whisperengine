@@ -191,11 +191,16 @@ def create_memory_manager(memory_type: str = "vector", **config) -> MemoryManage
         
         # Create vector config from environment and overrides
         import os
+        
+        # Use explicit collection name from environment variable
+        # This allows precise control without auto-detection
+        collection_name = os.getenv('QDRANT_COLLECTION_NAME', 'whisperengine_memory')
+        
         config = {
             'qdrant': {
                 'host': os.getenv('QDRANT_HOST', 'localhost'),
                 'port': int(os.getenv('QDRANT_PORT', '6333')),
-                'collection_name': os.getenv('QDRANT_COLLECTION_NAME', 'chat_memories')
+                'collection_name': collection_name
             },
             'embeddings': {
                 'model_name': os.getenv('EMBEDDING_MODEL', 'sentence-transformers/all-MiniLM-L6-v2'),  # Best 384D model - excellent quality and speed

@@ -70,6 +70,16 @@ python scripts/generate_multi_bot_config.py  # Example: configuration generation
 
 **DYNAMIC MULTI-CHARACTER SYSTEM**: Character configurations are auto-discovered from `.env.*` files. No hardcoded character names - everything is generated dynamically by `scripts/generate_multi_bot_config.py`. Currently active characters: elena, marcus, jake, dream, aethys, ryan, gabriel, sophia.
 
+**BOT-SPECIFIC COLLECTION ISOLATION**: Each bot uses its own dedicated Qdrant collection for complete memory isolation:
+- Elena: `whisperengine_memory_elena` (4,834 memories)
+- Marcus: `whisperengine_memory_marcus` (2,738 memories) 
+- Gabriel: `whisperengine_memory_gabriel` (2,897 memories)
+- Sophia: `whisperengine_memory_sophia` (3,131 memories)
+- Jake: `whisperengine_memory_jake` (1,040 memories)
+- Ryan: `whisperengine_memory_ryan` (821 memories)
+- Dream: `whisperengine_memory_dream` (916 memories)
+- Aethys: `chat_memories_aethys` (6,630 memories)
+
 **REDIS STATUS**: Redis is CURRENTLY DISABLED in multi-bot setup. Only PostgreSQL (port 5433) and Qdrant (port 6334) are active. Redis references remain in code for potential future re-enabling.
 
 ## Architecture Overview
@@ -284,6 +294,7 @@ python src/web/simple_chat_app.py
 # 1. Copy template and customize
 cp .env.template .env.newbot
 # Edit .env.newbot with unique Discord token, bot name, character file
+# CRITICAL: Set QDRANT_COLLECTION_NAME=whisperengine_memory_newbot for memory isolation
 
 # 2. Create character file (optional - will use default if not found)
 # Add characters/examples/newbot.json or similar
@@ -353,6 +364,28 @@ python src/validation/demo_validation_system.py
 ## Memory System (Critical)
 
 **Vector-Native Architecture**: Qdrant vector memory with fastembed is THE PRIMARY memory system:
+
+**🚨 CRITICAL: Bot-Specific Collections** - Each bot has its own dedicated Qdrant collection:
+```python
+# ALWAYS use the correct collection name for each bot via environment variable
+collection_name = os.getenv('QDRANT_COLLECTION_NAME')
+
+# Current bot collection assignments:
+# Elena: whisperengine_memory_elena (4,834 memories)
+# Marcus: whisperengine_memory_marcus (2,738 memories)  
+# Gabriel: whisperengine_memory_gabriel (2,897 memories)
+# Sophia: whisperengine_memory_sophia (3,131 memories)
+# Jake: whisperengine_memory_jake (1,040 memories)
+# Ryan: whisperengine_memory_ryan (821 memories)
+# Dream: whisperengine_memory_dream (916 memories)
+# Aethys: chat_memories_aethys (6,630 memories)
+
+# Memory operations are automatically isolated by collection
+# Elena's memories stay in whisperengine_memory_elena
+# Marcus's memories stay in whisperengine_memory_marcus
+# No cross-bot memory leakage possible
+```
+
 ```python
 # ALWAYS use vector/semantic search before manual Python analysis
 memories = await memory_manager.retrieve_relevant_memories(
@@ -406,15 +439,18 @@ results = client.search(
 point = PointStruct(id=memory.id, vector=embedding, payload=payload)
 ```
 
-**ALWAYS use Bot Segmentation** - Filter by bot_name:
+**ALWAYS use Bot Segmentation** - Filter by bot_name AND use correct collection:
 ```python
-# ✅ CORRECT: All operations must filter by bot_name
+# ✅ CORRECT: Bot-specific collection isolation (PRIMARY method)
+collection_name = os.getenv('QDRANT_COLLECTION_NAME')  # Each bot has unique collection
+
+# ✅ CORRECT: All operations must also filter by bot_name within collection
 must_conditions = [
     models.FieldCondition(key="user_id", match=models.MatchValue(value=user_id)),
     models.FieldCondition(key="bot_name", match=models.MatchValue(value=get_normalized_bot_name_from_env()))
 ]
 
-# ✅ CORRECT: Store with bot segmentation
+# ✅ CORRECT: Store with bot segmentation and collection isolation
 payload = {
     "user_id": user_id,
     "bot_name": get_normalized_bot_name_from_env(),  # CRITICAL: Bot isolation
@@ -424,6 +460,9 @@ payload = {
 
 # ❌ WRONG: Missing bot_name segmentation
 payload = {"user_id": user_id, "content": content}  # Will leak across bots!
+
+# ❌ WRONG: Using wrong collection
+collection_name = "whisperengine_memory"  # Don't hardcode - use environment variable!
 ```
 
 **Vector Retrieval Patterns** - Handle named vector responses:
@@ -444,14 +483,20 @@ scroll_result = client.scroll(
 )
 ```
 
-**Bot-Specific Memory Isolation**: Critical discovery - each bot has completely isolated memories:
+**Bot-Specific Memory Isolation**: Each bot has completely isolated memories via dedicated collections:
 ```python
-# Memory queries filter by bot_name (Elena, Marcus, etc.)
-# This creates complete conversation isolation between bots
-# Account discovery must show which bots user has history with
+# CRITICAL: Each bot uses its own dedicated Qdrant collection
+# Environment variable QDRANT_COLLECTION_NAME determines collection:
+# - Elena: whisperengine_memory_elena (4,834 memories)
+# - Marcus: whisperengine_memory_marcus (2,738 memories)
+# - Dream: whisperengine_memory_dream (916 memories)
+# - Aethys: chat_memories_aethys (6,630 memories)
+# - etc.
 
-# Memory filtering uses: user_id + bot_name + memory_type
-# Environment variable: DISCORD_BOT_NAME determines bot context
+# Memory operations are collection-isolated + bot_name filtered
+collection_name = os.getenv('QDRANT_COLLECTION_NAME')  # Bot-specific collection
+# Memory filtering uses: collection + user_id + bot_name + memory_type
+# Complete conversation isolation between bots at collection level
 ```
 
 **Multi-Bot Memory Intelligence**:

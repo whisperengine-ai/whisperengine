@@ -144,6 +144,8 @@ class BotConfigDiscovery:
             "PYTHONUNBUFFERED=1",
             f"HEALTH_CHECK_PORT={config['health_port']}",
             "HEALTH_CHECK_HOST=0.0.0.0"
+            # Note: QDRANT_COLLECTION_NAME is loaded from .env.{bot_name} via env_file
+            # and should not be explicitly set here to avoid conflicts
         ]
         
         # Add character file if available
