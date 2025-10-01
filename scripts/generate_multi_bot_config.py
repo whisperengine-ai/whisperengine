@@ -50,8 +50,13 @@ class BotConfigDiscovery:
                 # Read health check port from env file
                 health_port = self._extract_health_port(env_file)
                 
-                # Auto-discover character file
+                # Get character file from environment variable only (no auto-discovery)
                 character_file = self._find_character_file(bot_name)
+                
+                # Skip this bot if character file is not properly configured
+                if character_file is None:
+                    print(f"⚠️  Skipping {bot_name} bot - character file not properly configured")
+                    continue
                 
                 bot_configs[bot_name] = {
                     "env_file": str(env_file),
@@ -67,7 +72,7 @@ class BotConfigDiscovery:
     def _extract_health_port(self, env_file: Path) -> int:
         """Extract HEALTH_CHECK_PORT from environment file."""
         try:
-            with open(env_file, 'r') as f:
+            with open(env_file, 'r', encoding='utf-8') as f:
                 for line in f:
                     if line.startswith('HEALTH_CHECK_PORT='):
                         return int(line.split('=')[1].strip())
@@ -79,44 +84,35 @@ class BotConfigDiscovery:
     
     def _find_character_file(self, bot_name: str) -> Optional[str]:
         """
-        Auto-discover character JSON file for a bot.
-        Tries multiple naming patterns:
-        1. Direct match: {bot_name}.json
-        2. Underscore variant: {bot_name.replace('-', '_')}.json
-        3. Dash variant: {bot_name.replace('_', '-')}.json
+        Get character JSON file path from CDL_DEFAULT_CHARACTER environment variable only.
+        No auto-discovery or fallback logic - explicit configuration required.
         """
-        character_dir = self.workspace_root / "characters" / "examples"
-        
-        if not character_dir.exists():
+        env_file = self.workspace_root / f".env.{bot_name}"
+        if not env_file.exists():
+            print(f"❌ Error: Environment file .env.{bot_name} not found")
             return None
-            
-        # Try different naming patterns
-        patterns = [
-            bot_name,
-            bot_name.replace('-', '_'),
-            bot_name.replace('_', '-'),
-            bot_name.replace('-', '_').replace('_', '-'),  # normalize
-            # Specific mappings
-            f"{bot_name}-rodriguez" if bot_name == "elena" else None,
-            f"{bot_name}-thompson" if bot_name == "marcus" else None,
-            f"{bot_name}-tether" if bot_name == "gabriel" else None,
-            f"{bot_name}_of_the_endless" if bot_name == "dream" else None,
-            f"{bot_name}-blake" if bot_name == "sophia" else None,
-            f"{bot_name}-sterling" if bot_name == "jake" else None,
-            # Special case for ryan -> ryan-chen character file migration
-            "ryan-chen" if bot_name == "ryan" else None,
-            # Special case for aethys -> aethys-omnipotent-entity character file
-            f"{bot_name}-omnipotent-entity" if bot_name == "aethys" else None,
-        ]
         
-        # Filter out None values
-        patterns = [p for p in patterns if p is not None]
+        try:
+            with open(env_file, 'r', encoding='utf-8') as f:
+                for line in f:
+                    if line.startswith('CDL_DEFAULT_CHARACTER='):
+                        char_file = line.split('=')[1].strip()
+                        if not char_file:
+                            print(f"❌ Error: CDL_DEFAULT_CHARACTER is empty in .env.{bot_name}")
+                            return None
+                        
+                        # Verify the character file exists
+                        char_file_path = self.workspace_root / char_file
+                        if not char_file_path.exists():
+                            print(f"❌ Error: Character file {char_file} not found (specified in .env.{bot_name})")
+                            return None
+                        
+                        return char_file
+        except (IOError, IndexError) as e:
+            print(f"❌ Error reading .env.{bot_name}: {e}")
+            return None
         
-        for pattern in patterns:
-            character_file = character_dir / f"{pattern}.json"
-            if character_file.exists():
-                return str(character_file)
-                
+        print(f"❌ Error: CDL_DEFAULT_CHARACTER not specified in .env.{bot_name}")
         return None
     
     def _get_display_name(self, bot_name: str) -> str:

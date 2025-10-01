@@ -340,7 +340,7 @@ services:
       - PYTHONUNBUFFERED=1
       - HEALTH_CHECK_PORT=9091
       - HEALTH_CHECK_HOST=0.0.0.0
-      - CDL_DEFAULT_CHARACTER=characters/examples/elena.json
+      - CDL_DEFAULT_CHARACTER=characters/examples/elena-simple.json
     ports:
       - "9091:9091"
     logging:

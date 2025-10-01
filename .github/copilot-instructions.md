@@ -27,7 +27,11 @@
 
 **DOCKER-FIRST DEVELOPMENT**: Container-based development is the PRIMARY workflow. Use `./multi-bot.sh` for all operations (auto-generated, don't edit manually).
 
-**ELENA BOT FOR TESTING**: Always use Elena bot for testing code changes and development. Elena is THE PRIMARY test bot with the latest fidelity-first memory implementation. Use `./multi-bot.sh start elena` and `./multi-bot.sh restart elena` for development testing. Other bots may not have the latest code updates.
+**BOT TESTING STRATEGY**: Use different bots for specific testing scenarios:
+- **MEMORY TESTING**: Use Jake or Ryan bots - they have minimal personality complexity, making memory issues easier to isolate
+- **PERSONALITY/CDL TESTING**: Use Elena bot - she has the richest and most extensive CDL personality for testing emotional intelligence, character responses, and CDL pipeline functionality
+- **CODE CHANGES**: Use `./multi-bot.sh restart <bot>` for code changes, but `./multi-bot.sh stop <bot> && ./multi-bot.sh start <bot>` for environment changes
+- **START/STOP AS NEEDED**: Only run the specific bot(s) needed for testing to reduce resource usage and isolate issues
 
 **WEB INTERFACE STATUS**: The web chat interface (`src/web/simple_chat_app.py`) is currently not functional. **For HTTP API chat access, use individual bot API endpoints directly** (see Bot API Endpoints section below).
 
@@ -133,16 +137,24 @@ identity_manager = create_identity_manager(postgres_pool)
 
 **Template-Based Architecture**: WhisperEngine uses a template-based multi-bot system that fills in environment-specific values from a stable Docker Compose template.
 
-**Elena Bot for Development Testing**: Use Elena as the primary bot for testing code changes:
-
+**Multi-Bot Testing Strategy**:
 ```bash
-# Elena bot testing workflow
-./multi-bot.sh start elena       # Start Elena for testing
-./multi-bot.sh restart elena     # Restart Elena after code changes
+# MEMORY TESTING: Use Jake or Ryan (minimal personality complexity)
+./multi-bot.sh start jake       # Start Jake for memory testing
+./multi-bot.sh start ryan       # Or Ryan for memory testing
+
+# PERSONALITY/CDL TESTING: Use Elena (rich CDL personality)
+./multi-bot.sh start elena      # Start Elena for CDL/personality testing
+
+# 🚨 CRITICAL: Environment changes require FULL STOP/START, not restart
+./multi-bot.sh stop jake && ./multi-bot.sh start jake    # After .env.jake changes
+./multi-bot.sh restart jake     # ONLY for code changes (not .env changes)
 
 # ALWAYS use Docker commands for logs (multi-bot.sh logs fails consistently)
-docker logs whisperengine-elena-bot --tail 20  # Real-time logs
-docker logs whisperengine-elena-bot -f         # Follow logs continuously
+docker logs whisperengine-jake-bot --tail 20   # Jake logs
+docker logs whisperengine-ryan-bot --tail 20   # Ryan logs  
+docker logs whisperengine-elena-bot --tail 20  # Elena logs
+docker logs whisperengine-<bot>-bot -f         # Follow any bot logs
 ```
 
 **Discord Message Testing**: Discord message processing requires manual triggering:
@@ -163,9 +175,15 @@ docker logs whisperengine-elena-bot -f         # Follow logs continuously
 ./multi-bot.sh start elena
 ./multi-bot.sh start all
 
-# Stop and restart (use multi-bot.sh for these)
-./multi-bot.sh stop elena
+# 🚨 CRITICAL: Environment vs Code Changes
+# Environment changes (.env.* files) - REQUIRE FULL STOP/START:
+./multi-bot.sh stop elena && ./multi-bot.sh start elena
+
+# Code changes (Python files) - restart is sufficient:
 ./multi-bot.sh restart elena
+
+# Stop operations
+./multi-bot.sh stop elena
 
 # CRITICAL: ALWAYS use Docker commands for viewing logs
 docker logs whisperengine-elena-bot --tail 20     # Elena logs

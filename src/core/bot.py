@@ -210,8 +210,11 @@ class DiscordBotCore:
             self.character_file = os.getenv('CDL_DEFAULT_CHARACTER')
             
             if self.character_file:
-                # Initialize CDL AI integration system
-                self.character_system = CDLAIPromptIntegration()
+                # Initialize CDL AI integration system with required dependencies
+                self.character_system = CDLAIPromptIntegration(
+                    vector_memory_manager=self.memory_manager,
+                    llm_client=self.llm_client
+                )
                 self.logger.info(f"✅ Character system initialized with file: {self.character_file}")
             else:
                 self.logger.warning("⚠️ No CDL_DEFAULT_CHARACTER specified - character system disabled")

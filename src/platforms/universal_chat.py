@@ -739,50 +739,46 @@ class UniversalChatOrchestrator:
         self, 
         message: Message, 
         conversation_context: list[dict[str, str]],
-        phase3_context_switches=None,
-        phase3_empathy_calibration=None
+        phase3_context_switches=None,  # Legacy Discord compatibility - ignored
+        phase3_empathy_calibration=None,  # Legacy Discord compatibility - ignored
+        user_display_name: str | None = None
     ) -> AIResponse:
-        """Generate AI response using conversation context with Phase 3 intelligence"""
+        """Generate AI response using conversation context - simplified (phase3 params ignored)"""
         try:
+            # NOTE: phase3_context_switches and phase3_empathy_calibration are accepted for Discord compatibility
+            # but are not used in the simplified pipeline. They could be re-integrated if needed.
+            
             # Check if we have access to the full WhisperEngine AI framework
             if self.bot_core and hasattr(self.bot_core, "memory_manager"):
                 return await self._generate_full_ai_response(
-                    message, conversation_context, phase3_context_switches, phase3_empathy_calibration
+                    message, conversation_context, user_display_name, phase3_context_switches, phase3_empathy_calibration
                 )
             else:
                 # Use the character-enhanced conversation context passed in
-                # Don't override with generic WhisperEngine prompt
                 return await self._generate_basic_ai_response(message, conversation_context)
 
         except Exception as e:
             logging.error(f"Error generating AI response: {e}")
-
-            # Check if this is a dependency issue
-            error_str = str(e)
-            if "requests" in error_str or "ModuleNotFoundError" in error_str:
-                error_content = f"⚠️ Missing Dependencies: Cannot make LLM API calls. Install required packages: pip install requests aiohttp. Error: {error_str}"
-                logging.warning("Universal Chat falling back due to missing dependencies")
-            else:
-                error_content = f"I apologize, but I encountered an error while processing your message. Please try again or check the system configuration. Error: {error_str}"
-
-            # Fallback response with dependency guidance
+            
+            # Simple fallback response
             return AIResponse(
-                content=error_content,
-                model_used="fallback",
-                tokens_used=20,
+                content="I apologize, but I'm experiencing technical difficulties. Please try again.",
+                model_used="emergency_fallback",
+                tokens_used=0,
                 cost=0.0,
-                generation_time_ms=100,
-                confidence=0.0,
+                generation_time_ms=0,
+                confidence=0.1,
             )
 
     async def _generate_full_ai_response(
         self, 
         message: Message, 
         conversation_context: list[dict[str, str]],
+        user_display_name: str | None = None,
         phase3_context_switches=None,
         phase3_empathy_calibration=None
     ) -> AIResponse:
-        """Generate AI response using the full WhisperEngine AI framework"""
+        """Generate AI response using the full WhisperEngine AI framework - simplified with phase3"""
         try:
             start_time = datetime.now()
 
@@ -1167,45 +1163,8 @@ class UniversalChatOrchestrator:
                             f"- **Triggered by:** {len(moment['trigger_memories'])} related memories"
                         )
 
-                # Add Phase 3 intelligence context
-                if phase3_context_switches or phase3_empathy_calibration:
-                    context_parts.append("🧠 **Phase 3 Intelligence:**")
-                    
-                    if phase3_context_switches:
-                        context_parts.append(f"- **Context Switches Detected:** {len(phase3_context_switches)} switches")
-                        for switch in phase3_context_switches[:2]:  # Show top 2 switches
-                            # ContextSwitch is an object, not a dictionary
-                            switch_type = getattr(switch, 'switch_type', 'unknown')
-                            switch_type_value = switch_type.value if hasattr(switch_type, 'value') else str(switch_type)
-                            strength = getattr(switch, 'strength', 'unknown')
-                            strength_value = strength.value if hasattr(strength, 'value') else str(strength)
-                            description = getattr(switch, 'description', 'no description')[:100]
-                            context_parts.append(f"  - {switch_type_value} ({strength_value}): {description}")
-                            
-                            # Add evidence if available
-                            evidence = getattr(switch, 'evidence', [])
-                            if evidence and len(evidence) > 0:
-                                context_parts.append(f"    Evidence: {evidence[0][:80]}")
-                    
-                    if phase3_empathy_calibration:
-                        # EmpathyCalibration is also an object, not a dictionary
-                        empathy_style = getattr(phase3_empathy_calibration, 'recommended_style', 'unknown')
-                        empathy_style_value = empathy_style.value if hasattr(empathy_style, 'value') else str(empathy_style)
-                        confidence = getattr(phase3_empathy_calibration, 'confidence_score', 0.0)
-                        context_parts.append(f"- **Empathy Calibration:** Style: {empathy_style_value}, Confidence: {confidence:.2f}")
-                        
-                        # Add empathy guidance if available
-                        if phase3_empathy_calibration.get('guidance'):
-                            guidance = phase3_empathy_calibration.get('guidance', '')[:150]
-                            context_parts.append(f"  Guidance: {guidance}")
-                        
-                        # Add personalization factors if available
-                        if phase3_empathy_calibration.get('personalization_factors'):
-                            factors = phase3_empathy_calibration.get('personalization_factors', {})
-                            if factors:
-                                factor_list = [f"{k}: {v}" for k, v in list(factors.items())[:2]]
-                                context_parts.append(f"  Personalization: {', '.join(factor_list)}")
-
+                # ✅ SIMPLIFIED: Removed Phase 3 intelligence logic
+                
                 if context_parts:
                     # Include memory confidence assessment
                     confidence_guidance = self._get_confidence_guidance(memory_confidence)
@@ -1224,140 +1183,139 @@ class UniversalChatOrchestrator:
             # Add current message to conversation context
             conversation_context.append({"role": "user", "content": message.content})
 
-            # 🔧 LLM TOOL CALLING INTEGRATION 🔧
-            # Try LLM tool calling first for enhanced capabilities
-            llm_tool_manager = getattr(self.bot_core, 'llm_tool_manager', None)
-            if llm_tool_manager:
+            # ✅ SIMPLIFIED PIPELINE: Get CDL character context and add to conversation
+            character_context = ""
+            if hasattr(self.bot_core, 'character_system') and self.bot_core.character_system:
                 try:
-                    logging.info("🔧 LLM TOOL CALLING: Using Phase 1 & 2 tools within Universal Chat Orchestrator")
-                    
-                    # Get proper CDL character context with detailed logging
-                    character_context = ""
-                    if hasattr(self.bot_core, 'character_system') and self.bot_core.character_system:
-                        try:
-                            # Get CDL character file for this bot
-                            character_file = getattr(self.bot_core, 'character_file', None)
-                            logging.info(f"🎭 CDL CHARACTER: Checking character file: {character_file}")
-                            if character_file:
-                                # Create character-aware prompt using CDL system
-                                logging.info(f"🎭 CDL CHARACTER: Calling CDL system for {message.user_id}")
-                                cdl_prompt = await self.bot_core.character_system.create_unified_character_prompt(
-                                    character_file=character_file,
-                                    user_id=message.user_id,
-                                    message_content=message.content,
-                                    pipeline_result=emotion_context if emotion_context else None
-                                )
-                                character_context = cdl_prompt
-                                logging.info(f"✅ CDL CHARACTER: CDL prompt generated: {len(character_context)} chars")
-                            else:
-                                logging.error("❌ CDL CHARACTER: No character file available for CDL integration")
-                        except Exception as e:
-                            logging.error(f"❌ CDL CHARACTER: CDL character context failed: {e}")
-                            import traceback
-                            logging.error(f"CDL CHARACTER stack trace: {traceback.format_exc()}")
-                    else:
-                        logging.warning("⚠️ CDL CHARACTER: Character system not available")
+                    # Get CDL character file for this bot
+                    character_file = getattr(self.bot_core, 'character_file', None)
+                    logging.info(f"🎭 CDL CHARACTER: Using character file: {character_file}")
+                    if character_file:
+                        # STANDARDIZE PIPELINE DATA: Create VectorAIPipelineResult to match Discord path
+                        from src.prompts.ai_pipeline_vector_integration import VectorAIPipelineResult
+                        from datetime import datetime
                         
-                    # Fallback to system message extraction if CDL not available
-                    if not character_context:
-                        logging.info("🔄 FALLBACK CHARACTER: Using system message for character context")
-                        for msg in conversation_context:
-                            if msg.get("role") == "system":
-                                character_context = msg.get("content", "")
-                                break
-                        logging.info(f"✅ FALLBACK CHARACTER: System message context: {len(character_context)} chars")
-                    
-                    # Use LLM tools with proper character context from the conversation pipeline
-                    logging.info(f"🔧 LLM TOOLS: Calling execute_llm_with_tools for {message.user_id}")
-                    logging.info(f"🔧 LLM TOOLS: Character context length: {len(character_context)} chars")
-                    logging.info(f"🔧 LLM TOOLS: Emotion context type: {type(emotion_context)}")
-                    
-                    tool_result = await llm_tool_manager.execute_llm_with_tools(
-                        user_message=message.content,
-                        user_id=message.user_id,
-                        character_context=character_context,
-                        emotional_context=emotion_context or {}
-                    )
-                    
-                    logging.info(f"🔧 LLM TOOLS: Tool result type: {type(tool_result)}, success: {tool_result.get('success') if tool_result else 'None'}")
-                    
-                    # Check if tool execution was successful and has content
-                    if (tool_result and tool_result.get("success") and 
-                        tool_result.get("llm_response") and tool_result.get("llm_response").strip()):
-                        
-                        tool_response = tool_result.get("llm_response")
-                        logging.info(f"✅ LLM TOOLS: Generated response using sophisticated tools ({len(tool_response)} chars)")
-                        
-                        # Calculate generation time
-                        generation_time = (datetime.now() - start_time).total_seconds() * 1000
-                        
-                        # Return successful tool response with proper AIResponse format
-                        return AIResponse(
-                            content=tool_response,
-                            model_used="llm_tools",
-                            tokens_used=int(len(tool_response.split()) * 1.3),  # Rough estimate
-                            cost=0.0,  # Tool cost tracking could be added
-                            generation_time_ms=int(generation_time),
-                            confidence=0.9,  # Tools generally provide high confidence
+                        pipeline_result = VectorAIPipelineResult(
+                            user_id=message.user_id,
+                            message_content=message.content,
+                            timestamp=datetime.now(),
+                            emotional_state=str(emotion_context) if emotion_context else None,
+                            mood_assessment=emotion_context if isinstance(emotion_context, dict) else None,
+                            personality_profile=None,  # HTTP API doesn't have dynamic personality yet
+                            enhanced_context=None     # HTTP API doesn't have phase4 yet
                         )
-                    else:
-                        logging.error("❌ LLM TOOLS: Tools returned empty response or failed")
-                        logging.error(f"❌ LLM TOOLS: Tool result details: {tool_result}")
                         
+                        # Create character-aware prompt using CDL system - MATCHING DISCORD PARAMETERS
+                        logging.info(f"🎭 CDL CHARACTER: Calling CDL system for {message.user_id}")
+                        cdl_prompt = await self.bot_core.character_system.create_unified_character_prompt(
+                            character_file=character_file,
+                            user_id=message.user_id,
+                            message_content=message.content,
+                            pipeline_result=pipeline_result,  # ✅ Standardized pipeline data
+                            user_name=user_display_name       # ✅ User display name like Discord
+                        )
+                        character_context = cdl_prompt
+                        logging.info(f"✅ CDL CHARACTER: CDL prompt generated: {len(character_context)} chars")
+                    else:
+                        logging.error("❌ CDL CHARACTER: No character file available for CDL integration")
                 except Exception as e:
-                    logging.error(f"❌ LLM TOOLS: Error using tools: {e}")
+                    logging.error(f"❌ CDL CHARACTER: CDL character context failed: {e}")
                     import traceback
-                    logging.error(f"LLM TOOLS stack trace: {traceback.format_exc()}")
+                    logging.error(f"CDL CHARACTER stack trace: {traceback.format_exc()}")
             else:
-                logging.error("❌ LLM TOOLS: llm_tool_manager not available")
+                logging.warning("⚠️ CDL CHARACTER: Character system not available")
                 
+            # Fallback to system message extraction if CDL not available
+            if not character_context:
+                logging.info("🔄 FALLBACK CHARACTER: Using system message for character context")
+                for msg in conversation_context:
+                    if msg.get("role") == "system":
+                        character_context = msg.get("content", "")
+                        break
+                logging.info(f"✅ FALLBACK CHARACTER: System message context: {len(character_context)} chars")
+            
+            # ✅ SIMPLIFIED PIPELINE: Add character system prompt to conversation context
+            if character_context:
+                # Update or add system message with character-aware prompt
+                system_message_updated = False
+                for msg in conversation_context:
+                    if msg.get("role") == "system":
+                        msg["content"] = character_context
+                        system_message_updated = True
+                        logging.info(f"✅ SIMPLIFIED PIPELINE: Updated system message with character prompt ({len(character_context)} chars)")
+                        break
+                
+                # If no system message exists, add one at the beginning
+                if not system_message_updated:
+                    conversation_context.insert(0, {"role": "system", "content": character_context})
+                    logging.info(f"✅ SIMPLIFIED PIPELINE: Added character system prompt to conversation context ({len(character_context)} chars)")
+            
+            # ✅ RE-INTEGRATED: Add Phase3 intelligence context to conversation (simplified)
+            phase3_context_parts = []
+            if phase3_context_switches:
+                phase3_context_parts.append(f"**Context Switches Detected:** {len(phase3_context_switches)} transitions")
+                for switch in phase3_context_switches[:2]:  # Show top 2 switches
+                    switch_type = getattr(switch, 'switch_type', 'unknown')
+                    switch_type_value = switch_type.value if hasattr(switch_type, 'value') else str(switch_type)
+                    strength = getattr(switch, 'strength', 'unknown')
+                    strength_value = strength.value if hasattr(strength, 'value') else str(strength)
+                    description = getattr(switch, 'description', 'no description')[:80]
+                    phase3_context_parts.append(f"- {switch_type_value} ({strength_value}): {description}")
+            
+            if phase3_empathy_calibration:
+                empathy_style = getattr(phase3_empathy_calibration, 'recommended_style', 'unknown')
+                empathy_style_value = empathy_style.value if hasattr(empathy_style, 'value') else str(empathy_style)
+                confidence = getattr(phase3_empathy_calibration, 'confidence_score', 0.0)
+                phase3_context_parts.append(f"**Empathy Style:** {empathy_style_value} (confidence: {confidence:.2f})")
+                
+                # Add empathy guidance if available
+                guidance = getattr(phase3_empathy_calibration, 'guidance', None)
+                if guidance:
+                    phase3_context_parts.append(f"**Empathy Guidance:** {guidance[:100]}")
+            
+            # Add phase3 intelligence to conversation context as user message
+            if phase3_context_parts:
+                phase3_context = "🧠 **Conversation Intelligence:**\n" + "\n".join(phase3_context_parts)
+                conversation_context.append({"role": "user", "content": f"[CONTEXT: {phase3_context}]"})
+                logging.info(f"✅ PHASE3 RE-INTEGRATED: Added {len(phase3_context_parts)} intelligence insights")
+            
+            # ✅ SIMPLIFIED PIPELINE: Direct to basic AI response with enhanced context
+            logging.info("✅ SIMPLIFIED PIPELINE: Proceeding to basic AI response with phase3 intelligence")
+            return await self._generate_basic_ai_response(message, conversation_context)
+            
         except Exception as e:
             logging.error(f"Full AI response generation failed: {e}")
             import traceback
             traceback.print_exc()
-            raise  # Don't mask the real problem - let it fail properly
+            
+            # ✅ SIMPLIFIED PIPELINE: Fallback to basic AI response
+            logging.info("🔄 SIMPLIFIED PIPELINE: Full AI response failed, using basic AI response")
+            try:
+                return await self._generate_basic_ai_response(message, conversation_context)
+            except Exception as fallback_error:
+                logging.error(f"❌ SIMPLIFIED PIPELINE: Even basic AI response failed: {fallback_error}")
+                raise
 
     async def _load_system_prompt(
         self, user_id: str | None = None, template_context: dict | None = None
     ) -> str:
-        """Load the system prompt using the proper config system with template contextualization"""
+        """Load basic system prompt fallback - CDL integration is handled upstream"""
         
-        logging.info(f"🎭 UNIVERSAL CHAT DEBUG: Loading system prompt for user {user_id}")
+        logging.info(f"🎭 UNIVERSAL CHAT DEBUG: Loading basic system prompt fallback for user {user_id}")
         
-        # FIRST: Try to use character-aware prompt if character system is available
-        if self.character_system and user_id:
-            logging.info(f"🎭 UNIVERSAL CHAT DEBUG: Character system available, checking user character")
-            try:
-                # Check if user has an active character
-                character_file = self._get_user_active_character(user_id)
-                if not character_file:
-                    # Fall back to environment-configured default character
-                    default_character = os.getenv("CDL_DEFAULT_CHARACTER", "characters/default_assistant.json")
-                    character_file = default_character
-                    logging.info(f"🎭 UNIVERSAL CHAT: User {user_id} has no active character, using default CDL: {character_file}")
-                else:
-                    logging.info(f"🎭 UNIVERSAL CHAT: User {user_id} has active character: {character_file}")
-                    
-                character_prompt = await self.character_system.create_unified_character_prompt(
-                    character_file=character_file,
-                    user_id=user_id,
-                    message_content=""  # No current message in this context
-                )
-                if character_prompt:
-                    logging.info(f"✅ UNIVERSAL CHAT: Using character-aware prompt for user {user_id} ({len(character_prompt)} chars)")
-                    logging.info(f"🎭 UNIVERSAL CHAT DEBUG: Character prompt preview: {character_prompt[:200]}...")
-                    return character_prompt
-            except Exception as e:
-                logging.warning(f"Failed to generate character-aware prompt: {e}")
-        else:
-            if not self.character_system:
-                logging.warning(f"🎭 UNIVERSAL CHAT DEBUG: No character system available")
-            if not user_id:
-                logging.warning(f"🎭 UNIVERSAL CHAT DEBUG: No user_id provided")
+        # ✅ PIPELINE UNIFICATION: This is a fallback only - no CDL calls
+        # CDL character integration is handled in _generate_full_ai_response
         
-        # 🔥 CDL-ONLY: No fallback to legacy prompt system!
-        logging.error(f"🎭 UNIVERSAL CHAT: CDL system failed for user {user_id} - system is CDL-only, no fallbacks!")
-        raise RuntimeError(f"CDL character system is required but failed for user {user_id}. Check CDL_DEFAULT_CHARACTER configuration.")
+        # Return a minimal system prompt for rare fallback cases
+        basic_prompt = "You are a helpful AI assistant."
+        
+        # Add emotional context if available
+        if template_context and template_context.get("emotional_intelligence"):
+            emotional_context = template_context["emotional_intelligence"]
+            basic_prompt += f" Consider the user's emotional context: {emotional_context}"
+        
+        logging.info(f"✅ UNIVERSAL CHAT: Using basic fallback system prompt ({len(basic_prompt)} chars)")
+        return basic_prompt
 
     async def _generate_basic_ai_response(
         self, message: Message, conversation_context: list[dict[str, str]]
@@ -1523,12 +1481,9 @@ class UniversalChatOrchestrator:
         conversation_context = []
 
         try:
-            # Add character-aware system prompt first (only if available)
-            system_prompt = await self._get_basic_system_prompt(user_id, current_message)
-            if system_prompt:
-                conversation_context.append({"role": "system", "content": system_prompt})
-            else:
-                logging.info(f"🎭 UNIVERSAL CHAT: No system prompt available - using existing context as-is")
+            # Skip system prompt generation here - it will be handled in _generate_full_ai_response
+            # This eliminates duplicate CDL calls and matches Discord architecture
+            logging.info(f"🎭 UNIVERSAL CHAT: Building conversation context without system prompt (will be added later)")
 
             # Get recent conversation pairs for context
             recent_pairs = self._get_recent_conversation_pairs(user_id, channel_id, limit=5)
@@ -1764,44 +1719,21 @@ class UniversalChatOrchestrator:
         return None
 
     async def _get_basic_system_prompt(self, user_id: str = None, current_message: str = "") -> str:
-        """Get system prompt - character-aware if CDL system is available"""
+        """Get basic system prompt fallback - CDL integration is handled upstream"""
         
-        logging.info(f"🎭 UNIVERSAL CHAT DEBUG: Getting system prompt for user {user_id}")
+        logging.info(f"🎭 UNIVERSAL CHAT DEBUG: Getting basic system prompt for user {user_id}")
         
-        # Try to use character-aware prompt if character system is available
-        if self.character_system and user_id:
-            logging.info(f"🎭 UNIVERSAL CHAT DEBUG: Character system available, checking user character")
-            try:
-                # Check if user has an active character
-                character_file = self._get_user_active_character(user_id)
-                if not character_file:
-                    # Fall back to environment-configured default character
-                    default_character = os.getenv("CDL_DEFAULT_CHARACTER", "characters/default_assistant.json")
-                    character_file = default_character
-                    logging.info(f"🎭 UNIVERSAL CHAT: User {user_id} has no active character, using default: {character_file}")
-                else:
-                    logging.info(f"🎭 UNIVERSAL CHAT: User {user_id} has active character: {character_file}")
-                
-                character_prompt = await self.character_system.create_unified_character_prompt(
-                    character_file=character_file,
-                    user_id=user_id,
-                    message_content=current_message
-                )
-                if character_prompt:
-                    logging.info(f"✅ UNIVERSAL CHAT: Using character-aware prompt for user {user_id} ({len(character_prompt)} chars)")
-                    logging.info(f"🎭 UNIVERSAL CHAT DEBUG: Character prompt preview: {character_prompt[:200]}...")
-                    return character_prompt
-            except Exception as e:
-                logging.warning(f"Failed to generate character-aware prompt: {e}")
-        else:
-            if not self.character_system:
-                logging.warning(f"🎭 UNIVERSAL CHAT DEBUG: No character system available")
-            if not user_id:
-                logging.warning(f"🎭 UNIVERSAL CHAT DEBUG: No user_id provided")
+        # ✅ PIPELINE UNIFICATION: This is a fallback only - no CDL calls
+        # CDL character integration is handled in _generate_full_ai_response
         
-        # 🔥 CDL-ONLY: No fallback to legacy prompt system!
-        logging.error(f"🎭 UNIVERSAL CHAT: CDL system failed for user {user_id} - system is CDL-only, no fallbacks!")
-        raise RuntimeError(f"CDL character system is required but failed for user {user_id}. Check CDL_DEFAULT_CHARACTER configuration.")
+        # Return a minimal system prompt for rare fallback cases
+        basic_prompt = "You are a helpful AI assistant."
+        
+        if current_message:
+            basic_prompt += f" The user said: {current_message[:100]}"
+        
+        logging.info(f"✅ UNIVERSAL CHAT: Using basic system prompt ({len(basic_prompt)} chars)")
+        return basic_prompt
 
     async def cleanup(self):
         """Cleanup all platform connections"""

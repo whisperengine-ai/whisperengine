@@ -125,8 +125,30 @@ class EnhancedHealthServer:
             
             logger.info("🔍 No existing orchestrator found, attempting to create new one...")
             # Initialize our own universal chat orchestrator if none found
-            # Note: We'll need to get the database manager from the bot instance
+            # Try multiple ways to get the database manager
+            db_manager = None
+            
+            # Method 1: Direct from bot
             db_manager = getattr(self.bot, 'db_manager', None)
+            
+            # Method 2: From bot_manager
+            if not db_manager and self.bot_manager:
+                db_manager = getattr(self.bot_manager, 'db_manager', None)
+            
+            # Method 3: From event handlers
+            if not db_manager and self.bot_manager and hasattr(self.bot_manager, 'event_handlers'):
+                db_manager = getattr(self.bot_manager.event_handlers, 'db_manager', None)
+            
+            # Method 4: Create new one
+            if not db_manager:
+                logger.info("🔧 Creating database manager for health server...")
+                try:
+                    from src.database.database_integration import DatabaseIntegrationManager
+                    db_manager = DatabaseIntegrationManager()
+                    logger.info("✅ Created database manager for health server")
+                except Exception as e:
+                    logger.error(f"❌ Failed to create database manager: {e}")
+            
             if db_manager:
                 self.universal_orchestrator = UniversalChatOrchestrator(
                     db_manager=db_manager,
@@ -171,6 +193,8 @@ class EnhancedHealthServer:
             user_id = data.get('user_id', 'web_user')
             message_content = data.get('message', '')
             platform = data.get('platform', 'WEB_UI')
+            # Extract user display name for CDL integration consistency with Discord
+            user_display_name = data.get('display_name') or data.get('username') or f"web_user_{user_id[:8]}"
             
             if not message_content.strip():
                 return web.json_response(
@@ -178,7 +202,7 @@ class EnhancedHealthServer:
                     status=400
                 )
             
-            logger.info(f"🌐 Chat API: Received message from {user_id}: {message_content[:50]}...")
+            logger.info(f"🌐 Chat API: Received message from {user_id} ({user_display_name}): {message_content[:50]}...")
             
             # Auto-detect and store user name if present
             try:
@@ -219,7 +243,8 @@ class EnhancedHealthServer:
                     )
                     ai_response = await orchestrator.generate_ai_response(
                         universal_message, 
-                        conversation_context
+                        conversation_context,
+                        user_display_name=user_display_name  # Pass user display name for CDL consistency
                     )
                     
                     response_content = ai_response.content if hasattr(ai_response, 'content') else str(ai_response)

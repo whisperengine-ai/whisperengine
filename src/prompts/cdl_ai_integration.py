@@ -22,7 +22,7 @@ class CDLAIPromptIntegration:
         # Initialize the optimized prompt builder for size management
         from src.prompts.optimized_prompt_builder import create_optimized_prompt_builder
         self.optimized_builder = create_optimized_prompt_builder(
-            max_words=2000,
+            max_words=3000,  # Increased from 2000 to 3000 to match backup version
             llm_client=llm_client,
             memory_manager=vector_memory_manager
         )
@@ -63,9 +63,10 @@ class CDLAIPromptIntegration:
             display_name = preferred_name or user_name or "User"
             logger.info("🎭 UNIFIED: Using display name: %s", display_name)
             
-            # STEP 3: Retrieve relevant memories and conversation history
+            # STEP 3: Retrieve relevant memories, conversation history, and long-term summaries
             relevant_memories = []
             conversation_history = []
+            conversation_summary = ""
             
             if self.memory_manager:
                 try:
@@ -75,10 +76,22 @@ class CDLAIPromptIntegration:
                     conversation_history = await self.memory_manager.get_conversation_history(
                         user_id=user_id, limit=5
                     )
-                    logger.info("🧠 UNIFIED: Retrieved %d memories, %d conversation entries", 
-                               len(relevant_memories), len(conversation_history))
+                    
+                    # LONG-TERM MEMORY: Get conversation summary for context beyond the limit
+                    if hasattr(self.memory_manager, 'get_conversation_summary_with_recommendations'):
+                        summary_data = await self.memory_manager.get_conversation_summary_with_recommendations(
+                            user_id=user_id, limit=20  # Get broader context for summary
+                        )
+                        if summary_data and summary_data.get('topic_summary'):
+                            conversation_summary = summary_data['topic_summary']
+                            logger.info("🧠 LONG-TERM: Retrieved conversation summary: %s", conversation_summary[:100])
+                    
+                    logger.info("🧠 UNIFIED: Retrieved %d memories, %d conversation entries, summary: %s", 
+                               len(relevant_memories), len(conversation_history), 
+                               "Yes" if conversation_summary else "No")
+                        
                 except Exception as e:
-                    logger.debug("Could not retrieve memories: %s", e)
+                    logger.error("❌ MEMORY ERROR: Could not retrieve memories: %s", e)
 
             # STEP 4: Build comprehensive prompt with ALL intelligence
             prompt = await self._build_unified_prompt(
@@ -88,7 +101,8 @@ class CDLAIPromptIntegration:
                 message_content=message_content,
                 pipeline_result=pipeline_result,
                 relevant_memories=relevant_memories,
-                conversation_history=conversation_history
+                conversation_history=conversation_history,
+                conversation_summary=conversation_summary
             )
 
             # STEP 5: Apply fidelity-first size management
@@ -113,7 +127,8 @@ class CDLAIPromptIntegration:
         message_content: str,
         pipeline_result,  # Accept any type
         relevant_memories: list,
-        conversation_history: list
+        conversation_history: list,
+        conversation_summary: str = ""
     ) -> str:
         """🏗️ Build comprehensive prompt with ALL intelligence features in one place."""
         
@@ -179,19 +194,23 @@ class CDLAIPromptIntegration:
         # Add memory context intelligence
         if relevant_memories:
             prompt += f"\n\n🧠 RELEVANT CONVERSATION CONTEXT:\n"
-            for i, memory in enumerate(relevant_memories[:3], 1):  # Limit to top 3
+            for i, memory in enumerate(relevant_memories[:7], 1):  # Increased from 3 to 7
                 if hasattr(memory, 'content'):
-                    content = memory.content[:200]
-                    prompt += f"{i}. {content}{'...' if len(memory.content) > 200 else ''}\n"
+                    content = memory.content[:300]  # Increased from 200 to 300
+                    prompt += f"{i}. {content}{'...' if len(memory.content) > 300 else ''}\n"
+
+        # Add long-term conversation summary for continuity beyond recent history
+        if conversation_summary:
+            prompt += f"\n\n📚 CONVERSATION BACKGROUND:\n{conversation_summary}\n"
 
         # Add recent conversation history
         if conversation_history:
             prompt += f"\n\n💬 RECENT CONVERSATION:\n"
-            for conv in conversation_history[-3:]:  # Last 3 exchanges
+            for conv in conversation_history[-7:]:  # Increased from 3 to 7 exchanges
                 if isinstance(conv, dict):
                     role = conv.get('role', 'user')
-                    content = conv.get('content', '')[:150]
-                    prompt += f"{role.title()}: {content}{'...' if len(conv.get('content', '')) > 150 else ''}\n"
+                    content = conv.get('content', '')[:200]  # Increased from 150 to 200
+                    prompt += f"{role.title()}: {content}{'...' if len(conv.get('content', '')) > 200 else ''}\n"
 
         # Add emotional intelligence context
         if pipeline_dict:
@@ -218,11 +237,12 @@ class CDLAIPromptIntegration:
 
         # Add response style - simplified approach for unified method  
         prompt += f"\n\n🎤 RESPONSE REQUIREMENTS:\n"
+        prompt += f"- The user you are talking to is named {display_name}. ALWAYS use this name when addressing them.\n"
         prompt += f"- Use modern, professional language appropriate for {character.identity.occupation}\n"
         prompt += f"- NO action descriptions (*grins*, *adjusts glasses*) - speech only\n"
         prompt += f"- Answer directly without elaborate scene-setting\n"
         prompt += f"- Be authentic and engaging while staying professional\n"
-        prompt += f"\nRespond as {character.identity.name}:"
+        prompt += f"\nRespond as {character.identity.name} to {display_name}:"
 
         return prompt
 
@@ -244,7 +264,7 @@ class CDLAIPromptIntegration:
                        word_count, self.optimized_builder.max_words)
             return prompt
         else:
-            logger.info("📏 UNIFIED OPTIMIZATION: %d words > %d limit, applying intelligent fidelity-first trimming", 
+            logger.warning("📏 UNIFIED OPTIMIZATION TRIGGERED: %d words > %d limit, applying intelligent fidelity-first trimming", 
                        word_count, self.optimized_builder.max_words)
             try:
                 # Convert pipeline_result to dict for compatibility with build_character_prompt
@@ -287,10 +307,39 @@ class CDLAIPromptIntegration:
                 return prompt
 
     async def load_character(self, character_file: str) -> Character:
-        """Load a character from file."""
+        """Load a character from file with CDL validation."""
         try:
+            # First, validate the character file structure
+            logger.info("🔍 CDL: Validating character file before loading: %s", character_file)
+            
+            try:
+                from src.validation.cdl_validator import CDLValidator
+                validator = CDLValidator()
+                validation_result = validator.validate_file(character_file)
+                
+                if not validation_result.parsing_success:
+                    logger.error("❌ CDL VALIDATION: Character file failed parsing: %s", character_file)
+                    logger.error("❌ CDL VALIDATION: Errors: %s", [issue.message for issue in validation_result.issues if issue.level.name == "ERROR"])
+                    raise ValueError(f"Character file failed CDL validation: {[issue.message for issue in validation_result.issues if issue.level.name == 'ERROR']}")
+                
+                if validation_result.overall_status.name == "ERROR":
+                    logger.error("❌ CDL VALIDATION: Character file has critical errors: %s", character_file)
+                    error_messages = [issue.message for issue in validation_result.issues if issue.level.name == "ERROR"]
+                    raise ValueError(f"Character file has critical errors: {error_messages}")
+                
+                logger.info("✅ CDL VALIDATION: Character file passed validation (Status: %s, Quality: %.1f%%)", 
+                           validation_result.overall_status.name, validation_result.quality_score)
+                
+            except ImportError:
+                logger.warning("⚠️ CDL validation not available, loading character without validation")
+            except Exception as e:
+                logger.warning("⚠️ CDL validation failed, proceeding with load: %s", e)
+            
+            # Load the character
             character = load_character(character_file)
+            logger.info("✅ CDL: Successfully loaded character: %s", character.identity.name)
             return character
+            
         except Exception as e:
             logger.error("Failed to load character from %s: %s", character_file, e)
             raise
