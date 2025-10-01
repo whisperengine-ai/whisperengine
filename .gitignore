@@ -53,6 +53,7 @@ __pypackages__/
 .env.marcus
 .env.marcus-chen
 .env.marcus-thompson
+.env.liln
 
 # Keep example files
 !.env.example
@@ -102,6 +103,17 @@ logs/
 backups/
 models/
 checkpoints/
+
+# Cache directories
+cache/
+/cache/
+temp/
+/temp/
+/app/temp/
+/app/cache/
+huggingface_cache/
+.cache/
+*.cache/
 
 # Exception: Allow Python model classes in src/characters/models/
 !src/characters/models/
