@@ -145,6 +145,12 @@ docker logs whisperengine-elena-bot --tail 20  # Real-time logs
 docker logs whisperengine-elena-bot -f         # Follow logs continuously
 ```
 
+**Discord Message Testing**: Discord message processing requires manual triggering:
+- **IMPORTANT**: Discord events (message handling, CDL integration, character responses) require actual Discord messages
+- **Bot API endpoints work automatically**: HTTP API calls to `http://localhost:9091/api/chat` work immediately
+- **Discord integration testing**: Ask the user to send a Discord message to trigger event handlers when testing Discord-specific features
+- **Event handler updates**: Changes to `src/handlers/events.py` require Discord message to test the full pipeline
+
 **Multi-Bot Operations**:
 ```bash
 # NEVER edit multi-bot.sh or docker-compose.multi-bot.yml manually

@@ -127,6 +127,8 @@ class BotEventHandlers:
         self.dynamic_personality_profiler = getattr(bot_core, "dynamic_personality_profiler", None)
         self.graph_personality_manager = getattr(bot_core, "graph_personality_manager", None)
         self.phase2_integration = getattr(bot_core, "phase2_integration", None)
+        # Character system reference for CDL integration
+        self.character_system = getattr(bot_core, "character_system", None)
         # Legacy emotion engine removed - vector-native system handles this
         self.local_emotion_engine = None
         # Redis profile/memory cache (if enabled)
@@ -3274,11 +3276,17 @@ class BotEventHandlers:
                 enhanced_context=phase4_context if isinstance(phase4_context, dict) else None
             )
             
-            # Create CDL integration and generate character-aware prompt
-            cdl_integration = CDLAIPromptIntegration(
-                vector_memory_manager=self.memory_manager,
-                llm_client=self.llm_client
-            )
+            # Use centralized character system if available, otherwise create new instance
+            if self.character_system:
+                cdl_integration = self.character_system
+                logger.info(f"🎭 CDL: Using centralized character system for {user_id}")
+            else:
+                # Fallback: Create CDL integration instance
+                cdl_integration = CDLAIPromptIntegration(
+                    vector_memory_manager=self.memory_manager,
+                    llm_client=self.llm_client
+                )
+                logger.warning(f"⚠️ CDL: Using fallback CDL instance for {user_id} - character system not initialized")
             
             # Get user's display name for better identification
             user_display_name = getattr(message.author, 'display_name', None) or getattr(message.author, 'name', None)
