@@ -3837,6 +3837,30 @@ class VectorMemoryManager:
         
         start_time = time.time()
         try:
+            # 🎯 CRITICAL FIX: Add temporal query detection BEFORE semantic search
+            # This fixes Test 5 temporal intelligence where "first question today" was failing
+            is_temporal_query = await self.vector_store._detect_temporal_query_with_qdrant(query, user_id)
+            
+            if is_temporal_query:
+                logger.info(f"🎯 TEMPORAL QUERY DETECTED: '{query}' - Using chronological retrieval")
+                temporal_results = await self.vector_store._handle_temporal_query_with_qdrant(query, user_id, limit)
+                
+                # Format temporal results to match expected structure
+                formatted_results = []
+                for r in temporal_results:
+                    formatted_results.append({
+                        "content": r.get("content", ""),
+                        "score": r.get("score", 1.0),  # High score for temporal matches
+                        "timestamp": r.get("timestamp", ""),
+                        "metadata": r.get("metadata", {}),
+                        "memory_type": r.get("memory_type", "conversation"),
+                        "temporal": True,
+                        "search_type": "temporal_chronological"
+                    })
+                
+                logger.debug(f"🎯 TEMPORAL SEARCH: Retrieved {len(formatted_results)} memories in {(time.time() - start_time)*1000:.1f}ms")
+                return formatted_results
+            
             # 🚀 SIMPLIFIED: Trust vector embeddings for semantic search
             # RoBERTa-enhanced emotional metadata from storage provides the intelligence
             # No need for query-time emotion analysis - embeddings capture meaning naturally
@@ -3934,6 +3958,31 @@ class VectorMemoryManager:
         start_time = time.time()
         
         try:
+            # 🎯 CRITICAL FIX: Add temporal query detection for fidelity-first as well
+            # This ensures consistent temporal handling across all memory retrieval methods
+            is_temporal_query = await self.vector_store._detect_temporal_query_with_qdrant(query, user_id)
+            
+            if is_temporal_query:
+                logger.info(f"🎯 TEMPORAL QUERY (FIDELITY-FIRST): '{query}' - Using chronological retrieval")
+                temporal_results = await self.vector_store._handle_temporal_query_with_qdrant(query, user_id, limit)
+                
+                # Format temporal results with fidelity-first metadata
+                formatted_results = []
+                for r in temporal_results:
+                    formatted_results.append({
+                        "content": r.get("content", ""),
+                        "score": r.get("score", 1.0),  # High score for temporal matches
+                        "timestamp": r.get("timestamp", ""),
+                        "metadata": r.get("metadata", {}),
+                        "memory_type": r.get("memory_type", "conversation"),
+                        "temporal": True,
+                        "fidelity_first": True,
+                        "search_type": "temporal_chronological_fidelity_first"
+                    })
+                
+                logger.debug(f"🎯 TEMPORAL FIDELITY-FIRST: Retrieved {len(formatted_results)} memories in {(time.time() - start_time)*1000:.1f}ms")
+                return formatted_results
+            
             # Phase 1: Full Fidelity Assembly - Get complete context first
             if full_fidelity:
                 # Retrieve more memories initially for intelligent filtering

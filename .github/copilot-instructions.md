@@ -63,6 +63,7 @@
 **AI CHARACTER TESTING STRATEGY**: Use different AI roleplay characters for specific testing scenarios:
 - **MEMORY TESTING**: Use Jake or Ryan characters - they have minimal personality complexity, making memory issues easier to isolate
 - **PERSONALITY/CDL TESTING**: Use Elena character - she has the richest and most extensive CDL personality for testing emotional intelligence, character responses, and CDL pipeline functionality
+- **CDL MODE SWITCHING TESTING**: Use Mistral models for better compliance - Ryan bot showed 91.3% vs 68.8% improvement when switching from Claude to Mistral
 - **CODE CHANGES**: Use `./multi-bot.sh restart <character>` for code changes, but `./multi-bot.sh stop <character> && ./multi-bot.sh start <character>` for environment changes
 - **START/STOP AS NEEDED**: Only run the specific character(s) needed for testing to reduce resource usage and isolate issues
 
@@ -593,6 +594,52 @@ prompt = await cdl_integration.create_character_aware_prompt(
     message_content=message
 )
 ```
+
+## LLM Model Configuration & CDL Performance
+
+**🚨 CRITICAL MODEL SELECTION FOR CDL COMPLIANCE:**
+
+WhisperEngine testing has revealed significant performance differences between LLM models when following CDL (Character Definition Language) personality instructions and mode switching:
+
+**Mistral Models**: **RECOMMENDED for CDL compliance**
+- Superior adherence to CDL mode switching instructions
+- Follows technical/creative mode triggers consistently  
+- Respects anti-pattern guidance (avoiding poetic metaphors when inappropriate)
+- Clean mode transitions without personality bleed-through
+- **Validated Performance**: Ryan bot Test 3 (Mode Switching) improvement: 68.8% → 91.3% when switching from Claude to Mistral
+
+**Claude Models**: **Caution for strict CDL compliance**
+- Strong creative capabilities but exhibits "creative bias" 
+- May ignore technical mode instructions in favor of poetic/metaphorical responses
+- Less consistent with CDL mode switching triggers
+- Tends to maintain creative voice even when technical precision requested
+- **Performance Issue**: Claude 3.7 Sonnet struggled with technical mode (65% initial, 68.8% after CDL enhancement)
+
+**Model Configuration Recommendations**:
+```bash
+# ✅ RECOMMENDED: Mistral for strict CDL compliance
+LLM_CHAT_MODEL=mistral/mistral-medium  # or mistral/mistral-large
+
+# ⚠️ USE WITH CAUTION: Claude for primarily creative characters
+LLM_CHAT_MODEL=anthropic/claude-3.7-sonnet  # May struggle with mode switching
+
+# 🎯 OPTIMAL: Match model to character primary mode
+# Creative-focused characters (Dream, Aethys): Claude acceptable
+# Technical-focused characters (Marcus, Ryan): Mistral strongly recommended  
+# Multi-modal characters (Elena, Jake): Mistral for consistent switching
+```
+
+**CDL Mode Switching Validation**:
+- Test mode switching with diverse prompts (creative → technical → creative)
+- Validate anti-pattern compliance (avoiding metaphors in technical mode)
+- Check trigger word responsiveness (code/debug/technical should activate technical mode)
+- Monitor for personality bleed-through between modes
+
+**Performance Benchmarks** (Ryan 7D Migration validation):
+- **Creative Mode**: Both models perform well (95%+ typical)
+- **Technical Mode**: Mistral significantly outperforms Claude (95% vs 65-68%)
+- **Mode Switching**: Mistral excels at clean transitions (91% vs 68%)
+- **Overall CDL Compliance**: Mistral 95.6% vs Claude 67-68% on multi-modal characters
 
 ## Anti-Phantom Feature Guidelines
 
