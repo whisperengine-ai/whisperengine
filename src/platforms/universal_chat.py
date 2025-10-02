@@ -749,11 +749,14 @@ class UniversalChatOrchestrator:
             # but are not used in the simplified pipeline. They could be re-integrated if needed.
             
             # Check if we have access to the full WhisperEngine AI framework
+            logging.error(f"🚨 ROUTING DEBUG: bot_core={self.bot_core is not None}, memory_manager={hasattr(self.bot_core, 'memory_manager') if self.bot_core else False}")
             if self.bot_core and hasattr(self.bot_core, "memory_manager"):
+                logging.error(f"🚨 ROUTING DEBUG: Taking FULL AI response path (with CDL)")
                 return await self._generate_full_ai_response(
                     message, conversation_context, user_display_name, phase3_context_switches, phase3_empathy_calibration
                 )
             else:
+                logging.error(f"🚨 ROUTING DEBUG: Taking BASIC AI response path (NO CDL)")
                 # Use the character-enhanced conversation context passed in
                 return await self._generate_basic_ai_response(message, conversation_context)
 
@@ -780,13 +783,15 @@ class UniversalChatOrchestrator:
     ) -> AIResponse:
         """Generate AI response using the full WhisperEngine AI framework - simplified with phase3"""
         try:
-            start_time = datetime.now()
+            from datetime import datetime as dt
+            start_time = dt.now()
 
             # Access the Discord bot's sophisticated AI components
             memory_manager = getattr(self.bot_core, "memory_manager", None)
             safe_memory_manager = getattr(self.bot_core, "safe_memory_manager", None)
             llm_client = getattr(self.bot_core, "llm_client", None)
 
+            logging.error(f"🚨 COMPONENT DEBUG: memory_manager={memory_manager is not None}, llm_client={llm_client is not None}")
             if not memory_manager or not llm_client:
                 logging.warning(
                     "Full AI framework components not available, falling back to basic response"
@@ -1123,7 +1128,10 @@ class UniversalChatOrchestrator:
                 if additional_memories:
                     context_parts.append("🧠 **Additional Context:**")
                     
-                    # Process additional memories 
+                    # Initialize lists for processing additional memories 
+                    domain_facts = []
+                    regular_memories = []
+                    
                     for memory in additional_memories[:5]:  # Show more memories
                         memory_str = str(memory)
                         if (
@@ -1185,11 +1193,15 @@ class UniversalChatOrchestrator:
 
             # ✅ SIMPLIFIED PIPELINE: Get CDL character context and add to conversation
             character_context = ""
-            if hasattr(self.bot_core, 'character_system') and self.bot_core.character_system:
+            logging.error(f"🚨 CDL DEBUG: self.character_system={self.character_system is not None}")
+            if self.character_system:
                 try:
                     # Get CDL character file for this bot
                     character_file = getattr(self.bot_core, 'character_file', None)
-                    logging.info(f"🎭 CDL CHARACTER: Using character file: {character_file}")
+                    # If not found in bot_core, try environment variable as fallback
+                    if not character_file:
+                        character_file = os.getenv('CDL_DEFAULT_CHARACTER')
+                    logging.error(f"🎭 CDL CHARACTER: Using character file: {character_file}")
                     if character_file:
                         # STANDARDIZE PIPELINE DATA: Create VectorAIPipelineResult to match Discord path
                         from src.prompts.ai_pipeline_vector_integration import VectorAIPipelineResult
@@ -1206,8 +1218,8 @@ class UniversalChatOrchestrator:
                         )
                         
                         # Create character-aware prompt using CDL system - MATCHING DISCORD PARAMETERS
-                        logging.info(f"🎭 CDL CHARACTER: Calling CDL system for {message.user_id}")
-                        cdl_prompt = await self.bot_core.character_system.create_unified_character_prompt(
+                        logging.error(f"🎭 CDL CHARACTER: Calling CDL system for {message.user_id}")
+                        cdl_prompt = await self.character_system.create_unified_character_prompt(
                             character_file=character_file,
                             user_id=message.user_id,
                             message_content=message.content,
@@ -1215,7 +1227,7 @@ class UniversalChatOrchestrator:
                             user_name=user_display_name       # ✅ User display name like Discord
                         )
                         character_context = cdl_prompt
-                        logging.info(f"✅ CDL CHARACTER: CDL prompt generated: {len(character_context)} chars")
+                        logging.error(f"✅ CDL CHARACTER: CDL prompt generated: {len(character_context)} chars")
                     else:
                         logging.error("❌ CDL CHARACTER: No character file available for CDL integration")
                 except Exception as e:

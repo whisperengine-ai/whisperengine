@@ -92,11 +92,40 @@ class EnhancedHealthServer:
             
         try:
             # Try to get existing universal chat orchestrator from bot manager's event handlers
+            logger.error(f"🚨 DEBUG: bot_manager={self.bot_manager is not None}")
             if self.bot_manager and hasattr(self.bot_manager, 'event_handlers'):
                 event_handlers = self.bot_manager.event_handlers
+                logger.error(f"🚨 DEBUG: event_handlers={event_handlers is not None}")
                 if event_handlers and hasattr(event_handlers, 'chat_orchestrator'):
                     orchestrator = getattr(event_handlers, 'chat_orchestrator', None)
+                    logger.error(f"🚨 DEBUG: event_handlers.chat_orchestrator={orchestrator is not None}")
                     if orchestrator:
+                        # Check if this orchestrator has proper bot_core setup
+                        bot_core_check = getattr(orchestrator, 'bot_core', None)
+                        memory_manager_check = hasattr(bot_core_check, 'memory_manager') if bot_core_check else False
+                        logger.error(f"🚨 DEBUG: Found orchestrator bot_core={bot_core_check is not None}, memory_manager={memory_manager_check}")
+                        
+                        # 🔥 FIX: If bot_core doesn't have memory_manager, add it from event_handlers
+                        if bot_core_check and not memory_manager_check:
+                            event_memory_manager = getattr(event_handlers, 'memory_manager', None)
+                            logger.error(f"🚨 FIX: event_handlers.memory_manager={event_memory_manager is not None}")
+                            if event_memory_manager:
+                                setattr(bot_core_check, 'memory_manager', event_memory_manager)
+                                logger.info("✅ Added memory_manager to bot_core for CDL routing")
+                            else:
+                                logger.warning("⚠️ Could not find memory_manager in event_handlers")
+                        
+                        # 🔥 FIX: Also add llm_client if missing
+                        llm_client_check = hasattr(bot_core_check, 'llm_client') if bot_core_check else False
+                        if bot_core_check and not llm_client_check:
+                            event_llm_client = getattr(event_handlers, 'llm_client', None)
+                            logger.error(f"🚨 FIX: event_handlers.llm_client={event_llm_client is not None}")
+                            if event_llm_client:
+                                setattr(bot_core_check, 'llm_client', event_llm_client)
+                                logger.info("✅ Added llm_client to bot_core for CDL routing")
+                            else:
+                                logger.warning("⚠️ Could not find llm_client in event_handlers")
+                        
                         self.universal_orchestrator = orchestrator
                         logger.info("✅ Found existing universal chat orchestrator from bot manager event handlers")
                         return self.universal_orchestrator
@@ -235,17 +264,20 @@ class EnhancedHealthServer:
             
             # Process message through universal orchestrator if available
             orchestrator = await self._get_or_create_universal_orchestrator()
+            logger.error(f"🚨 HEALTH SERVER DEBUG: orchestrator={orchestrator is not None}")
             if orchestrator:
                 try:
                     # Generate AI response using universal system
                     conversation_context = await orchestrator.build_conversation_context(
                         user_id, "web_chat", message_content
                     )
+                    logger.error(f"🚨 HEALTH SERVER DEBUG: About to call generate_ai_response")
                     ai_response = await orchestrator.generate_ai_response(
                         universal_message, 
                         conversation_context,
                         user_display_name=user_display_name  # Pass user display name for CDL consistency
                     )
+                    logger.error(f"🚨 HEALTH SERVER DEBUG: generate_ai_response completed")
                     
                     response_content = ai_response.content if hasattr(ai_response, 'content') else str(ai_response)
                     
