@@ -4,6 +4,9 @@ Human-Like Memory Search Optimization
 This module optimizes LLM prompting specifically for chatbots that need to
 feel human-like in their memory recall and conversational continuity.
 Focus on natural conversation flow, emotional intelligence, and relationship building.
+
+🚀 ENHANCED with 6D Vector-powered conversation flow analysis
+Replaces keyword-based flow detection with semantic vector similarity search.
 """
 
 import logging
@@ -11,6 +14,15 @@ from dataclasses import dataclass
 from typing import Any
 
 logger = logging.getLogger(__name__)
+
+# 🚀 Import 6D Vector Enhanced Flow Analysis
+try:
+    from src.intelligence.vector_conversation_flow_analyzer import create_vector_conversation_flow_analyzer
+    VECTOR_FLOW_AVAILABLE = True
+    logger.info("✅ 6D Vector Conversation Flow Analysis AVAILABLE")
+except ImportError:
+    VECTOR_FLOW_AVAILABLE = False
+    logger.warning("⚠️ 6D Vector Flow Analysis not available, using fallback methods")
 
 
 @dataclass
@@ -45,30 +57,51 @@ class HumanLikeChatbotOptimizer:
         self.emotional_intelligence_prompts = self._build_emotional_prompts()
         self.relationship_context_templates = self._build_relationship_templates()
 
-    def optimize_for_human_conversation(
-        self,
-        message: str,
-        user_id: str,
-        conversation_history: list[str] | None = None,
-        relationship_context: dict | None = None,
-    ) -> tuple[str, str]:
+    async def optimize_conversation_flow(
+        self, current_message: str, user_id: str, conversation_history: list[str]
+    ) -> dict[str, Any]:
         """
-        Create prompts optimized for human-like conversational memory recall
-
-        Returns:
-            Tuple of (system_prompt, user_prompt) designed for natural conversation
+        🚀 ENHANCED: Optimize memory search with 6D vector-powered conversation flow analysis
+        
+        Uses semantic vector similarity for superior flow detection vs keyword matching.
         """
 
-        # Analyze the conversational context like a human would
-        conv_context = self._analyze_conversational_context(message, conversation_history)
+        # 🚀 Use 6D Vector Flow Analysis if available
+        if self.vector_flow_analyzer:
+            try:
+                logger.info(f"🚀 Using 6D Vector Flow Analysis for user {user_id}")
+                flow_analysis = await self.vector_flow_analyzer.analyze_conversation_flow_6d(
+                    user_id=user_id,
+                    current_message=current_message,
+                    conversation_history=conversation_history
+                )
+                logger.info(f"✅ 6D Flow Analysis: {flow_analysis.get('flow_type')} with {flow_analysis.get('confidence', 0):.3f} confidence")
+                
+            except Exception as e:
+                logger.error(f"❌ 6D Vector Flow Analysis failed: {e}, falling back to keyword analysis")
+                flow_analysis = self._analyze_conversation_flow(current_message, conversation_history)
+                flow_analysis["vector_enhanced"] = False
+                flow_analysis["fallback_reason"] = str(e)
+        else:
+            # Traditional keyword-based analysis
+            flow_analysis = self._analyze_conversation_flow(current_message, conversation_history)
+            flow_analysis["vector_enhanced"] = False
 
-        # Build human-like memory search prompt
-        system_prompt = self._build_human_like_system_prompt(conv_context, relationship_context)
-        user_prompt = self._build_conversational_user_prompt(
-            message, conv_context, conversation_history
+        # Determine search strategy based on flow
+        search_strategy = self._determine_search_strategy(flow_analysis)
+
+        # Generate flow-optimized queries (enhanced with vector context if available)
+        flow_optimized_queries = self._generate_flow_aware_queries(
+            current_message, flow_analysis, search_strategy
         )
 
-        return system_prompt, user_prompt
+        return {
+            "flow_analysis": flow_analysis,
+            "search_strategy": search_strategy,
+            "optimized_queries": flow_optimized_queries,
+            "conversation_continuity_weight": flow_analysis.get("continuity_score", 0.5),
+            "vector_enhanced": flow_analysis.get("vector_enhanced", False),
+        }
 
     def _analyze_conversational_context(
         self, message: str, conversation_history: list[str] | None = None
@@ -357,13 +390,25 @@ IMPORTANT: Be very concise. Complete the JSON properly."""
         }
 
 
-class ConversationalMemoryOptimizer:
+class ConversationFlowOptimizer:
     """
-    Optimizes memory search specifically for natural conversation flow
+    🚀 ENHANCED: Optimizes memory search with 6D vector-powered conversation flow analysis
+    
+    Replaces keyword-based flow detection with semantic vector similarity search
+    for superior conversation continuity and relationship building.
     """
 
-    def __init__(self):
-        self.conversation_flow_patterns = self._build_conversation_patterns()
+    def __init__(self, memory_manager=None):
+        self.memory_manager = memory_manager
+        self.conversation_patterns = self._build_conversation_patterns()
+        
+        # 🚀 Initialize 6D Vector Flow Analyzer if available
+        if VECTOR_FLOW_AVAILABLE and memory_manager and hasattr(memory_manager, 'retrieve_memories_by_dimensions'):
+            self.vector_flow_analyzer = create_vector_conversation_flow_analyzer(memory_manager)
+            logger.info("✅ Initialized 6D Vector Flow Analyzer")
+        else:
+            self.vector_flow_analyzer = None
+            logger.info("🔄 Using traditional keyword-based flow analysis")
 
     def optimize_for_conversation_flow(
         self,

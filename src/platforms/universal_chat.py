@@ -749,14 +749,24 @@ class UniversalChatOrchestrator:
             # but are not used in the simplified pipeline. They could be re-integrated if needed.
             
             # Check if we have access to the full WhisperEngine AI framework
+<<<<<<< Updated upstream
             logging.error(f"🚨 ROUTING DEBUG: bot_core={self.bot_core is not None}, memory_manager={hasattr(self.bot_core, 'memory_manager') if self.bot_core else False}")
             if self.bot_core and hasattr(self.bot_core, "memory_manager"):
                 logging.error(f"🚨 ROUTING DEBUG: Taking FULL AI response path (with CDL)")
+=======
+            logging.info(f"🚨 ROUTING DEBUG: bot_core={self.bot_core is not None}, memory_manager={hasattr(self.bot_core, 'memory_manager') if self.bot_core else False}")
+            if self.bot_core and hasattr(self.bot_core, "memory_manager"):
+                logging.info(f"🚨 ROUTING DEBUG: Taking FULL AI response path (with CDL)")
+>>>>>>> Stashed changes
                 return await self._generate_full_ai_response(
                     message, conversation_context, user_display_name, phase3_context_switches, phase3_empathy_calibration
                 )
             else:
+<<<<<<< Updated upstream
                 logging.error(f"🚨 ROUTING DEBUG: Taking BASIC AI response path (NO CDL)")
+=======
+                logging.info(f"🚨 ROUTING DEBUG: Taking BASIC AI response path (NO CDL)")
+>>>>>>> Stashed changes
                 # Use the character-enhanced conversation context passed in
                 return await self._generate_basic_ai_response(message, conversation_context)
 
@@ -1190,10 +1200,17 @@ class UniversalChatOrchestrator:
 
             # Add current message to conversation context
             conversation_context.append({"role": "user", "content": message.content})
+            
+            # DEBUG: Always log this to confirm we reach CDL processing
+            logging.info(f"🚨 UNIVERSAL CHAT DEBUG: Starting CDL processing for {message.user_id}")
 
             # ✅ SIMPLIFIED PIPELINE: Get CDL character context and add to conversation
             character_context = ""
+<<<<<<< Updated upstream
             logging.error(f"🚨 CDL DEBUG: self.character_system={self.character_system is not None}")
+=======
+            logging.info(f"🔍 CDL DEBUG: character_system available: {self.character_system is not None}")
+>>>>>>> Stashed changes
             if self.character_system:
                 try:
                     # Get CDL character file for this bot
@@ -1218,7 +1235,11 @@ class UniversalChatOrchestrator:
                         )
                         
                         # Create character-aware prompt using CDL system - MATCHING DISCORD PARAMETERS
+<<<<<<< Updated upstream
                         logging.error(f"🎭 CDL CHARACTER: Calling CDL system for {message.user_id}")
+=======
+                        logging.info(f"🎭 CDL CHARACTER: Calling CDL system for {message.user_id}")
+>>>>>>> Stashed changes
                         cdl_prompt = await self.character_system.create_unified_character_prompt(
                             character_file=character_file,
                             user_id=message.user_id,
@@ -1235,7 +1256,7 @@ class UniversalChatOrchestrator:
                     import traceback
                     logging.error(f"CDL CHARACTER stack trace: {traceback.format_exc()}")
             else:
-                logging.warning("⚠️ CDL CHARACTER: Character system not available")
+                logging.warning(f"⚠️ CDL CHARACTER: Character system not available. self.character_system = {self.character_system}")
                 
             # Fallback to system message extraction if CDL not available
             if not character_context:

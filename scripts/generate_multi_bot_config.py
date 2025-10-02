@@ -117,15 +117,26 @@ class BotConfigDiscovery:
     
     def _get_display_name(self, bot_name: str) -> str:
         """
-        Get the display name for a bot, handling special cases.
+        Get the display name for a bot by reading from .env file first, with fallback.
         Special mapping for ryan-chen -> ryan migration.
         """
-        # Special case for ryan-chen -> ryan migration
+        # First, try to read DISCORD_BOT_NAME from the .env file
+        env_file = self.workspace_root / f".env.{bot_name}"
+        if env_file.exists():
+            try:
+                with open(env_file, 'r', encoding='utf-8') as f:
+                    for line in f:
+                        if line.startswith('DISCORD_BOT_NAME='):
+                            return line.split('=')[1].strip()
+            except (IOError, IndexError):
+                pass
+        
+        # Fallback: Special case for ryan-chen -> ryan migration
         if bot_name == "ryan-chen":
             return "ryan"
         
-        # Default: convert dashes to spaces and title case
-        return bot_name.replace("-", " ").title()
+        # Final fallback: Use bot_name as-is (no title case conversion)
+        return bot_name
 
     def generate_bot_service_yaml(self, bot_name: str, config: Dict) -> str:
         """Generate YAML for a single bot service."""

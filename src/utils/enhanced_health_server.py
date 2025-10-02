@@ -13,6 +13,14 @@ import discord
 from aiohttp import web
 from discord.ext import commands
 
+# Import normalized bot name function
+try:
+    from src.memory.vector_memory_system import get_normalized_bot_name_from_env
+except ImportError:
+    def get_normalized_bot_name_from_env():
+        import os
+        return os.getenv('DISCORD_BOT_NAME', 'WhisperEngine')
+
 from src.platforms.universal_chat import (
     UniversalChatOrchestrator,
     Message,
@@ -127,7 +135,14 @@ class EnhancedHealthServer:
                                 logger.warning("⚠️ Could not find llm_client in event_handlers")
                         
                         self.universal_orchestrator = orchestrator
-                        logger.info("✅ Found existing universal chat orchestrator from bot manager event handlers")
+                        # 🚨 CRITICAL: Ensure bot has memory_manager for CDL routing
+                        if self.bot_manager and hasattr(self.bot_manager, 'event_handlers') and self.bot_manager.event_handlers.memory_manager:
+                            self.bot.memory_manager = self.bot_manager.event_handlers.memory_manager
+                            logger.info("✅ Added memory_manager to bot for CDL routing (existing orchestrator)")
+                        
+                        # 🚨 CRITICAL: Ensure existing orchestrator has bot_core set for CDL
+                        self.universal_orchestrator.set_bot_core(self.bot)
+                        logger.info("✅ Found existing universal chat orchestrator from bot manager event handlers with CDL integration")
                         return self.universal_orchestrator
                     else:
                         logger.info("⚠️ Event handlers have chat_orchestrator attribute but it's None")
@@ -145,7 +160,14 @@ class EnhancedHealthServer:
                     orchestrator = getattr(cog, 'chat_orchestrator', None)
                     if orchestrator:
                         self.universal_orchestrator = orchestrator
-                        logger.info(f"✅ Found existing universal chat orchestrator from bot cog '{cog_name}'")
+                        # 🚨 CRITICAL: Ensure bot has memory_manager for CDL routing
+                        if self.bot_manager and hasattr(self.bot_manager, 'event_handlers') and self.bot_manager.event_handlers.memory_manager:
+                            self.bot.memory_manager = self.bot_manager.event_handlers.memory_manager
+                            logger.info("✅ Added memory_manager to bot for CDL routing (cog orchestrator)")
+                        
+                        # 🚨 CRITICAL: Ensure existing orchestrator has bot_core set for CDL
+                        self.universal_orchestrator.set_bot_core(self.bot)
+                        logger.info(f"✅ Found existing universal chat orchestrator from bot cog '{cog_name}' with CDL integration")
                         return self.universal_orchestrator
                     else:
                         logger.info(f"⚠️ Cog '{cog_name}' has chat_orchestrator attribute but it's None")
@@ -184,7 +206,16 @@ class EnhancedHealthServer:
                     bot_core=self.bot,
                     use_enhanced_core=True
                 )
-                logger.info("✅ Created new universal chat orchestrator for health server")
+                # 🚨 CRITICAL: Ensure bot has memory_manager for CDL routing
+                if self.bot_manager and hasattr(self.bot_manager, 'event_handlers') and self.bot_manager.event_handlers.memory_manager:
+                    self.bot.memory_manager = self.bot_manager.event_handlers.memory_manager
+                    logger.info("✅ Added memory_manager to bot for CDL routing")
+                else:
+                    logger.warning("⚠️ Could not set memory_manager on bot - CDL may not work")
+                
+                # 🚨 CRITICAL: Set bot core to enable CDL character system
+                self.universal_orchestrator.set_bot_core(self.bot)
+                logger.info("✅ Created new universal chat orchestrator for health server with CDL integration")
                 return self.universal_orchestrator
             else:
                 logger.warning("Database manager not available - will use fallback responses")
@@ -264,13 +295,19 @@ class EnhancedHealthServer:
             
             # Process message through universal orchestrator if available
             orchestrator = await self._get_or_create_universal_orchestrator()
+<<<<<<< Updated upstream
             logger.error(f"🚨 HEALTH SERVER DEBUG: orchestrator={orchestrator is not None}")
+=======
+            logger.info(f"🔍 HEALTH SERVER DEBUG: Orchestrator available: {orchestrator is not None}")
+>>>>>>> Stashed changes
             if orchestrator:
+                logger.info(f"🔍 HEALTH SERVER DEBUG: Orchestrator character_system: {orchestrator.character_system is not None}")
                 try:
                     # Generate AI response using universal system
                     conversation_context = await orchestrator.build_conversation_context(
                         user_id, "web_chat", message_content
                     )
+<<<<<<< Updated upstream
                     logger.error(f"🚨 HEALTH SERVER DEBUG: About to call generate_ai_response")
                     ai_response = await orchestrator.generate_ai_response(
                         universal_message, 
@@ -278,6 +315,22 @@ class EnhancedHealthServer:
                         user_display_name=user_display_name  # Pass user display name for CDL consistency
                     )
                     logger.error(f"🚨 HEALTH SERVER DEBUG: generate_ai_response completed")
+=======
+                    logger.info(f"🔍 HEALTH SERVER DEBUG: About to call generate_ai_response")
+                    try:
+                        ai_response = await orchestrator.generate_ai_response(
+                            universal_message, 
+                            conversation_context,
+                            user_display_name=user_display_name  # Pass user display name for CDL consistency
+                        )
+                        logger.info(f"🔍 HEALTH SERVER DEBUG: AI response generated: {len(str(ai_response))} chars")
+                    except Exception as e:
+                        logger.error(f"🚨 HEALTH SERVER ERROR: generate_ai_response failed: {e}")
+                        logger.error(f"🚨 HEALTH SERVER ERROR: Exception type: {type(e)}")
+                        import traceback
+                        logger.error(f"🚨 HEALTH SERVER ERROR: Stack trace: {traceback.format_exc()}")
+                        raise
+>>>>>>> Stashed changes
                     
                     response_content = ai_response.content if hasattr(ai_response, 'content') else str(ai_response)
                     
@@ -310,7 +363,7 @@ class EnhancedHealthServer:
                         "response": response_content,
                         "timestamp": datetime.now().isoformat(),
                         "message_id": universal_message.message_id,
-                        "bot_name": self.bot.user.name if self.bot.user else "WhisperEngine",
+                        "bot_name": get_normalized_bot_name_from_env(),
                         "success": True
                     })
                     
@@ -319,7 +372,7 @@ class EnhancedHealthServer:
                     # Fall back to basic response
                     
             # Fallback: Basic response if universal orchestrator not available
-            bot_name = self.bot.user.name if self.bot.user else "WhisperEngine"
+            bot_name = get_normalized_bot_name_from_env()
             fallback_response = (
                 f"Hello! I'm {bot_name}. I received your message: '{message_content[:100]}...'. "
                 "I'm currently in development mode for web UI integration. "
@@ -330,7 +383,7 @@ class EnhancedHealthServer:
                 "response": fallback_response,
                 "timestamp": datetime.now().isoformat(),
                 "message_id": universal_message.message_id,
-                "bot_name": bot_name,
+                "bot_name": get_normalized_bot_name_from_env(),
                 "success": True,
                 "mode": "fallback"
             })
@@ -351,7 +404,7 @@ class EnhancedHealthServer:
         """Get information about this bot instance"""
         try:
             bot_info = {
-                "bot_name": self.bot.user.name if self.bot.user else "Unknown",
+                "bot_name": get_normalized_bot_name_from_env(),
                 "bot_id": str(self.bot.user.id) if self.bot.user else "unknown",
                 "status": "online" if self.bot.is_ready() else "offline",
                 "platform": "discord",
