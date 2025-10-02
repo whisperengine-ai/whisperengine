@@ -2368,11 +2368,17 @@ class VectorMemoryStore:
             
             # 🚀 QDRANT FEATURE: Use scroll API to get recent conversation chronologically
             # Convert to Unix timestamp for Qdrant numeric range filtering
-            # 🎯 SMART SESSION DETECTION: If "today" in query, use shorter window (current session)
+            # 🎯 SMART SESSION DETECTION: Context-aware time windows
             if "today" in query_lower or "this morning" in query_lower or "this afternoon" in query_lower:
                 # "Today" means current session (last 4 hours is typical active session)
                 recent_cutoff_dt = datetime.utcnow() - timedelta(hours=4)
                 logger.info(f"🎯 SESSION SCOPE: Detected 'today' - using 4-hour session window")
+            elif detected_direction == "FIRST/EARLIEST":
+                # 🎯 BUG FIX: "First" questions should default to current session (4 hours)
+                # Without session context, "first" queries return chronologically oldest memories
+                # from the entire 24-hour window, not the first in current conversation
+                recent_cutoff_dt = datetime.utcnow() - timedelta(hours=4)
+                logger.info(f"🎯 SESSION SCOPE: 'First' query - defaulting to 4-hour session window to avoid historical bleed")
             else:
                 # General temporal queries use 24-hour window
                 recent_cutoff_dt = datetime.utcnow() - timedelta(hours=24)

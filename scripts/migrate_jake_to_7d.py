@@ -43,6 +43,7 @@ async def migrate_jake_memories():
             return False
         
         # Create target 7D collection if it doesn't exist
+        collection_created = False
         try:
             client.get_collection(target_collection)
             print(f"✅ Target collection {target_collection} already exists")
@@ -61,6 +62,34 @@ async def migrate_jake_memories():
                 }
             )
             print("✅ 7D collection created with all dimensional vectors")
+            collection_created = True
+        
+        # Create payload indexes (critical for temporal queries)
+        if collection_created:
+            from qdrant_client.models import PayloadSchemaType
+            print(f"\n🔧 Creating payload indexes for temporal queries...")
+            indexes = [
+                ('user_id', PayloadSchemaType.KEYWORD),
+                ('timestamp_unix', PayloadSchemaType.FLOAT),  # CRITICAL for order_by
+                ('emotional_context', PayloadSchemaType.KEYWORD),
+                ('semantic_key', PayloadSchemaType.KEYWORD),
+                ('content_hash', PayloadSchemaType.INTEGER),
+                ('bot_name', PayloadSchemaType.KEYWORD),
+                ('memory_type', PayloadSchemaType.KEYWORD),
+            ]
+            
+            for field_name, schema_type in indexes:
+                try:
+                    client.create_payload_index(
+                        collection_name=target_collection,
+                        field_name=field_name,
+                        field_schema=schema_type
+                    )
+                    print(f"  ✅ Created index: {field_name}")
+                except Exception as e:
+                    print(f"  ⚠️  Index {field_name} may already exist: {e}")
+            
+            print("✅ All payload indexes created")
         
         # Get existing memories from target to avoid duplicates
         try:
