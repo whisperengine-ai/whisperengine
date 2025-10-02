@@ -748,7 +748,7 @@ class BotEventHandlers:
         enhanced_system_prompt = None
 
         # ALWAYS process AI components - NO CONDITIONAL FALLBACKS
-        (external_emotion_data, phase2_context, current_emotion_data, 
+        (external_emotion_data, context_analysis, current_emotion_data, 
          dynamic_personality_context, phase4_context, comprehensive_context, 
          enhanced_system_prompt, phase3_context_switches, phase3_empathy_calibration) = await self._process_ai_components_parallel(
             user_id, message.content, message, recent_messages, conversation_context
@@ -777,6 +777,7 @@ class BotEventHandlers:
             getattr(self, '_last_dynamic_personality_context', None),
             getattr(self, '_last_phase3_context_switches', None),
             getattr(self, '_last_phase3_empathy_calibration', None),
+            context_analysis,  # NEW: Pass context analysis for enhanced processing
         )
 
     async def _handle_guild_message(self, message):
@@ -1002,7 +1003,7 @@ class BotEventHandlers:
         enhanced_system_prompt = None
 
         # ALWAYS process AI components - NO CONDITIONAL FALLBACKS
-        (external_emotion_data, phase2_context, current_emotion_data, 
+        (external_emotion_data, context_analysis, current_emotion_data, 
          dynamic_personality_context, phase4_context, comprehensive_context, 
          enhanced_system_prompt, phase3_context_switches, phase3_empathy_calibration) = await self._process_ai_components_parallel(
             user_id, content, message, recent_messages, conversation_context
@@ -1032,6 +1033,7 @@ class BotEventHandlers:
             getattr(self, '_last_dynamic_personality_context', None),
             getattr(self, '_last_phase3_context_switches', None),
             getattr(self, '_last_phase3_empathy_calibration', None),
+            context_analysis,  # NEW: Pass context analysis for enhanced processing
             content,
         )
 
@@ -2061,6 +2063,7 @@ class BotEventHandlers:
         dynamic_personality_context=None,
         phase3_context_switches=None,
         phase3_empathy_calibration=None,
+        context_analysis=None,
         original_content=None,
     ):
         """Generate AI response and send to channel using Universal Chat Architecture."""
@@ -2126,7 +2129,9 @@ class BotEventHandlers:
 
                         # 🎭 CDL CHARACTER INTEGRATION: Check for active character and replace system prompt
                         logger.info(f"🎭 DEBUG: About to call character enhancement for user {user_id}")
-                        enhanced_context = await self._apply_cdl_character_enhancement(user_id, conversation_context, message)
+                        enhanced_context = await self._apply_cdl_character_enhancement(
+                            user_id, conversation_context, message, context_analysis
+                        )
                         logger.info(f"🎭 DEBUG: Character enhancement returned: {enhanced_context is not None}")
                         final_context = enhanced_context if enhanced_context else conversation_context
                         
@@ -2161,6 +2166,54 @@ class BotEventHandlers:
                             
                         # TODO: Integrate Phase 3 parameters into Universal Chat Orchestrator
                         # Current limitation: orchestrator doesn't accept Phase 3 intelligence data
+                        
+                        # 🎯 FIDELITY-FIRST PROMPT OPTIMIZATION: Apply optimized prompt building
+                        try:
+                            from src.prompts.optimized_prompt_builder import create_optimized_prompt_builder
+                            
+                            # Create optimized prompt builder with memory integration
+                            prompt_builder = create_optimized_prompt_builder(
+                                max_words=1200,  # Increased for character authenticity
+                                llm_client=self.llm_client,
+                                memory_manager=self.memory_manager
+                            )
+                            
+                            # Extract character data from system prompt for optimization
+                            character_data = None
+                            if final_context and final_context[0].get('role') == 'system':
+                                # Create a mock character object from system prompt content
+                                system_content = final_context[0]['content']
+                                character_data = type('MockCharacter', (), {
+                                    'identity': type('Identity', (), {'name': 'AI Character', 'occupation': 'Assistant'})()
+                                })()
+                            
+                            # Build optimized character prompt with full fidelity preservation
+                            if character_data:
+                                logger.info(f"🎯 FIDELITY-FIRST: Applying character prompt optimization")
+                                optimized_prompt = prompt_builder.build_character_prompt(
+                                    character=character_data,
+                                    message_content=message.content,
+                                    context={
+                                        'relevant_memories': [],  # Will be populated by builder if memory_manager available
+                                        'conversation_history': [msg for msg in final_context if msg.get('role') != 'system'],
+                                        'user_id': user_id
+                                    }
+                                )
+                                
+                                # Replace context with optimized version
+                                if optimized_prompt and len(optimized_prompt.split()) > 50:  # Sanity check
+                                    final_context = [
+                                        {'role': 'system', 'content': optimized_prompt},
+                                        {'role': 'user', 'content': message.content}
+                                    ]
+                                    logger.info(f"✅ FIDELITY-FIRST: Applied character prompt optimization ({len(optimized_prompt.split())} words)")
+                                else:
+                                    logger.warning(f"⚠️ FIDELITY-FIRST: Character optimization failed, using original context")
+                            else:
+                                logger.debug(f"🎯 FIDELITY-FIRST: No character data found, skipping optimization")
+                                
+                        except Exception as e:
+                            logger.warning(f"⚠️ FIDELITY-FIRST: Prompt optimization failed, using enhanced context: {e}")
                         
                         # Generate AI response using our conversation context directly
                         logger.info(f"🎯 CONTEXT DEBUG: Sending {len(final_context)} messages to Universal Chat Orchestrator")
@@ -3045,23 +3098,65 @@ class BotEventHandlers:
         # Prepare parallel tasks - exactly what you need, nothing more
         tasks = []
         
-        # Task 1: Memory retrieval (your unified CDL system handles this)
+        # Task 1: FIDELITY-FIRST Memory retrieval with intelligent ranking
         if self.memory_manager:
-            tasks.append(asyncio.create_task(
-                self.memory_manager.retrieve_relevant_memories(user_id=user_id, query=content, limit=10)
-            ))
+            # Check if fidelity-first method is available
+            if hasattr(self.memory_manager, 'retrieve_relevant_memories_fidelity_first'):
+                tasks.append(asyncio.create_task(
+                    self.memory_manager.retrieve_relevant_memories_fidelity_first(
+                        user_id=user_id, 
+                        query=content, 
+                        limit=15,  # Increased for better context
+                        full_fidelity=True,
+                        intelligent_ranking=True,
+                        graduated_filtering=True,
+                        preserve_character_nuance=True
+                    )
+                ))
+            else:
+                # Fallback to standard method
+                tasks.append(asyncio.create_task(
+                    self.memory_manager.retrieve_relevant_memories(user_id=user_id, query=content, limit=15)
+                ))
         else:
             tasks.append(asyncio.create_task(self._create_none_result()))
             
-        # Task 2: Conversation history
+        # Task 2: Enhanced conversation history with context awareness
         if self.memory_manager:
-            tasks.append(asyncio.create_task(
-                self.memory_manager.get_conversation_history(user_id=user_id, limit=5)
-            ))
+            # Use context-aware memory retrieval if available
+            if hasattr(self.memory_manager, 'retrieve_context_aware_memories'):
+                tasks.append(asyncio.create_task(
+                    self.memory_manager.retrieve_context_aware_memories(
+                        user_id=user_id, 
+                        query=content,
+                        max_memories=8,  # Increased for better context
+                        context={"message_type": "discord_conversation", "query_content": content}
+                    )
+                ))
+            else:
+                # Fallback to standard conversation history
+                tasks.append(asyncio.create_task(
+                    self.memory_manager.get_conversation_history(user_id=user_id, limit=8)
+                ))
         else:
             tasks.append(asyncio.create_task(self._create_none_result()))
             
-        # Task 3: Emotion analysis (if available)
+        # Task 3: HYBRID CONTEXT DETECTION: Vector-enhanced pattern recognition
+        try:
+            from src.prompts.hybrid_context_detector import create_hybrid_context_detector
+            
+            # Create context detector with memory integration for vector enhancement
+            context_detector = create_hybrid_context_detector(memory_manager=self.memory_manager)
+            tasks.append(asyncio.create_task(
+                asyncio.to_thread(  # Run in thread to avoid blocking
+                    context_detector.analyze_context, content, user_id
+                )
+            ))
+        except Exception as e:
+            logger.debug(f"HybridContextDetector unavailable, skipping: {e}")
+            tasks.append(asyncio.create_task(self._create_none_result()))
+            
+        # Task 4: Emotion analysis (if available)
         if self.phase2_integration:
             context_type = "guild_message" if hasattr(message, 'guild') and message.guild else "dm"
             tasks.append(asyncio.create_task(
@@ -3075,16 +3170,24 @@ class BotEventHandlers:
             logger.info(f"🚀 AI PIPELINE: Executing {len(tasks)} tasks in parallel")
             results = await asyncio.gather(*tasks, return_exceptions=True)
             
-            # Extract results
+            # Extract results with ENHANCED components
             relevant_memories = results[0] if not isinstance(results[0], Exception) else []
             conversation_history = results[1] if not isinstance(results[1], Exception) else []
-            emotion_data = results[2] if not isinstance(results[2], Exception) else None
+            context_analysis = results[2] if not isinstance(results[2], Exception) else None
+            emotion_data = results[3] if not isinstance(results[3], Exception) else None
             
             processing_time = time.time() - start_time
-            logger.info(f"✅ Simple parallel processing completed in {processing_time:.2f}s")
+            logger.info(f"✅ Enhanced parallel processing completed in {processing_time:.2f}s")
             
-            # Return what your pipeline expects (9 values to match existing interface)
-            return (emotion_data, None, None, None, None, None, None, None, None)
+            # Log context analysis results if available
+            if context_analysis and not isinstance(context_analysis, Exception):
+                logger.info(f"🎯 CONTEXT ANALYSIS: AI guidance needed: {getattr(context_analysis, 'needs_ai_guidance', False)}, "
+                           f"Memory context: {getattr(context_analysis, 'needs_memory_context', False)}, "
+                           f"Personality: {getattr(context_analysis, 'needs_personality', False)}")
+            
+            # Return enhanced results (9 values to match existing interface)
+            # Add context_analysis as additional intelligence data
+            return (emotion_data, context_analysis, None, None, None, None, None, None, None)
             
         except Exception as e:
             logger.error(f"Parallel processing failed: {e}")
@@ -3227,6 +3330,7 @@ class BotEventHandlers:
         user_id: str,
         conversation_context: list,
         message,
+        context_analysis=None,
         current_emotion_data=None,
         external_emotion_data=None,
         phase2_context=None,
@@ -3263,7 +3367,7 @@ class BotEventHandlers:
             from src.prompts.ai_pipeline_vector_integration import VectorAIPipelineResult
             from datetime import datetime
             
-            # Create AI pipeline result from available context data
+            # Create AI pipeline result from available context data WITH CONTEXT ANALYSIS
             pipeline_result = VectorAIPipelineResult(
                 user_id=user_id,
                 message_content=message.content,
@@ -3276,6 +3380,30 @@ class BotEventHandlers:
                 # Map phase4 data
                 enhanced_context=phase4_context if isinstance(phase4_context, dict) else None
             )
+            
+            # 🎯 ENHANCE: Add context analysis insights to pipeline result
+            if context_analysis and not isinstance(context_analysis, Exception):
+                try:
+                    # Convert context analysis to dict for pipeline compatibility
+                    context_dict = {
+                        'needs_ai_guidance': getattr(context_analysis, 'needs_ai_guidance', False),
+                        'needs_memory_context': getattr(context_analysis, 'needs_memory_context', False),
+                        'needs_personality': getattr(context_analysis, 'needs_personality', False),
+                        'needs_voice_style': getattr(context_analysis, 'needs_voice_style', False),
+                        'is_greeting': getattr(context_analysis, 'is_greeting', False),
+                        'is_simple_question': getattr(context_analysis, 'is_simple_question', False),
+                        'confidence_scores': getattr(context_analysis, 'confidence_scores', {}),
+                    }
+                    # Add to enhanced_context if available, otherwise create new field
+                    if isinstance(pipeline_result.enhanced_context, dict):
+                        pipeline_result.enhanced_context['context_analysis'] = context_dict
+                    else:
+                        pipeline_result.enhanced_context = {'context_analysis': context_dict}
+                    
+                    logger.info(f"🎯 CDL: Enhanced pipeline with context analysis insights")
+                except Exception as e:
+                    logger.debug(f"Failed to add context analysis to pipeline: {e}")
+            
             
             # Use centralized character system if available, otherwise create new instance
             if self.character_system:
@@ -3300,6 +3428,36 @@ class BotEventHandlers:
                 pipeline_result=pipeline_result,
                 user_name=user_display_name
             )
+            
+            # 🚀 VECTOR-NATIVE ENHANCEMENT: Enhance character prompt with dynamic vector context
+            try:
+                from src.prompts.vector_native_prompt_manager import create_vector_native_prompt_manager
+                
+                # Create vector-native prompt manager
+                vector_prompt_manager = create_vector_native_prompt_manager(
+                    vector_memory_system=self.memory_manager,
+                    personality_engine=None  # Reserved for future use
+                )
+                
+                # Extract emotional context from pipeline for vector enhancement
+                emotional_context = None
+                if pipeline_result and hasattr(pipeline_result, 'emotional_state'):
+                    emotional_context = pipeline_result.emotional_state
+                
+                # Enhance character prompt with vector-native context
+                vector_enhanced_prompt = await vector_prompt_manager.create_contextualized_prompt(
+                    base_prompt=character_prompt,
+                    user_id=user_id,
+                    current_message=message.content,
+                    emotional_context=emotional_context
+                )
+                
+                logger.info(f"🎯 VECTOR-NATIVE: Enhanced character prompt with dynamic context ({len(vector_enhanced_prompt)} chars)")
+                character_prompt = vector_enhanced_prompt
+                
+            except Exception as e:
+                logger.debug(f"Vector-native prompt enhancement unavailable, using CDL-only: {e}")
+                # Continue with CDL-only character prompt
             
             # Clone the conversation context and replace/enhance system message
             enhanced_context = conversation_context.copy()

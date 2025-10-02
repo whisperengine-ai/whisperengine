@@ -74,11 +74,11 @@ class VectorNativePromptManager:
         """
         try:
             # Search for relevant memories using vector similarity
-            relevant_memories = await self.vector_memory.search_memories_with_qdrant_intelligence(
-                query=current_message,
+            # Use the VectorMemoryManager interface instead of direct store access
+            relevant_memories = await self.vector_memory.retrieve_relevant_memories(
                 user_id=user_id,
-                top_k=10,
-                prefer_recent=True
+                query=current_message,
+                limit=10
             )
             
             # Get conversation patterns using vector clustering
@@ -92,7 +92,7 @@ class VectorNativePromptManager:
                 'key_topics': key_topics[:3],  # Top 3 topics
                 'patterns': conversation_patterns[:2],  # Top 2 patterns
                 'recent_context': relevant_memories[:3] if relevant_memories else [],
-                'memory_depth': self._calculate_memory_depth(relevant_memories)
+                'memory_depth': await self._calculate_memory_depth(relevant_memories)
             }
             
         except Exception as e:
@@ -106,11 +106,10 @@ class VectorNativePromptManager:
         """
         try:
             # Search for personality-indicating memories
-            personality_memories = await self.vector_memory.search_memories_with_qdrant_intelligence(
-                query="communication style personality preferences behavior",
+            personality_memories = await self.vector_memory.retrieve_relevant_memories(
                 user_id=user_id,
-                top_k=15,
-                emotional_context="personality_analysis"
+                query="communication style personality preferences behavior",
+                limit=15
             )
             
             # Analyze communication style from vector patterns
@@ -127,7 +126,7 @@ class VectorNativePromptManager:
             }
             
         except Exception as e:
-            logger.error(f"❌ Personality context failed: {e}")
+            logger.error("❌ Personality context failed: %s", e)
             raise e
     
     async def _get_relationship_context(self, user_id: str) -> Dict[str, Any]:
@@ -137,18 +136,16 @@ class VectorNativePromptManager:
         """
         try:
             # Get relationship progression using temporal queries
-            early_memories = await self.vector_memory.search_memories_with_qdrant_intelligence(
-                query="first interaction introduction",
+            early_memories = await self.vector_memory.retrieve_relevant_memories(
                 user_id=user_id,
-                top_k=5,
-                prefer_recent=False  # Get oldest memories
+                query="first interaction introduction",
+                limit=5
             )
             
-            recent_memories = await self.vector_memory.search_memories_with_qdrant_intelligence(
-                query="recent conversation current relationship",
+            recent_memories = await self.vector_memory.retrieve_relevant_memories(
                 user_id=user_id,
-                top_k=5,
-                prefer_recent=True
+                query="recent conversation current relationship",
+                limit=5
             )
             
             # Calculate relationship depth
@@ -165,22 +162,22 @@ class VectorNativePromptManager:
             }
             
         except Exception as e:
-            logger.error(f"❌ Relationship context failed: {e}")
+            logger.error("❌ Relationship context failed: %s", e)
             raise e
     
     async def _get_emotional_intelligence_context(self, user_id: str, current_emotional_context: Optional[str]) -> Dict[str, Any]:
         """
         Vector-native replacement for all emotional context variables.
-        Uses multi-vector search for emotional intelligence.
+        Uses context-aware memory retrieval for emotional intelligence.
         """
         try:
-            # Multi-vector search for emotional patterns
-            emotional_memories = await self.vector_memory.search_with_multi_vectors(
-                content_query="emotion feeling mood state",
-                emotional_query=current_emotional_context or "emotional patterns",
-                personality_context="emotional intelligence",
+            # Use context-aware memory retrieval which supports emotional context internally
+            emotional_memories = await self.vector_memory.retrieve_context_aware_memories(
                 user_id=user_id,
-                top_k=10
+                query="emotion feeling mood state",
+                emotional_context=current_emotional_context or "emotional patterns",
+                personality_context="emotional intelligence",
+                max_memories=10
             )
             
             # Analyze current emotional state from patterns
@@ -201,7 +198,7 @@ class VectorNativePromptManager:
             }
             
         except Exception as e:
-            logger.error(f"❌ Emotional intelligence context failed: {e}")
+            logger.error("❌ Emotional intelligence context failed: %s", e)
             raise e
     
     async def _build_vector_native_prompt(self, base_prompt: str, contexts: Dict[str, Any], user_id: str) -> str:
@@ -209,9 +206,11 @@ class VectorNativePromptManager:
         Build the final prompt using vector-derived context.
         
         CRITICAL: No template variables - directly inject context into prompt.
+        Note: base_prompt is kept for interface compatibility but overridden with vector context.
         """
         try:
             # Use generic assistant prompt that supports character overrides
+            # Note: We override base_prompt to ensure consistent vector-native behavior
             clean_prompt = "You are a helpful AI assistant. You communicate naturally and conversationally."
             
             # Build vector-native context sections
@@ -264,13 +263,13 @@ class VectorNativePromptManager:
                 final_prompt = f"{clean_prompt}. Respond naturally and conversationally - no technical formatting."
             
             # 🔍 DEBUG: Print final prompt before sending to LLM
-            logger.info(f"🎭 Vector-native prompt created for user {user_id}: {len(final_prompt)} characters")
-            logger.debug(f"🔍 FINAL PROMPT DEBUG for user {user_id}:\n{'-'*50}\n{final_prompt}\n{'-'*50}")
+            logger.info("🎭 Vector-native prompt created for user %s: %d characters", user_id, len(final_prompt))
+            logger.debug("🔍 FINAL PROMPT DEBUG for user %s:\n%s\n%s\n%s", user_id, '-'*50, final_prompt, '-'*50)
             
             return final_prompt
             
         except Exception as e:
-            logger.error(f"❌ Vector prompt building failed: {e}")
+            logger.error("❌ Vector prompt building failed: %s", e)
             raise e
     
     # Helper methods for context analysis
@@ -353,3 +352,17 @@ class VectorNativePromptManager:
     async def _identify_stress_indicators(self, memories: List[Dict[str, Any]]) -> List[str]:
         """Identify stress indicators."""
         return []
+
+
+def create_vector_native_prompt_manager(vector_memory_system, personality_engine=None):
+    """
+    Factory function to create VectorNativePromptManager instance.
+    
+    Args:
+        vector_memory_system: Vector memory system for dynamic context querying
+        personality_engine: Optional personality engine (not used yet but reserved for future)
+        
+    Returns:
+        VectorNativePromptManager instance
+    """
+    return VectorNativePromptManager(vector_memory_system, personality_engine)
