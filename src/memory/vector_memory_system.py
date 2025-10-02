@@ -2373,7 +2373,7 @@ class VectorMemoryStore:
                 # "Today" means current session (last 4 hours is typical active session)
                 recent_cutoff_dt = datetime.utcnow() - timedelta(hours=4)
                 logger.info(f"🎯 SESSION SCOPE: Detected 'today' - using 4-hour session window")
-            elif detected_direction == "FIRST/EARLIEST":
+            elif direction_label == "FIRST/EARLIEST":
                 # 🎯 BUG FIX: "First" questions should default to current session (4 hours)
                 # Without session context, "first" queries return chronologically oldest memories
                 # from the entire 24-hour window, not the first in current conversation
