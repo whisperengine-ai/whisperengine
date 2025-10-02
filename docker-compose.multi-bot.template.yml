@@ -82,40 +82,6 @@ services:
       timeout: 10s
       retries: 3
 
-  # ===== WEB INTERFACE =====
-  whisperengine-web:
-    build:
-      context: .
-      dockerfile: Dockerfile.web
-    container_name: whisperengine-web-interface
-    restart: unless-stopped
-    ports:
-      - "8081:8080"  # Changed from 8080 to 8081 to free up 8080 for monitoring dashboard
-    environment:
-      - DATABASE_URL=postgresql://whisperengine:whisperengine_password@postgres:5432/whisperengine
-      # - REDIS_URL=redis://redis:6379/0  # Commented out - using vector-native memory only
-      - QDRANT_URL=http://qdrant:6333
-      - WEB_UI_HOST=0.0.0.0
-      - WEB_UI_PORT=8080
-      - PYTHONPATH=/app
-    depends_on:
-      postgres:
-        condition: service_healthy
-      # redis:
-      #   condition: service_started
-      qdrant:
-        condition: service_started
-    networks:
-      - bot_network
-    volumes:
-      - ./characters:/app/characters:ro
-      - ./logs:/app/logs
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
   # ===== SHARED BOT IMAGE BUILD =====
   whisperengine-bot-builder:
     build:

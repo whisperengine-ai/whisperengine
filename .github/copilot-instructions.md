@@ -50,7 +50,7 @@
 - **CODE CHANGES**: Use `./multi-bot.sh restart <character>` for code changes, but `./multi-bot.sh stop <character> && ./multi-bot.sh start <character>` for environment changes
 - **START/STOP AS NEEDED**: Only run the specific character(s) needed for testing to reduce resource usage and isolate issues
 
-**WEB INTERFACE STATUS**: The web chat interface (`src/web/simple_chat_app.py`) is currently not functional. **For HTTP API chat access, use individual character API endpoints directly** (see Character API Endpoints section below).
+**DISCORD-FIRST ARCHITECTURE**: WhisperEngine is a Discord-focused multi-character AI roleplay system. **Web interface has been removed** - Discord is the primary and only supported platform.
 
 **PYTHON VIRTUAL ENVIRONMENT**: Always use `.venv/bin/activate` for Python commands:
 ```bash
@@ -151,12 +151,6 @@ identity_manager = create_identity_manager(postgres_pool)
 - All component initialization in `initialize_all()`
 - Factory-based component creation
 - Async initialization for heavy components
-
-**Web Interface**: `src/web/simple_chat_app.py` → `SimpleWebChatApp` class
-- FastAPI-based ChatGPT-like interface (CURRENTLY NOT FUNCTIONAL)
-- WebSocket real-time messaging (disabled)
-- Universal Identity integration for cross-platform user management (disabled)
-- Enhanced account discovery with bot-specific memory information (disabled)
 
 ## Development Workflow
 
@@ -265,29 +259,9 @@ curl -X POST -H "Content-Type: application/json" \
 
 ### Web Interface Development
 
-**Web UI Setup**: Run the web interface independently (CURRENTLY NOT WORKING):
-```bash
-# Start infrastructure first (PostgreSQL on port 5433, Qdrant on 6334)
-./multi-bot.sh start all
+### Development Workflow
 
-# Export correct PostgreSQL configuration
-export POSTGRES_HOST=localhost POSTGRES_PORT=5433 POSTGRES_DB=whisperengine 
-export POSTGRES_USER=whisperengine POSTGRES_PASSWORD=whisperengine123
-
-# Start web interface (standalone)
-source .venv/bin/activate
-python src/web/simple_chat_app.py
-# Accessible at http://localhost:8081 (standalone)
-
-# OR use Docker-based web interface (included in multi-bot)
-# Already running at http://localhost:8080 when using ./multi-bot.sh start all
-```
-
-**Web UI Features**:
-- Real-time WebSocket chat with multiple bot personalities (disabled)
-- Universal Identity account discovery (prevents duplicate accounts) (disabled)
-- Bot-specific memory isolation and conversation history (disabled)
-- Enhanced UX for Discord users migrating to web interface (disabled)
+**DOCKER-FIRST DEVELOPMENT**: Container-based development is the PRIMARY workflow. Use `./multi-bot.sh` for all operations (auto-generated, don't edit manually).
 
 ### Adding New Bots
 ```bash
@@ -661,7 +635,6 @@ def process_conversation_context(context, max_size):
 - `src/handlers/` - Discord command handlers (modular architecture)
 - `src/prompts/` - CDL integration and prompt management
 - `src/identity/` - Universal Identity system (NEW) - platform-agnostic user management
-- `src/web/` - Web chat interface (NEW) - FastAPI-based real-time chat (CURRENTLY NOT FUNCTIONAL)
 - `characters/examples/` - CDL character definitions (JSON)
 - `scripts/` - Configuration generation and utilities
 - `.env.*` files - Bot-specific configurations (auto-discovered)
@@ -858,8 +831,8 @@ python demo_vector_emoji_intelligence.py  # Example: testing demos
 
 **Active Infrastructure** (as of current deployment):
 - ✅ **Multi-Bot System**: 8+ character bots running simultaneously (Elena, Marcus, Jake, Dream, Aethys, Ryan, Gabriel, Sophia)
-- ❌ **Web Interface**: Web chat interface at http://localhost:8080 is currently not functional
-- ✅ **Individual Bot APIs**: Each bot has working HTTP API endpoints for direct chat access
+- ✅ **Discord-First Architecture**: Pure Discord bot system, no web interface
+- ❌ **Individual Bot APIs**: Chat API endpoints have been removed - Discord-only functionality
 - ✅ **Vector Memory**: Qdrant-powered with 384D embeddings, named vector support, bot-specific isolation
 - ✅ **Universal Identity**: Platform-agnostic user management with account discovery
 - ✅ **CDL Character System**: JSON-based personality definitions, integrated AI identity filtering
@@ -867,8 +840,11 @@ python demo_vector_emoji_intelligence.py  # Example: testing demos
 
 **Tested Working Features**:
 - Multi-bot Discord conversations with persistent memory
-- Individual bot HTTP API endpoints for programmatic chat access
+- Health endpoints for container orchestration status
 - Vector-based semantic memory retrieval across conversations
+- CDL-driven character personality responses
+- Bot-specific memory isolation (Elena's memories stay with Elena)
+- Template-based configuration management
 - CDL-driven character personality responses
 - Bot-specific memory isolation (Elena's memories stay with Elena)
 - Health endpoints for container orchestration
@@ -1096,7 +1072,7 @@ ENABLE_MEMORY_SYSTEM=true          # Creates phantom features
 
 ## Recent Major Changes
 
-**Universal Identity & Web Interface** (NEW): Introduced platform-agnostic user identity system allowing users to interact via Discord, Web UI, or future platforms while maintaining consistent memory. Enhanced account discovery prevents duplicate accounts.
+**Universal Identity & Account Discovery** (NEW): Introduced platform-agnostic user identity system allowing users to interact via Discord or future platforms while maintaining consistent memory. Enhanced account discovery prevents duplicate accounts.
 
 **Template-Based Multi-Bot System** (Complete): Migrated from programmatic Docker Compose generation to safe template-based approach. Infrastructure versions now pinned (PostgreSQL 16.4, Redis 7.4, Qdrant v1.15.4) to prevent breaking updates.
 
