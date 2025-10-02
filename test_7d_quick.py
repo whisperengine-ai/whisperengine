@@ -21,6 +21,11 @@ async def test_7d_system():
     os.environ['QDRANT_COLLECTION_NAME'] = 'test_7d_quick'
     os.environ['DISCORD_BOT_NAME'] = 'TestBot'
     
+    # Set a writable cache directory
+    import tempfile
+    temp_dir = tempfile.gettempdir()
+    os.environ['FASTEMBED_CACHE_PATH'] = temp_dir
+    
     try:
         # Test 7D analyzer
         print("1. Testing 7D Analyzer...")
