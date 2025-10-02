@@ -702,14 +702,22 @@ class VectorMemoryStore:
         return keywords[:20]  # Limit to top 20 keywords
 
     def _should_chunk_content(self, content: str) -> bool:
-        """Determine if content should be chunked for better vector quality"""
-        # Quick wins criteria for chunking
-        return (
-            len(content) > 300 or  # Long messages
-            content.count('.') > 2 or  # Multiple sentences
-            content.count('!') > 1 or  # Multiple exclamations
-            content.count('?') > 1     # Multiple questions
-        )
+        """Determine if content should be chunked for better vector quality
+        
+        DISABLED: Chunking hurts conversation fidelity and context continuity.
+        Modern embedding models (384D) can handle longer content without quality loss.
+        Keeping full conversations intact preserves emotional context and narrative flow.
+        """
+        # Always return False to preserve conversation fidelity
+        return False
+        
+        # Original chunking criteria (DISABLED for better conversation continuity):
+        # return (
+        #     len(content) > 300 or  # Long messages
+        #     content.count('.') > 2 or  # Multiple sentences
+        #     content.count('!') > 1 or  # Multiple exclamations
+        #     content.count('?') > 1     # Multiple questions
+        # )
 
     def _create_content_chunks(self, content: str) -> List[str]:
         """Split content into semantic chunks for better vector quality"""
@@ -3566,7 +3574,7 @@ class VectorMemoryManager:
         self,
         user_id: str,
         query: str,
-        limit: int = 15  # 🔧 HARMONIZED: Increased from 10 to 15 for richer context
+        limit: int = 25  # 🔧 ENHANCED: Increased from 15 to 25 for chunked conversation reassembly
     ) -> List[Dict[str, Any]]:
         """Retrieve memories relevant to the given query using vector similarity."""
         import time
