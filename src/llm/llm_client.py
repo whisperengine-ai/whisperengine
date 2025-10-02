@@ -1533,12 +1533,14 @@ class LLMClient:
             self.logger.error(f"Unexpected error generating sentiment completion: {e}")
             raise LLMError(f"Unexpected error: {str(e)}")
 
-    def get_chat_response(self, messages: list[dict[str, str]]) -> str:
+    def get_chat_response(self, messages: list[dict[str, str]], max_tokens: int | None = None, **kwargs) -> str:
         """
         Get a simple text response from a chat completion
 
         Args:
             messages: List of message dictionaries with 'role' and 'content'
+            max_tokens: Maximum tokens to generate (defaults to environment config)
+            **kwargs: Additional parameters passed to generate_chat_completion
 
         Returns:
             The text of the response
@@ -1555,7 +1557,7 @@ class LLMClient:
         )
 
         try:
-            response = self.generate_chat_completion(fixed_messages)
+            response = self.generate_chat_completion(fixed_messages, max_tokens=max_tokens, **kwargs)
 
             # Validate response structure
             if not isinstance(response, dict):
