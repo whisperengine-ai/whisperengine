@@ -591,6 +591,24 @@ class EnhancedVectorEmotionAnalyzer:
                     metadata = memory.get('metadata', {})
                     emotional_context = metadata.get('emotional_context', '')
                     
+                    # 🧹 FILTER OUT NON-EMOTION LABELS: These are memory context types, not actual emotions
+                    # This prevents legacy "discord_conversation", "guild_message", etc. from polluting emotion analysis
+                    non_emotion_labels = {
+                        'discord_conversation',
+                        'guild_message', 
+                        'direct_message',
+                        'dm',
+                        'general',
+                        'conversation',
+                        'message',
+                        'context'
+                    }
+                    
+                    # Skip non-emotion labels entirely - don't add them to semantic scores
+                    if emotional_context.lower() in non_emotion_labels:
+                        logger.debug(f"🧹 FILTERED OUT non-emotion label '{emotional_context}' from vector analysis")
+                        continue
+                    
                     if emotional_context and score > 0.1:  # Only consider meaningful similarities
                         # Use vector similarity to weight emotional context
                         if emotional_context in semantic_scores:

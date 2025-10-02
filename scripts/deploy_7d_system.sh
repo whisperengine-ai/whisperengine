@@ -125,6 +125,70 @@ deploy_character() {
     
     print_section "Deploying $character ($phase)"
     
+    # Check if character has existing memories
+    local source_collection="whisperengine_memory_$character"
+    if [[ "$character" == "aethys" ]]; then
+        source_collection="chat_memories_aethys"
+    fi
+    
+    local memory_count
+    memory_count=$(curl -s "http://localhost:6334/collections/$source_collection" | jq -r '.result.points_count // 0')
+    
+    if [[ "$memory_count" -gt 0 ]]; then
+        echo ""
+        print_warning "$character has $memory_count existing memories in $source_collection"
+        echo ""
+        echo "🤖 IMPORTANT: Users won't remember conversations with $character unless memories are migrated!"
+        echo ""
+        echo "Options:"
+        echo "1. Deploy with fresh 7D collection (users lose conversation history)"
+        echo "2. Migrate existing memories to 7D format (preserves user relationships)"
+        echo "3. Cancel deployment"
+        echo ""
+        read -p "Choose option (1/2/3): " migration_choice
+        
+        case "$migration_choice" in
+            "1")
+                print_warning "Proceeding with fresh 7D collection - users will lose conversation history"
+                ;;
+            "2")
+                print_section "Starting memory migration for $character"
+                echo "This will migrate $memory_count memories to 7D format..."
+                echo "⚠️  This may take several minutes for large memory collections"
+                read -p "Continue with migration? (y/N): " confirm_migration
+                
+                if [[ "$confirm_migration" =~ ^[Yy]$ ]]; then
+                    echo "🚀 Starting memory migration (this may take a while)..."
+                    
+                    # Run memory migration (limit to 1000 memories for safety)
+                    cd "$WORKSPACE_ROOT"
+                    source .venv/bin/activate
+                    
+                    if python scripts/migrate_3d_to_7d_memories.py "$character" --max-memories 1000; then
+                        print_success "Memory migration completed successfully"
+                    else
+                        print_error "Memory migration failed"
+                        read -p "Continue with fresh collection anyway? (y/N): " continue_anyway
+                        if [[ ! "$continue_anyway" =~ ^[Yy]$ ]]; then
+                            print_error "Deployment cancelled"
+                            return 1
+                        fi
+                    fi
+                else
+                    print_error "Migration cancelled - deploying with fresh collection"
+                fi
+                ;;
+            "3")
+                print_error "Deployment cancelled by user"
+                return 1
+                ;;
+            *)
+                print_error "Invalid choice - deployment cancelled"
+                return 1
+                ;;
+        esac
+    fi
+    
     # Update environment
     if ! update_character_env "$character"; then
         return 1

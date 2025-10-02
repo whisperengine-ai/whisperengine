@@ -796,6 +796,14 @@ class BotEventHandlers:
          enhanced_system_prompt, phase3_context_switches, phase3_empathy_calibration) = await self._process_ai_components_parallel(
             user_id, message.content, message, recent_messages, conversation_context
         )
+        
+        # 🎯 VECTOR-NATIVE: Emotion data is now a clean dict (not a tuple!)
+        # The vector-native analyzer returns a dict directly for storage
+        phase2_context = external_emotion_data
+        logger.debug(f"🎯 VECTOR-NATIVE FLOW: phase2_context assigned from vector emotion analysis: {type(phase2_context)}")
+        if phase2_context:
+            logger.info(f"� VECTOR-NATIVE FLOW: Emotion detected - {phase2_context.get('primary_emotion', 'unknown')} "
+                       f"(confidence: {phase2_context.get('confidence', 0):.3f})")
 
         # Process message with images
         conversation_context = await process_message_with_images(
@@ -1592,154 +1600,81 @@ class BotEventHandlers:
 
         return conversation_context
 
-    async def _analyze_external_emotion(self, content, user_id, conversation_context):
-        """Analyze emotion using enhanced vector emotion intelligence."""
+    async def _analyze_emotion_vector_native(
+        self, user_id, content, message, conversation_context
+    ):
+        """
+        🚀 VECTOR-NATIVE EMOTION ANALYSIS
+        
+        Analyzes emotion using EnhancedVectorEmotionAnalyzer with:
+        - RoBERTa transformer model for accuracy
+        - Vector semantic analysis using 7D memory system
+        - Multi-dimensional emotion classification
+        - Emoji reaction context integration
+        - Discord metadata preservation
+        
+        Replaces legacy Phase 2 integration with modern vector-first architecture.
+        """
         try:
-            # Use enhanced vector emotion analyzer
             from src.intelligence.enhanced_vector_emotion_analyzer import EnhancedVectorEmotionAnalyzer
             
-            # Initialize analyzer with memory manager
+            logger.info(f"🎭 VECTOR-NATIVE: Starting emotion analysis for user {user_id}")
+            logger.info(f"🎭 VECTOR-NATIVE: Content: '{content[:100]}{'...' if len(content) > 100 else ''}'")
+            
+            # Initialize vector-native analyzer with memory manager
             analyzer = EnhancedVectorEmotionAnalyzer(self.memory_manager)
             
-            # Get comprehensive emotion analysis
+            # 🎭 MULTIMODAL INTELLIGENCE: Get recent emoji reaction context
+            emoji_reaction_context = await self.get_recent_emotional_feedback(user_id)
+            has_emoji_context = emoji_reaction_context.get("confidence", 0.0) > 0.3
+            
+            if has_emoji_context:
+                logger.info(f"🎭 VECTOR-NATIVE: Emoji context available (confidence: {emoji_reaction_context.get('confidence', 0.0):.2f})")
+            else:
+                logger.debug(f"🎭 VECTOR-NATIVE: No significant emoji context (confidence: {emoji_reaction_context.get('confidence', 0.0):.3f})")
+            
+            # Perform vector-native emotion analysis
             emotion_result = await analyzer.analyze_emotion(
                 content=content,
                 user_id=user_id,
-                conversation_context=conversation_context
+                conversation_context=conversation_context  # Already formatted from parallel processing
             )
             
-            # Convert to expected format
+            logger.info(f"🎭 VECTOR-NATIVE: Analysis complete - {emotion_result.primary_emotion} "
+                       f"(confidence: {emotion_result.confidence:.3f}, intensity: {emotion_result.intensity:.3f})")
+            
+            # Convert to storage format with Discord metadata
             emotion_data = {
                 "primary_emotion": emotion_result.primary_emotion,
                 "confidence": emotion_result.confidence,
-                "sentiment_score": emotion_result.intensity,
-                "all_emotions": {emotion_result.primary_emotion: emotion_result.confidence},
-                "analysis_method": "enhanced_vector",
-                "analysis_time_ms": 0,
-                "api_calls_made": 0
-            }
-
-            logger.debug(
-                f"Enhanced vector emotion analysis: {emotion_result.primary_emotion} "
-                f"(confidence: {emotion_result.confidence:.2f})"
-            )
-
-            return emotion_data
-
-        except Exception as e:
-            logger.error(f"Enhanced vector emotion analysis failed: {e}")
-            raise
-
-    async def _analyze_phase2_emotion(
-        self, user_id, content, message, context_type="discord_conversation"
-    ):
-        """Analyze emotion using Phase 2 integration."""
-        try:
-            logger.debug("Running Phase 2 emotional intelligence analysis...")
-
-            phase2_context = {
-                "topic": "general",
-                "communication_style": "casual",
-                "user_id": user_id,
-                "message_length": len(content),
-                "timestamp": datetime.now().isoformat(),
-                "context": context_type,
-            }
-
-            if message.guild:
-                phase2_context["guild_id"] = str(message.guild.id)
-                phase2_context["channel_id"] = str(message.channel.id)
-
-            # 🎭 MULTIMODAL INTELLIGENCE: Get recent emoji reaction context for enhanced emotion analysis
-            emoji_reaction_context = await self.get_recent_emotional_feedback(user_id)
-            if emoji_reaction_context.get("confidence", 0.0) > 0.3:
-                logger.debug(f"🎭 Integrating emoji reaction context: {emoji_reaction_context.get('emotional_context')} (confidence: {emoji_reaction_context.get('confidence', 0.0):.2f})")
-                phase2_context["emoji_reaction_context"] = emoji_reaction_context
-            else:
-                logger.info(f"🎭 EVENT HANDLER: No significant emoji reaction context (confidence: {emoji_reaction_context.get('confidence', 0.0):.3f})")
-
-            # 🧠 CONTEXT FIX: Add conversation history to phase2_context
-            # Get recent conversation messages for context-aware emotion analysis
-            try:
-                recent_messages = await self.conversation_cache.get_user_conversation_context(
-                    user_id, max_context_tokens=2000
-                )
-                if recent_messages:
-                    # Convert to the format expected by emotion analyzer
-                    phase2_context["messages"] = [
-                        {
-                            "role": "user" if not msg.get("is_bot", False) else "assistant", 
-                            "content": msg.get("content", "")
-                        } 
-                        for msg in recent_messages[-10:]  # Last 10 messages for context
-                        if msg.get("content")  # Only include messages with actual content
-                    ]
-                    logger.info(f"🧠 CONTEXT: Added {len(phase2_context['messages'])} conversation messages to emotion context")
-                else:
-                    phase2_context["messages"] = []
-                    logger.info("🧠 CONTEXT: No recent conversation history available")
-            except Exception as context_error:
-                logger.warning(f"🧠 CONTEXT: Failed to get conversation history: {context_error}")
-                phase2_context["messages"] = []
-
-            logger.info(f"🎭 EVENT HANDLER: Starting Phase 2 emotion processing for user {user_id}")
-            logger.info(f"🎭 EVENT HANDLER: Message to analyze: '{content[:100]}{'...' if len(content) > 100 else ''}'")
-            logger.info(f"🎭 EVENT HANDLER: Context available: conversation={bool(phase2_context)}, emoji_reactions={bool(emoji_reaction_context)}")
-
-            # Enhanced emotion processing with multimodal intelligence
-            if hasattr(self.phase2_integration, 'analyze_message_emotion_with_reactions'):
-                logger.info(f"🎭 EVENT HANDLER: Using enhanced multimodal emotion analysis method")
-                # Use enhanced method that combines text and emoji reactions
-                phase2_results = await self.phase2_integration.analyze_message_emotion_with_reactions(
-                    user_id=user_id, 
-                    message=content, 
-                    conversation_context=phase2_context,
-                    emoji_reaction_context=emoji_reaction_context
-                )
-                logger.info(f"🎭 EVENT HANDLER: Enhanced multimodal emotion analysis completed")
+                "intensity": emotion_result.intensity,
+                "all_emotions": emotion_result.all_emotions,
+                "mixed_emotions": emotion_result.mixed_emotions,
+                "emotion_description": emotion_result.emotion_description,
+                "emotional_trajectory": emotion_result.emotional_trajectory,
+                "analysis_method": "vector_native_roberta",
+                "analysis_time_ms": emotion_result.analysis_time_ms,
                 
-                # 🎭 ENHANCED DEBUG: Log detailed emotion analysis results
-                if phase2_results:
-                    primary = phase2_results.get('primary_emotion', 'None')
-                    confidence = phase2_results.get('confidence', 0)
-                    description = phase2_results.get('emotion_description', 'None')
-                    mixed = phase2_results.get('mixed_emotions', [])
-                    all_emotions = phase2_results.get('all_emotions', {})
-                    trajectory = phase2_results.get('emotional_trajectory', [])
-                    
-                    logger.info(f"🎭 ENHANCED EMOTION DEBUG:")
-                    logger.info(f"  - Primary: {primary} (confidence: {confidence:.3f})")
-                    logger.info(f"  - Description: '{description}'")
-                    logger.info(f"  - Mixed emotions: {len(mixed)} detected -> {mixed}")
-                    logger.info(f"  - All emotions: {len(all_emotions)} categories -> {list(all_emotions.keys())}")
-                    logger.info(f"  - Trajectory: {trajectory}")
-                    
-                    # Check for advanced emotional intelligence data
-                    ei_data = phase2_results.get('emotional_intelligence', {})
-                    if ei_data:
-                        ei_mixed = ei_data.get('mixed_emotions', [])
-                        ei_desc = ei_data.get('emotion_description', 'None')
-                        ei_trajectory = ei_data.get('emotional_trajectory', [])
-                        logger.info(f"  - EI mixed emotions: {ei_mixed}")
-                        logger.info(f"  - EI description: '{ei_desc}'")
-                        logger.info(f"  - EI trajectory: {ei_trajectory}")
-                else:
-                    logger.warning(f"🎭 EVENT HANDLER: No emotion results received!")
-                    
-            else:
-                logger.info(f"🎭 EVENT HANDLER: Using fallback standard emotion processing")
-                # Fallback to standard emotion processing
-                phase2_results = (
-                    await self.phase2_integration.process_message_with_emotional_intelligence(
-                        user_id=user_id, message=content, conversation_context=phase2_context
-                    )
-                )
-                logger.info(f"🎭 EVENT HANDLER: Phase 2 emotional intelligence analysis completed: {phase2_results}")
-            return phase2_results, None  # Return results and placeholder for current_emotion_data
+                # Vector-specific metrics
+                "vector_similarity": emotion_result.vector_similarity,
+                "embedding_confidence": emotion_result.embedding_confidence,
+                
+                # Discord context metadata (preserved from Phase 2)
+                "guild_id": str(message.guild.id) if message.guild else None,
+                "channel_id": str(message.channel.id) if message.channel else None,
+                "timestamp": datetime.now().isoformat(),
+                
+                # Emoji reaction context if significant
+                "emoji_reaction_context": emoji_reaction_context if has_emoji_context else None
+            }
+            
+            logger.info(f"🎭 VECTOR-NATIVE: Emotion data prepared for storage with {len(emotion_data)} fields")
+            
+            return emotion_data  # Return DICT directly (no tuple!)
 
         except Exception as e:
-            logger.error(f"Phase 2 emotional intelligence analysis failed: {e}")
-            return None, None
+            logger.error(f"🎭 VECTOR-NATIVE: Emotion analysis failed: {e}", exc_info=True)
+            return None
 
     async def _analyze_context_switches(self, user_id, content, message):
         """Analyze context switches using Phase 3 ContextSwitchDetector."""
@@ -2566,7 +2501,16 @@ class BotEventHandlers:
                 # 🧠 ENHANCED: Use phase2_context emotional data if current_emotion_data is None
                 logger.info(f"🎭 EVENT HANDLER: Using phase2_context emotion data for storage")
                 emotion_metadata = phase2_context.copy()  # Use all the rich emotional analysis from phase2
-                logger.info(f"🎭 EVENT HANDLER: Phase2 emotion metadata for storage: {list(emotion_metadata.keys())}")
+                
+                # 🧹 BUG FIX: Remove non-emotion metadata fields that pollute emotion storage
+                # These are context fields, NOT emotion data, and should not be stored as emotional_context
+                metadata_fields_to_remove = ['context', 'channel_id', 'guild_id', 'timestamp']
+                for field in metadata_fields_to_remove:
+                    if field in emotion_metadata:
+                        removed_value = emotion_metadata.pop(field)
+                        logger.debug(f"🧹 CLEANED: Removed non-emotion field '{field}' (value: '{removed_value}') from emotion_metadata")
+                
+                logger.info(f"🎭 EVENT HANDLER: Phase2 emotion metadata for storage (cleaned): {list(emotion_metadata.keys())}")
             else:
                 logger.info(f"🎭 EVENT HANDLER: No current emotion data or phase2 context available for storage")
 
@@ -2867,6 +2811,7 @@ class BotEventHandlers:
         if not response or not str(response).strip():
             logger.warning("Attempted to send empty or whitespace-only message. Skipping send.")
             return
+
             
         if len(response) > 2000:
             chunks = [response[i : i + 1900] for i in range(0, len(response), 1900)]
@@ -3091,14 +3036,11 @@ class BotEventHandlers:
             logger.debug(f"HybridContextDetector unavailable, skipping: {e}")
             tasks.append(asyncio.create_task(self._create_none_result()))
             
-        # Task 4: Emotion analysis (if available)
-        if self.phase2_integration:
-            context_type = "guild_message" if hasattr(message, 'guild') and message.guild else "dm"
-            tasks.append(asyncio.create_task(
-                self._analyze_phase2_emotion(user_id, content, message, context_type)
-            ))
-        else:
-            tasks.append(asyncio.create_task(self._create_none_result()))
+        # Task 4: Emotion analysis (VECTOR-NATIVE with EnhancedVectorEmotionAnalyzer)
+        # Always available - vector-native system doesn't need external dependencies
+        tasks.append(asyncio.create_task(
+            self._analyze_emotion_vector_native(user_id, content, message, conversation_context)
+        ))
         
         # Execute all in parallel - simple and reliable
         try:

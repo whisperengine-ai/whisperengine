@@ -11,6 +11,7 @@ from typing import Dict, Optional
 from pathlib import Path
 
 from src.characters.cdl.parser import Character, load_character
+from src.characters.cdl.manager import get_cdl_manager, get_cdl_field, get_conversation_flow_guidelines
 
 logger = logging.getLogger(__name__)
 
@@ -222,26 +223,43 @@ class CDLAIPromptIntegration:
                     prompt += f"\n\n🎭 USER EMOTIONAL STATE: {primary_emotion} (confidence: {confidence:.2f})"
                     prompt += f"\nRespond with appropriate empathy and emotional intelligence."
 
-        # Add CDL communication scenarios
+        # Add CDL conversation flow guidelines and communication scenarios
         try:
+            # Extract conversation flow guidelines from CDL
+            conversation_flow_guidance = self._extract_conversation_flow_guidelines(character)
+            
+            # Detect communication scenarios for context
             communication_scenarios = self._detect_communication_scenarios(message_content, character, display_name)
             scenario_guidance = self._get_cdl_conversation_flow_guidance(character.identity.name, communication_scenarios)
+            
+            # Combine flow guidelines with scenario guidance
+            combined_guidance = []
+            if conversation_flow_guidance:
+                combined_guidance.append(conversation_flow_guidance)
             if scenario_guidance:
-                prompt += f"\n\n🎬 CONVERSATION CONTEXT:\n{scenario_guidance}"
+                combined_guidance.append(scenario_guidance)
+                
+            if combined_guidance:
+                prompt += f"\n\n🎬 CONVERSATION FLOW & CONTEXT:\n{' '.join(combined_guidance)}"
         except Exception as e:
-            logger.debug("Could not detect communication scenarios: %s", e)
+            logger.debug("Could not extract conversation flow guidance: %s", e)
 
         # Add AI identity handling - simplified approach for unified method
         if any(ai_keyword in message_content.lower() for ai_keyword in ['ai', 'artificial intelligence', 'robot', 'computer', 'program', 'bot']):
             prompt += f"\n\n🤖 AI IDENTITY GUIDANCE:\nIf asked about AI nature, respond authentically as {character.identity.name} while being honest about your AI nature when directly asked."
 
         # Add response style - simplified approach for unified method  
-        prompt += f"\n\n🎤 RESPONSE REQUIREMENTS:\n"
+        prompt += "\n\n🎤 RESPONSE REQUIREMENTS:\n"
         prompt += f"- The user you are talking to is named {display_name}. ALWAYS use this name when addressing them.\n"
         prompt += f"- Use modern, professional language appropriate for {character.identity.occupation}\n"
-        prompt += f"- NO action descriptions (*grins*, *adjusts glasses*) - speech only\n"
-        prompt += f"- Answer directly without elaborate scene-setting\n"
-        prompt += f"- Be authentic and engaging while staying professional\n"
+        prompt += "- NO action descriptions (*grins*, *adjusts glasses*) - speech only\n"
+        prompt += "- Answer directly without elaborate scene-setting\n"
+        prompt += "- Be authentic and engaging while staying professional\n"
+        prompt += "🚨 CRITICAL DISCORD RESPONSE LIMITS:\n"
+        prompt += "- MAXIMUM 1-2 Discord messages (NEVER send 3+ part responses)\n"
+        prompt += "- Keep responses under 1500 characters total\n"
+        prompt += "- If you have a lot to say, pick the MOST IMPORTANT points only\n"
+        prompt += "- End with an engaging question to keep conversation flowing\n"
         prompt += f"\nRespond as {character.identity.name} to {display_name}:"
 
         return prompt
@@ -428,6 +446,67 @@ class CDLAIPromptIntegration:
             guidance_parts.append(f"Share personal insights authentically as {character_name}.")
             
         return " ".join(guidance_parts)
+
+    def _extract_conversation_flow_guidelines(self, character) -> str:
+        """Extract conversation flow guidelines from CDL character definition using CDL Manager."""
+        try:
+            # Use CDL Manager instead of re-reading file
+            flow_guidelines = get_conversation_flow_guidelines()
+            if not flow_guidelines:
+                return ""
+            
+            guidance_parts = []
+            
+            # Extract platform-specific guidance (Discord) - try both locations
+            discord_guidance = get_cdl_field("character.communication.conversation_flow_guidelines.platform_awareness.discord", {})
+            if not discord_guidance:
+                discord_guidance = get_cdl_field("character.conversation_flow_guidelines.platform_awareness.discord", {})
+            
+            if discord_guidance:
+                max_length = discord_guidance.get('max_response_length', '')
+                if max_length:
+                    guidance_parts.append(f"🚨 CRITICAL LENGTH LIMIT: {max_length}")
+                
+                collab_style = discord_guidance.get('collaboration_style', '')
+                if collab_style:
+                    guidance_parts.append(f"CONVERSATION STYLE: {collab_style}")
+                
+                avoid = discord_guidance.get('avoid', '')
+                if avoid:
+                    guidance_parts.append(f"❌ NEVER: {avoid}")
+                
+                prefer = discord_guidance.get('prefer', '')
+                if prefer:
+                    guidance_parts.append(f"✅ ALWAYS: {prefer}")
+            
+            # Extract flow optimization guidance - try both locations
+            flow_opt = get_cdl_field("character.communication.conversation_flow_guidelines.flow_optimization", {})
+            if not flow_opt:
+                flow_opt = get_cdl_field("character.conversation_flow_guidelines.flow_optimization", {})
+            
+            if flow_opt:
+                auth_engagement = flow_opt.get('character_authentic_engagement', '')
+                if auth_engagement:
+                    guidance_parts.append(f"ENGAGEMENT PATTERN: {auth_engagement}")
+                
+                length_mgmt = flow_opt.get('length_management', '')
+                if length_mgmt:
+                    guidance_parts.append(f"LENGTH STRATEGY: {length_mgmt}")
+                
+                rhythm = flow_opt.get('conversation_rhythm', '')
+                if rhythm:
+                    guidance_parts.append(f"CONVERSATION RHYTHM: {rhythm}")
+            
+            # Add extra emphasis for Discord length limits
+            if guidance_parts:
+                guidance_parts.insert(0, "🎯 DISCORD CONVERSATION FLOW REQUIREMENTS:")
+                guidance_parts.append("⚠️  CRITICAL: If your response approaches 2000 characters, STOP and ask a follow-up question instead!")
+            
+            return "\n".join(guidance_parts) if guidance_parts else ""
+            
+        except Exception as e:
+            logger.debug("Error extracting conversation flow guidelines: %s", e)
+            return ""
 
 
 async def load_character_definitions(characters_dir: str = "characters") -> Dict[str, Character]:

@@ -12,7 +12,7 @@ import asyncio
 import logging
 from typing import Dict, List, Optional, Any
 from datetime import datetime
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 
 logger = logging.getLogger(__name__)
@@ -104,6 +104,7 @@ class InteractionContext:
 
 
 @dataclass
+@dataclass
 class TemporalContext:
     """Temporal analysis result"""
     conversation_phase: ConversationPhase
@@ -111,6 +112,7 @@ class TemporalContext:
     phase_confidence: float
     rhythm_confidence: float
     flow_indicators: List[str]
+    flow_optimization_hints: List[str] = field(default_factory=list)
 
 
 class RelationshipAnalyzer:
@@ -531,12 +533,48 @@ class TemporalAnalyzer:
         if conversation_rhythm in rhythm_indicators:
             flow_indicators.extend(rhythm_indicators[conversation_rhythm][:2])
         
+        # 🚨 CONVERSATION FLOW INTELLIGENCE: Add flow optimization hints
+        flow_optimization_hints = []
+        
+        # Detect verbose patterns that need conversational compression
+        verbose_patterns = [
+            "let me explain", "i should mention", "it's important to note",
+            "first", "second", "third", "in conclusion", "to elaborate"
+        ]
+        has_verbose_indicators = any(pattern in content_lower for pattern in verbose_patterns)
+        
+        # Detect question opportunities for engagement
+        question_indicators = ["?", "what do you think", "how about you", "your thoughts"]
+        has_question_opportunities = any(indicator in content_lower for indicator in question_indicators)
+        
+        # Generate conversation flow hints
+        if has_verbose_indicators:
+            flow_optimization_hints.append("compress_to_conversational")
+            flow_optimization_hints.append("use_engaging_questions")
+        
+        if conversation_phase == ConversationPhase.OPENING:
+            flow_optimization_hints.append("keep_opening_concise")
+            flow_optimization_hints.append("invite_user_sharing")
+        elif conversation_phase == ConversationPhase.MIDDLE:
+            flow_optimization_hints.append("maintain_back_and_forth")
+            if not has_question_opportunities:
+                flow_optimization_hints.append("add_engaging_question")
+        elif conversation_phase == ConversationPhase.CLIMAX:
+            flow_optimization_hints.append("balance_depth_with_engagement")
+        elif conversation_phase == ConversationPhase.RESOLUTION:
+            flow_optimization_hints.append("natural_conversation_pause")
+        
+        # Discord-specific optimization
+        if len(content) > 1500:  # Approaching Discord 2000 char limit
+            flow_optimization_hints.append("discord_length_optimization")
+        
         return TemporalContext(
             conversation_phase=conversation_phase,
             conversation_rhythm=conversation_rhythm,
             phase_confidence=phase_confidence,
             rhythm_confidence=rhythm_confidence,
-            flow_indicators=flow_indicators[:5]
+            flow_indicators=flow_indicators[:5],
+            flow_optimization_hints=flow_optimization_hints[:4]  # Keep top 4 hints
         )
     
     def get_temporal_embedding_key(self, temporal_context: TemporalContext) -> str:
