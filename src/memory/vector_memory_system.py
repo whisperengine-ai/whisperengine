@@ -43,6 +43,9 @@ from src.memory.context_aware_memory_security import (
     ContextSecurity
 )
 
+# Import 7D vector analysis components
+from src.intelligence.enhanced_7d_vector_analyzer import Enhanced7DVectorAnalyzer
+
 logger = logging.getLogger(__name__)
 
 
@@ -189,6 +192,14 @@ class VectorMemoryStore:
         except ImportError as e:
             logger.warning("Enhanced emotion analyzer not available: %s", e)
         
+        # Initialize 7D vector analyzer for enhanced dimensional analysis
+        self._vector_7d_analyzer = None
+        try:
+            self._vector_7d_analyzer = Enhanced7DVectorAnalyzer()
+            logger.info("🎯 7D Vector Analyzer initialized for enhanced dimensional intelligence")
+        except Exception as e:
+            logger.warning("7D Vector Analyzer initialization failed: %s", e)
+        
         # Performance tracking
         self.stats = {
             "embeddings_generated": 0,
@@ -289,18 +300,18 @@ class VectorMemoryStore:
         🚀 QDRANT-NATIVE: Create advanced collection with named vectors
         
         Features:
-        - Named vectors for multi-dimensional search (content, emotion, semantic)
+        - Named vectors for multi-dimensional search (7 dimensions: content, emotion, semantic, relationship, personality, interaction, temporal)
         - Optimized indexing for payload fields
         - Performance optimizations
         """
         try:
             collections = self.client.get_collections().collections
             collection_names = [c.name for c in collections]
-            
+
             if self.collection_name not in collection_names:
-                # 🎯 QDRANT FEATURE: Named vectors for multi-dimensional intelligence
+                # 🎯 QDRANT FEATURE: Enhanced 7D named vectors for multi-dimensional intelligence
                 vectors_config = {
-                    # Main content vector for semantic similarity
+                    # Main content vector for semantic similarity (30% weight)
                     "content": VectorParams(
                         size=self.embedding_dimension,
                         distance=Distance.COSINE,
@@ -311,7 +322,7 @@ class VectorMemoryStore:
                         )
                     ),
                     
-                    # Emotional context vector for sentiment-aware search
+                    # Emotional context vector for sentiment-aware search (20% weight)
                     "emotion": VectorParams(
                         size=self.embedding_dimension,
                         distance=Distance.COSINE,
@@ -321,7 +332,7 @@ class VectorMemoryStore:
                         )
                     ),
                     
-                    # Semantic concept vector for contradiction detection
+                    # Semantic concept vector for contradiction detection (10% weight)
                     "semantic": VectorParams(
                         size=self.embedding_dimension,
                         distance=Distance.COSINE,
@@ -329,10 +340,48 @@ class VectorMemoryStore:
                             m=16,
                             ef_construct=128
                         )
+                    ),
+                    
+                    # Relationship context vector for bond-appropriate responses (15% weight)
+                    "relationship": VectorParams(
+                        size=self.embedding_dimension,
+                        distance=Distance.COSINE,
+                        hnsw_config=models.HnswConfigDiff(
+                            m=16,
+                            ef_construct=128
+                        )
+                    ),
+                    
+                    # Personality trait vector for character consistency (15% weight)
+                    "personality": VectorParams(
+                        size=self.embedding_dimension,
+                        distance=Distance.COSINE,
+                        hnsw_config=models.HnswConfigDiff(
+                            m=16,
+                            ef_construct=128
+                        )
+                    ),
+                    
+                    # Interaction style vector for communication patterns (5% weight)
+                    "interaction": VectorParams(
+                        size=self.embedding_dimension,
+                        distance=Distance.COSINE,
+                        hnsw_config=models.HnswConfigDiff(
+                            m=8,   # Lower connectivity for interaction patterns
+                            ef_construct=64
+                        )
+                    ),
+                    
+                    # Temporal flow vector for conversation timing (5% weight)
+                    "temporal": VectorParams(
+                        size=self.embedding_dimension,
+                        distance=Distance.COSINE,
+                        hnsw_config=models.HnswConfigDiff(
+                            m=8,   # Lower connectivity for temporal patterns
+                            ef_construct=64
+                        )
                     )
-                }
-                
-                # 🚀 QDRANT FEATURE: Optimized configuration for performance
+                }                # 🚀 QDRANT FEATURE: Optimized configuration for performance
                 optimizers_config = models.OptimizersConfigDiff(
                     deleted_threshold=0.2,
                     vacuum_min_vector_number=1000,
@@ -536,9 +585,46 @@ class VectorMemoryStore:
             semantic_embedding = await self.generate_embedding(f"concept {semantic_key}: {memory.content}")
             logger.debug(f"Generated semantic embedding: {type(semantic_embedding)}, length: {len(semantic_embedding) if semantic_embedding else None}")
             
-            # Validate all embeddings before creating vectors dict
+            # 🎯 NEW: Generate 7D vector analysis and embeddings
+            relationship_embedding = None
+            personality_embedding = None  
+            interaction_embedding = None
+            temporal_embedding = None
+            dimension_contexts = {}
+            
+            if self._vector_7d_analyzer:
+                try:
+                    # Analyze all 7 dimensions
+                    dimension_analysis = await self._vector_7d_analyzer.analyze_all_dimensions(
+                        content=memory.content,
+                        user_id=memory.user_id,
+                        character_name=get_normalized_bot_name_from_env(),
+                        conversation_history=None  # TODO: Add conversation history support
+                    )
+                    
+                    # Store dimension contexts for payload
+                    dimension_contexts = {
+                        'relationship_context': dimension_analysis['relationship_key'],
+                        'personality_context': dimension_analysis['personality_key'],
+                        'interaction_context': dimension_analysis['interaction_key'],
+                        'temporal_context': dimension_analysis['temporal_key']
+                    }
+                    
+                    # Generate embeddings for new dimensions
+                    relationship_embedding = await self.generate_embedding(f"{dimension_analysis['relationship_key']}: {memory.content}")
+                    personality_embedding = await self.generate_embedding(f"{dimension_analysis['personality_key']}: {memory.content}")
+                    interaction_embedding = await self.generate_embedding(f"{dimension_analysis['interaction_key']}: {memory.content}")
+                    temporal_embedding = await self.generate_embedding(f"{dimension_analysis['temporal_key']}: {memory.content}")
+                    
+                    logger.info(f"🎯 7D VECTORS: Generated enhanced dimensional embeddings for memory {memory.id}")
+                    logger.debug(f"🎯 7D CONTEXTS: {dimension_contexts}")
+                    
+                except Exception as e:
+                    logger.warning(f"🎯 7D VECTORS: Failed to generate enhanced vectors, falling back to 3D: {e}")
+            
+            # Validate core embeddings (content, emotion, semantic are required)
             if not content_embedding or not emotion_embedding or not semantic_embedding:
-                raise ValueError(f"Invalid embeddings generated: content={bool(content_embedding)}, emotion={bool(emotion_embedding)}, semantic={bool(semantic_embedding)}")
+                raise ValueError(f"Invalid core embeddings generated: content={bool(content_embedding)}, emotion={bool(emotion_embedding)}, semantic={bool(semantic_embedding)}")
             
             # 🚀 QDRANT FEATURE: Create keyword metadata for filtering
             keywords = self._extract_keywords(memory.content)
@@ -609,6 +695,9 @@ class VectorMemoryStore:
                 # 🎯 PHASE 1.3: Memory significance scoring
                 **significance_data,
                 
+                # 🎯 NEW: 7D Vector contexts
+                **dimension_contexts,
+                
                 # Handle metadata safely
                 **(memory.metadata if memory.metadata else {})
             }
@@ -652,6 +741,34 @@ class VectorMemoryStore:
                 logger.debug("UPSERT DEBUG: Semantic vector added: len=%d", len(semantic_embedding))
             else:
                 logger.debug("UPSERT DEBUG: No semantic embedding generated")
+            
+            # 🎯 NEW: RELATIONSHIP VECTOR: Enable bond-appropriate responses
+            if relationship_embedding and len(relationship_embedding) > 0:
+                vectors["relationship"] = relationship_embedding
+                logger.debug("UPSERT DEBUG: Relationship vector added: len=%d", len(relationship_embedding))
+            else:
+                logger.debug("UPSERT DEBUG: No relationship embedding generated")
+            
+            # 🎯 NEW: PERSONALITY VECTOR: Enable character consistency
+            if personality_embedding and len(personality_embedding) > 0:
+                vectors["personality"] = personality_embedding
+                logger.debug("UPSERT DEBUG: Personality vector added: len=%d", len(personality_embedding))
+            else:
+                logger.debug("UPSERT DEBUG: No personality embedding generated")
+                
+            # 🎯 NEW: INTERACTION VECTOR: Enable communication style patterns
+            if interaction_embedding and len(interaction_embedding) > 0:
+                vectors["interaction"] = interaction_embedding
+                logger.debug("UPSERT DEBUG: Interaction vector added: len=%d", len(interaction_embedding))
+            else:
+                logger.debug("UPSERT DEBUG: No interaction embedding generated")
+                
+            # 🎯 NEW: TEMPORAL VECTOR: Enable conversation flow intelligence
+            if temporal_embedding and len(temporal_embedding) > 0:
+                vectors["temporal"] = temporal_embedding
+                logger.debug("UPSERT DEBUG: Temporal vector added: len=%d", len(temporal_embedding))
+            else:
+                logger.debug("UPSERT DEBUG: No temporal embedding generated")
             
             # Ensure we have at least one valid vector
             if not vectors:
