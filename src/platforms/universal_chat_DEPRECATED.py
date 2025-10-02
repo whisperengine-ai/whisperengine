@@ -1279,9 +1279,127 @@ class UniversalChatOrchestrator:
                 conversation_context.append({"role": "user", "content": f"[CONTEXT: {phase3_context}]"})
                 logging.info(f"✅ PHASE3 RE-INTEGRATED: Added {len(phase3_context_parts)} intelligence insights")
             
-            # ✅ SIMPLIFIED PIPELINE: Direct to basic AI response with enhanced context
-            logging.info("✅ SIMPLIFIED PIPELINE: Proceeding to basic AI response with phase3 intelligence")
-            return await self._generate_basic_ai_response(message, conversation_context)
+            # ✅ SOPHISTICATED PIPELINE: Generate response with full AI processing
+            logging.info("✅ SOPHISTICATED PIPELINE: Generating response with CDL + Phase3 intelligence")
+            
+            # 🎯 FIDELITY-FIRST PROMPT OPTIMIZATION: Apply optimized prompt building (matching Discord)
+            try:
+                from src.prompts.optimized_prompt_builder import create_optimized_prompt_builder
+                
+                # Create optimized prompt builder with memory integration
+                prompt_builder = create_optimized_prompt_builder(
+                    max_words=1000,
+                    llm_client=self.llm_client if hasattr(self, 'llm_client') else None,
+                    memory_manager=memory_manager
+                )
+                
+                # Extract character data from conversation context for optimization
+                character_context_content = ""
+                for msg in conversation_context:
+                    if msg.get("role") == "system":
+                        character_context_content = msg.get("content", "")
+                        break
+                
+                logging.info(f"🎯 CHARACTER DATA: Found {len(character_context_content)} chars of character context")
+                
+                if character_context_content:
+                    # Build optimized character prompt with full fidelity preservation
+                    logging.info("🎯 FIDELITY-FIRST: Building optimized character prompt")
+                    try:
+                        optimized_prompt = prompt_builder.build_character_prompt(
+                            character={"prompt": character_context_content},  # Wrap in expected format
+                            message_content=message.content,
+                            context={
+                                "user_id": message.user_id,
+                                "conversation_history": conversation_context[:-1],  # Exclude current message
+                                "phase3_intelligence": bool(phase3_context_parts)
+                            }
+                        )
+                        
+                        logging.info(f"🎯 OPTIMIZATION RESULT: Generated {len(optimized_prompt.split()) if optimized_prompt else 0} words")
+                        
+                        if optimized_prompt and len(optimized_prompt.split()) > 50:  # Sanity check
+                            # Update system message with optimized prompt
+                            for msg in conversation_context:
+                                if msg.get("role") == "system":
+                                    msg["content"] = optimized_prompt
+                                    break
+                            logging.info(f"✅ FIDELITY-FIRST: Applied character prompt optimization ({len(optimized_prompt.split())} words)")
+                        else:
+                            logging.warning(f"⚠️ FIDELITY-FIRST: Optimization produced insufficient content ({len(optimized_prompt.split()) if optimized_prompt else 0} words)")
+                    except Exception as e:
+                        logging.warning(f"🔄 FIDELITY-FIRST: Optimization failed, using original CDL prompt: {e}")
+                        import traceback
+                        logging.debug(f"Optimization error traceback: {traceback.format_exc()}")
+                else:
+                    logging.warning("⚠️ FIDELITY-FIRST: No character context found for optimization")
+                        
+            except ImportError as e:
+                logging.debug(f"OptimizedPromptBuilder unavailable, using standard processing: {e}")
+            
+            # 🚀 VECTOR-NATIVE ENHANCEMENT: Enhance character prompt with dynamic vector context (matching Discord)
+            try:
+                from src.prompts.vector_native_prompt_manager import create_vector_native_prompt_manager
+                
+                # Create vector-native prompt manager
+                vector_prompt_manager = create_vector_native_prompt_manager(
+                    vector_memory_system=memory_manager  # Use memory_manager as vector system
+                )
+                
+                # Get current character prompt for enhancement
+                current_prompt = ""
+                for msg in conversation_context:
+                    if msg.get("role") == "system":
+                        current_prompt = msg.get("content", "")
+                        break
+                
+                if current_prompt:
+                    vector_enhanced_prompt = await vector_prompt_manager.create_contextualized_prompt(
+                        base_prompt=current_prompt,
+                        user_id=message.user_id,
+                        current_message=message.content
+                    )
+                    
+                    # Update system message with vector-enhanced prompt
+                    for msg in conversation_context:
+                        if msg.get("role") == "system":
+                            msg["content"] = vector_enhanced_prompt
+                            break
+                    logging.info(f"🎯 VECTOR-NATIVE: Enhanced character prompt with dynamic context ({len(vector_enhanced_prompt)} chars)")
+                    
+            except Exception as e:
+                logging.debug(f"Vector-native prompt enhancement unavailable, using optimized prompt: {e}")
+            
+            # Import LLM client for sophisticated response generation
+            from src.llm.llm_client import LLMClient
+
+            # Initialize LLM client if not already done
+            if not hasattr(self, "llm_client"):
+                self.llm_client = LLMClient()
+
+            # Generate response using sophisticated context (run in thread to avoid blocking)
+            start_time = datetime.now()
+            response_text = await asyncio.to_thread(
+                self.llm_client.get_chat_response, conversation_context
+            )
+            end_time = datetime.now()
+
+            generation_time_ms = int((end_time - start_time).total_seconds() * 1000)
+
+            # Log sophisticated processing completion
+            total_tokens = sum(len(msg.get("content", "").split()) for msg in conversation_context) * 1.3
+            estimated_cost = total_tokens * 0.00001  # Rough cost estimate
+            logging.info(f"✅ SOPHISTICATED PIPELINE: Generated response with {total_tokens:.0f} input tokens, took {generation_time_ms}ms")
+
+            # Return sophisticated response
+            return AIResponse(
+                content=response_text,
+                model_used="openrouter/auto",  # Uses configured model
+                tokens_used=int(total_tokens),
+                cost=estimated_cost,
+                generation_time_ms=generation_time_ms,
+                confidence=0.9,  # High confidence for sophisticated processing
+            )
             
         except Exception as e:
             logging.error(f"Full AI response generation failed: {e}")

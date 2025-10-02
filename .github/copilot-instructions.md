@@ -220,42 +220,32 @@ docker logs whisperengine-<bot>-bot -f            # Follow any bot logs
 
 ### Bot API Endpoints
 
-**Individual Bot APIs**: Each bot exposes HTTP API endpoints for direct chat access:
+**DISCORD-ONLY FUNCTIONALITY**: WhisperEngine is a pure Discord bot system with no HTTP API endpoints for chat.
 
-**Bot Health Check Ports**:
-- Elena (Marine Biologist): http://localhost:9091
-- Marcus (AI Researcher): http://localhost:9092  
-- Ryan (Indie Game Developer): http://localhost:9093
-- Dream (Mythological): http://localhost:9094
-- Gabriel (Archangel): http://localhost:9095
-- Sophia (Marketing Executive): http://localhost:9096
-- Jake (Adventure Photographer): http://localhost:9097
-- Aethys (Omnipotent): http://localhost:3007
+**Bot Health Check Ports** (Discord bots only):
+- Elena (Marine Biologist): Discord bot running on container port 9091 
+- Marcus (AI Researcher): Discord bot running on container port 9092  
+- Ryan (Indie Game Developer): Discord bot running on container port 9093
+- Dream (Mythological): Discord bot running on container port 9094
+- Gabriel (Archangel): Discord bot running on container port 9095
+- Sophia (Marketing Executive): Discord bot running on container port 9096
+- Jake (Adventure Photographer): Discord bot running on container port 9097
+- Aethys (Omnipotent): Discord bot running on container port 3007
 
-**API Endpoints**:
+**Health Check Only** (no chat endpoints):
 ```bash
-# Health check
+# Health check for container orchestration
 curl http://localhost:9091/health
 
-# Bot information
-curl http://localhost:9091/api/bot-info
-
-# Send chat message
-curl -X POST -H "Content-Type: application/json" \
-  -d '{"message": "Hello!", "user_id": "your_user_id"}' \
-  http://localhost:9091/api/chat
+# ❌ NO CHAT API ENDPOINTS - Discord Only!
+# Chat functionality requires Discord messages sent directly to the bots
+# Use Discord client to test conversation features
 ```
 
-**Example Response**:
-```json
-{
-  "response": "¡Hola! How can I help you today? 🌊",
-  "timestamp": "2025-09-29T05:02:16.906209",
-  "message_id": "web_1759122135.930857",
-  "bot_name": "Elena Rodriguez [AI DEMO]",
-  "success": true
-}
-```
+**Testing Conversation Features**:
+- **Discord Messages Required**: All conversation intelligence, CDL integration, and memory features require actual Discord messages
+- **No HTTP Chat API**: Chat endpoints have been removed - Discord is the only supported interface
+- **Container Health Only**: HTTP endpoints are solely for Docker health checks and container orchestration
 
 ### Web Interface Development
 
@@ -831,8 +821,9 @@ python demo_vector_emoji_intelligence.py  # Example: testing demos
 
 **Active Infrastructure** (as of current deployment):
 - ✅ **Multi-Bot System**: 8+ character bots running simultaneously (Elena, Marcus, Jake, Dream, Aethys, Ryan, Gabriel, Sophia)
-- ✅ **Discord-First Architecture**: Pure Discord bot system, no web interface
-- ❌ **Individual Bot APIs**: Chat API endpoints have been removed - Discord-only functionality
+- ✅ **Discord-First Architecture**: Pure Discord bot system, no web interface or HTTP chat APIs
+- ❌ **HTTP Chat APIs**: All chat API endpoints have been removed - Discord-only functionality
+- ✅ **Container Health Checks**: HTTP health endpoints for Docker orchestration only
 - ✅ **Vector Memory**: Qdrant-powered with 384D embeddings, named vector support, bot-specific isolation
 - ✅ **Universal Identity**: Platform-agnostic user management with account discovery
 - ✅ **CDL Character System**: JSON-based personality definitions, integrated AI identity filtering
@@ -840,14 +831,10 @@ python demo_vector_emoji_intelligence.py  # Example: testing demos
 
 **Tested Working Features**:
 - Multi-bot Discord conversations with persistent memory
-- Health endpoints for container orchestration status
+- Container health endpoints for orchestration status (health checks only)
 - Vector-based semantic memory retrieval across conversations
 - CDL-driven character personality responses
 - Bot-specific memory isolation (Elena's memories stay with Elena)
-- Template-based configuration management
-- CDL-driven character personality responses
-- Bot-specific memory isolation (Elena's memories stay with Elena)
-- Health endpoints for container orchestration
 - Template-based configuration management
 
 **Development Commands Verified Working**:
@@ -855,7 +842,7 @@ python demo_vector_emoji_intelligence.py  # Example: testing demos
 ./multi-bot.sh start all     # ✅ Starts all 8+ bots + infrastructure
 ./multi-bot.sh status        # ✅ Shows container health status
 ./multi-bot.sh logs elena    # ✅ Real-time bot logs
-curl http://localhost:9091/api/chat  # ✅ Individual bot API endpoints
+curl http://localhost:9091/health  # ✅ Health check only (no chat API)
 ```
 
 ## Phase 4 Integration

@@ -506,7 +506,21 @@ class DiscordBotCore:
             # Initialize ContextSwitchDetector
             if hasattr(self, 'memory_manager') and self.memory_manager:
                 self.context_switch_detector = ContextSwitchDetector(vector_memory_store=self.memory_manager)
-                self.logger.info("✅ Phase 3: ContextSwitchDetector initialized")
+                self.logger.info("✅ Phase 3: ContextSwitchDetector initialized with memory manager")
+                
+                # Log thresholds and configuration for debugging
+                topic_threshold = self.context_switch_detector.topic_shift_threshold
+                emotional_threshold = self.context_switch_detector.emotional_shift_threshold
+                mode_threshold = self.context_switch_detector.conversation_mode_threshold
+                urgency_threshold = self.context_switch_detector.urgency_change_threshold
+                
+                self.logger.info("✅ Phase 3: ContextSwitchDetector thresholds: topic=%s, emotional=%s, mode=%s, urgency=%s",
+                                topic_threshold, emotional_threshold, mode_threshold, urgency_threshold)
+                
+                # Make sure it's properly attached to bot instance for handlers
+                if hasattr(self, 'bot') and self.bot:
+                    self.bot.context_switch_detector = self.context_switch_detector
+                    self.logger.info("✅ Phase 3: ContextSwitchDetector attached to bot instance")
             else:
                 self.context_switch_detector = None
                 self.logger.warning("⚠️ Cannot initialize ContextSwitchDetector - missing memory manager")

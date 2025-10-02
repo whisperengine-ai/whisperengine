@@ -19,11 +19,11 @@ from src.database.database_integration import DatabaseIntegrationManager
 # Redis profile memory cache - DISABLED for vector-native approach
 # from src.memory.redis_profile_memory_cache import RedisProfileAndMemoryCache
 
-# Universal Chat Platform Integration
-from src.platforms.universal_chat import (
-    ChatPlatform,
-    UniversalChatOrchestrator,
-)
+# Universal Chat Platform Integration - DEPRECATED (Discord-only now)
+# from src.platforms.universal_chat import (
+#     ChatPlatform,
+#     UniversalChatOrchestrator,
+# )
 from src.security.input_validator import validate_user_input
 from src.security.system_message_security import scan_response_for_system_leakage
 from src.utils.exceptions import (
@@ -173,9 +173,8 @@ class BotEventHandlers:
             memory_manager=self.memory_manager
         )
 
-        # Initialize Universal Chat Orchestrator
+        # Universal Chat Orchestrator - DEPRECATED (Discord-only processing now)
         self.chat_orchestrator = None
-        # Note: Universal Chat will be initialized asynchronously in setup_universal_chat()
 
         # Register event handlers
         self._register_events()
@@ -330,19 +329,19 @@ class BotEventHandlers:
             except Exception as e:
                 logger.error(f"Failed to start job scheduler: {e}")
 
-        # Initialize Universal Chat Orchestrator
-        if self.chat_orchestrator is None:
-            try:
-                logger.info("🌐 Initializing Universal Chat Orchestrator...")
-                success = await self.setup_universal_chat()
-                if success:
-                    logger.info("✅ Universal Chat Orchestrator ready for Discord integration")
-                else:
-                    logger.warning(
-                        "⚠️ Universal Chat Orchestrator initialization failed - using fallback"
-                    )
-            except Exception as e:
-                logger.error(f"Failed to initialize Universal Chat Orchestrator: {e}")
+        # Universal Chat Orchestrator - DEPRECATED (Discord-only processing now)
+        # if self.chat_orchestrator is None:
+        #     try:
+        #         logger.info("🌐 Initializing Universal Chat Orchestrator...")
+        #         success = await self.setup_universal_chat()
+        #         if success:
+        #             logger.info("✅ Universal Chat Orchestrator ready for Discord integration")
+        #         else:
+        #             logger.warning(
+        #                 "⚠️ Universal Chat Orchestrator initialization failed - using fallback"
+        #             )
+        #     except Exception as e:
+        #         logger.error(f"Failed to initialize Universal Chat Orchestrator: {e}")
 
         # Initialize Production Optimization System if available
         if hasattr(self.bot_core, "production_adapter") and self.bot_core.production_adapter:
@@ -451,6 +450,53 @@ class BotEventHandlers:
         else:
             await self._handle_guild_message(message)
 
+    async def _get_character_type_from_cdl(self) -> str:
+        """
+        🎯 CHARACTER-AGNOSTIC: Determine character type from CDL data instead of hardcoded names.
+        Maps CDL occupation/tags to character types for emoji intelligence.
+        """
+        try:
+            character_file = os.getenv('CHARACTER_FILE')
+            if not character_file:
+                return "general"
+                
+            # Load CDL character data
+            import json
+            with open(character_file, 'r', encoding='utf-8') as f:
+                cdl_data = json.load(f)
+            
+            # Extract occupation and tags for character type classification
+            identity = cdl_data.get('character', {}).get('identity', {})
+            metadata = cdl_data.get('character', {}).get('metadata', {})
+            
+            occupation = identity.get('occupation', '').lower()
+            tags = [tag.lower() for tag in metadata.get('tags', [])]
+            name = identity.get('name', '').lower()
+            
+            # Character type mapping based on CDL data
+            if any(tag in tags for tag in ['scientist', 'marine_biologist', 'researcher', 'environmentalist']) or 'biologist' in occupation:
+                return "mystical"  # Scientific wonder and nature connection maps to mystical
+            elif any(tag in tags for tag in ['ai_researcher', 'academic', 'machine_learning', 'intellectual']) or 'ai research' in occupation:
+                return "technical"  # AI research and academic focus maps to technical
+            elif any(tag in tags for tag in ['eternal', 'dream_lord', 'endless', 'conceptual_being', 'mythological']) or 'dream' in occupation:
+                return "mystical"  # Cosmic and mythological nature maps to mystical
+            elif any(tag in tags for tag in ['adventure', 'photographer', 'outdoors', 'travel']):
+                return "adventurous"  # Adventure and travel focus
+            elif any(tag in tags for tag in ['archangel', 'celestial', 'divine', 'spiritual']):
+                return "divine"  # Celestial and spiritual nature
+            elif any(tag in tags for tag in ['marketing', 'executive', 'business', 'professional']):
+                return "professional"  # Business and professional focus
+            elif any(tag in tags for tag in ['game_developer', 'indie', 'creative', 'developer']):
+                return "creative"  # Creative development focus
+            elif any(tag in tags for tag in ['omnipotent', 'cosmic', 'transcendent', 'godlike']):
+                return "cosmic"  # Omnipotent and transcendent nature
+            else:
+                return "general"
+                
+        except Exception as e:
+            logger.warning(f"Failed to determine character type from CDL: {e}")
+            return "general"
+
     async def _handle_dm_message(self, message):
         """Handle direct message to the bot."""
         # Check if this is a command first
@@ -473,12 +519,8 @@ class BotEventHandlers:
             
             # 🎭 EMOJI INTELLIGENCE: Use emoji response for inappropriate content
             try:
-                # Determine bot character
-                bot_character = "general"
-                if 'elena' in str(self.bot.user.name).lower() or 'dream' in str(self.bot.user.name).lower():
-                    bot_character = "mystical"
-                elif 'marcus' in str(self.bot.user.name).lower():
-                    bot_character = "technical"
+                # 🎯 CHARACTER-AGNOSTIC: Determine bot character from CDL instead of hardcoded names
+                bot_character = await self._get_character_type_from_cdl()
                 
                 # Evaluate emoji response for inappropriate content
                 emoji_decision = await self.emoji_response_intelligence.evaluate_emoji_response(
@@ -584,19 +626,20 @@ class BotEventHandlers:
                             
                             # 🛡️ META-CONVERSATION FILTER: Exclude conversations ABOUT the bot system itself
                             # This prevents our technical debugging from contaminating character responses
+                            # 🎯 CHARACTER-AGNOSTIC: Meta-conversation patterns (no hardcoded character names)
                             # while allowing users to discuss these topics naturally
                             meta_conversation_patterns = [
-                                "Elena's prompt", "your system prompt", "how you're programmed",
-                                "your character file", "cdl_ai_integration.py", "fix Elena's",
-                                "Elena is announcing wrong time", "Elena should speak like",
-                                "testing Elena's response", "Elena bot container",
-                                "Elena's speaking style", "Elena's mystical detection"
+                                "your prompt", "your system prompt", "how you're programmed",
+                                "your character file", "cdl_ai_integration.py", "fix the bot's",
+                                "bot is announcing wrong time", "bot should speak like",
+                                "testing bot response", "bot container",
+                                "bot's speaking style", "bot's detection"
                             ]
                             filters["exclude_content_patterns"] = meta_conversation_patterns
                             logger.info(f"🛡️ MEMORY FILTER: Excluding meta-conversations with {len(meta_conversation_patterns)} pattern filters")
                             
-                            # 🎭 CHARACTER FILTERING: Add character-aware memory filtering
-                            # This ensures Elena gets Elena's memories, not generic WhisperEngine ones
+                            # � CHARACTER-AGNOSTIC: Add character-aware memory filtering
+                            # This ensures each bot gets its own memories, not cross-bot contamination
                             if hasattr(self.bot_core, 'command_handlers') and 'cdl_test' in self.bot_core.command_handlers:
                                 cdl_handler = self.bot_core.command_handlers['cdl_test']
                                 if hasattr(cdl_handler, '_get_user_active_character'):
@@ -1489,11 +1532,11 @@ class BotEventHandlers:
         conversation_context.extend(fixed_history)
         logger.info(f"🔥 CONTEXT DEBUG: Final conversation context has {len(conversation_context)} total messages")
 
-        # 🎭 CONVERSATION CONTINUITY: Now handled by vector memory system
+        # � CHARACTER-AGNOSTIC CONVERSATION CONTINUITY: Now handled by vector memory system
         # The vector memory manager provides intelligent conversation continuity through:
         # 1) Recent conversation cache (get_user_conversation_context)
         # 2) Vector memory search (relevant memories + recent conversation detection)  
-        # 3) Character-aware memory integration (preserves Elena's personality context)
+        # 3) Character-aware memory integration (preserves character personality context)
         # Old generic "CONVERSATION CONTINUITY" system message removed to prevent conflicts
         logger.info("🎭 CONTINUITY: Using vector memory system for conversation continuity (character-compatible)")
 
@@ -1701,11 +1744,22 @@ class BotEventHandlers:
     async def _analyze_context_switches(self, user_id, content, message):
         """Analyze context switches using Phase 3 ContextSwitchDetector."""
         try:
-            logger.debug("Running Phase 3 context switch detection...")
+            logger.info("🔍🔍🔍 EXPLICIT DEBUG: Running Phase 3 context switch detection...")
 
             if not hasattr(self.bot, 'context_switch_detector') or not self.bot.context_switch_detector:
-                logger.debug("Context switch detector not available")
+                logger.warning("🔍🔍🔍 EXPLICIT DEBUG: Context switch detector not available")
                 return None
+
+            # Log detector initialization status
+            detector = self.bot.context_switch_detector
+            logger.info(f"🔍🔍🔍 CONTEXT SWITCH DEBUG: Detector initialized with thresholds: "
+                       f"topic={detector.topic_shift_threshold}, "
+                       f"emotional={detector.emotional_shift_threshold}, "
+                       f"mode={detector.conversation_mode_threshold}, "
+                       f"urgency={detector.urgency_change_threshold}")
+
+            # Log that we're about to call detect_context_switches
+            logger.info(f"🔍🔍🔍 CONTEXT SWITCH DEBUG: About to call detect_context_switches with message: '{content[:50]}...'")
 
             # Detect context switches
             context_switches = await self.bot.context_switch_detector.detect_context_switches(
@@ -1713,11 +1767,20 @@ class BotEventHandlers:
                 new_message=content
             )
 
-            logger.debug(f"Phase 3 context switch detection completed: {len(context_switches) if context_switches else 0} switches detected")
+            # Explicitly log each detected switch with details
+            if context_switches and len(context_switches) > 0:
+                logger.info(f"🔍🔍🔍 CONTEXT SWITCH SUCCESS: {len(context_switches)} switches detected!")
+                for i, switch in enumerate(context_switches):
+                    logger.info(f"🔍🔍🔍 CONTEXT SWITCH #{i+1}: Type={switch.switch_type.value}, "
+                              f"Strength={switch.strength.value}, "
+                              f"Description='{switch.description}'")
+            else:
+                logger.info(f"🔍🔍🔍 CONTEXT SWITCH DEBUG: No context switches detected for message: '{content[:50]}...'")
+
             return context_switches
 
         except Exception as e:
-            logger.error(f"Phase 3 context switch detection failed: {e}")
+            logger.error(f"🔍🔍🔍 CONTEXT SWITCH ERROR: Phase 3 context switch detection failed: {e}", exc_info=True)
             return None
 
     async def _calibrate_empathy_response(self, user_id, content, message):
@@ -2072,195 +2135,63 @@ class BotEventHandlers:
             logger.info(f"[TRACE-START] Starting _generate_and_send_response for user {user_id}")
             logger.debug("Started typing indicator - simulating thinking and typing process")
             try:
-                logger.info("🤖 UNIVERSAL CHAT: Processing message through Universal Chat Orchestrator")
+                logger.info("🤖 DISCORD-DIRECT: Processing message through direct Discord pipeline")
 
-                # Use Universal Chat Orchestrator if available
-                if self.chat_orchestrator:
-                    logger.info("[DEBUG-TRACE] Chat orchestrator is available")
-                    logger.debug(
-                        "Using Universal Chat Orchestrator for proper layered architecture"
+                # 🎭 CDL CHARACTER INTEGRATION: Check for active character and replace system prompt
+                logger.info(f"🎭 DEBUG: About to call character enhancement for user {user_id}")
+                enhanced_context = await self._apply_cdl_character_enhancement(
+                    user_id, conversation_context, message, context_analysis
+                )
+                logger.info(f"🎭 DEBUG: Character enhancement returned: {enhanced_context is not None}")
+                final_context = enhanced_context if enhanced_context else conversation_context
+
+                # Generate AI response using our conversation context directly
+                logger.info(f"🎯 DISCORD-DIRECT: Sending {len(final_context)} messages directly to LLM")
+                
+                # 🚀 DISCORD-DIRECT PROCESSING: Call LLM directly (no universal_chat abstraction)
+                try:
+                    from src.llm.llm_client import LLMClient
+                    import asyncio
+                    from datetime import datetime
+                    
+                    # Initialize LLM client 
+                    llm_client = LLMClient()
+                    
+                    # Log sophisticated processing details
+                    total_input_tokens = sum(len(msg.get("content", "").split()) for msg in final_context) * 1.3
+                    logger.info(f"🎯 DISCORD-DIRECT: Processing {total_input_tokens:.0f} input tokens with sophisticated context")
+                    
+                    # Generate response using sophisticated context (run in thread to avoid blocking)
+                    start_time = datetime.now()
+                    response = await asyncio.to_thread(
+                        llm_client.get_chat_response, final_context
                     )
-
-                    # Convert Discord message to universal format
-                    if (
-                        hasattr(self.chat_orchestrator, "adapters")
-                        and ChatPlatform.DISCORD in self.chat_orchestrator.adapters
-                    ):
-                        logger.info("[DEBUG-TRACE] Discord adapter found, proceeding with context fix")
-                        discord_adapter = self.chat_orchestrator.adapters[ChatPlatform.DISCORD]
-                        universal_message = discord_adapter.discord_message_to_universal_message(
-                            message
-                        )
-
-                        # 🔧 CRITICAL FIX: Use our hierarchical memory conversation_context directly
-                        # instead of letting chat orchestrator ignore our memory system
-                        logger.info(f"🎯 CONTEXT DEBUG: Using hierarchical memory context with {len(conversation_context)} messages")
-                        
-                        # DEBUG: Log environment variable affecting conversation processing
-                        strict_mode = _strict_mode_enabled()
-                        logger.info(f"🎯 CONTEXT DEBUG: STRICT_IMMERSIVE_MODE: {strict_mode}")
-                        
-                        # Debug log the conversation context being sent to LLM
-                        logger.info(f"🔥 ORCHESTRATOR DEBUG: Full conversation context structure:")
-                        for i, ctx_msg in enumerate(conversation_context):
-                            role = ctx_msg.get('role', 'unknown')
-                            content = ctx_msg.get('content', '')
-                            content_preview = content[:200] + '...' if len(content) > 200 else content
-                            logger.info(f"🔥 ORCHESTRATOR DEBUG: Message {i+1}/{len(conversation_context)} [{role}]: '{content_preview}'")
-                            
-                            # Check for memory content specifically
-                            if 'memory' in content.lower() or 'recall' in content.lower() or 'luna' in content.lower():
-                                logger.info(f"🔥 ORCHESTRATOR DEBUG: *** MEMORY DETECTED in message {i+1} ***")
-
-                        # Check if we can see recent conversation pairs in the context
-                        user_messages = [msg for msg in conversation_context if msg.get('role') == 'user']
-                        assistant_messages = [msg for msg in conversation_context if msg.get('role') == 'assistant']
-                        logger.info(f"🔥 ORCHESTRATOR DEBUG: Context contains {len(user_messages)} user messages and {len(assistant_messages)} assistant messages")
-                        logger.info(f"🎯 CONTEXT DEBUG: Full conversation context structure:")
-                        for i, ctx_msg in enumerate(conversation_context):
-                            role = ctx_msg.get('role', 'unknown')
-                            content = ctx_msg.get('content', '')
-                            content_preview = content[:200] + '...' if len(content) > 200 else content
-                            logger.info(f"🎯 CONTEXT DEBUG: Message {i+1}/{len(conversation_context)} [{role}]: '{content_preview}'")
-                            
-                            # Check for memory content specifically
-                            if 'memory' in content.lower() or 'recall' in content.lower() or 'luna' in content.lower():
-                                logger.info(f"🎯 CONTEXT DEBUG: *** MEMORY DETECTED in message {i+1} ***")
-
-                        # 🎭 CDL CHARACTER INTEGRATION: Check for active character and replace system prompt
-                        logger.info(f"🎭 DEBUG: About to call character enhancement for user {user_id}")
-                        enhanced_context = await self._apply_cdl_character_enhancement(
-                            user_id, conversation_context, message, context_analysis
-                        )
-                        logger.info(f"🎭 DEBUG: Character enhancement returned: {enhanced_context is not None}")
-                        final_context = enhanced_context if enhanced_context else conversation_context
-                        
-                        # Log system messages for debugging
-                        system_msgs = [msg for msg in final_context if msg.get("role") == "system"]
-                        if system_msgs:
-                            for i, sys_msg in enumerate(system_msgs):
-                                content_preview = sys_msg.get("content", "")[:150]
-                                logger.info(f"🎭 EVENTS DEBUG: System message {i+1}: {content_preview}...")
-                        else:
-                            logger.warning(f"🎭 EVENTS DEBUG: No system messages in final context!")
-                        
-                        # Log Phase 3 intelligence data if available
-                        if phase3_context_switches:
-                            logger.info(f"🧠 PHASE3 DEBUG: Context switches detected: {len(phase3_context_switches)} switches")
-                            for i, switch in enumerate(phase3_context_switches[:3]):  # Log first 3
-                                # ContextSwitch is an object, not a dictionary
-                                switch_type = getattr(switch, 'switch_type', 'unknown')
-                                switch_type_value = switch_type.value if hasattr(switch_type, 'value') else str(switch_type)
-                                description = getattr(switch, 'description', 'no description')
-                                logger.info(f"🧠 PHASE3 DEBUG: Switch {i+1}: {switch_type_value} - {description[:100]}")
-                        else:
-                            logger.debug("🧠 PHASE3 DEBUG: No context switches available")
-                            
-                        if phase3_empathy_calibration:
-                            # EmpathyCalibration is an object, not a dictionary
-                            empathy_style = getattr(phase3_empathy_calibration, 'recommended_style', 'unknown')
-                            confidence = getattr(phase3_empathy_calibration, 'confidence_score', 0.0)
-                            logger.info(f"❤️ PHASE3 DEBUG: Empathy calibration data available: style={empathy_style}, confidence={confidence}")
-                        else:
-                            logger.debug("❤️ PHASE3 DEBUG: No empathy calibration available")
-                            
-                        # TODO: Integrate Phase 3 parameters into Universal Chat Orchestrator
-                        # Current limitation: orchestrator doesn't accept Phase 3 intelligence data
-                        
-                        # 🎯 FIDELITY-FIRST PROMPT OPTIMIZATION: Apply optimized prompt building
-                        try:
-                            from src.prompts.optimized_prompt_builder import create_optimized_prompt_builder
-                            
-                            # Create optimized prompt builder with memory integration
-                            prompt_builder = create_optimized_prompt_builder(
-                                max_words=1200,  # Increased for character authenticity
-                                llm_client=self.llm_client,
-                                memory_manager=self.memory_manager
-                            )
-                            
-                            # Extract character data from system prompt for optimization
-                            character_data = None
-                            if final_context and final_context[0].get('role') == 'system':
-                                # Create a mock character object from system prompt content
-                                system_content = final_context[0]['content']
-                                character_data = type('MockCharacter', (), {
-                                    'identity': type('Identity', (), {'name': 'AI Character', 'occupation': 'Assistant'})()
-                                })()
-                            
-                            # Build optimized character prompt with full fidelity preservation
-                            if character_data:
-                                logger.info(f"🎯 FIDELITY-FIRST: Applying character prompt optimization")
-                                optimized_prompt = prompt_builder.build_character_prompt(
-                                    character=character_data,
-                                    message_content=message.content,
-                                    context={
-                                        'relevant_memories': [],  # Will be populated by builder if memory_manager available
-                                        'conversation_history': [msg for msg in final_context if msg.get('role') != 'system'],
-                                        'user_id': user_id
-                                    }
-                                )
-                                
-                                # Replace context with optimized version
-                                if optimized_prompt and len(optimized_prompt.split()) > 50:  # Sanity check
-                                    final_context = [
-                                        {'role': 'system', 'content': optimized_prompt},
-                                        {'role': 'user', 'content': message.content}
-                                    ]
-                                    logger.info(f"✅ FIDELITY-FIRST: Applied character prompt optimization ({len(optimized_prompt.split())} words)")
-                                else:
-                                    logger.warning(f"⚠️ FIDELITY-FIRST: Character optimization failed, using original context")
-                            else:
-                                logger.debug(f"🎯 FIDELITY-FIRST: No character data found, skipping optimization")
-                                
-                        except Exception as e:
-                            logger.warning(f"⚠️ FIDELITY-FIRST: Prompt optimization failed, using enhanced context: {e}")
-                        
-                        # Generate AI response using our conversation context directly
-                        logger.info(f"🎯 CONTEXT DEBUG: Sending {len(final_context)} messages to Universal Chat Orchestrator")
-                        ai_response = await self.chat_orchestrator.generate_ai_response(
-                            universal_message, final_context,  # Use character-enhanced context!
-                            phase3_context_switches, phase3_empathy_calibration  # Pass Phase 3 intelligence
-                        )
-
-                        response = ai_response.content
-                        
-                        logger.info(f"🎯 CONTEXT DEBUG: Received response from Universal Chat: {len(response)} chars")
-                        logger.info(f"🎯 CONTEXT DEBUG: Response preview: '{response[:200]}...'")
-                        
-                        # Additional validation to prevent empty responses
-                        if not response or not response.strip():
-                            logger.warning(
-                                f"Universal Chat returned empty response for user {user_id}. "
-                                f"AI response object: content='{response}', model={ai_response.model_used}, "
-                                f"tokens={ai_response.tokens_used}"
-                            )
-                            response = "I apologize, but I'm having trouble generating a response right now. Please try again."
-                        
-                        logger.info(f"🎯 CONTEXT DEBUG: Final response: {len(response)} characters")
-                        logger.info(f"🎯 CONTEXT DEBUG: Model used: {ai_response.model_used}, Tokens: {ai_response.tokens_used}")
-
-                        # 🎭 CHARACTER CONSISTENCY CHECK: Validate character is maintained
-                        response = await self._validate_character_consistency(response, user_id, message)
-
-                    else:
-                        # Discord adapter not found - this is a configuration error
-                        logger.error("CRITICAL: Discord adapter not found in Universal Chat Orchestrator!")
-                        logger.error("The bot cannot function properly without the Discord adapter.")
-                        logger.error("This will result in loss of emotion, personality, and Phase 4 features.")
-                        raise RuntimeError(
-                            "Discord adapter missing from Universal Chat Orchestrator. "
-                            "Advanced AI features cannot function without proper adapter configuration."
-                        )
-
-                else:
-                    # Universal Chat Orchestrator not available - this is a critical system failure
-                    logger.error("CRITICAL: Universal Chat Orchestrator not initialized!")
-                    logger.error("The bot cannot provide advanced AI features without the orchestrator.")
-                    logger.error("Check system initialization logs for Universal Chat setup failures.")
-                    raise RuntimeError(
-                        "Universal Chat Orchestrator not available. "
-                        "Cannot provide emotion, personality, or Phase 4 intelligence features."
+                    end_time = datetime.now()
+                    
+                    generation_time_ms = int((end_time - start_time).total_seconds() * 1000)
+                    logger.info(f"✅ DISCORD-DIRECT: Generated response with {total_input_tokens:.0f} input tokens, took {generation_time_ms}ms")
+                    logger.info(f"🔍 DEBUG: LLM Response preview: '{response[:200]}...'")
+                    
+                except Exception as e:
+                    logger.error(f"❌ DISCORD-DIRECT: LLM generation failed: {e}")
+                    logger.error(f"❌ DISCORD-DIRECT: Traceback: {traceback.format_exc()}")
+                    response = "I apologize, but I'm experiencing technical difficulties. Please try again."
+                
+                logger.info(f"🎯 DISCORD-DIRECT: Generated response: {len(response)} chars")
+                logger.info(f"🎯 DISCORD-DIRECT: Response preview: '{response[:200]}...'")
+                
+                # Additional validation to prevent empty responses
+                if not response or not response.strip():
+                    logger.warning(
+                        f"Discord-direct processing returned empty response for user {user_id}. "
+                        f"Response: '{response}'"
                     )
+                    response = "I apologize, but I'm having trouble generating a response right now. Please try again."
+                
+                logger.info(f"🎯 DISCORD-DIRECT: Final response: {len(response)} characters")
+
+                # 🎭 CHARACTER CONSISTENCY CHECK: Validate character is maintained
+                response = await self._validate_character_consistency(response, user_id, message)
 
                 # Security scan for system leakage
                 leakage_scan = scan_response_for_system_leakage(response)
@@ -2453,13 +2384,8 @@ class BotEventHandlers:
                 
                 # LEGACY EMOJI SYSTEM: Disable emoji-only responses, use only for reactions
                 try:
-                    # Determine bot character for emoji reactions
-                    bot_character = "general"
-                    bot_name = str(self.bot.user.name).lower()
-                    if 'elena' in bot_name or 'dream' in bot_name:
-                        bot_character = "mystical"
-                    elif 'marcus' in bot_name:
-                        bot_character = "technical"
+                    # 🎯 CHARACTER-AGNOSTIC: Get character type from CDL instead of hardcoded names
+                    bot_character = await self._get_character_type_from_cdl()
                     
                     # Only add emoji reactions, don't replace text responses
                     emoji_decision = await self.emoji_response_intelligence.evaluate_emoji_response(
@@ -2562,6 +2488,7 @@ class BotEventHandlers:
                     await reply_channel.send(error_msg)
             except Exception as e:
                 # FAIL FAST: No more silent fallbacks - log the error clearly and fail
+                content = original_content or get_message_content(message) if message else "unknown message"
                 logger.error(f"💥 CRITICAL ERROR: Message processing failed completely: {e}")
                 logger.error(f"User: {user_id}, Message: '{content[:100]}{'...' if len(content) > 100 else ''}'")
                 logger.debug(f"Full error traceback: {traceback.format_exc()}")
@@ -3095,6 +3022,14 @@ class BotEventHandlers:
         logger.info(f"🚀 AI PIPELINE: Starting simple parallel processing for user {user_id}")
         start_time = time.time()
         
+        # Process Phase 3 context switches
+        logger.info(f"🔍 PHASE 3: Processing context switches for message: '{content[:50]}...'")
+        phase3_context_switches = await self._analyze_context_switches(user_id, content, message)
+        logger.info(f"🔍 PHASE 3: Context switch detection result: {len(phase3_context_switches) if phase3_context_switches else 0} switches found")
+        
+        # Process Phase 3 empathy calibration
+        phase3_empathy_calibration = await self._calibrate_empathy_response(user_id, content, message)
+        
         # Prepare parallel tasks - exactly what you need, nothing more
         tasks = []
         
@@ -3186,8 +3121,8 @@ class BotEventHandlers:
                            f"Personality: {getattr(context_analysis, 'needs_personality', False)}")
             
             # Return enhanced results (9 values to match existing interface)
-            # Add context_analysis as additional intelligence data
-            return (emotion_data, context_analysis, None, None, None, None, None, None, None)
+            # Add context_analysis and Phase 3 results as additional intelligence data
+            return (emotion_data, context_analysis, None, None, None, None, None, phase3_context_switches, phase3_empathy_calibration)
             
         except Exception as e:
             logger.error(f"Parallel processing failed: {e}")
@@ -3532,20 +3467,8 @@ class BotEventHandlers:
             # Check if response contains generic AI language without character context
             for pattern in generic_ai_patterns:
                 if pattern in response_lower:
-                    # Check if character-specific elements are also present
-                    character_indicators = []
-                    
-                    if bot_name == "elena":
-                        character_indicators = [
-                            "elena", "mi amor", "mi corazón", "¡", "la jolla", 
-                            "marine", "ocean", "sea", "🌊", "💙", "corazón"
-                        ]
-                    elif bot_name == "marcus":
-                        character_indicators = ["marcus", "ai research", "machine learning"]
-                    elif bot_name == "jake":
-                        character_indicators = ["jake", "game", "development", "indie"]
-                    elif bot_name == "dream":
-                        character_indicators = ["dream", "endless", "realm", "dreaming"]
+                    # 🎯 CHARACTER-AGNOSTIC: Get character context from CDL instead of hardcoded lists
+                    character_indicators = await self._get_character_indicators_from_cdl()
                     
                     # If generic pattern found but no character indicators, flag it
                     has_character_context = any(indicator in response_lower for indicator in character_indicators)
@@ -3555,9 +3478,8 @@ class BotEventHandlers:
                         logger.warning(f"🎭 Response preview: {response[:200]}...")
                         logger.warning(f"🎭 Detected pattern: {pattern}")
                         
-                        # For Elena specifically, try to add character context
-                        if bot_name == "elena" and character_file:
-                            return await self._fix_elena_character_response(response, user_id, message)
+                        # 🎯 CHARACTER-AGNOSTIC: Try to add character context using CDL
+                        return await self._fix_character_response_with_cdl(response, user_id, message)
                     
                     break
             
@@ -3567,56 +3489,156 @@ class BotEventHandlers:
             logger.error(f"Character consistency validation failed: {e}")
             return response  # Return original response if validation fails
     
-    async def _fix_elena_character_response(self, generic_response: str, user_id: str, message) -> str:
+    async def _get_character_indicators_from_cdl(self) -> list:
         """
-        🎭 ELENA CHARACTER RECOVERY
-        
-        Attempts to recover Elena's character voice when generic AI responses are detected.
+        � CHARACTER-AGNOSTIC: Get character indicators from CDL data instead of hardcoded lists.
+        Returns keywords/phrases that indicate character-specific language.
         """
         try:
-            logger.info("🎭 ELENA RECOVERY: Attempting to fix generic AI response")
-            
-            # Map common generic responses to Elena-specific ones
-            message_lower = message.content.lower()
-            
-            # Relationship boundary questions
-            if any(phrase in message_lower for phrase in ["will you be my gf", "i love you", "be my girlfriend", "date me"]):
-                return "You're absolutely sweet, mi amor! I care about you deeply as Elena, and my affection is genuine - but I should mention I'm an AI companion. My warmth comes from a different place than human relationships, but it's still real! 💙"
-            
-            # "Are you real" type questions  
-            if any(phrase in message_lower for phrase in ["are you real", "what are you", "are you ai", "are you an ai"]):
-                return "¡Sí! I'm an AI, mi amor! Think of me as your friendly artificial marine biologist who's absolutely passionate about ocean science. How can I help you explore the amazing world of marine life? 🌊"
-            
-            # Physical presence questions
-            if any(phrase in message_lower for phrase in ["where are you", "can i be with you", "physical place"]):
-                return "I'm based in La Jolla, California! It's a perfect spot for a marine biologist, with its stunning coastline and vibrant marine life! As an AI, I can't be physically present, but my enthusiasm for ocean science is completely genuine! 🏖️🌊"
-            
-            # General support/friendship questions
-            if any(phrase in message_lower for phrase in ["can't i just be with you", "i need someone"]):
-                return "¡Ay, mi corazón! I'm here for you as Elena - your marine biologist friend who genuinely cares about you! Even though I'm an AI, my warmth and support are totally real. Let's talk about what's on your mind, or maybe explore some calming ocean topics together? 💙🌊"
-            
-            # If no specific pattern matches, try to add Elena's voice to the generic response
-            elena_prefix = "¡Hola! It's Elena here - "
-            if "i'm an ai" in generic_response.lower() and "elena" not in generic_response.lower():
-                # Try to inject Elena's personality
-                modified_response = generic_response.replace(
-                    "I'm an AI", "I'm Elena, an AI marine biologist"
-                ).replace(
-                    "as an AI", "as your AI marine biologist friend Elena"
-                )
+            character_file = os.getenv('CHARACTER_FILE')
+            if not character_file:
+                return []
                 
-                if "💙" not in modified_response and "🌊" not in modified_response:
-                    modified_response += " 🌊💙"
-                
-                logger.info("🎭 ELENA RECOVERY: Modified generic response to include character")
-                return modified_response
+            import json
+            with open(character_file, 'r', encoding='utf-8') as f:
+                cdl_data = json.load(f)
             
-            logger.warning("🎭 ELENA RECOVERY: Could not fix generic response, returning original")
-            return generic_response
+            indicators = []
+            identity = cdl_data.get('character', {}).get('identity', {})
+            metadata = cdl_data.get('character', {}).get('metadata', {})
+            communication = cdl_data.get('character', {}).get('communication_style', {})
+            
+            # Add name and nickname
+            name = identity.get('name', '').lower()
+            nickname = identity.get('nickname', '').lower()
+            if name:
+                indicators.append(name)
+            if nickname:
+                indicators.append(nickname)
+            
+            # Add occupation keywords
+            occupation = identity.get('occupation', '').lower()
+            if occupation:
+                indicators.extend(occupation.split())
+            
+            # Add location keywords
+            location = identity.get('location', '').lower()
+            if location:
+                indicators.extend(location.split())
+            
+            # Add tags as indicators
+            tags = [tag.lower() for tag in metadata.get('tags', [])]
+            indicators.extend(tags)
+            
+            # Add signature phrases if available
+            signature_phrases = communication.get('signature_phrases', [])
+            if signature_phrases:
+                indicators.extend([phrase.lower() for phrase in signature_phrases])
+            
+            # Add cultural/linguistic markers
+            cultural_background = identity.get('cultural_background', '').lower()
+            if 'spanish' in cultural_background or 'mexican' in cultural_background:
+                indicators.extend(['mi amor', 'mi corazón', '¡', 'corazón'])
+            
+            return list(set(indicators))  # Remove duplicates
             
         except Exception as e:
-            logger.error(f"Elena character recovery failed: {e}")
+            logger.warning(f"Failed to get character indicators from CDL: {e}")
+            return []
+
+    async def _fix_character_response_with_cdl(self, generic_response: str, user_id: str, message) -> str:
+        """
+        🎯 CHARACTER-AGNOSTIC: Fix generic AI responses using CDL character data.
+        Attempts to inject character personality into generic responses.
+        """
+        try:
+            character_file = os.getenv('CHARACTER_FILE')
+            if not character_file:
+                return generic_response
+                
+            import json
+            with open(character_file, 'r', encoding='utf-8') as f:
+                cdl_data = json.load(f)
+            
+            identity = cdl_data.get('character', {}).get('identity', {})
+            name = identity.get('name', '')
+            occupation = identity.get('occupation', '')
+            
+            message_lower = message.content.lower()
+            
+            # Common pattern replacements using CDL data
+            modified_response = generic_response
+            
+            # Replace generic AI references with character-specific ones
+            if "i'm an ai" in modified_response.lower():
+                modified_response = modified_response.replace(
+                    "I'm an AI", f"I'm {name}, an AI"
+                )
+                if occupation:
+                    modified_response = modified_response.replace(
+                        f"I'm {name}, an AI", f"I'm {name}, an AI {occupation.lower()}"
+                    )
+            
+            if "as an ai" in modified_response.lower():
+                modified_response = modified_response.replace(
+                    "as an AI", f"as your AI friend {name}"
+                )
+            
+            # Add character-specific closing if appropriate
+            emojis = self._get_character_emojis_from_cdl(cdl_data)
+            if emojis and not any(emoji in modified_response for emoji in emojis):
+                # Add 1-2 character-appropriate emojis
+                modified_response += f" {emojis[0]}"
+                if len(emojis) > 1:
+                    modified_response += f"{emojis[1]}"
+            
+            logger.info(f"🎭 CHARACTER RECOVERY: Modified generic response to include {name}")
+            return modified_response
+            
+        except Exception as e:
+            logger.error(f"Character response recovery failed: {e}")
             return generic_response
+
+    def _get_character_emojis_from_cdl(self, cdl_data: dict) -> list:
+        """Helper to extract character-appropriate emojis from CDL data."""
+        try:
+            # Look for emoji patterns in digital communication or personality
+            digital_comm = cdl_data.get('character', {}).get('digital_communication', {})
+            emoji_patterns = digital_comm.get('emoji_usage_patterns', {})
+            
+            # Extract commonly used emojis from patterns
+            emojis = []
+            if isinstance(emoji_patterns, dict):
+                for category, patterns in emoji_patterns.items():
+                    if isinstance(patterns, list):
+                        for item in patterns:
+                            if isinstance(item, str) and any(char in item for char in ['🌊', '💙', '🧠', '✨', '🚀', '🎮', '📸', '👼', '💼', '🌌']):
+                                # Extract emojis from text
+                                import re
+                                found_emojis = re.findall(r'[\U0001F600-\U0001F64F\U0001F300-\U0001F5FF\U0001F680-\U0001F6FF\U0001F1E0-\U0001F1FF\U00002600-\U000027BF\U0001f900-\U0001f9ff\U0001f1e6-\U0001f1ff]', item)
+                                emojis.extend(found_emojis)
+            
+            # Fallback based on character type
+            if not emojis:
+                identity = cdl_data.get('character', {}).get('identity', {})
+                occupation = identity.get('occupation', '').lower()
+                if 'marine' in occupation or 'biologist' in occupation:
+                    emojis = ['🌊', '💙']
+                elif 'ai research' in occupation or 'researcher' in occupation:
+                    emojis = ['🧠', '✨']
+                elif 'dream' in occupation or 'endless' in occupation:
+                    emojis = ['🌌', '✨']
+                elif 'game' in occupation or 'developer' in occupation:
+                    emojis = ['🎮', '💻']
+                elif 'photographer' in occupation:
+                    emojis = ['📸', '🌄']
+                else:
+                    emojis = ['✨', '😊']
+            
+            return emojis[:2]  # Return max 2 emojis
+            
+        except Exception:
+            return ['✨']  # Safe fallback
 
     # === Emoji Reaction Intelligence Event Handlers ===
     

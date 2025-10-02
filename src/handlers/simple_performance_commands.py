@@ -343,21 +343,53 @@ class SimplePerformanceCommands:
                 inline=False
             )
             
-            # Bot-specific health endpoints
-            bot_endpoints = [
-                "Elena (Marine Biologist): http://localhost:9091/health",
-                "Marcus (AI Researcher): http://localhost:9092/health", 
-                "Ryan (Game Developer): http://localhost:9093/health",
-                "Dream (Mythological): http://localhost:9094/health",
-                "Gabriel (Archangel): http://localhost:9095/health",
-                "Sophia (Marketing): http://localhost:9096/health",
-                "Jake (Photographer): http://localhost:9097/health",
-                "Aethys (Omnipotent): http://localhost:3007/health"
-            ]
+            # 🎯 CHARACTER-AGNOSTIC: Generate bot health endpoints dynamically from environment files
+            try:
+                import glob
+                import os
+                
+                bot_endpoints = []
+                env_files = glob.glob(".env.*")
+                
+                for env_file in sorted(env_files):
+                    # Skip template and backup files
+                    if env_file.endswith('.template') or env_file.endswith('.bak'):
+                        continue
+                        
+                    bot_name = env_file.replace('.env.', '').title()
+                    
+                    # Try to read health check port from env file
+                    try:
+                        with open(env_file, 'r') as f:
+                            content = f.read()
+                            for line in content.split('\n'):
+                                if line.startswith('HEALTH_CHECK_PORT='):
+                                    port = line.split('=')[1].strip()
+                                    bot_endpoints.append(f"{bot_name}: http://localhost:{port}/health")
+                                    break
+                    except Exception:
+                        # Skip if we can't read the file
+                        continue
+                
+                # Fallback to common endpoints if dynamic discovery fails
+                if not bot_endpoints:
+                    bot_endpoints = [
+                        "Bot Health endpoints available",
+                        "Check multi-bot.sh status for active bots",
+                        "Default ports: 9091-9097, 3007"
+                    ]
+                    
+            except Exception as e:
+                # Safe fallback if discovery fails
+                bot_endpoints = [
+                    "Multi-bot health endpoints available",
+                    "Use ./multi-bot.sh status to see active bots",
+                    "Check docker logs for individual bot status"
+                ]
             
             embed.add_field(
                 name="🏥 Bot Health Endpoints",
-                value="\n".join(bot_endpoints[:4]) + "\n*(and 4 more bots)*",
+                value="\n".join(bot_endpoints[:6]) + (f"\n*(and {len(bot_endpoints)-6} more)*" if len(bot_endpoints) > 6 else ""),
                 inline=False
             )
             

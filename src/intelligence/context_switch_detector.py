@@ -10,7 +10,6 @@ Phase 3: Advanced Intelligence
 
 import logging
 import os
-import statistics
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from enum import Enum
@@ -123,49 +122,68 @@ class ContextSwitchDetector:
         Returns:
             List of detected context switches
         """
-        logger.debug("Detecting context switches for user %s", user_id)
+        logger.info("🔍🔍🔍 ULTRA EXPLICIT DEBUG: Starting context switch detection for user %s", user_id)
+        logger.info("🔍🔍🔍 ULTRA EXPLICIT DEBUG: New message: '%s'", new_message[:100])
         
         try:
             # Get current context
             current_context = await self._get_current_context(user_id)
+            logger.info("🔍🔍🔍 ULTRA EXPLICIT DEBUG: Current context primary_topic: %s", 
+                        current_context.primary_topic if current_context else "None")
             
             # Analyze different types of context switches
             detected_switches = []
             
             # 1. Topic shift detection
+            logger.info("🔍🔍🔍 ULTRA EXPLICIT DEBUG: Starting topic shift detection...")
             topic_switch = await self._detect_topic_shift(user_id, new_message, current_context)
             if topic_switch:
+                logger.info("🔍🔍🔍 CONTEXT SWITCH DETECTED: Topic shift - %s", topic_switch.description)
                 detected_switches.append(topic_switch)
+            else:
+                logger.info("🔍🔍🔍 ULTRA EXPLICIT DEBUG: No topic shift detected")
             
             # 2. Emotional shift detection
+            logger.debug("🔍 CONTEXT SWITCH DEBUG: Starting emotional shift detection...")
             emotional_switch = await self._detect_emotional_shift(user_id, current_context)
             if emotional_switch:
+                logger.info("🔍 CONTEXT SWITCH DETECTED: Emotional shift - %s", emotional_switch.description)
                 detected_switches.append(emotional_switch)
             
             # 3. Conversation mode change
+            logger.debug("🔍 CONTEXT SWITCH DEBUG: Starting conversation mode detection...")
             mode_switch = await self._detect_conversation_mode_change(user_id, new_message, current_context)
             if mode_switch:
+                logger.info("🔍 CONTEXT SWITCH DETECTED: Mode change - %s", mode_switch.description)
                 detected_switches.append(mode_switch)
             
             # 4. Urgency level change
+            logger.debug("🔍 CONTEXT SWITCH DEBUG: Starting urgency detection...")
             urgency_switch = await self._detect_urgency_change(user_id, new_message, current_context)
             if urgency_switch:
+                logger.info("🔍 CONTEXT SWITCH DETECTED: Urgency change - %s", urgency_switch.description)
                 detected_switches.append(urgency_switch)
             
             # 5. Intent category change
+            logger.debug("🔍 CONTEXT SWITCH DEBUG: Starting intent detection...")
             intent_switch = await self._detect_intent_change(user_id, new_message, current_context)
             if intent_switch:
+                logger.info("🔍 CONTEXT SWITCH DETECTED: Intent change - %s", intent_switch.description)
                 detected_switches.append(intent_switch)
             
             # Update context based on detected switches
             if detected_switches:
+                logger.info("🔍 CONTEXT SWITCH SUMMARY: %d switches detected, updating context", len(detected_switches))
                 await self._update_context_after_switches(user_id, detected_switches)
+            else:
+                logger.debug("🔍 CONTEXT SWITCH DEBUG: No context switches detected")
             
-            logger.debug("Detected %d context switches", len(detected_switches))
+            logger.info("🔍 CONTEXT SWITCH FINAL: Detected %d context switches for user %s", 
+                       len(detected_switches), user_id)
             return detected_switches
             
         except (AttributeError, ValueError, KeyError) as e:
-            logger.error("Error detecting context switches: %s", e)
+            logger.error("🔍 CONTEXT SWITCH ERROR: Error detecting context switches: %s", e)
             return []
     
     async def _detect_topic_shift(
@@ -176,98 +194,155 @@ class ContextSwitchDetector:
     ) -> Optional[ContextSwitch]:
         """Detect topic shifts using vector contradictions and semantic analysis"""
         
-        if not self.vector_store:
-            return None
+        logger.debug("🔍 TOPIC SHIFT DEBUG: Starting topic shift detection for user %s", user_id)
+        logger.debug("🔍 TOPIC SHIFT DEBUG: Vector store check - has detect_contradictions? %s", 
+                    hasattr(self.vector_store, 'detect_contradictions'))
         
+        logger.info("🔍🔍🔍 TOPIC SHIFT ULTRA DEBUG: Entered _detect_topic_shift method")
+        
+        if not self.vector_store:
+            logger.warning("🔍🔍🔍 TOPIC SHIFT ULTRA DEBUG: No vector store available")
+            return None
+        else:
+            logger.info("🔍🔍🔍 TOPIC SHIFT ULTRA DEBUG: Vector store is available")
+        
+        # Extract the topic from the new message
+        new_topic = await self._extract_primary_topic(new_message)
+        logger.info(f"🔍🔍🔍 TOPIC SHIFT ULTRA DEBUG: New topic detected: '{new_topic}', current topic: '{current_context.primary_topic}'")
+        
+        # Log threshold values
+        logger.info(f"🔍🔍🔍 TOPIC SHIFT ULTRA DEBUG: Using threshold value: {self.topic_shift_threshold}")
+        
+        # 1. First attempt: Direct topic extraction for clear topic comparison
+        if (current_context.primary_topic != "general" and 
+            new_topic != current_context.primary_topic and
+            new_topic != "general"):
+            
+            logger.info("🔍 TOPIC SHIFT FOUND: Direct topic change from %s to %s", 
+                       current_context.primary_topic, new_topic)
+            
+            # Create topic shift result with correct parameter format
+            now = datetime.now(UTC)
+            return ContextSwitch(
+                switch_id=f"topic_{user_id}_{int(now.timestamp())}",
+                switch_type=ContextSwitchType.TOPIC_SHIFT,
+                strength=ContextSwitchStrength.STRONG,
+                confidence_score=0.85,
+                description=f"Topic shift from {current_context.primary_topic} to {new_topic}",
+                evidence=[new_message[:100]],
+                previous_context={"primary_topic": current_context.primary_topic},
+                new_context={"primary_topic": new_topic},
+                adaptation_strategy="acknowledge_topic_change",
+                detected_at=now,
+                metadata={"user_id": user_id}
+            )
+        
+        # 2. Use contradiction detection if direct comparison didn't work
+        contradictions = None
         try:
-            # Use vector store's contradiction detection for topic shifts
+            logger.info("🔍🔍🔍 TOPIC SHIFT ULTRA DEBUG: Starting contradiction detection")
             if hasattr(self.vector_store, 'detect_contradictions'):
+                logger.info("🔍🔍🔍 TOPIC SHIFT ULTRA DEBUG: Vector store has detect_contradictions method")
+                
+                # Call detect_contradictions with explicit logging
+                logger.info("🔍🔍🔍 TOPIC SHIFT ULTRA DEBUG: Calling detect_contradictions with threshold %s", 
+                           self.topic_shift_threshold)
+                
                 contradictions = await self.vector_store.detect_contradictions(
                     new_content=new_message,
                     user_id=user_id,
                     similarity_threshold=self.topic_shift_threshold
                 )
-            elif hasattr(self.vector_store, 'vector_store') and hasattr(self.vector_store.vector_store, 'detect_contradictions'):
-                # Try accessing underlying vector store
-                contradictions = await self.vector_store.vector_store.detect_contradictions(
-                    new_content=new_message,
-                    user_id=user_id,
-                    similarity_threshold=self.topic_shift_threshold
-                )
-            else:
-                # Fallback: use semantic similarity for basic topic shift detection
-                recent_memories = await self.vector_store.get_conversation_history(
-                    user_id=user_id,
-                    limit=3
-                )
                 
-                if recent_memories and len(recent_memories) > 0:
-                    # Simple topic shift detection based on current vs previous topic
-                    previous_topic = current_context.primary_topic
-                    new_topic = await self._extract_primary_topic(new_message)
-                    
-                    if previous_topic != new_topic and previous_topic != "general":
-                        # Create mock contradiction for topic shift
-                        contradictions = [{
-                            'similarity_score': 0.3,  # Assume moderate dissimilarity
-                            'content': new_message,
-                            'reason': f'Topic change from {previous_topic} to {new_topic}'
-                        }]
-                    else:
-                        contradictions = []
+                logger.info("🔍🔍🔍 TOPIC SHIFT ULTRA DEBUG: Retrieved contradictions for '%s': %d contradictions found", 
+                            new_message[:100], len(contradictions) if contradictions else 0)
+                
+                # Log the first contradiction for debugging
+                if contradictions and len(contradictions) > 0:
+                    logger.info("🔍🔍🔍 TOPIC SHIFT ULTRA DEBUG: Contradiction found: %s", str(contradictions[0]))
                 else:
-                    contradictions = []
+                    logger.info("🔍🔍🔍 TOPIC SHIFT ULTRA DEBUG: No contradictions found")
+            else:
+                logger.info("🔍🔍🔍 TOPIC SHIFT ULTRA DEBUG: Vector store does NOT have detect_contradictions method")
             
-            # Get recent conversation for topic context analysis
-            await self.vector_store.search_memories(
-                query=current_context.primary_topic,
+            # Process contradictions if found
+            if contradictions and len(contradictions) > 0:
+                # Get the most significant contradiction
+                top_contradiction = contradictions[0]
+                
+                # Extract topics from contradiction
+                previous_topic = await self._extract_primary_topic(top_contradiction.get('content', ''))
+                
+                # Calculate a dissimilarity score (1.0 - similarity)
+                similarity = float(top_contradiction.get('similarity_score', 0.5))
+                dissimilarity = 1.0 - similarity
+                
+                logger.debug("🔍 TOPIC SHIFT DEBUG: Detected topic shift from '%s' to '%s'. Average dissimilarity: %.2f, strength: %s",
+                            previous_topic, new_topic, dissimilarity, 
+                            "strong" if dissimilarity > 0.4 else "moderate")
+                
+                # Create topic shift result with correct parameter format
+                now = datetime.now(UTC)
+                return ContextSwitch(
+                    switch_id=f"topic_{user_id}_{int(now.timestamp())}",
+                    switch_type=ContextSwitchType.TOPIC_SHIFT,
+                    strength=ContextSwitchStrength.MODERATE if dissimilarity < 0.4 else ContextSwitchStrength.STRONG,
+                    confidence_score=dissimilarity * 0.8 + 0.2,  # Scale to 0.2-1.0 range
+                    description=f"Topic shift detected with {dissimilarity:.2f} dissimilarity",
+                    evidence=[top_contradiction.get('content', 'No content')[:100]],
+                    previous_context={"primary_topic": previous_topic},
+                    new_context={"primary_topic": new_topic},
+                    adaptation_strategy="acknowledge_topic_change",
+                    detected_at=now,
+                    metadata={"user_id": user_id}
+                )
+        except (AttributeError, ValueError, KeyError, IndexError) as e:
+            logger.error("Error in contradiction detection: %s", str(e), exc_info=True)
+        
+        # 3. Fallback: use conversation history for basic topic shift detection
+        try:
+            # Get recent conversation history
+            recent_memories = await self.vector_store.get_conversation_history(
                 user_id=user_id,
-                limit=5,
-                memory_types=["conversation"]
+                limit=5
             )
             
-            # Calculate topic shift strength
-            if contradictions:
-                # Analyze contradiction strength
-                avg_dissimilarity = statistics.mean([
-                    1.0 - c.get('similarity_score', 0.5) for c in contradictions
-                ])
+            if recent_memories and len(recent_memories) > 0:
+                # Compute semantic similarity
+                last_topics = []
+                for memory in recent_memories:
+                    if isinstance(memory, dict) and 'content' in memory:
+                        last_topic = await self._extract_primary_topic(memory['content'])
+                        if last_topic != "general":
+                            last_topics.append(last_topic)
                 
-                # Determine shift strength
-                if avg_dissimilarity > 0.7:
-                    strength = ContextSwitchStrength.DRAMATIC
-                elif avg_dissimilarity > 0.5:
-                    strength = ContextSwitchStrength.STRONG
-                elif avg_dissimilarity > 0.3:
-                    strength = ContextSwitchStrength.MODERATE
-                else:
-                    strength = ContextSwitchStrength.SUBTLE
-                
-                # Extract new topic from message
-                new_topic = await self._extract_primary_topic(new_message)
-                
-                return ContextSwitch(
-                    switch_id=f"topic_{user_id}_{int(datetime.now(UTC).timestamp())}",
-                    switch_type=ContextSwitchType.TOPIC_SHIFT,
-                    strength=strength,
-                    confidence_score=avg_dissimilarity,
-                    description=f"Topic shift from '{current_context.primary_topic}' to '{new_topic}'",
-                    evidence=[f"Vector contradictions found: {len(contradictions)}"],
-                    previous_context={"topic": current_context.primary_topic},
-                    new_context={"topic": new_topic},
-                    adaptation_strategy=self.adaptation_strategies[ContextSwitchType.TOPIC_SHIFT],
-                    detected_at=datetime.now(UTC),
-                    metadata={
-                        "contradictions": contradictions,
-                        "dissimilarity_score": avg_dissimilarity
-                    }
-                )
-            
-            return None
-            
-        except (AttributeError, ValueError, KeyError) as e:
-            logger.error("Error detecting topic shift: %s", e)
-            return None
+                # If we have previous topics, compare with current
+                if last_topics and new_topic not in last_topics and new_topic != "general":
+                    last_primary_topic = last_topics[0] if last_topics else "general"
+                    
+                    logger.debug("🔍 TOPIC SHIFT DEBUG: Detected topic shift from '%s' to '%s' using fallback method", 
+                                last_primary_topic, new_topic)
+                    
+                    # Create topic shift result
+                    now = datetime.now(UTC)
+                    return ContextSwitch(
+                        switch_id=f"topic_{user_id}_{int(now.timestamp())}",
+                        switch_type=ContextSwitchType.TOPIC_SHIFT,
+                        strength=ContextSwitchStrength.MODERATE,
+                        confidence_score=0.6,  # Medium confidence
+                        description=f"Topic shift from {last_primary_topic} to {new_topic} (fallback detection)",
+                        evidence=[],
+                        previous_context={"primary_topic": last_primary_topic},
+                        new_context={"primary_topic": new_topic},
+                        adaptation_strategy="acknowledge_topic_change",
+                        detected_at=now,
+                        metadata={"user_id": user_id, "detection_method": "fallback"}
+                    )
+        except (AttributeError, ValueError, KeyError, IndexError) as e:
+            logger.error("Error in fallback topic detection: %s", str(e), exc_info=True)
+        
+        # No topic shift detected
+        return None
     
     async def _detect_emotional_shift(
         self, 
@@ -465,27 +540,46 @@ class ContextSwitchDetector:
     async def _initialize_context(self, user_id: str) -> ConversationContext:
         """Initialize conversation context from recent history"""
         
+        logger.debug("🔍 CONTEXT INIT DEBUG: Initializing context for user %s", user_id)
+        
         try:
             if self.vector_store:
+                logger.debug("🔍 CONTEXT INIT DEBUG: Vector store available, fetching recent conversation")
                 # Get recent conversation to infer context
                 recent_memories = await self.vector_store.get_conversation_history(
                     user_id=user_id,
                     limit=3
                 )
                 
+                logger.debug("🔍 CONTEXT INIT DEBUG: Retrieved %d recent memories", 
+                           len(recent_memories) if recent_memories else 0)
+                
                 if recent_memories:
                     # Extract context from most recent user message
-                    user_memory = next(
-                        (m for m in recent_memories if m.get('metadata', {}).get('role') == 'user'), 
-                        None
-                    )
+                    user_memory = None
+                    for memory in recent_memories:
+                        # Handle different possible memory formats
+                        metadata = memory.get('metadata', {})
+                        role = metadata.get('role') or metadata.get('message_type') or metadata.get('speaker_type')
+                        
+                        if role == 'user' or role == 'human':
+                            user_memory = memory
+                            break
+                    
+                    logger.debug("🔍 CONTEXT INIT DEBUG: Found user memory: %s", bool(user_memory))
                     
                     if user_memory:
                         metadata = user_memory.get('metadata', {})
                         content = user_memory.get('content', '')
                         
+                        logger.debug("🔍 CONTEXT INIT DEBUG: User memory content preview: %s", content[:100])
+                        
+                        # Extract topic with fallback
+                        primary_topic = await self._extract_primary_topic(content)
+                        logger.debug("🔍 CONTEXT INIT DEBUG: Extracted primary topic: %s", primary_topic)
+                        
                         return ConversationContext(
-                            primary_topic=await self._extract_primary_topic(content),
+                            primary_topic=primary_topic,
                             emotional_state=metadata.get('emotional_context', 'neutral'),
                             conversation_mode=await self._determine_conversation_mode(content),
                             urgency_level=await self._calculate_message_urgency(content),
@@ -495,8 +589,15 @@ class ContextSwitchDetector:
                             established_at=datetime.now(UTC),
                             last_updated=datetime.now(UTC)
                         )
+                    else:
+                        logger.debug("🔍 CONTEXT INIT DEBUG: No user memory found in recent history")
+                else:
+                    logger.debug("🔍 CONTEXT INIT DEBUG: No recent memories available")
+            else:
+                logger.warning("🔍 CONTEXT INIT DEBUG: No vector store available")
             
             # Default context for new users
+            logger.debug("🔍 CONTEXT INIT DEBUG: Using default context")
             return ConversationContext(
                 primary_topic="general",
                 emotional_state="neutral",
@@ -510,7 +611,7 @@ class ContextSwitchDetector:
             )
             
         except (AttributeError, ValueError, KeyError) as e:
-            logger.error("Error initializing context: %s", e)
+            logger.error("🔍 CONTEXT INIT ERROR: Error initializing context: %s", e)
             return ConversationContext(
                 primary_topic="general",
                 emotional_state="neutral", 
@@ -536,22 +637,52 @@ class ContextSwitchDetector:
             return "general"
         
         message_lower = message.lower()
+        logger.info("🔍🔍🔍 TOPIC EXTRACTION: Analyzing message for topic: '%s'", message_lower[:50])
         
-        # Use structural and linguistic indicators instead of hardcoded keywords
+        # Enhanced topic categorization with broader categories for better detection
+        
+        # Topic categories with keyword lists
+        topic_categories = {
+            "inquiry": ["?", "who", "what", "when", "where", "why", "how", "which", "can you", "could you"],
+            "emotional": ["feel", "emotion", "mood", "sad", "happy", "angry", "excited", "nervous", "anxious", 
+                         "love", "hate", "like", "dislike", "afraid", "scared", "worried", "glad"],
+            "professional": ["work", "job", "career", "office", "business", "company", "interview", "resume", 
+                           "salary", "boss", "colleague", "project", "meeting"],
+            "educational": ["learn", "study", "school", "college", "university", "class", "course", "teacher", 
+                          "student", "homework", "assignment", "degree", "education", "knowledge"],
+            "health": ["health", "doctor", "medical", "hospital", "sick", "pain", "medicine", "disease", 
+                      "injury", "fitness", "diet", "exercise", "weight", "symptom"],
+            "technology": ["computer", "software", "hardware", "internet", "website", "app", "program", 
+                         "code", "digital", "technology", "online", "mobile", "device", "smartphone"],
+            "entertainment": ["movie", "tv", "show", "music", "game", "play", "book", "read", "watch", 
+                            "listen", "hobby", "fun", "entertainment", "sport", "actor", "artist"],
+            "food": ["food", "eat", "drink", "restaurant", "recipe", "cooking", "meal", "breakfast", 
+                   "lunch", "dinner", "snack", "taste", "flavor", "kitchen"],
+            "travel": ["travel", "trip", "vacation", "visit", "country", "city", "flight", "hotel", 
+                     "tourism", "destination", "journey", "abroad", "explore"],
+            "personal": ["family", "friend", "relationship", "marriage", "partner", "child", "parent", 
+                       "home", "house", "life", "personal", "private", "birthday", "celebration"]
+        }
+        
+        # Check for each category
+        for topic, keywords in topic_categories.items():
+            if any(keyword in message_lower for keyword in keywords):
+                logger.info("🔍🔍🔍 TOPIC EXTRACTION: Detected topic '%s' from keywords", topic)
+                return topic
+                
+        # Check for question mark (common case)
         if "?" in message:
+            logger.info("🔍🔍🔍 TOPIC EXTRACTION: Detected 'inquiry' from question mark")
             return "inquiry"
-        elif any(indicator in message_lower for indicator in ["feel", "emotion", "mood"]):
-            return "emotional"
-        elif any(indicator in message_lower for indicator in ["work", "job", "career"]):
-            return "professional"
-        elif any(indicator in message_lower for indicator in ["learn", "study", "school"]):
-            return "educational"
-        elif any(indicator in message_lower for indicator in ["health", "doctor", "medical"]):
-            return "health"
-        elif len(message.split()) > 30:
+            
+        # Length-based categorization as fallback
+        if len(message.split()) > 30:
+            logger.info("🔍🔍🔍 TOPIC EXTRACTION: Detected 'detailed_discussion' based on length")
             return "detailed_discussion"
-        else:
-            return "general"
+            
+        # Final fallback
+        logger.info("🔍🔍🔍 TOPIC EXTRACTION: No specific topic detected, returning 'general'")
+        return "general"
     
     async def _determine_conversation_mode(self, message: str) -> str:
         """
