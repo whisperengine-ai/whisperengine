@@ -38,9 +38,9 @@ from src.utils.health_monitor import HealthMonitor
 # Voice functionality import
 from src.voice.voice_protocol import create_voice_service
 
-# Redis conversation cache and profile memory cache - our own local code, always import
-from src.memory.redis_conversation_cache import RedisConversationCache
-from src.memory.redis_profile_memory_cache import RedisProfileAndMemoryCache
+# Redis conversation cache and profile memory cache - DISABLED for vector-native approach
+# from src.memory.redis_conversation_cache import RedisConversationCache
+# from src.memory.redis_profile_memory_cache import RedisProfileAndMemoryCache
 
 # Graph memory availability check - REMOVED
 # Vector-native components replace previous graph relationships

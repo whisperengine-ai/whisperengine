@@ -69,9 +69,11 @@ except ImportError:
 
 # Try to import cloud/production datastores with fallbacks
 try:
-    from src.memory.redis_conversation_cache import RedisConversationCache
+    # Redis conversation cache disabled for vector-native approach
+    # from src.memory.redis_conversation_cache import RedisConversationCache
 
-    REDIS_AVAILABLE = True
+    REDIS_AVAILABLE = False  # Explicitly disabled
+    RedisConversationCache = None  # Explicitly set to None
 except ImportError:
     REDIS_AVAILABLE = False
     RedisConversationCache = None

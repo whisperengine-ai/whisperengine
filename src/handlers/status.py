@@ -211,13 +211,14 @@ class StatusCommandHandlers:
 
         # Handle both sync (HybridConversationCache) and async (RedisConversationCache) stats
         try:
-            # Import to check the type
-            from src.memory.redis_conversation_cache import RedisConversationCache
+            # Redis conversation cache disabled for vector-native approach
+            # from src.memory.redis_conversation_cache import RedisConversationCache
 
-            if isinstance(self.conversation_cache, RedisConversationCache):
-                stats = await self.conversation_cache.get_cache_stats()
-            else:
-                # Default to sync method
+            # Redis cache disabled - fallback to sync method
+            # if isinstance(self.conversation_cache, RedisConversationCache):
+            #     stats = await self.conversation_cache.get_cache_stats()
+            # else:
+            #     # Default to sync method
                 stats = self.conversation_cache.get_cache_stats()
 
         except Exception as e:

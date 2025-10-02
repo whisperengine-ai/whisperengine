@@ -32,9 +32,9 @@ from fastembed import TextEmbedding
 import numpy as np
 from pydantic import BaseModel, Field
 
-# Performance & Async (PostgreSQL for system data, Redis for session cache)
+# Performance & Async (PostgreSQL for system data, Redis disabled for vector-native approach)
 import asyncpg
-import redis.asyncio as redis
+# import redis.asyncio as redis  # DISABLED: Using vector-native memory only
 
 # Import memory context classes for Discord context classification
 from src.memory.context_aware_memory_security import (
@@ -1509,7 +1509,7 @@ class VectorMemoryStore:
                 scroll_filter=models.Filter(
                     must=[models.FieldCondition(key="user_id", match=models.MatchValue(value=user_id))]
                 ),
-                limit=1000,  # Process in batches
+                limit=100,  # 🔧 REDUCED: From 1000 to 100 to prevent timeouts in batch processing
                 with_payload=True
             )
             
@@ -2109,7 +2109,10 @@ class VectorMemoryStore:
         temporal_keywords = [
             'last', 'recent', 'just', 'earlier', 'before', 'previous', 
             'moments ago', 'just now', 'a moment ago', 'just said',
-            'just told', 'just asked', 'just mentioned'
+            'just told', 'just asked', 'just mentioned', 'recently',
+            'talked about', 'discussed', 'remember', 'recall',
+            'what have we', 'what did we', 'our conversation',
+            'we were talking', 'we chatted', 'we spoke'
         ]
         
         query_lower = query.lower()
@@ -2125,7 +2128,8 @@ class VectorMemoryStore:
             
             # 🚀 QDRANT FEATURE: Use scroll API to get recent conversation chronologically
             # Convert to Unix timestamp for Qdrant numeric range filtering
-            recent_cutoff_dt = datetime.utcnow() - timedelta(hours=2)
+            # 🔧 EXPANDED: Increased from 2 hours to 24 hours for better "recent" coverage
+            recent_cutoff_dt = datetime.utcnow() - timedelta(hours=24)
             recent_cutoff_timestamp = recent_cutoff_dt.timestamp()
             
             # Get recent conversation messages in chronological order
@@ -2140,7 +2144,7 @@ class VectorMemoryStore:
                         models.FieldCondition(key="timestamp_unix", range=Range(gte=recent_cutoff_timestamp))
                     ]
                 ),
-                limit=20,  # Get last 20 conversation messages
+                limit=50,  # 🔧 INCREASED: Get more context for rich conversations (was 20)
                 with_payload=True,
                 with_vectors=False,  # Don't need vectors for temporal queries
                 order_by=models.OrderBy(key="timestamp_unix", direction=Direction.DESC)  # Most recent first
@@ -2162,7 +2166,7 @@ class VectorMemoryStore:
                         ]
                     ),
                     limit=limit,
-                    score_threshold=0.5,
+                    score_threshold=0.25,  # 🔧 LOWERED: From 0.5 to 0.25 for better temporal query recall
                     with_payload=True
                 )
                 
@@ -3562,7 +3566,7 @@ class VectorMemoryManager:
         self,
         user_id: str,
         query: str,
-        limit: int = 10
+        limit: int = 15  # 🔧 HARMONIZED: Increased from 10 to 15 for richer context
     ) -> List[Dict[str, Any]]:
         """Retrieve memories relevant to the given query using vector similarity."""
         import time

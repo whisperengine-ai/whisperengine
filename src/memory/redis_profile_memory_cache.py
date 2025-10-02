@@ -10,7 +10,7 @@ import redis.asyncio as redis
 logger = logging.getLogger(__name__)
 
 class RedisProfileAndMemoryCache:
-    def __init__(self, cache_timeout_minutes=20):
+    def __init__(self, cache_timeout_minutes=15):  # 🔧 HARMONIZED: Changed from 20 to 15 minutes to match conversation cache
         self.cache_timeout = int(cache_timeout_minutes) * 60
         self.redis_host = os.getenv("REDIS_HOST", "localhost")
         self.redis_port = int(os.getenv("REDIS_PORT", "6379"))

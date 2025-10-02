@@ -117,7 +117,7 @@ class QdrantQueryOptimizer:
         
     async def optimized_search(self, query: str, user_id: str, query_type: str = "general_search",
                             user_history: Optional[Dict] = None, filters: Optional[Dict] = None,
-                            limit: int = 10) -> List[Dict[str, Any]]:
+                            limit: int = 15) -> List[Dict[str, Any]]:  # 🔧 HARMONIZED: Increased from 10 to 15 to match main API
         """
         Main entry point for optimized search - called by vector memory system.
         
@@ -160,7 +160,7 @@ class QdrantQueryOptimizer:
                 logger.warning(f"🔧 QDRANT-OPTIMIZATION: No results found for query '{query}' (optimized: '{optimized_query}') - user_id: {user_id}")
                 # Try a broader search with no filters as diagnostic
                 try:
-                    diagnostic_results = await self._search_with_vector_store(query=query, user_id=user_id, limit=5)
+                    diagnostic_results = await self._search_with_vector_store(query=query, user_id=user_id, limit=10)  # 🔧 INCREASED: From 5 to 10 for better diagnostics
                     logger.info(f"🔧 DIAGNOSTIC: Broader search found {len(diagnostic_results)} results")
                 except Exception as diag_e:
                     logger.error(f"🔧 DIAGNOSTIC: Broader search also failed: {diag_e}")
@@ -192,7 +192,16 @@ class QdrantQueryOptimizer:
         Returns:
             Optimized query string
         """
-        # Word-level preprocessing
+        # 🔧 TEMPORAL QUERY FIX: Don't remove stop words from temporal/memory queries
+        # as they contain important contextual information
+        temporal_indicators = ['what', 'have', 'we', 'talked', 'remember', 'recall', 'discussed']
+        is_memory_query = any(indicator in query.lower() for indicator in temporal_indicators)
+        
+        if is_memory_query:
+            # For memory/temporal queries, preserve original structure
+            return query.strip()
+        
+        # Word-level preprocessing for other queries
         words = query.lower().split()
         words = [w for w in words if w not in self.stop_words]
         

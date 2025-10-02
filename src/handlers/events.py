@@ -16,7 +16,8 @@ from typing import List
 import discord
 
 from src.database.database_integration import DatabaseIntegrationManager
-from src.memory.redis_profile_memory_cache import RedisProfileAndMemoryCache
+# Redis profile memory cache - DISABLED for vector-native approach
+# from src.memory.redis_profile_memory_cache import RedisProfileAndMemoryCache
 
 # Universal Chat Platform Integration
 from src.platforms.universal_chat import (
