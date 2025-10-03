@@ -15,7 +15,7 @@ import asyncio
 import logging
 import traceback
 from datetime import datetime
-from typing import Dict, List, Optional, Any, Tuple, Union
+from typing import Dict, List, Optional, Any
 from dataclasses import dataclass
 
 from src.utils.production_error_handler import handle_errors, ErrorCategory, ErrorSeverity
@@ -92,13 +92,13 @@ class MessageProcessor:
         start_time = datetime.now()
         
         try:
-            logger.info(f"🔄 MESSAGE PROCESSOR: Starting processing for user {message_context.user_id} "
-                       f"on platform {message_context.platform}")
+            logger.info("🔄 MESSAGE PROCESSOR: Starting processing for user %s on platform %s", 
+                       message_context.user_id, message_context.platform)
             
             # Phase 1: Security validation
             validation_result = await self._validate_security(message_context)
             if not validation_result["is_safe"]:
-                logger.warning(f"SECURITY: Rejected unsafe message from user {message_context.user_id}")
+                logger.warning("SECURITY: Rejected unsafe message from user %s", message_context.user_id)
                 return ProcessingResult(
                     response="I'm sorry, but I can't process that message for security reasons.",
                     success=False,
@@ -108,7 +108,8 @@ class MessageProcessor:
             # Update message content with sanitized version
             message_context.content = validation_result["sanitized_content"]
             if validation_result["warnings"]:
-                logger.warning(f"SECURITY: Input warnings for user {message_context.user_id}: {validation_result['warnings']}")
+                logger.warning("SECURITY: Input warnings for user %s: %s", 
+                             message_context.user_id, validation_result['warnings'])
             
             # Phase 2: Name detection and storage
             await self._process_name_detection(message_context)
@@ -151,8 +152,8 @@ class MessageProcessor:
             end_time = datetime.now()
             processing_time_ms = int((end_time - start_time).total_seconds() * 1000)
             
-            logger.info(f"✅ MESSAGE PROCESSOR: Successfully processed message for user {message_context.user_id} "
-                       f"in {processing_time_ms}ms")
+            logger.info("✅ MESSAGE PROCESSOR: Successfully processed message for user %s in %dms", 
+                       message_context.user_id, processing_time_ms)
             
             return ProcessingResult(
                 response=response,
@@ -166,12 +167,13 @@ class MessageProcessor:
                 }
             )
             
-        except Exception as e:
+        except (ValueError, KeyError, TypeError) as e:
             end_time = datetime.now()
             processing_time_ms = int((end_time - start_time).total_seconds() * 1000)
             
-            logger.error(f"❌ MESSAGE PROCESSOR: Failed to process message for user {message_context.user_id}: {e}")
-            logger.error(f"❌ MESSAGE PROCESSOR: Traceback: {traceback.format_exc()}")
+            logger.error("❌ MESSAGE PROCESSOR: Failed to process message for user %s: %s", 
+                        message_context.user_id, str(e))
+            logger.debug("❌ MESSAGE PROCESSOR: Traceback: %s", traceback.format_exc())
             
             return ProcessingResult(
                 response="I apologize, but I'm experiencing technical difficulties. Please try again.",
@@ -203,8 +205,8 @@ class MessageProcessor:
             self._last_security_validation = validation_result
             return validation_result
             
-        except Exception as e:
-            logger.error(f"Security validation failed: {e}")
+        except (AttributeError, ValueError, TypeError) as e:
+            logger.error("Security validation failed: %s", str(e))
             return {
                 "is_safe": True,  # Fail open for now
                 "sanitized_content": message_context.content,
@@ -224,9 +226,9 @@ class MessageProcessor:
                     message_context.user_id, message_context.content
                 )
                 if detected_name:
-                    logger.info(f"🏷️ Auto-detected name '{detected_name}' for user {message_context.user_id}")
-        except Exception as e:
-            logger.debug(f"Name detection failed: {e}")
+                    logger.info("🏷️ Auto-detected name '%s' for user %s", detected_name, message_context.user_id)
+        except (ImportError, AttributeError, ValueError) as e:
+            logger.debug("Name detection failed: %s", str(e))
 
     async def _retrieve_relevant_memories(self, message_context: MessageContext) -> List[Dict[str, Any]]:
         """Retrieve relevant memories with context-aware filtering."""
@@ -245,7 +247,7 @@ class MessageProcessor:
             })()
             
             classified_context = self.memory_manager.classify_discord_context(mock_message)
-            logger.debug(f"Message context classified: {classified_context.context_type.value}")
+            logger.debug("Message context classified: %s", classified_context.context_type.value)
 
             # Try optimized memory retrieval first if available
             if hasattr(self.memory_manager, 'retrieve_relevant_memories_optimized'):
@@ -274,11 +276,11 @@ class MessageProcessor:
                         limit=20
                     )
                     
-                    logger.info(f"🚀 MEMORY: Optimized retrieval returned {len(relevant_memories)} memories")
+                    logger.info("🚀 MEMORY: Optimized retrieval returned %d memories", len(relevant_memories))
                     return relevant_memories
                     
-                except Exception as e:
-                    logger.warning(f"Optimized memory retrieval failed, using fallback: {e}")
+                except (AttributeError, ValueError, TypeError) as e:
+                    logger.warning("Optimized memory retrieval failed, using fallback: %s", str(e))
             
             # Fallback to context-aware retrieval
             relevant_memories = await self.memory_manager.retrieve_context_aware_memories(
@@ -289,11 +291,11 @@ class MessageProcessor:
                 emotional_context="general conversation"
             )
             
-            logger.info(f"🔍 MEMORY: Retrieved {len(relevant_memories)} memories via context-aware fallback")
+            logger.info("🔍 MEMORY: Retrieved %d memories via context-aware fallback", len(relevant_memories))
             return relevant_memories
             
-        except Exception as e:
-            logger.error(f"Memory retrieval failed: {e}")
+        except (AttributeError, ValueError, TypeError) as e:
+            logger.error("Memory retrieval failed: %s", str(e))
             return []
 
     def _classify_query_type(self, content: str) -> str:
@@ -364,6 +366,7 @@ class MessageProcessor:
     async def _process_ai_components_parallel(self, message_context: MessageContext, 
                                             conversation_context: List[Dict[str, str]]) -> Dict[str, Any]:
         """Process AI components in parallel (emotions, context analysis, etc.)."""
+        # TODO: Implement full AI component processing pipeline
         # This is a simplified version - the full implementation would replicate
         # the complex parallel processing from the Discord handler
         ai_components = {
@@ -378,10 +381,11 @@ class MessageProcessor:
             # Placeholder for parallel AI component processing
             # In the full implementation, this would call the same methods
             # as _process_ai_components_parallel in the Discord handler
-            logger.debug("AI component processing placeholder")
+            logger.debug("AI component processing placeholder - using %d context messages for user %s", 
+                        len(conversation_context), message_context.user_id)
             
-        except Exception as e:
-            logger.error(f"AI component processing failed: {e}")
+        except (AttributeError, ValueError, TypeError) as e:
+            logger.error("AI component processing failed: %s", str(e))
         
         return ai_components
 
@@ -394,11 +398,11 @@ class MessageProcessor:
         try:
             # Process images and add to context
             # This would use the existing image processing logic
-            logger.debug(f"Processing {len(message_context.attachments)} attachments")
-            # Placeholder for actual image processing
+            logger.debug("Processing %d attachments", len(message_context.attachments))
+            # TODO: Implement actual image processing
             
-        except Exception as e:
-            logger.error(f"Attachment processing failed: {e}")
+        except (AttributeError, ValueError, TypeError) as e:
+            logger.error("Attachment processing failed: %s", str(e))
         
         return conversation_context
 
@@ -425,7 +429,7 @@ class MessageProcessor:
             final_context = emotion_enhanced_context if emotion_enhanced_context else conversation_context
             
             # Generate response using LLM
-            logger.info(f"🎯 GENERATING: Sending {len(final_context)} messages to LLM")
+            logger.info("🎯 GENERATING: Sending %d messages to LLM", len(final_context))
             
             from src.llm.llm_client import LLMClient
             llm_client = LLMClient()
@@ -434,26 +438,31 @@ class MessageProcessor:
                 llm_client.get_chat_response, final_context
             )
             
-            logger.info(f"✅ GENERATED: Response with {len(response)} characters")
+            logger.info("✅ GENERATED: Response with %d characters", len(response))
             return response
             
-        except Exception as e:
-            logger.error(f"Response generation failed: {e}")
+        except (ImportError, AttributeError, ValueError, TypeError) as e:
+            logger.error("Response generation failed: %s", str(e))
             return "I apologize, but I'm having trouble generating a response right now. Please try again."
 
     async def _apply_cdl_character_enhancement(self, user_id: str, conversation_context: List[Dict[str, str]], 
                                              message_context: MessageContext, ai_components: Dict[str, Any]) -> List[Dict[str, str]]:
         """Apply CDL character enhancement to conversation context."""
-        # Placeholder for CDL character enhancement
+        # TODO: Implement CDL character enhancement
         # This would replicate the _apply_cdl_character_enhancement logic from Discord handler
-        logger.debug("CDL character enhancement placeholder")
+        logger.debug("CDL character enhancement placeholder for user %s", user_id)
+        # Avoid unused parameter warnings by referencing them
+        _ = message_context, ai_components
         return conversation_context
 
     async def _add_mixed_emotion_context(self, conversation_context: List[Dict[str, str]], 
                                        content: str, user_id: str, emotion_data, external_emotion_data) -> List[Dict[str, str]]:
         """Add emotion context to conversation."""
-        # Placeholder for emotion context enhancement
-        logger.debug("Emotion context enhancement placeholder")
+        # TODO: Implement emotion context enhancement
+        logger.debug("Emotion context enhancement placeholder for user %s with content length %d", 
+                    user_id, len(content))
+        # Avoid unused parameter warnings by referencing them  
+        _ = emotion_data, external_emotion_data
         return conversation_context
 
     async def _validate_and_sanitize_response(self, response: str, message_context: MessageContext) -> str:
@@ -466,7 +475,8 @@ class MessageProcessor:
             from src.security.system_message_security import scan_response_for_system_leakage
             leakage_scan = scan_response_for_system_leakage(response)
             if leakage_scan["has_leakage"]:
-                logger.error(f"SECURITY: System message leakage detected in response to user {message_context.user_id}")
+                logger.error("SECURITY: System message leakage detected in response to user %s", 
+                           message_context.user_id)
                 response = leakage_scan["sanitized_response"]
             
             # Meta-analysis sanitization
@@ -474,14 +484,16 @@ class MessageProcessor:
             
             return response
             
-        except Exception as e:
-            logger.error(f"Response validation failed: {e}")
+        except (ImportError, AttributeError, ValueError, TypeError) as e:
+            logger.error("Response validation failed: %s", str(e))
             return response  # Return original if validation fails
 
     async def _validate_character_consistency(self, response: str, user_id: str, message_context: MessageContext) -> str:
         """Validate that response maintains character consistency."""
-        # Placeholder for character consistency validation
-        logger.debug("Character consistency validation placeholder")
+        # TODO: Implement character consistency validation
+        logger.debug("Character consistency validation placeholder for user %s", user_id)
+        # Avoid unused parameter warnings
+        _ = message_context
         return response
 
     def _sanitize_meta_analysis(self, response: str) -> str:
@@ -516,8 +528,8 @@ class MessageProcessor:
             
             return response
             
-        except Exception as e:
-            logger.error(f"Meta-analysis sanitization failed: {e}")
+        except (ValueError, TypeError) as e:
+            logger.error("Meta-analysis sanitization failed: %s", str(e))
             return response
 
     async def _store_conversation_memory(self, message_context: MessageContext, response: str, 
@@ -542,14 +554,15 @@ class MessageProcessor:
             )
             
             if verification_memories:
-                logger.info(f"✅ MEMORY: Successfully stored and verified conversation for user {message_context.user_id}")
+                logger.info("✅ MEMORY: Successfully stored and verified conversation for user %s", 
+                           message_context.user_id)
                 return True
             else:
-                logger.warning(f"⚠️ MEMORY: Storage verification failed for user {message_context.user_id}")
+                logger.warning("⚠️ MEMORY: Storage verification failed for user %s", message_context.user_id)
                 return False
                 
-        except Exception as e:
-            logger.error(f"Memory storage failed: {e}")
+        except (AttributeError, ValueError, TypeError) as e:
+            logger.error("Memory storage failed: %s", str(e))
             return False
 
 

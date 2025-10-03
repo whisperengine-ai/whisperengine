@@ -7,10 +7,8 @@ that reuse the same message processing pipeline as Discord.
 """
 
 import asyncio
-import json
 import logging
-from datetime import datetime
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 import aiohttp
 
@@ -25,7 +23,7 @@ class WhisperEngineAPIClient:
     def __init__(self, base_url: str = "http://localhost:9091"):
         """Initialize the API client."""
         self.base_url = base_url.rstrip('/')
-        self.session = None
+        self.session: Optional[aiohttp.ClientSession] = None
 
     async def __aenter__(self):
         """Async context manager entry."""
@@ -39,22 +37,31 @@ class WhisperEngineAPIClient:
 
     async def health_check(self) -> Dict[str, Any]:
         """Check if the API is healthy."""
+        if self.session is None:
+            raise RuntimeError("Session not initialized")
         async with self.session.get(f"{self.base_url}/health") as response:
             return await response.json()
 
     async def get_status(self) -> Dict[str, Any]:
         """Get detailed status information."""
+        if self.session is None:
+            raise RuntimeError("Session not initialized")
         async with self.session.get(f"{self.base_url}/status") as response:
             return await response.json()
 
     async def get_bot_info(self) -> Dict[str, Any]:
         """Get bot information."""
+        if self.session is None:
+            raise RuntimeError("Session not initialized")
         async with self.session.get(f"{self.base_url}/api/bot-info") as response:
             return await response.json()
 
-    async def send_message(self, user_id: str, message: str, context: Dict[str, Any] = None) -> Dict[str, Any]:
+    async def send_message(self, user_id: str, message: str, context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """Send a single message to the bot."""
-        payload = {
+        if self.session is None:
+            raise RuntimeError("Session not initialized")
+            
+        payload: Dict[str, Any] = {
             "user_id": user_id,
             "message": message
         }
@@ -73,6 +80,9 @@ class WhisperEngineAPIClient:
 
     async def send_batch_messages(self, messages: list) -> Dict[str, Any]:
         """Send multiple messages in a batch."""
+        if self.session is None:
+            raise RuntimeError("Session not initialized")
+            
         payload = {"messages": messages}
 
         async with self.session.post(

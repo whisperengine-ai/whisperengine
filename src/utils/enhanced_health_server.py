@@ -7,13 +7,12 @@ import json
 import logging
 import traceback
 from datetime import datetime
-from typing import Optional, Dict, Any
+from typing import Dict, Any
 
-import discord
 from aiohttp import web
 from discord.ext import commands
 
-from src.core.message_processor import create_message_processor, MessageContext, ProcessingResult
+from src.core.message_processor import create_message_processor, MessageContext
 
 logger = logging.getLogger(__name__)
 
@@ -94,6 +93,8 @@ class EnhancedHealthServer:
 
     async def handle_cors_preflight(self, request):
         """Handle CORS preflight requests"""
+        # Avoid unused parameter warning
+        _ = request
         return web.Response(
             status=200,
             headers={
@@ -105,6 +106,8 @@ class EnhancedHealthServer:
 
     async def get_bot_info(self, request):
         """Get information about this bot instance"""
+        # Avoid unused parameter warning
+        _ = request
         try:
             bot_info = {
                 "bot_name": self.bot.user.name if self.bot.user else "Unknown",
@@ -123,8 +126,8 @@ class EnhancedHealthServer:
             
             return web.json_response(bot_info)
             
-        except Exception as e:
-            logger.error(f"Error getting bot info: {e}")
+        except (AttributeError, ValueError, TypeError) as e:
+            logger.error("Error getting bot info: %s", str(e))
             return web.json_response(
                 {"error": f"Failed to get bot info: {str(e)}"}, 
                 status=500
@@ -152,8 +155,8 @@ class EnhancedHealthServer:
                     "has_personality": False
                 }
                 
-        except Exception as e:
-            logger.warning(f"Could not get character info: {e}")
+        except (OSError, ImportError) as e:
+            logger.warning("Could not get character info: %s", str(e))
             return {
                 "character_file": None,
                 "character_name": "Assistant",
@@ -244,8 +247,8 @@ class EnhancedHealthServer:
                 {'error': 'Invalid JSON in request body'}, 
                 status=400
             )
-        except Exception as e:
-            logger.error("🌐 EXTERNAL API: Unexpected error: %s", e)
+        except (KeyError, ValueError, TypeError) as e:
+            logger.error("🌐 EXTERNAL API: Unexpected error: %s", str(e))
             logger.debug("🌐 EXTERNAL API: Traceback: %s", traceback.format_exc())
             return web.json_response(
                 {
@@ -339,8 +342,8 @@ class EnhancedHealthServer:
                     
                     results.append(result)
 
-                except Exception as e:
-                    logger.error("🌐 EXTERNAL API: Batch processing error for message %d: %s", i, e)
+                except (AttributeError, ValueError, TypeError) as e:
+                    logger.error("🌐 EXTERNAL API: Batch processing error for message %d: %s", i, str(e))
                     results.append({
                         'index': i,
                         'success': False,
@@ -359,8 +362,8 @@ class EnhancedHealthServer:
                 {'error': 'Invalid JSON in request body'},
                 status=400
             )
-        except Exception as e:
-            logger.error("🌐 EXTERNAL API: Batch processing failed: %s", e)
+        except (KeyError, ValueError, TypeError) as e:
+            logger.error("🌐 EXTERNAL API: Batch processing failed: %s", str(e))
             return web.json_response(
                 {
                     'error': 'Internal server error',
@@ -373,7 +376,7 @@ class EnhancedHealthServer:
     async def health_check(self, request):
         """Basic health check - is the service running?"""
         if logger.isEnabledFor(logging.DEBUG):
-            logger.debug(f"Health check from {request.remote}")
+            logger.debug("Health check from %s", request.remote)
 
         return web.json_response(
             {
@@ -392,7 +395,7 @@ class EnhancedHealthServer:
 
             if is_ready:
                 if logger.isEnabledFor(logging.DEBUG):
-                    logger.debug(f"Readiness check from {request.remote} - bot ready")
+                    logger.debug("Readiness check from %s - bot ready", request.remote)
 
                 return web.json_response(
                     {
@@ -405,7 +408,8 @@ class EnhancedHealthServer:
                 )
             else:
                 logger.warning(
-                    f"Readiness check failed - bot not ready: ready={self.bot.is_ready()}, closed={self.bot.is_closed()}"
+                    "Readiness check failed - bot not ready: ready=%s, closed=%s",
+                    self.bot.is_ready(), self.bot.is_closed()
                 )
                 return web.json_response(
                     {
@@ -416,8 +420,8 @@ class EnhancedHealthServer:
                     status=503,
                 )
 
-        except Exception as e:
-            logger.error(f"Error in readiness check: {e}")
+        except (AttributeError, ValueError, TypeError) as e:
+            logger.error("Error in readiness check: %s", str(e))
             return web.json_response(
                 {"status": "error", "timestamp": datetime.utcnow().isoformat(), "error": str(e)},
                 status=500,
@@ -425,6 +429,8 @@ class EnhancedHealthServer:
 
     async def metrics(self, request):
         """Basic metrics endpoint"""
+        # Avoid unused parameter warning
+        _ = request
         try:
             metrics_data = {
                 "timestamp": datetime.utcnow().isoformat(),
@@ -436,8 +442,8 @@ class EnhancedHealthServer:
 
             return web.json_response(metrics_data)
 
-        except Exception as e:
-            logger.error(f"Error generating metrics: {e}")
+        except (AttributeError, ValueError, TypeError) as e:
+            logger.error("Error generating metrics: %s", str(e))
             return web.json_response(
                 {"error": f"Failed to generate metrics: {str(e)}"}, 
                 status=500
@@ -445,6 +451,8 @@ class EnhancedHealthServer:
 
     async def detailed_status(self, request):
         """Detailed status information"""
+        # Avoid unused parameter warning
+        _ = request
         try:
             status_data = {
                 "service": "WhisperEngine Discord Bot",
@@ -467,8 +475,8 @@ class EnhancedHealthServer:
 
             return web.json_response(status_data)
 
-        except Exception as e:
-            logger.error(f"Error generating detailed status: {e}")
+        except (AttributeError, ValueError, TypeError) as e:
+            logger.error("Error generating detailed status: %s", str(e))
             return web.json_response(
                 {"error": f"Failed to generate status: {str(e)}"}, 
                 status=500
@@ -485,7 +493,7 @@ class EnhancedHealthServer:
             return round(memory_mb, 2)
         except ImportError:
             return -1  # psutil not available
-        except Exception:
+        except OSError:
             return -1  # Error getting memory info
 
     async def start(self):
@@ -498,22 +506,23 @@ class EnhancedHealthServer:
             self.site = web.TCPSite(self.runner, self.host, self.port)
             await self.site.start()
 
-            logger.info(f"✅ Enhanced health server with External Chat API started on {self.host}:{self.port}")
+            logger.info("✅ Enhanced health server with External Chat API started on %s:%d", 
+                       self.host, self.port)
             logger.info("Health endpoints:")
-            logger.info(f"  - http://{self.host}:{self.port}/health")
-            logger.info(f"  - http://{self.host}:{self.port}/ready")
-            logger.info(f"  - http://{self.host}:{self.port}/metrics")
-            logger.info(f"  - http://{self.host}:{self.port}/status")
-            logger.info(f"  - http://{self.host}:{self.port}/api/bot-info (GET)")
+            logger.info("  - http://%s:%d/health", self.host, self.port)
+            logger.info("  - http://%s:%d/ready", self.host, self.port)
+            logger.info("  - http://%s:%d/metrics", self.host, self.port)
+            logger.info("  - http://%s:%d/status", self.host, self.port)
+            logger.info("  - http://%s:%d/api/bot-info (GET)", self.host, self.port)
             logger.info("🌐 External Chat API endpoints:")
-            logger.info(f"  - http://{self.host}:{self.port}/api/chat (POST)")
-            logger.info(f"  - http://{self.host}:{self.port}/api/chat/batch (POST)")
+            logger.info("  - http://%s:%d/api/chat (POST)", self.host, self.port)
+            logger.info("  - http://%s:%d/api/chat/batch (POST)", self.host, self.port)
             
             # Initialize message processor for API endpoints
             self._initialize_message_processor()
 
-        except Exception as e:
-            logger.error(f"Failed to start enhanced server: {e}")
+        except (OSError, ValueError) as e:
+            logger.error("Failed to start enhanced server: %s", str(e))
             raise
 
     async def stop(self):
@@ -527,8 +536,8 @@ class EnhancedHealthServer:
                 await self.runner.cleanup()
                 logger.info("Enhanced server cleaned up")
 
-        except Exception as e:
-            logger.error(f"Error stopping enhanced server: {e}")
+        except (OSError, AttributeError) as e:
+            logger.error("Error stopping enhanced server: %s", str(e))
 
 
 # Factory function for easy integration
