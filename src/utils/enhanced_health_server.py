@@ -1,16 +1,19 @@
 """
-Enhanced Health Server
-Basic health monitoring for Discord bots.
+Enhanced Health Server with External Chat API
+Basic health monitoring for Discord bots plus HTTP chat API endpoints.
 """
 
 import json
 import logging
+import traceback
 from datetime import datetime
 from typing import Optional, Dict, Any
 
 import discord
 from aiohttp import web
 from discord.ext import commands
+
+from src.core.message_processor import create_message_processor, MessageContext, ProcessingResult
 
 logger = logging.getLogger(__name__)
 
@@ -20,7 +23,7 @@ access_logger.setLevel(logging.WARNING)
 
 
 class EnhancedHealthServer:
-    """HTTP server with health checks for Discord bots"""
+    """HTTP server with health checks and external chat API for Discord bots"""
 
     def __init__(self, bot: commands.Bot, port: int = 9090, host: str = "0.0.0.0", bot_manager=None):
         self.bot = bot
@@ -32,7 +35,35 @@ class EnhancedHealthServer:
         self.runner = None
         self.site = None
         
+        # Initialize message processor for external API
+        self.message_processor = None
+        
         self.setup_routes()
+
+    def _initialize_message_processor(self):
+        """Initialize message processor using bot components."""
+        if self.bot_manager and hasattr(self.bot_manager, 'bot') and self.bot_manager.bot:
+            bot_core = self.bot_manager.bot
+            
+            # Get required components from bot core
+            memory_manager = getattr(bot_core, 'memory_manager', None)
+            llm_client = getattr(bot_core, 'llm_client', None)
+            
+            if memory_manager and llm_client:
+                self.message_processor = create_message_processor(
+                    bot_core=bot_core,
+                    memory_manager=memory_manager,
+                    llm_client=llm_client,
+                    security_validator=getattr(bot_core, 'security_validator', None),
+                    emoji_intelligence=getattr(bot_core, 'emoji_response_intelligence', None),
+                    image_processor=getattr(bot_core, 'image_processor', None),
+                    conversation_cache=getattr(bot_core, 'conversation_cache', None)
+                )
+                logger.info("🌐 EXTERNAL API: Message processor initialized with same components as Discord bot")
+            else:
+                logger.warning("🌐 EXTERNAL API: Bot components not available for message processor")
+        else:
+            logger.warning("🌐 EXTERNAL API: Bot manager not available for message processor")
 
     def setup_routes(self):
         """Configure HTTP routes"""
@@ -43,8 +74,11 @@ class EnhancedHealthServer:
         self.app.router.add_get("/status", self.detailed_status)
         self.app.router.add_get("/api/bot-info", self.get_bot_info)
         
-        # CORS middleware setup
-        self.app.middlewares.append(self.cors_middleware)
+        # NEW: External Chat API routes
+        self.app.router.add_post("/api/chat", self.handle_chat_message)
+        self.app.router.add_post("/api/chat/batch", self.handle_batch_messages)
+        self.app.router.add_options("/api/chat", self.handle_cors_preflight)
+        self.app.router.add_options("/api/chat/batch", self.handle_cors_preflight)
         
         # CORS middleware setup
         self.app.middlewares.append(self.cors_middleware)
@@ -125,6 +159,215 @@ class EnhancedHealthServer:
                 "character_name": "Assistant",
                 "has_personality": False
             }
+
+    async def handle_chat_message(self, request):
+        """
+        Handle single chat message API endpoint.
+        
+        POST /api/chat
+        {
+            "user_id": "string",
+            "message": "string", 
+            "context": {
+                "channel_type": "dm|guild",
+                "platform": "api",
+                "metadata": {}
+            }
+        }
+        """
+        try:
+            # Initialize message processor if not done yet
+            if not self.message_processor:
+                self._initialize_message_processor()
+            
+            if not self.message_processor:
+                return web.json_response(
+                    {
+                        'error': 'Chat API not available - bot components not ready',
+                        'success': False
+                    },
+                    status=503
+                )
+
+            # Parse request body
+            request_data = await request.json()
+            
+            # Validate required fields
+            if not request_data.get('user_id'):
+                return web.json_response(
+                    {'error': 'user_id is required'}, 
+                    status=400
+                )
+            
+            if not request_data.get('message'):
+                return web.json_response(
+                    {'error': 'message is required'}, 
+                    status=400
+                )
+
+            # Create message context
+            context_data = request_data.get('context', {})
+            message_context = MessageContext(
+                user_id=request_data['user_id'],
+                content=request_data['message'],
+                platform='api',
+                channel_type=context_data.get('channel_type', 'dm'),
+                metadata=context_data.get('metadata', {})
+            )
+
+            logger.info("🌐 EXTERNAL API: Processing message for user %s", message_context.user_id)
+
+            # Process message through the same pipeline as Discord
+            processing_result = await self.message_processor.process_message(message_context)
+
+            # Return response
+            response_data = {
+                'success': processing_result.success,
+                'response': processing_result.response,
+                'processing_time_ms': processing_result.processing_time_ms,
+                'memory_stored': processing_result.memory_stored,
+                'timestamp': datetime.utcnow().isoformat(),
+                'bot_name': self.bot.user.name if self.bot.user else "WhisperEngine Bot"
+            }
+
+            if not processing_result.success:
+                response_data['error'] = processing_result.error_message
+
+            if processing_result.metadata:
+                response_data['metadata'] = processing_result.metadata
+
+            status_code = 200 if processing_result.success else 500
+            return web.json_response(response_data, status=status_code)
+
+        except json.JSONDecodeError:
+            return web.json_response(
+                {'error': 'Invalid JSON in request body'}, 
+                status=400
+            )
+        except Exception as e:
+            logger.error("🌐 EXTERNAL API: Unexpected error: %s", e)
+            logger.debug("🌐 EXTERNAL API: Traceback: %s", traceback.format_exc())
+            return web.json_response(
+                {
+                    'error': 'Internal server error',
+                    'message': str(e),
+                    'success': False
+                }, 
+                status=500
+            )
+
+    async def handle_batch_messages(self, request):
+        """
+        Handle batch message processing.
+        
+        POST /api/chat/batch
+        {
+            "messages": [
+                {
+                    "user_id": "string",
+                    "message": "string",
+                    "context": {}
+                }
+            ]
+        }
+        """
+        try:
+            # Initialize message processor if not done yet
+            if not self.message_processor:
+                self._initialize_message_processor()
+            
+            if not self.message_processor:
+                return web.json_response(
+                    {
+                        'error': 'Chat API not available - bot components not ready',
+                        'success': False
+                    },
+                    status=503
+                )
+
+            request_data = await request.json()
+            messages = request_data.get('messages', [])
+            
+            if not messages:
+                return web.json_response(
+                    {'error': 'messages array is required'},
+                    status=400
+                )
+            
+            if len(messages) > 10:  # Limit batch size
+                return web.json_response(
+                    {'error': 'Maximum 10 messages per batch'},
+                    status=400
+                )
+
+            results = []
+            for i, msg_data in enumerate(messages):
+                try:
+                    # Validate message
+                    if not msg_data.get('user_id') or not msg_data.get('message'):
+                        results.append({
+                            'index': i,
+                            'success': False,
+                            'error': 'user_id and message are required'
+                        })
+                        continue
+
+                    # Create message context
+                    context_data = msg_data.get('context', {})
+                    message_context = MessageContext(
+                        user_id=msg_data['user_id'],
+                        content=msg_data['message'],
+                        platform='api',
+                        channel_type=context_data.get('channel_type', 'dm'),
+                        metadata=context_data.get('metadata', {})
+                    )
+
+                    # Process message
+                    processing_result = await self.message_processor.process_message(message_context)
+                    
+                    result = {
+                        'index': i,
+                        'user_id': msg_data['user_id'],
+                        'success': processing_result.success,
+                        'response': processing_result.response,
+                        'processing_time_ms': processing_result.processing_time_ms,
+                        'memory_stored': processing_result.memory_stored
+                    }
+                    
+                    if not processing_result.success:
+                        result['error'] = processing_result.error_message
+                    
+                    results.append(result)
+
+                except Exception as e:
+                    logger.error("🌐 EXTERNAL API: Batch processing error for message %d: %s", i, e)
+                    results.append({
+                        'index': i,
+                        'success': False,
+                        'error': str(e)
+                    })
+
+            return web.json_response({
+                'results': results,
+                'total_processed': len(results),
+                'timestamp': datetime.utcnow().isoformat(),
+                'bot_name': self.bot.user.name if self.bot.user else "WhisperEngine Bot"
+            })
+
+        except json.JSONDecodeError:
+            return web.json_response(
+                {'error': 'Invalid JSON in request body'},
+                status=400
+            )
+        except Exception as e:
+            logger.error("🌐 EXTERNAL API: Batch processing failed: %s", e)
+            return web.json_response(
+                {
+                    'error': 'Internal server error',
+                    'message': str(e)
+                },
+                status=500
+            )
 
     # Existing health check methods (unchanged)
     async def health_check(self, request):
@@ -213,7 +456,11 @@ class EnhancedHealthServer:
                     "latency_ms": round(self.bot.latency * 1000, 2) if self.bot.is_ready() else -1,
                 },
                 "api": {
-                    "endpoints": ["/api/bot-info"]
+                    "endpoints": [
+                        "/api/bot-info",
+                        "/api/chat (POST)",
+                        "/api/chat/batch (POST)"
+                    ]
                 },
                 "character": self._get_character_info()
             }
@@ -242,7 +489,7 @@ class EnhancedHealthServer:
             return -1  # Error getting memory info
 
     async def start(self):
-        """Start the enhanced health server"""
+        """Start the enhanced health server with external chat API"""
         try:
             # Configure runner to suppress access logs for health checks
             self.runner = web.AppRunner(self.app, access_log=None)
@@ -251,13 +498,19 @@ class EnhancedHealthServer:
             self.site = web.TCPSite(self.runner, self.host, self.port)
             await self.site.start()
 
-            logger.info(f"✅ Enhanced health server started on {self.host}:{self.port}")
-            logger.info("Available endpoints:")
+            logger.info(f"✅ Enhanced health server with External Chat API started on {self.host}:{self.port}")
+            logger.info("Health endpoints:")
             logger.info(f"  - http://{self.host}:{self.port}/health")
             logger.info(f"  - http://{self.host}:{self.port}/ready")
             logger.info(f"  - http://{self.host}:{self.port}/metrics")
             logger.info(f"  - http://{self.host}:{self.port}/status")
             logger.info(f"  - http://{self.host}:{self.port}/api/bot-info (GET)")
+            logger.info("🌐 External Chat API endpoints:")
+            logger.info(f"  - http://{self.host}:{self.port}/api/chat (POST)")
+            logger.info(f"  - http://{self.host}:{self.port}/api/chat/batch (POST)")
+            
+            # Initialize message processor for API endpoints
+            self._initialize_message_processor()
 
         except Exception as e:
             logger.error(f"Failed to start enhanced server: {e}")
