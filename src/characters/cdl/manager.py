@@ -232,6 +232,13 @@ class CDLManager:
             guidelines = self.get_field("character.communication.conversation_flow_guidelines", {})
         return guidelines
     
+    def get_response_style(self) -> Dict[str, Any]:
+        """Convenience method to get response style from conversation flow guidelines"""
+        guidelines = self.get_conversation_flow_guidelines()
+        if guidelines:
+            return guidelines.get('response_style', {})
+        return {}
+    
     def get_communication_style(self) -> Dict[str, Any]:
         """Convenience method to get communication style"""
         return self.get_field("character.identity.communication_style", default={})
@@ -303,3 +310,8 @@ def get_character_name() -> str:
 def get_conversation_flow_guidelines() -> Dict[str, Any]:
     """Global convenience function to get conversation flow guidelines"""
     return get_cdl_manager().get_conversation_flow_guidelines()
+
+
+def get_response_style() -> Dict[str, Any]:
+    """Global convenience function to get response style from CDL"""
+    return get_cdl_manager().get_response_style()

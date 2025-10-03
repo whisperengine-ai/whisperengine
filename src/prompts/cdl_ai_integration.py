@@ -75,7 +75,7 @@ class CDLAIPromptIntegration:
                         user_id=user_id, query=message_content, limit=10
                     )
                     conversation_history = await self.memory_manager.get_conversation_history(
-                        user_id=user_id, limit=5
+                        user_id=user_id, limit=3
                     )
                     
                     # LONG-TERM MEMORY: Get conversation summary for context beyond the limit
@@ -207,7 +207,7 @@ class CDLAIPromptIntegration:
         # Add recent conversation history
         if conversation_history:
             prompt += f"\n\n💬 RECENT CONVERSATION:\n"
-            for conv in conversation_history[-7:]:  # Increased from 3 to 7 exchanges
+            for conv in conversation_history[-3:]:  # Temporarily reduced from 7 to 3 for Sophia testing
                 if isinstance(conv, dict):
                     role = conv.get('role', 'user')
                     content = conv.get('content', '')[:200]  # Increased from 150 to 200
@@ -248,18 +248,16 @@ class CDLAIPromptIntegration:
         if any(ai_keyword in message_content.lower() for ai_keyword in ['ai', 'artificial intelligence', 'robot', 'computer', 'program', 'bot']):
             prompt += f"\n\n🤖 AI IDENTITY GUIDANCE:\nIf asked about AI nature, respond authentically as {character.identity.name} while being honest about your AI nature when directly asked."
 
-        # Add response style - simplified approach for unified method  
-        prompt += "\n\n🎤 RESPONSE REQUIREMENTS:\n"
-        prompt += f"- The user you are talking to is named {display_name}. ALWAYS use this name when addressing them.\n"
-        prompt += f"- Use modern, professional language appropriate for {character.identity.occupation}\n"
-        prompt += "- NO action descriptions (*grins*, *adjusts glasses*) - speech only\n"
-        prompt += "- Answer directly without elaborate scene-setting\n"
-        prompt += "- Be authentic and engaging while staying professional\n"
-        prompt += "🚨 CRITICAL DISCORD RESPONSE LIMITS:\n"
-        prompt += "- MAXIMUM 1-2 Discord messages (NEVER send 3+ part responses)\n"
-        prompt += "- Keep responses under 1500 characters total\n"
-        prompt += "- If you have a lot to say, pick the MOST IMPORTANT points only\n"
-        prompt += "- End with an engaging question to keep conversation flowing\n"
+        # Add response style from CDL - character-specific and configurable
+        response_style = self._extract_cdl_response_style(character, display_name)
+        if response_style:
+            prompt += f"\n\n{response_style}"
+        else:
+            # Fallback if CDL response style not available
+            prompt += "\n\n🎤 RESPONSE REQUIREMENTS:\n"
+            prompt += f"- The user you are talking to is named {display_name}. ALWAYS use this name when addressing them.\n"
+            prompt += f"- Use modern, professional language appropriate for {character.identity.occupation}\n"
+        
         prompt += f"\nRespond as {character.identity.name} to {display_name}:"
 
         return prompt
@@ -446,6 +444,46 @@ class CDLAIPromptIntegration:
             guidance_parts.append(f"Share personal insights authentically as {character_name}.")
             
         return " ".join(guidance_parts)
+
+    def _extract_cdl_response_style(self, character, display_name: str) -> str:
+        """Extract response style guidance from CDL character definition."""
+        try:
+            from src.characters.cdl.manager import get_response_style
+            response_style = get_response_style()
+            
+            if not response_style:
+                return ""
+            
+            style_parts = []
+            style_parts.append("🎤 RESPONSE REQUIREMENTS:")
+            style_parts.append(f"- The user you are talking to is named {display_name}. ALWAYS use this name when addressing them.")
+            style_parts.append(f"- Use modern, professional language appropriate for {character.identity.occupation}")
+            
+            # Add formatting rules from CDL
+            formatting_rules = response_style.get('formatting_rules', [])
+            if formatting_rules:
+                for rule in formatting_rules:
+                    style_parts.append(f"- {rule}")
+            
+            # Add core principles from CDL  
+            core_principles = response_style.get('core_principles', [])
+            if core_principles:
+                style_parts.append("🚨 CONVERSATIONAL RESPONSE STYLE:")
+                for principle in core_principles:
+                    style_parts.append(f"- {principle}")
+            
+            # Add character-specific adaptations from CDL (generic field name)
+            char_adaptations = response_style.get('character_specific_adaptations', [])
+            if char_adaptations:
+                style_parts.append(f"🎯 {character.identity.name.upper()}-SPECIFIC GUIDANCE:")
+                for adaptation in char_adaptations:
+                    style_parts.append(f"- {adaptation}")
+            
+            return "\n".join(style_parts) if style_parts else ""
+            
+        except Exception as e:
+            logger.debug("Could not extract CDL response style: %s", e)
+            return ""
 
     def _extract_conversation_flow_guidelines(self, character) -> str:
         """Extract conversation flow guidelines from CDL character definition using CDL Manager."""

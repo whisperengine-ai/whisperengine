@@ -405,70 +405,96 @@ class VectorMemoryStore:
                 
                 logger.info(f"🚀 QDRANT-ADVANCED: Created collection '{self.collection_name}' with named vectors")
             else:
-                logger.info(f"Using existing collection: {self.collection_name}")
+                logger.info(f"Found existing collection: {self.collection_name}")
+                
+                # 🚀 CRITICAL: Validate and upgrade existing collection
+                self._validate_and_upgrade_collection()
                 
         except Exception as e:
             logger.debug(f"Collection creation/connection issue: {e}")
             raise  # Don't fallback - we need named vectors to work properly
+
+    def _validate_and_upgrade_collection(self):
+        """
+        🎯 CRITICAL: Validate existing collection has all required vectors and indexes
+        
+        This ensures that legacy collections (3 vectors) are properly upgraded
+        to the current 7-vector schema with all required indexes.
+        """
+        try:
+            # Get current collection configuration
+            collection_info = self.client.get_collection(self.collection_name)
+            current_vectors = collection_info.config.params.vectors
+            
+            # Expected 7 named vectors
+            expected_vectors = {
+                "content", "emotion", "semantic", "relationship", 
+                "personality", "interaction", "temporal"
+            }
+            
+            if isinstance(current_vectors, dict):
+                current_vector_names = set(current_vectors.keys())
+                missing_vectors = expected_vectors - current_vector_names
+                
+                if missing_vectors:
+                    logger.warning(f"🚨 COLLECTION UPGRADE: Missing vectors {missing_vectors}")
+                    logger.warning(f"🚨 Current vectors: {current_vector_names}")
+                    logger.warning(f"🚨 This collection needs to be recreated with full 7-vector schema")
+                    
+                    # For now, log the issue but don't auto-recreate to avoid data loss
+                    logger.error(f"❌ CRITICAL: Collection '{self.collection_name}' has incomplete vector schema!")
+                    logger.error(f"❌ Please recreate collection or run migration script")
+                    
+                    # Could add auto-recreation here but it would delete all memories
+                    # raise Exception(f"Collection {self.collection_name} requires 7-vector upgrade")
+                else:
+                    logger.info(f"✅ Collection has all 7 required vectors: {current_vector_names}")
+            else:
+                logger.warning(f"🚨 LEGACY COLLECTION: Single vector detected, needs 7-vector upgrade")
+                logger.error(f"❌ CRITICAL: Collection '{self.collection_name}' uses legacy single-vector schema!")
+            
+            # Always ensure payload indexes exist (safe to call multiple times)
+            self._create_payload_indexes()
+            
+        except Exception as e:
+            logger.error(f"Failed to validate collection: {e}")
+            # Don't raise - let the system continue but log the issue
     
     def _create_payload_indexes(self):
         """
         🎯 QDRANT FEATURE: Create optimized payload indexes for fast filtering
+        
+        This method is safe to call multiple times - Qdrant will ignore
+        duplicate index creation attempts.
         """
-        try:
-            # Index for user-based filtering (most common)
-            self.client.create_payload_index(
-                collection_name=self.collection_name,
-                field_name="user_id",
-                field_schema=models.PayloadSchemaType.KEYWORD
-            )
-            
-            # Index for memory type filtering
-            self.client.create_payload_index(
-                collection_name=self.collection_name,
-                field_name="memory_type", 
-                field_schema=models.PayloadSchemaType.KEYWORD
-            )
-            
-            # Index for temporal range queries
-            self.client.create_payload_index(
-                collection_name=self.collection_name,
-                field_name="timestamp_unix",
-                field_schema=models.PayloadSchemaType.FLOAT
-            )
-            
-            # Index for semantic grouping
-            self.client.create_payload_index(
-                collection_name=self.collection_name,
-                field_name="semantic_key",
-                field_schema=models.PayloadSchemaType.KEYWORD
-            )
-            
-            # Index for emotional context
-            self.client.create_payload_index(
-                collection_name=self.collection_name,
-                field_name="emotional_context",
-                field_schema=models.PayloadSchemaType.KEYWORD
-            )
-            
-            # Index for content hash (deduplication)
-            self.client.create_payload_index(
-                collection_name=self.collection_name,
-                field_name="content_hash",
-                field_schema=models.PayloadSchemaType.INTEGER
-            )
-            
-            # Index for bot-specific memory isolation
-            self.client.create_payload_index(
-                collection_name=self.collection_name,
-                field_name="bot_name",
-                field_schema=models.PayloadSchemaType.KEYWORD
-            )
-            
-            logger.info("🎯 QDRANT-INDEXES: Created optimized payload indexes")
-            
-        except Exception as e:
-            logger.warning(f"Could not create payload indexes (may already exist): {e}")
+        required_indexes = [
+            ("user_id", models.PayloadSchemaType.KEYWORD, "User-based filtering (most common)"),
+            ("memory_type", models.PayloadSchemaType.KEYWORD, "Memory type filtering"),
+            ("timestamp_unix", models.PayloadSchemaType.FLOAT, "Temporal range queries and ordering"),
+            ("semantic_key", models.PayloadSchemaType.KEYWORD, "Semantic grouping"),
+            ("emotional_context", models.PayloadSchemaType.KEYWORD, "Emotional context"),
+            ("content_hash", models.PayloadSchemaType.INTEGER, "Content hash (deduplication)"),
+            ("bot_name", models.PayloadSchemaType.KEYWORD, "Bot-specific memory isolation"),
+        ]
+        
+        created_count = 0
+        for field_name, field_type, description in required_indexes:
+            try:
+                self.client.create_payload_index(
+                    collection_name=self.collection_name,
+                    field_name=field_name,
+                    field_schema=field_type
+                )
+                logger.debug(f"✅ Created index: {field_name} ({description})")
+                created_count += 1
+            except Exception as e:
+                # Index probably already exists - this is normal
+                logger.debug(f"⚠️ Index {field_name} already exists or failed: {e}")
+        
+        if created_count > 0:
+            logger.info(f"🎯 QDRANT-INDEXES: Created {created_count} payload indexes")
+        else:
+            logger.info(f"🎯 QDRANT-INDEXES: All payload indexes already exist")
     
     async def generate_embedding(self, text: str) -> List[float]:
         """Generate high-quality embedding using local fastembed"""

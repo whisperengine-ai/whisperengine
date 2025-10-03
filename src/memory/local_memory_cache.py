@@ -38,6 +38,12 @@ class LocalMemoryCache:
         enable_persistence=True,
         persistence_interval=300,
     ):
+        # Read from environment variables if available
+        import os
+        cache_timeout_minutes = float(os.getenv('CONVERSATION_CACHE_TIMEOUT_MINUTES', cache_timeout_minutes))
+        bootstrap_limit = int(os.getenv('CONVERSATION_CACHE_BOOTSTRAP_LIMIT', bootstrap_limit))
+        max_local_messages = int(os.getenv('CONVERSATION_CACHE_MAX_LOCAL', max_local_messages))
+        
         self.cache_timeout = float(cache_timeout_minutes) * 60  # Convert to seconds
         self.bootstrap_limit = bootstrap_limit
         self.max_local_messages = max_local_messages
