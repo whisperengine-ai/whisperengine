@@ -51,11 +51,18 @@ class EmojiEmotionMapper:
     EMOJI_EMOTION_MAP = {
         # Strong Positive
         "❤️": (EmotionalReactionType.POSITIVE_STRONG, 0.95),
+        "♥️": (EmotionalReactionType.POSITIVE_STRONG, 0.95),  # Heart suit variant
         "😍": (EmotionalReactionType.POSITIVE_STRONG, 0.95),
         "🥰": (EmotionalReactionType.POSITIVE_STRONG, 0.90),
         "🤩": (EmotionalReactionType.POSITIVE_STRONG, 0.90),
         "💖": (EmotionalReactionType.POSITIVE_STRONG, 0.88),
         "💕": (EmotionalReactionType.POSITIVE_STRONG, 0.85),
+        "💗": (EmotionalReactionType.POSITIVE_STRONG, 0.83),  # Growing heart
+        "💘": (EmotionalReactionType.POSITIVE_STRONG, 0.80),  # Heart with arrow
+        "💙": (EmotionalReactionType.POSITIVE_MILD, 0.75),    # Blue heart
+        "💚": (EmotionalReactionType.POSITIVE_MILD, 0.75),    # Green heart
+        "💛": (EmotionalReactionType.POSITIVE_MILD, 0.75),    # Yellow heart
+        "💜": (EmotionalReactionType.POSITIVE_MILD, 0.75),    # Purple heart
         
         # Mild Positive
         "😊": (EmotionalReactionType.POSITIVE_MILD, 0.80),
