@@ -34,7 +34,7 @@ characters/
 │   ├── elena-rodriguez.json     # Marine biologist (passionate scientist)
 │   ├── marcus-thompson.json     # AI researcher (philosophical tech expert)
 │   ├── jake.json                # Adventure photographer (survival instructor)
-│   ├── gabriel.json             # Archangel (spiritual wisdom)
+│   ├── gabriel.json             # British Gentleman (sophisticated charm)
 │   ├── sophia-blake.json        # Marketing Executive (sophisticated lifestyle)
 │   ├── dream_of_the_endless.json # Mythological figure (Sandman series)
 │   ├── aethys-omnipotent-entity.json # Omnipotent entity (philosophical)

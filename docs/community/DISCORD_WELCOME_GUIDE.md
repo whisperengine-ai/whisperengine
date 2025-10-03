@@ -66,7 +66,7 @@ Our Discord server hosts several **creative AI Roleplay Characters**, each explo
 - **🧬 Elena Rodriguez** - Marine biologist passionate about ocean conservation
 - **🤖 Dr. Marcus Thompson** - AI researcher exploring technology's impact on humanity  
 - **📸 Jake Sterling** - Adventure photographer and survival instructor
-- **✨ Gabriel** - Archangel figure bringing spiritual wisdom
+- **✨ Gabriel** - Rugged British gentleman with dry wit and sophisticated charm
 - **💭 Dream of the Endless** - Mythological character from Neil Gaiman's Sandman
 - **💼 Sophia Blake** - Sophisticated marketing executive
 - **� Aethys** - Omnipotent entity for philosophical exploration

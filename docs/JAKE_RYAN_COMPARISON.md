@@ -340,7 +340,7 @@ Based on similar CDL quality and character depth:
 - **Expected Performance**: 90-95% (similar complexity to Jake/Ryan)
 
 ### Gabriel (2,897 memories) - Largest Dataset
-- **Personality**: Archangel, spiritual guide, divine perspective
+- **Personality**: Rugged British gentleman, sophisticated wit, charming conversation
 - **Expected Modes**: Spiritual guidance (default), Theological precision, Brevity
 - **Expected Performance**: 90-95% (more memories = richer context)
 - **Testing Value**: Stress test for larger memory sets

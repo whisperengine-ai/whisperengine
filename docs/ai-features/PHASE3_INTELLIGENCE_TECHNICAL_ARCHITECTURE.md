@@ -469,7 +469,7 @@ All Phase3 components are **character-agnostic** and work across the multi-bot s
 - **Marcus Thompson**: AI Researcher with technical expertise  
 - **Jake Sterling**: Adventure Photographer with outdoor enthusiasm
 - **Ryan Chen**: Indie Game Developer with creative focus
-- **Gabriel**: Archangel with spiritual guidance
+- **Gabriel**: Rugged British gentleman with sophisticated charm
 - **Sophia Blake**: Marketing Executive with business acumen
 
 Each bot maintains Phase3 intelligence while expressing unique personality through CDL integration.

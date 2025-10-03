@@ -58,6 +58,25 @@
 - When adding features, ensure they work for ANY character via CDL integration
 - Use `get_normalized_bot_name_from_env()` for bot identification, never literal strings
 
+**🚨 CRITICAL RULE: ALWAYS USE CDL FOR CHARACTER DESCRIPTIONS!**
+- **NEVER use outdated or incorrect character descriptions** in code, documentation, or comments
+- **ALWAYS reference the character's actual CDL JSON file** for accurate descriptions
+- **Gabriel is a "British Gentleman AI companion"** - NOT an archangel (common error to avoid)
+- **Elena is a "Marine Biologist"** - get specifics from elena.json
+- **Marcus is an "AI Researcher"** - get specifics from marcus.json  
+- **All character descriptions MUST match their CDL identity.occupation and identity.description fields**
+- **Update documentation to reflect actual CDL character data**, not assumptions or outdated info
+- When in doubt, check `characters/examples/[character].json` for the authoritative character definition
+- **ALL character data must come from CDL JSON files** (`characters/examples/*.json`)
+- **ALL bot identification must use environment variables** (`DISCORD_BOT_NAME`, `CHARACTER_FILE`)
+- **USE dynamic discovery and configuration generation** via `scripts/generate_multi_bot_config.py`
+- **NO hardcoded bot lists, character references, or personality assumptions**
+- **Character logic flows through CDL system ONLY** - never embed personality traits in code
+- **Bot names are discovered dynamically** from `.env.*` files - never maintain static lists
+- **Multi-character architecture requires complete character agnosticism** in all Python components
+- When adding features, ensure they work for ANY character via CDL integration
+- Use `get_normalized_bot_name_from_env()` for bot identification, never literal strings
+
 **DOCKER-FIRST DEVELOPMENT**: Container-based development is the PRIMARY workflow. Use `./multi-bot.sh` for all operations (auto-generated, don't edit manually).
 
 **AI CHARACTER TESTING STRATEGY**: Use different AI roleplay characters for specific testing scenarios:
@@ -253,7 +272,7 @@ docker logs whisperengine-<bot>-bot -f            # Follow any bot logs
 - Marcus (AI Researcher): Discord bot running on container port 9092  
 - Ryan (Indie Game Developer): Discord bot running on container port 9093
 - Dream (Mythological): Discord bot running on container port 9094
-- Gabriel (Archangel): Discord bot running on container port 9095
+- Gabriel (British Gentleman): Discord bot running on container port 9095
 - Sophia (Marketing Executive): Discord bot running on container port 9096
 - Jake (Adventure Photographer): Discord bot running on container port 9097
 - Aethys (Omnipotent): Discord bot running on container port 3007
@@ -895,7 +914,7 @@ python demo_vector_emoji_intelligence.py  # Example: testing demos
 - `.env.dream` - Dream of the Endless (Mythological)
 - `.env.aethys` - Aethys (Omnipotent Entity)
 - `.env.ryan` - Ryan Chen (Indie Game Developer)
-- `.env.gabriel` - Gabriel (Archangel)
+- `.env.gabriel` - Gabriel (British Gentleman)
 - `.env.sophia` - Sophia Blake (Marketing Executive)
 - Each file needs unique `DISCORD_BOT_TOKEN` and `HEALTH_CHECK_PORT`
 

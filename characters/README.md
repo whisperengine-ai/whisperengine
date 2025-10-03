@@ -11,7 +11,7 @@ A helpful, adaptive AI assistant that provides balanced support and information.
 - **🧬 Elena Rodriguez** (`examples/elena-rodriguez.json`) - Marine biologist passionate about ocean conservation
 - **🤖 Marcus Thompson** (`examples/marcus-thompson.json`) - AI researcher exploring technology's impact on humanity  
 - **📸 Jake Sterling** (`examples/jake.json`) - Adventure photographer and survival instructor
-- **✨ Gabriel** (`examples/gabriel.json`) - Archangel figure bringing spiritual wisdom
+- **✨ Gabriel** (`examples/gabriel.json`) - Rugged British gentleman with dry wit and sophistication
 - **� Dream of the Endless** (`examples/dream_of_the_endless.json`) - Mythological character from Neil Gaiman's Sandman
 - **🎨 Sophia Blake** (`examples/sophia-blake.json`) - Sophisticated marketing executive
 - **🌟 Aethys** (`examples/aethys-omnipotent-entity.json`) - Omnipotent entity for philosophical exploration  

@@ -56,7 +56,7 @@ BOTS = [
     BotConfig("marcus", "Dr. Marcus Thompson", "AI Researcher", 9092, "🤖"), 
     BotConfig("ryan", "Ryan Chen", "Indie Game Developer", 9093, "🎮"),
     BotConfig("dream", "Dream of the Endless", "Mythological Entity", 9094, "🌙"),
-    BotConfig("gabriel", "Gabriel", "Archangel", 9095, "👼"),
+    BotConfig("gabriel", "Gabriel", "British Gentleman", 9095, "🎩"),
     BotConfig("sophia", "Sophia Blake", "Marketing Executive", 9096, "💼"),
     BotConfig("jake", "Jake Sterling", "Adventure Photographer", 9097, "📸"),
     BotConfig("aethys", "Aethys", "Omnipotent Entity", 3007, "✨"),

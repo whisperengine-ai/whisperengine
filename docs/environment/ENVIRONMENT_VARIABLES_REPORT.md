@@ -232,7 +232,6 @@ This document catalogs all environment variables used in the WhisperEngine Pytho
 |----------|---------|-------------|----------|
 | `SECURITY_LOG_LEVEL` | `"quiet"` | Security logging level | `src/security/llm_message_role_security.py` |
 | `ADMIN_USER_IDS` | *None* | Comma-separated admin user IDs | `src/utils/helpers.py` |
-| `STRICT_IMMERSIVE_MODE` | `true` | Enable strict immersive mode | `src/handlers/events.py` |
 
 ### Privacy Manager
 | Variable | Default | Description | Location |

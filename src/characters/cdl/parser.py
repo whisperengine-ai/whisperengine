@@ -447,6 +447,10 @@ class CDLParser:
         if 'communication_style' in data:
             communication.communication_style = str(data['communication_style'])
         
+        # Parse message_pattern_triggers section
+        if 'message_pattern_triggers' in data:
+            communication.message_pattern_triggers = data['message_pattern_triggers']
+        
         return communication
     
     def serialize_to_dict(self, character: Character) -> Dict[str, Any]:

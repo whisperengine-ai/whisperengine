@@ -12,7 +12,7 @@ get_bot_config() {
         "marcus") echo "9092:AI Researcher:🤖" ;;
         "ryan") echo "9093:Indie Game Developer:🎮" ;;
         "dream") echo "9094:Mythological Entity:🌙" ;;
-        "gabriel") echo "9095:Archangel:👼" ;;
+        "gabriel") echo "9095:British Gentleman:🎩" ;;
         "sophia") echo "9096:Marketing Executive:💼" ;;
         "jake") echo "9097:Adventure Photographer:📸" ;;
         "aethys") echo "3007:Omnipotent Entity:✨" ;;

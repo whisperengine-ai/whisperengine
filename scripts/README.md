@@ -147,7 +147,7 @@ All bots expose the same API structure:
 | Marcus | 9092 | AI Researcher | 🤖 |
 | Ryan | 9093 | Indie Game Developer | 🎮 |
 | Dream | 9094 | Mythological Entity | 🌙 |
-| Gabriel | 9095 | Archangel | 👼 |
+| Gabriel | 9095 | British Gentleman | 🎩 |
 | Sophia | 9096 | Marketing Executive | 💼 |
 | Jake | 9097 | Adventure Photographer | 📸 |
 | Aethys | 3007 | Omnipotent Entity | ✨ |

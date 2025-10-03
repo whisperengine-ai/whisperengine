@@ -18,7 +18,7 @@ async def migrate_gabriel_data():
     
     print("🤖 Gabriel Data Migration - 3D to 7D Collection")
     print("=" * 55)
-    print("Character: Gabriel - Archangel & Divine Messenger")
+    print("Character: Gabriel - Rugged British Gentleman AI Companion")
     print("Source: whisperengine_memory_gabriel (3D)")
     print("Target: whisperengine_memory_gabriel_7d (Enhanced 7D)")
     print()

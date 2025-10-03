@@ -91,34 +91,21 @@ class CDLValidator:
         """Initialize the validator."""
         self.cdl_integration = CDLAIPromptIntegration()
         
-        # Standard test messages for pattern detection
-        self.standard_test_messages = [
-            ("consciousness expansion", ["mystical", "transcendent", "spiritual"]),
-            ("had a dream", ["dream", "sleep", "vision"]),
-            ("beautiful eyes", ["romantic", "compliment", "attractive"]),
-            ("teach me", ["education", "learning", "academic"]),
-            ("marine biology", ["science", "environmental", "ocean"]),
-            ("code together", ["collaboration", "creative", "programming"]),
-            ("gaming discussion", ["game", "development", "technical"]),
-            ("need spiritual guidance", ["spiritual", "guidance"]),
-            ("faith questions", ["spiritual", "guidance"])
-        ]
-        
-        # 🚨 CRITICAL: Required CDL sections that match UNIFIED CDL structure
+        # 🚨 CRITICAL: Required CDL sections that match ACTUAL CDL structure and pipeline usage
         self.required_sections = {
             # Core identity (used in character.identity.name, character.identity.occupation)
             'character.identity': 'Character Identity (name, age, occupation, etc.)',
             'character.identity.name': 'Character Name',
             'character.identity.occupation': 'Character Occupation',
             'character.identity.description': 'Character Description',
-            'character.identity.appearance': 'Physical Appearance Description',
+            'character.identity.physical_appearance': 'Physical Appearance Description',
             'character.identity.voice': 'Voice and Speaking Style',
             
             # Personality (used for character.personality.big_five)
             'character.personality': 'Core Personality Traits',
             'character.personality.big_five': 'Big Five Personality Profile',
             
-            # 🚨 CRITICAL: UNIFIED conversation flow structure
+            # 🚨 CRITICAL: UNIFIED conversation flow structure (ACTUAL structure used by pipeline)
             'character.communication': 'Communication Patterns',
             'character.communication.conversation_flow_guidance': 'Conversation Flow Guidance (UNIFIED)',
             'character.communication.conversation_flow_guidance.response_style': 'Response Style (CRITICAL - Unified Path)',
@@ -130,15 +117,15 @@ class CDLValidator:
             'character.communication.conversation_flow_guidance.platform_awareness': 'Platform Awareness',
             'character.communication.conversation_flow_guidance.platform_awareness.discord': 'Discord-Specific Guidance',
             
-            # Message triggers (unified path)
+            # Message triggers (unified path) - ACTUALLY USED BY PIPELINE
             'character.communication.message_pattern_triggers': 'Message Pattern Triggers',
             
-            # Background and life context
+            # Background and life context (ACTUAL CDL structure - not personal_background)
             'character.backstory': 'Character Background/History',
             'character.backstory.formative_experiences': 'Life-Shaping Events',
             'character.current_life': 'Current Life Situation',
             
-            # Personal knowledge
+            # Personal knowledge (ACTUAL CDL structure - separate top-level sections)
             'character.relationships': 'Relationship Dynamics',
             'character.skills_and_expertise': 'Professional Skills',
             'character.interests_and_hobbies': 'Personal Interests'
@@ -309,28 +296,48 @@ class CDLValidator:
         }
     
     def _test_pattern_detection(self, character, filename: str) -> Dict[str, Any]:
-        """Test pattern detection functionality."""
+        """Test pattern detection functionality using character's own triggers."""
         issues = []
         patterns_detected = []
         working = False
         
-        # Use character-specific test messages
-        test_messages = self.standard_test_messages
-        if 'gabriel' in filename.lower():
-            test_messages = [
-                ("need spiritual guidance", ["spiritual", "guidance"]),
-                ("faith questions", ["spiritual", "guidance"]),
-                ("theological discussion", ["theological", "discussion"])
-            ]
-        
         try:
-            for message, expected_keywords in test_messages:
-                scenarios = self.cdl_integration._detect_communication_scenarios(
-                    message, character, 'test_user'
-                )
-                if scenarios:
-                    patterns_detected.extend(list(scenarios.keys()))
-                    working = True
+            # Get character's own message_pattern_triggers
+            message_triggers = getattr(character.communication, 'message_pattern_triggers', {})
+            
+            if not message_triggers:
+                issues.append(ValidationIssue(
+                    level=ValidationStatus.WARNING,
+                    category="pattern_detection",
+                    message="No message_pattern_triggers defined in CDL",
+                    suggestion="Add message_pattern_triggers section to character.communication"
+                ))
+                return {'working': False, 'patterns': [], 'issues': issues}
+            
+            # Test using character's own keywords and phrases
+            for trigger_name, trigger_data in message_triggers.items():
+                keywords = trigger_data.get('keywords', [])
+                phrases = trigger_data.get('phrases', [])
+                
+                # Test with first few keywords/phrases from this character
+                test_messages = []
+                if keywords:
+                    test_messages.extend(keywords[:2])  # Test first 2 keywords
+                if phrases:
+                    test_messages.extend(phrases[:1])   # Test first phrase
+                
+                # Test each message
+                for test_message in test_messages:
+                    scenarios = self.cdl_integration._detect_communication_scenarios(
+                        test_message, character, 'test_user'
+                    )
+                    if scenarios:
+                        patterns_detected.extend(scenarios)
+                        working = True
+                        break  # Found working patterns for this trigger
+                
+                if working:
+                    break  # Found at least one working pattern
             
             # Remove duplicates
             patterns_detected = list(set(patterns_detected))
@@ -339,8 +346,8 @@ class CDLValidator:
                 issues.append(ValidationIssue(
                     level=ValidationStatus.WARNING,
                     category="pattern_detection",
-                    message="No patterns detected with standard test messages",
-                    suggestion="Verify message_pattern_triggers have matching conversation_flow_guidance entries"
+                    message="Pattern detection not working with character's own triggers",
+                    suggestion="Verify message_pattern_triggers keywords/phrases are properly configured"
                 ))
             
         except Exception as e:

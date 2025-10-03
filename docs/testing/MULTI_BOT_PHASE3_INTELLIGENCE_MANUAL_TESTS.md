@@ -340,7 +340,7 @@ Actually, forget the report. I've been thinking about dropping out of business s
 ```bash
 ./multi-bot.sh start marcus    # AI Researcher (Port 9092)
 ./multi-bot.sh start jake      # Adventure Photographer (Port 9097)
-./multi-bot.sh start gabriel   # Archangel (Port 9095)
+./multi-bot.sh start gabriel   # British Gentleman (Port 9095)
 ./multi-bot.sh start ryan      # Indie Game Developer (Port 9093)
 ./multi-bot.sh start sophia    # Marketing Executive (Port 9096)
 ./multi-bot.sh start dream     # Mythological Entity (Port 9094)

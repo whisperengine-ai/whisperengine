@@ -105,14 +105,14 @@ class EmojiEmotionMapper:
         "❓": (EmotionalReactionType.CONFUSION, 0.80),
         "❔": (EmotionalReactionType.CONFUSION, 0.75),
         
-        # Mystical Wonder (for Dream/Elena)
+        # Mystical Wonder reactions
         "🔮": (EmotionalReactionType.MYSTICAL_WONDER, 0.95),
         "🌟": (EmotionalReactionType.MYSTICAL_WONDER, 0.85),
         "🪄": (EmotionalReactionType.MYSTICAL_WONDER, 0.90),
         "⭐": (EmotionalReactionType.MYSTICAL_WONDER, 0.80),
         "🌙": (EmotionalReactionType.MYSTICAL_WONDER, 0.85),
         
-        # Technical Appreciation (for Marcus bots)
+        # Technical Appreciation reactions
         "🤖": (EmotionalReactionType.TECHNICAL_APPRECIATION, 0.90),
         "💻": (EmotionalReactionType.TECHNICAL_APPRECIATION, 0.85),
         "⚡": (EmotionalReactionType.TECHNICAL_APPRECIATION, 0.80),
@@ -278,17 +278,14 @@ class EmojiReactionIntelligence:
             logger.error(f"Error storing emoji reaction in memory: {e}")
     
     def _determine_character_context(self, bot_message: str) -> str:
-        """Determine character context from bot message content."""
-        # Simple character detection based on message content
-        content_lower = bot_message.lower()
+        """Determine character context from bot message content using CDL data."""
+        # Use dynamic character detection based on current bot's CDL data
+        from src.memory.vector_memory_system import get_normalized_bot_name_from_env
         
-        if any(word in content_lower for word in ['ocean', 'marine', 'sea', 'whale', 'coral']):
-            return "elena"
-        elif any(word in content_lower for word in ['ai', 'algorithm', 'code', 'neural', 'computing']):
-            return "marcus"
-        elif any(word in content_lower for word in ['dream', 'realm', 'endless', 'morpheus', 'nightmare']):
-            return "dream"
-        else:
+        try:
+            bot_name = get_normalized_bot_name_from_env()
+            return bot_name if bot_name else "general"
+        except Exception:
             return "general"
     
     def _extract_conversation_context(self, bot_message: str) -> str:

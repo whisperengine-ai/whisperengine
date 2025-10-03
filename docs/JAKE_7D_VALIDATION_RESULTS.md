@@ -353,7 +353,7 @@ and composing engaging aurora photos."
 **Next Priority Bots**:
 1. **Ryan** (821 memories) - Similar memory size to Jake, indie game developer character
 2. **Dream** (916 memories) - Mythological character, different personality archetype
-3. **Gabriel** (2,897 memories) - Larger memory set, archangel character
+3. **Gabriel** (2,897 memories) - Larger memory set, British gentleman character
 
 **Migration Checklist** (Updated with lessons from Jake):
 - ✅ Use enhanced migration script with automatic payload index creation

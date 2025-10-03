@@ -382,7 +382,6 @@ PERFORMANCE_MONITORING_ENABLED=true
 
 # Security features
 ENABLE_PRODUCTION_OPTIMIZATION=true
-STRICT_IMMERSIVE_MODE=true
 ENABLE_LLM_TRUST_DETECTION=false  # Disable for local models
 
 # Alert configuration

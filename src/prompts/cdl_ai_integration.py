@@ -155,6 +155,10 @@ class CDLAIPromptIntegration:
         if hasattr(character.identity, 'description') and character.identity.description:
             prompt += f" {character.identity.description}"
         
+        # Add AI identity handling early for proper identity establishment
+        if any(ai_keyword in message_content.lower() for ai_keyword in ['ai', 'artificial intelligence', 'robot', 'computer', 'program', 'bot']):
+            prompt += f" If asked about AI nature, respond authentically as {character.identity.name} while being honest about your AI nature when directly asked."
+        
         # Add Big Five personality integration
         if hasattr(character, 'personality') and hasattr(character.personality, 'big_five'):
             big_five = character.personality.big_five
@@ -190,46 +194,7 @@ class CDLAIPromptIntegration:
             if hasattr(big_five, 'neuroticism'):
                 prompt += f"- {get_trait_info(big_five.neuroticism, 'neuroticism')}\n"
 
-        # Add personal knowledge sections (relationships, family, career, etc.)
-        try:
-            personal_sections = await self._extract_cdl_personal_knowledge_sections(character, message_content)
-            if personal_sections:
-                prompt += f"\n\n👨‍👩‍👧‍👦 PERSONAL BACKGROUND:\n{personal_sections}"
-        except Exception as e:
-            logger.debug("Could not extract personal knowledge: %s", e)
-
-        # Add memory context intelligence
-        if relevant_memories:
-            prompt += f"\n\n🧠 RELEVANT CONVERSATION CONTEXT:\n"
-            for i, memory in enumerate(relevant_memories[:7], 1):  # Increased from 3 to 7
-                if hasattr(memory, 'content'):
-                    content = memory.content[:300]  # Increased from 200 to 300
-                    prompt += f"{i}. {content}{'...' if len(memory.content) > 300 else ''}\n"
-
-        # Add long-term conversation summary for continuity beyond recent history
-        if conversation_summary:
-            prompt += f"\n\n📚 CONVERSATION BACKGROUND:\n{conversation_summary}\n"
-
-        # Add recent conversation history
-        if conversation_history:
-            prompt += f"\n\n💬 RECENT CONVERSATION:\n"
-            for conv in conversation_history[-3:]:  # Temporarily reduced from 7 to 3 for Sophia testing
-                if isinstance(conv, dict):
-                    role = conv.get('role', 'user')
-                    content = conv.get('content', '')[:200]  # Increased from 150 to 200
-                    prompt += f"{role.title()}: {content}{'...' if len(conv.get('content', '')) > 200 else ''}\n"
-
-        # Add emotional intelligence context
-        if pipeline_dict:
-            emotion_data = pipeline_dict.get('emotion_analysis', {})
-            if emotion_data:
-                primary_emotion = emotion_data.get('primary_emotion', '')
-                confidence = emotion_data.get('confidence', 0)
-                if primary_emotion:
-                    prompt += f"\n\n🎭 USER EMOTIONAL STATE: {primary_emotion} (confidence: {confidence:.2f})"
-                    prompt += f"\nRespond with appropriate empathy and emotional intelligence."
-
-        # Add CDL conversation flow guidelines and communication scenarios
+        # Add CDL conversation flow guidelines early for communication style establishment
         try:
             # Extract conversation flow guidelines from CDL
             conversation_flow_guidance = self._extract_conversation_flow_guidelines(character)
@@ -250,11 +215,46 @@ class CDLAIPromptIntegration:
         except Exception as e:
             logger.debug("Could not extract conversation flow guidance: %s", e)
 
-        # Add AI identity handling - simplified approach for unified method
-        if any(ai_keyword in message_content.lower() for ai_keyword in ['ai', 'artificial intelligence', 'robot', 'computer', 'program', 'bot']):
-            prompt += f"\n\n🤖 AI IDENTITY GUIDANCE:\nIf asked about AI nature, respond authentically as {character.identity.name} while being honest about your AI nature when directly asked."
+        # Add personal knowledge sections (relationships, family, career, etc.)
+        try:
+            personal_sections = await self._extract_cdl_personal_knowledge_sections(character, message_content)
+            if personal_sections:
+                prompt += f"\n\n👨‍👩‍👧‍👦 PERSONAL BACKGROUND:\n{personal_sections}"
+        except Exception as e:
+            logger.debug("Could not extract personal knowledge: %s", e)
 
-        # Response style already added at the beginning for maximum prominence
+        # Add emotional intelligence context early to inform interpretation
+        if pipeline_dict:
+            emotion_data = pipeline_dict.get('emotion_analysis', {})
+            if emotion_data:
+                primary_emotion = emotion_data.get('primary_emotion', '')
+                confidence = emotion_data.get('confidence', 0)
+                if primary_emotion:
+                    prompt += f"\n\n🎭 USER EMOTIONAL STATE: {primary_emotion} (confidence: {confidence:.2f})"
+                    prompt += f"\nRespond with appropriate empathy and emotional intelligence."
+
+        # Add memory context intelligence
+        if relevant_memories:
+            prompt += f"\n\n🧠 RELEVANT CONVERSATION CONTEXT:\n"
+            for i, memory in enumerate(relevant_memories[:7], 1):  # Increased from 3 to 7
+                if hasattr(memory, 'content'):
+                    content = memory.content[:300]  # Increased from 200 to 300
+                    prompt += f"{i}. {content}{'...' if len(memory.content) > 300 else ''}\n"
+
+        # Add long-term conversation summary for continuity beyond recent history
+        if conversation_summary:
+            prompt += f"\n\n📚 CONVERSATION BACKGROUND:\n{conversation_summary}\n"
+
+        # Add recent conversation history
+        if conversation_history:
+            prompt += f"\n\n💬 RECENT CONVERSATION:\n"
+            for conv in conversation_history[-3:]:  # Use recent conversation history for context
+                if isinstance(conv, dict):
+                    role = conv.get('role', 'user')
+                    content = conv.get('content', '')[:200]  # Increased from 150 to 200
+                    prompt += f"{role.title()}: {content}{'...' if len(conv.get('content', '')) > 200 else ''}\n"
+
+        # Remove duplicate AI identity and conversation flow sections (moved up earlier)
         
         prompt += f"\nRespond as {character.identity.name} to {display_name}:"
 
@@ -362,37 +362,84 @@ class CDLAIPromptIntegration:
         """Extract relevant personal knowledge sections from CDL based on message context."""
         try:
             personal_sections = []
+            message_lower = message_content.lower()
             
-            # Check if character has personal_background section
-            if hasattr(character, 'personal_background'):
-                pb = character.personal_background
+            # 🎯 ENHANCED CONTEXT-AWARE EXTRACTION: Check actual CDL structure dynamically
+            
+            # Extract relationship info if message seems relationship-focused
+            if any(keyword in message_lower for keyword in ['relationship', 'partner', 'dating', 'married', 'family']):
+                # Check character.relationships (actual CDL structure)
+                if hasattr(character, 'relationships') and character.relationships:
+                    rel_info = character.relationships
+                    if hasattr(rel_info, 'status') and rel_info.status:
+                        personal_sections.append(f"Relationship Status: {rel_info.status}")
+                    if hasattr(rel_info, 'important_relationships') and rel_info.important_relationships:
+                        personal_sections.append(f"Key Relationships: {', '.join(rel_info.important_relationships[:3])}")
                 
-                # Extract relationship info if message seems relationship-focused
-                if any(keyword in message_content.lower() for keyword in ['relationship', 'partner', 'dating', 'married', 'family']):
-                    if hasattr(pb, 'relationships') and pb.relationships:
-                        rel_info = pb.relationships
-                        if hasattr(rel_info, 'status') and rel_info.status:
-                            personal_sections.append(f"Relationship Status: {rel_info.status}")
-                        if hasattr(rel_info, 'important_relationships') and rel_info.important_relationships:
-                            personal_sections.append(f"Key Relationships: {', '.join(rel_info.important_relationships[:3])}")
+                # Check character.current_life for family info (actual CDL structure)
+                if hasattr(character, 'current_life') and character.current_life:
+                    current_life = character.current_life
+                    if hasattr(current_life, 'family') and current_life.family:
+                        personal_sections.append(f"Family Context: {current_life.family}")
+            
+            # Extract family info if message mentions family
+            if any(keyword in message_lower for keyword in ['family', 'parents', 'siblings', 'children', 'mother', 'father']):
+                # Check character.backstory for family background (actual CDL structure)
+                if hasattr(character, 'backstory') and character.backstory:
+                    backstory = character.backstory
+                    if hasattr(backstory, 'family_background') and backstory.family_background:
+                        personal_sections.append(f"Family Background: {backstory.family_background}")
+                    if hasattr(backstory, 'formative_experiences') and backstory.formative_experiences:
+                        personal_sections.append(f"Family Influences: {backstory.formative_experiences}")
+            
+            # Extract career/work info if message mentions work/career
+            if any(keyword in message_lower for keyword in ['work', 'job', 'career', 'education', 'study', 'university', 'college', 'professional']):
+                # Check character.skills_and_expertise (if exists)
+                if hasattr(character, 'skills_and_expertise') and character.skills_and_expertise:
+                    skills = character.skills_and_expertise
+                    if hasattr(skills, 'education') and skills.education:
+                        personal_sections.append(f"Education: {skills.education}")
+                    if hasattr(skills, 'professional_skills') and skills.professional_skills:
+                        personal_sections.append(f"Professional Skills: {skills.professional_skills}")
                 
-                # Extract family info if message mentions family
-                if any(keyword in message_content.lower() for keyword in ['family', 'parents', 'siblings', 'children', 'mother', 'father']):
-                    if hasattr(pb, 'family') and pb.family:
-                        family_info = pb.family
-                        if hasattr(family_info, 'parents') and family_info.parents:
-                            personal_sections.append(f"Family: {family_info.parents}")
-                        if hasattr(family_info, 'siblings') and family_info.siblings:
-                            personal_sections.append(f"Siblings: {family_info.siblings}")
+                # Check character.current_life for current work (actual CDL structure)
+                if hasattr(character, 'current_life') and character.current_life:
+                    current_life = character.current_life
+                    if hasattr(current_life, 'occupation_details') and current_life.occupation_details:
+                        personal_sections.append(f"Current Work: {current_life.occupation_details}")
+                    if hasattr(current_life, 'daily_routine') and current_life.daily_routine:
+                        # Extract work-related routine info
+                        routine = current_life.daily_routine
+                        if hasattr(routine, 'work_schedule') and routine.work_schedule:
+                            personal_sections.append(f"Work Schedule: {routine.work_schedule}")
                 
-                # Extract career info if message mentions work/career
-                if any(keyword in message_content.lower() for keyword in ['work', 'job', 'career', 'education', 'study', 'university', 'college']):
-                    if hasattr(pb, 'career') and pb.career:
-                        career_info = pb.career
-                        if hasattr(career_info, 'education') and career_info.education:
-                            personal_sections.append(f"Education: {career_info.education}")
-                        if hasattr(career_info, 'career_path') and career_info.career_path:
-                            personal_sections.append(f"Career: {career_info.career_path}")
+                # Check character.backstory for career background
+                if hasattr(character, 'backstory') and character.backstory:
+                    backstory = character.backstory
+                    if hasattr(backstory, 'career_background') and backstory.career_background:
+                        personal_sections.append(f"Career Background: {backstory.career_background}")
+                    if hasattr(backstory, 'formative_experiences') and backstory.formative_experiences:
+                        # Include if career-relevant
+                        formative = backstory.formative_experiences
+                        if any(work_term in formative.lower() for work_term in ['work', 'career', 'job', 'business', 'education']):
+                            personal_sections.append(f"Career Influences: {formative}")
+            
+            # Extract hobbies/interests if message mentions interests/leisure
+            if any(keyword in message_lower for keyword in ['hobby', 'hobbies', 'interest', 'interests', 'free time', 'fun', 'enjoy', 'like']):
+                # Check character.interests_and_hobbies (if exists)  
+                if hasattr(character, 'interests_and_hobbies') and character.interests_and_hobbies:
+                    interests = character.interests_and_hobbies
+                    personal_sections.append(f"Interests: {interests}")
+                
+                # Check character.current_life for leisure activities
+                if hasattr(character, 'current_life') and character.current_life:
+                    current_life = character.current_life
+                    if hasattr(current_life, 'daily_routine') and current_life.daily_routine:
+                        routine = current_life.daily_routine
+                        if hasattr(routine, 'weekend_activities') and routine.weekend_activities:
+                            personal_sections.append(f"Weekend Activities: {', '.join(routine.weekend_activities)}")
+                        if hasattr(routine, 'evening_routine') and routine.evening_routine:
+                            personal_sections.append(f"Evening Routine: {routine.evening_routine}")
             
             return "\n".join(personal_sections) if personal_sections else ""
             
@@ -401,46 +448,84 @@ class CDLAIPromptIntegration:
             return ""
 
     def _detect_communication_scenarios(self, message_content: str, character, display_name: str) -> list:
-        """Detect communication scenarios for CDL conversation flow guidance."""
+        """Detect communication scenarios using CDL message_pattern_triggers."""
         scenarios = []
+        message_lower = message_content.lower()
         
-        # Check for greeting scenarios
-        if any(greeting in message_content.lower() for greeting in ['hello', 'hi', 'hey', 'good morning', 'good evening']):
-            scenarios.append('greeting')
+        # Get message pattern triggers from CDL character data
+        try:
+            # Access character.communication.message_pattern_triggers directly
+            message_triggers = getattr(character.communication, 'message_pattern_triggers', {})
+            
+            # Check each pattern trigger
+            for scenario_name, trigger_data in message_triggers.items():
+                keywords = trigger_data.get('keywords', [])
+                phrases = trigger_data.get('phrases', [])
+                
+                # Check keywords
+                keyword_matches = sum(1 for keyword in keywords if keyword.lower() in message_lower)
+                
+                # Check phrases
+                phrase_matches = sum(1 for phrase in phrases if phrase.lower() in message_lower)
+                
+                # If we have matches, add this scenario
+                if keyword_matches > 0 or phrase_matches > 0:
+                    scenarios.append(scenario_name)
+                    logger.debug("🎯 CDL Pattern Match: '%s' triggered by message: %s", scenario_name, message_content[:50])
+                    
+        except Exception as e:
+            logger.debug("Error checking message pattern triggers: %s", e)
         
-        # Check for question scenarios
-        if '?' in message_content:
-            scenarios.append('question')
+        # Fallback to basic pattern detection if no CDL triggers matched
+        if not scenarios:
+            # Generic fallback patterns (character-agnostic)
+            if any(greeting in message_lower for greeting in ['hello', 'hi', 'hey', 'good morning', 'good evening']):
+                scenarios.append('basic_greeting')
             
-        # Check for emotional scenarios
-        if any(emotion in message_content.lower() for emotion in ['sad', 'happy', 'angry', 'worried', 'excited', 'frustrated']):
-            scenarios.append('emotional_support')
-            
-        # Check for personal scenarios
-        if any(personal in message_content.lower() for personal in ['tell me about', 'what do you', 'how do you', 'your']):
-            scenarios.append('personal_inquiry')
-            
+            # Check for question scenarios
+            if '?' in message_content:
+                scenarios.append('basic_question')
+                
+            # Check for emotional scenarios
+            if any(emotion in message_lower for emotion in ['sad', 'happy', 'angry', 'worried', 'excited', 'frustrated']):
+                scenarios.append('emotional_context')
+                
+            # Check for personal scenarios
+            if any(personal in message_lower for personal in ['tell me about', 'what do you', 'how do you', 'your']):
+                scenarios.append('personal_context')
+                
         return scenarios
 
     def _get_cdl_conversation_flow_guidance(self, character_name: str, scenarios: list) -> str:
-        """Get conversation flow guidance based on detected scenarios."""
+        """Get conversation flow guidance based on detected scenarios - fully character-agnostic."""
         if not scenarios:
             return ""
             
         guidance_parts = []
         
-        if 'greeting' in scenarios:
-            guidance_parts.append(f"Respond warmly as {character_name} would naturally greet someone.")
+        # Generate dynamic guidance based on scenario names (character-agnostic)
+        for scenario in scenarios:
+            # Convert scenario names to natural guidance
+            scenario_clean = scenario.replace('_', ' ').title()
             
-        if 'question' in scenarios:
-            guidance_parts.append(f"Answer thoughtfully and authentically from {character_name}'s perspective.")
-            
-        if 'emotional_support' in scenarios:
-            guidance_parts.append(f"Show empathy and emotional intelligence as {character_name}.")
-            
-        if 'personal_inquiry' in scenarios:
-            guidance_parts.append(f"Share personal insights authentically as {character_name}.")
-            
+            if 'greeting' in scenario.lower():
+                guidance_parts.append(f"Respond warmly as {character_name} would naturally greet someone.")
+            elif 'question' in scenario.lower():
+                guidance_parts.append(f"Answer thoughtfully and authentically from {character_name}'s perspective.")
+            elif 'emotional' in scenario.lower() or 'support' in scenario.lower():
+                guidance_parts.append(f"Show empathy and emotional intelligence as {character_name}.")
+            elif 'personal' in scenario.lower():
+                guidance_parts.append(f"Share personal insights authentically as {character_name}.")
+            elif 'technical' in scenario.lower() or 'professional' in scenario.lower():
+                guidance_parts.append(f"Apply your professional expertise as {character_name} in this {scenario_clean} context.")
+            elif 'collaboration' in scenario.lower() or 'working' in scenario.lower():
+                guidance_parts.append(f"Engage collaboratively as {character_name} would in {scenario_clean} situations.")
+            elif 'education' in scenario.lower() or 'teaching' in scenario.lower() or 'learning' in scenario.lower():
+                guidance_parts.append(f"Share knowledge enthusiastically as {character_name} would when teaching about {scenario_clean}.")
+            else:
+                # Generic guidance for any scenario
+                guidance_parts.append(f"Respond authentically as {character_name} in this {scenario_clean} context.")
+                
         return " ".join(guidance_parts)
 
     def _extract_cdl_response_style(self, character, display_name: str) -> str:

@@ -49,7 +49,7 @@ python scripts/smoke_test.py --sequential
 - `marcus` - Marcus Thompson (AI Researcher) - Port 9092  
 - `ryan` - Ryan Chen (Indie Game Developer) - Port 9093
 - `dream` - Dream of the Endless (Mythological Entity) - Port 9094
-- `gabriel` - Gabriel (Archangel) - Port 9095
+- `gabriel` - Gabriel (British Gentleman) - Port 9095
 - `sophia` - Sophia Blake (Marketing Executive) - Port 9096
 - `jake` - Jake Sterling (Adventure Photographer) - Port 9097
 - `aethys` - Aethys (Omnipotent Entity) - Port 3007

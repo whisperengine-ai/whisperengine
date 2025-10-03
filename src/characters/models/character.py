@@ -199,6 +199,7 @@ class CharacterCommunication:
     emotional_expressions: Dict[str, str] = field(default_factory=dict)
     response_length: str = "moderate"
     communication_style: str = "adaptive"
+    message_pattern_triggers: Dict[str, Any] = field(default_factory=dict)
     
     def __post_init__(self):
         """Initialize default typical responses if empty"""

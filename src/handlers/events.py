@@ -66,33 +66,6 @@ from src.intelligence.vector_emoji_intelligence import EmojiResponseIntegration,
 
 logger = logging.getLogger(__name__)
 
-# Reusable meta/analysis pattern list for filtering & sanitization
-META_ANALYSIS_PATTERNS = [
-    "Core Conversation Analysis",
-    "Emotional Analysis",
-    "Technical Metadata",
-    "Personality & Interaction",
-    "Overall Assessment",
-    "Overall Analysis",
-    "Overall Impression",
-    "Combined Response",
-    "Why this response works",
-    "Would you like me to generate",
-    "Would you like me to",
-    "Do you want me to",
-    "Here is a breakdown",
-    "Here's a breakdown",
-    "Relevance Score",
-    "API Success Rate",
-    "Key Points",
-    "In Essence",
-]
-
-def _strict_mode_enabled() -> bool:
-    return os.getenv("STRICT_IMMERSIVE_MODE", "true").lower() in ("1", "true", "yes", "on")
-
-# FALLBACK FUNCTIONS REMOVED - CDL CHARACTER SYSTEM HANDLES ALL PROMPTS
-
 
 class BotEventHandlers:
     """
@@ -482,8 +455,8 @@ class BotEventHandlers:
                 return "mystical"  # Cosmic and mythological nature maps to mystical
             elif any(tag in tags for tag in ['adventure', 'photographer', 'outdoors', 'travel']):
                 return "adventurous"  # Adventure and travel focus
-            elif any(tag in tags for tag in ['archangel', 'celestial', 'divine', 'spiritual']):
-                return "divine"  # Celestial and spiritual nature
+            elif any(tag in tags for tag in ['british_gentleman', 'sophisticated', 'charming', 'witty']):
+                return "sophisticated"  # British gentleman character
             elif any(tag in tags for tag in ['marketing', 'executive', 'business', 'professional']):
                 return "professional"  # Business and professional focus
             elif any(tag in tags for tag in ['game_developer', 'indie', 'creative', 'developer']):
@@ -1494,19 +1467,6 @@ class BotEventHandlers:
             is_bot = msg.get('bot', False)
             logger.info(f"🔥 CONTEXT DEBUG: Recent message {i+1}: [{author_name}] (bot={is_bot}): '{content}...'")
 
-        # Apply strict mode cleansing to remove meta-analysis patterns from history
-        if _strict_mode_enabled():
-            cleaned = []
-            for msg in filtered_messages:
-                content_preview = getattr(msg, "content", "") or ""
-                if any(pat in content_preview for pat in META_ANALYSIS_PATTERNS):
-                    logger.debug(
-                        f"[STRICT] Dropping prior meta-style message from history: '{content_preview[:80]}'"
-                    )
-                    continue
-                cleaned.append(msg)
-            filtered_messages = cleaned
-
         # Filter out commands and responses
         skip_next_bot_response = False
         for msg in filtered_messages:
@@ -2192,36 +2152,6 @@ class BotEventHandlers:
                         pre_meta_len,
                         len(response),
                     )
-
-                # Two-pass rewrite if still leaking patterns in strict mode
-                if _strict_mode_enabled() and any(p in response for p in META_ANALYSIS_PATTERNS):
-                    logger.warning("Meta patterns still detected post-sanitization - invoking rewrite pass")
-                    try:
-                        bot_name = os.getenv('DISCORD_BOT_NAME', 'Assistant')
-                        rewrite_context = [
-                            {"role": "system", "content": (
-                                f"You are a style refiner. Rewrite the assistant content into a SINGLE immersive in-character reply as {bot_name}. Remove all analysis sections, headings, breakdowns, score talk, coaching offers, or meta commentary. Keep poetic tone, <=120 words."
-                            )},
-                            {"role": "user", "content": response[:4000]},
-                        ]
-                        rewritten = await self.llm_client.generate_chat_completion_safe(
-                            rewrite_context
-                        )
-                        if rewritten and any(c.isprintable() for c in rewritten):
-                            if any(p in rewritten for p in META_ANALYSIS_PATTERNS):
-                                logger.warning(
-                                    "Rewrite still contains meta markers; using first paragraph fallback"
-                                )
-                                para = rewritten.split("\n\n")[0].strip()
-                                if para:
-                                    response = para
-                            else:
-                                response = rewritten.strip()
-                                logger.debug(
-                                    f"Rewrite pass successful (len={len(response)})"
-                                )
-                    except Exception as e:
-                        logger.error(f"Rewrite pass failed: {e}")
 
                 # CRITICAL FIX: Store conversation in memory BEFORE sending response
                 # This ensures memory is available for future context building

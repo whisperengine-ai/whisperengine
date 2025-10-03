@@ -75,7 +75,7 @@ class SmokeTestRunner:
             'marcus': {'port': 9092, 'name': 'Marcus Thompson', 'character': 'AI Researcher', 'container': 'whisperengine-marcus-bot'},
             'ryan': {'port': 9093, 'name': 'Ryan Chen', 'character': 'Indie Game Developer', 'container': 'whisperengine-ryan-bot'},
             'dream': {'port': 9094, 'name': 'Dream of the Endless', 'character': 'Mythological Entity', 'container': 'whisperengine-dream-bot'},
-            'gabriel': {'port': 9095, 'name': 'Gabriel', 'character': 'Archangel', 'container': 'whisperengine-gabriel-bot'},
+            'gabriel': {'port': 9095, 'name': 'Gabriel', 'character': 'British Gentleman', 'container': 'whisperengine-gabriel-bot'},
             'sophia': {'port': 9096, 'name': 'Sophia Blake', 'character': 'Marketing Executive', 'container': 'whisperengine-sophia-bot'},
             'jake': {'port': 9097, 'name': 'Jake Sterling', 'character': 'Adventure Photographer', 'container': 'whisperengine-jake-bot'},
             'aethys': {'port': 3007, 'name': 'Aethys', 'character': 'Omnipotent Entity', 'container': 'whisperengine-aethys-bot'}
@@ -469,7 +469,7 @@ class SmokeTestRunner:
                     'marcus': ['ai', 'artificial', 'intelligence', 'research', 'technology', 'algorithm'],
                     'ryan': ['game', 'development', 'indie', 'programming', 'design'],
                     'dream': ['dream', 'reality', 'morpheus', 'endless', 'realm'],
-                    'gabriel': ['divine', 'god', 'heaven', 'mission', 'archangel', 'holy'],
+                    'gabriel': ['british', 'gentleman', 'sophisticated', 'charming', 'witty'],
                     'sophia': ['marketing', 'strategy', 'brand', 'campaign', 'business'],
                     'jake': ['photo', 'adventure', 'travel', 'landscape', 'expedition'],
                     'aethys': ['omnipotent', 'existence', 'reality', 'infinite', 'consciousness']

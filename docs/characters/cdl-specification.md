@@ -349,7 +349,7 @@ See the `characters/examples/` directory for complete implementations:
 - **🧬 elena-rodriguez.json** - Passionate marine biologist with environmental focus
 - **🤖 marcus-thompson.json** - Philosophical AI researcher exploring technology's impact  
 - **📸 jake.json** - Adventure photographer and survival instructor
-- **✨ gabriel.json** - Archangel figure providing spiritual wisdom and guidance
+- **✨ gabriel.json** - Rugged British gentleman with dry wit and sophisticated charm
 - **💼 sophia-blake.json** - Marketing Executive with sophisticated lifestyle
 - **💭 dream_of_the_endless.json** - Mythological character from Neil Gaiman's universe
 - **🌟 aethys-omnipotent-entity.json** - Omnipotent entity for philosophical exploration
