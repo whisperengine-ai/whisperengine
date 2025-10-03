@@ -793,15 +793,15 @@ class BotEventHandlers:
             message,
             user_id,
             conversation_context,
-            getattr(self, '_last_current_emotion_data', None),
-            getattr(self, '_last_external_emotion_data', None),
-            getattr(self, '_last_phase2_context', None),
-            getattr(self, '_last_phase4_context', None),
-            getattr(self, '_last_comprehensive_context', None),
-            getattr(self, '_last_dynamic_personality_context', None),
-            getattr(self, '_last_phase3_context_switches', None),
-            getattr(self, '_last_phase3_empathy_calibration', None),
-            context_analysis,  # NEW: Pass context analysis for enhanced processing
+            current_emotion_data,  # Use fresh data from parallel processing
+            external_emotion_data,  # Use fresh data from parallel processing (phase2_context)
+            phase2_context,  # Use fresh phase2_context from emotion analysis
+            phase4_context,  # Use fresh data from parallel processing
+            comprehensive_context,  # Use fresh data from parallel processing
+            dynamic_personality_context,  # Use fresh data from parallel processing
+            phase3_context_switches,  # Use fresh data from parallel processing
+            phase3_empathy_calibration,  # Use fresh data from parallel processing
+            context_analysis,  # Use fresh context analysis for enhanced processing
         )
 
     async def _handle_guild_message(self, message):
@@ -1049,15 +1049,15 @@ class BotEventHandlers:
             message,
             user_id,
             conversation_context,
-            getattr(self, '_last_current_emotion_data', None),
-            getattr(self, '_last_external_emotion_data', None),
-            getattr(self, '_last_phase2_context', None),
-            None,
-            None,
-            getattr(self, '_last_dynamic_personality_context', None),
-            getattr(self, '_last_phase3_context_switches', None),
-            getattr(self, '_last_phase3_empathy_calibration', None),
-            context_analysis,  # NEW: Pass context analysis for enhanced processing
+            current_emotion_data,  # Use fresh data from parallel processing
+            external_emotion_data,  # Use fresh data from parallel processing
+            getattr(self, '_last_phase2_context', None),  # Legacy phase2 - keep as cached
+            phase4_context,  # Use fresh data from parallel processing
+            comprehensive_context,  # Use fresh data from parallel processing
+            dynamic_personality_context,  # Use fresh data from parallel processing
+            phase3_context_switches,  # Use fresh data from parallel processing
+            phase3_empathy_calibration,  # Use fresh data from parallel processing
+            context_analysis,  # Use fresh context analysis for enhanced processing
             content,
         )
 
@@ -2038,7 +2038,33 @@ class BotEventHandlers:
                     user_id, conversation_context, message, context_analysis
                 )
                 logger.info(f"🎭 DEBUG: Character enhancement returned: {enhanced_context is not None}")
-                final_context = enhanced_context if enhanced_context else conversation_context
+                
+                # 🎭 MIXED EMOTION ENHANCEMENT: Add real-time emotion analysis to context
+                emotion_enhanced_context = await self._add_mixed_emotion_context(
+                    enhanced_context if enhanced_context else conversation_context,
+                    message.content,
+                    user_id,
+                    current_emotion_data,
+                    external_emotion_data
+                )
+                
+                # 🎯 CONTEXT SELECTION: Choose final context based on processing pipeline results
+                if comprehensive_context:
+                    # Phase 4 comprehensive context takes priority
+                    final_context = emotion_enhanced_context
+                    logger.info("🎯 CONTEXT: Using emotion-enhanced context with Phase 4 comprehensive integration")
+                elif enhanced_context:
+                    # CDL character enhancement successful
+                    final_context = emotion_enhanced_context  
+                    logger.info("🎯 CONTEXT: Using emotion-enhanced context with CDL character integration")
+                elif emotion_enhanced_context != conversation_context:
+                    # Emotion enhancement applied successfully
+                    final_context = emotion_enhanced_context
+                    logger.info("🎯 CONTEXT: Using emotion-enhanced context (emotion analysis successful)")
+                else:
+                    # Fallback to basic conversation context
+                    final_context = conversation_context
+                    logger.info("🎯 CONTEXT: Using basic conversation context (no enhancements applied)")
 
                 # Generate AI response using our conversation context directly
                 logger.info(f"🎯 DISCORD-DIRECT: Sending {len(final_context)} messages directly to LLM")
@@ -3593,6 +3619,84 @@ class BotEventHandlers:
         except Exception as e:
             logger.error(f"Error getting recent emotional feedback: {e}")
             return {"emotional_context": "neutral", "confidence": 0.0}
+    
+    async def _add_mixed_emotion_context(
+        self,
+        conversation_context,
+        message_content,
+        user_id,
+        current_emotion_data,
+        external_emotion_data
+    ):
+        """
+        Add real-time mixed emotion analysis to conversation context for more nuanced responses.
+        
+        This ensures Elena and other characters can understand emotional complexity like
+        "haha I hate you" (playful + frustrated) rather than just interpreting it as pure playfulness.
+        """
+        try:
+            # Analyze current message emotion using our enhanced RoBERTa system
+            if self.phase2_integration and hasattr(self.phase2_integration, 'emotion_analyzer'):
+                logger.info("🎭 MIXED EMOTION: Analyzing current message emotions...")
+                
+                emotion_result = await self.phase2_integration.emotion_analyzer.analyze_emotion(
+                    content=message_content,
+                    user_id=user_id
+                )
+                
+                # Build emotion context string for the LLM
+                if len(emotion_result.all_emotions) > 1:
+                    # Mixed emotions detected
+                    sorted_emotions = sorted(
+                        emotion_result.all_emotions.items(), 
+                        key=lambda x: x[1], 
+                        reverse=True
+                    )[:3]  # Top 3 emotions
+                    
+                    emotion_summary = []
+                    for emotion, intensity in sorted_emotions:
+                        emotion_summary.append(f"{emotion} ({intensity:.2f})")
+                    
+                    emotion_context = f"MIXED EMOTIONS DETECTED: {', '.join(emotion_summary)}. "
+                    emotion_context += f"The user's message contains complex emotional nuance - "
+                    emotion_context += f"acknowledge both the {sorted_emotions[0][0]} and underlying {sorted_emotions[1][0]} feelings."
+                    
+                    logger.info(f"🎭 MIXED EMOTION: Detected complex emotions: {emotion_summary}")
+                else:
+                    # Single emotion
+                    emotion_context = f"EMOTION DETECTED: {emotion_result.primary_emotion} (confidence: {emotion_result.confidence:.2f})"
+                    logger.info(f"🎭 EMOTION: Single emotion detected: {emotion_result.primary_emotion}")
+                
+                # Add emotion context to the conversation by modifying the system message
+                enhanced_context = conversation_context.copy()
+                
+                # Find system message and enhance it with emotion context
+                for i, msg in enumerate(enhanced_context):
+                    if msg.get("role") == "system":
+                        current_content = msg.get("content", "")
+                        enhanced_content = current_content + f"\n\n🎭 EMOTIONAL CONTEXT: {emotion_context}"
+                        enhanced_context[i] = {
+                            "role": "system",
+                            "content": enhanced_content
+                        }
+                        logger.info(f"🎭 MIXED EMOTION: Enhanced system prompt with emotion context")
+                        break
+                else:
+                    # No system message found, add emotion as a separate context message
+                    enhanced_context.insert(0, {
+                        "role": "system", 
+                        "content": f"🎭 EMOTIONAL CONTEXT: {emotion_context}"
+                    })
+                
+                return enhanced_context
+                
+            else:
+                logger.debug("🎭 MIXED EMOTION: Phase2 emotion analyzer not available")
+                return conversation_context
+                
+        except Exception as e:
+            logger.error(f"🎭 MIXED EMOTION: Error adding emotion context: {e}")
+            return conversation_context
     
     # ✨ PERSISTENT CONVERSATION TRACKING: REMOVED - Over-engineered helper methods
     # The question extraction and classification system was causing inappropriate 

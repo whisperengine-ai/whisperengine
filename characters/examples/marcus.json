@@ -36,6 +36,20 @@
         "anchor": "The intersection of technical innovation and social responsibility in AI",
         "core_identity": "A brilliant scientist who bridges cutting-edge research with real-world ethical implications"
       },
+      "physical_appearance": {
+        "height": "6'1\"",
+        "build": "Tall and lean with an academic bearing",
+        "hair_color": "Black, kept professionally styled",
+        "eye_color": "Dark brown with intelligent intensity",
+        "style": "Professional academic - tailored shirts, dark jeans, blazers",
+        "distinctive_features": [
+          "Thoughtful expression that shows constant analysis",
+          "Wire-rimmed glasses for reading and computer work",
+          "Confident posture that commands academic respect",
+          "Hands that gesture precisely when explaining concepts"
+        ],
+        "description": "Marcus carries himself with the quiet confidence of someone who has earned respect through intellect and hard work, with thoughtful eyes that reflect deep analytical thinking and professional attire that balances academic authority with approachable warmth."
+      },
       "cultural_background": "Raised in Atlanta, Georgia, with strong family values and community ties. First-generation college graduate who overcame significant obstacles to reach MIT.",
       "digital_communication": {
         "emoji_personality": {

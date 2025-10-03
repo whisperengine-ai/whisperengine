@@ -295,6 +295,69 @@ class VectorMemoryStore:
         
         return payload
     
+    def _create_mixed_emotion_embedding_text(self, primary_emotion: str, content: str) -> str:
+        """
+        Create fidelity-preserving emotion embedding text from RoBERTa multi-emotion analysis
+        
+        This preserves mixed emotion fidelity that would otherwise be lost when embedding
+        only the primary emotion. Uses the stored _last_emotion_analysis from RoBERTa.
+        
+        Args:
+            primary_emotion: The primary emotion (fallback if no analysis available)
+            content: The original content being embedded
+            
+        Returns:
+            Enhanced emotion embedding text preserving multi-emotion context
+            
+        Examples:
+            Single emotion: "emotion joy: content"
+            Mixed emotions: "emotion joy with excitement: content"
+            Complex mix: "emotion joy mixed with excitement and surprise: content"
+        """
+        # Check if we have multi-emotion analysis available
+        if not hasattr(self, '_last_emotion_analysis') or not self._last_emotion_analysis:
+            # Fallback to simple primary emotion
+            return f"emotion {primary_emotion}: {content}"
+        
+        analysis = self._last_emotion_analysis
+        all_emotions = analysis.get('all_emotions', {})
+        
+        # If no multi-emotion data or only one emotion, use simple format
+        if not all_emotions or len(all_emotions) <= 1:
+            return f"emotion {primary_emotion}: {content}"
+        
+        # Filter emotions above threshold (0.1 = 10% confidence) and sort by intensity
+        emotion_threshold = 0.1
+        significant_emotions = {
+            emotion: score for emotion, score in all_emotions.items() 
+            if score >= emotion_threshold
+        }
+        
+        # Sort by intensity (highest first)
+        sorted_emotions = sorted(significant_emotions.items(), key=lambda x: x[1], reverse=True)
+        
+        # Create composite emotion description preserving fidelity
+        if len(sorted_emotions) == 1:
+            # Single significant emotion
+            emotion_desc = sorted_emotions[0][0]
+        elif len(sorted_emotions) == 2:
+            # Two emotions - use "with" pattern  
+            emotion_desc = f"{sorted_emotions[0][0]} with {sorted_emotions[1][0]}"
+        else:
+            # Complex mix - use "mixed with" pattern (limit to top 3 for embedding efficiency)
+            primary = sorted_emotions[0][0]
+            secondary = [e[0] for e in sorted_emotions[1:3]]  # Top 2 secondary emotions
+            emotion_desc = f"{primary} mixed with {' and '.join(secondary)}"
+        
+        # Create final embedding text
+        embedding_text = f"emotion {emotion_desc}: {content}"
+        
+        # Log for debugging mixed emotion fidelity
+        emotion_summary = {e: f"{s:.2f}" for e, s in sorted_emotions[:3]}
+        logger.debug(f"🎭 MIXED EMOTION FIDELITY: '{emotion_desc}' from {emotion_summary}")
+        
+        return embedding_text
+    
     def _ensure_collection_exists(self):
         """
         🚀 QDRANT-NATIVE: Create advanced collection with named vectors
@@ -640,10 +703,14 @@ class VectorMemoryStore:
             # This achieves ~7x speedup: 210ms sequential → 30ms parallel
             logger.info(f"🚀 PARALLEL EMBEDDINGS: Starting parallel generation of {'7' if dimension_analysis else '3'} embeddings")
             
+            # 🎭 FIDELITY-FIRST: Create mixed emotion embedding text preserving RoBERTa multi-emotion data
+            emotion_embedding_text = self._create_mixed_emotion_embedding_text(emotional_context, memory.content)
+            logger.info(f"🎭 MIXED EMOTION: Generated fidelity-preserving emotion embedding text: '{emotion_embedding_text[:100]}...'")
+            
             embedding_tasks = [
                 # Core embeddings (always generated)
                 asyncio.create_task(self.generate_embedding(memory.content)),  # content
-                asyncio.create_task(self.generate_embedding(f"emotion {emotional_context}: {memory.content}")),  # emotion
+                asyncio.create_task(self.generate_embedding(emotion_embedding_text)),  # emotion - ENHANCED for mixed emotions
                 asyncio.create_task(self.generate_embedding(f"concept {semantic_key}: {memory.content}"))  # semantic
             ]
             
