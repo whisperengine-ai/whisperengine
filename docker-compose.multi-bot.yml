@@ -114,6 +114,7 @@ services:
       - PYTHONUNBUFFERED=1
       - HEALTH_CHECK_PORT=9097
       - HEALTH_CHECK_HOST=0.0.0.0
+      - CDL_DEFAULT_CHARACTER=characters/examples/jake.json
     ports:
       - "9097:9097"
     logging:
@@ -177,6 +178,7 @@ services:
       - PYTHONUNBUFFERED=1
       - HEALTH_CHECK_PORT=9092
       - HEALTH_CHECK_HOST=0.0.0.0
+      - CDL_DEFAULT_CHARACTER=characters/examples/marcus.json
     ports:
       - "9092:9092"
     logging:
@@ -221,6 +223,70 @@ services:
       # - redis  # Commented out - using vector-native memory only
       - qdrant
 
+  dotty-bot:
+    image: whisperengine-bot:${VERSION:-latest}
+    container_name: whisperengine-dotty-bot
+    restart: unless-stopped
+    env_file:
+      - .env.dotty
+    environment:
+      - DISCORD_BOT_NAME=Dotty
+      - POSTGRES_HOST=postgres
+      - QDRANT_HOST=qdrant
+      - MODEL_CACHE_DIR=/app/models
+      - DISABLE_MODEL_DOWNLOAD=true
+      - HF_HUB_OFFLINE=false
+      - TRANSFORMERS_OFFLINE=0
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - DEBUG_MODE=false
+      - PYTHONUNBUFFERED=1
+      - HEALTH_CHECK_PORT=9098
+      - HEALTH_CHECK_HOST=0.0.0.0
+      - CDL_DEFAULT_CHARACTER=characters/examples/dotty.json
+    ports:
+      - "9098:9098"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+        tag: "dotty-{.ImageName}-{.Name}-{.ID}"
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+          cpus: "4.0"
+        reservations:
+          memory: 2G
+          cpus: "2.0"
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - curl -f http://localhost:9098/health || exit 1
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    volumes:
+      - dotty_backups:/app/backups
+      - dotty_privacy:/app/privacy
+      - dotty_temp:/app/temp
+      - ./sql:/app/sql:ro
+      # Live code mounting for development (no rebuild needed)
+      - ./src:/app/src
+      - ./scripts:/app/scripts
+      - ./characters:/app/characters
+      - ./config:/app/config
+      - ./validate_config.py:/app/validate_config.py
+      - ./run.py:/app/run.py
+      - ./env_manager.py:/app/env_manager.py
+      # Note: Using Docker logging instead of mounted log volumes
+    networks:
+      - bot_network
+    depends_on:
+      - postgres
+      # - redis  # Commented out - using vector-native memory only
+      - qdrant
+
   dream-bot:
     image: whisperengine-bot:${VERSION:-latest}
     container_name: whisperengine-dream-bot
@@ -240,6 +306,7 @@ services:
       - PYTHONUNBUFFERED=1
       - HEALTH_CHECK_PORT=9094
       - HEALTH_CHECK_HOST=0.0.0.0
+      - CDL_DEFAULT_CHARACTER=characters/examples/dream.json
     ports:
       - "9094:9094"
     logging:
@@ -303,6 +370,7 @@ services:
       - PYTHONUNBUFFERED=1
       - HEALTH_CHECK_PORT=9091
       - HEALTH_CHECK_HOST=0.0.0.0
+      - CDL_DEFAULT_CHARACTER=characters/examples/elena.json
     ports:
       - "9091:9091"
     logging:
@@ -366,6 +434,7 @@ services:
       - PYTHONUNBUFFERED=1
       - HEALTH_CHECK_PORT=3007
       - HEALTH_CHECK_HOST=0.0.0.0
+      - CDL_DEFAULT_CHARACTER=characters/examples/aethys.json
     ports:
       - "3007:3007"
     logging:
@@ -429,6 +498,7 @@ services:
       - PYTHONUNBUFFERED=1
       - HEALTH_CHECK_PORT=9093
       - HEALTH_CHECK_HOST=0.0.0.0
+      - CDL_DEFAULT_CHARACTER=characters/examples/ryan.json
     ports:
       - "9093:9093"
     logging:
@@ -492,6 +562,7 @@ services:
       - PYTHONUNBUFFERED=1
       - HEALTH_CHECK_PORT=9095
       - HEALTH_CHECK_HOST=0.0.0.0
+      - CDL_DEFAULT_CHARACTER=characters/examples/gabriel.json
     ports:
       - "9095:9095"
     logging:
@@ -555,6 +626,7 @@ services:
       - PYTHONUNBUFFERED=1
       - HEALTH_CHECK_PORT=9096
       - HEALTH_CHECK_HOST=0.0.0.0
+      - CDL_DEFAULT_CHARACTER=characters/examples/sophia_v2.json
     ports:
       - "9096:9096"
     logging:
@@ -635,6 +707,14 @@ volumes:
     name: whisperengine-multi_marcus_temp
   marcus_logs:
     name: whisperengine-multi_marcus_logs
+  dotty_backups:
+    name: whisperengine-multi_dotty_backups
+  dotty_privacy:
+    name: whisperengine-multi_dotty_privacy
+  dotty_temp:
+    name: whisperengine-multi_dotty_temp
+  dotty_logs:
+    name: whisperengine-multi_dotty_logs
   dream_backups:
     name: whisperengine-multi_dream_backups
   dream_privacy:

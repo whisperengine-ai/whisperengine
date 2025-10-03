@@ -140,3 +140,4 @@ docker-data/
 characters/examples/gabriel.json
 .env.ryan
 .env.aethys
+.env.dotty
