@@ -3,10 +3,10 @@
   "character": "Marine Biologist",
   "port": 9091,
   "container": "whisperengine-elena-bot",
-  "test_user_id": "smoke_test_694f083c",
-  "test_start": "2025-09-29T15:52:54.849634",
-  "test_end": "2025-09-29T15:53:27.068829",
-  "test_duration_seconds": 32.219195,
+  "test_user_id": "smoke_test_71ced418",
+  "test_start": "2025-10-03T14:15:35.429103",
+  "test_end": "2025-10-03T14:16:37.407202",
+  "test_duration_seconds": 61.978099,
   "test_results": {
     "CDL Validation": true,
     "Health Check": true,
@@ -14,24 +14,24 @@
     "Basic Conversation": true,
     "Personality Traits": true,
     "Memory Storage & Recall": true,
-    "Conversation Context": true,
+    "Conversation Context": false,
     "Emotional Intelligence": true,
     "Performance": true,
     "Log Analysis": true
   },
   "log_analysis": {
     "success": true,
-    "warnings": 5,
+    "warnings": 12,
     "errors": 0,
     "raw_errors": 0,
     "config_warnings": 0,
     "critical_issues": [],
-    "log_lines": 9819
+    "log_lines": 4018
   },
   "summary": {
     "total_tests": 10,
-    "passed_tests": 10,
-    "failed_tests": 0,
-    "success_rate": 100.0
+    "passed_tests": 9,
+    "failed_tests": 1,
+    "success_rate": 90.0
   }
 }

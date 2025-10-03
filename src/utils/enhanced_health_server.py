@@ -41,28 +41,43 @@ class EnhancedHealthServer:
 
     def _initialize_message_processor(self):
         """Initialize message processor using bot components."""
-        if self.bot_manager and hasattr(self.bot_manager, 'bot') and self.bot_manager.bot:
-            bot_core = self.bot_manager.bot
+        if not self.bot_manager:
+            logger.debug("🌐 EXTERNAL API: Bot manager not available for message processor")
+            return False
             
-            # Get required components from bot core
-            memory_manager = getattr(bot_core, 'memory_manager', None)
-            llm_client = getattr(bot_core, 'llm_client', None)
+        if not hasattr(self.bot_manager, 'bot_core') or not self.bot_manager.bot_core:
+            logger.debug("🌐 EXTERNAL API: Bot core not available for message processor")
+            return False
             
-            if memory_manager and llm_client:
-                self.message_processor = create_message_processor(
-                    bot_core=bot_core,
-                    memory_manager=memory_manager,
-                    llm_client=llm_client,
-                    security_validator=getattr(bot_core, 'security_validator', None),
-                    emoji_intelligence=getattr(bot_core, 'emoji_response_intelligence', None),
-                    image_processor=getattr(bot_core, 'image_processor', None),
-                    conversation_cache=getattr(bot_core, 'conversation_cache', None)
-                )
-                logger.info("🌐 EXTERNAL API: Message processor initialized with same components as Discord bot")
-            else:
-                logger.warning("🌐 EXTERNAL API: Bot components not available for message processor")
-        else:
-            logger.warning("🌐 EXTERNAL API: Bot manager not available for message processor")
+        bot_core = self.bot_manager.bot_core
+        
+        # Get required components from bot core
+        memory_manager = getattr(bot_core, 'memory_manager', None)
+        llm_client = getattr(bot_core, 'llm_client', None)
+        
+        if not memory_manager:
+            logger.debug("🌐 EXTERNAL API: Memory manager not available for message processor")
+            return False
+            
+        if not llm_client:
+            logger.debug("🌐 EXTERNAL API: LLM client not available for message processor")
+            return False
+        
+        try:
+            self.message_processor = create_message_processor(
+                bot_core=bot_core,
+                memory_manager=memory_manager,
+                llm_client=llm_client,
+                security_validator=getattr(bot_core, 'security_validator', None),
+                emoji_intelligence=getattr(bot_core, 'emoji_response_intelligence', None),
+                image_processor=getattr(bot_core, 'image_processor', None),
+                conversation_cache=getattr(bot_core, 'conversation_cache', None)
+            )
+            logger.info("🌐 EXTERNAL API: Message processor initialized with same components as Discord bot")
+            return True
+        except Exception as e:
+            logger.warning("🌐 EXTERNAL API: Failed to initialize message processor: %s", str(e))
+            return False
 
     def setup_routes(self):
         """Configure HTTP routes"""
@@ -181,16 +196,15 @@ class EnhancedHealthServer:
         try:
             # Initialize message processor if not done yet
             if not self.message_processor:
-                self._initialize_message_processor()
-            
-            if not self.message_processor:
-                return web.json_response(
-                    {
-                        'error': 'Chat API not available - bot components not ready',
-                        'success': False
-                    },
-                    status=503
-                )
+                if not self._initialize_message_processor():
+                    return web.json_response(
+                        {
+                            'error': 'Chat API not available - bot components not ready',
+                            'success': False,
+                            'details': 'Bot is still initializing. Please try again in a few moments.'
+                        },
+                        status=503
+                    )
 
             # Parse request body
             request_data = await request.json()
@@ -277,16 +291,15 @@ class EnhancedHealthServer:
         try:
             # Initialize message processor if not done yet
             if not self.message_processor:
-                self._initialize_message_processor()
-            
-            if not self.message_processor:
-                return web.json_response(
-                    {
-                        'error': 'Chat API not available - bot components not ready',
-                        'success': False
-                    },
-                    status=503
-                )
+                if not self._initialize_message_processor():
+                    return web.json_response(
+                        {
+                            'error': 'Chat API not available - bot components not ready',
+                            'success': False,
+                            'details': 'Bot is still initializing. Please try again in a few moments.'
+                        },
+                        status=503
+                    )
 
             request_data = await request.json()
             messages = request_data.get('messages', [])

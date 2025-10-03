@@ -237,16 +237,8 @@ class MessageProcessor:
             return []
 
         try:
-            # Create message context for memory classification
-            mock_message = type('MockMessage', (), {
-                'content': message_context.content,
-                'channel': type('MockChannel', (), {
-                    'type': getattr(message_context, 'channel_type', 'dm')
-                })(),
-                'guild': None if message_context.channel_type == 'dm' else type('MockGuild', (), {})()
-            })()
-            
-            classified_context = self.memory_manager.classify_discord_context(mock_message)
+            # Create platform-agnostic message context classification
+            classified_context = self._classify_message_context(message_context)
             logger.debug("Message context classified: %s", classified_context.context_type.value)
 
             # Try optimized memory retrieval first if available
@@ -564,6 +556,69 @@ class MessageProcessor:
         except (AttributeError, ValueError, TypeError) as e:
             logger.error("Memory storage failed: %s", str(e))
             return False
+    
+    def _classify_message_context(self, message_context: MessageContext):
+        """
+        Platform-agnostic message context classification.
+        
+        Args:
+            message_context: MessageContext object
+            
+        Returns:
+            MemoryContext object with platform-agnostic classification
+        """
+        from src.memory.context_aware_memory_security import MemoryContext, MemoryContextType, ContextSecurity
+        
+        try:
+            # Determine context type based on platform and channel type
+            if message_context.platform == "api":
+                # External API calls are treated as DM-like private contexts
+                return MemoryContext(
+                    context_type=MemoryContextType.DM,
+                    server_id=None,
+                    channel_id=getattr(message_context, 'channel_id', 'api_channel'),
+                    is_private=True,
+                    security_level=ContextSecurity.PRIVATE_DM,
+                )
+            elif message_context.platform == "discord":
+                # Discord-specific classification
+                if getattr(message_context, 'channel_type', 'dm') == 'dm':
+                    return MemoryContext(
+                        context_type=MemoryContextType.DM,
+                        server_id=None,
+                        channel_id=getattr(message_context, 'channel_id', 'unknown'),
+                        is_private=True,
+                        security_level=ContextSecurity.PRIVATE_DM,
+                    )
+                else:
+                    # Guild/server context
+                    return MemoryContext(
+                        context_type=MemoryContextType.PUBLIC_CHANNEL,
+                        server_id=getattr(message_context, 'server_id', None),
+                        channel_id=getattr(message_context, 'channel_id', 'unknown'),
+                        is_private=False,
+                        security_level=ContextSecurity.PUBLIC_CHANNEL,
+                    )
+            else:
+                # Unknown platform - default to private for security
+                return MemoryContext(
+                    context_type=MemoryContextType.DM,
+                    server_id=None,
+                    channel_id='unknown',
+                    is_private=True,
+                    security_level=ContextSecurity.PRIVATE_DM,
+                )
+                
+        except Exception as e:
+            logger.warning("Context classification failed: %s, using safe defaults", str(e))
+            # Safe default - treat as private
+            return MemoryContext(
+                context_type=MemoryContextType.DM,
+                server_id=None,
+                channel_id='error',
+                is_private=True,
+                security_level=ContextSecurity.PRIVATE_DM,
+            )
 
 
 def create_message_processor(bot_core, memory_manager, llm_client, **kwargs) -> MessageProcessor:
