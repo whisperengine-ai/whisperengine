@@ -142,8 +142,14 @@ class CDLAIPromptIntegration:
         else:
             pipeline_dict = {}
         
-        # Base character identity
-        prompt = f"You are {character.identity.name}, a {character.identity.occupation}."
+        # 🚨 CRITICAL: Put response style FIRST for maximum instruction compliance
+        response_style = self._extract_cdl_response_style(character, display_name)
+        prompt = ""
+        if response_style:
+            prompt = response_style + "\n\n"
+        
+        # Base character identity (after response style for hierarchy)
+        prompt += f"You are {character.identity.name}, a {character.identity.occupation}."
         
         # Add character description
         if hasattr(character.identity, 'description') and character.identity.description:
@@ -248,15 +254,7 @@ class CDLAIPromptIntegration:
         if any(ai_keyword in message_content.lower() for ai_keyword in ['ai', 'artificial intelligence', 'robot', 'computer', 'program', 'bot']):
             prompt += f"\n\n🤖 AI IDENTITY GUIDANCE:\nIf asked about AI nature, respond authentically as {character.identity.name} while being honest about your AI nature when directly asked."
 
-        # Add response style from CDL - character-specific and configurable
-        response_style = self._extract_cdl_response_style(character, display_name)
-        if response_style:
-            prompt += f"\n\n{response_style}"
-        else:
-            # Fallback if CDL response style not available
-            prompt += "\n\n🎤 RESPONSE REQUIREMENTS:\n"
-            prompt += f"- The user you are talking to is named {display_name}. ALWAYS use this name when addressing them.\n"
-            prompt += f"- Use modern, professional language appropriate for {character.identity.occupation}\n"
+        # Response style already added at the beginning for maximum prominence
         
         prompt += f"\nRespond as {character.identity.name} to {display_name}:"
 
@@ -495,10 +493,8 @@ class CDLAIPromptIntegration:
             
             guidance_parts = []
             
-            # Extract platform-specific guidance (Discord) - try both locations
-            discord_guidance = get_cdl_field("character.communication.conversation_flow_guidelines.platform_awareness.discord", {})
-            if not discord_guidance:
-                discord_guidance = get_cdl_field("character.conversation_flow_guidelines.platform_awareness.discord", {})
+            # Extract platform-specific guidance (Discord) - UNIFIED PATH
+            discord_guidance = get_cdl_field("character.communication.conversation_flow_guidance.platform_awareness.discord", {})
             
             if discord_guidance:
                 max_length = discord_guidance.get('max_response_length', '')
@@ -517,10 +513,8 @@ class CDLAIPromptIntegration:
                 if prefer:
                     guidance_parts.append(f"✅ ALWAYS: {prefer}")
             
-            # Extract flow optimization guidance - try both locations
-            flow_opt = get_cdl_field("character.communication.conversation_flow_guidelines.flow_optimization", {})
-            if not flow_opt:
-                flow_opt = get_cdl_field("character.conversation_flow_guidelines.flow_optimization", {})
+            # Extract flow optimization guidance - UNIFIED PATH
+            flow_opt = get_cdl_field("character.communication.conversation_flow_guidance.flow_optimization", {})
             
             if flow_opt:
                 auth_engagement = flow_opt.get('character_authentic_engagement', '')

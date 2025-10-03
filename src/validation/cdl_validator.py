@@ -104,29 +104,44 @@ class CDLValidator:
             ("faith questions", ["spiritual", "guidance"])
         ]
         
-        # Required CDL sections for completeness check
+        # 🚨 CRITICAL: Required CDL sections that match UNIFIED CDL structure
         self.required_sections = {
+            # Core identity (used in character.identity.name, character.identity.occupation)
             'character.identity': 'Character Identity (name, age, occupation, etc.)',
+            'character.identity.name': 'Character Name',
+            'character.identity.occupation': 'Character Occupation',
+            'character.identity.description': 'Character Description',
             'character.identity.appearance': 'Physical Appearance Description',
             'character.identity.voice': 'Voice and Speaking Style',
+            
+            # Personality (used for character.personality.big_five)
             'character.personality': 'Core Personality Traits',
             'character.personality.big_five': 'Big Five Personality Profile',
-            'character.personality.communication_style': 'Communication Preferences',
+            
+            # 🚨 CRITICAL: UNIFIED conversation flow structure
             'character.communication': 'Communication Patterns',
-            'character.communication.typical_responses': 'Scenario-Based Responses',
+            'character.communication.conversation_flow_guidance': 'Conversation Flow Guidance (UNIFIED)',
+            'character.communication.conversation_flow_guidance.response_style': 'Response Style (CRITICAL - Unified Path)',
+            'character.communication.conversation_flow_guidance.response_style.core_principles': 'Core Response Principles (CRITICAL)',
+            'character.communication.conversation_flow_guidance.response_style.formatting_rules': 'Formatting Rules',
+            'character.communication.conversation_flow_guidance.response_style.character_specific_adaptations': 'Character-Specific Adaptations (CRITICAL)',
+            
+            # Platform awareness (unified path)
+            'character.communication.conversation_flow_guidance.platform_awareness': 'Platform Awareness',
+            'character.communication.conversation_flow_guidance.platform_awareness.discord': 'Discord-Specific Guidance',
+            
+            # Message triggers (unified path)
             'character.communication.message_pattern_triggers': 'Message Pattern Triggers',
-            'character.communication.conversation_flow_guidance': 'Conversation Flow Rules',
-            'character.background': 'Character Background/History',
-            'character.background.formative_experiences': 'Life-Shaping Events',
+            
+            # Background and life context
+            'character.backstory': 'Character Background/History',
+            'character.backstory.formative_experiences': 'Life-Shaping Events',
             'character.current_life': 'Current Life Situation',
+            
+            # Personal knowledge
             'character.relationships': 'Relationship Dynamics',
-            'character.personality.communication_style.ai_identity_handling': 'AI Identity Responses',
-            'character.personality.communication_style.ai_identity_handling.relationship_boundary_scenarios': 'Romantic Boundary Handling',
-            'character.identity.digital_communication': 'Digital/Emoji Communication',
-            'character.identity.digital_communication.emoji_personality': 'Emoji Usage Patterns',
             'character.skills_and_expertise': 'Professional Skills',
-            'character.interests_and_hobbies': 'Personal Interests',
-            'character.speech_patterns': 'Detailed Speech Patterns'
+            'character.interests_and_hobbies': 'Personal Interests'
         }
     
     def validate_file(self, file_path: Union[str, Path]) -> ValidationResult:
@@ -211,7 +226,15 @@ class CDLValidator:
             result.patterns_detected = pattern_result['patterns']
             issues.extend(pattern_result['issues'])
         
-        # Test 5: Completeness analysis
+        # Test 5: CDL AI Integration Structure Validation (🚨 CRITICAL)
+        ai_integration_result = self._validate_cdl_ai_integration_structure(cdl_data)
+        issues.extend(ai_integration_result['issues'])
+        
+        # Mark as non-compliant if critical AI integration structure is missing
+        if not ai_integration_result['ai_integration_ready']:
+            result.standardization_compliant = False
+        
+        # Test 6: Completeness analysis
         completeness_result = self._analyze_completeness(cdl_data)
         result.completeness_score = completeness_result['score']
         result.quality_score = completeness_result['quality_score']
@@ -332,6 +355,87 @@ class CDLValidator:
             'working': working,
             'patterns': patterns_detected,
             'issues': issues
+        }
+    
+    def _validate_cdl_ai_integration_structure(self, cdl_data: Dict) -> Dict[str, Any]:
+        """
+        🚨 CRITICAL: Validate the UNIFIED CDL structure.
+        
+        This ensures the character instructions will actually be used by the system.
+        Based on unified path: character.communication.conversation_flow_guidance
+        """
+        issues = []
+        critical_missing = []
+        
+        # 🎯 UNIFIED: Check only the standard response_style path
+        response_style = (cdl_data.get('character', {})
+                         .get('communication', {})
+                         .get('conversation_flow_guidance', {})
+                         .get('response_style', {}))
+        
+        if not response_style:
+            critical_missing.append("response_style section")
+            issues.append(ValidationIssue(
+                level=ValidationStatus.ERROR,
+                category="cdl_ai_integration",
+                message="🚨 CRITICAL: Missing response_style section - character instructions will be IGNORED",
+                section="character.communication.conversation_flow_guidance.response_style",
+                suggestion="Add response_style section with core_principles and character_specific_adaptations in the UNIFIED path"
+            ))
+        else:
+            # Check for critical subsections
+            if not response_style.get('core_principles'):
+                issues.append(ValidationIssue(
+                    level=ValidationStatus.ERROR,
+                    category="cdl_ai_integration",
+                    message="Missing core_principles in response_style - primary character identity instructions",
+                    section="response_style.core_principles",
+                    suggestion="Add core_principles array with character identity and behavior instructions"
+                ))
+            
+            if not response_style.get('character_specific_adaptations'):
+                issues.append(ValidationIssue(
+                    level=ValidationStatus.WARNING,
+                    category="cdl_ai_integration", 
+                    message="Missing character_specific_adaptations - character personality nuances",
+                    section="response_style.character_specific_adaptations",
+                    suggestion="Add character_specific_adaptations array with personality-specific guidance"
+                ))
+        
+        # 🎯 UNIFIED: Discord platform awareness
+        discord_guidance = (cdl_data.get('character', {})
+                           .get('communication', {})
+                           .get('conversation_flow_guidance', {})
+                           .get('platform_awareness', {})
+                           .get('discord', {}))
+        
+        if not discord_guidance:
+            issues.append(ValidationIssue(
+                level=ValidationStatus.WARNING,
+                category="cdl_ai_integration",
+                message="Missing Discord platform guidance - Discord-specific behavior not configured",
+                section="character.communication.conversation_flow_guidance.platform_awareness.discord",
+                suggestion="Add Discord platform awareness for optimal Discord bot behavior"
+            ))
+        
+        # 🎯 UNIFIED: Core identity fields
+        identity = cdl_data.get('character', {}).get('identity', {})
+        required_identity = ['name', 'occupation']
+        
+        for identity_field in required_identity:
+            if not identity.get(identity_field):
+                issues.append(ValidationIssue(
+                    level=ValidationStatus.ERROR,
+                    category="cdl_ai_integration",
+                    message=f"Missing character.identity.{identity_field} - used in character prompt building",
+                    section=f"character.identity.{identity_field}",
+                    suggestion=f"Add {identity_field} to character identity - required for CDL AI integration"
+                ))
+        
+        return {
+            'critical_missing': critical_missing,
+            'issues': issues,
+            'ai_integration_ready': len(critical_missing) == 0
         }
     
     def _analyze_completeness(self, cdl_data: Dict) -> Dict[str, Any]:

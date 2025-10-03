@@ -225,19 +225,15 @@ class CDLManager:
         return self.get_field("character.identity.occupation", default="")
     
     def get_conversation_flow_guidelines(self) -> Dict[str, Any]:
-        """Convenience method to get conversation flow guidelines"""
-        # Try both possible locations for conversation flow guidelines
-        guidelines = self.get_field("character.conversation_flow_guidelines", {})
-        if not guidelines:
-            guidelines = self.get_field("character.communication.conversation_flow_guidelines", {})
-        return guidelines
+        """Convenience method to get conversation flow guidelines - UNIFIED PATH"""
+        # 🎯 UNIFIED: Use single standardized path
+        return self.get_field("character.communication.conversation_flow_guidance", {})
     
     def get_response_style(self) -> Dict[str, Any]:
-        """Convenience method to get response style from conversation flow guidelines"""
-        guidelines = self.get_conversation_flow_guidelines()
-        if guidelines:
-            return guidelines.get('response_style', {})
-        return {}
+        """Convenience method to get response_style - UNIFIED PATH"""
+        # 🎯 UNIFIED: Use single standardized path only
+        guidelines = self.get_field("character.communication.conversation_flow_guidance", {})
+        return guidelines.get('response_style', {})
     
     def get_communication_style(self) -> Dict[str, Any]:
         """Convenience method to get communication style"""
