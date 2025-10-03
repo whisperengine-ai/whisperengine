@@ -37,7 +37,7 @@ class CDLManager:
     Singleton manager for Character Definition Language data access.
     
     Features:
-    - Lazy loading from CHARACTER_FILE environment variable
+    - Lazy loading from CDL_DEFAULT_CHARACTER environment variable
     - Thread-safe singleton pattern
     - Generic field access with dot notation or dict-style paths
     - Schema validation and error handling
@@ -90,7 +90,7 @@ class CDLManager:
             cls._loaded = False
     
     def _load_character_data(self) -> None:
-        """Lazy load character data from CHARACTER_FILE environment variable"""
+        """Lazy load character data from CDL_DEFAULT_CHARACTER environment variable"""
         if self._loaded:
             return
             
@@ -99,9 +99,9 @@ class CDLManager:
                 return
                 
             try:
-                character_file = os.getenv('CHARACTER_FILE', '')
+                character_file = os.getenv('CDL_DEFAULT_CHARACTER', '')
                 if not character_file:
-                    logger.warning("CHARACTER_FILE environment variable not set")
+                    logger.warning("CDL_DEFAULT_CHARACTER environment variable not set")
                     self._data = {}
                     self._loaded = True
                     return

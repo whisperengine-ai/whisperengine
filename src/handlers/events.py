@@ -456,7 +456,7 @@ class BotEventHandlers:
         Maps CDL occupation/tags to character types for emoji intelligence.
         """
         try:
-            character_file = os.getenv('CHARACTER_FILE')
+            character_file = os.getenv('CDL_DEFAULT_CHARACTER')
             if not character_file:
                 return "general"
                 
@@ -3433,11 +3433,11 @@ class BotEventHandlers:
     
     async def _get_character_indicators_from_cdl(self) -> list:
         """
-        � CHARACTER-AGNOSTIC: Get character indicators from CDL data instead of hardcoded lists.
+        🎯 CHARACTER-AGNOSTIC: Get character indicators from CDL data instead of hardcoded lists.
         Returns keywords/phrases that indicate character-specific language.
         """
         try:
-            character_file = os.getenv('CHARACTER_FILE')
+            character_file = os.getenv('CDL_DEFAULT_CHARACTER')
             if not character_file:
                 return []
                 
@@ -3494,7 +3494,7 @@ class BotEventHandlers:
         Attempts to inject character personality into generic responses.
         """
         try:
-            character_file = os.getenv('CHARACTER_FILE')
+            character_file = os.getenv('CDL_DEFAULT_CHARACTER')
             if not character_file:
                 return generic_response
                 
