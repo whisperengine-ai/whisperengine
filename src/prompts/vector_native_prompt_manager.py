@@ -205,15 +205,15 @@ class VectorNativePromptManager:
         """
         Build the final prompt using vector-derived context.
         
-        CRITICAL: No template variables - directly inject context into prompt.
-        Note: base_prompt is kept for interface compatibility but overridden with vector context.
+        CRITICAL: PRESERVE character identity from base_prompt (CDL system).
+        Vector enhancement should ADD context, not replace character identity.
         """
         try:
-            # Use generic assistant prompt that supports character overrides
-            # Note: We override base_prompt to ensure consistent vector-native behavior
-            clean_prompt = "You are a helpful AI assistant. You communicate naturally and conversationally."
+            # 🚨 CRITICAL FIX: Use the CDL character prompt as foundation, don't override it
+            # The base_prompt contains essential character identity from CDL system
+            clean_prompt = base_prompt
             
-            # Build vector-native context sections
+            # Build vector-native context sections to ENHANCE the character prompt
             context_sections = []
             
             # Memory context
