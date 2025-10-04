@@ -356,6 +356,42 @@ docker exec whisperengine-elena-bot python -m pytest tests/unit/
 
 ## Debugging & Validation
 
+**🔧 COMPREHENSIVE PROMPT LOGGING SYSTEM**: WhisperEngine logs every prompt sent to LLM and every response received for complete debugging visibility:
+
+**Location**: `logs/prompts/` directory with external Docker volume mount
+**Format**: JSON files with complete conversation context and LLM responses
+**File Pattern**: `{BotName}_{YYYYMMDD}_{HHMMSS}_{UserID}.json`
+
+```bash
+# 🚨 CRITICAL: ALWAYS check prompt logs FIRST when debugging conversation issues
+ls -la logs/prompts/Elena_* | tail -5        # Recent Elena conversation logs
+ls -la logs/prompts/Ryan_* | tail -5         # Recent Ryan conversation logs
+cat logs/prompts/Elena_20251004_205238_672814231002939413.json   # Full prompt + response
+
+# Each log contains:
+# - Complete system prompt with CDL character integration
+# - Full conversation history (all messages sent to LLM)
+# - Memory context and AI component data
+# - Exact LLM response with character count and timestamp
+# - User metadata and workflow context
+```
+
+**Prompt Log Contents**:
+- **timestamp**: When prompt was sent to LLM
+- **bot_name**: Which character bot processed the message
+- **user_id**: Discord user ID for conversation tracking
+- **message_count**: Number of messages in conversation context
+- **total_chars**: Total character count sent to LLM
+- **messages[]**: Complete conversation array sent to LLM (system + history)
+- **llm_response**: Exact response received from LLM with metadata
+
+**Debugging Workflow**:
+1. **🔍 Check prompt logs first** - Don't analyze code until you see what LLM actually received
+2. **📊 Verify conversation context** - Ensure proper message ordering and memory retrieval
+3. **🎭 Validate character integration** - Check CDL system prompt enhancement
+4. **⚠️ Look for recursive patterns** - Check for LLM failure indicators in responses
+5. **🔄 Compare multiple conversations** - Pattern analysis across different users/sessions
+
 **Environment Validation**: Critical for troubleshooting setup issues:
 ```bash
 # Validate complete environment setup
@@ -387,6 +423,40 @@ python src/validation/validate_cdl.py patterns characters/examples/elena.json
 
 # Run complete CDL demo validation
 python src/validation/demo_validation_system.py
+```
+
+**🛡️ RECURSIVE PATTERN DETECTION SYSTEM**: WhisperEngine includes comprehensive protection against LLM recursive failures:
+
+**Location**: `src/core/message_processor.py` - 3-layer defense system
+**Purpose**: Prevent memory poisoning from broken LLM responses that could contaminate future conversations
+
+**Layer 1: Response Validation** (`_detect_and_fix_recursive_patterns`):
+- Detects known failure patterns: "remember that you can remember", excessive repetition
+- Length-based detection: Responses >10,000 chars flagged as suspicious  
+- Phrase repetition detection: 5-word phrases repeating 3+ times
+- Character-agnostic fallback generation
+
+**Layer 2: Memory Storage Safety** (`_is_response_safe_to_store`):
+- Final safety check before storing in vector memory
+- Blocks responses >6,000 chars or containing unsafe patterns
+- Prevents memory feedback loop poisoning
+
+**Layer 3: Fallback Response Generation** (`_generate_fallback_response`):
+- Generic fallback: "I apologize {user_name}, I need to gather my thoughts..."
+- Gets CDL character personality applied naturally
+- Maintains character authenticity while providing safe recovery
+
+**Common Failure Patterns Detected**:
+```bash
+# Check for recursive pattern detection in logs
+docker logs whisperengine-{bot}-bot | grep "RECURSIVE PATTERN"
+docker logs whisperengine-{bot}-bot | grep "FALLBACK RESPONSE"
+
+# Signs of LLM failure:
+# - "remember that you can remember" loops
+# - Excessive phrase repetition  
+# - Responses >10,000 characters
+# - Nonsense patterns like "EEREE" or "Eternalized Eternally"
 ```
 
 ## Memory System (Critical)

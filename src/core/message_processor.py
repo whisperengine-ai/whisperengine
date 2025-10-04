@@ -1680,6 +1680,9 @@ class MessageProcessor:
     async def _validate_and_sanitize_response(self, response: str, message_context: MessageContext) -> str:
         """Validate response for character consistency and sanitize for security."""
         try:
+            # 🚨 CRITICAL: Check for LLM recursive failures FIRST
+            response = self._detect_and_fix_recursive_patterns(response, message_context)
+            
             # Character consistency check
             response = await self._validate_character_consistency(response, message_context.user_id, message_context)
             
@@ -1743,6 +1746,80 @@ class MessageProcessor:
         except (ValueError, TypeError) as e:
             logger.error("Meta-analysis sanitization failed: %s", str(e))
             return response
+
+    def _detect_and_fix_recursive_patterns(self, response: str, message_context: MessageContext) -> str:
+        """Detect and fix LLM recursive failures that could poison memory."""
+        import re
+        from src.memory.vector_memory_system import get_normalized_bot_name_from_env
+        
+        try:
+            bot_name = get_normalized_bot_name_from_env()
+            
+            # 🚨 CRITICAL PATTERNS: Known recursive failure indicators
+            recursive_patterns = [
+                r'remember that you can remember',
+                r'(\w+\s+){25,}',  # Same words repeating 25+ times (raised from 10)
+                r'(that you can\s+){5,}',  # "that you can" repeating
+                r'(\w+\s+\w+\s+){20,}',  # Any two-word pattern repeating 20+ times (raised from 15)
+                r'(being able to\s+){3,}',  # "being able to" repeating
+                r'EEREE|Eternalized Eternally',  # Specific nonsense patterns from Ryan
+                r'(processing data.*entertainment.*){3,}',  # Recursive tech explanations
+                r'(.{20,})\1{3,}',  # Any 20+ char phrase repeating 3+ times (NEW: more precise)
+            ]
+            
+            # Length-based detection
+            if len(response) > 10000:  # Raised from 8000 - Ryan's broken response was 14,202 chars
+                logger.warning("🚨 RECURSIVE PATTERN: Response length excessive (%d chars) for user %s", 
+                             len(response), message_context.user_id)
+                
+                # Check for any recursive patterns
+                for pattern in recursive_patterns:
+                    if re.search(pattern, response, re.IGNORECASE):
+                        logger.error("🚨 RECURSIVE PATTERN DETECTED: %s pattern found in %s response", 
+                                   pattern, bot_name)
+                        return self._generate_fallback_response(message_context, "recursive_pattern")
+            
+            # Pattern-based detection (regardless of length)
+            for pattern in recursive_patterns:
+                match = re.search(pattern, response, re.IGNORECASE)
+                if match:
+                    logger.error("🚨 RECURSIVE PATTERN DETECTED: %s pattern found in %s response", 
+                               pattern, bot_name)
+                    logger.error("🚨 PATTERN CONTEXT: ...%s...", response[max(0, match.start()-50):match.end()+50])
+                    return self._generate_fallback_response(message_context, "recursive_pattern")
+            
+            # Repetition detection - more targeted to catch severe loops
+            words = response.split()
+            if len(words) > 150:  # Only check very long responses (raised from 100)
+                # Check for phrase repetition patterns - look for longer phrases
+                for i in range(len(words) - 15):
+                    phrase = ' '.join(words[i:i+5])  # 5-word phrase (increased from 3)
+                    remaining_text = ' '.join(words[i+5:])
+                    phrase_count = remaining_text.count(phrase)
+                    
+                    if phrase_count >= 3:  # Same 5-word phrase appears 3+ more times (reduced from 5)
+                        logger.error("🚨 REPETITION PATTERN: Phrase '%s' repeats %d times in %s response", 
+                                   phrase, phrase_count, bot_name)
+                        return self._generate_fallback_response(message_context, "repetition_pattern")
+            
+            return response
+            
+        except Exception as e:
+            logger.error("🚨 RECURSIVE PATTERN DETECTION FAILED: %s", e)
+            return response  # Return original if detection fails
+
+    def _generate_fallback_response(self, message_context: MessageContext, failure_type: str) -> str:
+        """Generate a safe fallback response when recursive patterns are detected."""
+        from src.memory.vector_memory_system import get_normalized_bot_name_from_env
+        
+        bot_name = get_normalized_bot_name_from_env()
+        user_name = getattr(message_context, 'user_display_name', 'there')
+        
+        # Generic fallback response - character personality will be applied by CDL system
+        fallback = f"I apologize {user_name}, I need to gather my thoughts for a moment. What can I help you with?"
+        
+        logger.warning("🛡️ FALLBACK RESPONSE: Generated safe response for %s due to %s", bot_name, failure_type)
+        return fallback
 
     async def _extract_and_store_knowledge(self, message_context: MessageContext, 
                                           ai_components: Dict[str, Any]) -> bool:
@@ -2004,31 +2081,61 @@ class MessageProcessor:
             return False
         
         try:
-            await self.memory_manager.store_conversation(
-                user_id=message_context.user_id,
-                user_message=message_context.content,
-                bot_response=response,
-                pre_analyzed_emotion_data=ai_components.get('emotion_data')
-            )
-            
-            # Verify storage
-            verification_memories = await self.memory_manager.retrieve_context_aware_memories(
-                user_id=message_context.user_id,
-                query=message_context.content,
-                max_memories=1
-            )
-            
-            if verification_memories:
-                logger.info("✅ MEMORY: Successfully stored and verified conversation for user %s", 
-                           message_context.user_id)
-                return True
+            # 🛡️ FINAL SAFETY CHECK: Don't store obviously broken responses
+            if self._is_response_safe_to_store(response):
+                await self.memory_manager.store_conversation(
+                    user_id=message_context.user_id,
+                    user_message=message_context.content,
+                    bot_response=response,
+                    pre_analyzed_emotion_data=ai_components.get('emotion_data')
+                )
+                
+                # Verify storage
+                verification_memories = await self.memory_manager.retrieve_context_aware_memories(
+                    user_id=message_context.user_id,
+                    query=message_context.content,
+                    max_memories=1
+                )
+                
+                if verification_memories:
+                    logger.info("✅ MEMORY: Successfully stored and verified conversation for user %s", 
+                               message_context.user_id)
+                    return True
+                else:
+                    logger.warning("⚠️ MEMORY: Storage verification failed for user %s", message_context.user_id)
+                    return False
             else:
-                logger.warning("⚠️ MEMORY: Storage verification failed for user %s", message_context.user_id)
+                logger.warning("🛡️ MEMORY: Blocked storage of potentially broken response for user %s", 
+                              message_context.user_id)
                 return False
                 
         except (AttributeError, ValueError, TypeError) as e:
             logger.error("Memory storage failed: %s", str(e))
             return False
+
+    def _is_response_safe_to_store(self, response: str) -> bool:
+        """Final safety check before storing response in memory."""
+        import re
+        
+        # Block obviously broken responses from being stored
+        unsafe_patterns = [
+            r'remember that you can remember',
+            r'EEREE|Eternalized Eternally',
+            r'(\w+\s+){20,}',  # 20+ repeated words
+        ]
+        
+        # Length check - responses over 6000 chars are suspicious
+        if len(response) > 6000:
+            logger.warning("🛡️ MEMORY SAFETY: Response length suspicious (%d chars)", len(response))
+            return False
+        
+        # Pattern check
+        for pattern in unsafe_patterns:
+            if re.search(pattern, response, re.IGNORECASE):
+                logger.warning("🛡️ MEMORY SAFETY: Unsafe pattern detected: %s", pattern)
+                return False
+        
+        return True
     
     def _classify_message_context(self, message_context: MessageContext):
         """
