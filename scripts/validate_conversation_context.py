@@ -568,6 +568,174 @@ class ConversationContextValidator:
             }
             return False
     
+    def test_conversation_thread_continuity(self) -> bool:
+        """Test 7: Verify conversation thread maintains continuity (anti-"rivers are honest" bug)."""
+        test_name = "conversation_thread_continuity"
+        self.log(f"\n{'='*60}")
+        self.log(f"TEST 7: Conversation Thread Continuity")
+        self.log(f"{'='*60}")
+        
+        try:
+            # Find a user with multiple consecutive conversation messages
+            scroll_result = self.client.scroll(
+                collection_name=self.collection_name,
+                scroll_filter=Filter(
+                    must=[
+                        FieldCondition(key="memory_type", match=MatchValue(value="conversation")),
+                        FieldCondition(key="bot_name", match=MatchValue(value=self.bot_name))
+                    ]
+                ),
+                limit=50,
+                with_payload=True
+            )
+            
+            points = scroll_result[0]
+            
+            if not points:
+                self.log("No conversation memories found", "WARNING")
+                self.results["tests"][test_name] = {
+                    "passed": False,
+                    "error": "No conversations to validate"
+                }
+                return False
+            
+            # Group by user and find user with most consecutive messages
+            user_conversations = {}
+            for point in points:
+                if not point.payload:
+                    continue
+                user_id = point.payload.get("user_id")
+                if user_id:
+                    if user_id not in user_conversations:
+                        user_conversations[user_id] = []
+                    user_conversations[user_id].append(point)
+            
+            # Find user with longest conversation thread
+            best_user = None
+            max_messages = 0
+            for user_id, messages in user_conversations.items():
+                if len(messages) > max_messages:
+                    max_messages = len(messages)
+                    best_user = user_id
+            
+            if not best_user or max_messages < 3:
+                self.log(f"Not enough conversation history (found {max_messages} messages)", "WARNING")
+                self.results["tests"][test_name] = {
+                    "passed": True,  # Pass but inconclusive
+                    "note": "Insufficient conversation history for continuity testing"
+                }
+                return True
+            
+            # Sort this user's conversation by timestamp
+            user_messages = user_conversations[best_user]
+            
+            def get_timestamp(point):
+                ts = point.payload.get("timestamp", 0) if point.payload else 0
+                if isinstance(ts, str):
+                    try:
+                        return float(ts)
+                    except (ValueError, TypeError):
+                        return 0
+                return float(ts) if ts else 0
+            
+            sorted_messages = sorted(user_messages, key=get_timestamp)
+            
+            # Check for topic continuity in consecutive messages
+            # Look for messages that reference each other's content
+            continuity_checks = []
+            
+            for i in range(len(sorted_messages) - 1):
+                curr_msg = sorted_messages[i]
+                next_msg = sorted_messages[i + 1]
+                
+                if not (curr_msg.payload and next_msg.payload):
+                    continue
+                
+                curr_content = curr_msg.payload.get("content", "").lower()
+                next_content = next_msg.payload.get("content", "").lower()
+                curr_role = curr_msg.payload.get("role", "unknown")
+                next_role = next_msg.payload.get("role", "unknown")
+                
+                # Skip if we don't have valid content
+                if not curr_content or not next_content:
+                    continue
+                
+                # Check if messages are part of same conversation thread
+                # Look for:
+                # 1. Temporal proximity (within 15 minutes)
+                curr_ts = get_timestamp(curr_msg)
+                next_ts = get_timestamp(next_msg)
+                time_gap = next_ts - curr_ts
+                
+                # 2. Topic continuity indicators
+                # Extract key words from current message (simple approach)
+                curr_words = set(w for w in curr_content.split() if len(w) > 4)
+                next_words = set(w for w in next_content.split() if len(w) > 4)
+                word_overlap = len(curr_words & next_words)
+                
+                continuity_checks.append({
+                    "index": i,
+                    "time_gap_seconds": time_gap,
+                    "time_gap_minutes": time_gap / 60,
+                    "word_overlap": word_overlap,
+                    "roles": f"{curr_role} → {next_role}",
+                    "has_continuity": time_gap < 900 and word_overlap > 0  # 15min and shared words
+                })
+            
+            # Analyze continuity
+            total_pairs = len(continuity_checks)
+            continuous_pairs = sum(1 for c in continuity_checks if c["has_continuity"])
+            
+            self.log(f"👤 Test user: {best_user}")
+            self.log(f"📊 Total messages analyzed: {len(sorted_messages)}")
+            self.log(f"📊 Message pairs checked: {total_pairs}")
+            self.log(f"✅ Pairs with continuity: {continuous_pairs}")
+            
+            if total_pairs > 0:
+                continuity_rate = (continuous_pairs / total_pairs) * 100
+                self.log(f"📈 Continuity rate: {continuity_rate:.1f}%")
+                
+                # Show some examples
+                self.log(f"\n📋 Sample conversation flow:")
+                for i, msg in enumerate(sorted_messages[:5]):
+                    if not msg.payload:
+                        continue
+                    role = msg.payload.get("role", "unknown")
+                    content = msg.payload.get("content", "")[:60]
+                    self.log(f"   [{role}] {content}...", "DEBUG")
+                
+                # Test passes if we see reasonable continuity
+                # We expect some gaps (topic shifts), but not complete randomness
+                passed = continuity_rate >= 30  # At least 30% of pairs show continuity
+                
+                if passed:
+                    self.log(f"Conversation thread continuity is GOOD ({continuity_rate:.1f}%)", "SUCCESS")
+                else:
+                    self.log(f"Conversation continuity is LOW ({continuity_rate:.1f}%) - may indicate context issues", "WARNING")
+            else:
+                passed = True  # Pass if no pairs to check
+                self.log("Not enough message pairs to validate continuity", "WARNING")
+            
+            self.results["tests"][test_name] = {
+                "passed": passed,
+                "test_user": best_user,
+                "total_messages": len(sorted_messages),
+                "message_pairs": total_pairs,
+                "continuous_pairs": continuous_pairs,
+                "continuity_rate": round((continuous_pairs / total_pairs * 100), 1) if total_pairs > 0 else 0,
+                "note": "Validates conversation maintains topical coherence across messages"
+            }
+            
+            return passed
+            
+        except Exception as e:
+            self.log(f"Failed to check conversation continuity: {e}", "ERROR")
+            self.results["tests"][test_name] = {
+                "passed": False,
+                "error": str(e)
+            }
+            return False
+    
     def test_no_redis_dependencies(self) -> bool:
         """Test 7: Verify no Redis session persistence (pure vector-native)."""
         test_name = "no_redis_dependencies"
@@ -711,6 +879,7 @@ class ConversationContextValidator:
             self.test_bot_memory_isolation,
             self.test_vector_storage_format,
             self.test_message_alternation_preserved,
+            self.test_conversation_thread_continuity,  # NEW: Continuity test
             self.test_no_redis_dependencies
         ]
         
