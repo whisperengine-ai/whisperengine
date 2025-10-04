@@ -238,12 +238,18 @@ class WorkflowManager:
         # 1. Pattern matching (regex)
         patterns = triggers.get("patterns", [])
         pattern_match = None
+        
+        self.logger.debug(f"🔍 WORKFLOW: Checking workflow '{workflow_name}' with {len(patterns)} patterns")
+        
         for pattern in patterns:
             try:
                 match = re.search(pattern, message, re.IGNORECASE)
                 if match:
                     pattern_match = match
+                    self.logger.info(f"✅ WORKFLOW: Pattern matched for '{workflow_name}': {pattern}")
                     break
+                else:
+                    self.logger.debug(f"❌ WORKFLOW: Pattern '{pattern}' did not match message")
             except re.error as e:
                 self.logger.warning(f"Invalid regex pattern '{pattern}': {e}")
                 continue

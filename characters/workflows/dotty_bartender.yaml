@@ -193,6 +193,7 @@ workflows:
       # Patterns for custom requests
       patterns:
         - "make me something (.*)"
+        - "can you make (me |us )?(a |an |some )?(.*)"
         - "surprise me"
         - "what do you recommend"
         - "something (special|unique|creative)"
