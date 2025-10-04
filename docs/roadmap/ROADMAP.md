@@ -1,15 +1,66 @@
 # WhisperEngine AI - Product Roadmap 2025-2026
 
-## 🎯 Current State (v0.8.0 - September 2025)
+## 🎯 Current State (v0.8.5 - October 2025)
 
-WhisperEngine has completed its **Production Hardening Sprint**, significantly improving reliability, security, and monitoring. The platform offers both entertainment-focused AI companions and enhanced deployment capabilities, but is still in active development toward a stable 1.0 release.
+WhisperEngine has completed its **Production Hardening Sprint** and **PostgreSQL Semantic Knowledge Graph** implementation. The platform now combines vector memory intelligence with structured factual knowledge, enabling authentic character responses with fact recall capabilities.
 
-### ✅ Recently Completed (v0.8.0)
+### ✅ Recently Completed (v0.8.5 - October 2025)
+- **Semantic Knowledge Graph**: PostgreSQL-based factual knowledge system with character integration
+  - Phase 1: Schema implementation (fact_entities, user_fact_relationships, entity_relationships)
+  - Phase 2: SemanticKnowledgeRouter with query intent analysis
+  - Phase 3: Knowledge extraction pipeline with auto-user-creation
+  - Phase 4: Character integration with personality-first synthesis (75% recall success, 100% character synthesis)
 - **Production Security**: SBOM generation, container signing, supply chain protection
 - **Monitoring & Operations**: Real-time health dashboards, performance analytics, alert systems
 - **Enterprise Features**: Multi-registry support, compliance documentation, security hardening
 - **Companion Platform**: Rich personality system with gaming, creative, and relationship companions
-- **Memory Architecture**: Phase 4 human-like intelligence with persistent memory networks
+- **Memory Architecture**: Hybrid vector + PostgreSQL with persistent memory networks
+
+---
+
+## 🚀 Immediate Priorities (October 2025)
+
+### Phase 5: User Preferences Integration ⚡ IN PROGRESS
+**Status**: Active Development  
+**Timeline**: October 2025 (2-4 hours)  
+**Priority**: CRITICAL
+
+**Goals**:
+- Move user preferences from vector memory to PostgreSQL
+- Implement fast, deterministic preference retrieval
+- Support preferred names and general preferences
+- Performance improvement: <1ms vs 10-50ms
+
+**Key Features**:
+- [x] Gap analysis completed - `universal_users.preferences` column identified but unused
+- [ ] Preference detection in MessageProcessor ("My name is Mark", "Call me Mark")
+- [ ] `store_user_preference()` in SemanticKnowledgeRouter
+- [ ] `get_user_preference()` in SemanticKnowledgeRouter  
+- [ ] Update CDL integration to use PostgreSQL preferences
+- [ ] Test preferred name patterns
+- [ ] Validate performance improvements
+
+**Impact**: Major UX improvement - instant, reliable preference recall vs slow semantic search
+
+### Phase 6: Entity Relationship Discovery 🔗
+**Status**: Planned  
+**Timeline**: Q4 2025  
+**Priority**: MEDIUM
+
+**Goals**:
+- Enable "similar to" recommendation queries
+- Populate entity_relationships via trigram matching
+- Implement 2-hop graph traversal
+- Natural discovery conversations
+
+**Key Features**:
+- [ ] Auto-populate entity_relationships on fact storage
+- [ ] "What's similar to pizza?" queries
+- [ ] 2-hop relationship traversal queries
+- [ ] Recommendation engine integration
+- [ ] Character-aware recommendations
+
+**Impact**: Enhanced conversation intelligence with natural recommendations
 
 ---
 
