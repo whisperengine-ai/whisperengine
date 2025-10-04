@@ -26,6 +26,7 @@ from src.database.database_integration import DatabaseIntegrationManager
 # )
 from src.security.input_validator import validate_user_input
 from src.security.system_message_security import scan_response_for_system_leakage
+from src.core.message_processor import create_message_processor
 from src.utils.exceptions import (
     LLMConnectionError,
     LLMError,
@@ -145,6 +146,18 @@ class BotEventHandlers:
         self.emoji_response_intelligence = EmojiResponseIntegration(
             memory_manager=self.memory_manager
         )
+
+        # Initialize unified MessageProcessor for consistent processing across platforms
+        try:
+            self.message_processor = create_message_processor(
+                bot_core=bot_core,  # Pass the bot_core instance
+                memory_manager=self.memory_manager,
+                llm_client=self.llm_client
+            )
+            logger.info("✅ MessageProcessor initialized for unified processing")
+        except Exception as e:
+            logger.error(f"❌ Failed to initialize MessageProcessor: {e}")
+            self.message_processor = None
 
         # Universal Chat Orchestrator - DEPRECATED (Discord-only processing now)
         self.chat_orchestrator = None
@@ -553,256 +566,86 @@ class BotEventHandlers:
         phase4_context = None
         comprehensive_context = None
 
-
-        # Get relevant memories with context-aware filtering, using Redis cache if available
-        relevant_memories = None
-        try:
-            if self.memory_manager is not None:
-                message_context = self.memory_manager.classify_discord_context(message)
-                logger.debug(
-                    f"DM context classified: {message_context.context_type.value} (security: {message_context.security_level.value})"
+        # Use unified MessageProcessor if available (preferred), fallback to complex manual processing
+        if self.message_processor:
+            try:
+                logger.info("🚀 Using unified MessageProcessor for DM processing")
+                
+                # Import MessageContext for creating platform-agnostic context
+                from src.core.message_processor import MessageContext
+                
+                # Create platform-agnostic message context
+                message_context = MessageContext(
+                    user_id=user_id,
+                    content=message.content,
+                    original_content=message.content,
+                    attachments=[{
+                        'url': attachment.url,
+                        'filename': attachment.filename,
+                        'content_type': getattr(attachment, 'content_type', None)
+                    } for attachment in message.attachments],
+                    platform="discord",
+                    channel_id=str(reply_channel.id),
+                    channel_type="dm" if reply_channel.type.name == "private" else "guild",
+                    metadata={
+                        'discord_message_id': str(message.id),
+                        'discord_author_id': str(message.author.id),
+                        'discord_author_name': message.author.display_name,  # Add user display name
+                        'discord_timestamp': message.created_at.isoformat()
+                    }
                 )
-
-                # Redis cache disabled - using vector-native memory directly
-                # if self.profile_memory_cache:
-                #     try:
-                #         if not self.profile_memory_cache.redis:
-                #             await self.profile_memory_cache.initialize()
-                #         relevant_memories = await self.profile_memory_cache.get_memory_retrieval(user_id, message.content)
-                #         if relevant_memories:
-                #             logger.debug(f"[CACHE] Memory retrieval cache hit for user {user_id}")
-                #     except Exception as e:
-                #         logger.debug(f"Cache lookup failed, proceeding with DB: {e}")
-                #         relevant_memories = None
-                # Use vector memory directly instead
-                relevant_memories = None
-                if not relevant_memories:
-                    logger.info(f"🔍 MEMORY DEBUG: Retrieving memories for user {user_id} with query: '{message.content[:50]}...'")
+                
+                # Show typing indicator while processing
+                async with reply_channel.typing():
+                    # Process the message with unified pipeline
+                    result = await self.message_processor.process_message(message_context)
+                
+                if result.success:
+                    # Send response using chunking method (no reply pattern for DM)
+                    await self._send_response_chunks(reply_channel, result.response, reference_message=None)
                     
-                    # Try optimized memory retrieval first if available
-                    if hasattr(self.memory_manager, 'retrieve_relevant_memories_optimized'):
-                        try:
-                            logger.info("🚀 MEMORY DEBUG: Using optimized memory retrieval")
-                            
-                            # Determine query type based on message content and context
-                            query_type = self._classify_query_type(message.content)
-                            
-                            # Build user preferences from context
-                            user_preferences = self._build_user_preferences(user_id, message_context)
-                            
-                            # Build filters from message context
-                            filters = self._build_memory_filters(message_context)
-                            
-                            # Add recency boost for conversation continuity
-                            filters["prefer_recent_conversation"] = True
-                            filters["recency_hours"] = 2  # Prefer memories from last 2 hours
-                            
-                            # 🛡️ META-CONVERSATION FILTER: Exclude conversations ABOUT the bot system itself
-                            # This prevents our technical debugging from contaminating character responses
-                            # 🎯 CHARACTER-AGNOSTIC: Meta-conversation patterns (no hardcoded character names)
-                            # while allowing users to discuss these topics naturally
-                            meta_conversation_patterns = [
-                                "your prompt", "your system prompt", "how you're programmed",
-                                "your character file", "cdl_ai_integration.py", "fix the bot's",
-                                "bot is announcing wrong time", "bot should speak like",
-                                "testing bot response", "bot container",
-                                "bot's speaking style", "bot's detection"
-                            ]
-                            filters["exclude_content_patterns"] = meta_conversation_patterns
-                            logger.info(f"🛡️ MEMORY FILTER: Excluding meta-conversations with {len(meta_conversation_patterns)} pattern filters")
-                            
-                            # � CHARACTER-AGNOSTIC: Add character-aware memory filtering
-                            # This ensures each bot gets its own memories, not cross-bot contamination
-                            if hasattr(self.bot_core, 'command_handlers') and 'cdl_test' in self.bot_core.command_handlers:
-                                cdl_handler = self.bot_core.command_handlers['cdl_test']
-                                if hasattr(cdl_handler, '_get_user_active_character'):
-                                    try:
-                                        active_character = cdl_handler._get_user_active_character(user_id)
-                                        if active_character:
-                                            character_name = active_character.replace('.json', '').replace('examples/', '')
-                                            filters["active_character"] = character_name
-                                            filters["has_character"] = True
-                                            logger.info(f"🎭 MEMORY SEARCH: Filtering for character: {character_name}")
-                                        else:
-                                            filters["has_character"] = False
-                                            logger.info(f"🎭 MEMORY SEARCH: Filtering for non-character conversations")
-                                    except Exception as e:
-                                        logger.warning(f"🎭 MEMORY SEARCH: Could not detect character for search: {e}")
-                                        # Don't add character filters if detection fails
-                            
-                            relevant_memories = await self.memory_manager.retrieve_relevant_memories_optimized(
-                                user_id=user_id,
-                                query=message.content,
-                                query_type=query_type,
-                                user_history=user_preferences,
-                                filters=filters,
-                                limit=20
-                            )
-                            
-                            logger.info(f"🚀 MEMORY DEBUG: Optimized retrieval returned {len(relevant_memories) if relevant_memories else 0} memories")
-                            
-                            # Log optimization details for debugging
-                            if relevant_memories and len(relevant_memories) > 0:
-                                sample = relevant_memories[0]
-                                if 'reranked_score' in sample:
-                                    logger.info(f"🚀 MEMORY DEBUG: Re-ranking active - top reranked score: {sample['reranked_score']:.3f}")
-                                if 'scoring_breakdown' in sample:
-                                    breakdown = sample['scoring_breakdown']
-                                    logger.info(f"🚀 MEMORY DEBUG: Scoring breakdown - base: {breakdown.get('base_score', 0):.3f}, "
-                                              f"recency: {breakdown.get('recency_boost', 0):.3f}, "
-                                              f"preference: {breakdown.get('preference_boost', 0):.3f}")
-                            
-                        except Exception as e:
-                            logger.warning(f"🚀 MEMORY DEBUG: Optimized retrieval failed, using context-aware fallback: {e}")
-                            # Use context-aware retrieval as fallback (no hardcoded temporal detection)
-                            relevant_memories = await self.memory_manager.retrieve_context_aware_memories(
-                                user_id=user_id, 
-                                query=message.content, 
-                                max_memories=20,
-                                context=message_context,
-                                emotional_context="general conversation"
-                            )
-                    
-                    # Ensure we always have some form of memory retrieval
-                    if not relevant_memories:
-                        logger.info("🔍 MEMORY DEBUG: Using context-aware memory retrieval")
-                        relevant_memories = await self.memory_manager.retrieve_context_aware_memories(
-                            user_id=user_id, 
-                            query=message.content, 
-                            max_memories=20,
-                            context=message_context,
-                            emotional_context="general conversation"
-                        )
-                    
-                    logger.info(f"🔍 MEMORY DEBUG: Retrieved {len(relevant_memories) if relevant_memories else 0} memories")
-                    if relevant_memories:
-                        for i, memory in enumerate(relevant_memories[:3]):  # Log first 3 memories
-                            content = memory.get('content', '')[:100]
-                            score = memory.get('score', 'N/A')
-                            reranked = memory.get('reranked_score')
-                            score_text = f"score: {score}"
-                            if reranked:
-                                score_text += f", reranked: {reranked:.3f}"
-                            logger.info(f"🔍 MEMORY DEBUG: Memory {i+1}: ({score_text}) '{content}...'")
-                    else:
-                        logger.warning(f"🔍 MEMORY DEBUG: No memories retrieved for user {user_id}")
-                    
-                    # Store in cache for next time
-                    if self.profile_memory_cache and relevant_memories:
-                        try:
-                            if not self.profile_memory_cache.redis:
-                                await self.profile_memory_cache.initialize()
-                            await self.profile_memory_cache.set_memory_retrieval(user_id, message.content, relevant_memories)
-                        except Exception as e:
-                            logger.debug(f"Failed to cache memory retrieval: {e}")
-
-                # Get emotion context if available
-                emotion_context = ""
-                if hasattr(self.memory_manager, "get_emotion_context"):
+                    # 🎭 BOT EMOJI REACTIONS: Add emoji reaction to user's message (multimodal feedback)
                     try:
-                        # Check if method is async or sync and handle accordingly (WhisperEngine architecture)
-                        import inspect
-                        if inspect.iscoroutinefunction(self.memory_manager.get_emotion_context):
-                            emotion_context = await self.memory_manager.get_emotion_context(user_id)
-                        else:
-                            # Use thread worker pattern for sync methods in async context
-                            loop = asyncio.get_running_loop()
-                            emotion_context = await loop.run_in_executor(
-                                None, self.memory_manager.get_emotion_context, user_id
-                            )
+                        # Get character type from CDL for emoji selection
+                        bot_character = await self._get_character_type_from_cdl()
+                        
+                        # Evaluate whether to add emoji reaction based on context
+                        emoji_decision = await self.emoji_response_intelligence.evaluate_emoji_response(
+                            user_id=user_id,
+                            user_message=message.content,
+                            bot_character=bot_character,
+                            security_validation_result=result.metadata.get('security_validation') if result.metadata else None,
+                            emotional_context=result.metadata.get('ai_components', {}).get('emotion_data') if result.metadata else None,
+                            conversation_context={'channel_type': message_context.channel_type}
+                        )
+                        
+                        # Add emoji reaction if recommended (but don't replace text response)
+                        if emoji_decision.should_use_emoji:
+                            logger.info(f"🎭 REACTION: Adding emoji '{emoji_decision.emoji_choice}' to user DM "
+                                      f"(confidence: {emoji_decision.confidence_score:.2f}, reason: {emoji_decision.context_reason.value})")
+                            await message.add_reaction(emoji_decision.emoji_choice)
                     except Exception as e:
-                        logger.debug(f"Could not get emotion context: {e}")
-                        emotion_context = ""
-            else:
-                logger.warning("memory_manager is not initialized; skipping memory retrieval.")
-                relevant_memories = []
-                emotion_context = ""
-
-        except (MemoryRetrievalError, ValidationError) as e:
-            logger.warning(f"Could not retrieve memories for user {user_id}: {e}")
-            relevant_memories = []
-            emotion_context = ""
-        except Exception as e:
-            logger.error(f"Unexpected error retrieving memories: {e}")
-            relevant_memories = []
-            emotion_context = ""
-
-        # Get recent conversation history - Use HYBRID approach: summary + recent messages
-        conversation_summary = await self._get_intelligent_conversation_summary(reply_channel, user_id, message)
-        
-        if conversation_summary:
-            # Use HYBRID: intelligent summary for older context + recent messages for continuity
-            logger.info(f"✅ Using HYBRID approach: conversation summary + recent messages for user {user_id}")
-            recent_messages = await self._get_recent_messages(reply_channel, user_id, message.id)
-            # Add summary as a system context message
-            conversation_summary_context = [
-                {"role": "system", "content": f"Previous conversation summary: {conversation_summary}"}
-            ]
-        else:
-            # Fall back to traditional message loading
-            recent_messages = await self._get_recent_messages(reply_channel, user_id, message.id)
-            conversation_summary_context = []
-
-        # Build conversation context
-        conversation_context = await self._build_conversation_context(
-            message, relevant_memories, emotion_context, recent_messages, enhanced_system_prompt
-        )
-        
-        # Add intelligent conversation summary if available
-        if conversation_summary_context:
-            # Insert summary before user messages but after system prompts
-            # Find where to insert (after system messages, before user messages)
-            insert_pos = len([ctx for ctx in conversation_context if ctx["role"] == "system"])
-            conversation_context[insert_pos:insert_pos] = conversation_summary_context
-
-        external_emotion_data = None
-        phase2_context = None
-        current_emotion_data = None
-        dynamic_personality_context = None
-        phase4_context = None
-        comprehensive_context = None
-        enhanced_system_prompt = None
-
-        # ALWAYS process AI components - NO CONDITIONAL FALLBACKS
-        (external_emotion_data, context_analysis, current_emotion_data, 
-         dynamic_personality_context, phase4_context, comprehensive_context, 
-         enhanced_system_prompt, phase3_context_switches, phase3_empathy_calibration) = await self._process_ai_components_parallel(
-            user_id, message.content, message, recent_messages, conversation_context
-        )
-        
-        # 🎯 VECTOR-NATIVE: Emotion data is now a clean dict (not a tuple!)
-        # The vector-native analyzer returns a dict directly for storage
-        phase2_context = external_emotion_data
-        logger.debug(f"🎯 VECTOR-NATIVE FLOW: phase2_context assigned from vector emotion analysis: {type(phase2_context)}")
-        if phase2_context:
-            logger.info(f"� VECTOR-NATIVE FLOW: Emotion detected - {phase2_context.get('primary_emotion', 'unknown')} "
-                       f"(confidence: {phase2_context.get('confidence', 0):.3f})")
-
-        # Process message with images
-        conversation_context = await process_message_with_images(
-            message.content,
-            message.attachments,
-            conversation_context,
-            self.llm_client,
-            self.image_processor,
-        )
-
-        # Generate and send response
-        await self._generate_and_send_response(
-            reply_channel,
-            message,
-            user_id,
-            conversation_context,
-            current_emotion_data,  # Use fresh data from parallel processing
-            external_emotion_data,  # Use fresh data from parallel processing (phase2_context)
-            phase2_context,  # Use fresh phase2_context from emotion analysis
-            phase4_context,  # Use fresh data from parallel processing
-            comprehensive_context,  # Use fresh data from parallel processing
-            dynamic_personality_context,  # Use fresh data from parallel processing
-            phase3_context_switches,  # Use fresh data from parallel processing
-            phase3_empathy_calibration,  # Use fresh data from parallel processing
-            context_analysis,  # Use fresh context analysis for enhanced processing
-        )
+                        logger.error(f"Error adding bot emoji reaction (non-critical): {e}")
+                        # Continue - emoji reaction failure shouldn't break conversation
+                    
+                    # Send voice response if applicable  
+                    await self._send_voice_response(message, result.response)
+                    
+                else:
+                    # Handle processing error
+                    logger.error(f"MessageProcessor returned error: {result.error_message}")
+                    await reply_channel.send("I apologize, but I encountered an error processing your message. Please try again.")
+                
+                return  # Exit early when using MessageProcessor
+                
+            except Exception as e:
+                logger.error(f"Error with MessageProcessor, falling back to manual processing: {e}")
+                
+        # Simple fallback if MessageProcessor completely unavailable
+        if not self.message_processor:
+            logger.warning("📋 MessageProcessor unavailable - using simple fallback")
+            await reply_channel.send("I'm currently updating my systems. Please try again in a moment!")
+            return
 
     async def _handle_guild_message(self, message):
         """Handle guild (server) message."""
@@ -909,6 +752,30 @@ class BotEventHandlers:
                 f"SECURITY: Unsafe input detected from user {user_id} in server {message.guild.name}"
             )
             logger.error(f"SECURITY: Blocked patterns: {validation_result['blocked_patterns']}")
+            
+            # 🎭 EMOJI INTELLIGENCE: Use emoji response for inappropriate content
+            try:
+                # 🎯 CHARACTER-AGNOSTIC: Determine bot character from CDL instead of hardcoded names
+                bot_character = await self._get_character_type_from_cdl()
+                
+                # Evaluate emoji response for inappropriate content
+                emoji_decision = await self.emoji_response_intelligence.evaluate_emoji_response(
+                    user_id=user_id,
+                    user_message=content,
+                    bot_character=bot_character,
+                    security_validation_result=validation_result,
+                    emotional_context=None,
+                    conversation_context={'channel_type': 'guild'}
+                )
+                
+                if emoji_decision.should_use_emoji:
+                    logger.info(f"🎭 SECURITY + EMOJI: Adding emoji '{emoji_decision.emoji_choice}' for inappropriate content in guild")
+                    await message.add_reaction(emoji_decision.emoji_choice)
+                    
+            except Exception as e:
+                logger.error(f"Error in security emoji response: {e}")
+            
+            # Send text warning (with or without emoji)
             security_msg = f"⚠️ {message.author.mention} Your message contains content that could not be processed for security reasons. Please rephrase your message."
             await message.reply(security_msg, mention_author=False)  # mention_author=False since we already include the mention
             return
@@ -922,144 +789,90 @@ class BotEventHandlers:
         # AI identity questions are now handled naturally through CDL character responses
         # No more dirty filter patterns - let characters respond authentically
 
-        # Get relevant memories with context-aware filtering, using Redis cache if available
-        relevant_memories = None
-        try:
-            if self.memory_manager is not None:
-                message_context = self.memory_manager.classify_discord_context(message)
-                logger.debug(
-                    f"Server context classified: {message_context.context_type.value} (security: {message_context.security_level.value}, server: {message.guild.name})"
+        # Use unified MessageProcessor for guild mentions (same as DMs)
+        if self.message_processor:
+            try:
+                logger.info("🚀 Using unified MessageProcessor for guild mention processing")
+                
+                # Import MessageContext for creating platform-agnostic context
+                from src.core.message_processor import MessageContext
+                
+                # Create platform-agnostic message context for guild mention
+                message_context = MessageContext(
+                    user_id=user_id,
+                    content=content,
+                    original_content=message.content,
+                    attachments=[{
+                        'url': attachment.url,
+                        'filename': attachment.filename,
+                        'content_type': getattr(attachment, 'content_type', None)
+                    } for attachment in message.attachments],
+                    platform="discord",
+                    channel_id=str(reply_channel.id),
+                    channel_type="guild",
+                    metadata={
+                        'discord_message_id': str(message.id),
+                        'discord_author_id': str(message.author.id),
+                        'discord_author_name': message.author.display_name,  # Add user display name
+                        'discord_timestamp': message.created_at.isoformat(),
+                        'discord_guild_id': str(message.guild.id),
+                        'discord_guild_name': message.guild.name,
+                        'discord_channel_name': getattr(message.channel, 'name', 'unknown'),
+                        'mention_processed': True
+                    }
                 )
-
-                # Try Redis cache first
-                if self.profile_memory_cache:
+                
+                # Process the message with unified pipeline
+                # Show typing indicator while processing
+                async with reply_channel.typing():
+                    result = await self.message_processor.process_message(message_context)
+                
+                if result.success:
+                    # Send response using chunking method with reply pattern for guild mentions
+                    await self._send_response_chunks(reply_channel, result.response, reference_message=message)
+                    
+                    # 🎭 BOT EMOJI REACTIONS: Add emoji reaction to user's mention (multimodal feedback)
                     try:
-                        if not self.profile_memory_cache.redis:
-                            await self.profile_memory_cache.initialize()
-                        relevant_memories = await self.profile_memory_cache.get_memory_retrieval(user_id, content)
-                        if relevant_memories:
-                            logger.debug(f"[CACHE] Memory retrieval cache hit for user {user_id}")
+                        # Get character type from CDL for emoji selection
+                        bot_character = await self._get_character_type_from_cdl()
+                        
+                        # Evaluate whether to add emoji reaction based on context
+                        emoji_decision = await self.emoji_response_intelligence.evaluate_emoji_response(
+                            user_id=user_id,
+                            user_message=content,
+                            bot_character=bot_character,
+                            security_validation_result=result.metadata.get('security_validation') if result.metadata else None,
+                            emotional_context=result.metadata.get('ai_components', {}).get('emotion_data') if result.metadata else None,
+                            conversation_context={'channel_type': message_context.channel_type}
+                        )
+                        
+                        # Add emoji reaction if recommended (but don't replace text response)
+                        if emoji_decision.should_use_emoji:
+                            logger.info(f"🎭 REACTION: Adding emoji '{emoji_decision.emoji_choice}' to user mention "
+                                      f"(confidence: {emoji_decision.confidence_score:.2f}, reason: {emoji_decision.context_reason.value})")
+                            await message.add_reaction(emoji_decision.emoji_choice)
                     except Exception as e:
-                        logger.debug(f"Cache lookup failed, proceeding with DB: {e}")
-                        relevant_memories = None
-                if not relevant_memories:
-                    relevant_memories = await self.memory_manager.retrieve_context_aware_memories(
-                        user_id=user_id, 
-                        query=content, 
-                        max_memories=20,
-                        context=message_context
-                    )
-                    # Store in cache for next time
-                    if self.profile_memory_cache and relevant_memories:
-                        try:
-                            if not self.profile_memory_cache.redis:
-                                await self.profile_memory_cache.initialize()
-                            await self.profile_memory_cache.set_memory_retrieval(user_id, content, relevant_memories)
-                        except Exception as e:
-                            logger.debug(f"Failed to cache memory retrieval: {e}")
-
-                emotion_context = ""
-                if hasattr(self.memory_manager, "get_emotion_context"):
-                    try:
-                        # Check if method is async or sync and handle accordingly (WhisperEngine architecture)
-                        import inspect
-                        if inspect.iscoroutinefunction(self.memory_manager.get_emotion_context):
-                            emotion_context = await self.memory_manager.get_emotion_context(user_id)
-                        else:
-                            # Use thread worker pattern for sync methods in async context
-                            loop = asyncio.get_running_loop()
-                            emotion_context = await loop.run_in_executor(
-                                None, self.memory_manager.get_emotion_context, user_id
-                            )
-                    except Exception as e:
-                        logger.debug(f"Could not get emotion context: {e}")
-                        emotion_context = ""
-            else:
-                logger.warning("memory_manager is not initialized; skipping memory retrieval.")
-                relevant_memories = []
-                emotion_context = ""
-
-        except (MemoryRetrievalError, ValidationError) as e:
-            logger.warning(f"Could not retrieve memories for user {user_id}: {e}")
-            relevant_memories = []
-            emotion_context = ""
-        except Exception as e:
-            logger.error(f"Unexpected error retrieving memories: {e}")
-            relevant_memories = []
-            emotion_context = ""
-
-        # Get recent conversation history (guild-specific) - Use HYBRID approach: summary + recent messages
-        conversation_summary = await self._get_intelligent_conversation_summary(reply_channel, user_id, message)
-        
-        if conversation_summary:
-            # Use HYBRID: intelligent summary for older context + recent messages for continuity
-            logger.info(f"✅ Using HYBRID approach: conversation summary + recent messages for guild user {user_id}")
-            recent_messages = await self._get_recent_messages(reply_channel, user_id, message.id)
-            # Add summary as a system context message
-            conversation_summary_context = [
-                {"role": "system", "content": f"Previous conversation summary: {conversation_summary}"}
-            ]
-        else:
-            # Fall back to traditional message loading
-            recent_messages = await self._get_recent_messages(reply_channel, user_id, message.id)
-            conversation_summary_context = []
-
-        # Build conversation context
-        conversation_context = await self._build_conversation_context(
-            message, relevant_memories, emotion_context, recent_messages, None, content
-        )
-        
-        # Add intelligent conversation summary if available
-        if conversation_summary_context:
-            # Insert summary before user messages but after system prompts
-            # Find where to insert (after system messages, before user messages)
-            insert_pos = len([ctx for ctx in conversation_context if ctx["role"] == "system"])
-            conversation_context[insert_pos:insert_pos] = conversation_summary_context
-            
-        logger.info(f"[CONV-CTX] Built conversation context for message_id={message.id} user_id={user_id} context_type={type(conversation_context)} context_preview={str(conversation_context)[:120]}")
-
-        external_emotion_data = None
-        phase2_context = None
-        current_emotion_data = None
-        dynamic_personality_context = None
-        phase4_context = None
-        comprehensive_context = None
-        enhanced_system_prompt = None
-
-        # ALWAYS process AI components - NO CONDITIONAL FALLBACKS
-        (external_emotion_data, context_analysis, current_emotion_data, 
-         dynamic_personality_context, phase4_context, comprehensive_context, 
-         enhanced_system_prompt, phase3_context_switches, phase3_empathy_calibration) = await self._process_ai_components_parallel(
-            user_id, content, message, recent_messages, conversation_context
-        )
-
-        # Process message with images (content with mentions removed)
-        conversation_context = await process_message_with_images(
-            content,
-            message.attachments,
-            conversation_context,
-            self.llm_client,
-            self.image_processor,
-        )
-
-        # Generate and send response for guild mention
-        logger.info(f"[CONV-CTX] Sending to LLM: message_id={message.id} user_id={user_id} final_content='{content}' context_length={len(conversation_context)}")
-        await self._generate_and_send_response(
-            reply_channel,
-            message,
-            user_id,
-            conversation_context,
-            current_emotion_data,  # Use fresh data from parallel processing
-            external_emotion_data,  # Use fresh data from parallel processing
-            getattr(self, '_last_phase2_context', None),  # Legacy phase2 - keep as cached
-            phase4_context,  # Use fresh data from parallel processing
-            comprehensive_context,  # Use fresh data from parallel processing
-            dynamic_personality_context,  # Use fresh data from parallel processing
-            phase3_context_switches,  # Use fresh data from parallel processing
-            phase3_empathy_calibration,  # Use fresh data from parallel processing
-            context_analysis,  # Use fresh context analysis for enhanced processing
-            content,
-        )
+                        logger.error(f"Error adding bot emoji reaction (non-critical): {e}")
+                        # Continue - emoji reaction failure shouldn't break conversation
+                    
+                    # Send voice response if applicable
+                    await self._send_voice_response(message, result.response)
+                    
+                else:
+                    # Handle processing error
+                    logger.error(f"MessageProcessor returned error: {result.error_message}")
+                    await message.reply("I apologize, but I encountered an error processing your message. Please try again.", mention_author=False)
+                
+                return  # Exit early when using MessageProcessor
+                
+            except Exception as e:
+                logger.error(f"Error with MessageProcessor in guild mention, falling back to basic response: {e}")
+                
+        # Simple fallback if MessageProcessor unavailable
+        if not self.message_processor:
+            logger.warning("📋 MessageProcessor unavailable for guild mention - using simple fallback")
+            await message.reply("I'm currently updating my systems. Please try again in a moment!", mention_author=False)
+            return
 
     async def _get_intelligent_conversation_summary(self, channel, user_id, message):
         """Use boundary manager to create intelligent conversation summary instead of crude truncation."""
@@ -1560,1473 +1373,6 @@ class BotEventHandlers:
 
         return conversation_context
 
-    async def _analyze_emotion_vector_native(
-        self, user_id, content, message, conversation_context
-    ):
-        """
-        🚀 VECTOR-NATIVE EMOTION ANALYSIS
-        
-        Analyzes emotion using EnhancedVectorEmotionAnalyzer with:
-        - RoBERTa transformer model for accuracy
-        - Vector semantic analysis using 7D memory system
-        - Multi-dimensional emotion classification
-        - Emoji reaction context integration
-        - Discord metadata preservation
-        
-        Replaces legacy Phase 2 integration with modern vector-first architecture.
-        """
-        try:
-            from src.intelligence.enhanced_vector_emotion_analyzer import EnhancedVectorEmotionAnalyzer
-            
-            logger.info(f"🎭 VECTOR-NATIVE: Starting emotion analysis for user {user_id}")
-            logger.info(f"🎭 VECTOR-NATIVE: Content: '{content[:100]}{'...' if len(content) > 100 else ''}'")
-            
-            # Initialize vector-native analyzer with memory manager
-            analyzer = EnhancedVectorEmotionAnalyzer(self.memory_manager)
-            
-            # 🎭 MULTIMODAL INTELLIGENCE: Get recent emoji reaction context
-            emoji_reaction_context = await self.get_recent_emotional_feedback(user_id)
-            has_emoji_context = emoji_reaction_context.get("confidence", 0.0) > 0.3
-            
-            if has_emoji_context:
-                logger.info(f"🎭 VECTOR-NATIVE: Emoji context available (confidence: {emoji_reaction_context.get('confidence', 0.0):.2f})")
-            else:
-                logger.debug(f"🎭 VECTOR-NATIVE: No significant emoji context (confidence: {emoji_reaction_context.get('confidence', 0.0):.3f})")
-            
-            # Perform vector-native emotion analysis
-            emotion_result = await analyzer.analyze_emotion(
-                content=content,
-                user_id=user_id,
-                conversation_context=conversation_context  # Already formatted from parallel processing
-            )
-            
-            logger.info(f"🎭 VECTOR-NATIVE: Analysis complete - {emotion_result.primary_emotion} "
-                       f"(confidence: {emotion_result.confidence:.3f}, intensity: {emotion_result.intensity:.3f})")
-            
-            # Convert to storage format with Discord metadata
-            emotion_data = {
-                "primary_emotion": emotion_result.primary_emotion,
-                "confidence": emotion_result.confidence,
-                "intensity": emotion_result.intensity,
-                "all_emotions": emotion_result.all_emotions,
-                "mixed_emotions": emotion_result.mixed_emotions,
-                "emotion_description": emotion_result.emotion_description,
-                "emotional_trajectory": emotion_result.emotional_trajectory,
-                "analysis_method": "vector_native_roberta",
-                "analysis_time_ms": emotion_result.analysis_time_ms,
-                
-                # Vector-specific metrics
-                "vector_similarity": emotion_result.vector_similarity,
-                "embedding_confidence": emotion_result.embedding_confidence,
-                
-                # Discord context metadata (preserved from Phase 2)
-                "guild_id": str(message.guild.id) if message.guild else None,
-                "channel_id": str(message.channel.id) if message.channel else None,
-                "timestamp": datetime.now().isoformat(),
-                
-                # Emoji reaction context if significant
-                "emoji_reaction_context": emoji_reaction_context if has_emoji_context else None
-            }
-            
-            logger.info(f"🎭 VECTOR-NATIVE: Emotion data prepared for storage with {len(emotion_data)} fields")
-            
-            return emotion_data  # Return DICT directly (no tuple!)
-
-        except Exception as e:
-            logger.error(f"🎭 VECTOR-NATIVE: Emotion analysis failed: {e}", exc_info=True)
-            return None
-
-    async def _analyze_context_switches(self, user_id, content, message):
-        """Analyze context switches using Phase 3 ContextSwitchDetector."""
-        try:
-            logger.info("🔍🔍🔍 EXPLICIT DEBUG: Running Phase 3 context switch detection...")
-
-            if not hasattr(self.bot, 'context_switch_detector') or not self.bot.context_switch_detector:
-                logger.warning("🔍🔍🔍 EXPLICIT DEBUG: Context switch detector not available")
-                return None
-
-            # Log detector initialization status
-            detector = self.bot.context_switch_detector
-            logger.info(f"🔍🔍🔍 CONTEXT SWITCH DEBUG: Detector initialized with thresholds: "
-                       f"topic={detector.topic_shift_threshold}, "
-                       f"emotional={detector.emotional_shift_threshold}, "
-                       f"mode={detector.conversation_mode_threshold}, "
-                       f"urgency={detector.urgency_change_threshold}")
-
-            # Log that we're about to call detect_context_switches
-            logger.info(f"🔍🔍🔍 CONTEXT SWITCH DEBUG: About to call detect_context_switches with message: '{content[:50]}...'")
-
-            # Detect context switches
-            context_switches = await self.bot.context_switch_detector.detect_context_switches(
-                user_id=user_id,
-                new_message=content
-            )
-
-            # Explicitly log each detected switch with details
-            if context_switches and len(context_switches) > 0:
-                logger.info(f"🔍🔍🔍 CONTEXT SWITCH SUCCESS: {len(context_switches)} switches detected!")
-                for i, switch in enumerate(context_switches):
-                    logger.info(f"🔍🔍🔍 CONTEXT SWITCH #{i+1}: Type={switch.switch_type.value}, "
-                              f"Strength={switch.strength.value}, "
-                              f"Description='{switch.description}'")
-            else:
-                logger.info(f"🔍🔍🔍 CONTEXT SWITCH DEBUG: No context switches detected for message: '{content[:50]}...'")
-
-            return context_switches
-
-        except Exception as e:
-            logger.error(f"🔍🔍🔍 CONTEXT SWITCH ERROR: Phase 3 context switch detection failed: {e}", exc_info=True)
-            return None
-
-    async def _calibrate_empathy_response(self, user_id, content, message):
-        """Calibrate empathy response using Phase 3 EmpathyCalibrator."""
-        try:
-            logger.debug("Running Phase 3 empathy calibration...")
-
-            if not hasattr(self.bot, 'empathy_calibrator') or not self.bot.empathy_calibrator:
-                logger.debug("Empathy calibrator not available")
-                return None
-
-            # Use sophisticated emotion detection from Enhanced Vector Emotion Analyzer
-            from src.intelligence.empathy_calibrator import EmotionalResponseType
-            
-            detected_emotion = EmotionalResponseType.CONTENTMENT  # Default to contentment instead of neutral
-            
-            # Try to use Enhanced Vector Emotion Analyzer for sophisticated emotion detection
-            if hasattr(self.bot, 'enhanced_emotion_analyzer') and self.bot.enhanced_emotion_analyzer:
-                try:
-                    emotion_analysis = await self.bot.enhanced_emotion_analyzer.analyze_emotional_context(
-                        user_id=user_id, 
-                        message_content=content, 
-                        conversation_context=message.channel.type.name if hasattr(message.channel, 'type') else 'unknown'
-                    )
-                    
-                    # Map enhanced emotion analysis to empathy calibrator emotion types
-                    if emotion_analysis and hasattr(emotion_analysis, 'primary_emotion'):
-                        emotion_mapping = {
-                            'stress': EmotionalResponseType.STRESS,
-                            'anxiety': EmotionalResponseType.ANXIETY,
-                            'frustration': EmotionalResponseType.FRUSTRATION,
-                            'sadness': EmotionalResponseType.SADNESS,
-                            'joy': EmotionalResponseType.JOY,
-                            'excitement': EmotionalResponseType.EXCITEMENT,
-                            'confusion': EmotionalResponseType.CONFUSION,
-                            'anger': EmotionalResponseType.ANGER,
-                            'overwhelm': EmotionalResponseType.OVERWHELM,
-                            'contentment': EmotionalResponseType.CONTENTMENT
-                        }
-                        
-                        primary_emotion = emotion_analysis.primary_emotion.lower()
-                        detected_emotion = emotion_mapping.get(primary_emotion, EmotionalResponseType.CONTENTMENT)
-                        
-                        logger.debug(f"Enhanced emotion detection: {primary_emotion} -> {detected_emotion.value}")
-                    
-                except Exception as e:
-                    logger.warning(f"Enhanced emotion detection failed, using contentment: {e}")
-            else:
-                logger.debug("Enhanced emotion analyzer not available, using contentment emotion")
-
-            # Calibrate empathy
-            empathy_calibration = await self.bot.empathy_calibrator.calibrate_empathy(
-                user_id=user_id,
-                detected_emotion=detected_emotion,
-                message_content=content
-            )
-
-            logger.debug(f"Phase 3 empathy calibration completed: {empathy_calibration.recommended_style.value if empathy_calibration else 'None'}")
-            return empathy_calibration
-
-        except Exception as e:
-            logger.error(f"Phase 3 empathy calibration failed: {e}")
-            return None
-
-    async def _process_phase4_intelligence(
-        self, user_id, message, recent_messages, external_emotion_data, phase2_context,
-        phase3_context_switches=None, phase3_empathy_calibration=None
-    ):
-        """Process Phase 4 human-like conversation intelligence."""
-        try:
-            logger.info(f"🧠 PHASE 4 DEBUG: Starting Phase 4 human-like conversation intelligence for user {user_id}")
-            logger.info(f"🧠 PHASE 4 DEBUG: Input message: '{message.content[:100]}...'")
-            logger.info(f"🧠 PHASE 4 DEBUG: External emotion data: {str(external_emotion_data)[:200] if external_emotion_data else 'None'}")
-            logger.info(f"🧠 PHASE 4 DEBUG: Phase 2 context: {str(phase2_context)[:200] if phase2_context else 'None'}")
-
-            discord_context = {
-                "channel_id": str(message.channel.id),
-                "guild_id": str(message.guild.id) if message.guild else None,
-                "channel_type": "dm" if message.guild is None else "guild",
-                "user_display_name": message.author.display_name,
-                "external_emotion_data": external_emotion_data,
-                "phase2_results": phase2_context,
-                "phase3_context_switches": phase3_context_switches,
-                "phase3_empathy_calibration": phase3_empathy_calibration,
-            }
-            
-            logger.info(f"🧠 PHASE 4 DEBUG: Discord context: {discord_context}")
-
-            # Clean Phase 4 integration - call directly instead of through monkey-patched methods
-            from src.intelligence.phase4_human_like_integration import Phase4HumanLikeIntegration
-            
-            # Create Phase 4 integration instance with clean architecture
-            logger.info("🧠 PHASE 4 DEBUG: Creating Phase4HumanLikeIntegration instance")
-            phase4_integration = Phase4HumanLikeIntegration(
-                phase2_integration=getattr(self.bot, 'phase2_integration', None),
-                phase3_memory_networks=getattr(self.bot, 'phase3_memory_networks', None),
-                memory_manager=self.memory_manager,
-                llm_client=getattr(self.bot, 'llm_client', None),
-                enable_adaptive_mode=True,
-                memory_optimization=True,
-                emotional_resonance=True,
-            )
-            
-            # Process message with Phase 4 intelligence
-            logger.info("🧠 PHASE 4 DEBUG: Processing message with comprehensive intelligence")
-            phase4_context = await phase4_integration.process_comprehensive_message(
-                user_id=user_id,
-                message=message.content,
-                conversation_context=recent_messages,
-                discord_context=discord_context,
-            )
-            
-            logger.info(f"🧠 PHASE 4 DEBUG: Received Phase 4 context: {str(phase4_context)[:300] if phase4_context else 'None'}")
-
-            # --- PHASE 4 SCATTER-GATHER PARALLELISM ---
-            import asyncio
-            thread_manager_task = None
-            engagement_task = None
-            human_like_task = None
-            conversation_analysis_task = None
-
-            # Prepare thread manager task - ALWAYS enabled in development!
-            if (hasattr(self.bot, 'thread_manager') and self.bot.thread_manager):
-                thread_manager_task = asyncio.create_task(
-                    self.bot.thread_manager.process_user_message(
-                        user_id=user_id,
-                        message=message.content,
-                        context={
-                            "channel_id": discord_context["channel_id"],
-                            "guild_id": discord_context["guild_id"],
-                            "emotional_data": external_emotion_data,
-                            "phase2_context": phase2_context
-                        }
-                    )
-                )
-
-            # Prepare engagement engine task - always enabled in development!
-            if (hasattr(self.bot, 'engagement_engine') and self.bot.engagement_engine):
-                # Prepare recent messages in the expected format
-                formatted_recent_messages = []
-                for msg in recent_messages[-10:]:  # Last 10 messages
-                    if isinstance(msg, dict):
-                        formatted_recent_messages.append(msg)
-                    elif hasattr(msg, 'content') and hasattr(msg, 'author'):
-                        formatted_recent_messages.append({
-                            "content": msg.content,
-                            "user_id": str(msg.author.id),
-                            "timestamp": getattr(msg, 'created_at', None)
-                        })
-                engagement_task = asyncio.create_task(
-                    self.bot.engagement_engine.analyze_conversation_engagement(
-                        user_id=user_id,
-                        context_id=discord_context["channel_id"],
-                        recent_messages=formatted_recent_messages,
-                        current_thread_info=None  # Will patch in thread_manager_result after gather
-                    )
-                )
-
-            # Prepare human-like memory processing task
-            # DISABLED: Legacy human-like system causes async/sync complexity
-            # Clean Protocol-based architecture provides the same intelligence without wrapper chaos
-            # if hasattr(self.memory_manager, 'human_like_system'):
-            if False:  # Permanently disabled legacy human-like enhancement system
-                # Prepare conversation history - handle both dict and Discord Message objects
-                conversation_history = []
-                for msg in recent_messages[-5:]:
-                    if isinstance(msg, dict):
-                        if 'content' in msg:
-                            conversation_history.append(msg['content'])
-                    else:
-                        # Handle Discord Message object
-                        if hasattr(msg, 'content') and msg.content:
-                            conversation_history.append(msg.content)
-                # Build relationship context
-                relationship_context = {
-                    "interaction_history": len(recent_messages),
-                    "emotional_data": external_emotion_data,
-                    "phase2_context": phase2_context,
-                    "discord_context": discord_context
-                }
-                from src.utils.human_like_conversation_engine import analyze_conversation_for_human_response
-                conversation_analysis_task = asyncio.create_task(
-                    analyze_conversation_for_human_response(
-                        user_id=user_id,
-                        message=message.content,
-                        conversation_history=[{"content": msg} for msg in conversation_history],
-                        emotional_context=external_emotion_data,
-                        relationship_context=relationship_context
-                    )
-                )
-                human_like_task = asyncio.create_task(
-                    self.memory_manager.human_like_system.search_like_human_friend(
-                        user_id=user_id,
-                        message=message.content if hasattr(message, 'content') else str(message),
-                        conversation_history=conversation_history,
-                        relationship_context=relationship_context,
-                        limit=20
-                    )
-                )
-
-            # Gather all tasks in parallel
-            gather_tasks = [t for t in [thread_manager_task, engagement_task, human_like_task, conversation_analysis_task] if t]
-            logger.info(f"🧠 PHASE 4 DEBUG: Executing {len(gather_tasks)} Phase 4 scatter-gather tasks")
-            results = await asyncio.gather(*gather_tasks, return_exceptions=True) if gather_tasks else []
-            logger.info(f"🧠 PHASE 4 DEBUG: Phase 4 scatter-gather completed with {len(results)} results")
-
-            # Unpack results with robust error handling
-            idx = 0
-            thread_manager_result = None
-            engagement_result = None
-            human_like_context = None
-            conversation_analysis = None
-            if thread_manager_task:
-                if not isinstance(results[idx], Exception):
-                    thread_manager_result = results[idx]
-                    logger.info(f"🧠 PHASE 4 DEBUG: Thread manager result: {str(thread_manager_result)[:200] if thread_manager_result else 'None'}")
-                else:
-                    logger.warning(f"🧠 PHASE 4 DEBUG: Thread Manager task failed: {results[idx]}")
-                idx += 1
-            if engagement_task:
-                if not isinstance(results[idx], Exception):
-                    engagement_result = results[idx]
-                else:
-                    logger.warning(f"Phase 4.3 Engagement Engine task failed: {results[idx]}")
-                idx += 1
-            if human_like_task:
-                if not isinstance(results[idx], Exception):
-                    human_like_context = results[idx]
-                else:
-                    logger.warning(f"Human-like memory task failed: {results[idx]}")
-                idx += 1
-            if conversation_analysis_task:
-                if not isinstance(results[idx], Exception):
-                    conversation_analysis = results[idx]
-                else:
-                    logger.warning(f"Human-like conversation analysis task failed: {results[idx]}")
-                idx += 1
-
-            comprehensive_context = None
-            enhanced_system_prompt = None
-
-            # Get comprehensive context directly from Phase 4 integration
-            if phase4_context:
-                logger.info("🧠 PHASE 4 DEBUG: Getting comprehensive context from Phase 4 integration")
-                comprehensive_context = phase4_integration.get_comprehensive_context_for_response(
-                    phase4_context
-                )
-                logger.info(f"🧠 PHASE 4 DEBUG: Comprehensive context keys: {list(comprehensive_context.keys()) if comprehensive_context else 'None'}")
-
-                # Prepare template context for enhanced response generation
-                template_context = {
-                    "phase4_context": phase4_context,
-                    "comprehensive_context": comprehensive_context,
-                    "interaction_type": getattr(phase4_context, "interaction_type", None),
-                    "conversation_mode": getattr(phase4_context, "conversation_mode", None),
-                }
-                
-                logger.info(f"🧠 PHASE 4 DEBUG: Template context prepared with keys: {list(template_context.keys())}")
-                logger.info(f"🧠 PHASE 4 DEBUG: Interaction type: {getattr(phase4_context, 'interaction_type', 'None')}")
-                logger.info(f"🧠 PHASE 4 DEBUG: Conversation mode: {getattr(phase4_context, 'conversation_mode', 'None')}")
-
-                # System prompt enhancement handled by the LLM response generation
-                enhanced_system_prompt = None
-
-                phases_executed = []
-                if hasattr(phase4_context, "processing_metadata"):
-                    if isinstance(phase4_context.processing_metadata, dict):
-                        phases_executed = phase4_context.processing_metadata.get(
-                            "phases_executed", []
-                        )
-                    elif isinstance(phase4_context.processing_metadata, list):
-                        phases_executed = phase4_context.processing_metadata
-                    else:
-                        phases_executed = []
-
-                # Handle different Phase4Context versions (simple vs full integration)
-                conversation_mode = getattr(phase4_context, "conversation_mode", None)
-                conversation_mode_str = conversation_mode.value if conversation_mode else "unknown"
-
-                logger.info(
-                    f"🧠 PHASE 4 DEBUG: Analysis summary - Mode: {conversation_mode_str}, "
-                    f"Interaction: {phase4_context.interaction_type.value if hasattr(phase4_context, 'interaction_type') else 'unknown'}, "
-                    f"Phases executed: {len(phases_executed)}"
-                )
-
-            # Merge human-like context into comprehensive context if available and not Exception
-            if (human_like_context and comprehensive_context and 
-                not isinstance(human_like_context, Exception) and
-                isinstance(human_like_context, dict)):
-                try:
-                    comprehensive_context["human_like_context"] = human_like_context.get("human_context", {})
-                    comprehensive_context["human_like_memories"] = human_like_context.get("memories", [])
-                    comprehensive_context["human_like_performance"] = human_like_context.get("search_performance", {})
-                except Exception as e:
-                    logger.warning(f"Failed to merge human-like context: {e}")
-                    
-                # Add conversation analysis for enhanced response guidance
-                if (conversation_analysis and 
-                    not isinstance(conversation_analysis, Exception) and
-                    isinstance(conversation_analysis, dict)):
-                    try:
-                        comprehensive_context["conversation_analysis"] = conversation_analysis
-                        comprehensive_context["response_guidance"] = conversation_analysis.get("response_guidance", "")
-                        comprehensive_context["conversation_mode"] = conversation_analysis.get("mode", "standard")
-                        comprehensive_context["interaction_type"] = conversation_analysis.get("interaction_type", "general")
-                        comprehensive_context["personality_type"] = conversation_analysis.get("personality_type", "default")
-                        comprehensive_context["relationship_level"] = conversation_analysis.get("relationship_level", "acquaintance")
-                    except Exception as e:
-                        logger.warning(f"Failed to merge conversation analysis: {e}")
-                logger.debug("Enhanced comprehensive context with human-like intelligence and conversation analysis")
-
-            # Merge Phase 4.2 and 4.3 results into comprehensive context
-            if comprehensive_context:
-                if thread_manager_result:
-                    comprehensive_context["phase4_2_thread_analysis"] = thread_manager_result
-                    logger.info("🧠 PHASE 4 DEBUG: Added Phase 4.2 Advanced Thread Management results to context")
-                
-                if engagement_result:
-                    comprehensive_context["phase4_3_engagement_analysis"] = engagement_result
-                    logger.info("🧠 PHASE 4 DEBUG: Added Phase 4.3 Proactive Engagement results to context")
-                    
-                logger.info(f"🧠 PHASE 4 DEBUG: Final comprehensive context size: {len(str(comprehensive_context))} chars")
-                logger.info(f"🧠 PHASE 4 DEBUG: Final comprehensive context keys: {list(comprehensive_context.keys())}")
-
-            logger.info(f"🧠 PHASE 4 DEBUG: Returning - Phase4 context: {'Yes' if phase4_context else 'No'}, Comprehensive: {'Yes' if comprehensive_context else 'No'}, Enhanced prompt: {'Yes' if enhanced_system_prompt else 'No'}")
-            return phase4_context, comprehensive_context, enhanced_system_prompt
-
-        except Exception as e:
-            logger.error(f"Phase 4 human-like intelligence processing failed: {e}")
-            return None, None, None
-
-    async def _generate_and_send_response(
-        self,
-        reply_channel,
-        message,
-        user_id,
-        conversation_context,
-        current_emotion_data,
-        external_emotion_data,
-        phase2_context,
-        phase4_context=None,
-        comprehensive_context=None,
-        dynamic_personality_context=None,
-        phase3_context_switches=None,
-        phase3_empathy_calibration=None,
-        context_analysis=None,
-        original_content=None,
-    ):
-        """Generate AI response and send to channel using Universal Chat Architecture."""
-        # Show typing indicator
-        async with reply_channel.typing():
-            logger.info(f"[TRACE-START] Starting _generate_and_send_response for user {user_id}")
-            logger.debug("Started typing indicator - simulating thinking and typing process")
-            try:
-                logger.info("🤖 DISCORD-DIRECT: Processing message through direct Discord pipeline")
-
-                # 🎭 CDL CHARACTER INTEGRATION: Check for active character and replace system prompt
-                logger.info(f"🎭 DEBUG: About to call character enhancement for user {user_id}")
-                enhanced_context = await self._apply_cdl_character_enhancement(
-                    user_id, conversation_context, message, context_analysis
-                )
-                logger.info(f"🎭 DEBUG: Character enhancement returned: {enhanced_context is not None}")
-                
-                # 🎭 MIXED EMOTION ENHANCEMENT: Add real-time emotion analysis to context
-                emotion_enhanced_context = await self._add_mixed_emotion_context(
-                    enhanced_context if enhanced_context else conversation_context,
-                    message.content,
-                    user_id,
-                    current_emotion_data,
-                    external_emotion_data
-                )
-                
-                # 🎯 CONTEXT SELECTION: Choose final context based on processing pipeline results
-                if comprehensive_context:
-                    # Phase 4 comprehensive context takes priority
-                    final_context = emotion_enhanced_context
-                    logger.info("🎯 CONTEXT: Using emotion-enhanced context with Phase 4 comprehensive integration")
-                elif enhanced_context:
-                    # CDL character enhancement successful
-                    final_context = emotion_enhanced_context  
-                    logger.info("🎯 CONTEXT: Using emotion-enhanced context with CDL character integration")
-                elif emotion_enhanced_context != conversation_context:
-                    # Emotion enhancement applied successfully
-                    final_context = emotion_enhanced_context
-                    logger.info("🎯 CONTEXT: Using emotion-enhanced context (emotion analysis successful)")
-                else:
-                    # Fallback to basic conversation context
-                    final_context = conversation_context
-                    logger.info("🎯 CONTEXT: Using basic conversation context (no enhancements applied)")
-
-                # Generate AI response using our conversation context directly
-                logger.info(f"🎯 DISCORD-DIRECT: Sending {len(final_context)} messages directly to LLM")
-                
-                # 🚀 DISCORD-DIRECT PROCESSING: Call LLM directly (no universal_chat abstraction)
-                try:
-                    from src.llm.llm_client import LLMClient
-                    import asyncio
-                    from datetime import datetime
-                    
-                    # Initialize LLM client 
-                    llm_client = LLMClient()
-                    
-                    # Log sophisticated processing details
-                    total_input_tokens = sum(len(msg.get("content", "").split()) for msg in final_context) * 1.3
-                    logger.info(f"🎯 DISCORD-DIRECT: Processing {total_input_tokens:.0f} input tokens with sophisticated context")
-                    
-                    # Generate response using sophisticated context (run in thread to avoid blocking)
-                    start_time = datetime.now()
-                    response = await asyncio.to_thread(
-                        llm_client.get_chat_response, final_context
-                    )
-                    end_time = datetime.now()
-                    
-                    generation_time_ms = int((end_time - start_time).total_seconds() * 1000)
-                    logger.info(f"✅ DISCORD-DIRECT: Generated response with {total_input_tokens:.0f} input tokens, took {generation_time_ms}ms")
-                    logger.info(f"🔍 DEBUG: LLM Response preview: '{response[:200]}...'")
-                    
-                except Exception as e:
-                    logger.error(f"❌ DISCORD-DIRECT: LLM generation failed: {e}")
-                    logger.error(f"❌ DISCORD-DIRECT: Traceback: {traceback.format_exc()}")
-                    response = "I apologize, but I'm experiencing technical difficulties. Please try again."
-                
-                logger.info(f"🎯 DISCORD-DIRECT: Generated response: {len(response)} chars")
-                logger.info(f"🎯 DISCORD-DIRECT: Response preview: '{response[:200]}...'")
-                
-                # Additional validation to prevent empty responses
-                if not response or not response.strip():
-                    logger.warning(
-                        f"Discord-direct processing returned empty response for user {user_id}. "
-                        f"Response: '{response}'"
-                    )
-                    response = "I apologize, but I'm having trouble generating a response right now. Please try again."
-                
-                logger.info(f"🎯 DISCORD-DIRECT: Final response: {len(response)} characters")
-
-                # 🎭 CHARACTER CONSISTENCY CHECK: Validate character is maintained
-                response = await self._validate_character_consistency(response, user_id, message)
-
-                # Security scan for system leakage
-                leakage_scan = scan_response_for_system_leakage(response)
-                if leakage_scan["has_leakage"]:
-                    logger.error(
-                        f"SECURITY: System message leakage detected in response to user {user_id}"
-                    )
-                    logger.error(f"SECURITY: Leaked patterns: {leakage_scan['leaked_patterns']}")
-                    response = leakage_scan["sanitized_response"]
-                    logger.info("SECURITY: Response sanitized to remove system message leakage")
-
-                # Additional sanitization: prevent coaching/meta analytical sections (image-triggered regression)
-                def _sanitize_meta_analysis(resp: str) -> str:
-                    try:
-                        import re
-                        patterns = [
-                            "Core Conversation Analysis",
-                            "Emotional Analysis",
-                            "Technical Metadata",
-                            "Personality & Interaction",
-                            "Overall Assessment",
-                        ]
-                        trigger_count = sum(p in resp for p in patterns)
-                        coaching_phrase = "Do you want me to" in resp
-                        # Heuristic: if two or more section headings OR explicit coaching phrase, sanitize
-                        if trigger_count >= 2 or coaching_phrase:
-                            logger.warning(
-                                "Meta/coaching analytical response detected (patterns=%d, coaching=%s) - sanitizing",
-                                trigger_count,
-                                coaching_phrase,
-                            )
-                            # Extract first natural paragraph before any heading
-                            lines = resp.splitlines()
-                            natural_parts = []
-                            for line in lines:
-                                if any(p in line for p in patterns) or re.match(
-                                    r"^[A-Z][A-Za-z &]+:\s*$", line.strip()
-                                ):
-                                    break
-                                if line.strip():
-                                    natural_parts.append(line.strip())
-                            base_text = " ".join(natural_parts).strip()
-                            if not base_text:
-                                base_text = (
-                                    "I behold the image you have shared—its quiet details drift like motes in the dark between stars."
-                                )
-                            sanitized = (
-                                base_text
-                                + "\n\n"
-                                + "(Your image was received. I have omitted internal analytical sections to preserve an immersive, in-character reply.)"
-                            )
-                            return sanitized
-                        return resp
-                    except Exception as e:
-                        logger.error(f"Meta-analysis sanitization failure: {e}")
-                        return resp
-
-                pre_meta_len = len(response)
-                response = _sanitize_meta_analysis(response)
-                if len(response) != pre_meta_len:
-                    logger.debug(
-                        "Applied meta-analysis sanitization (old_len=%d new_len=%d)",
-                        pre_meta_len,
-                        len(response),
-                    )
-
-                # CRITICAL FIX: Store conversation in memory BEFORE sending response
-                # This ensures memory is available for future context building
-                memory_stored = False
-                try:
-                    memory_stored = await self._store_conversation_memory(
-                        message,
-                        user_id,
-                        response,
-                        current_emotion_data,
-                        external_emotion_data,
-                        phase2_context,
-                        phase4_context,
-                        comprehensive_context,
-                        dynamic_personality_context,
-                        original_content,
-                    )
-                    if memory_stored:
-                        logger.info(f"✅ MEMORY: Successfully stored conversation for user {user_id}")
-                        
-                        # VERIFICATION: Quick check that memory was actually stored
-                        try:
-                            verification_memories = await self.memory_manager.retrieve_context_aware_memories(
-                                user_id=user_id, 
-                                query=message.content, 
-                                max_memories=1
-                            )
-                            if verification_memories:
-                                logger.info(f"✅ VERIFIED: Memory storage confirmed - {len(verification_memories)} memories found")
-                            else:
-                                logger.warning(f"⚠️ VERIFICATION: No memories found immediately after storage for user {user_id}")
-                        except Exception as verify_error:
-                            logger.warning(f"⚠️ VERIFICATION: Could not verify memory storage: {verify_error}")
-                    else:
-                        logger.error(f"❌ MEMORY: Failed to store conversation for user {user_id}")
-                except Exception as memory_error:
-                    logger.error(f"❌ CRITICAL: Memory storage exception for user {user_id}: {memory_error}")
-                    logger.error(f"❌ CRITICAL: Memory storage traceback: {traceback.format_exc()}")
-
-                # Add user message to cache after memory storage
-                if self.conversation_cache:
-                    logger.info(f"🔥 CACHE DEBUG: Adding user message to cache - content: '{message.content[:100]}...'")
-                    logger.info(f"🔥 CACHE DEBUG: User message author: {message.author.name} (bot={message.author.bot})")
-                    if hasattr(self.conversation_cache, "add_message"):
-                        if asyncio.iscoroutinefunction(self.conversation_cache.add_message):
-                            await self.conversation_cache.add_message(
-                                str(reply_channel.id), message
-                            )
-                        else:
-                            self.conversation_cache.add_message(str(reply_channel.id), message)
-                    logger.debug(
-                        f"✅ CACHE: Added user message to conversation cache (memory_stored: {memory_stored})"
-                    )
-
-                # Add debug information if needed
-                response_with_debug = add_debug_info_to_response(
-                    response, user_id, self.memory_manager, str(message.id)
-                )
-
-                # 🎭 CDL EMOJI PERSONALITY: Enhance response with character-appropriate emojis
-                try:
-                    # Import our new CDL emoji integration system
-                    from src.intelligence.cdl_emoji_integration import create_cdl_emoji_integration
-                    
-                    cdl_emoji_integration = create_cdl_emoji_integration()
-                    
-                    # Determine character file based on CDL_DEFAULT_CHARACTER environment variable
-                    character_file = os.getenv("CDL_DEFAULT_CHARACTER", "characters/examples/elena-rodriguez.json")
-                    # Extract just the filename if full path is provided
-                    if "/" in character_file:
-                        character_file = character_file.split("/")[-1]
-                    
-                    # Enhance response with CDL-appropriate emojis (ADDS to text, doesn't replace)
-                    enhanced_response, emoji_metadata = cdl_emoji_integration.enhance_bot_response(
-                        character_file=character_file,
-                        user_id=user_id,
-                        user_message=original_content or message.content,
-                        bot_response=response_with_debug,
-                        context={
-                            'emotional_context': getattr(self, '_last_emotional_context', None),
-                            'conversation_history': conversation_context[:3] if conversation_context else []
-                        }
-                    )
-                    
-                    if emoji_metadata.get("cdl_emoji_applied", False):
-                        response_with_debug = enhanced_response
-                        logger.info(f"🎭 CDL EMOJI: Enhanced response with {len(emoji_metadata.get('emoji_additions', []))} emojis "
-                                  f"({emoji_metadata.get('placement_style', 'unknown')} style)")
-                    else:
-                        logger.debug(f"🎭 CDL EMOJI: No enhancement applied - {emoji_metadata.get('reason', 'unknown')}")
-                        
-                except Exception as e:
-                    logger.error(f"Error in CDL emoji enhancement: {e}")
-                    # Continue with original response if CDL emoji enhancement fails
-                
-                # LEGACY EMOJI SYSTEM: Disable emoji-only responses, use only for reactions
-                try:
-                    # 🎯 CHARACTER-AGNOSTIC: Get character type from CDL instead of hardcoded names
-                    bot_character = await self._get_character_type_from_cdl()
-                    
-                    # Only add emoji reactions, don't replace text responses
-                    emoji_decision = await self.emoji_response_intelligence.evaluate_emoji_response(
-                        user_id=user_id,
-                        user_message=original_content or message.content,
-                        bot_character=bot_character,
-                        security_validation_result=getattr(self, '_last_security_validation', None),
-                        emotional_context=getattr(self, '_last_emotional_context', None),
-                        conversation_context={'channel_type': 'dm' if not message.guild else 'guild'}
-                    )
-                    
-                    # Only add reaction, don't replace text response
-                    if emoji_decision.should_use_emoji and emoji_decision.context_reason != EmojiResponseContext.INAPPROPRIATE_CONTENT:
-                        logger.info(f"🎭 REACTION: Adding emoji reaction '{emoji_decision.emoji_choice}' "
-                                  f"(confidence: {emoji_decision.confidence_score:.2f})")
-                        try:
-                            await message.add_reaction(emoji_decision.emoji_choice)
-                        except Exception as reaction_error:
-                            logger.warning(f"Could not add emoji reaction: {reaction_error}")
-                        
-                except Exception as e:
-                    logger.error(f"Error in emoji reaction evaluation: {e}")
-                    # Continue with text response regardless
-                
-                # Send response (chunked if too long)
-                # Use reply format for guild mentions, regular send for DMs
-                reference_message = message if message.guild else None
-                await self._send_response_chunks(reply_channel, response_with_debug, reference_message)
-
-                # ✨ PERSISTENT CONVERSATION TRACKING: REMOVED - Over-engineered follow-up system
-                # This section was causing inappropriate question repetition by tracking and 
-                # re-injecting old bot questions as "conversation continuity notes"
-                logger.debug(f"🔗 CONVERSATION CONTINUITY: Using vector memory system for natural conversation flow")
-
-                # CRITICAL FIX: Add bot response to conversation cache after sending
-                if self.conversation_cache:
-                    try:
-                        # Create a mock message object for the bot's response
-                        # Use the real bot.user object, not a fake one
-                        logger.info(f"🔥 DEBUG: Creating bot response message with real bot.user: {self.bot.user.name} (bot={self.bot.user.bot})")
-                        
-                        bot_response_message = type('BotMessage', (), {
-                            'id': f"bot_response_{message.id}",
-                            'content': response,
-                            'author': self.bot.user,  # Use real bot.user, not mock
-                            'created_at': discord.utils.utcnow(),
-                            'channel': reply_channel,
-                            'guild': message.guild,  # Add guild attribute for cache compatibility
-                            'attachments': [],  # Add empty attachments list
-                            'embeds': [],  # Add empty embeds list
-                            'mentions': []  # Add empty mentions list
-                        })()
-                        
-                        if hasattr(self.conversation_cache, "add_message"):
-                            logger.info(f"🔥 CACHE DEBUG: Adding bot response to cache - content: '{response[:100]}...'")
-                            if asyncio.iscoroutinefunction(self.conversation_cache.add_message):
-                                await self.conversation_cache.add_message(
-                                    str(reply_channel.id), bot_response_message
-                                )
-                            else:
-                                self.conversation_cache.add_message(str(reply_channel.id), bot_response_message)
-                        logger.debug(
-                            f"✅ CACHE: Added bot response to conversation cache: {response[:100]}..."
-                        )
-                    except Exception as cache_error:
-                        logger.warning(f"Failed to cache bot response: {cache_error}")
-
-                # Send voice response if applicable
-                await self._send_voice_response(message, response)
-
-            except LLMConnectionError:
-                logger.warning("LLM connection error")
-                error_msg = "I'm having trouble connecting to my knowledge systems. Please try again in a moment."
-                if message.guild:
-                    await message.reply(error_msg, mention_author=True)
-                else:
-                    await reply_channel.send(error_msg)
-            except LLMTimeoutError:
-                logger.warning("LLM timeout error")
-                error_msg = "I apologize, but that took longer than expected to process. Could you please try again?"
-                if message.guild:
-                    await message.reply(error_msg, mention_author=True)
-                else:
-                    await reply_channel.send(error_msg)
-            except LLMRateLimitError:
-                logger.warning("LLM rate limit error")
-                error_msg = "I'm experiencing high demand right now. Please wait a moment before trying again."
-                if message.guild:
-                    await message.reply(error_msg, mention_author=True)
-                else:
-                    await reply_channel.send(error_msg)
-            except LLMError as e:
-                # LOG FALLBACK: Explicit logging when LLM fails and we use fallback message
-                logger.error(f"🤖 LLM ERROR FALLBACK: LLM processing failed: {e} - Sending fallback message to user")
-                logger.debug(f"LLM error details: {traceback.format_exc()}")
-                error_msg = "*The threads of thought grow tangled for a moment...* Please, speak again, and I shall attend to thy words more clearly."
-                if message.guild:
-                    await message.reply(error_msg, mention_author=True)
-                else:
-                    await reply_channel.send(error_msg)
-            except Exception as e:
-                # FAIL FAST: No more silent fallbacks - log the error clearly and fail
-                content = original_content or get_message_content(message) if message else "unknown message"
-                logger.error(f"💥 CRITICAL ERROR: Message processing failed completely: {e}")
-                logger.error(f"User: {user_id}, Message: '{content[:100]}{'...' if len(content) > 100 else ''}'")
-                logger.debug(f"Full error traceback: {traceback.format_exc()}")
-                
-                # Send a clear error message instead of cryptic mystical nonsense
-                error_msg = f"❌ **System Error**: I encountered a technical issue processing your message. Please try again or contact support if this persists.\n\n*Error ID: {str(e)[:50]}*"
-                if message.guild:
-                    await message.reply(error_msg, mention_author=True)
-                else:
-                    await reply_channel.send(error_msg)
-                
-                # Re-raise the exception to ensure it's properly tracked and not silently ignored
-                raise RuntimeError(f"Message processing failed for user {user_id}: {e}") from e
-
-    async def _store_conversation_memory(
-        self,
-        message,
-        user_id,
-        response,
-        current_emotion_data,
-        external_emotion_data,
-        phase2_context,
-        phase4_context,
-        comprehensive_context,
-        dynamic_personality_context=None,
-        original_content=None,
-    ):
-        """Store conversation in memory with all AI analysis data."""
-        try:
-            # Validate response before storing
-            if not response or not response.strip():
-                logger.error(f"❌ CRITICAL: Attempted to store conversation with empty response for user {user_id}")
-                return False  # Return failure status
-                
-            # Extract content for storage
-            content_to_store = original_content if original_content else message.content
-            storage_content = extract_text_for_memory_storage(content_to_store, message.attachments)
-
-            # Skip empty content
-            if not storage_content or not storage_content.strip():
-                logger.error(f"❌ CRITICAL: Empty storage content detected for user {user_id}")
-                logger.error(f"❌ CRITICAL: Original content: '{content_to_store}', extracted: '{storage_content}'")
-                return False
-
-            logger.info(f"💾 Storing conversation for user {user_id}: '{storage_content[:100]}...' → '{response[:100]}...'")
-
-            # Prepare emotion metadata - use phase2_context if current_emotion_data is None
-            emotion_metadata = None
-            if current_emotion_data:
-                logger.info(f"🎭 EVENT HANDLER: Processing current emotion data for storage")
-                user_profile, emotion_profile = current_emotion_data
-                emotion_metadata = {}
-
-                if emotion_profile.detected_emotion:
-                    emotion_metadata["detected_emotion"] = emotion_profile.detected_emotion.value
-                    logger.info(f"🎭 EVENT HANDLER: Detected emotion for storage: {emotion_profile.detected_emotion.value}")
-                if emotion_profile.confidence is not None:
-                    emotion_metadata["confidence"] = float(emotion_profile.confidence)
-                    logger.info(f"🎭 EVENT HANDLER: Emotion confidence: {emotion_profile.confidence:.3f}")
-                if emotion_profile.intensity is not None:
-                    emotion_metadata["intensity"] = float(emotion_profile.intensity)
-                    logger.info(f"🎭 EVENT HANDLER: Emotion intensity: {emotion_profile.intensity:.3f}")
-                if user_profile.relationship_level:
-                    emotion_metadata["relationship_level"] = user_profile.relationship_level.value
-                    logger.info(f"🎭 EVENT HANDLER: Relationship level: {user_profile.relationship_level.value}")
-                if user_profile.interaction_count is not None:
-                    emotion_metadata["interaction_count"] = int(user_profile.interaction_count)
-                    logger.info(f"🎭 EVENT HANDLER: Interaction count: {user_profile.interaction_count}")
-
-                logger.info(f"🎭 EVENT HANDLER: Complete emotion metadata for storage: {emotion_metadata}")
-                logger.debug(
-                    f"Passing pre-analyzed emotion data to storage: {emotion_profile.detected_emotion.value if emotion_profile.detected_emotion else 'unknown'}"
-                )
-            elif phase2_context:
-                # 🧠 ENHANCED: Use phase2_context emotional data if current_emotion_data is None
-                logger.info(f"🎭 EVENT HANDLER: Using phase2_context emotion data for storage")
-                emotion_metadata = phase2_context.copy()  # Use all the rich emotional analysis from phase2
-                
-                # 🧹 BUG FIX: Remove non-emotion metadata fields that pollute emotion storage
-                # These are context fields, NOT emotion data, and should not be stored as emotional_context
-                metadata_fields_to_remove = ['context', 'channel_id', 'guild_id', 'timestamp']
-                for field in metadata_fields_to_remove:
-                    if field in emotion_metadata:
-                        removed_value = emotion_metadata.pop(field)
-                        logger.debug(f"🧹 CLEANED: Removed non-emotion field '{field}' (value: '{removed_value}') from emotion_metadata")
-                
-                logger.info(f"🎭 EVENT HANDLER: Phase2 emotion metadata for storage (cleaned): {list(emotion_metadata.keys())}")
-            else:
-                logger.info(f"🎭 EVENT HANDLER: No current emotion data or phase2 context available for storage")
-
-            # Perform personality analysis
-            personality_metadata = await self._analyze_personality_for_storage(
-                user_id, storage_content, message
-            )
-
-            # Perform emotional intelligence analysis for storage
-            emotional_intelligence_results = await self._analyze_emotional_intelligence_for_storage(
-                user_id, storage_content, message, phase2_context, external_emotion_data
-            )
-
-            # Prepare storage metadata
-            storage_metadata = {}
-
-            # Add message context metadata
-            if hasattr(self.memory_manager, "classify_discord_context"):
-                message_context = self.memory_manager.classify_discord_context(message)
-                if message_context:
-                    storage_metadata.update(
-                        {
-                            "context_type": (
-                                message_context.context_type.value
-                                if hasattr(message_context.context_type, "value")
-                                else str(message_context.context_type)
-                            ),
-                            "server_id": message_context.server_id,
-                            "channel_id": message_context.channel_id,
-                            "is_private": message_context.is_private,
-                            "security_level": (
-                                message_context.security_level.value
-                                if hasattr(message_context.security_level, "value")
-                                else str(message_context.security_level)
-                            ),
-                        }
-                    )
-
-            # Add personality metadata
-            if personality_metadata:
-                personality_simple = {}
-                for key, value in personality_metadata.items():
-                    if value is not None:
-                        if hasattr(value, "value"):  # Enum
-                            personality_simple[f"personality_{key}"] = value.value
-                        elif isinstance(value, (str, int, float, bool)):
-                            personality_simple[f"personality_{key}"] = value
-                        else:
-                            personality_simple[f"personality_{key}"] = str(value)
-                storage_metadata.update(personality_simple)
-
-            # Add dynamic personality metadata
-            if dynamic_personality_context:
-                dynamic_personality_simple = {}
-                for key, value in dynamic_personality_context.items():
-                    if value is not None:
-                        if key == "personality_dimensions" and isinstance(value, dict):
-                            # Flatten personality dimensions
-                            for dim_name, dim_data in value.items():
-                                if isinstance(dim_data, dict):
-                                    dynamic_personality_simple[
-                                        f"dynamic_personality_{dim_name}_value"
-                                    ] = dim_data.get("value", 0.0)
-                                    dynamic_personality_simple[
-                                        f"dynamic_personality_{dim_name}_confidence"
-                                    ] = dim_data.get("confidence", 0.0)
-                        elif isinstance(value, (str, int, float, bool)):
-                            dynamic_personality_simple[f"dynamic_personality_{key}"] = value
-                        else:
-                            dynamic_personality_simple[f"dynamic_personality_{key}"] = str(value)
-                storage_metadata.update(dynamic_personality_simple)
-
-            # Add emotional intelligence metadata
-            if emotional_intelligence_results:
-                emotional_simple = {}
-                for key, value in emotional_intelligence_results.items():
-                    if value is not None and isinstance(value, dict):
-                        for subkey, subvalue in value.items():
-                            if subvalue is not None:
-                                if hasattr(subvalue, "value"):  # Enum
-                                    emotional_simple[f"emotional_{key}_{subkey}"] = subvalue.value
-                                elif isinstance(subvalue, (str, int, float, bool)):
-                                    emotional_simple[f"emotional_{key}_{subkey}"] = subvalue
-                                else:
-                                    emotional_simple[f"emotional_{key}_{subkey}"] = str(subvalue)
-                    elif value is not None:
-                        if hasattr(value, "value"):  # Enum
-                            emotional_simple[f"emotional_{key}"] = value.value
-                        elif isinstance(value, (str, int, float, bool)):
-                            emotional_simple[f"emotional_{key}"] = value
-                        else:
-                            emotional_simple[f"emotional_{key}"] = str(value)
-                storage_metadata.update(emotional_simple)
-
-            # 🎭 CHARACTER METADATA: Add active character context for proper filtering
-            # This prevents character-specific conversations from being mixed with generic ones
-            if hasattr(self.bot_core, 'command_handlers') and 'cdl_test' in self.bot_core.command_handlers:
-                cdl_handler = self.bot_core.command_handlers['cdl_test']
-                if hasattr(cdl_handler, '_get_user_active_character'):
-                    try:
-                        active_character = cdl_handler._get_user_active_character(user_id)
-                        if active_character:
-                            # Extract character name from filename (e.g., "elena-rodriguez.json" -> "elena-rodriguez")
-                            character_name = active_character.replace('.json', '').replace('examples/', '')
-                            storage_metadata['active_character'] = character_name
-                            storage_metadata['has_character'] = True
-                            logger.info(f"🎭 STORAGE: Adding character metadata - active_character: {character_name}")
-                        else:
-                            storage_metadata['has_character'] = False
-                            logger.info(f"🎭 STORAGE: No active character for user {user_id}")
-                    except Exception as e:
-                        logger.warning(f"🎭 STORAGE: Could not detect character for user {user_id}: {e}")
-                        storage_metadata['has_character'] = False
-
-            # Store with thread-safe operations
-            storage_success = await self.memory_manager.store_conversation(
-                user_id=user_id,
-                user_message=storage_content,
-                bot_response=response,
-                channel_id=str(message.channel.id),
-                pre_analyzed_emotion_data=emotion_metadata,
-                metadata=storage_metadata,
-            )
-
-            if storage_success:
-                logger.info(f"✅ Successfully stored conversation in memory for user {user_id}")
-            else:
-                logger.error(f"❌ CRITICAL: Memory storage returned False for user {user_id}")
-
-            # Sync cache with storage result
-            if self.conversation_cache and hasattr(self.conversation_cache, "sync_with_storage"):
-                import inspect
-
-                if inspect.iscoroutinefunction(self.conversation_cache.sync_with_storage):
-                    await self.conversation_cache.sync_with_storage(
-                        str(message.channel.id), message, storage_success
-                    )
-                else:
-                    self.conversation_cache.sync_with_storage(
-                        str(message.channel.id), message, storage_success
-                    )
-
-            logger.debug(f"Memory storage complete for user {user_id} - success: {storage_success}")
-            return storage_success
-
-        except (MemoryStorageError, ValidationError) as e:
-            logger.error(f"❌ CRITICAL: Memory storage validation error for user {user_id}: {e}")
-            return False
-        except Exception as e:
-            logger.error(f"❌ CRITICAL: Unexpected memory storage error for user {user_id}: {e}")
-            logger.error(f"❌ CRITICAL: Memory storage traceback: {traceback.format_exc()}")
-            return False
-
-    async def _analyze_personality_for_storage(self, user_id, storage_content, message):
-        """Analyze personality for conversation storage."""
-        personality_metadata = None
-        # Legacy personality profiler removed - vector-native system handles personality analysis
-        personality_metadata = None
-        if user_id:
-            logger.debug(f"Using vector-native personality analysis for user {user_id}")
-            # Vector system automatically captures personality patterns through embedding analysis
-            personality_metadata = {
-                "communication_style": "adaptive",  # Vector system determines this automatically
-                "confidence_level": "vector_native",
-                "decision_style": "context_aware",
-                "analysis_confidence": 0.8,
-            }
-
-        return personality_metadata
-
-    async def _analyze_emotional_intelligence_for_storage(
-        self, user_id, storage_content, message, phase2_context, external_emotion_data
-    ):
-        """Analyze emotional intelligence for conversation storage."""
-        emotional_intelligence_results = None
-        if self.phase2_integration and user_id:
-            try:
-                logger.debug(f"Performing emotional intelligence analysis for user {user_id}")
-
-                context = {
-                    "channel_id": str(message.channel.id),
-                    "guild_id": str(message.guild.id) if message.guild else None,
-                    "timestamp": datetime.now(UTC).isoformat(),
-                    "context": "discord_conversation",
-                }
-
-                # Use existing phase2_context if available, otherwise analyze
-                if phase2_context:
-                    emotional_intelligence_results = phase2_context
-                else:
-                    emotional_intelligence_results = (
-                        await self.phase2_integration.process_message_with_emotional_intelligence(
-                            user_id=user_id, message=storage_content, conversation_context=context
-                        )
-                    )
-
-                # Enhance with external emotion data
-                if emotional_intelligence_results and external_emotion_data:
-                    emotional_intelligence_results["external_emotion_analysis"] = (
-                        external_emotion_data
-                    )
-                    logger.debug(
-                        f"Enhanced emotional intelligence with external API data: {external_emotion_data.get('primary_emotion', 'unknown')}"
-                    )
-                elif external_emotion_data and not emotional_intelligence_results:
-                    emotional_intelligence_results = {
-                        "external_emotion_analysis": external_emotion_data,
-                        "primary_emotion_source": "external_api",
-                        "emotion_confidence": external_emotion_data.get("confidence", 0.5),
-                        "emotion_tier": external_emotion_data.get("tier_used", "unknown"),
-                    }
-                    logger.debug(
-                        f"Using external emotion data as primary emotional intelligence: {external_emotion_data.get('primary_emotion', 'unknown')}"
-                    )
-
-                if emotional_intelligence_results:
-                    logger.debug(
-                        f"Emotional intelligence analysis complete: {emotional_intelligence_results}"
-                    )
-
-            except Exception as e:
-                logger.warning(f"Emotional intelligence analysis failed for user {user_id}: {e}")
-                emotional_intelligence_results = None
-
-        return emotional_intelligence_results
-
-    async def _analyze_dynamic_personality(self, user_id, content, message, recent_messages):
-        """Analyze personality with the dynamic personality profiler and store results."""
-        try:
-            if not self.dynamic_personality_profiler:
-                return None
-
-            logger.debug(f"Analyzing dynamic personality for user {user_id}")
-
-            # Get emotional data if available
-            emotional_data = None
-            if hasattr(self.bot_core, "components") and "emotion_ai" in self.bot_core.components:
-                emotion_ai = self.bot_core.components["emotion_ai"]
-                try:
-                    emotional_data = await emotion_ai.analyze_emotion(content)
-                except Exception as e:
-                    logger.debug(f"Could not get emotional analysis: {e}")
-
-            # Get the last bot response for context
-            bot_response = ""
-            for msg in reversed(recent_messages):
-                # Handle both dict and Discord Message objects
-                if isinstance(msg, dict):
-                    if msg.get("bot", False):
-                        bot_response = msg.get("content", "")
-                        break
-                else:
-                    # Handle Discord Message object
-                    if hasattr(msg, 'author') and msg.author.id == self.bot.user.id:
-                        bot_response = msg.content or ""
-                        break
-
-            # Analyze the conversation for personality insights (using correct method signature)
-            analysis = await self.dynamic_personality_profiler.analyze_conversation(
-                user_id=user_id,
-                context_id=str(message.channel.id),
-                user_message=content,
-                bot_response=bot_response,
-                response_time_seconds=0.0,  # Could be calculated if needed
-                emotional_data=emotional_data,
-            )
-
-            # Update the personality profile (this automatically saves to database!)
-            profile = await self.dynamic_personality_profiler.update_personality_profile(analysis)
-
-            logger.debug(
-                f"Dynamic personality profile updated for user {user_id}: "
-                f"traits={len(profile.traits)}, relationship_depth={profile.relationship_depth:.2f}"
-            )
-
-            # Return analysis context for system prompt enhancement
-            return {
-                "personality_traits": dict(profile.traits),
-                "communication_style": profile.preferred_response_style,
-                "relationship_depth": profile.relationship_depth,
-                "trust_level": profile.trust_level,
-                "conversation_count": profile.total_conversations,
-                "topics_of_interest": profile.topics_of_high_engagement,
-            }
-
-        except Exception as e:
-            logger.warning(f"Dynamic personality analysis failed for user {user_id}: {e}")
-            return None
-
-    async def _send_response_chunks(self, channel, response, reference_message=None):
-        """Send response in chunks if it's too long. Prevent sending empty/whitespace-only messages.
-        
-        Args:
-            channel: Discord channel to send to
-            response: Response text to send
-            reference_message: If provided, will reply to this message instead of just sending to channel
-        """
-        if not response or not str(response).strip():
-            logger.warning("Attempted to send empty or whitespace-only message. Skipping send.")
-            return
-
-            
-        if len(response) > 2000:
-            chunks = [response[i : i + 1900] for i in range(0, len(response), 1900)]
-            logger.info(
-                f"Response too long ({len(response)} chars), splitting into {len(chunks)} chunks"
-            )
-            for i, chunk in enumerate(chunks):
-                if chunk and str(chunk).strip():
-                    chunk_content = f"{chunk}" + (f"\n*(continued {i+1}/{len(chunks)})*" if len(chunks) > 1 else "")
-                    
-                    # Use reply for first chunk if reference message provided, otherwise regular send
-                    if i == 0 and reference_message:
-                        await reference_message.reply(chunk_content, mention_author=True)
-                        logger.debug(f"Replied to message with chunk {i+1}/{len(chunks)}")
-                    else:
-                        await channel.send(chunk_content)
-                        logger.debug(f"Sent chunk {i+1}/{len(chunks)}")
-                else:
-                    logger.warning(f"Skipped sending empty chunk {i+1}/{len(chunks)}")
-        else:
-            # Use reply if reference message provided, otherwise regular send
-            if reference_message:
-                await reference_message.reply(response, mention_author=True)
-                logger.debug("Replied to message with single response")
-            else:
-                await channel.send(response)
-                logger.debug("Sent single message response")
-
-    async def _send_voice_response(self, message, response):
-        """Send voice response if user is in voice channel and message is from voice-related channel."""
-        if self.voice_manager and message.guild and self.voice_support_enabled:
-            try:
-                logger.debug(f"Checking voice response for user {message.author.display_name}")
-
-                # Skip voice response for DMs
-                if not message.guild:
-                    logger.debug("Skipping voice response for DM")
-                    return
-
-                if (
-                    isinstance(message.author, discord.Member)
-                    and message.author.voice
-                    and message.author.voice.channel
-                ):
-                    user_channel = message.author.voice.channel
-                    bot_channel = self.voice_manager.get_current_channel(message.guild.id)
-
-                    logger.debug(
-                        f"User in channel: {user_channel.name if user_channel else 'None'}"
-                    )
-                    logger.debug(f"Bot in channel: {bot_channel.name if bot_channel else 'None'}")
-
-                    if bot_channel and user_channel.id == bot_channel.id:
-                        # Check if message is from a voice-related text channel
-                        is_voice_related_channel = self._is_voice_related_channel(message.channel, bot_channel)
-                        
-                        if not is_voice_related_channel:
-                            logger.debug(
-                                f"Skipping voice response - message from non-voice channel: {message.channel.name}"
-                            )
-                            return
-
-                        # Clean response for TTS
-                        clean_response = (
-                            response.replace("*", "").replace("**", "").replace("`", "")
-                        )
-                        voice_max_length = int(os.getenv("VOICE_MAX_RESPONSE_LENGTH", "300"))
-                        if len(clean_response) > voice_max_length:
-                            clean_response = clean_response[:voice_max_length] + "..."
-
-                        logger.info(
-                            f"🎤 Sending voice response to {message.author.display_name} in voice channel: {clean_response[:50]}..."
-                        )
-                        await self.voice_manager.speak_message(message.guild.id, clean_response)
-                    else:
-                        logger.debug(
-                            "Not sending voice response - user and bot not in same channel"
-                        )
-                else:
-                    logger.debug("User not in voice channel or not a member")
-            except Exception as e:
-                logger.error(f"Failed to send voice response: {e}")
-                logger.error(f"Voice response error traceback: {traceback.format_exc()}")
-
-    def _is_voice_related_channel(self, text_channel, voice_channel):
-        """
-        Check if a text channel should trigger voice responses.
-        
-        Args:
-            text_channel: The text channel where the message was sent
-            voice_channel: The voice channel the bot is currently in
-            
-        Returns:
-            bool: True if the text channel should trigger voice responses
-        """
-        if not voice_channel:
-            logger.debug("No voice channel - skipping voice response")
-            return False
-        
-        # Strategy 1: Check if text channel has exact same name as voice channel
-        if text_channel.name.lower() == voice_channel.name.lower():
-            logger.debug(f"Text channel '{text_channel.name}' matches voice channel '{voice_channel.name}' exactly")
-            return True
-        
-        # Strategy 2: Check if text channel is in the same category as voice channel
-        if (hasattr(voice_channel, 'category') and hasattr(text_channel, 'category') and 
-            voice_channel.category and text_channel.category and 
-            voice_channel.category.id == text_channel.category.id):
-            # Same category - check if it's a reasonable text channel name for this voice channel
-            voice_name = voice_channel.name.lower()
-            text_name = text_channel.name.lower()
-            
-            # Allow text channels with similar names or common voice-related patterns
-            if (voice_name in text_name or text_name in voice_name or 
-                any(pattern in text_name for pattern in ["chat", "text", "discussion"])):
-                logger.debug(f"Text channel '{text_channel.name}' is in same category as voice channel '{voice_channel.name}' and has voice-related name")
-                return True
-        
-        # Strategy 3: Check for Discord's automatic text channel for voice channels
-        # Some Discord servers auto-create text channels for voice channels
-        voice_name_normalized = voice_channel.name.lower().replace(" ", "-").replace("_", "-")
-        text_name_normalized = text_channel.name.lower().replace(" ", "-").replace("_", "-")
-        
-        if voice_name_normalized == text_name_normalized:
-            logger.debug(f"Text channel '{text_channel.name}' matches normalized voice channel name")
-            return True
-        
-        # Strategy 4: Fallback to environment configuration (if user wants broader matching)
-        use_pattern_fallback = os.getenv("VOICE_USE_PATTERN_FALLBACK", "false").lower() == "true"
-        if use_pattern_fallback:
-            voice_channel_patterns = os.getenv("VOICE_TEXT_CHANNELS", "").split(",")
-            voice_channel_patterns = [pattern.strip().lower() for pattern in voice_channel_patterns if pattern.strip()]
-            
-            if voice_channel_patterns:
-                channel_name = text_channel.name.lower()
-                for pattern in voice_channel_patterns:
-                    if pattern in channel_name:
-                        logger.debug(f"Text channel '{channel_name}' matches fallback pattern '{pattern}'")
-                        return True
-        
-        logger.debug(f"Text channel '{text_channel.name}' does not correspond to voice channel '{voice_channel.name}'")
-        return False
-
-    async def _process_ai_components_parallel(self, user_id, content, message, recent_messages, conversation_context):
-        """
-        SIMPLE & RELIABLE: Process AI components in parallel using standard asyncio.gather.
-        
-        Uses simple Python asyncio patterns for predictable 2-3x performance improvement.
-        Much simpler and more reliable than complex queue systems for Discord bot use case.
-        """
-        import asyncio
-        
-        logger.info(f"🚀 AI PIPELINE: Starting simple parallel processing for user {user_id}")
-        start_time = time.time()
-        
-        # Process Phase 3 context switches
-        logger.info(f"🔍 PHASE 3: Processing context switches for message: '{content[:50]}...'")
-        phase3_context_switches = await self._analyze_context_switches(user_id, content, message)
-        logger.info(f"🔍 PHASE 3: Context switch detection result: {len(phase3_context_switches) if phase3_context_switches else 0} switches found")
-        
-        # Process Phase 3 empathy calibration
-        phase3_empathy_calibration = await self._calibrate_empathy_response(user_id, content, message)
-        
-        # Prepare parallel tasks - exactly what you need, nothing more
-        tasks = []
-        
-        # Task 1: FIDELITY-FIRST Memory retrieval with intelligent ranking
-        if self.memory_manager:
-            # Check if fidelity-first method is available
-            if hasattr(self.memory_manager, 'retrieve_relevant_memories_fidelity_first'):
-                tasks.append(asyncio.create_task(
-                    self.memory_manager.retrieve_relevant_memories_fidelity_first(
-                        user_id=user_id, 
-                        query=content, 
-                        limit=15,  # Increased for better context
-                        full_fidelity=True,
-                        intelligent_ranking=True,
-                        graduated_filtering=True,
-                        preserve_character_nuance=True
-                    )
-                ))
-            else:
-                # Fallback to standard method
-                tasks.append(asyncio.create_task(
-                    self.memory_manager.retrieve_relevant_memories(user_id=user_id, query=content, limit=15)
-                ))
-        else:
-            tasks.append(asyncio.create_task(self._create_none_result()))
-            
-        # Task 2: Enhanced conversation history with context awareness
-        if self.memory_manager:
-            # Use context-aware memory retrieval if available
-            if hasattr(self.memory_manager, 'retrieve_context_aware_memories'):
-                tasks.append(asyncio.create_task(
-                    self.memory_manager.retrieve_context_aware_memories(
-                        user_id=user_id, 
-                        query=content,
-                        max_memories=8,  # Increased for better context
-                        context={"message_type": "discord_conversation", "query_content": content}
-                    )
-                ))
-            else:
-                # Fallback to standard conversation history
-                tasks.append(asyncio.create_task(
-                    self.memory_manager.get_conversation_history(user_id=user_id, limit=8)
-                ))
-        else:
-            tasks.append(asyncio.create_task(self._create_none_result()))
-            
-        # Task 3: HYBRID CONTEXT DETECTION: Vector-enhanced pattern recognition
-        try:
-            from src.prompts.hybrid_context_detector import create_hybrid_context_detector
-            
-            # Create context detector with memory integration for vector enhancement
-            context_detector = create_hybrid_context_detector(memory_manager=self.memory_manager)
-            tasks.append(asyncio.create_task(
-                asyncio.to_thread(  # Run in thread to avoid blocking
-                    context_detector.analyze_context, content, user_id
-                )
-            ))
-        except Exception as e:
-            logger.debug(f"HybridContextDetector unavailable, skipping: {e}")
-            tasks.append(asyncio.create_task(self._create_none_result()))
-            
-        # Task 4: Emotion analysis (VECTOR-NATIVE with EnhancedVectorEmotionAnalyzer)
-        # Always available - vector-native system doesn't need external dependencies
-        tasks.append(asyncio.create_task(
-            self._analyze_emotion_vector_native(user_id, content, message, conversation_context)
-        ))
-        
-        # Execute all in parallel - simple and reliable
-        try:
-            logger.info(f"🚀 AI PIPELINE: Executing {len(tasks)} tasks in parallel")
-            results = await asyncio.gather(*tasks, return_exceptions=True)
-            
-            # Extract results with ENHANCED components
-            relevant_memories = results[0] if not isinstance(results[0], Exception) else []
-            conversation_history = results[1] if not isinstance(results[1], Exception) else []
-            context_analysis = results[2] if not isinstance(results[2], Exception) else None
-            emotion_data = results[3] if not isinstance(results[3], Exception) else None
-            
-            processing_time = time.time() - start_time
-            logger.info(f"✅ Enhanced parallel processing completed in {processing_time:.2f}s")
-            
-            # Log context analysis results if available
-            if context_analysis and not isinstance(context_analysis, Exception):
-                logger.info(f"🎯 CONTEXT ANALYSIS: AI guidance needed: {getattr(context_analysis, 'needs_ai_guidance', False)}, "
-                           f"Memory context: {getattr(context_analysis, 'needs_memory_context', False)}, "
-                           f"Personality: {getattr(context_analysis, 'needs_personality', False)}")
-            
-            # Return enhanced results (9 values to match existing interface)
-            # Add context_analysis and Phase 3 results as additional intelligence data
-            return (emotion_data, context_analysis, None, None, None, None, None, phase3_context_switches, phase3_empathy_calibration)
-            
-        except Exception as e:
-            logger.error(f"Parallel processing failed: {e}")
-            return (None, None, None, None, None, None, None, None, None)
-
-    async def _create_none_result(self):
         """Helper method for disabled AI components in parallel processing."""
         return None
 
@@ -3635,37 +1981,40 @@ class BotEventHandlers:
         "haha I hate you" (playful + frustrated) rather than just interpreting it as pure playfulness.
         """
         try:
-            # Analyze current message emotion using our enhanced RoBERTa system
-            if self.phase2_integration and hasattr(self.phase2_integration, 'emotion_analyzer'):
-                logger.info("🎭 MIXED EMOTION: Analyzing current message emotions...")
+            # Use emotion data that was already analyzed in the parallel processing pipeline
+            # This is more efficient than re-analyzing the same message
+            if external_emotion_data and isinstance(external_emotion_data, dict):
+                logger.info("🎭 MIXED EMOTION: Using pre-analyzed emotion data from parallel pipeline...")
                 
-                emotion_result = await self.phase2_integration.emotion_analyzer.analyze_emotion(
-                    content=message_content,
-                    user_id=user_id
-                )
+                # Extract emotion information from the already-analyzed data
+                all_emotions = external_emotion_data.get('all_emotions', {})
+                mixed_emotions = external_emotion_data.get('mixed_emotions', [])
+                primary_emotion = external_emotion_data.get('primary_emotion', 'neutral')
+                confidence = external_emotion_data.get('confidence', 0.0)
                 
                 # Build emotion context string for the LLM
-                if len(emotion_result.all_emotions) > 1:
+                if len(all_emotions) > 1 or mixed_emotions:
                     # Mixed emotions detected
-                    sorted_emotions = sorted(
-                        emotion_result.all_emotions.items(), 
-                        key=lambda x: x[1], 
-                        reverse=True
-                    )[:3]  # Top 3 emotions
-                    
-                    emotion_summary = []
-                    for emotion, intensity in sorted_emotions:
-                        emotion_summary.append(f"{emotion} ({intensity:.2f})")
+                    if mixed_emotions:
+                        # Use mixed emotions if available
+                        emotion_summary = [f"{emotion} ({intensity:.2f})" for emotion, intensity in mixed_emotions[:3]]
+                    else:
+                        # Fall back to all_emotions
+                        sorted_emotions = sorted(all_emotions.items(), key=lambda x: x[1], reverse=True)[:3]
+                        emotion_summary = [f"{emotion} ({intensity:.2f})" for emotion, intensity in sorted_emotions]
                     
                     emotion_context = f"MIXED EMOTIONS DETECTED: {', '.join(emotion_summary)}. "
                     emotion_context += f"The user's message contains complex emotional nuance - "
-                    emotion_context += f"acknowledge both the {sorted_emotions[0][0]} and underlying {sorted_emotions[1][0]} feelings."
+                    if len(emotion_summary) >= 2:
+                        emotion_context += f"acknowledge both the {emotion_summary[0].split('(')[0].strip()} and underlying {emotion_summary[1].split('(')[0].strip()} feelings."
+                    else:
+                        emotion_context += f"acknowledge the emotional complexity in their message."
                     
-                    logger.info(f"🎭 MIXED EMOTION: Detected complex emotions: {emotion_summary}")
+                    logger.info(f"🎭 MIXED EMOTION: Detected complex emotions from pipeline: {emotion_summary}")
                 else:
                     # Single emotion
-                    emotion_context = f"EMOTION DETECTED: {emotion_result.primary_emotion} (confidence: {emotion_result.confidence:.2f})"
-                    logger.info(f"🎭 EMOTION: Single emotion detected: {emotion_result.primary_emotion}")
+                    emotion_context = f"EMOTION DETECTED: {primary_emotion} (confidence: {confidence:.2f})"
+                    logger.info(f"🎭 EMOTION: Single emotion detected from pipeline: {primary_emotion}")
                 
                 # Add emotion context to the conversation by modifying the system message
                 enhanced_context = conversation_context.copy()
@@ -3679,7 +2028,7 @@ class BotEventHandlers:
                             "role": "system",
                             "content": enhanced_content
                         }
-                        logger.info(f"🎭 MIXED EMOTION: Enhanced system prompt with emotion context")
+                        logger.info(f"🎭 MIXED EMOTION: Enhanced system prompt with emotion context from pipeline")
                         break
                 else:
                     # No system message found, add emotion as a separate context message
@@ -3691,7 +2040,7 @@ class BotEventHandlers:
                 return enhanced_context
                 
             else:
-                logger.debug("🎭 MIXED EMOTION: Phase2 emotion analyzer not available")
+                logger.debug("🎭 MIXED EMOTION: No pre-analyzed emotion data available from parallel pipeline")
                 return conversation_context
                 
         except Exception as e:
@@ -3710,3 +2059,160 @@ class BotEventHandlers:
         """REMOVED: Over-engineered question classification system"""
         # Return dummy values to prevent errors in any remaining code
         return None, None  # Disabled - vector memory handles conversation continuity
+
+    # === Discord Response Handling Methods ===
+    
+    async def _send_response_chunks(self, channel, response, reference_message=None):
+        """Send response in chunks if it's too long. Prevent sending empty/whitespace-only messages.
+        
+        Args:
+            channel: Discord channel to send to
+            response: Response text to send
+            reference_message: If provided, will reply to this message instead of just sending to channel
+        """
+        if not response or not str(response).strip():
+            logger.warning("Attempted to send empty or whitespace-only message. Skipping send.")
+            return
+            
+        if len(response) > 2000:
+            chunks = [response[i : i + 1900] for i in range(0, len(response), 1900)]
+            logger.info(
+                f"Response too long ({len(response)} chars), splitting into {len(chunks)} chunks"
+            )
+            for i, chunk in enumerate(chunks):
+                if chunk and str(chunk).strip():
+                    chunk_content = f"{chunk}" + (f"\n*(continued {i+1}/{len(chunks)})*" if len(chunks) > 1 else "")
+                    
+                    # Use reply for first chunk if reference message provided, otherwise regular send
+                    if i == 0 and reference_message:
+                        await reference_message.reply(chunk_content, mention_author=True)
+                        logger.debug(f"Replied to message with chunk {i+1}/{len(chunks)}")
+                    else:
+                        await channel.send(chunk_content)
+                        logger.debug(f"Sent chunk {i+1}/{len(chunks)}")
+                else:
+                    logger.warning(f"Skipped sending empty chunk {i+1}/{len(chunks)}")
+        else:
+            # Use reply if reference message provided, otherwise regular send
+            if reference_message:
+                await reference_message.reply(response, mention_author=True)
+                logger.debug("Replied to message with single response")
+            else:
+                await channel.send(response)
+                logger.debug("Sent single message response")
+
+    async def _send_voice_response(self, message, response):
+        """Send voice response if user is in voice channel and message is from voice-related channel."""
+        if self.voice_manager and message.guild and self.voice_support_enabled:
+            try:
+                logger.debug(f"Checking voice response for user {message.author.display_name}")
+
+                # Skip voice response for DMs
+                if not message.guild:
+                    logger.debug("Skipping voice response for DM")
+                    return
+
+                if (
+                    isinstance(message.author, discord.Member)
+                    and message.author.voice
+                    and message.author.voice.channel
+                ):
+                    user_channel = message.author.voice.channel
+                    bot_channel = self.voice_manager.get_current_channel(message.guild.id)
+
+                    logger.debug(
+                        f"User in channel: {user_channel.name if user_channel else 'None'}"
+                    )
+                    logger.debug(f"Bot in channel: {bot_channel.name if bot_channel else 'None'}")
+
+                    if bot_channel and user_channel.id == bot_channel.id:
+                        # Check if message is from a voice-related text channel
+                        is_voice_related_channel = self._is_voice_related_channel(message.channel, bot_channel)
+                        
+                        if not is_voice_related_channel:
+                            logger.debug(
+                                f"Skipping voice response - message from non-voice channel: {message.channel.name}"
+                            )
+                            return
+
+                        # Clean response for TTS
+                        clean_response = (
+                            response.replace("*", "").replace("**", "").replace("`", "")
+                        )
+                        voice_max_length = int(os.getenv("VOICE_MAX_RESPONSE_LENGTH", "300"))
+                        if len(clean_response) > voice_max_length:
+                            clean_response = clean_response[:voice_max_length] + "..."
+
+                        logger.info(
+                            f"🎤 Sending voice response to {message.author.display_name} in voice channel: {clean_response[:50]}..."
+                        )
+                        await self.voice_manager.speak_message(message.guild.id, clean_response)
+                    else:
+                        logger.debug(
+                            "Not sending voice response - user and bot not in same channel"
+                        )
+                else:
+                    logger.debug("User not in voice channel or not a member")
+            except Exception as e:
+                logger.error(f"Failed to send voice response: {e}")
+                logger.error(f"Voice response error traceback: {traceback.format_exc()}")
+
+    def _is_voice_related_channel(self, text_channel, voice_channel):
+        """
+        Check if a text channel should trigger voice responses.
+        
+        Args:
+            text_channel: The text channel where the message was sent
+            voice_channel: The voice channel the bot is currently in
+            
+        Returns:
+            bool: True if the text channel should trigger voice responses
+        """
+        if not voice_channel:
+            logger.debug("No voice channel - skipping voice response")
+            return False
+        
+        # Strategy 1: Check if text channel has exact same name as voice channel
+        if text_channel.name.lower() == voice_channel.name.lower():
+            logger.debug(f"Text channel '{text_channel.name}' matches voice channel '{voice_channel.name}' exactly")
+            return True
+        
+        # Strategy 2: Check if text channel is in the same category as voice channel
+        if (hasattr(voice_channel, 'category') and hasattr(text_channel, 'category') and 
+            voice_channel.category and text_channel.category and 
+            voice_channel.category.id == text_channel.category.id):
+            # Same category - check if it's a reasonable text channel name for this voice channel
+            voice_name = voice_channel.name.lower()
+            text_name = text_channel.name.lower()
+            
+            # Allow text channels with similar names or common voice-related patterns
+            if (voice_name in text_name or text_name in voice_name or 
+                any(pattern in text_name for pattern in ["chat", "text", "discussion"])):
+                logger.debug(f"Text channel '{text_channel.name}' is in same category as voice channel '{voice_channel.name}' and has voice-related name")
+                return True
+        
+        # Strategy 3: Check for Discord's automatic text channel for voice channels
+        # Some Discord servers auto-create text channels for voice channels
+        voice_name_normalized = voice_channel.name.lower().replace(" ", "-").replace("_", "-")
+        text_name_normalized = text_channel.name.lower().replace(" ", "-").replace("_", "-")
+        
+        if voice_name_normalized == text_name_normalized:
+            logger.debug(f"Text channel '{text_channel.name}' matches normalized voice channel name")
+            return True
+        
+        # Strategy 4: Fallback to environment configuration (if user wants broader matching)
+        use_pattern_fallback = os.getenv("VOICE_USE_PATTERN_FALLBACK", "false").lower() == "true"
+        if use_pattern_fallback:
+            voice_channel_patterns = os.getenv("VOICE_TEXT_CHANNELS", "").split(",")
+            voice_channel_patterns = [pattern.strip().lower() for pattern in voice_channel_patterns if pattern.strip()]
+            
+            if voice_channel_patterns:
+                channel_name = text_channel.name.lower()
+                for pattern in voice_channel_patterns:
+                    if pattern in channel_name:
+                        logger.debug(f"Text channel '{channel_name}' matches fallback pattern '{pattern}'")
+                        return True
+        
+        logger.debug(f"Text channel '{text_channel.name}' does not correspond to voice channel '{voice_channel.name}'")
+        return False
+

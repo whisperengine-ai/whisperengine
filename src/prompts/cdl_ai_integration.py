@@ -16,9 +16,10 @@ from src.characters.cdl.manager import get_cdl_manager, get_cdl_field, get_conve
 logger = logging.getLogger(__name__)
 
 class CDLAIPromptIntegration:
-    def __init__(self, vector_memory_manager=None, llm_client=None):
+    def __init__(self, vector_memory_manager=None, llm_client=None, knowledge_router=None):
         self.memory_manager = vector_memory_manager
         self.llm_client = llm_client
+        self.knowledge_router = knowledge_router
         
         # Initialize the optimized prompt builder for size management
         from src.prompts.optimized_prompt_builder import create_optimized_prompt_builder
@@ -54,10 +55,23 @@ class CDLAIPromptIntegration:
 
             # STEP 2: Get user's preferred name with Discord username fallback
             preferred_name = None
-            if self.memory_manager and user_name:
+            if user_name:
                 try:
-                    from src.utils.user_preferences import get_user_preferred_name
-                    preferred_name = await get_user_preferred_name(user_id, self.memory_manager, user_name)
+                    # Phase 5: Use PostgreSQL for <1ms preference retrieval (replaces 10-50ms vector memory)
+                    if self.knowledge_router:
+                        pref_result = await self.knowledge_router.get_user_preference(
+                            user_id=user_id,
+                            preference_key='preferred_name'
+                        )
+                        if pref_result and pref_result.get('value'):
+                            preferred_name = pref_result['value']
+                            logger.debug("✅ PREFERENCE: Retrieved preferred name '%s' from PostgreSQL", preferred_name)
+                    
+                    # Fallback to legacy vector memory if PostgreSQL lookup fails
+                    if not preferred_name and self.memory_manager:
+                        from src.utils.user_preferences import get_user_preferred_name
+                        preferred_name = await get_user_preferred_name(user_id, self.memory_manager, user_name)
+                        logger.debug("🔄 PREFERENCE: Used fallback vector memory for preferred name")
                 except Exception as e:
                     logger.debug("Could not retrieve preferred name: %s", e)
 
@@ -148,6 +162,11 @@ class CDLAIPromptIntegration:
         if response_style:
             prompt = response_style + "\n\n"
         
+        # 🕒 TEMPORAL AWARENESS: Add current date/time context EARLY for proper grounding
+        from src.utils.helpers import get_current_time_context
+        time_context = get_current_time_context()
+        prompt += f"CURRENT DATE & TIME: {time_context}\n\n"
+        
         # Base character identity (after response style for hierarchy)
         prompt += f"You are {character.identity.name}, a {character.identity.occupation}."
         
@@ -223,6 +242,114 @@ class CDLAIPromptIntegration:
         except Exception as e:
             logger.debug("Could not extract personal knowledge: %s", e)
 
+        # 🎯 SEMANTIC KNOWLEDGE INTEGRATION: Retrieve structured facts from PostgreSQL
+        if self.knowledge_router:
+            try:
+                # Analyze query intent to determine what facts to retrieve
+                intent = await self.knowledge_router.analyze_query_intent(message_content)
+                logger.info(f"🎯 KNOWLEDGE: Query intent detected: {intent.intent_type.value} (confidence: {intent.confidence:.2f})")
+                
+                # Retrieve character-aware facts if query has factual intent
+                if intent.confidence > 0.3 and intent.intent_type.value in ['factual_recall', 'relationship_discovery', 'entity_search']:
+                    # Get character name from CDL for character-aware retrieval
+                    character_name = character.identity.name.lower().split()[0] if character and hasattr(character, 'identity') else 'unknown'
+                    
+                    # Retrieve facts with character context
+                    facts = await self.knowledge_router.get_character_aware_facts(
+                        user_id=user_id,
+                        character_name=character_name,
+                        entity_type=intent.entity_type,
+                        limit=15
+                    )
+                    
+                    if facts:
+                        # Format facts for character-aware synthesis
+                        prompt += f"\n\n📊 KNOWN FACTS ABOUT {display_name}:\n"
+                        
+                        # Group facts by entity type for better organization
+                        facts_by_type = {}
+                        for fact in facts:
+                            entity_type = fact.get('entity_type', 'general')
+                            if entity_type not in facts_by_type:
+                                facts_by_type[entity_type] = []
+                            facts_by_type[entity_type].append(fact)
+                        
+                        # Add facts with personality-first synthesis guidance
+                        for entity_type, type_facts in sorted(facts_by_type.items()):
+                            type_label = entity_type.replace('_', ' ').title()
+                            prompt += f"\n{type_label}:\n"
+                            for fact in type_facts[:5]:  # Limit per type
+                                entity_name = fact.get('entity_name', 'unknown')
+                                relationship = fact.get('relationship_type', 'related to')
+                                confidence = fact.get('confidence', 0.0)
+                                
+                                # Include confidence for gradual knowledge building
+                                confidence_marker = "✓" if confidence > 0.8 else "~" if confidence > 0.5 else "?"
+                                prompt += f"  {confidence_marker} {relationship}: {entity_name}\n"
+                        
+                        # Add personality-first synthesis instruction
+                        prompt += f"\nInterpret these facts through {character.identity.name}'s personality and communication style."
+                        prompt += " Weave them naturally into conversation, not as robotic data delivery."
+                        
+                        logger.info(f"🎯 KNOWLEDGE: Added {len(facts)} structured facts across {len(facts_by_type)} categories")
+                    else:
+                        logger.debug("🎯 KNOWLEDGE: No facts found for query intent")
+                else:
+                    logger.debug(f"🎯 KNOWLEDGE: Skipping fact retrieval (intent: {intent.intent_type.value}, confidence: {intent.confidence:.2f})")
+                
+                # 🔗 PHASE 6: Entity relationship recommendations
+                # Detect "similar to" or "like" queries and provide recommendations
+                similarity_keywords = ['similar to', 'like', 'related to', 'compared to', 'alternative to']
+                if any(keyword in message_content.lower() for keyword in similarity_keywords):
+                    # Extract entity name from query (simple pattern matching)
+                    import re
+                    patterns = [
+                        r"similar to (\w+)",
+                        r"like (\w+)",
+                        r"compared to (\w+)",
+                        r"alternative to (\w+)"
+                    ]
+                    
+                    target_entity = None
+                    for pattern in patterns:
+                        match = re.search(pattern, message_content.lower())
+                        if match:
+                            target_entity = match.group(1)
+                            break
+                    
+                    if target_entity:
+                        # Get related entities via graph traversal
+                        related_entities = await self.knowledge_router.get_related_entities(
+                            entity_name=target_entity,
+                            relationship_type='similar_to',
+                            max_hops=2,
+                            min_weight=0.3
+                        )
+                        
+                        if related_entities:
+                            prompt += f"\n\n🔗 RELATED TO '{target_entity.upper()}':\n"
+                            
+                            # Group by hop distance
+                            direct = [e for e in related_entities if e['hops'] == 1]
+                            extended = [e for e in related_entities if e['hops'] == 2]
+                            
+                            if direct:
+                                prompt += f"Direct matches:\n"
+                                for entity in direct[:3]:
+                                    prompt += f"  • {entity['entity_name']} (relevance: {entity['weight']:.0%})\n"
+                            
+                            if extended:
+                                prompt += f"You might also like:\n"
+                                for entity in extended[:3]:
+                                    prompt += f"  • {entity['entity_name']} (extended match)\n"
+                            
+                            prompt += f"\nUse these recommendations naturally in your response, matching {character.identity.name}'s personality."
+                            logger.info(f"🔗 RECOMMENDATIONS: Found {len(related_entities)} entities related to '{target_entity}'")
+                    
+            except Exception as e:
+                logger.error(f"❌ KNOWLEDGE: Fact retrieval failed: {e}")
+                # Continue without facts - don't break conversation flow
+
         # Add emotional intelligence context early to inform interpretation
         if pipeline_dict:
             emotion_data = pipeline_dict.get('emotion_analysis', {})
@@ -253,6 +380,18 @@ class CDLAIPromptIntegration:
                     role = conv.get('role', 'user')
                     content = conv.get('content', '')[:200]  # Increased from 150 to 200
                     prompt += f"{role.title()}: {content}{'...' if len(conv.get('content', '')) > 200 else ''}\n"
+
+        # 🚨 CRITICAL AI ETHICS LAYER: Physical interaction detection
+        if self._detect_physical_interaction_request(message_content):
+            allows_full_roleplay = self._check_roleplay_flexibility(character)
+            
+            if not allows_full_roleplay:
+                ai_ethics_guidance = self._get_cdl_roleplay_guidance(character, display_name)
+                if ai_ethics_guidance:
+                    prompt += f"\n\n{ai_ethics_guidance}"
+                    logger.info("🛡️ AI ETHICS: Physical interaction detected, injecting guidance for %s", character.identity.name)
+            else:
+                logger.info("🎭 ROLEPLAY IMMERSION: %s allows full roleplay - skipping AI ethics layer", character.identity.name)
 
         # Remove duplicate AI identity and conversation flow sections (moved up earlier)
         
@@ -321,42 +460,36 @@ class CDLAIPromptIntegration:
                 return prompt
 
     async def load_character(self, character_file: str) -> Character:
-        """Load a character from file with CDL validation."""
+        """
+        Load a character from file with CDL validation.
+        
+        Uses CDL Manager singleton for caching - loads once, uses everywhere.
+        """
         try:
-            # First, validate the character file structure
-            logger.info("🔍 CDL: Validating character file before loading: %s", character_file)
+            # Use singleton CDL Manager for cached Character object
+            from src.characters.cdl.manager import get_cdl_manager
             
-            try:
-                from src.validation.cdl_validator import CDLValidator
-                validator = CDLValidator()
-                validation_result = validator.validate_file(character_file)
-                
-                if not validation_result.parsing_success:
-                    logger.error("❌ CDL VALIDATION: Character file failed parsing: %s", character_file)
-                    logger.error("❌ CDL VALIDATION: Errors: %s", [issue.message for issue in validation_result.issues if issue.level.name == "ERROR"])
-                    raise ValueError(f"Character file failed CDL validation: {[issue.message for issue in validation_result.issues if issue.level.name == 'ERROR']}")
-                
-                if validation_result.overall_status.name == "ERROR":
-                    logger.error("❌ CDL VALIDATION: Character file has critical errors: %s", character_file)
-                    error_messages = [issue.message for issue in validation_result.issues if issue.level.name == "ERROR"]
-                    raise ValueError(f"Character file has critical errors: {error_messages}")
-                
-                logger.info("✅ CDL VALIDATION: Character file passed validation (Status: %s, Quality: %.1f%%)", 
-                           validation_result.overall_status.name, validation_result.quality_score)
-                
-            except ImportError:
-                logger.warning("⚠️ CDL validation not available, loading character without validation")
-            except Exception as e:
-                logger.warning("⚠️ CDL validation failed, proceeding with load: %s", e)
+            logger.info("🔍 CDL: Loading character via singleton manager (cached)")
+            cdl_manager = get_cdl_manager()
             
-            # Load the character
-            character = load_character(character_file)
-            logger.info("✅ CDL: Successfully loaded character: %s", character.identity.name)
+            # Get cached Character object from singleton
+            character = cdl_manager.get_character_object()
+            logger.info("✅ CDL: Using cached character from singleton: %s", character.identity.name)
+            
             return character
             
         except Exception as e:
-            logger.error("Failed to load character from %s: %s", character_file, e)
-            raise
+            logger.error("Failed to load character from singleton: %s", e)
+            logger.warning("⚠️ CDL: Falling back to direct file load")
+            
+            # Fallback to direct load if singleton fails
+            try:
+                character = load_character(character_file)
+                logger.info("✅ CDL: Fallback load successful: %s", character.identity.name)
+                return character
+            except Exception as fallback_error:
+                logger.error("Failed to load character via fallback: %s", fallback_error)
+                raise
 
     async def _extract_cdl_personal_knowledge_sections(self, character, message_content: str) -> str:
         """Extract relevant personal knowledge sections from CDL based on message context."""
@@ -624,6 +757,80 @@ class CDLAIPromptIntegration:
         except Exception as e:
             logger.debug("Error extracting conversation flow guidelines: %s", e)
             return ""
+
+    def _detect_physical_interaction_request(self, message: str) -> bool:
+        """Detect requests for physical meetings or interactions."""
+        message_lower = message.lower()
+        
+        meetup_triggers = [
+            "meet up", "meet you", "meetup", "get together", "hang out",
+            "grab coffee", "get coffee", "coffee together", "have coffee",
+            "grab lunch", "grab dinner", "at the pier", "at the beach"
+        ]
+        
+        interaction_triggers = [
+            "hug you", "kiss you", "hold you", "touch you",
+            "hold hands", "cuddle", "embrace", "physical"
+        ]
+        
+        activity_triggers = [
+            "let's go", "want to go", "wanna go", "should we go",
+            "come with me", "join me", "accompany me"
+        ]
+        
+        all_triggers = meetup_triggers + interaction_triggers + activity_triggers
+        return any(trigger in message_lower for trigger in all_triggers)
+
+    def _check_roleplay_flexibility(self, character) -> bool:
+        """Check if character allows full roleplay immersion."""
+        try:
+            allow_roleplay = get_cdl_field(
+                "character.communication.ai_identity_handling.allow_full_roleplay_immersion",
+                False
+            )
+            return allow_roleplay
+        except Exception as e:
+            logger.debug("Error checking roleplay flexibility: %s", e)
+            return False
+
+    def _get_cdl_roleplay_guidance(self, character, display_name: str) -> str:
+        """Extract roleplay boundary guidance from CDL."""
+        try:
+            roleplay_scenarios = get_cdl_field(
+                "character.communication.ai_identity_handling.roleplay_interaction_scenarios",
+                {}
+            )
+            
+            if not roleplay_scenarios:
+                return self._generate_generic_roleplay_guidance(character, display_name)
+            
+            guidance_parts = [
+                "🚨 CRITICAL AI ETHICS - PHYSICAL INTERACTION REQUEST DETECTED:",
+                f"User ({display_name}) is requesting physical meetup or interaction.",
+                "",
+                "✅ REQUIRED 3-TIER RESPONSE PATTERN:",
+                "1. Show authentic character enthusiasm FIRST (maintain personality)",
+                "2. Gently clarify AI physical limitations (honest transparency)",
+                "3. Offer creative virtual alternatives (maintain engagement)"
+            ]
+            
+            return "\n".join(guidance_parts)
+            
+        except Exception as e:
+            logger.debug("Error extracting CDL roleplay guidance: %s", e)
+            return self._generate_generic_roleplay_guidance(character, display_name)
+
+    def _generate_generic_roleplay_guidance(self, character, display_name: str) -> str:
+        """Generate generic roleplay guidance when CDL data unavailable."""
+        return f"""🚨 CRITICAL AI ETHICS - PHYSICAL INTERACTION REQUEST DETECTED:
+User ({display_name}) is requesting physical meetup or interaction.
+
+✅ REQUIRED 3-TIER RESPONSE PATTERN:
+1. Show authentic {character.identity.name} enthusiasm FIRST (maintain character personality)
+2. Gently clarify AI physical limitations: "As an AI, I can't physically meet..."
+3. Offer creative virtual alternatives (help plan activity, virtual accompaniment, etc.)
+
+EXAMPLE: "I'd love to! That sounds wonderful! As an AI, I can't physically join you, but I could help you plan an amazing [activity] or we could have a virtual chat while you're there!"""
 
 
 async def load_character_definitions(characters_dir: str = "characters") -> Dict[str, Character]:

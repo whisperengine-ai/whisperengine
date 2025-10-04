@@ -120,6 +120,11 @@ class CDLValidator:
             # Message triggers (unified path) - ACTUALLY USED BY PIPELINE
             'character.communication.message_pattern_triggers': 'Message Pattern Triggers',
             
+            # AI Identity Handling - CRITICAL FOR AI ETHICS LAYER
+            'character.communication.ai_identity_handling': 'AI Identity Handling & Ethics',
+            'character.communication.ai_identity_handling.allow_full_roleplay_immersion': 'Roleplay Flexibility Flag',
+            'character.communication.ai_identity_handling.roleplay_interaction_scenarios': 'Physical Interaction Scenarios',
+            
             # Background and life context (ACTUAL CDL structure - not personal_background)
             'character.backstory': 'Character Background/History',
             'character.backstory.formative_experiences': 'Life-Shaping Events',
@@ -238,6 +243,7 @@ class CDLValidator:
         communication = cdl_data.get('character', {}).get('communication', {})
         has_triggers = 'message_pattern_triggers' in communication
         has_guidance = 'conversation_flow_guidance' in communication
+        has_ai_identity = 'ai_identity_handling' in communication
         
         # Check for standardized location
         if not has_triggers:
@@ -260,6 +266,53 @@ class CDLValidator:
             ))
             compliant = False
         
+        # 🚨 NEW: Check for AI identity handling section
+        if not has_ai_identity:
+            issues.append(ValidationIssue(
+                level=ValidationStatus.WARNING,
+                category="ai_ethics",
+                message="Missing ai_identity_handling in character.communication",
+                section="character.communication",
+                suggestion="Add ai_identity_handling section with allow_full_roleplay_immersion flag and roleplay_interaction_scenarios"
+            ))
+            compliant = False
+        else:
+            # Validate AI identity handling structure
+            ai_identity = communication.get('ai_identity_handling', {})
+            
+            # Check for roleplay flexibility flag
+            if 'allow_full_roleplay_immersion' not in ai_identity:
+                issues.append(ValidationIssue(
+                    level=ValidationStatus.WARNING,
+                    category="ai_ethics",
+                    message="Missing allow_full_roleplay_immersion flag (defaults to false for safety)",
+                    section="character.communication.ai_identity_handling",
+                    suggestion="Add 'allow_full_roleplay_immersion: true' for narrative/game characters or 'false' for real-world grounded characters"
+                ))
+            else:
+                # Validate flag value
+                flag_value = ai_identity.get('allow_full_roleplay_immersion')
+                if not isinstance(flag_value, bool):
+                    issues.append(ValidationIssue(
+                        level=ValidationStatus.ERROR,
+                        category="ai_ethics",
+                        message=f"allow_full_roleplay_immersion must be boolean, got {type(flag_value).__name__}",
+                        section="character.communication.ai_identity_handling",
+                        suggestion="Set to true (for game/narrative characters) or false (for real-world characters)"
+                    ))
+                    compliant = False
+            
+            # Check for roleplay scenarios (only required if allow_full_roleplay_immersion is false or missing)
+            immersion_allowed = ai_identity.get('allow_full_roleplay_immersion', False)
+            if not immersion_allowed and 'roleplay_interaction_scenarios' not in ai_identity:
+                issues.append(ValidationIssue(
+                    level=ValidationStatus.WARNING,
+                    category="ai_ethics",
+                    message="Missing roleplay_interaction_scenarios for real-world grounded character",
+                    section="character.communication.ai_identity_handling",
+                    suggestion="Add roleplay_interaction_scenarios with strategy and examples for physical interaction requests (coffee_invitation, meeting_up, etc.)"
+                ))
+        
         # Check for old location patterns (should not exist)
         old_location = (cdl_data.get('character', {})
                        .get('personality', {})
@@ -267,6 +320,7 @@ class CDLValidator:
         
         has_old_triggers = 'message_pattern_triggers' in old_location
         has_old_guidance = 'conversation_flow_guidance' in old_location
+        has_old_ai_identity = 'ai_identity_handling' in old_location
         
         if has_old_triggers:
             issues.append(ValidationIssue(
@@ -288,11 +342,22 @@ class CDLValidator:
             ))
             compliant = False
         
+        if has_old_ai_identity:
+            issues.append(ValidationIssue(
+                level=ValidationStatus.ERROR,
+                category="standardization",
+                message="Found ai_identity_handling in old location (personality.communication_style)",
+                section="character.personality.communication_style",
+                suggestion="Move ai_identity_handling to character.communication"
+            ))
+            compliant = False
+        
         return {
             'compliant': compliant,
             'issues': issues,
             'has_triggers': has_triggers,
-            'has_guidance': has_guidance
+            'has_guidance': has_guidance,
+            'has_ai_identity': has_ai_identity
         }
     
     def _test_pattern_detection(self, character, filename: str) -> Dict[str, Any]:

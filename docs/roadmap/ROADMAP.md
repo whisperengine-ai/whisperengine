@@ -1,15 +1,111 @@
 # WhisperEngine AI - Product Roadmap 2025-2026
 
-## 🎯 Current State (v0.8.0 - September 2025)
+## 🎯 Current State (v0.8.5 - October 2025)
 
-WhisperEngine has completed its **Production Hardening Sprint**, significantly improving reliability, security, and monitoring. The platform offers both entertainment-focused AI companions and enhanced deployment capabilities, but is still in active development toward a stable 1.0 release.
+WhisperEngine has completed its **Production Hardening Sprint** and **PostgreSQL Semantic Knowledge Graph** implementation. The platform now combines vector memory intelligence with structured factual knowledge, enabling authentic character responses with fact recall capabilities.
 
-### ✅ Recently Completed (v0.8.0)
+### ✅ Recently Completed (v0.8.5 - October 2025)
+- **Semantic Knowledge Graph**: PostgreSQL-based factual knowledge system with character integration
+  - Phase 1: Schema implementation (fact_entities, user_fact_relationships, entity_relationships)
+  - Phase 2: SemanticKnowledgeRouter with query intent analysis
+  - Phase 3: Knowledge extraction pipeline with auto-user-creation
+  - Phase 4: Character integration with personality-first synthesis (75% recall success, 100% character synthesis)
 - **Production Security**: SBOM generation, container signing, supply chain protection
 - **Monitoring & Operations**: Real-time health dashboards, performance analytics, alert systems
 - **Enterprise Features**: Multi-registry support, compliance documentation, security hardening
 - **Companion Platform**: Rich personality system with gaming, creative, and relationship companions
-- **Memory Architecture**: Phase 4 human-like intelligence with persistent memory networks
+- **Memory Architecture**: Hybrid vector + PostgreSQL with persistent memory networks
+
+---
+
+## 🚀 Immediate Priorities (October 2025)
+
+### Phase 5: User Preferences Integration ✅ COMPLETE
+**Status**: Completed  
+**Timeline**: October 2025 (Completed in 2-4 hours)  
+**Priority**: CRITICAL
+
+**Goals**:
+- Move user preferences from vector memory to PostgreSQL
+- Implement fast, deterministic preference retrieval
+- Support preferred names and general preferences
+- Performance improvement: <1ms vs 10-50ms
+
+**Key Features**:
+- [x] Gap analysis completed - `universal_users.preferences` column identified but unused
+- [x] Preference detection in MessageProcessor ("My name is Mark", "Call me Mark")
+- [x] `store_user_preference()` in SemanticKnowledgeRouter
+- [x] `get_user_preference()` in SemanticKnowledgeRouter  
+- [x] Update CDL integration to use PostgreSQL preferences
+- [x] Test preferred name patterns (100% pattern detection)
+- [x] Validate performance improvements (59.2x speedup: 0.5ms vs 30ms)
+
+**Results**: ✅ **59.2x performance improvement** - PostgreSQL <1ms vs vector memory 30ms
+
+**Impact**: Major UX improvement - instant, reliable preference recall vs slow semantic search
+
+### Phase 6: Entity Relationship Discovery ✅ COMPLETE
+**Status**: Completed  
+**Timeline**: Q4 2025 (Completed October 2025)  
+**Priority**: MEDIUM
+
+**Goals**:
+- Enable "similar to" recommendation queries
+- Populate entity_relationships via trigram matching
+- Implement 2-hop graph traversal
+- Natural discovery conversations
+
+**Key Features**:
+- [x] Auto-populate entity_relationships on fact storage
+- [x] `find_similar_entities()` with trigram similarity
+- [x] `auto_populate_entity_relationships()` on fact insertion
+- [x] `get_related_entities()` with 1-hop and 2-hop traversal
+- [x] Bidirectional relationship support
+- [x] Weight-based relationship ranking
+
+**Results**: ✅ **Trigram similarity operational** - auto-discovers relationships like hiking ↔ biking (0.40 similarity)
+
+**Impact**: Enhanced conversation intelligence with natural recommendations
+
+### Phase 7: Full-Text Search Integration 🔍
+**Status**: Planned  
+**Timeline**: Q4 2025  
+**Priority**: LOW
+
+**Goals**:
+- Add PostgreSQL full-text search for entity discovery
+- Enable fuzzy matching and typo tolerance
+- Support multi-word entity queries
+- Optimize search performance
+
+**Key Features**:
+- [ ] GIN index on entity names
+- [ ] `to_tsvector()` and `ts_rank()` implementation
+- [ ] Fuzzy search with trigram similarity
+- [ ] Combined vector + text search queries
+- [ ] Search result ranking and relevance
+
+**Impact**: Better entity discovery and search accuracy
+
+### Phase 8: Temporal Analytics with InfluxDB 📊
+**Status**: Future  
+**Timeline**: Q1 2026  
+**Priority**: LOW
+
+**Goals**:
+- Track preference evolution over time
+- Analyze conversation patterns and trends
+- Monitor relationship development metrics
+- Enable time-series insights
+
+**Key Features**:
+- [ ] InfluxDB integration for time-series data
+- [ ] Preference change tracking
+- [ ] Conversation frequency analytics
+- [ ] Emotional trend analysis
+- [ ] Relationship health scoring
+
+**Impact**: Deep insights into user relationships and preference evolution
 
 ---
 

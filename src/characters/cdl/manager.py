@@ -66,6 +66,7 @@ class CDLManager:
     _data: Optional[Dict[str, Any]] = None
     _character_file: Optional[str] = None
     _loaded = False
+    _character_object: Optional[Any] = None  # Cached Character object from parser
     
     def __new__(cls):
         """Thread-safe singleton implementation"""
@@ -88,6 +89,7 @@ class CDLManager:
             cls._data = None
             cls._character_file = None
             cls._loaded = False
+            cls._character_object = None  # Clear cached Character object
     
     def _load_character_data(self) -> None:
         """Lazy load character data from CDL_DEFAULT_CHARACTER environment variable"""
@@ -253,8 +255,42 @@ class CDLManager:
             self._loaded = False
             self._data = None
             self._character_file = None
+            self._character_object = None  # Clear cached Character object too
         self._load_character_data()
         logger.info("🔄 CDL Manager: Reloaded character data")
+    
+    def get_character_object(self):
+        """
+        Get cached Character object from parser.
+        
+        Lazy loads and caches the full Character object on first access.
+        This provides the parsed Character object needed by CDLAIPromptIntegration
+        without re-parsing the JSON on every request.
+        
+        Returns:
+            Character: Parsed Character object from CDL parser
+        """
+        self._load_character_data()
+        
+        if self._character_object is None:
+            with self._lock:
+                if self._character_object is None:  # Double-check locking
+                    try:
+                        from src.characters.cdl.parser import load_character
+                        
+                        if not self._character_file:
+                            logger.error("❌ CDL Manager: No character file loaded")
+                            raise ValueError("No character file loaded in CDL Manager")
+                        
+                        logger.info("🔄 CDL Manager: Loading Character object from parser (first access)")
+                        self._character_object = load_character(self._character_file)
+                        logger.info("✅ CDL Manager: Cached Character object: %s", self._character_object.identity.name)
+                        
+                    except Exception as e:
+                        logger.error("❌ CDL Manager: Failed to load Character object: %s", e)
+                        raise
+        
+        return self._character_object
     
     def get_data_summary(self) -> Dict[str, Any]:
         """Get summary of loaded data for debugging"""

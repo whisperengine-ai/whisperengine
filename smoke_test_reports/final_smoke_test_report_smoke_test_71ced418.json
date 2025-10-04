@@ -1,0 +1,68 @@
+{
+  "test_suite": "WhisperEngine Smoke Test",
+  "timestamp": "2025-10-03T14:15:35.429097",
+  "test_user_id": "smoke_test_71ced418",
+  "parallel_mode": false,
+  "overall_duration_seconds": 61.978449,
+  "bots_tested": [
+    "elena"
+  ],
+  "individual_reports": {
+    "elena": {
+      "bot_name": "elena",
+      "character": "Marine Biologist",
+      "port": 9091,
+      "container": "whisperengine-elena-bot",
+      "test_user_id": "smoke_test_71ced418",
+      "test_start": "2025-10-03T14:15:35.429103",
+      "test_end": "2025-10-03T14:16:37.407202",
+      "test_duration_seconds": 61.978099,
+      "test_results": {
+        "CDL Validation": true,
+        "Health Check": true,
+        "Bot Info": true,
+        "Basic Conversation": true,
+        "Personality Traits": true,
+        "Memory Storage & Recall": true,
+        "Conversation Context": false,
+        "Emotional Intelligence": true,
+        "Performance": true,
+        "Log Analysis": true
+      },
+      "log_analysis": {
+        "success": true,
+        "warnings": 12,
+        "errors": 0,
+        "raw_errors": 0,
+        "config_warnings": 0,
+        "critical_issues": [],
+        "log_lines": 4018
+      },
+      "summary": {
+        "total_tests": 10,
+        "passed_tests": 9,
+        "failed_tests": 1,
+        "success_rate": 90.0
+      }
+    }
+  },
+  "overall_summary": {
+    "total_bots_tested": 1,
+    "bots_fully_passed": 0,
+    "total_tests_run": 10,
+    "total_tests_passed": 9,
+    "total_tests_failed": 1,
+    "overall_success_rate": 90.0,
+    "log_analysis_summary": {
+      "total_warnings": 12,
+      "total_errors": 0,
+      "total_raw_errors": 0,
+      "total_config_warnings": 0,
+      "unique_critical_issues": []
+    }
+  },
+  "recommendations": [
+    "Investigate failed tests in: elena",
+    "Performance optimization needed for: elena"
+  ]
+}

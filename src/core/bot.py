@@ -107,6 +107,9 @@ class DiscordBotCore:
         self.empathy_calibrator = None  # Phase 3 Advanced Intelligence
         self.graph_emotion_manager = None  # Reference to update later with external emotion AI
 
+        # Knowledge management components
+        self.knowledge_router = None  # Semantic knowledge router for factual intelligence
+
         # Production optimization components
         self.production_adapter = None
 
@@ -222,6 +225,43 @@ class DiscordBotCore:
         except Exception as e:
             self.logger.error(f"❌ Character system initialization failed: {e}")
             # Don't raise - character system is optional
+    
+    async def initialize_knowledge_router(self):
+        """Initialize semantic knowledge router for structured factual intelligence."""
+        try:
+            from src.knowledge.semantic_router import create_semantic_knowledge_router
+            
+            # Wait for postgres pool to be available (max 30 seconds)
+            max_wait = 30
+            wait_interval = 1
+            waited = 0
+            
+            while not self.postgres_pool and waited < max_wait:
+                await asyncio.sleep(wait_interval)
+                waited += wait_interval
+            
+            # Check if postgres pool is available
+            if not self.postgres_pool:
+                self.logger.warning("⚠️ PostgreSQL pool not available after %ds - knowledge router disabled", max_wait)
+                return
+            
+            # Create knowledge router with all data stores
+            self.knowledge_router = create_semantic_knowledge_router(
+                postgres_pool=self.postgres_pool,
+                qdrant_client=getattr(self.memory_manager, 'client', None) if self.memory_manager else None,
+                influx_client=None  # InfluxDB integration optional for Phase 1
+            )
+            
+            self.logger.info("✅ Semantic Knowledge Router initialized with multi-modal intelligence")
+            
+            # Update character system with knowledge_router if it exists
+            if self.character_system and self.knowledge_router:
+                self.character_system.knowledge_router = self.knowledge_router
+                self.logger.info("✅ Character system updated with knowledge router integration")
+            
+        except Exception as e:
+            self.logger.error(f"❌ Knowledge router initialization failed: {e}")
+            # Don't raise - knowledge router is optional enhancement
     
     def initialize_hybrid_emotion_analyzer(self):
         """🚀 FAST TRACK: Initialize hybrid emotion analyzer for optimal performance"""
@@ -772,6 +812,54 @@ class DiscordBotCore:
             self.logger.warning("Bot will continue with standard performance")
             self.production_adapter = None
 
+    async def initialize_postgres_pool(self):
+        """
+        Initialize PostgreSQL connection pool for semantic knowledge graph.
+        
+        This runs asynchronously and is required for the knowledge_router.
+        """
+        try:
+            self.logger.info("🐘 Initializing PostgreSQL connection pool...")
+            
+            import asyncpg
+            
+            # Get PostgreSQL configuration from environment
+            db_host = os.getenv("POSTGRES_HOST", "whisperengine-multi-postgres")
+            db_port = int(os.getenv("POSTGRES_PORT", "5432"))
+            db_name = os.getenv("POSTGRES_DB", "whisperengine")
+            db_user = os.getenv("POSTGRES_USER", "whisperengine")
+            db_password = os.getenv("POSTGRES_PASSWORD", "whisperengine")
+            
+            # Create connection pool
+            self.postgres_pool = await asyncpg.create_pool(
+                host=db_host,
+                port=db_port,
+                database=db_name,
+                user=db_user,
+                password=db_password,
+                min_size=2,
+                max_size=10,
+                command_timeout=60
+            )
+            
+            # Store configuration for reference
+            self.postgres_config = {
+                "host": db_host,
+                "port": db_port,
+                "database": db_name,
+                "user": db_user
+            }
+            
+            self.logger.info(f"✅ PostgreSQL pool initialized: {db_host}:{db_port}/{db_name}")
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"❌ Failed to initialize PostgreSQL pool: {e}")
+            self.logger.warning("⚠️ Bot will continue without semantic knowledge graph features")
+            self.postgres_pool = None
+            self.postgres_config = None
+            return False
+
     def initialize_multi_entity_system(self):
         """Initialize the multi-entity relationship system."""
         try:
@@ -797,9 +885,8 @@ class DiscordBotCore:
             self.multi_entity_manager = None
             self.ai_self_bridge = None
 
-        # PostgreSQL configuration removed - using vector-native storage only
-        self.postgres_pool = None
-        self.postgres_config = None
+        # Note: PostgreSQL pool is now initialized separately in initialize_postgres_pool()
+        # for use with semantic knowledge graph
 
     def initialize_supporting_systems(self):
         """Initialize supporting systems like heartbeat monitor and conversation history."""
@@ -893,8 +980,15 @@ class DiscordBotCore:
         if self._needs_batch_init:
             asyncio.create_task(self.initialize_batch_optimizer())
 
+        # Schedule async initialization of PostgreSQL pool (required for knowledge router)
+        asyncio.create_task(self.initialize_postgres_pool())
+        
         # Schedule async initialization of Phase 4 components
         asyncio.create_task(self.initialize_phase4_components())
+        
+        # Schedule async initialization of knowledge router (requires postgres pool)
+        # Note: This will wait for postgres_pool to be available
+        asyncio.create_task(self.initialize_knowledge_router())
 
         # Supporting systems
         self.initialize_conversation_cache()
