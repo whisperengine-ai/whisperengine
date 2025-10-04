@@ -150,9 +150,14 @@ class MessageProcessor:
                 response, message_context
             )
             
-            # Phase 9: Memory storage
+            # Phase 9: Memory storage (vector + knowledge graph)
             memory_stored = await self._store_conversation_memory(
                 message_context, response, ai_components
+            )
+            
+            # Phase 9b: Knowledge extraction and storage (PostgreSQL)
+            knowledge_stored = await self._extract_and_store_knowledge(
+                message_context, ai_components
             )
             
             # Calculate processing time
@@ -168,6 +173,8 @@ class MessageProcessor:
                 processing_time_ms=processing_time_ms,
                 memory_stored=memory_stored,
                 metadata={
+                    "memory_count": len(relevant_memories) if relevant_memories else 0,
+                    "knowledge_stored": knowledge_stored,
                     "memory_count": len(relevant_memories) if relevant_memories else 0,
                     "ai_components": ai_components,
                     "security_validation": validation_result
@@ -1608,6 +1615,168 @@ class MessageProcessor:
         except (ValueError, TypeError) as e:
             logger.error("Meta-analysis sanitization failed: %s", str(e))
             return response
+
+    async def _extract_and_store_knowledge(self, message_context: MessageContext, 
+                                          ai_components: Dict[str, Any]) -> bool:
+        """
+        Extract factual knowledge from message and store in PostgreSQL knowledge graph.
+        
+        This is Phase 3 of the Semantic Knowledge Graph implementation:
+        - Detects factual statements (preferences, facts about user)
+        - Extracts entity information
+        - Stores in PostgreSQL with automatic relationship discovery
+        
+        Args:
+            message_context: The message context
+            ai_components: AI processing results including emotion data
+            
+        Returns:
+            True if knowledge was extracted and stored
+        """
+        # Check if knowledge router is available
+        if not hasattr(self.bot_core, 'knowledge_router') or not self.bot_core.knowledge_router:
+            return False
+        
+        try:
+            content = message_context.content.lower()
+            
+            # Simple pattern-based factual detection for Phase 3
+            # This will be enhanced with semantic analysis in future iterations
+            factual_patterns = {
+                # Food preferences
+                'food_preference': [
+                    ('love', 'likes'), ('like', 'likes'), ('enjoy', 'likes'),
+                    ('favorite', 'likes'), ('prefer', 'likes'),
+                    ('hate', 'dislikes'), ('dislike', 'dislikes'), ("don't like", 'dislikes')
+                ],
+                # Drink preferences  
+                'drink_preference': [
+                    ('love', 'likes'), ('like', 'likes'), ('enjoy', 'likes'),
+                    ('favorite', 'likes'), ('prefer', 'likes'),
+                    ('hate', 'dislikes'), ('dislike', 'dislikes'), ("don't like", 'dislikes')
+                ],
+                # Hobbies
+                'hobby_preference': [
+                    ('love', 'enjoys'), ('like', 'enjoys'), ('enjoy', 'enjoys'),
+                    ('hobby', 'enjoys'), ('do for fun', 'enjoys')
+                ],
+                # Places visited
+                'place_visited': [
+                    ('visited', 'visited'), ('been to', 'visited'), ('went to', 'visited'),
+                    ('traveled to', 'visited')
+                ]
+            }
+            
+            # Entity type keywords for classification
+            entity_keywords = {
+                'food': ['pizza', 'pasta', 'sushi', 'burger', 'taco', 'food', 'meal', 'dish', 'eat', 'eating'],
+                'drink': ['beer', 'wine', 'coffee', 'tea', 'water', 'soda', 'juice', 'drink'],
+                'hobby': ['hiking', 'reading', 'gaming', 'cooking', 'photography', 'music', 'hobby'],
+                'place': ['city', 'country', 'beach', 'mountain', 'park', 'place', 'location']
+            }
+            
+            detected_facts = []
+            
+            # Detect factual statements
+            for event_type, patterns in factual_patterns.items():
+                for pattern, relationship in patterns:
+                    if pattern in content:
+                        # Determine entity type based on keywords
+                        entity_type = 'other'
+                        for etype, keywords in entity_keywords.items():
+                            if any(kw in content for kw in keywords):
+                                entity_type = etype
+                                break
+                        
+                        # Extract entity name (simplified - will be enhanced)
+                        entity_name = self._extract_entity_from_content(content, pattern, entity_type)
+                        
+                        if entity_name:
+                            detected_facts.append({
+                                'entity_name': entity_name,
+                                'entity_type': entity_type,
+                                'relationship_type': relationship,
+                                'confidence': 0.8,
+                                'event_type': event_type
+                            })
+            
+            # Store detected facts in PostgreSQL
+            if detected_facts:
+                bot_name = os.getenv('DISCORD_BOT_NAME', 'assistant').lower()
+                emotion_data = ai_components.get('emotion_data', {})
+                emotional_context = emotion_data.get('primary_emotion', 'neutral') if emotion_data else 'neutral'
+                
+                for fact in detected_facts:
+                    stored = await self.bot_core.knowledge_router.store_user_fact(
+                        user_id=message_context.user_id,
+                        entity_name=fact['entity_name'],
+                        entity_type=fact['entity_type'],
+                        relationship_type=fact['relationship_type'],
+                        confidence=fact['confidence'],
+                        emotional_context=emotional_context,
+                        mentioned_by_character=bot_name,
+                        source_conversation_id=message_context.channel_id
+                    )
+                    
+                    if stored:
+                        logger.info(f"✅ KNOWLEDGE: Stored fact '{fact['entity_name']}' ({fact['entity_type']}) "
+                                  f"for user {message_context.user_id}")
+                
+                return len(detected_facts) > 0
+            
+            return False
+            
+        except Exception as e:
+            logger.error(f"❌ Knowledge extraction failed: {e}")
+            return False
+    
+    def _extract_entity_from_content(self, content: str, pattern: str, entity_type: str) -> Optional[str]:
+        """
+        Extract entity name from content based on pattern and entity type.
+        
+        Simple extraction for Phase 3 - will be enhanced with NLP in future.
+        
+        Args:
+            content: User message content
+            pattern: Detected pattern (e.g., "love", "like")
+            entity_type: Type of entity (food, drink, hobby, place)
+            
+        Returns:
+            Extracted entity name or None
+        """
+        try:
+            # Find the pattern in content
+            pattern_idx = content.find(pattern)
+            if pattern_idx == -1:
+                return None
+            
+            # Extract words after the pattern
+            after_pattern = content[pattern_idx + len(pattern):].strip()
+            
+            # Remove common articles and prepositions
+            articles = ['the', 'a', 'an', 'to', 'for', 'of']
+            words = after_pattern.split()
+            
+            # Filter out articles and take first 1-3 meaningful words
+            entity_words = []
+            for word in words[:5]:  # Look at first 5 words
+                clean_word = word.strip('.,!?;:')
+                if clean_word and clean_word.lower() not in articles:
+                    entity_words.append(clean_word)
+                if len(entity_words) >= 3:  # Max 3 words for entity name
+                    break
+            
+            if entity_words:
+                entity_name = ' '.join(entity_words)
+                # Basic cleanup
+                entity_name = entity_name.strip('.,!?;:').lower()
+                return entity_name if len(entity_name) > 1 else None
+            
+            return None
+            
+        except Exception as e:
+            logger.debug(f"Entity extraction failed: {e}")
+            return None
 
     async def _store_conversation_memory(self, message_context: MessageContext, response: str, 
                                        ai_components: Dict[str, Any]) -> bool:

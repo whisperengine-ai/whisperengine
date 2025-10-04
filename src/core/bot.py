@@ -107,6 +107,9 @@ class DiscordBotCore:
         self.empathy_calibrator = None  # Phase 3 Advanced Intelligence
         self.graph_emotion_manager = None  # Reference to update later with external emotion AI
 
+        # Knowledge management components
+        self.knowledge_router = None  # Semantic knowledge router for factual intelligence
+
         # Production optimization components
         self.production_adapter = None
 
@@ -222,6 +225,29 @@ class DiscordBotCore:
         except Exception as e:
             self.logger.error(f"❌ Character system initialization failed: {e}")
             # Don't raise - character system is optional
+    
+    async def initialize_knowledge_router(self):
+        """Initialize semantic knowledge router for structured factual intelligence."""
+        try:
+            from src.knowledge.semantic_router import create_semantic_knowledge_router
+            
+            # Ensure postgres pool is available
+            if not self.postgres_pool:
+                self.logger.warning("⚠️ PostgreSQL pool not available - knowledge router disabled")
+                return
+            
+            # Create knowledge router with all data stores
+            self.knowledge_router = create_semantic_knowledge_router(
+                postgres_pool=self.postgres_pool,
+                qdrant_client=getattr(self.memory_manager, 'client', None) if self.memory_manager else None,
+                influx_client=None  # InfluxDB integration optional for Phase 1
+            )
+            
+            self.logger.info("✅ Semantic Knowledge Router initialized with multi-modal intelligence")
+            
+        except Exception as e:
+            self.logger.error(f"❌ Knowledge router initialization failed: {e}")
+            # Don't raise - knowledge router is optional enhancement
     
     def initialize_hybrid_emotion_analyzer(self):
         """🚀 FAST TRACK: Initialize hybrid emotion analyzer for optimal performance"""
@@ -895,6 +921,9 @@ class DiscordBotCore:
 
         # Schedule async initialization of Phase 4 components
         asyncio.create_task(self.initialize_phase4_components())
+        
+        # Schedule async initialization of knowledge router (requires postgres pool)
+        asyncio.create_task(self.initialize_knowledge_router())
 
         # Supporting systems
         self.initialize_conversation_cache()
