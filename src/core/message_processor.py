@@ -13,6 +13,7 @@ integration, and context management.
 
 import asyncio
 import logging
+import os
 import traceback
 from datetime import datetime
 from typing import Dict, List, Optional, Any
@@ -34,6 +35,8 @@ class MessageContext:
     channel_id: Optional[str] = None
     channel_type: Optional[str] = None  # "dm", "guild", etc.
     metadata: Optional[Dict[str, Any]] = None
+    # Platform-specific context for features like typing indicators
+    platform_context: Optional[Any] = None  # Discord channel, HTTP response object, etc.
 
     def __post_init__(self):
         if self.attachments is None:
@@ -325,12 +328,21 @@ class MessageProcessor:
         # For now, we'll create a basic context structure
         context = []
         
-        # Add system context if available
+        # Add time context for temporal awareness
+        from src.utils.helpers import get_current_time_context
+        time_context = get_current_time_context()
+        
+        # Build system message with time context and memory summary
+        system_parts = [f"CURRENT DATE & TIME: {time_context}"]
+        
         if relevant_memories:
             memory_summary = self._summarize_memories(relevant_memories)
+            system_parts.append(f"\nRelevant context from previous conversations: {memory_summary}")
+        
+        if system_parts:
             context.append({
                 "role": "system",
-                "content": f"Relevant context from previous conversations: {memory_summary}"
+                "content": "\n".join(system_parts)
             })
         
         # Add current user message
@@ -358,23 +370,72 @@ class MessageProcessor:
     async def _process_ai_components_parallel(self, message_context: MessageContext, 
                                             conversation_context: List[Dict[str, str]]) -> Dict[str, Any]:
         """Process AI components in parallel (emotions, context analysis, etc.)."""
-        # TODO: Implement full AI component processing pipeline
-        # This is a simplified version - the full implementation would replicate
-        # the complex parallel processing from the Discord handler
-        ai_components = {
-            'emotion_data': None,
-            'context_analysis': None,
-            'phase4_context': None,
-            'comprehensive_context': None,
-            'enhanced_system_prompt': None
-        }
+        ai_components = {}
         
         try:
-            # Placeholder for parallel AI component processing
-            # In the full implementation, this would call the same methods
-            # as _process_ai_components_parallel in the Discord handler
-            logger.debug("AI component processing placeholder - using %d context messages for user %s", 
-                        len(conversation_context), message_context.user_id)
+            # Vector-native emotion analysis using existing infrastructure
+            if self.bot_core and hasattr(self.bot_core, 'phase2_integration'):
+                try:
+                    emotion_data = await self._analyze_emotion_vector_native(
+                        message_context.user_id, 
+                        message_context.content,
+                        message_context
+                    )
+                    ai_components['emotion_data'] = emotion_data
+                    ai_components['external_emotion_data'] = emotion_data
+                    logger.debug("Processed vector-native emotion analysis")
+                except Exception as e:
+                    logger.debug("Vector emotion analysis failed: %s", str(e))
+                    ai_components['emotion_data'] = None
+            
+            # Context analysis using hybrid detector if available
+            try:
+                context_analysis = self.detect_context_patterns(
+                    message=message_context.content,
+                    conversation_history=[],  # Could be enhanced with conversation history
+                    vector_boost=True,
+                    confidence_threshold=0.7
+                )
+                ai_components['context_analysis'] = context_analysis
+                logger.debug("Processed hybrid context analysis")
+            except Exception as e:
+                logger.debug("Context analysis failed: %s", str(e))
+                ai_components['context_analysis'] = None
+            
+            # Dynamic personality profiling if available
+            if self.bot_core and hasattr(self.bot_core, 'dynamic_personality_profiler'):
+                try:
+                    personality_context = await self._analyze_dynamic_personality(
+                        message_context.user_id,
+                        message_context.content,
+                        message_context
+                    )
+                    ai_components['personality_context'] = personality_context
+                    logger.debug("Processed dynamic personality analysis")
+                except Exception as e:
+                    logger.debug("Personality analysis failed: %s", str(e))
+                    ai_components['personality_context'] = None
+            
+            # Phase 4 intelligence processing if available
+            if self.bot_core and hasattr(self.bot_core, 'phase2_integration'):
+                try:
+                    phase4_context = await self._process_phase4_intelligence(
+                        message_context.user_id,
+                        message_context.content,
+                        message_context,
+                        ai_components.get('emotion_data')
+                    )
+                    ai_components['phase4_context'] = phase4_context
+                    logger.debug("Processed Phase 4 intelligence")
+                except Exception as e:
+                    logger.debug("Phase 4 processing failed: %s", str(e))
+                    ai_components['phase4_context'] = None
+            
+            # Set fallback values for expected components
+            ai_components.setdefault('comprehensive_context', None)
+            ai_components.setdefault('enhanced_system_prompt', None)
+            
+            logger.info("✅ AI COMPONENTS: Processed emotion, context, personality, and Phase 4 intelligence")
             
         except (AttributeError, ValueError, TypeError) as e:
             logger.error("AI component processing failed: %s", str(e))
@@ -388,15 +449,188 @@ class MessageProcessor:
             return conversation_context
         
         try:
-            # Process images and add to context
-            # This would use the existing image processing logic
+            # Process images and add to context using existing image processing logic
             logger.debug("Processing %d attachments", len(message_context.attachments))
-            # TODO: Implement actual image processing
+            
+            # Use existing image processing from utils.helpers
+            from src.utils.helpers import process_message_with_images
+            
+            # Convert MessageContext attachments to format expected by process_message_with_images
+            discord_like_attachments = []
+            for attachment in message_context.attachments:
+                # Create a simple object with the required attributes
+                class AttachmentLike:
+                    def __init__(self, url, filename, content_type=None):
+                        self.url = url
+                        self.filename = filename
+                        self.content_type = content_type
+                
+                discord_like_attachments.append(AttachmentLike(
+                    url=attachment.get('url'),
+                    filename=attachment.get('filename'),
+                    content_type=attachment.get('content_type')
+                ))
+            
+            # Process images with existing logic
+            enhanced_context = await process_message_with_images(
+                message_context.content,
+                discord_like_attachments,
+                conversation_context,
+                self.llm_client,
+                self.image_processor
+            )
+            
+            return enhanced_context
             
         except (AttributeError, ValueError, TypeError) as e:
             logger.error("Attachment processing failed: %s", str(e))
         
         return conversation_context
+
+    async def _analyze_emotion_vector_native(self, user_id: str, content: str, message_context: MessageContext) -> Optional[Dict[str, Any]]:
+        """Analyze emotions using vector-native approach."""
+        try:
+            if not self.bot_core or not hasattr(self.bot_core, 'phase2_integration'):
+                return None
+            
+            # Use the enhanced vector emotion analyzer from the bot core
+            from src.intelligence.enhanced_vector_emotion_analyzer import EnhancedVectorEmotionAnalyzer
+            
+            analyzer = EnhancedVectorEmotionAnalyzer(
+                vector_memory_manager=self.memory_manager
+            )
+            
+            # Analyze emotion with vector intelligence (use the correct method name)
+            emotion_results = await analyzer.analyze_emotion(
+                content=content,
+                user_id=user_id,
+                conversation_context=[],  # Could be enhanced with history
+                recent_emotions=None
+            )
+            
+            # Convert results to dictionary format
+            if emotion_results:
+                emotion_data = {
+                    'primary_emotion': emotion_results.primary_emotion.value if hasattr(emotion_results.primary_emotion, 'value') else str(emotion_results.primary_emotion),
+                    'intensity': emotion_results.intensity,
+                    'confidence': emotion_results.confidence_score,
+                    'method': emotion_results.detection_method,
+                    'analysis_method': 'vector_native'
+                }
+                logger.debug("Vector emotion analysis successful for user %s", user_id)
+                return emotion_data
+            
+        except Exception as e:
+            logger.debug("Vector emotion analysis failed: %s", str(e))
+        
+        return None
+
+    async def _analyze_dynamic_personality(self, user_id: str, content: str, message_context: MessageContext) -> Optional[Dict[str, Any]]:
+        """Analyze dynamic personality if profiler is available."""
+        try:
+            if not self.bot_core or not hasattr(self.bot_core, 'dynamic_personality_profiler'):
+                return None
+            
+            profiler = self.bot_core.dynamic_personality_profiler
+            
+            # Create a mock message object for the profiler
+            class MessageLike:
+                def __init__(self, content, user_id):
+                    self.content = content
+                    self.author = type('Author', (), {'id': user_id})()
+            
+            mock_message = MessageLike(content, user_id)
+            
+            # Analyze personality
+            personality_data = await profiler.analyze_personality(
+                user_id=user_id,
+                content=content,
+                message=mock_message,
+                recent_messages=[]
+            )
+            
+            logger.debug("Dynamic personality analysis successful for user %s", user_id)
+            return personality_data
+            
+        except Exception as e:
+            logger.debug("Dynamic personality analysis failed: %s", str(e))
+        
+        return None
+
+    async def _process_phase4_intelligence(self, user_id: str, content: str, message_context: MessageContext, emotion_data: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+        """Process Phase 4 human-like intelligence if available."""
+        try:
+            if not self.bot_core or not hasattr(self.bot_core, 'phase2_integration'):
+                return None
+            
+            # Create a mock message object for Phase 4 processing
+            class MessageLike:
+                def __init__(self, content, user_id):
+                    self.content = content
+                    self.author = type('Author', (), {'id': user_id})()
+            
+            mock_message = MessageLike(content, user_id)
+            
+            # Use Phase 4 integration if available
+            phase4_context = await self.bot_core.phase2_integration.process_phase4_intelligence(
+                user_id=user_id,
+                message=mock_message,
+                recent_messages=[],
+                external_emotion_data=emotion_data,
+                phase2_context=emotion_data
+            )
+            
+            logger.debug("Phase 4 intelligence processing successful for user %s", user_id)
+            return phase4_context
+            
+        except Exception as e:
+            logger.debug("Phase 4 intelligence processing failed: %s", str(e))
+        
+        return None
+
+    def detect_context_patterns(self, message: str, conversation_history: List[Dict[str, str]], 
+                               vector_boost: bool = True, confidence_threshold: float = 0.7) -> Dict[str, Any]:
+        """Detect context patterns using hybrid context detector."""
+        try:
+            from src.prompts.hybrid_context_detector import create_hybrid_context_detector
+            
+            # Create context detector with memory manager if available
+            context_detector = create_hybrid_context_detector(memory_manager=self.memory_manager)
+            
+            # Analyze context using the correct method name
+            context_analysis = context_detector.analyze_context(
+                message=message,
+                user_id="context_analysis"  # Could be enhanced with actual user_id
+            )
+            
+            # Convert to expected format
+            context_result = {
+                'needs_ai_guidance': context_analysis.needs_ai_guidance,
+                'needs_memory_context': context_analysis.needs_memory_context,
+                'needs_personality': context_analysis.needs_personality,
+                'needs_voice_style': context_analysis.needs_voice_style,
+                'is_greeting': context_analysis.is_greeting,
+                'is_simple_question': context_analysis.is_simple_question,
+                'confidence_scores': context_analysis.confidence_scores,
+                'detection_method': context_analysis.detection_method
+            }
+            
+            logger.debug("Context pattern detection successful")
+            return context_result
+            
+        except Exception as e:
+            logger.debug("Context pattern detection failed: %s", str(e))
+            # Return sensible defaults
+            return {
+                'needs_ai_guidance': True,
+                'needs_memory_context': True,
+                'needs_personality': True,
+                'needs_voice_style': True,
+                'is_greeting': False,
+                'is_simple_question': False,
+                'confidence_scores': {},
+                'detection_method': {}
+            }
 
     async def _generate_response(self, message_context: MessageContext, 
                                conversation_context: List[Dict[str, str]], 
@@ -431,6 +665,41 @@ class MessageProcessor:
             )
             
             logger.info("✅ GENERATED: Response with %d characters", len(response))
+            
+            # 🎭 CDL EMOJI ENHANCEMENT: Add character-appropriate emojis to text response
+            try:
+                character_file = os.getenv("CDL_DEFAULT_CHARACTER")
+                if character_file:
+                    from src.intelligence.cdl_emoji_integration import create_cdl_emoji_integration
+                    
+                    cdl_emoji_integration = create_cdl_emoji_integration()
+                    
+                    # Extract just the filename if full path is provided
+                    if "/" in character_file:
+                        character_file = character_file.split("/")[-1]
+                    
+                    # Enhance response with CDL-appropriate emojis (ADDS to text, doesn't replace)
+                    enhanced_response, emoji_metadata = cdl_emoji_integration.enhance_bot_response(
+                        character_file=character_file,
+                        user_id=message_context.user_id,
+                        user_message=message_context.content,
+                        bot_response=response,
+                        context={
+                            'emotional_context': ai_components.get('emotion_data'),
+                            'conversation_history': conversation_context[:3] if conversation_context else []
+                        }
+                    )
+                    
+                    if emoji_metadata.get("cdl_emoji_applied", False):
+                        response = enhanced_response
+                        logger.info(f"🎭 CDL EMOJI: Enhanced response with {len(emoji_metadata.get('emoji_additions', []))} emojis "
+                                  f"({emoji_metadata.get('placement_style', 'unknown')} style)")
+                    else:
+                        logger.debug(f"🎭 CDL EMOJI: No enhancement applied - {emoji_metadata.get('reason', 'unknown')}")
+            except Exception as e:
+                logger.error(f"CDL emoji enhancement failed (non-critical): {e}")
+                # Continue with original response if CDL emoji enhancement fails
+            
             return response
             
         except (ImportError, AttributeError, ValueError, TypeError) as e:
@@ -439,13 +708,159 @@ class MessageProcessor:
 
     async def _apply_cdl_character_enhancement(self, user_id: str, conversation_context: List[Dict[str, str]], 
                                              message_context: MessageContext, ai_components: Dict[str, Any]) -> List[Dict[str, str]]:
-        """Apply CDL character enhancement to conversation context."""
-        # TODO: Implement CDL character enhancement
-        # This would replicate the _apply_cdl_character_enhancement logic from Discord handler
-        logger.debug("CDL character enhancement placeholder for user %s", user_id)
-        # Avoid unused parameter warnings by referencing them
-        _ = message_context, ai_components
-        return conversation_context
+        """
+        🎭 CDL CHARACTER INTEGRATION 🎭
+        
+        Apply CDL character enhancement to conversation context if user has active character.
+        This injects character-aware prompts that combine:
+        - CDL character personality, backstory, and voice
+        - AI pipeline emotional analysis and memory networks  
+        - Real-time conversation context and relationship dynamics
+        """
+        try:
+            import os
+            logger.info("🎭 CDL CHARACTER DEBUG: Starting enhancement for user %s", user_id)
+            
+            # Use CDL singleton manager for character data access
+            from src.characters.cdl.manager import get_cdl_manager
+            cdl_manager = get_cdl_manager()
+            
+            # Force load of character data if not already loaded
+            cdl_manager._load_character_data()
+            
+            # Get character file from manager (now guaranteed to be loaded)
+            character_file = cdl_manager._character_file
+            
+            if not character_file:
+                logger.warning("🎭 CDL CHARACTER: No character file loaded in CDL Manager, skipping enhancement")
+                return conversation_context
+            
+            bot_name = os.getenv("DISCORD_BOT_NAME", "Unknown")
+            logger.info("🎭 CDL CHARACTER: Using %s bot with cached character (%s) for user %s", 
+                       bot_name, character_file, user_id)
+            
+            # Import CDL integration modules
+            from src.prompts.cdl_ai_integration import CDLAIPromptIntegration
+            from src.prompts.ai_pipeline_vector_integration import VectorAIPipelineResult
+            from datetime import datetime
+            
+            # Create AI pipeline result from available context data
+            pipeline_result = VectorAIPipelineResult(
+                user_id=user_id,
+                message_content=message_context.content,
+                timestamp=datetime.now(),
+                # Map emotion data from ai_components
+                emotional_state=str(ai_components.get('emotion_data')) if ai_components.get('emotion_data') else None,
+                mood_assessment=ai_components.get('emotion_data') if isinstance(ai_components.get('emotion_data'), dict) else None,
+                # Map personality data 
+                personality_profile=ai_components.get('personality_context') if isinstance(ai_components.get('personality_context'), dict) else None,
+                # Map phase4 data
+                enhanced_context=ai_components.get('phase4_context') if isinstance(ai_components.get('phase4_context'), dict) else None
+            )
+            
+            # Add context analysis insights to pipeline result if available
+            context_analysis = ai_components.get('context_analysis')
+            if context_analysis and not isinstance(context_analysis, Exception):
+                try:
+                    # Convert context analysis to dict for pipeline compatibility
+                    context_dict = {
+                        'needs_ai_guidance': getattr(context_analysis, 'needs_ai_guidance', False),
+                        'needs_memory_context': getattr(context_analysis, 'needs_memory_context', False),
+                        'needs_personality': getattr(context_analysis, 'needs_personality', False),
+                        'needs_voice_style': getattr(context_analysis, 'needs_voice_style', False),
+                        'is_greeting': getattr(context_analysis, 'is_greeting', False),
+                        'is_simple_question': getattr(context_analysis, 'is_simple_question', False),
+                        'confidence_scores': getattr(context_analysis, 'confidence_scores', {}),
+                    }
+                    # Add to enhanced_context if available, otherwise create new field
+                    if isinstance(pipeline_result.enhanced_context, dict):
+                        pipeline_result.enhanced_context['context_analysis'] = context_dict
+                    else:
+                        pipeline_result.enhanced_context = {'context_analysis': context_dict}
+                    
+                    logger.info(f"🎯 CDL: Enhanced pipeline with context analysis insights")
+                except Exception as e:
+                    logger.debug(f"Failed to add context analysis to pipeline: {e}")
+            
+            # Create CDL integration instance - uses singleton manager for cached Character object
+            cdl_integration = CDLAIPromptIntegration(
+                vector_memory_manager=self.memory_manager,
+                llm_client=self.llm_client
+            )
+            logger.info("🎭 CDL: Created CDL integration instance (uses singleton) for user %s", user_id)
+            
+            # Get user display name from metadata if available
+            user_display_name = message_context.metadata.get('discord_author_name') if message_context.metadata else None
+            
+            # 🚀 FULL INTELLIGENCE: Use complete character-aware prompt with all emotional intelligence
+            character_prompt = await cdl_integration.create_unified_character_prompt(
+                character_file=character_file,
+                user_id=user_id,
+                message_content=message_context.content,
+                pipeline_result=pipeline_result,
+                user_name=user_display_name
+            )
+            
+            # 🚀 VECTOR-NATIVE ENHANCEMENT: Enhance character prompt with dynamic vector context
+            try:
+                from src.prompts.vector_native_prompt_manager import create_vector_native_prompt_manager
+                
+                # Create vector-native prompt manager
+                vector_prompt_manager = create_vector_native_prompt_manager(
+                    vector_memory_system=self.memory_manager,
+                    personality_engine=None  # Reserved for future use
+                )
+                
+                # Extract emotional context from pipeline for vector enhancement
+                emotional_context = None
+                if pipeline_result and hasattr(pipeline_result, 'emotional_state'):
+                    emotional_context = pipeline_result.emotional_state
+                
+                # Enhance character prompt with vector-native context
+                vector_enhanced_prompt = await vector_prompt_manager.create_contextualized_prompt(
+                    base_prompt=character_prompt,
+                    user_id=user_id,
+                    current_message=message_context.content,
+                    emotional_context=emotional_context
+                )
+                
+                logger.info(f"🎯 VECTOR-NATIVE: Enhanced character prompt with dynamic context ({len(vector_enhanced_prompt)} chars)")
+                character_prompt = vector_enhanced_prompt
+                
+            except Exception as e:
+                logger.debug(f"Vector-native prompt enhancement unavailable, using CDL-only: {e}")
+                # Continue with CDL-only character prompt
+            
+            # Clone the conversation context and replace/enhance system message
+            enhanced_context = conversation_context.copy()
+            
+            # Find system message and replace with character-aware prompt
+            system_message_found = False
+            for i, msg in enumerate(enhanced_context):
+                if msg.get('role') == 'system':
+                    enhanced_context[i] = {
+                        'role': 'system',
+                        'content': character_prompt
+                    }
+                    system_message_found = True
+                    logger.info(f"🎭 CDL CHARACTER: Replaced system message with character prompt ({len(character_prompt)} chars)")
+                    break
+            
+            # If no system message found, add character prompt as first message
+            if not system_message_found:
+                enhanced_context.insert(0, {
+                    'role': 'system', 
+                    'content': character_prompt
+                })
+                logger.info(f"🎭 CDL CHARACTER: Added character prompt as new system message ({len(character_prompt)} chars)")
+            
+            logger.info(f"🎭 CDL CHARACTER: Enhanced conversation context with {character_file} personality")
+            return enhanced_context
+            
+        except Exception as e:
+            logger.error(f"🎭 CDL CHARACTER ERROR: Failed to apply character enhancement: {e}")
+            logger.error(f"🎭 CDL CHARACTER ERROR: Falling back to original conversation context")
+            return conversation_context
 
     async def _add_mixed_emotion_context(self, conversation_context: List[Dict[str, str]], 
                                        content: str, user_id: str, emotion_data, external_emotion_data) -> List[Dict[str, str]]:

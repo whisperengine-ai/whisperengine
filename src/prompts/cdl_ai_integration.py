@@ -148,6 +148,11 @@ class CDLAIPromptIntegration:
         if response_style:
             prompt = response_style + "\n\n"
         
+        # 🕒 TEMPORAL AWARENESS: Add current date/time context EARLY for proper grounding
+        from src.utils.helpers import get_current_time_context
+        time_context = get_current_time_context()
+        prompt += f"CURRENT DATE & TIME: {time_context}\n\n"
+        
         # Base character identity (after response style for hierarchy)
         prompt += f"You are {character.identity.name}, a {character.identity.occupation}."
         
@@ -321,42 +326,36 @@ class CDLAIPromptIntegration:
                 return prompt
 
     async def load_character(self, character_file: str) -> Character:
-        """Load a character from file with CDL validation."""
+        """
+        Load a character from file with CDL validation.
+        
+        Uses CDL Manager singleton for caching - loads once, uses everywhere.
+        """
         try:
-            # First, validate the character file structure
-            logger.info("🔍 CDL: Validating character file before loading: %s", character_file)
+            # Use singleton CDL Manager for cached Character object
+            from src.characters.cdl.manager import get_cdl_manager
             
-            try:
-                from src.validation.cdl_validator import CDLValidator
-                validator = CDLValidator()
-                validation_result = validator.validate_file(character_file)
-                
-                if not validation_result.parsing_success:
-                    logger.error("❌ CDL VALIDATION: Character file failed parsing: %s", character_file)
-                    logger.error("❌ CDL VALIDATION: Errors: %s", [issue.message for issue in validation_result.issues if issue.level.name == "ERROR"])
-                    raise ValueError(f"Character file failed CDL validation: {[issue.message for issue in validation_result.issues if issue.level.name == 'ERROR']}")
-                
-                if validation_result.overall_status.name == "ERROR":
-                    logger.error("❌ CDL VALIDATION: Character file has critical errors: %s", character_file)
-                    error_messages = [issue.message for issue in validation_result.issues if issue.level.name == "ERROR"]
-                    raise ValueError(f"Character file has critical errors: {error_messages}")
-                
-                logger.info("✅ CDL VALIDATION: Character file passed validation (Status: %s, Quality: %.1f%%)", 
-                           validation_result.overall_status.name, validation_result.quality_score)
-                
-            except ImportError:
-                logger.warning("⚠️ CDL validation not available, loading character without validation")
-            except Exception as e:
-                logger.warning("⚠️ CDL validation failed, proceeding with load: %s", e)
+            logger.info("🔍 CDL: Loading character via singleton manager (cached)")
+            cdl_manager = get_cdl_manager()
             
-            # Load the character
-            character = load_character(character_file)
-            logger.info("✅ CDL: Successfully loaded character: %s", character.identity.name)
+            # Get cached Character object from singleton
+            character = cdl_manager.get_character_object()
+            logger.info("✅ CDL: Using cached character from singleton: %s", character.identity.name)
+            
             return character
             
         except Exception as e:
-            logger.error("Failed to load character from %s: %s", character_file, e)
-            raise
+            logger.error("Failed to load character from singleton: %s", e)
+            logger.warning("⚠️ CDL: Falling back to direct file load")
+            
+            # Fallback to direct load if singleton fails
+            try:
+                character = load_character(character_file)
+                logger.info("✅ CDL: Fallback load successful: %s", character.identity.name)
+                return character
+            except Exception as fallback_error:
+                logger.error("Failed to load character via fallback: %s", fallback_error)
+                raise
 
     async def _extract_cdl_personal_knowledge_sections(self, character, message_content: str) -> str:
         """Extract relevant personal knowledge sections from CDL based on message context."""

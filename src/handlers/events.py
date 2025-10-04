@@ -590,16 +590,47 @@ class BotEventHandlers:
                     metadata={
                         'discord_message_id': str(message.id),
                         'discord_author_id': str(message.author.id),
+                        'discord_author_name': message.author.display_name,  # Add user display name
                         'discord_timestamp': message.created_at.isoformat()
                     }
                 )
                 
-                # Process the message with unified pipeline
-                result = await self.message_processor.process_message(message_context)
+                # Show typing indicator while processing
+                async with reply_channel.typing():
+                    # Process the message with unified pipeline
+                    result = await self.message_processor.process_message(message_context)
                 
                 if result.success:
-                    # Send response to Discord
-                    await reply_channel.send(result.response)
+                    # Send response using chunking method (no reply pattern for DM)
+                    await self._send_response_chunks(reply_channel, result.response, reference_message=None)
+                    
+                    # 🎭 BOT EMOJI REACTIONS: Add emoji reaction to user's message (multimodal feedback)
+                    try:
+                        # Get character type from CDL for emoji selection
+                        bot_character = await self._get_character_type_from_cdl()
+                        
+                        # Evaluate whether to add emoji reaction based on context
+                        emoji_decision = await self.emoji_response_intelligence.evaluate_emoji_response(
+                            user_id=user_id,
+                            user_message=message.content,
+                            bot_character=bot_character,
+                            security_validation_result=result.metadata.get('security_validation') if result.metadata else None,
+                            emotional_context=result.metadata.get('ai_components', {}).get('emotion_data') if result.metadata else None,
+                            conversation_context={'channel_type': message_context.channel_type}
+                        )
+                        
+                        # Add emoji reaction if recommended (but don't replace text response)
+                        if emoji_decision.should_use_emoji:
+                            logger.info(f"🎭 REACTION: Adding emoji '{emoji_decision.emoji_choice}' to user DM "
+                                      f"(confidence: {emoji_decision.confidence_score:.2f}, reason: {emoji_decision.context_reason.value})")
+                            await message.add_reaction(emoji_decision.emoji_choice)
+                    except Exception as e:
+                        logger.error(f"Error adding bot emoji reaction (non-critical): {e}")
+                        # Continue - emoji reaction failure shouldn't break conversation
+                    
+                    # Send voice response if applicable  
+                    await self._send_voice_response(message, result.response)
+                    
                 else:
                     # Handle processing error
                     logger.error(f"MessageProcessor returned error: {result.error_message}")
@@ -721,6 +752,30 @@ class BotEventHandlers:
                 f"SECURITY: Unsafe input detected from user {user_id} in server {message.guild.name}"
             )
             logger.error(f"SECURITY: Blocked patterns: {validation_result['blocked_patterns']}")
+            
+            # 🎭 EMOJI INTELLIGENCE: Use emoji response for inappropriate content
+            try:
+                # 🎯 CHARACTER-AGNOSTIC: Determine bot character from CDL instead of hardcoded names
+                bot_character = await self._get_character_type_from_cdl()
+                
+                # Evaluate emoji response for inappropriate content
+                emoji_decision = await self.emoji_response_intelligence.evaluate_emoji_response(
+                    user_id=user_id,
+                    user_message=content,
+                    bot_character=bot_character,
+                    security_validation_result=validation_result,
+                    emotional_context=None,
+                    conversation_context={'channel_type': 'guild'}
+                )
+                
+                if emoji_decision.should_use_emoji:
+                    logger.info(f"🎭 SECURITY + EMOJI: Adding emoji '{emoji_decision.emoji_choice}' for inappropriate content in guild")
+                    await message.add_reaction(emoji_decision.emoji_choice)
+                    
+            except Exception as e:
+                logger.error(f"Error in security emoji response: {e}")
+            
+            # Send text warning (with or without emoji)
             security_msg = f"⚠️ {message.author.mention} Your message contains content that could not be processed for security reasons. Please rephrase your message."
             await message.reply(security_msg, mention_author=False)  # mention_author=False since we already include the mention
             return
@@ -758,6 +813,7 @@ class BotEventHandlers:
                     metadata={
                         'discord_message_id': str(message.id),
                         'discord_author_id': str(message.author.id),
+                        'discord_author_name': message.author.display_name,  # Add user display name
                         'discord_timestamp': message.created_at.isoformat(),
                         'discord_guild_id': str(message.guild.id),
                         'discord_guild_name': message.guild.name,
@@ -767,11 +823,41 @@ class BotEventHandlers:
                 )
                 
                 # Process the message with unified pipeline
-                result = await self.message_processor.process_message(message_context)
+                # Show typing indicator while processing
+                async with reply_channel.typing():
+                    result = await self.message_processor.process_message(message_context)
                 
                 if result.success:
-                    # Send response to Discord as a reply
-                    await message.reply(result.response, mention_author=False)
+                    # Send response using chunking method with reply pattern for guild mentions
+                    await self._send_response_chunks(reply_channel, result.response, reference_message=message)
+                    
+                    # 🎭 BOT EMOJI REACTIONS: Add emoji reaction to user's mention (multimodal feedback)
+                    try:
+                        # Get character type from CDL for emoji selection
+                        bot_character = await self._get_character_type_from_cdl()
+                        
+                        # Evaluate whether to add emoji reaction based on context
+                        emoji_decision = await self.emoji_response_intelligence.evaluate_emoji_response(
+                            user_id=user_id,
+                            user_message=content,
+                            bot_character=bot_character,
+                            security_validation_result=result.metadata.get('security_validation') if result.metadata else None,
+                            emotional_context=result.metadata.get('ai_components', {}).get('emotion_data') if result.metadata else None,
+                            conversation_context={'channel_type': message_context.channel_type}
+                        )
+                        
+                        # Add emoji reaction if recommended (but don't replace text response)
+                        if emoji_decision.should_use_emoji:
+                            logger.info(f"🎭 REACTION: Adding emoji '{emoji_decision.emoji_choice}' to user mention "
+                                      f"(confidence: {emoji_decision.confidence_score:.2f}, reason: {emoji_decision.context_reason.value})")
+                            await message.add_reaction(emoji_decision.emoji_choice)
+                    except Exception as e:
+                        logger.error(f"Error adding bot emoji reaction (non-critical): {e}")
+                        # Continue - emoji reaction failure shouldn't break conversation
+                    
+                    # Send voice response if applicable
+                    await self._send_voice_response(message, result.response)
+                    
                 else:
                     # Handle processing error
                     logger.error(f"MessageProcessor returned error: {result.error_message}")
@@ -1973,3 +2059,160 @@ class BotEventHandlers:
         """REMOVED: Over-engineered question classification system"""
         # Return dummy values to prevent errors in any remaining code
         return None, None  # Disabled - vector memory handles conversation continuity
+
+    # === Discord Response Handling Methods ===
+    
+    async def _send_response_chunks(self, channel, response, reference_message=None):
+        """Send response in chunks if it's too long. Prevent sending empty/whitespace-only messages.
+        
+        Args:
+            channel: Discord channel to send to
+            response: Response text to send
+            reference_message: If provided, will reply to this message instead of just sending to channel
+        """
+        if not response or not str(response).strip():
+            logger.warning("Attempted to send empty or whitespace-only message. Skipping send.")
+            return
+            
+        if len(response) > 2000:
+            chunks = [response[i : i + 1900] for i in range(0, len(response), 1900)]
+            logger.info(
+                f"Response too long ({len(response)} chars), splitting into {len(chunks)} chunks"
+            )
+            for i, chunk in enumerate(chunks):
+                if chunk and str(chunk).strip():
+                    chunk_content = f"{chunk}" + (f"\n*(continued {i+1}/{len(chunks)})*" if len(chunks) > 1 else "")
+                    
+                    # Use reply for first chunk if reference message provided, otherwise regular send
+                    if i == 0 and reference_message:
+                        await reference_message.reply(chunk_content, mention_author=True)
+                        logger.debug(f"Replied to message with chunk {i+1}/{len(chunks)}")
+                    else:
+                        await channel.send(chunk_content)
+                        logger.debug(f"Sent chunk {i+1}/{len(chunks)}")
+                else:
+                    logger.warning(f"Skipped sending empty chunk {i+1}/{len(chunks)}")
+        else:
+            # Use reply if reference message provided, otherwise regular send
+            if reference_message:
+                await reference_message.reply(response, mention_author=True)
+                logger.debug("Replied to message with single response")
+            else:
+                await channel.send(response)
+                logger.debug("Sent single message response")
+
+    async def _send_voice_response(self, message, response):
+        """Send voice response if user is in voice channel and message is from voice-related channel."""
+        if self.voice_manager and message.guild and self.voice_support_enabled:
+            try:
+                logger.debug(f"Checking voice response for user {message.author.display_name}")
+
+                # Skip voice response for DMs
+                if not message.guild:
+                    logger.debug("Skipping voice response for DM")
+                    return
+
+                if (
+                    isinstance(message.author, discord.Member)
+                    and message.author.voice
+                    and message.author.voice.channel
+                ):
+                    user_channel = message.author.voice.channel
+                    bot_channel = self.voice_manager.get_current_channel(message.guild.id)
+
+                    logger.debug(
+                        f"User in channel: {user_channel.name if user_channel else 'None'}"
+                    )
+                    logger.debug(f"Bot in channel: {bot_channel.name if bot_channel else 'None'}")
+
+                    if bot_channel and user_channel.id == bot_channel.id:
+                        # Check if message is from a voice-related text channel
+                        is_voice_related_channel = self._is_voice_related_channel(message.channel, bot_channel)
+                        
+                        if not is_voice_related_channel:
+                            logger.debug(
+                                f"Skipping voice response - message from non-voice channel: {message.channel.name}"
+                            )
+                            return
+
+                        # Clean response for TTS
+                        clean_response = (
+                            response.replace("*", "").replace("**", "").replace("`", "")
+                        )
+                        voice_max_length = int(os.getenv("VOICE_MAX_RESPONSE_LENGTH", "300"))
+                        if len(clean_response) > voice_max_length:
+                            clean_response = clean_response[:voice_max_length] + "..."
+
+                        logger.info(
+                            f"🎤 Sending voice response to {message.author.display_name} in voice channel: {clean_response[:50]}..."
+                        )
+                        await self.voice_manager.speak_message(message.guild.id, clean_response)
+                    else:
+                        logger.debug(
+                            "Not sending voice response - user and bot not in same channel"
+                        )
+                else:
+                    logger.debug("User not in voice channel or not a member")
+            except Exception as e:
+                logger.error(f"Failed to send voice response: {e}")
+                logger.error(f"Voice response error traceback: {traceback.format_exc()}")
+
+    def _is_voice_related_channel(self, text_channel, voice_channel):
+        """
+        Check if a text channel should trigger voice responses.
+        
+        Args:
+            text_channel: The text channel where the message was sent
+            voice_channel: The voice channel the bot is currently in
+            
+        Returns:
+            bool: True if the text channel should trigger voice responses
+        """
+        if not voice_channel:
+            logger.debug("No voice channel - skipping voice response")
+            return False
+        
+        # Strategy 1: Check if text channel has exact same name as voice channel
+        if text_channel.name.lower() == voice_channel.name.lower():
+            logger.debug(f"Text channel '{text_channel.name}' matches voice channel '{voice_channel.name}' exactly")
+            return True
+        
+        # Strategy 2: Check if text channel is in the same category as voice channel
+        if (hasattr(voice_channel, 'category') and hasattr(text_channel, 'category') and 
+            voice_channel.category and text_channel.category and 
+            voice_channel.category.id == text_channel.category.id):
+            # Same category - check if it's a reasonable text channel name for this voice channel
+            voice_name = voice_channel.name.lower()
+            text_name = text_channel.name.lower()
+            
+            # Allow text channels with similar names or common voice-related patterns
+            if (voice_name in text_name or text_name in voice_name or 
+                any(pattern in text_name for pattern in ["chat", "text", "discussion"])):
+                logger.debug(f"Text channel '{text_channel.name}' is in same category as voice channel '{voice_channel.name}' and has voice-related name")
+                return True
+        
+        # Strategy 3: Check for Discord's automatic text channel for voice channels
+        # Some Discord servers auto-create text channels for voice channels
+        voice_name_normalized = voice_channel.name.lower().replace(" ", "-").replace("_", "-")
+        text_name_normalized = text_channel.name.lower().replace(" ", "-").replace("_", "-")
+        
+        if voice_name_normalized == text_name_normalized:
+            logger.debug(f"Text channel '{text_channel.name}' matches normalized voice channel name")
+            return True
+        
+        # Strategy 4: Fallback to environment configuration (if user wants broader matching)
+        use_pattern_fallback = os.getenv("VOICE_USE_PATTERN_FALLBACK", "false").lower() == "true"
+        if use_pattern_fallback:
+            voice_channel_patterns = os.getenv("VOICE_TEXT_CHANNELS", "").split(",")
+            voice_channel_patterns = [pattern.strip().lower() for pattern in voice_channel_patterns if pattern.strip()]
+            
+            if voice_channel_patterns:
+                channel_name = text_channel.name.lower()
+                for pattern in voice_channel_patterns:
+                    if pattern in channel_name:
+                        logger.debug(f"Text channel '{channel_name}' matches fallback pattern '{pattern}'")
+                        return True
+        
+        logger.debug(f"Text channel '{text_channel.name}' does not correspond to voice channel '{voice_channel.name}'")
+        return False
+
