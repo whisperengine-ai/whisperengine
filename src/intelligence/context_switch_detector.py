@@ -48,6 +48,20 @@ class ContextSwitch:
     previous_context: Dict[str, Any]
     new_context: Dict[str, Any]
     adaptation_strategy: str
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for JSON serialization"""
+        return {
+            "switch_id": self.switch_id,
+            "switch_type": self.switch_type.value if isinstance(self.switch_type, ContextSwitchType) else self.switch_type,
+            "strength": self.strength.value if isinstance(self.strength, ContextSwitchStrength) else self.strength,
+            "confidence_score": self.confidence_score,
+            "description": self.description,
+            "evidence": self.evidence,
+            "previous_context": self.previous_context,
+            "new_context": self.new_context,
+            "adaptation_strategy": self.adaptation_strategy
+        }
     detected_at: datetime
     metadata: Dict[str, Any]
 

@@ -8,6 +8,7 @@ Uses Enhanced Vector Emotion Analyzer as the primary system.
 """
 
 import logging
+import traceback
 from typing import Any, Dict, Optional
 
 logger = logging.getLogger(__name__)
@@ -340,6 +341,109 @@ class SimplifiedEmotionManager:
         enhanced_context["emotion_analysis"] = emotion_data
         
         return enhanced_context
+
+    async def process_phase4_intelligence(
+        self, 
+        user_id: str,
+        message,  # Can be Discord message or string
+        recent_messages = None,
+        external_emotion_data = None,
+        phase2_context = None
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Process Phase 4 Intelligence Integration.
+        
+        This method provides the interface expected by MessageProcessor for Phase 4 processing.
+        It initializes and runs the Phase4HumanLikeIntegration system.
+        """
+        logger.info("🚀 PHASE 4 DEBUG: Starting Phase 4 intelligence processing for user %s", user_id)
+        logger.info("🚀 PHASE 4 DEBUG: Message type: %s, Recent messages: %s", 
+                   type(message), len(recent_messages) if recent_messages else 0)
+        
+        try:
+            # Import Phase 4 integration
+            logger.info("🚀 PHASE 4 DEBUG: Importing Phase4HumanLikeIntegration...")
+            from .phase4_human_like_integration import Phase4HumanLikeIntegration
+            logger.info("✅ PHASE 4 DEBUG: Phase4HumanLikeIntegration imported successfully")
+            
+            # Create Phase 4 integration instance if not already created
+            if not hasattr(self, '_phase4_integration') or self._phase4_integration is None:
+                logger.info("🚀 PHASE 4 DEBUG: Creating new Phase4HumanLikeIntegration instance...")
+                self._phase4_integration = Phase4HumanLikeIntegration(
+                    simplified_emotion_manager=self,
+                    memory_manager=self.vector_memory_manager,
+                    enable_adaptive_mode=True,
+                    conversation_mode="adaptive"
+                )
+                logger.info("✅ PHASE 4 DEBUG: Phase 4 Integration initialized successfully")
+            else:
+                logger.info("✅ PHASE 4 DEBUG: Using existing Phase 4 Integration instance")
+            
+            # Extract message content
+            message_content = message.content if hasattr(message, 'content') else str(message)
+            logger.info("🚀 PHASE 4 DEBUG: Extracted message content: '%s'", 
+                       message_content[:100] + ('...' if len(message_content) > 100 else ''))
+            
+            # Convert recent_messages to conversation_context format expected by Phase 4
+            conversation_context = []
+            if recent_messages:
+                for msg in recent_messages:
+                    if isinstance(msg, dict):
+                        conversation_context.append(msg)
+                    elif hasattr(msg, 'content'):
+                        conversation_context.append({
+                            'content': msg.content,
+                            'author': getattr(msg, 'author', {}).get('id', 'unknown'),
+                            'timestamp': getattr(msg, 'timestamp', None)
+                        })
+            
+            logger.info("🚀 PHASE 4 DEBUG: Converted conversation context with %s messages", len(conversation_context))
+            
+            # Process with Phase 4 intelligence using correct method signature
+            logger.info("🚀 PHASE 4 DEBUG: Calling process_comprehensive_message...")
+            phase4_context = await self._phase4_integration.process_comprehensive_message(
+                user_id=user_id,
+                message=message_content,
+                conversation_context=conversation_context,
+                discord_context=None  # Could be enhanced with actual Discord context
+            )
+            logger.info("🚀 PHASE 4 DEBUG: process_comprehensive_message returned: %s", type(phase4_context))
+            
+            if phase4_context:
+                logger.info("✅ PHASE 4 DEBUG: Phase 4 intelligence processing successful for user %s", user_id)
+                logger.info("✅ PHASE 4 DEBUG: Phase4Context attributes: %s", dir(phase4_context))
+                
+                # Helper function to convert datetime objects to strings for JSON serialization
+                def serialize_datetime_objects(obj):
+                    if hasattr(obj, 'isoformat'):  # datetime object
+                        return obj.isoformat()
+                    elif isinstance(obj, dict):
+                        return {k: serialize_datetime_objects(v) for k, v in obj.items()}
+                    elif isinstance(obj, list):
+                        return [serialize_datetime_objects(item) for item in obj]
+                    else:
+                        return obj
+                
+                # Convert Phase4Context to dictionary format expected by MessageProcessor
+                result = {
+                    "conversation_mode": phase4_context.conversation_mode.value if hasattr(phase4_context.conversation_mode, 'value') else str(phase4_context.conversation_mode),
+                    "interaction_type": phase4_context.interaction_type.value if hasattr(phase4_context.interaction_type, 'value') else str(phase4_context.interaction_type),
+                    "phase2_results": serialize_datetime_objects(phase4_context.phase2_results),
+                    "phase3_results": serialize_datetime_objects(phase4_context.phase3_results),
+                    "human_like_results": serialize_datetime_objects(phase4_context.human_like_results),
+                    "memory_enhancement_results": serialize_datetime_objects(phase4_context.memory_enhancement_results),
+                    "processing_metadata": serialize_datetime_objects(phase4_context.processing_metadata)
+                }
+                logger.info("✅ PHASE 4 DEBUG: Returning result with serialized datetimes")
+                return result
+            else:
+                logger.warning("⚠️ PHASE 4 DEBUG: Phase 4 intelligence processing returned None for user %s", user_id)
+                return None
+                
+        except Exception as e:
+            logger.error("❌ PHASE 4 DEBUG: Phase 4 intelligence processing failed: %s", e)
+            logger.error("❌ PHASE 4 DEBUG: Exception traceback: %s", traceback.format_exc())
+            return None
 
 
 # Factory function for easy integration

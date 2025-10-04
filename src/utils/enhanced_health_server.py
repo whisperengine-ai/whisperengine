@@ -13,6 +13,7 @@ from aiohttp import web
 from discord.ext import commands
 
 from src.core.message_processor import create_message_processor, MessageContext
+from src.intelligence.context_switch_detector import ContextSwitch
 
 logger = logging.getLogger(__name__)
 
@@ -96,6 +97,17 @@ class EnhancedHealthServer:
         
         # CORS middleware setup
         self.app.middlewares.append(self.cors_middleware)
+
+    def _make_json_serializable(self, obj):
+        """Convert objects to JSON-serializable format"""
+        if isinstance(obj, ContextSwitch):
+            return obj.to_dict()
+        elif isinstance(obj, dict):
+            return {k: self._make_json_serializable(v) for k, v in obj.items()}
+        elif isinstance(obj, list):
+            return [self._make_json_serializable(item) for item in obj]
+        else:
+            return obj
 
     @web.middleware
     async def cors_middleware(self, request, handler):
@@ -251,7 +263,7 @@ class EnhancedHealthServer:
                 response_data['error'] = processing_result.error_message
 
             if processing_result.metadata:
-                response_data['metadata'] = processing_result.metadata
+                response_data['metadata'] = self._make_json_serializable(processing_result.metadata)
 
             status_code = 200 if processing_result.success else 500
             return web.json_response(response_data, status=status_code)

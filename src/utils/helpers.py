@@ -6,6 +6,7 @@ Contains common functionality used across multiple modules.
 import logging
 import os
 from datetime import UTC, datetime
+from typing import List
 
 logger = logging.getLogger(__name__)
 
@@ -100,6 +101,47 @@ def store_discord_server_info(guild, memory_manager, debug_mode: bool = False):
             logger.debug(f"Guild info: {guild.name} ({guild.id})")
 
 
+def _summarize_message_topics(messages: List[str]) -> List[str]:
+    """Convert raw message content to meaningful topic summaries."""
+    topics = []
+    
+    # Topic extraction patterns
+    topic_keywords = {
+        'Food preferences': ['pizza', 'burger', 'sandwich', 'taco', 'food', 'eat', 'meal', 'breakfast', 'dinner', 'lunch'],
+        'Greetings and social': ['hi', 'hello', 'good morning', 'good afternoon', 'good evening', 'hey', 'how are you'],
+        'Mood and emotions': ['good mood', 'secret', 'happy', 'excited', 'feeling', 'emotion'],
+        'Activities': ['beach', 'swim', 'dive', 'travel', 'visit', 'went to', 'going to'],
+        'Questions about preferences': ['what do', 'what foods', 'what\'s your', 'tell me about'],
+        'Creative topics': ['dream', 'creative', 'art', 'music', 'design', 'imagine'],
+        'Science topics': ['research', 'experiment', 'ocean', 'marine', 'study']
+    }
+    
+    for message in messages:
+        message_lower = message.lower()
+        topic_found = False
+        
+        # Find matching topic categories
+        for topic, keywords in topic_keywords.items():
+            if any(keyword in message_lower for keyword in keywords):
+                if topic not in topics:  # Avoid duplicates
+                    topics.append(topic)
+                topic_found = True
+                break
+        
+        # If no specific topic found, create a generic one
+        if not topic_found and len(message) > 20:
+            # Extract meaningful words and create a topic
+            words = message.split()[:4]  # First 4 words
+            clean_words = [w for w in words if len(w) > 2 and w.lower() not in ['the', 'and', 'for', 'are', 'you', 'what', 'how']]
+            if clean_words:
+                generic_topic = f"Discussion about {' '.join(clean_words[:2]).lower()}"
+                if generic_topic not in topics:
+                    topics.append(generic_topic)
+    
+    # Limit to 3 most relevant topics
+    return topics[:3] if topics else ["General conversation"]
+
+
 def generate_conversation_summary(recent_messages, user_id: str, max_length: int = 400) -> str:
     """
     Generate an intelligent summary of recent conversation for system context.
@@ -153,12 +195,12 @@ def generate_conversation_summary(recent_messages, user_id: str, max_length: int
         # Generate structured summary
         summary_parts = []
 
-        # Recent user interests/topics (last 3 most meaningful)
+        # Recent user interests/topics (last 3 most meaningful) - IMPROVED: Summarize instead of raw content
         meaningful_topics = [topic for topic in user_topics[-3:] if len(topic) > 10]
         if meaningful_topics:
-            topics_summary = "; ".join(
-                [topic[:80] + "..." if len(topic) > 80 else topic for topic in meaningful_topics]
-            )
+            # Convert raw message content to topic summaries
+            summarized_topics = _summarize_message_topics(meaningful_topics)
+            topics_summary = "; ".join(summarized_topics)
             summary_parts.append(f"Recent topics: {topics_summary}")
 
         # Conversation flow indicator

@@ -311,6 +311,63 @@ curl http://localhost:9091/health
 - **No HTTP Chat API**: Chat endpoints have been removed - Discord is the only supported interface
 - **Container Health Only**: HTTP endpoints are solely for Docker health checks and container orchestration
 
+### Testing Strategy & Preferred Methods
+
+**🚨 CRITICAL: DIRECT PYTHON VALIDATION IS THE PREFERRED TESTING METHOD:**
+
+**Direct Python API Testing** (PRIMARY method for feature validation):
+- **USE FIRST**: Direct Python scripting calls to internal APIs
+- **ADVANTAGES**: Complete access to internal data structures, no HTTP timeouts, full metadata visibility, immediate debugging
+- **PATTERN**: Create `test_[feature]_direct_validation.py` scripts in `tests/automated/`
+- **EXAMPLE**: `tests/automated/test_phase4_direct_validation.py`, `tests/automated/test_phase3_direct_validation.py`
+- **PROVEN SUCCESSFUL**: Phase 4 and Phase 3 direct validation suites demonstrate this approach works reliably
+- **PATTERN**: Create `test_[feature]_direct_validation.py` scripts in `tests/automated/`
+- **EXAMPLE**: `tests/automated/test_phase4_direct_validation.py`, `tests/automated/test_phase3_direct_validation.py`
+
+```python
+# PREFERRED: Direct Python validation pattern
+from src.core.message_processor import create_message_processor, MessageContext
+
+# Initialize components directly
+memory_manager = create_memory_manager(memory_type="vector")
+llm_client = create_llm_client(llm_client_type="openrouter")
+message_processor = create_message_processor(None, memory_manager, llm_client)
+
+# Process messages directly - no HTTP layer
+message_context = MessageContext(user_id="test_user", content="test message", platform="direct_test")
+processing_result = await message_processor.process_message(message_context)
+
+# Full access to AI components and metadata
+ai_components = processing_result.metadata.get('ai_components', {})
+phase4_data = ai_components.get('phase4_intelligence', {})
+```
+
+**HTTP API Testing** (SECONDARY method):
+- **USE WHEN**: Need to test full end-to-end HTTP integration
+- **LIMITATIONS**: Network timeouts, less debugging visibility, may miss internal data paths
+- **PATTERN**: HTTP requests to bot health check ports (9091-9097, 3007)
+
+**Discord Integration Testing** (REQUIRED for event handlers):
+- **USE WHEN**: Testing Discord-specific features (event handlers, CDL integration, character responses)
+- **REQUIREMENT**: Actual Discord messages to trigger event pipeline
+- **PATTERN**: Manual Discord testing or Discord API automation
+
+**Environment Setup for Direct Testing**:
+```bash
+# Required environment variables for direct Python validation
+export FASTEMBED_CACHE_PATH="/tmp/fastembed_cache"
+export QDRANT_HOST="localhost" 
+export QDRANT_PORT="6334"
+source .venv/bin/activate
+python tests/automated/test_[feature]_direct_validation.py
+```
+
+**Testing Prioritization**:
+1. **FIRST**: Direct Python validation for feature logic and AI components
+2. **SECOND**: HTTP testing for integration validation  
+3. **THIRD**: Discord testing for user-facing features
+4. **USE**: `./multi-bot.sh logs [bot]` and `docker logs whisperengine-[bot]-bot` for debugging
+
 ### Web Interface Development
 
 ### Development Workflow
@@ -513,7 +570,7 @@ await memory_manager.store_conversation(
 
 **ALWAYS use Named Vectors** - Never use single vectors:
 ```python
-# ✅ CORRECT: Named vectors for multi-dimensional search
+# ✅ CORRECT: 3D Named vectors for multi-dimensional search
 vectors = {
     "content": content_embedding,      # Main semantic content (384D)
     "emotion": emotion_embedding,      # Emotional context (384D)
@@ -522,11 +579,11 @@ vectors = {
 
 point = PointStruct(
     id=memory.id,
-    vector=vectors,  # Named vectors dict
+    vector=vectors,  # Named vectors dict (3D system)
     payload=qdrant_payload
 )
 
-# ✅ CORRECT: Query with named vectors
+# ✅ CORRECT: Query with named vectors (3D system)
 results = client.search(
     collection_name=collection_name,
     query_vector=models.NamedVector(name="content", vector=query_embedding),
@@ -535,6 +592,9 @@ results = client.search(
 
 # ❌ WRONG: Single vector (legacy format)
 point = PointStruct(id=memory.id, vector=embedding, payload=payload)
+
+# ❌ DEPRECATED: 7D vector system (personality, interaction, relationship, temporal)
+# WhisperEngine reverted from 7-vector to 3-vector system for performance and simplicity
 ```
 
 **ALWAYS use Bot Segmentation** - Filter by bot_name AND use correct collection:
@@ -765,11 +825,18 @@ LLM_CHAT_MODEL=anthropic/claude-3.7-sonnet  # May struggle with mode switching
 - Check trigger word responsiveness (code/debug/technical should activate technical mode)
 - Monitor for personality bleed-through between modes
 
-**Performance Benchmarks** (Ryan 7D Migration validation):
+**Performance Benchmarks** (CDL Performance validation):
 - **Creative Mode**: Both models perform well (95%+ typical)
 - **Technical Mode**: Mistral significantly outperforms Claude (95% vs 65-68%)
 - **Mode Switching**: Mistral excels at clean transitions (91% vs 68%)
 - **Overall CDL Compliance**: Mistral 95.6% vs Claude 67-68% on multi-modal characters
+
+**Vector System Architecture**: WhisperEngine uses a **3D named vector system** (content, emotion, semantic):
+- **Content Vector**: Main semantic content representation (384D)
+- **Emotion Vector**: Emotional context and sentiment analysis (384D)  
+- **Semantic Vector**: Concept and personality context (384D)
+- **Previous 7D System**: Reverted from 7-vector approach (personality, interaction, relationship, temporal) as it was overkill
+- **Design Philosophy**: Simpler 3D system provides sufficient intelligence while maintaining performance
 
 ## Anti-Phantom Feature Guidelines
 
@@ -1191,13 +1258,14 @@ context_result = context_detector.detect_context_patterns(
 - Document integration points, not just implementation files
 
 **🚨 CRITICAL: Vector Storage Compliance** - ALL vector operations must follow these patterns:
-- **ALWAYS use Named Vectors**: Never single vector format - use `{"content": embedding}` structure
+- **ALWAYS use Named Vectors**: Never single vector format - use `{"content": embedding, "emotion": embedding, "semantic": embedding}` structure (3D system)
 - **ALWAYS use Bot Segmentation**: Every payload must include `bot_name` for isolation
 - **ALWAYS extract with helpers**: Use `_extract_named_vector()` when retrieving vectors
 - **ALWAYS query with NamedVector**: Use `models.NamedVector(name="content", vector=embedding)`
 - **NEVER bypass bot isolation**: All searches must filter by `bot_name` + `user_id`
 - Vector retrieval code must handle dictionary format from Qdrant named vectors
 - When in doubt, check `src/memory/vector_memory_system.py` for reference patterns
+- **3D Vector System Only**: content, emotion, semantic vectors (7D system was deprecated)
 
 **Error Handling Patterns**: All async operations use production error handling:
 ```python
@@ -1220,13 +1288,21 @@ ENABLE_MEMORY_SYSTEM=true          # Creates phantom features
 
 **Testing Commands**: Essential testing and validation workflows:
 ```bash
+# PREFERRED: Direct Python validation (PRIMARY method)
+export FASTEMBED_CACHE_PATH="/tmp/fastembed_cache"
+export QDRANT_HOST="localhost" 
+export QDRANT_PORT="6334"
+source .venv/bin/activate
+python tests/automated/test_phase4_direct_validation.py  # Phase 4 intelligence features
+python tests/automated/test_phase3_direct_validation.py  # Phase 3 intelligence features
+
 # Environment validation (CRITICAL for troubleshooting)
 source .venv/bin/activate && python scripts/verify_environment.py
 
 # Bot health testing (all running bots)
 ./scripts/quick_bot_test.sh
 
-# Container-based testing (recommended)
+# Container-based testing (recommended for unit tests)
 docker exec whisperengine-elena-bot python -m pytest tests/unit/
 
 # Quick test commands for specific components
@@ -1270,6 +1346,8 @@ ENABLE_MEMORY_SYSTEM=true          # Creates phantom features
 - `scripts/` - Configuration generation and environment validation
 
 ## Recent Major Changes
+
+**3D Vector System Adoption** (Complete): Reverted from 7D vector system (personality, interaction, relationship, temporal) back to simpler 3D named vector system (content, emotion, semantic). The 7D approach was overkill and the 3D system provides sufficient intelligence while maintaining performance. Legacy 7D documentation needs cleanup.
 
 **Universal Identity & Account Discovery** (NEW): Introduced platform-agnostic user identity system allowing users to interact via Discord or future platforms while maintaining consistent memory. Enhanced account discovery prevents duplicate accounts.
 

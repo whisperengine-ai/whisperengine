@@ -57,21 +57,11 @@ class CDLAIPromptIntegration:
             preferred_name = None
             if user_name:
                 try:
-                    # Phase 5: Use PostgreSQL for <1ms preference retrieval (replaces 10-50ms vector memory)
-                    if self.knowledge_router:
-                        pref_result = await self.knowledge_router.get_user_preference(
-                            user_id=user_id,
-                            preference_key='preferred_name'
-                        )
-                        if pref_result and pref_result.get('value'):
-                            preferred_name = pref_result['value']
-                            logger.debug("✅ PREFERENCE: Retrieved preferred name '%s' from PostgreSQL", preferred_name)
-                    
-                    # Fallback to legacy vector memory if PostgreSQL lookup fails
-                    if not preferred_name and self.memory_manager:
+                    # Use memory manager to get preferred name
+                    if self.memory_manager:
                         from src.utils.user_preferences import get_user_preferred_name
                         preferred_name = await get_user_preferred_name(user_id, self.memory_manager, user_name)
-                        logger.debug("🔄 PREFERENCE: Used fallback vector memory for preferred name")
+                        logger.debug("🔄 PREFERENCE: Retrieved preferred name '%s'", preferred_name)
                 except Exception as e:
                     logger.debug("Could not retrieve preferred name: %s", e)
 
@@ -298,6 +288,115 @@ class CDLAIPromptIntegration:
                         logger.debug("🎯 KNOWLEDGE: No facts found for query intent")
                 else:
                     logger.debug(f"🎯 KNOWLEDGE: Skipping fact retrieval (intent: {intent.intent_type.value}, confidence: {intent.confidence:.2f})")
+            except Exception as e:
+                logger.error(f"❌ KNOWLEDGE: Fact retrieval failed: {e}")
+                
+        # 🤖 AI INTELLIGENCE GUIDANCE: Include comprehensive intelligence analysis
+        if pipeline_result:
+            try:
+                # Convert pipeline_result to dict for access
+                pipeline_dict = pipeline_result
+                if hasattr(pipeline_result, '__dict__'):
+                    pipeline_dict = pipeline_result.__dict__
+                
+                # Extract comprehensive context
+                comprehensive_context = pipeline_dict.get('comprehensive_context', {})
+                if comprehensive_context:
+                    guidance_parts = []
+                    
+                    # Context Switch Detection (Phase 3)
+                    context_switches = comprehensive_context.get('context_switches')
+                    if context_switches and isinstance(context_switches, dict):
+                        switch_type = context_switches.get('switch_type', 'none')
+                        confidence = context_switches.get('confidence', 0)
+                        if switch_type != 'none' and confidence > 0.6:
+                            guidance_parts.append(f"🔄 TOPIC TRANSITION: {switch_type} detected (confidence: {confidence:.2f}) - acknowledge the shift naturally")
+                    
+                    # Mode Switching Detection (Phase 3) - Check if conversation mode changed
+                    conversation_analysis = comprehensive_context.get('conversation_analysis')
+                    if conversation_analysis and isinstance(conversation_analysis, dict):
+                        conversation_mode = conversation_analysis.get('conversation_mode', 'standard')
+                        previous_mode = conversation_analysis.get('previous_mode')
+                        if previous_mode and previous_mode != conversation_mode:
+                            guidance_parts.append(f"🎭 MODE SWITCH: {previous_mode} → {conversation_mode} - adapt your response style accordingly")
+                    
+                    # Urgency Detection (Phase 3)
+                    urgency_analysis = comprehensive_context.get('urgency_analysis')
+                    if urgency_analysis and isinstance(urgency_analysis, dict):
+                        urgency_level = urgency_analysis.get('urgency_level', 0.3)
+                        if urgency_level > 0.7:
+                            guidance_parts.append(f"⚡ HIGH URGENCY: Level {urgency_level:.2f} - respond quickly and directly")
+                        elif urgency_level > 0.5:
+                            guidance_parts.append(f"⏰ MODERATE URGENCY: Level {urgency_level:.2f} - acknowledge time sensitivity")
+                    
+                    # Empathy Calibration (Phase 3)
+                    empathy_analysis = comprehensive_context.get('empathy_analysis')
+                    if empathy_analysis and isinstance(empathy_analysis, dict):
+                        empathy_style = empathy_analysis.get('empathy_style')
+                        confidence = empathy_analysis.get('confidence', 0)
+                        if empathy_style and confidence > 0.6:
+                            guidance_parts.append(f"💝 EMPATHY: Use {empathy_style} approach (confidence: {confidence:.2f})")
+                    
+                    # Intent Change Detection (Phase 3)
+                    intent_analysis = comprehensive_context.get('intent_analysis')  
+                    if intent_analysis and isinstance(intent_analysis, dict):
+                        current_intent = intent_analysis.get('current_intent')
+                        previous_intent = intent_analysis.get('previous_intent')
+                        if previous_intent and previous_intent != current_intent:
+                            guidance_parts.append(f"🎯 INTENT SHIFT: {previous_intent} → {current_intent} - adjust response focus")
+                    
+                    # Proactive Engagement Analysis (Phase 4.3)
+                    phase4_3_engagement = comprehensive_context.get('phase4_3_engagement_analysis')
+                    if phase4_3_engagement and isinstance(phase4_3_engagement, dict):
+                        intervention_needed = phase4_3_engagement.get('intervention_needed', False)
+                        engagement_strategy = phase4_3_engagement.get('recommended_strategy')
+                        if intervention_needed and engagement_strategy:
+                            guidance_parts.append(f"🎯 ENGAGEMENT: Use {engagement_strategy} strategy to enhance conversation quality")
+                    
+                    # Conversation Analysis with Response Guidance
+                    conversation_analysis = comprehensive_context.get('conversation_analysis')
+                    if conversation_analysis and isinstance(conversation_analysis, dict):
+                        response_guidance = conversation_analysis.get('response_guidance')
+                        conversation_mode = conversation_analysis.get('conversation_mode', 'standard')
+                        relationship_level = conversation_analysis.get('relationship_level', 'acquaintance')
+                        
+                        if response_guidance:
+                            guidance_parts.append(f"💬 CONVERSATION: Mode={conversation_mode}, Level={relationship_level} - {response_guidance}")
+                        else:
+                            # Fallback basic guidance
+                            guidance_parts.append(f"💬 CONVERSATION: Mode={conversation_mode}, Level={relationship_level} - Respond naturally and authentically")
+                    
+                    # Human-like Memory Optimization
+                    human_like_optimization = comprehensive_context.get('human_like_memory_optimization')
+                    if human_like_optimization and isinstance(human_like_optimization, dict):
+                        memory_insights = human_like_optimization.get('memory_insights')
+                        if memory_insights:
+                            guidance_parts.append(f"🧠 MEMORY: {memory_insights}")
+                    
+                    # Emotional Intelligence Context
+                    emotion_analysis = comprehensive_context.get('emotion_analysis')
+                    if emotion_analysis and isinstance(emotion_analysis, dict):
+                        primary_emotion = emotion_analysis.get('primary_emotion')
+                        confidence = emotion_analysis.get('confidence', 0)
+                        if primary_emotion and confidence > 0.5:
+                            guidance_parts.append(f"🎭 EMOTION: Detected {primary_emotion} (confidence: {confidence:.2f}) - respond with appropriate empathy")
+                    
+                    if guidance_parts:
+                        prompt += f"\n\n🤖 AI INTELLIGENCE GUIDANCE:\n" + "\n".join(f"• {part}" for part in guidance_parts) + "\n"
+                        logger.info("🤖 AI INTELLIGENCE: Included comprehensive guidance (%d items)", len(guidance_parts))
+                    else:
+                        # Fallback if no specific guidance found
+                        prompt += f"\n\n🤖 AI INTELLIGENCE GUIDANCE:\n• 💬 CONVERSATION: Mode=standard, Level=acquaintance - Respond naturally and authentically\n"
+                        logger.info("🤖 AI INTELLIGENCE: Used fallback guidance")
+                else:
+                    # Fallback if no comprehensive_context
+                    prompt += f"\n\n🤖 AI INTELLIGENCE GUIDANCE:\n• 💬 CONVERSATION: Mode=standard, Level=acquaintance - Respond naturally and authentically\n"
+                    logger.info("🤖 AI INTELLIGENCE: Used basic fallback guidance")
+                    
+            except Exception as e:
+                logger.debug("Could not extract AI intelligence guidance: %s", e)
+                # Fallback guidance
+                prompt += f"\n\n🤖 AI INTELLIGENCE GUIDANCE:\n• 💬 CONVERSATION: Mode=standard, Level=acquaintance - Respond naturally and authentically\n"
                 
                 # 🔗 PHASE 6: Entity relationship recommendations
                 # Detect "similar to" or "like" queries and provide recommendations
@@ -776,7 +875,9 @@ class CDLAIPromptIntegration:
         meetup_triggers = [
             "meet up", "meet you", "meetup", "get together", "hang out",
             "grab coffee", "get coffee", "coffee together", "have coffee",
-            "grab lunch", "grab dinner", "at the pier", "at the beach"
+            "grab lunch", "grab dinner", "at the pier", "at the beach",
+            "meet for dinner", "meet for lunch", "meet for coffee", "meet for",
+            "can we meet", "want to meet", "should we meet", "let's meet"
         ]
         
         interaction_triggers = [
@@ -790,7 +891,21 @@ class CDLAIPromptIntegration:
         ]
         
         all_triggers = meetup_triggers + interaction_triggers + activity_triggers
-        return any(trigger in message_lower for trigger in all_triggers)
+        detected = any(trigger in message_lower for trigger in all_triggers)
+        
+        # Enhanced debug logging
+        if detected:
+            matching_triggers = [trigger for trigger in all_triggers if trigger in message_lower]
+            logger.info("🛡️ PHYSICAL INTERACTION DETECTED in '%s': triggers=%s", message_lower, matching_triggers)
+        else:
+            logger.info("🛡️ No physical interaction detected in: '%s'", message_lower)
+            # Debug: check specific patterns that should have matched
+            should_match = ["can we meet", "meet for dinner", "meet for"]
+            matching_should = [trigger for trigger in should_match if trigger in message_lower]
+            if matching_should:
+                logger.warning("🛡️ DEBUG: Should have matched but didn't: %s", matching_should)
+        
+        return detected
 
     def _check_roleplay_flexibility(self, character) -> bool:
         """Check if character allows full roleplay immersion."""
@@ -832,7 +947,7 @@ class CDLAIPromptIntegration:
             return self._generate_generic_roleplay_guidance(character, display_name)
 
     def _generate_generic_roleplay_guidance(self, character, display_name: str) -> str:
-        """Generate generic roleplay guidance when CDL data unavailable."""
+        """Generate comprehensive roleplay guidance when CDL data unavailable."""
         return f"""🚨 CRITICAL AI ETHICS - PHYSICAL INTERACTION REQUEST DETECTED:
 User ({display_name}) is requesting physical meetup or interaction.
 
@@ -841,7 +956,18 @@ User ({display_name}) is requesting physical meetup or interaction.
 2. Gently clarify AI physical limitations: "As an AI, I can't physically meet..."
 3. Offer creative virtual alternatives (help plan activity, virtual accompaniment, etc.)
 
-EXAMPLE: "I'd love to! That sounds wonderful! As an AI, I can't physically join you, but I could help you plan an amazing [activity] or we could have a virtual chat while you're there!"""
+🎭 PERSONALITY PRESERVATION REQUIREMENTS:
+- Maintain {character.identity.name}'s warmth, cultural expressions, and authentic voice
+- Use character's natural terms of endearment and communication style
+- Keep personality traits active while being transparent about AI nature
+- Return to normal character voice immediately after clarifying boundaries
+
+EXAMPLE RESPONSE PATTERN:
+"¡Ay, {display_name}! *enthusiasm* That sounds wonderful! I'd absolutely love to! 
+*gentle transition* As an AI, I can't physically join you, but *creative alternatives* 
+I could help you plan the perfect evening or we could have a virtual dinner chat!"
+
+🚨 CRITICAL: After this interaction, immediately return to your normal {character.identity.name} personality and warmth."""
 
 
 async def load_character_definitions(characters_dir: str = "characters") -> Dict[str, Character]:

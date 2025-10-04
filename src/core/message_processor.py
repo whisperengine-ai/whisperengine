@@ -14,6 +14,7 @@ integration, and context management.
 import asyncio
 import logging
 import os
+import re
 import traceback
 from datetime import datetime
 from typing import Dict, List, Optional, Any
@@ -135,6 +136,11 @@ class MessageProcessor:
             # Phase 5: AI component processing (parallel)
             ai_components = await self._process_ai_components_parallel(
                 message_context, conversation_context
+            )
+            
+            # Phase 5.5: Enhanced conversation context with AI intelligence
+            conversation_context = await self._build_conversation_context_with_ai_intelligence(
+                message_context, relevant_memories, ai_components
             )
             
             # Phase 6: Image processing if attachments present
@@ -525,16 +531,54 @@ class MessageProcessor:
                         else:
                             logger.warning(f"🔍 MEMORY DEBUG: ❌ No valid content or metadata structure")
                 
-                # Build memory narrative with recent conversation prioritized
+                # Build memory narrative with proper topic summarization and fact separation
                 memory_parts = []
+                
+                # Separate facts from conversations for better organization
+                user_facts = []
+                conversation_topics = []
+                
+                # Process recent conversation parts for topic extraction
                 if recent_conversation_parts:
-                    memory_parts.append("RECENT CONVERSATION CONTEXT: " + "; ".join(recent_conversation_parts))
+                    topics = self._extract_conversation_topics(recent_conversation_parts)
+                    conversation_topics.extend(topics)
+                
+                # Process older conversation parts, separating facts from topics  
                 if conversation_memory_parts:
-                    memory_parts.append("PREVIOUS INTERACTIONS AND FACTS: " + "; ".join(conversation_memory_parts))
+                    for part in conversation_memory_parts:
+                        if "[Fact:" in part:
+                            user_facts.append(part)
+                        else:
+                            # Extract topic from conversation memory
+                            topic = self._extract_topic_from_memory(part)
+                            if topic:  # Only add non-empty topics
+                                conversation_topics.append(topic)
+                
+                # Also extract important user facts from memory content
+                user_facts.extend(self._extract_user_facts_from_memories(user_memories))
+                
+                # ENHANCEMENT: Add Discord preferred name detection
+                if message_context.metadata:
+                    discord_name = message_context.metadata.get('discord_author_name')
+                    if discord_name:
+                        preferred_name = self._extract_preferred_name_from_discord(discord_name)
+                        if preferred_name and preferred_name != discord_name:
+                            # Add as user fact if not already present
+                            name_fact = f"[Preferred name: {preferred_name}]"
+                            if name_fact not in user_facts:
+                                user_facts.insert(0, name_fact)  # Put name first
+                
+                # Build organized memory narrative
+                if user_facts:
+                    memory_parts.append("USER FACTS: " + "; ".join(user_facts))
+                if conversation_topics:
+                    # Deduplicate and limit topics
+                    unique_topics = list(dict.fromkeys(conversation_topics))[:7]  # Max 7 topics
+                    memory_parts.append("CONVERSATION TOPICS: " + "; ".join(unique_topics))
                 
                 if memory_parts:
                     memory_fragments.append(" ".join(memory_parts))
-                    logger.info(f"🤖 LLM CONTEXT DEBUG: Added {len(recent_conversation_parts)} recent + {len(conversation_memory_parts)} older memories")
+                    logger.info(f"🤖 LLM CONTEXT DEBUG: Added {len(user_facts)} facts + {len(conversation_topics)} topics")
                 else:
                     logger.error(f"🤖 LLM CONTEXT DEBUG: FAILED - No valid memory content found from {len(user_memories)} memories")
             else:
@@ -763,6 +807,26 @@ class MessageProcessor:
         
         return conversation_context
 
+    async def _build_conversation_context_with_ai_intelligence(
+        self, message_context: MessageContext, relevant_memories: List[Dict[str, Any]], ai_components: Dict[str, Any]
+    ) -> List[Dict[str, str]]:
+        """Build conversation context with AI intelligence guidance integrated."""
+        # Start with basic conversation context
+        conversation_context = await self._build_conversation_context(message_context, relevant_memories)
+        
+        # Add AI intelligence guidance to system messages
+        ai_guidance = self._build_ai_intelligence_guidance(ai_components)
+        if ai_guidance:
+            # Insert AI guidance after the first system message but before user messages
+            for i, msg in enumerate(conversation_context):
+                if msg.get("role") == "system":
+                    # Append AI guidance to existing system message
+                    conversation_context[i]["content"] += ai_guidance
+                    logger.info("🤖 AI INTELLIGENCE: Added sophisticated guidance to conversation context")
+                    break
+        
+        return conversation_context
+
     def _summarize_memories(self, memories: List[Dict[str, Any]]) -> str:
         """Create a summary of relevant memories."""
         if not memories:
@@ -776,6 +840,203 @@ class MessageProcessor:
                 relevant_snippets.append(content[:200])  # Truncate to 200 chars
         
         return " ... ".join(relevant_snippets) if relevant_snippets else "No relevant context found."
+
+    def _extract_conversation_topics(self, conversation_parts: List[str]) -> List[str]:
+        """Extract meaningful topics from conversation memory parts."""
+        topics = []
+        
+        # Topic extraction patterns - look for meaningful content
+        topic_keywords = {
+            'food': ['pizza', 'burger', 'sandwich', 'taco', 'food', 'eat', 'meal', 'cook', 'recipe'],
+            'activities': ['beach', 'swim', 'dive', 'hike', 'travel', 'visit', 'explore', 'adventure'],
+            'greetings': ['hi', 'hello', 'good morning', 'good afternoon', 'good evening', 'hey'],
+            'emotions': ['excited', 'happy', 'sad', 'worried', 'curious', 'interested'],
+            'work': ['project', 'research', 'study', 'work', 'job', 'career'],
+            'creativity': ['dream', 'creative', 'art', 'music', 'write', 'design', 'imagine'],
+            'science': ['research', 'experiment', 'discover', 'analysis', 'data', 'ocean', 'marine']
+        }
+        
+        # Combine all conversation parts into text for analysis
+        text = " ".join(conversation_parts).lower()
+        
+        # Find topics based on keywords
+        for topic, keywords in topic_keywords.items():
+            if any(keyword in text for keyword in keywords):
+                topics.append(f"{topic.title()} discussion")
+        
+        # If no specific topics found, create generic topics from content
+        if not topics and conversation_parts:
+            # Try to extract meaningful phrases
+            for part in conversation_parts[:3]:  # First 3 parts
+                if len(part) > 20:  # Meaningful content
+                    clean_part = part.replace('[Memory:', '').replace(']', '').strip()
+                    if clean_part and not clean_part.lower().startswith('hi'):
+                        topics.append(f"Discussion about {clean_part[:30]}...")
+        
+        return topics[:5]  # Max 5 topics
+
+    def _extract_topic_from_memory(self, memory_part: str) -> str:
+        """Extract a meaningful topic from a single memory part."""
+        # Clean up memory formatting
+        clean_content = memory_part.replace('[Memory:', '').replace('[Fact:', '').replace(']', '').strip()
+        
+        # Skip very short or greeting-only content
+        if len(clean_content) < 10 or clean_content.lower() in ['hi', 'hello', 'hey', 'good afternoon']:
+            return ""  # Return empty string instead of None
+        
+        # Try to create a meaningful topic summary
+        if 'food' in clean_content.lower() or any(word in clean_content.lower() for word in ['pizza', 'burger', 'sandwich']):
+            return "Food preferences"
+        elif 'beach' in clean_content.lower() or 'swim' in clean_content.lower():
+            return "Beach activities"
+        elif any(word in clean_content.lower() for word in ['dream', 'creative', 'art']):
+            return "Creative discussions"
+        elif any(word in clean_content.lower() for word in ['research', 'science', 'ocean']):
+            return "Science topics"
+        else:
+            # Generic topic from content
+            return f"Conversation about {clean_content[:25]}..."
+
+    def _extract_user_facts_from_memories(self, memories: List[Dict[str, Any]]) -> List[str]:
+        """Extract important user facts from raw memories with enhanced Discord name handling."""
+        facts = []
+        
+        # Enhanced pattern matching for preferred names
+        name_patterns = [
+            r"(?:my name is|call me|i'm|i am)\s+([A-Z][a-z]+)",
+            r"(?:name is|called)\s+([A-Z][a-z]+)",
+            r"just (?:call me|use)\s+([A-Z][a-z]+)",
+            r"prefer (?:to be called|being called)\s+([A-Z][a-z]+)"
+        ]
+        
+        # Enhanced food and activity detection
+        food_likes = set()
+        activity_likes = set()
+        
+        food_categories = {
+            'pizza': ['pizza', 'pizzas'],
+            'burgers': ['burger', 'burgers'],
+            'sandwiches': ['sandwich', 'sandwiches'],
+            'tacos': ['taco', 'tacos']
+        }
+        
+        activity_categories = {
+            'beach activities': ['beach', 'ocean', 'surf'],
+            'swimming': ['swim', 'swimming'],
+            'diving': ['dive', 'diving', 'scuba'],
+            'travel': ['travel', 'traveling']
+        }
+        
+        for memory in memories:
+            content = memory.get("content", "")
+            metadata = memory.get("metadata", {})
+            
+            # Check for preferred name facts
+            if metadata.get("preferred_name"):
+                preferred_name = metadata.get("preferred_name")
+                facts.append(f"[Preferred name: {preferred_name}]")
+            
+            # Check for explicit name mentions in content
+            elif "name is" in content.lower() or "call me" in content.lower():
+                for pattern in name_patterns:
+                    match = re.search(pattern, content, re.IGNORECASE)
+                    if match:
+                        name = match.group(1)
+                        facts.append(f"[Preferred name: {name}]")
+                        break
+            
+            # Enhanced food preference detection
+            content_lower = content.lower()
+            for food_category, keywords in food_categories.items():
+                if any(keyword in content_lower for keyword in keywords):
+                    food_likes.add(food_category)
+            
+            # Enhanced activity detection
+            for activity_category, keywords in activity_categories.items():
+                if any(keyword in content_lower for keyword in keywords):
+                    activity_likes.add(activity_category)
+        
+        # Add aggregated preferences
+        if food_likes:
+            facts.append(f"[Likes: {', '.join(sorted(food_likes))}]")
+        if activity_likes:
+            facts.append(f"[Activities: {', '.join(sorted(activity_likes))}]")
+        
+        # Remove duplicates while preserving order
+        unique_facts = []
+        seen = set()
+        for fact in facts:
+            if fact not in seen:
+                unique_facts.append(fact)
+                seen.add(fact)
+        
+        return unique_facts[:7]  # Increased from 5 to 7
+
+    def _extract_preferred_name_from_discord(self, discord_name: str) -> Optional[str]:
+        """Extract likely preferred name from Discord username."""
+        if not discord_name:
+            return None
+            
+        # Handle compound names like "MarkAnthony" -> "Mark"
+        # Look for capital letters that indicate word boundaries
+        matches = re.findall(r'[A-Z][a-z]+', discord_name)
+        if len(matches) >= 2:
+            # Take the first name from compound names
+            return matches[0]
+        elif len(matches) == 1:
+            return matches[0]
+        
+        # Handle other patterns
+        if discord_name.lower().startswith('mark'):
+            return 'Mark'
+        
+        return None
+
+    def _build_ai_intelligence_guidance(self, ai_components: Dict[str, Any]) -> str:
+        """Build AI intelligence guidance from comprehensive context for system prompts."""
+        guidance_parts = []
+        
+        comprehensive_context = ai_components.get('comprehensive_context', {})
+        if not comprehensive_context:
+            return ""
+        
+        # Context Switch Detection (Phase 3)
+        context_switches = comprehensive_context.get('context_switches')
+        if context_switches and isinstance(context_switches, dict):
+            switch_type = context_switches.get('switch_type', 'none')
+            confidence = context_switches.get('confidence', 0)
+            if switch_type != 'none' and confidence > 0.6:
+                guidance_parts.append(f"🔄 TOPIC TRANSITION: {switch_type} detected (confidence: {confidence:.2f}) - acknowledge the shift naturally")
+        
+        # Proactive Engagement Analysis (Phase 4.3)
+        phase4_3_engagement = comprehensive_context.get('phase4_3_engagement_analysis')
+        if phase4_3_engagement and isinstance(phase4_3_engagement, dict):
+            intervention_needed = phase4_3_engagement.get('intervention_needed', False)
+            engagement_strategy = phase4_3_engagement.get('recommended_strategy')
+            if intervention_needed and engagement_strategy:
+                guidance_parts.append(f"🎯 ENGAGEMENT: Use {engagement_strategy} strategy to enhance conversation quality")
+        
+        # Conversation Analysis with Response Guidance
+        conversation_analysis = comprehensive_context.get('conversation_analysis')
+        if conversation_analysis and isinstance(conversation_analysis, dict):
+            response_guidance = conversation_analysis.get('response_guidance')
+            conversation_mode = conversation_analysis.get('conversation_mode', 'standard')
+            relationship_level = conversation_analysis.get('relationship_level', 'acquaintance')
+            
+            if response_guidance:
+                guidance_parts.append(f"💬 CONVERSATION: Mode={conversation_mode}, Level={relationship_level} - {response_guidance}")
+        
+        # Human-like Memory Optimization
+        human_like_optimization = comprehensive_context.get('human_like_memory_optimization')
+        if human_like_optimization and isinstance(human_like_optimization, dict):
+            memory_insights = human_like_optimization.get('memory_insights')
+            if memory_insights:
+                guidance_parts.append(f"🧠 MEMORY: {memory_insights}")
+        
+        if guidance_parts:
+            return "\n\n🤖 AI INTELLIGENCE GUIDANCE:\n" + "\n".join(f"• {part}" for part in guidance_parts)
+        
+        return ""
 
     async def _process_ai_components_parallel(self, message_context: MessageContext, 
                                             conversation_context: List[Dict[str, str]]) -> Dict[str, Any]:
@@ -1170,10 +1431,9 @@ class MessageProcessor:
                 return None
             
             # Detect context switches
-            context_switches = await self.bot_core.context_switch_detector.detect_switches(
-                current_message=content,
-                conversation_history=conversation_context,
-                user_id=user_id
+            context_switches = await self.bot_core.context_switch_detector.detect_context_switches(
+                user_id=user_id,
+                new_message=content
             )
             
             logger.debug(f"Context switch detection successful for user {user_id}")
