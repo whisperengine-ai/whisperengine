@@ -629,6 +629,270 @@ class SemanticKnowledgeRouter:
         except Exception as e:
             logger.error(f"❌ Failed to retrieve all preferences: {e}")
             return {}
+    
+    async def find_similar_entities(
+        self,
+        entity_name: str,
+        entity_type: Optional[str] = None,
+        similarity_threshold: float = 0.3,
+        limit: int = 10
+    ) -> List[Dict[str, Any]]:
+        """
+        Find entities similar to the given entity using trigram similarity.
+        
+        Phase 6: Entity Relationship Discovery
+        Uses PostgreSQL trigram matching for fuzzy entity discovery.
+        Supports "What's similar to pizza?" type queries.
+        
+        Args:
+            entity_name: Name of entity to find similar matches for
+            entity_type: Optional filter by entity type
+            similarity_threshold: Minimum similarity score 0-1 (default 0.3)
+            limit: Maximum number of results
+            
+        Returns:
+            List of similar entities with similarity scores
+            
+        Example:
+            similar = await router.find_similar_entities("pizza", similarity_threshold=0.4)
+            # Returns: [{'entity_name': 'pasta', 'similarity': 0.6}, ...]
+        """
+        try:
+            async with self.postgres.acquire() as conn:
+                query = """
+                    SELECT 
+                        entity_name,
+                        entity_type,
+                        category,
+                        subcategory,
+                        similarity(entity_name, $1) as similarity_score
+                    FROM fact_entities
+                    WHERE 
+                        entity_name != $1
+                        AND similarity(entity_name, $1) > $2
+                        {type_filter}
+                    ORDER BY similarity_score DESC
+                    LIMIT $3
+                """
+                
+                # Add optional type filter
+                if entity_type:
+                    query = query.format(type_filter="AND entity_type = $4")
+                    results = await conn.fetch(query, entity_name, similarity_threshold, limit, entity_type)
+                else:
+                    query = query.format(type_filter="")
+                    results = await conn.fetch(query, entity_name, similarity_threshold, limit)
+                
+                similar_entities = [
+                    {
+                        'entity_name': row['entity_name'],
+                        'entity_type': row['entity_type'],
+                        'category': row['category'],
+                        'subcategory': row['subcategory'],
+                        'similarity': float(row['similarity_score'])
+                    }
+                    for row in results
+                ]
+                
+                logger.info(f"🔍 Found {len(similar_entities)} entities similar to '{entity_name}'")
+                return similar_entities
+                
+        except Exception as e:
+            logger.error(f"❌ Failed to find similar entities: {e}")
+            return []
+    
+    async def auto_populate_entity_relationships(
+        self,
+        entity_id: str,
+        entity_name: str,
+        entity_type: str,
+        similarity_threshold: float = 0.4
+    ) -> int:
+        """
+        Automatically populate entity_relationships table using trigram similarity.
+        
+        Phase 6: Entity Relationship Discovery
+        Called during fact storage to build relationship graph automatically.
+        Creates bidirectional 'similar_to' relationships.
+        
+        Args:
+            entity_id: UUID of the entity
+            entity_name: Name of the entity
+            entity_type: Type of entity
+            similarity_threshold: Minimum similarity for relationship creation
+            
+        Returns:
+            Number of relationships created
+        """
+        try:
+            # Find similar entities
+            similar_entities = await self.find_similar_entities(
+                entity_name=entity_name,
+                entity_type=entity_type,
+                similarity_threshold=similarity_threshold,
+                limit=5  # Top 5 most similar
+            )
+            
+            if not similar_entities:
+                return 0
+            
+            relationships_created = 0
+            
+            async with self.postgres.acquire() as conn:
+                for similar in similar_entities:
+                    # Get the similar entity's ID
+                    similar_entity_id = await conn.fetchval("""
+                        SELECT id FROM fact_entities
+                        WHERE entity_name = $1 AND entity_type = $2
+                    """, similar['entity_name'], similar['entity_type'])
+                    
+                    if not similar_entity_id:
+                        continue
+                    
+                    # Create bidirectional relationship
+                    await conn.execute("""
+                        INSERT INTO entity_relationships 
+                            (from_entity_id, to_entity_id, relationship_type, weight, bidirectional)
+                        VALUES ($1, $2, 'similar_to', $3, true)
+                        ON CONFLICT (from_entity_id, to_entity_id, relationship_type) 
+                        DO UPDATE SET weight = EXCLUDED.weight
+                    """, entity_id, similar_entity_id, similar['similarity'])
+                    
+                    relationships_created += 1
+            
+            logger.info(f"✅ Created {relationships_created} relationships for '{entity_name}'")
+            return relationships_created
+            
+        except Exception as e:
+            logger.error(f"❌ Failed to auto-populate relationships: {e}")
+            return 0
+    
+    async def get_related_entities(
+        self,
+        entity_name: str,
+        relationship_type: str = 'similar_to',
+        max_hops: int = 1,
+        min_weight: float = 0.3
+    ) -> List[Dict[str, Any]]:
+        """
+        Get entities related to the given entity via graph traversal.
+        
+        Phase 6: Entity Relationship Discovery
+        Supports multi-hop relationship traversal for recommendations.
+        
+        Args:
+            entity_name: Name of starting entity
+            relationship_type: Type of relationship to traverse
+            max_hops: Maximum hops in graph traversal (1 or 2)
+            min_weight: Minimum relationship weight threshold
+            
+        Returns:
+            List of related entities with relationship paths
+            
+        Example:
+            related = await router.get_related_entities("pizza", max_hops=2)
+            # Returns entities similar to pizza and entities similar to those
+        """
+        try:
+            async with self.postgres.acquire() as conn:
+                # Get starting entity ID
+                entity_id = await conn.fetchval("""
+                    SELECT id FROM fact_entities WHERE entity_name = $1
+                """, entity_name)
+                
+                if not entity_id:
+                    logger.debug(f"🔍 Entity '{entity_name}' not found")
+                    return []
+                
+                if max_hops == 1:
+                    # Single-hop query
+                    results = await conn.fetch("""
+                        SELECT 
+                            e.entity_name,
+                            e.entity_type,
+                            e.category,
+                            er.weight,
+                            er.relationship_type,
+                            1 as hops
+                        FROM entity_relationships er
+                        JOIN fact_entities e ON e.id = er.to_entity_id
+                        WHERE er.from_entity_id = $1
+                            AND er.relationship_type = $2
+                            AND er.weight >= $3
+                        ORDER BY er.weight DESC
+                    """, entity_id, relationship_type, min_weight)
+                    
+                else:
+                    # 2-hop query (recursive CTE)
+                    results = await conn.fetch("""
+                        WITH RECURSIVE entity_graph AS (
+                            -- Base case: direct relationships
+                            SELECT 
+                                e.id,
+                                e.entity_name,
+                                e.entity_type,
+                                e.category,
+                                er.weight,
+                                er.relationship_type,
+                                1 as hops,
+                                ARRAY[er.from_entity_id, er.to_entity_id] as path
+                            FROM entity_relationships er
+                            JOIN fact_entities e ON e.id = er.to_entity_id
+                            WHERE er.from_entity_id = $1
+                                AND er.relationship_type = $2
+                                AND er.weight >= $3
+                            
+                            UNION
+                            
+                            -- Recursive case: 2nd hop relationships
+                            SELECT 
+                                e.id,
+                                e.entity_name,
+                                e.entity_type,
+                                e.category,
+                                er.weight * eg.weight as weight,  -- Multiply weights for path strength
+                                er.relationship_type,
+                                eg.hops + 1 as hops,
+                                eg.path || er.to_entity_id as path
+                            FROM entity_graph eg
+                            JOIN entity_relationships er ON er.from_entity_id = eg.id
+                            JOIN fact_entities e ON e.id = er.to_entity_id
+                            WHERE eg.hops < $4
+                                AND er.relationship_type = $2
+                                AND er.weight >= $3
+                                AND NOT (er.to_entity_id = ANY(eg.path))  -- Avoid cycles
+                        )
+                        SELECT DISTINCT ON (entity_name)
+                            entity_name,
+                            entity_type,
+                            category,
+                            weight,
+                            relationship_type,
+                            hops
+                        FROM entity_graph
+                        WHERE entity_name != $5  -- Exclude starting entity
+                        ORDER BY entity_name, weight DESC, hops ASC
+                        LIMIT 20
+                    """, entity_id, relationship_type, min_weight, max_hops, entity_name)
+                
+                related_entities = [
+                    {
+                        'entity_name': row['entity_name'],
+                        'entity_type': row['entity_type'],
+                        'category': row['category'],
+                        'weight': float(row['weight']),
+                        'relationship_type': row['relationship_type'],
+                        'hops': row['hops']
+                    }
+                    for row in results
+                ]
+                
+                logger.info(f"🔍 Found {len(related_entities)} related entities for '{entity_name}' ({max_hops}-hop)")
+                return related_entities
+                
+        except Exception as e:
+            logger.error(f"❌ Failed to get related entities: {e}")
+            return []
 
 
 # Factory function for easy integration

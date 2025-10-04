@@ -296,6 +296,55 @@ class CDLAIPromptIntegration:
                         logger.debug("🎯 KNOWLEDGE: No facts found for query intent")
                 else:
                     logger.debug(f"🎯 KNOWLEDGE: Skipping fact retrieval (intent: {intent.intent_type.value}, confidence: {intent.confidence:.2f})")
+                
+                # 🔗 PHASE 6: Entity relationship recommendations
+                # Detect "similar to" or "like" queries and provide recommendations
+                similarity_keywords = ['similar to', 'like', 'related to', 'compared to', 'alternative to']
+                if any(keyword in message_content.lower() for keyword in similarity_keywords):
+                    # Extract entity name from query (simple pattern matching)
+                    import re
+                    patterns = [
+                        r"similar to (\w+)",
+                        r"like (\w+)",
+                        r"compared to (\w+)",
+                        r"alternative to (\w+)"
+                    ]
+                    
+                    target_entity = None
+                    for pattern in patterns:
+                        match = re.search(pattern, message_content.lower())
+                        if match:
+                            target_entity = match.group(1)
+                            break
+                    
+                    if target_entity:
+                        # Get related entities via graph traversal
+                        related_entities = await self.knowledge_router.get_related_entities(
+                            entity_name=target_entity,
+                            relationship_type='similar_to',
+                            max_hops=2,
+                            min_weight=0.3
+                        )
+                        
+                        if related_entities:
+                            prompt += f"\n\n🔗 RELATED TO '{target_entity.upper()}':\n"
+                            
+                            # Group by hop distance
+                            direct = [e for e in related_entities if e['hops'] == 1]
+                            extended = [e for e in related_entities if e['hops'] == 2]
+                            
+                            if direct:
+                                prompt += f"Direct matches:\n"
+                                for entity in direct[:3]:
+                                    prompt += f"  • {entity['entity_name']} (relevance: {entity['weight']:.0%})\n"
+                            
+                            if extended:
+                                prompt += f"You might also like:\n"
+                                for entity in extended[:3]:
+                                    prompt += f"  • {entity['entity_name']} (extended match)\n"
+                            
+                            prompt += f"\nUse these recommendations naturally in your response, matching {character.identity.name}'s personality."
+                            logger.info(f"🔗 RECOMMENDATIONS: Found {len(related_entities)} entities related to '{target_entity}'")
                     
             except Exception as e:
                 logger.error(f"❌ KNOWLEDGE: Fact retrieval failed: {e}")
