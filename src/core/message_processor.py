@@ -508,19 +508,30 @@ class MessageProcessor:
                 )
                 
                 # Convert to expected format for generate_conversation_summary
+                # 🚨 FIX: Include author_id so summary can filter user-specific messages
                 recent_messages = []
                 for msg in conversation_history:
                     if isinstance(msg, dict):
+                        content = msg.get('content', '')
+                        role = msg.get('role', 'user')
+                        is_bot = role in ['assistant', 'bot']
+                        
                         recent_messages.append({
-                            'content': msg.get('content', ''),
-                            'role': msg.get('role', 'user'),
-                            'bot': msg.get('role') in ['assistant', 'bot']
+                            'content': content,
+                            'author_id': user_id if not is_bot else 'bot',  # 🚨 FIX: Add author_id for filtering
+                            'role': role,
+                            'bot': is_bot
                         })
                     else:
+                        content = getattr(msg, 'content', '')
+                        role = getattr(msg, 'role', 'user')
+                        is_bot = role in ['assistant', 'bot']
+                        
                         recent_messages.append({
-                            'content': getattr(msg, 'content', ''),
-                            'role': getattr(msg, 'role', 'user'),
-                            'bot': getattr(msg, 'role', 'user') in ['assistant', 'bot']
+                            'content': content,
+                            'author_id': user_id if not is_bot else 'bot',  # 🚨 FIX: Add author_id for filtering
+                            'role': role,
+                            'bot': is_bot
                         })
                 
                 logger.info(f"🔥 FALLBACK: Using memory manager conversation history - {len(recent_messages)} messages")

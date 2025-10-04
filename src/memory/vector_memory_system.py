@@ -4573,26 +4573,70 @@ class VectorMemoryManager:
         user_id: str,
         limit: int = 50
     ) -> List[Dict[str, Any]]:
-        """Get conversation history for the user."""
+        """
+        Get conversation history for the user in chronological order.
+        
+        🚨 CRITICAL FIX: Use scroll/filter instead of search to get ACTUAL recent conversations.
+        search_memories() with empty query does vector search which returns semantically similar 
+        (but potentially OLD) conversations, not chronologically recent ones.
+        """
         try:
-            results = await self.vector_store.search_memories(
-                query="",
-                user_id=user_id,
-                memory_types=["conversation"],  # Fixed: Use lowercase to match MemoryType.CONVERSATION.value
-                limit=limit  # Fixed: interface contract violation - use 'limit' not 'top_k'
+            # 🚨 FIX: Use direct Qdrant scroll with timestamp-based filtering
+            # This gets the ACTUAL most recent conversations, not semantically similar ones
+            from datetime import datetime, timedelta
+            from qdrant_client import models
+            
+            # Get conversations from the last 7 days (configurable window)
+            time_window_days = 7
+            cutoff_timestamp = datetime.now() - timedelta(days=time_window_days)
+            cutoff_unix = cutoff_timestamp.timestamp()
+            
+            # Build filter for recent conversations
+            must_conditions = [
+                models.FieldCondition(
+                    key="user_id",
+                    match=models.MatchValue(value=user_id)
+                ),
+                models.FieldCondition(
+                    key="memory_type",
+                    match=models.MatchValue(value="conversation")
+                ),
+                models.FieldCondition(
+                    key="timestamp_unix",
+                    range=models.Range(gte=cutoff_unix)
+                )
+            ]
+            
+            # Scroll through recent conversations (no vector search needed)
+            scroll_result = self.vector_store.client.scroll(
+                collection_name=self.vector_store.collection_name,
+                scroll_filter=models.Filter(must=must_conditions),
+                limit=limit * 2,  # Get extra in case some are filtered
+                with_payload=True,
+                with_vectors=False  # Don't need vectors for history retrieval
             )
             
-            return [
-                {
-                    "content": r["content"],
-                    "timestamp": r["timestamp"],
-                    "role": r.get("metadata", {}).get("role", "unknown"),
-                    "metadata": r.get("metadata", {})
-                }
-                for r in sorted(results, key=lambda x: x["timestamp"], reverse=True)
-            ]
+            # Extract and format results
+            results = []
+            for point in scroll_result[0]:  # scroll returns (points, next_offset)
+                payload = point.payload
+                results.append({
+                    "content": payload.get("content", ""),
+                    "timestamp": payload.get("timestamp", ""),
+                    "role": payload.get("metadata", {}).get("role", "unknown"),
+                    "metadata": payload.get("metadata", {})
+                })
+            
+            # Sort by timestamp descending (most recent first) and limit
+            sorted_results = sorted(results, key=lambda x: x["timestamp"], reverse=True)[:limit]
+            
+            logger.info(f"🕒 CONVERSATION HISTORY: Retrieved {len(sorted_results)} most recent conversations for user {user_id}")
+            
+            return sorted_results
+            
         except Exception as e:
             logger.error(f"Failed to get conversation history: {e}")
+            logger.error(f"Traceback: {traceback.format_exc()}")
             return []
     
     async def search_memories(
