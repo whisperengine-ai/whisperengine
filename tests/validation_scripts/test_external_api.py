@@ -15,6 +15,82 @@ import aiohttp
 # Setup logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+    print("\n🔍 Testing User Facts and Relationship Metrics")
+    print("=" * 50)
+    
+    # Test with Elena bot (port 9091) - she has rich personality features
+    base_url = "http://localhost:9091"
+    test_user_id = "relationship_test_user"
+    
+    try:
+        async with WhisperEngineAPIClient(base_url) as client:
+            print("Testing relationship progression with Elena...")
+            
+            # Sequence of messages to build relationship
+            test_sequence = [
+                "Hello! My name is Alex Thompson.",
+                "I'm really excited to meet you. I love marine biology too!",
+                "Thank you so much for the information, you're amazing!",
+                "I work as a software engineer but I'm passionate about ocean conservation.",
+                "I've been feeling a bit worried about climate change lately."
+            ]
+            
+            for i, message in enumerate(test_sequence, 1):
+                print(f"\n--- Message {i}: {message[:50]}...")
+                
+                result = await client.send_message(
+                    user_id=test_user_id,
+                    message=message,
+                    context={"channel_type": "dm", "platform": "api"}
+                )
+                
+                if result.get("success"):
+                    user_facts = result.get("userFacts", {})
+                    metrics = result.get("relationshipMetrics", {})
+                    
+                    print(f"User Facts:")
+                    for key, value in user_facts.items():
+                        print(f"  - {key}: {value}")
+                    
+                    print(f"Relationship Metrics:")
+                    print(f"  - Affection: {metrics.get('affection', 'N/A')}")
+                    print(f"  - Trust: {metrics.get('trust', 'N/A')}")
+                    print(f"  - Attunement: {metrics.get('attunement', 'N/A')}")
+                    
+                    # Show part of response
+                    response = result.get("response", "")
+                    print(f"Response snippet: {response[:100]}...")
+                else:
+                    print(f"❌ Message failed: {result.get('error', 'Unknown error')}")
+                
+    except aiohttp.ClientConnectorError:
+        print("⚠️  Elena bot (port 9091) not running - cannot test relationship features")
+    except Exception as e:
+        print(f"❌ Error testing relationships: {e}")
+
+
+async def main():
+    """Main test function."""
+    print("WhisperEngine External Chat API Test Client")
+    print("=" * 50)
+    
+    mode = input("Choose mode:\n1. Test all endpoints\n2. Interactive chat\n3. Test user facts & relationships\nEnter choice (1, 2, or 3): ").strip()
+    
+    if mode == "1":
+        await test_api_endpoints()
+    elif mode == "2":
+        await interactive_chat()
+    elif mode == "3":
+        await test_user_facts_and_relationships()
+    else:
+        print("Invalid choice. Running endpoint tests...")
+        await test_api_endpoints()port Dict, Any, Optional
+
+import aiohttp
+
+# Setup logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 
 class WhisperEngineAPIClient:
@@ -142,9 +218,13 @@ async def test_api_endpoints():
                     response = chat_result.get("response", "")
                     processing_time = chat_result.get("processing_time_ms", 0)
                     memory_stored = chat_result.get("memory_stored", False)
+                    user_facts = chat_result.get("user_facts", {})
+                    relationship_metrics = chat_result.get("relationship_metrics", {})
                     
                     print(f"   ✅ Success (took {processing_time}ms, memory: {memory_stored})")
                     print(f"   Response: {response[:150]}{'...' if len(response) > 150 else ''}")
+                    print(f"   User Facts: {user_facts}")
+                    print(f"   Relationship: affection={relationship_metrics.get('affection', 'N/A')}, trust={relationship_metrics.get('trust', 'N/A')}, attunement={relationship_metrics.get('attunement', 'N/A')}")
                 else:
                     print(f"   ❌ Failed: {chat_result.get('error', 'Unknown error')}")
                 

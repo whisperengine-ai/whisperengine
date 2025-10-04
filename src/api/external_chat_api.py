@@ -109,13 +109,19 @@ class ExternalChatAPI:
             # Process message through the same pipeline as Discord
             processing_result = await self.message_processor.process_message(message_context)
 
+            # Extract user facts and relationship metrics
+            user_facts = await self._extract_user_facts(request_data['user_id'])
+            relationship_metrics = await self._extract_relationship_metrics(request_data['user_id'])
+
             # Return response
             response_data = {
                 'success': processing_result.success,
                 'response': processing_result.response,
                 'processing_time_ms': processing_result.processing_time_ms,
                 'memory_stored': processing_result.memory_stored,
-                'timestamp': datetime.utcnow().isoformat()
+                'timestamp': datetime.utcnow().isoformat(),
+                'user_facts': user_facts,
+                'relationship_metrics': relationship_metrics
             }
 
             if not processing_result.success:
@@ -124,8 +130,7 @@ class ExternalChatAPI:
             if processing_result.metadata:
                 response_data['metadata'] = processing_result.metadata
 
-            status_code = 200 if processing_result.success else 500
-            return web.json_response(response_data, status=status_code)
+            return web.json_response(response_data)
 
         except json.JSONDecodeError:
             return web.json_response(
@@ -143,6 +148,149 @@ class ExternalChatAPI:
                 }, 
                 status=500
             )
+
+    async def _extract_user_facts(self, user_id: str) -> Dict[str, Any]:
+        """Extract user facts from memory system."""
+        try:
+            # Get user profile from memory system - could be used for future enhancements
+            if hasattr(self.memory_manager, 'get_user_profile'):
+                _ = await self.memory_manager.get_user_profile(user_id)  # Reserved for future use
+            
+            # Get conversation history to extract facts
+            if hasattr(self.memory_manager, 'get_conversation_history'):
+                conversation_history = await self.memory_manager.get_conversation_history(user_id, limit=20)
+            else:
+                conversation_history = []
+
+            # Extract basic user facts from memory
+            user_facts = {}
+            
+            # Try to get name from profile or conversation history
+            name = None
+            for memory in conversation_history:
+                content = memory.get('content', '')
+                memory_metadata = memory.get('metadata', {})
+                
+                # Look for name in metadata or content patterns
+                if memory_metadata.get('user_name'):
+                    name = memory_metadata.get('user_name')
+                    break
+                elif 'my name is' in content.lower() or 'i am' in content.lower():
+                    # Simple name extraction - could be enhanced with NLP
+                    words = content.lower().split()
+                    if 'my name is' in content.lower():
+                        try:
+                            name_idx = words.index('name') + 2  # Skip "is"
+                            if name_idx < len(words):
+                                name = words[name_idx].strip('.,!?').title()
+                        except (ValueError, IndexError):
+                            pass
+            
+            if name:
+                user_facts['name'] = name
+
+            # Add other extractable facts
+            interaction_count = len(conversation_history)
+            if interaction_count > 0:
+                user_facts['interaction_count'] = interaction_count
+                user_facts['first_interaction'] = conversation_history[-1].get('timestamp') if conversation_history else None
+                user_facts['last_interaction'] = conversation_history[0].get('timestamp') if conversation_history else None
+
+            return user_facts
+
+        except Exception as e:
+            logger.warning("Failed to extract user facts for %s: %s", user_id, e)
+            return {}
+
+    async def _extract_relationship_metrics(self, user_id: str) -> Dict[str, Any]:
+        """Extract relationship metrics from emotion manager and memory system."""
+        try:
+            # Initialize default metrics
+            relationship_metrics = {
+                'affection': 50,
+                'trust': 42,
+                'attunement': 78
+            }
+
+            # Get emotion manager if available
+            emotion_manager = getattr(self.bot_core, 'emotion_manager', None)
+            if emotion_manager and hasattr(emotion_manager, 'user_profiles'):
+                user_profiles = emotion_manager.user_profiles
+                if user_id in user_profiles:
+                    profile = user_profiles[user_id]
+                    
+                    # Convert relationship level to affection score
+                    relationship_mapping = {
+                        'stranger': 30,
+                        'acquaintance': 50, 
+                        'friend': 70,
+                        'close_friend': 90
+                    }
+                    
+                    if hasattr(profile, 'relationship_level'):
+                        level_name = profile.relationship_level.value if hasattr(profile.relationship_level, 'value') else str(profile.relationship_level)
+                        relationship_metrics['affection'] = relationship_mapping.get(level_name, 50)
+                    
+                    # Calculate trust based on interaction count and positive interactions
+                    if hasattr(profile, 'interaction_count'):
+                        # Base trust grows with interactions (capped at 80)
+                        base_trust = min(80, 20 + (profile.interaction_count * 2))
+                        
+                        # Reduce trust for escalation count
+                        if hasattr(profile, 'escalation_count'):
+                            trust_penalty = profile.escalation_count * 10
+                            base_trust = max(10, base_trust - trust_penalty)
+                        
+                        relationship_metrics['trust'] = base_trust
+                    
+                    # Calculate attunement based on emotional understanding
+                    if hasattr(profile, 'emotion_history') and profile.emotion_history:
+                        # Higher attunement for users with emotional history (shows understanding)
+                        emotion_diversity = len(set(e.detected_emotion.value if hasattr(e.detected_emotion, 'value') else str(e.detected_emotion) 
+                                                   for e in profile.emotion_history[-10:]))  # Last 10 emotions
+                        attunement_base = min(90, 60 + (emotion_diversity * 5))
+                        relationship_metrics['attunement'] = attunement_base
+
+            # Get memory-based relationship indicators
+            if hasattr(self.memory_manager, 'retrieve_relevant_memories'):
+                try:
+                    # Look for positive/negative sentiment in recent memories
+                    recent_memories = await self.memory_manager.retrieve_relevant_memories(
+                        user_id=user_id,
+                        query="positive negative sentiment emotion feeling",
+                        limit=10
+                    )
+                    
+                    positive_count = 0
+                    negative_count = 0
+                    
+                    for memory in recent_memories:
+                        content = memory.get('content', '').lower()
+                        # metadata could be used for additional sentiment context in future
+                        
+                        # Simple sentiment indicators
+                        positive_words = ['thank', 'love', 'great', 'amazing', 'wonderful', 'perfect', 'happy', 'excited']
+                        negative_words = ['hate', 'terrible', 'awful', 'frustrated', 'angry', 'disappointed', 'worried']
+                        
+                        if any(word in content for word in positive_words):
+                            positive_count += 1
+                        if any(word in content for word in negative_words):
+                            negative_count += 1
+                    
+                    # Adjust trust based on sentiment
+                    if positive_count > negative_count:
+                        relationship_metrics['trust'] = min(95, relationship_metrics['trust'] + (positive_count - negative_count) * 5)
+                    elif negative_count > positive_count:
+                        relationship_metrics['trust'] = max(10, relationship_metrics['trust'] - (negative_count - positive_count) * 3)
+                
+                except Exception as e:
+                    logger.debug("Could not analyze sentiment for relationship metrics: %s", e)
+
+            return relationship_metrics
+
+        except Exception as e:
+            logger.warning("Failed to extract relationship metrics for %s: %s", user_id, e)
+            return {'affection': 50, 'trust': 42, 'attunement': 78}  # Fallback values
 
     async def handle_health_check(self, request: web_request.Request) -> web_response.Response:
         """Health check endpoint."""
@@ -288,13 +436,19 @@ class ExternalChatAPI:
                     # Process message
                     processing_result = await self.message_processor.process_message(message_context)
                     
+                    # Extract user facts and relationship metrics for batch processing
+                    user_facts = await self._extract_user_facts(msg_data['user_id'])
+                    relationship_metrics = await self._extract_relationship_metrics(msg_data['user_id'])
+                    
                     result = {
                         'index': i,
                         'user_id': msg_data['user_id'],
                         'success': processing_result.success,
                         'response': processing_result.response,
                         'processing_time_ms': processing_result.processing_time_ms,
-                        'memory_stored': processing_result.memory_stored
+                        'memory_stored': processing_result.memory_stored,
+                        'user_facts': user_facts,
+                        'relationship_metrics': relationship_metrics
                     }
                     
                     if not processing_result.success:
