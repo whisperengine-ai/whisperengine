@@ -4586,9 +4586,10 @@ class VectorMemoryManager:
             from datetime import datetime, timedelta
             from qdrant_client import models
             
-            # Get conversations from the last 7 days (configurable window)
-            time_window_days = 7
-            cutoff_timestamp = datetime.now() - timedelta(days=time_window_days)
+            # Get conversations from the last 1 hour for current conversation thread
+            # 7 days was WAY too long - was mixing completely different conversations
+            time_window_hours = 1
+            cutoff_timestamp = datetime.now() - timedelta(hours=time_window_hours)
             cutoff_unix = cutoff_timestamp.timestamp()
             
             # Build filter for recent conversations

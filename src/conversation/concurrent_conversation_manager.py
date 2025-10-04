@@ -143,7 +143,8 @@ class ConcurrentConversationManager:
         max_concurrent_sessions: int = 1000,
         max_workers_threads: int | None = None,
         max_workers_processes: int | None = None,
-        session_timeout_minutes: int = 30,
+        session_timeout_minutes: int = 90,  # Increased from 30 to 90 minutes
+        session_keepalive_minutes: int = 15,  # NEW: Keepalive timeout for active sessions
     ):
         """
         Initialize concurrent conversation manager
@@ -153,6 +154,8 @@ class ConcurrentConversationManager:
             memory_batcher: Memory batching system
             emotion_engine: Emotion processing engine
             max_concurrent_sessions: Maximum concurrent conversation sessions
+            session_timeout_minutes: Maximum session duration (absolute timeout)
+            session_keepalive_minutes: Keepalive timeout - session expires if no activity
             max_workers_threads: Thread pool size for I/O operations (auto-detected if None)
             max_workers_processes: Process pool size for CPU operations (auto-detected if None)
             session_timeout_minutes: Session timeout in minutes
