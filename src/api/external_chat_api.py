@@ -8,12 +8,13 @@ Key Features:
 - Platform-agnostic message processing
 - Shared AI components with Discord handlers
 - RESTful API design
-- Authentication and rate limiting
+- Environment-controlled CORS and security
 - Consistent response format
 """
 
 import asyncio
 import logging
+import os
 import traceback
 from datetime import datetime
 from typing import Dict, Any, Optional, List
@@ -333,11 +334,40 @@ class ExternalChatAPI:
 
 @middleware
 async def cors_middleware(request: web_request.Request, handler):
-    """CORS middleware for API access."""
-    response = await handler(request)
-    response.headers['Access-Control-Allow-Origin'] = '*'
-    response.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS'
-    response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
+    """
+    CORS middleware with environment-controlled allowed origins.
+    
+    Security: Only allows requests from explicitly configured origins.
+    Set ALLOWED_ORIGINS environment variable (comma-separated list).
+    Example: ALLOWED_ORIGINS=http://localhost:3000,https://app.example.com
+    """
+    # Handle preflight OPTIONS requests
+    if request.method == 'OPTIONS':
+        response = web.Response()
+    else:
+        response = await handler(request)
+    
+    # Get allowed origins from environment (default to localhost for development)
+    allowed_origins_str = os.getenv('ALLOWED_ORIGINS', 'http://localhost:3000,http://localhost:8080')
+    allowed_origins = [origin.strip() for origin in allowed_origins_str.split(',')]
+    
+    # Get request origin
+    request_origin = request.headers.get('Origin')
+    
+    # Check if origin is allowed
+    if request_origin in allowed_origins:
+        response.headers['Access-Control-Allow-Origin'] = request_origin
+        response.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS'
+        response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
+        response.headers['Access-Control-Max-Age'] = '86400'  # 24 hours cache for preflight
+    elif request_origin:
+        # Origin provided but not allowed - log for security monitoring
+        logger.warning(
+            "CORS: Rejected request from unauthorized origin: %s (allowed: %s)",
+            request_origin,
+            allowed_origins
+        )
+    
     return response
 
 

@@ -20,6 +20,10 @@ from typing import Dict, List, Optional, Any
 from dataclasses import dataclass
 
 from src.utils.production_error_handler import handle_errors, ErrorCategory, ErrorSeverity
+from src.adapters.platform_adapters import (
+    create_discord_message_adapter,
+    create_discord_attachment_adapters
+)
 
 logger = logging.getLogger(__name__)
 
@@ -195,16 +199,10 @@ class MessageProcessor:
             }
         
         try:
-            # Create a mock message object for the security validator
-            mock_message = type('MockMessage', (), {
-                'content': message_context.content,
-                'author': type('MockAuthor', (), {
-                    'id': message_context.user_id,
-                    'name': f"user_{message_context.user_id}"
-                })()
-            })()
+            # Create adapter for Discord-specific components
+            discord_message = create_discord_message_adapter(message_context)
             
-            validation_result = await self.security_validator.validate_input(mock_message)
+            validation_result = await self.security_validator.validate_input(discord_message)
             self._last_security_validation = validation_result
             return validation_result
             
@@ -455,26 +453,13 @@ class MessageProcessor:
             # Use existing image processing from utils.helpers
             from src.utils.helpers import process_message_with_images
             
-            # Convert MessageContext attachments to format expected by process_message_with_images
-            discord_like_attachments = []
-            for attachment in message_context.attachments:
-                # Create a simple object with the required attributes
-                class AttachmentLike:
-                    def __init__(self, url, filename, content_type=None):
-                        self.url = url
-                        self.filename = filename
-                        self.content_type = content_type
-                
-                discord_like_attachments.append(AttachmentLike(
-                    url=attachment.get('url'),
-                    filename=attachment.get('filename'),
-                    content_type=attachment.get('content_type')
-                ))
+            # Convert MessageContext attachments to Discord format using adapter
+            discord_attachments = create_discord_attachment_adapters(message_context.attachments)
             
             # Process images with existing logic
             enhanced_context = await process_message_with_images(
                 message_context.content,
-                discord_like_attachments,
+                discord_attachments,
                 conversation_context,
                 self.llm_client,
                 self.image_processor
@@ -533,19 +518,14 @@ class MessageProcessor:
             
             profiler = self.bot_core.dynamic_personality_profiler
             
-            # Create a mock message object for the profiler
-            class MessageLike:
-                def __init__(self, content, user_id):
-                    self.content = content
-                    self.author = type('Author', (), {'id': user_id})()
-            
-            mock_message = MessageLike(content, user_id)
+            # Create adapter for Discord-specific component
+            discord_message = create_discord_message_adapter(message_context)
             
             # Analyze personality
             personality_data = await profiler.analyze_personality(
                 user_id=user_id,
                 content=content,
-                message=mock_message,
+                message=discord_message,
                 recent_messages=[]
             )
             
@@ -563,18 +543,13 @@ class MessageProcessor:
             if not self.bot_core or not hasattr(self.bot_core, 'phase2_integration'):
                 return None
             
-            # Create a mock message object for Phase 4 processing
-            class MessageLike:
-                def __init__(self, content, user_id):
-                    self.content = content
-                    self.author = type('Author', (), {'id': user_id})()
-            
-            mock_message = MessageLike(content, user_id)
+            # Create adapter for Discord-specific component
+            discord_message = create_discord_message_adapter(message_context)
             
             # Use Phase 4 integration if available
             phase4_context = await self.bot_core.phase2_integration.process_phase4_intelligence(
                 user_id=user_id,
-                message=mock_message,
+                message=discord_message,
                 recent_messages=[],
                 external_emotion_data=emotion_data,
                 phase2_context=emotion_data
