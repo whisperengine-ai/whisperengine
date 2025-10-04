@@ -616,17 +616,12 @@ class MessageProcessor:
                     user_assistant_messages.append({"role": role, "content": msg_content})
                     logger.info(f"🔥 CONTEXT DEBUG: Added to conversation context as [{role}]: '{msg_content[:100]}...'")
                 
-                logger.info(f"🔥 CONTEXT DEBUG: Before alternation fix: {len(user_assistant_messages)} messages")
+                logger.info(f"✅ SOPHISTICATED CONTEXT: Adding {len(user_assistant_messages)} conversation history messages")
                 
-                # Apply alternation fix to ensure proper user/assistant flow
-                fixed_history = self._fix_message_alternation(user_assistant_messages)
-                logger.info(f"🔥 CONTEXT DEBUG: After alternation fix: {len(fixed_history)} messages")
+                # Add the conversation history to context (no alternation fix needed)
+                conversation_context.extend(user_assistant_messages)
                 
-                # Add the conversation history to context
-                conversation_context.extend(fixed_history)
-                
-                logger.info(f"✅ SOPHISTICATED CONTEXT: Added {len(recent_messages)} raw messages, "
-                           f"{len(fixed_history)} after filtering/alternation for conversation continuity")
+                logger.info(f"✅ SOPHISTICATED CONTEXT: Added {len(recent_messages)} raw messages to conversation context")
             else:
                 logger.info("🔥 CONTEXT DEBUG: No recent messages available for context")
                 
@@ -642,28 +637,6 @@ class MessageProcessor:
         logger.info(f"🔥 CONTEXT DEBUG: Final conversation context has {len(conversation_context)} total messages")
         
         return conversation_context
-
-    def _fix_message_alternation(self, messages: List[Dict[str, str]]) -> List[Dict[str, str]]:
-        """
-        Fix message alternation to ensure proper user/assistant flow.
-        Removes duplicate consecutive messages from the same role.
-        Based on the previous Discord implementation pattern.
-        """
-        if not messages:
-            return []
-        
-        fixed_messages = []
-        last_role = None
-        
-        for msg in messages:
-            current_role = msg.get('role')
-            
-            # Skip if same role as previous message (avoid duplicates)
-            if current_role != last_role:
-                fixed_messages.append(msg)
-                last_role = current_role
-        
-        return fixed_messages
 
     def _summarize_memories(self, memories: List[Dict[str, Any]]) -> str:
         """Create a summary of relevant memories."""

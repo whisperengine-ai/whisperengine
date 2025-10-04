@@ -4620,10 +4620,11 @@ class VectorMemoryManager:
             results = []
             for point in scroll_result[0]:  # scroll returns (points, next_offset)
                 payload = point.payload
+                # 🚨 FIX: role is at top level of payload (from metadata spread), not nested in metadata dict
                 results.append({
                     "content": payload.get("content", ""),
                     "timestamp": payload.get("timestamp", ""),
-                    "role": payload.get("metadata", {}).get("role", "unknown"),
+                    "role": payload.get("role", "unknown"),  # 🚨 FIX: Get role from top level
                     "metadata": payload.get("metadata", {})
                 })
             
