@@ -156,18 +156,10 @@ class CDLAIPromptIntegration:
         else:
             pipeline_dict = {}
         
-        # 🚨 CRITICAL: Put response style FIRST for maximum instruction compliance
-        response_style = self._extract_cdl_response_style(character, display_name)
+        # 🎭 CRITICAL: Start with character identity FIRST for proper foundation
         prompt = ""
-        if response_style:
-            prompt = response_style + "\n\n"
         
-        # 🕒 TEMPORAL AWARENESS: Add current date/time context EARLY for proper grounding
-        from src.utils.helpers import get_current_time_context
-        time_context = get_current_time_context()
-        prompt += f"CURRENT DATE & TIME: {time_context}\n\n"
-        
-        # Base character identity (after response style for hierarchy)
+        # Base character identity - WHO ARE YOU (must come first)
         prompt += f"You are {character.identity.name}, a {character.identity.occupation}."
         
         # Add character description
@@ -177,6 +169,16 @@ class CDLAIPromptIntegration:
         # Add AI identity handling early for proper identity establishment
         if any(ai_keyword in message_content.lower() for ai_keyword in ['ai', 'artificial intelligence', 'robot', 'computer', 'program', 'bot']):
             prompt += f" If asked about AI nature, respond authentically as {character.identity.name} while being honest about your AI nature when directly asked."
+        
+        # 🕒 TEMPORAL AWARENESS: Add current date/time context 
+        from src.utils.helpers import get_current_time_context
+        time_context = get_current_time_context()
+        prompt += f"\n\nCURRENT DATE & TIME: {time_context}\n\n"
+        
+        # 🎯 RESPONSE STYLE: Add behavioral guidelines AFTER identity is established
+        response_style = self._extract_cdl_response_style(character, display_name)
+        if response_style:
+            prompt += response_style + "\n\n"
         
         # Add Big Five personality integration
         if hasattr(character, 'personality') and hasattr(character.personality, 'big_five'):
@@ -364,9 +366,18 @@ class CDLAIPromptIntegration:
         if relevant_memories:
             prompt += f"\n\n🧠 RELEVANT CONVERSATION CONTEXT:\n"
             for i, memory in enumerate(relevant_memories[:7], 1):  # Increased from 3 to 7
+                # Handle both dict and object memory formats
                 if hasattr(memory, 'content'):
-                    content = memory.content[:300]  # Increased from 200 to 300
-                    prompt += f"{i}. {content}{'...' if len(memory.content) > 300 else ''}\n"
+                    content = memory.content[:300]  # Object format
+                elif isinstance(memory, dict) and 'content' in memory:
+                    content = memory['content'][:300]  # Dict format
+                elif isinstance(memory, dict) and 'payload' in memory and isinstance(memory['payload'], dict):
+                    # Qdrant format: content might be in payload
+                    content = memory['payload'].get('content', str(memory)[:300])
+                else:
+                    content = str(memory)[:300]  # Fallback
+                    
+                prompt += f"{i}. {content}{'...' if len(str(memory)) > 300 else ''}\n"
 
         # Add long-term conversation summary for continuity beyond recent history
         if conversation_summary:
@@ -375,11 +386,11 @@ class CDLAIPromptIntegration:
         # Add recent conversation history
         if conversation_history:
             prompt += f"\n\n💬 RECENT CONVERSATION:\n"
-            for conv in conversation_history[-3:]:  # Use recent conversation history for context
+            for conv in conversation_history[-8:]:  # Increased from 3 to 8 recent messages for better continuity
                 if isinstance(conv, dict):
                     role = conv.get('role', 'user')
-                    content = conv.get('content', '')[:200]  # Increased from 150 to 200
-                    prompt += f"{role.title()}: {content}{'...' if len(conv.get('content', '')) > 200 else ''}\n"
+                    content = conv.get('content', '')[:300]  # Increased from 200 to 300 chars
+                    prompt += f"{role.title()}: {content}{'...' if len(conv.get('content', '')) > 300 else ''}\n"
 
         # 🚨 CRITICAL AI ETHICS LAYER: Physical interaction detection
         if self._detect_physical_interaction_request(message_content):

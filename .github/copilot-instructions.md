@@ -46,6 +46,16 @@
 
 **ALPHA/DEV PHASE**: WhisperEngine is in active development. Prioritize working features over production optimization. No production users yet - we can freely iterate and change.
 
+**🚨 CRITICAL: MESSAGE PROCESSING ARCHITECTURE - NO DUAL PATHS!**
+- **PRIMARY**: `src/core/message_processor.py` handles ALL message processing via `process_message()` method
+- **EVENTS.py ROLE**: Only Discord event routing - calls MessageProcessor, contains NO duplicate logic
+- **NEVER modify conversation/prompt building in events.py** - it all happens in MessageProcessor
+- **ANTI-PATTERN**: Dual processing paths, duplicate `_build_conversation_context` methods, parallel prompt logic
+- **VALIDATION**: All conversation features (continuity, memory, CDL, workflows) must be in MessageProcessor ONLY
+- **REFACTORING RULE**: When adding conversation features, check they go to MessageProcessor, not events.py
+- **DEAD CODE**: events.py may contain legacy `_build_conversation_context` - it's unused fallback, DELETE IT
+- Events.py should be <200 lines max - just Discord API event handling, not AI logic
+
 **🚨 CRITICAL DEV RULE: NO FEATURE FLAGS FOR LOCAL CODE!** 
 - Features should work BY DEFAULT in development
 - **ONLY use feature flags for REMOTE/EXTERNAL dependencies** (APIs, external services, optional dependencies)

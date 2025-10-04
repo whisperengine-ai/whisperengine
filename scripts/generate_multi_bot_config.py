@@ -191,6 +191,7 @@ class BotConfigDiscovery:
       - {bot_name}_backups:/app/backups
       - {bot_name}_privacy:/app/privacy
       - {bot_name}_temp:/app/temp
+      - ./logs:/app/logs  # External mount for prompt/response logs
       - ./sql:/app/sql:ro
       # Live code mounting for development (no rebuild needed)
       - ./src:/app/src
@@ -200,7 +201,7 @@ class BotConfigDiscovery:
       - ./validate_config.py:/app/validate_config.py
       - ./run.py:/app/run.py
       - ./env_manager.py:/app/env_manager.py
-      # Note: Using Docker logging instead of mounted log volumes
+      # Note: Using external host mount for logs instead of Docker volumes
     networks:
       - bot_network
     depends_on:

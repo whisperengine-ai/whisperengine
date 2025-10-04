@@ -4583,11 +4583,13 @@ class VectorMemoryManager:
             from datetime import datetime, timedelta
             from qdrant_client import models
             
-            # Get conversations from the last 1 hour for current conversation thread
-            # 7 days was WAY too long - was mixing completely different conversations
-            time_window_hours = 1
+            # Get conversations from the last 24 hours for current conversation thread
+            # Previous 1 hour was too restrictive and was cutting off bot responses
+            time_window_hours = 24
             cutoff_timestamp = datetime.now() - timedelta(hours=time_window_hours)
             cutoff_unix = cutoff_timestamp.timestamp()
+            
+            logger.info(f"🕒 DEBUG: Retrieving conversations newer than {cutoff_timestamp} for user {user_id}")
             
             # Build filter for recent conversations
             must_conditions = [
@@ -4605,6 +4607,15 @@ class VectorMemoryManager:
                 )
             ]
             
+            # Add bot_name filtering for memory isolation
+            current_bot_name = get_normalized_bot_name_from_env()
+            must_conditions.append(
+                models.FieldCondition(
+                    key="bot_name",
+                    match=models.MatchValue(value=current_bot_name)
+                )
+            )
+            
             # Scroll through recent conversations (no vector search needed)
             scroll_result = self.vector_store.client.scroll(
                 collection_name=self.vector_store.collection_name,
@@ -4618,18 +4629,30 @@ class VectorMemoryManager:
             results = []
             for point in scroll_result[0]:  # scroll returns (points, next_offset)
                 payload = point.payload
+                
                 # 🚨 FIX: role is at top level of payload (from metadata spread), not nested in metadata dict
+                role = payload.get("role", "unknown")
+                source = payload.get("source", "unknown")
+                content = payload.get("content", "")
+                
+                # Debug log for role detection
+                logger.debug(f"🕒 ROLE DEBUG: Found message with role='{role}', source='{source}', content='{content[:50]}...'")
+                
                 results.append({
-                    "content": payload.get("content", ""),
+                    "content": content,
                     "timestamp": payload.get("timestamp", ""),
-                    "role": payload.get("role", "unknown"),  # 🚨 FIX: Get role from top level
+                    "role": role,
                     "metadata": payload.get("metadata", {})
                 })
             
-            # Sort by timestamp descending (most recent first) and limit
-            sorted_results = sorted(results, key=lambda x: x["timestamp"], reverse=True)[:limit]
+            # First sort by timestamp descending to get the most recent conversations
+            recent_results = sorted(results, key=lambda x: x["timestamp"], reverse=True)[:limit]
             
-            logger.info(f"🕒 CONVERSATION HISTORY: Retrieved {len(sorted_results)} most recent conversations for user {user_id}")
+            # Then reverse to chronological order for proper LLM conversation flow
+            # This ensures user/assistant messages are properly interleaved in time order
+            sorted_results = list(reversed(recent_results))
+            
+            logger.info(f"🕒 CONVERSATION HISTORY: Retrieved {len(sorted_results)} most recent conversations in chronological order for user {user_id}")
             
             return sorted_results
             

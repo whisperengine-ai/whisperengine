@@ -595,6 +595,28 @@ class MessageProcessor:
                         })
                 
                 logger.info(f"🔥 FALLBACK: Using memory manager conversation history - {len(recent_messages)} messages")
+                
+                # 🚨 CRITICAL FIX: Ensure conversation context includes bot responses for continuity
+                # If the most recent messages are all user messages, this breaks LLM context
+                if recent_messages:
+                    # Count recent user vs bot messages  
+                    recent_5 = recent_messages[-5:] if len(recent_messages) >= 5 else recent_messages
+                    user_count = sum(1 for msg in recent_5 if not msg.get('bot', False))
+                    bot_count = sum(1 for msg in recent_5 if msg.get('bot', False))
+                    
+                    logger.info(f"🔥 CONTINUITY CHECK: Recent 5 messages - User: {user_count}, Bot: {bot_count}")
+                    
+                    # If no bot messages in recent 5, expand search to include at least 1 bot response
+                    if bot_count == 0 and len(recent_messages) > 5:
+                        logger.warning(f"🔥 CONTINUITY FIX: No bot responses in recent 5 messages - expanding search")
+                        # Look further back to find at least one bot response
+                        for i in range(5, min(15, len(recent_messages))):
+                            if recent_messages[-(i+1)].get('bot', False):
+                                # Include this bot message for context
+                                bot_msg = recent_messages[-(i+1)]
+                                recent_messages = recent_messages[-5:] + [bot_msg]
+                                logger.info(f"🔥 CONTINUITY FIX: Added bot response from position -{i+1} for context")
+                                break
             
             # ALWAYS generate conversation summary - NO CONDITIONAL FALLBACKS
             conversation_summary = generate_conversation_summary(recent_messages, user_id)
@@ -608,18 +630,17 @@ class MessageProcessor:
             conversation_summary = ""
             recent_messages = []
         
-        # 🚀 ADVANCED SYSTEM MESSAGE CONSOLIDATION: Restored sophisticated system prompt building
+        # 🚀 OPTIMIZED SYSTEM MESSAGE: Lean core prompt, memory/summary as bridge messages
         
-        # Build comprehensive system message with all contexts
+        # Build lean system message - memory/summary moved to bridge position for better flow
         system_prompt_content = f"CURRENT DATE & TIME: {time_context}"
         
-        # Add memory narrative if available
+        # Log what will become bridge messages
         if memory_narrative:
-            system_prompt_content += f"\n\n{memory_narrative}"
+            logger.info(f"📚 MEMORY: Will add memory narrative as bridge message ({len(memory_narrative)} chars)")
         
-        # Add conversation summary if available
         if conversation_summary:
-            system_prompt_content += f"\n\nRecent thread: {conversation_summary}"
+            logger.info(f"📝 SUMMARY: Will add conversation summary as bridge message ({len(conversation_summary)} chars)")
         
         # Add attachment guard if needed
         attachment_guard = ""
@@ -638,26 +659,73 @@ class MessageProcessor:
             f"or section headings. Stay in character and speak like a real person would."
         )
         
-        # Consolidate all system context
-        consolidated_system = system_prompt_content + attachment_guard + guidance_clause
+        # Consolidate core system context (lean)
+        core_system = system_prompt_content + attachment_guard + guidance_clause
         
-        conversation_context.append({"role": "system", "content": consolidated_system})
+        conversation_context.append({"role": "system", "content": core_system})
         
-        # 🚀 SOPHISTICATED RECENT MESSAGE PROCESSING: Restored conversation cache integration
+        # 🚀 SOPHISTICATED RECENT MESSAGE PROCESSING with OPTIMIZED ASSEMBLY ORDER
         try:
             if recent_messages:
                 logger.info(f"🔥 CONTEXT DEBUG: Processing {len(recent_messages)} recent messages for conversation context")
                 
-                # Add recent messages with proper alternation
-                user_assistant_messages = []
+                # OPTIMIZED: Split messages into OLDER (truncated) vs RECENT (detailed)
+                recent_full_count = 20  # Last 10 exchanges (20 messages)
+                older_messages = recent_messages[:-recent_full_count] if len(recent_messages) > recent_full_count else []
+                recent_full_messages = recent_messages[-recent_full_count:] if len(recent_messages) > recent_full_count else recent_messages
+
+                logger.info(f"🔥 CONTINUITY: Split into {len(older_messages)} older (500 chars) + {len(recent_full_messages)} recent (2000 chars)")
                 
-                # Filter out commands and responses
+                # Add older messages first (truncated for space)
+                user_assistant_messages = []
                 skip_next_bot_response = False
-                for msg in recent_messages:
+                
+                for msg in older_messages:
                     msg_content = msg.get('content', '')
                     is_bot_msg = msg.get('bot', False)
                     
-                    logger.info(f"🔥 CONTEXT DEBUG: Processing message - is_bot: {is_bot_msg}, content: '{msg_content[:100]}...'")
+                    if msg_content.startswith("!"):
+                        skip_next_bot_response = True
+                        continue
+
+                    if is_bot_msg and skip_next_bot_response:
+                        skip_next_bot_response = False
+                        continue
+
+                    if not is_bot_msg:
+                        skip_next_bot_response = False
+
+                    # Truncate older messages to 500 chars
+                    truncated_content = msg_content[:500] + "..." if len(msg_content) > 500 else msg_content
+                    role = "assistant" if is_bot_msg else "user"
+                    user_assistant_messages.append({"role": role, "content": truncated_content})
+                    logger.debug(f"🔥 CONTEXT (OLDER): Added truncated [{role}]: '{truncated_content[:100]}...'")
+
+                # Add older messages to context
+                conversation_context.extend(user_assistant_messages)
+                
+                # OPTIMIZED: Add memory narrative as context bridge
+                if memory_narrative:
+                    conversation_context.append({
+                        "role": "system", 
+                        "content": f"RELEVANT MEMORIES: {memory_narrative}"
+                    })
+                    logger.debug(f"🔥 CONTEXT BRIDGE: Added memory narrative ({len(memory_narrative)} chars)")
+
+                # OPTIMIZED: Add conversation summary as "where we left off" bridge
+                if conversation_summary:
+                    conversation_context.append({
+                        "role": "system",
+                        "content": f"CONVERSATION FLOW: {conversation_summary}"
+                    })
+                    logger.debug(f"🔥 CONTEXT BRIDGE: Added conversation summary ({len(conversation_summary)} chars)")
+                
+                # Add recent messages (detailed)
+                for msg in recent_full_messages:
+                    msg_content = msg.get('content', '')
+                    is_bot_msg = msg.get('bot', False)
+                    
+                    logger.info(f"🔥 CONTEXT DEBUG: Processing RECENT message - is_bot: {is_bot_msg}, content: '{msg_content[:100]}...'")
                     
                     if msg_content.startswith("!"):
                         logger.debug(f"Skipping command from conversation history: {msg_content[:50]}...")
@@ -672,16 +740,13 @@ class MessageProcessor:
                     if not is_bot_msg:
                         skip_next_bot_response = False
 
+                    # Recent messages: EXPANDED LIMIT - 2000 chars for conversation continuity
+                    recent_content = msg_content[:2000] + "..." if len(msg_content) > 2000 else msg_content
                     role = "assistant" if is_bot_msg else "user"
-                    user_assistant_messages.append({"role": role, "content": msg_content})
-                    logger.info(f"🔥 CONTEXT DEBUG: Added to conversation context as [{role}]: '{msg_content[:100]}...'")
+                    conversation_context.append({"role": role, "content": recent_content})
+                    logger.info(f"🔥 CONTEXT (RECENT): Added [{role}] ({len(recent_content)} chars): '{recent_content[:100]}...'")
                 
-                logger.info(f"✅ SOPHISTICATED CONTEXT: Adding {len(user_assistant_messages)} conversation history messages")
-                
-                # Add the conversation history to context (no alternation fix needed)
-                conversation_context.extend(user_assistant_messages)
-                
-                logger.info(f"✅ SOPHISTICATED CONTEXT: Added {len(recent_messages)} raw messages to conversation context")
+                logger.info(f"✅ OPTIMIZED CONTEXT: Added {len(older_messages)} older (500 chars) + {len(recent_full_messages)} recent (2000 chars) messages")
             else:
                 logger.info("🔥 CONTEXT DEBUG: No recent messages available for context")
                 
@@ -1306,6 +1371,9 @@ class MessageProcessor:
             # Choose final context
             final_context = emotion_enhanced_context if emotion_enhanced_context else conversation_context
             
+            # 📝 COMPREHENSIVE PROMPT LOGGING: Log full prompts to file for review
+            await self._log_full_prompt_to_file(final_context, message_context.user_id)
+            
             # Generate response using LLM
             logger.info("🎯 GENERATING: Sending %d messages to LLM", len(final_context))
             
@@ -1317,6 +1385,9 @@ class MessageProcessor:
             )
             
             logger.info("✅ GENERATED: Response with %d characters", len(response))
+            
+            # 📝 LOG LLM RESPONSE: Add response to the prompt log for complete picture
+            await self._log_llm_response_to_file(response, message_context.user_id)
             
             # 🎭 CDL EMOJI ENHANCEMENT: Add character-appropriate emojis to text response
             try:
@@ -2021,6 +2092,87 @@ class MessageProcessor:
                 is_private=True,
                 security_level=ContextSecurity.PRIVATE_DM,
             )
+
+    async def _log_full_prompt_to_file(self, conversation_context: List[Dict[str, Any]], user_id: str):
+        """Log the complete prompt sent to LLM for debugging and review."""
+        try:
+            import json
+            from datetime import datetime
+            import os
+            
+            bot_name = os.getenv('DISCORD_BOT_NAME', 'unknown')
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            
+            # Create filename: /app/logs/prompts/botname_YYYYMMDD_HHMMSS_userid.json
+            filename = f"/app/logs/prompts/{bot_name}_{timestamp}_{user_id}.json"
+            
+            # Prepare structured log data
+            log_data = {
+                "timestamp": datetime.now().isoformat(),
+                "bot_name": bot_name,
+                "user_id": user_id,
+                "message_count": len(conversation_context),
+                "total_chars": sum(len(msg.get('content', '')) for msg in conversation_context),
+                "messages": conversation_context
+            }
+            
+            # Write to file
+            os.makedirs("/app/logs/prompts", exist_ok=True)
+            with open(filename, 'w', encoding='utf-8') as f:
+                json.dump(log_data, f, indent=2, ensure_ascii=False)
+            
+            # Also log summary to console
+            logger.info(f"📝 PROMPT LOGGED: {filename} ({len(conversation_context)} messages, {log_data['total_chars']} chars)")
+            
+        except Exception as e:
+            logger.warning(f"Failed to log prompt to file: {e}")
+
+    async def _log_llm_response_to_file(self, response: str, user_id: str):
+        """Add LLM response to the existing prompt log file for complete conversation picture."""
+        try:
+            import json
+            from datetime import datetime
+            import os
+            
+            bot_name = os.getenv('DISCORD_BOT_NAME', 'unknown')
+            
+            # Find the most recent prompt file for this user and bot
+            prompt_dir = "/app/logs/prompts"
+            if not os.path.exists(prompt_dir):
+                logger.warning("Prompt directory not found, cannot log response")
+                return
+                
+            # Find the most recent file matching the pattern
+            import glob
+            pattern = f"{prompt_dir}/{bot_name}_*_{user_id}.json"
+            files = glob.glob(pattern)
+            if not files:
+                logger.warning(f"No prompt file found for user {user_id}, cannot log response")
+                return
+                
+            # Get the most recent file
+            latest_file = max(files, key=os.path.getctime)
+            
+            # Read existing data
+            with open(latest_file, 'r', encoding='utf-8') as f:
+                log_data = json.load(f)
+            
+            # Add response data
+            log_data["llm_response"] = {
+                "content": response,
+                "char_count": len(response),
+                "response_timestamp": datetime.now().isoformat()
+            }
+            
+            # Write back to file
+            with open(latest_file, 'w', encoding='utf-8') as f:
+                json.dump(log_data, f, indent=2, ensure_ascii=False)
+            
+            # Log summary to console
+            logger.info(f"📝 RESPONSE LOGGED: {latest_file} ({len(response)} chars)")
+            
+        except Exception as e:
+            logger.warning(f"Failed to log response to file: {e}")
 
 
 def create_message_processor(bot_core, memory_manager, llm_client, **kwargs) -> MessageProcessor:

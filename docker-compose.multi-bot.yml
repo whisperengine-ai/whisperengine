@@ -142,6 +142,7 @@ services:
       - jake_backups:/app/backups
       - jake_privacy:/app/privacy
       - jake_temp:/app/temp
+      - ./logs:/app/logs  # External mount for prompt/response logs
       - ./sql:/app/sql:ro
       # Live code mounting for development (no rebuild needed)
       - ./src:/app/src
@@ -151,7 +152,7 @@ services:
       - ./validate_config.py:/app/validate_config.py
       - ./run.py:/app/run.py
       - ./env_manager.py:/app/env_manager.py
-      # Note: Using Docker logging instead of mounted log volumes
+      # Note: Using external host mount for logs instead of Docker volumes
     networks:
       - bot_network
     depends_on:
@@ -206,6 +207,7 @@ services:
       - marcus_backups:/app/backups
       - marcus_privacy:/app/privacy
       - marcus_temp:/app/temp
+      - ./logs:/app/logs  # External mount for prompt/response logs
       - ./sql:/app/sql:ro
       # Live code mounting for development (no rebuild needed)
       - ./src:/app/src
@@ -215,7 +217,7 @@ services:
       - ./validate_config.py:/app/validate_config.py
       - ./run.py:/app/run.py
       - ./env_manager.py:/app/env_manager.py
-      # Note: Using Docker logging instead of mounted log volumes
+      # Note: Using external host mount for logs instead of Docker volumes
     networks:
       - bot_network
     depends_on:
@@ -270,6 +272,7 @@ services:
       - dotty_backups:/app/backups
       - dotty_privacy:/app/privacy
       - dotty_temp:/app/temp
+      - ./logs:/app/logs  # External mount for prompt/response logs
       - ./sql:/app/sql:ro
       # Live code mounting for development (no rebuild needed)
       - ./src:/app/src
@@ -279,7 +282,7 @@ services:
       - ./validate_config.py:/app/validate_config.py
       - ./run.py:/app/run.py
       - ./env_manager.py:/app/env_manager.py
-      # Note: Using Docker logging instead of mounted log volumes
+      # Note: Using external host mount for logs instead of Docker volumes
     networks:
       - bot_network
     depends_on:
@@ -334,6 +337,7 @@ services:
       - dream_backups:/app/backups
       - dream_privacy:/app/privacy
       - dream_temp:/app/temp
+      - ./logs:/app/logs  # External mount for prompt/response logs
       - ./sql:/app/sql:ro
       # Live code mounting for development (no rebuild needed)
       - ./src:/app/src
@@ -343,7 +347,7 @@ services:
       - ./validate_config.py:/app/validate_config.py
       - ./run.py:/app/run.py
       - ./env_manager.py:/app/env_manager.py
-      # Note: Using Docker logging instead of mounted log volumes
+      # Note: Using external host mount for logs instead of Docker volumes
     networks:
       - bot_network
     depends_on:
@@ -398,6 +402,7 @@ services:
       - elena_backups:/app/backups
       - elena_privacy:/app/privacy
       - elena_temp:/app/temp
+      - ./logs:/app/logs  # External mount for prompt/response logs
       - ./sql:/app/sql:ro
       # Live code mounting for development (no rebuild needed)
       - ./src:/app/src
@@ -407,7 +412,7 @@ services:
       - ./validate_config.py:/app/validate_config.py
       - ./run.py:/app/run.py
       - ./env_manager.py:/app/env_manager.py
-      # Note: Using Docker logging instead of mounted log volumes
+      # Note: Using external host mount for logs instead of Docker volumes
     networks:
       - bot_network
     depends_on:
@@ -462,6 +467,7 @@ services:
       - aethys_backups:/app/backups
       - aethys_privacy:/app/privacy
       - aethys_temp:/app/temp
+      - ./logs:/app/logs  # External mount for prompt/response logs
       - ./sql:/app/sql:ro
       # Live code mounting for development (no rebuild needed)
       - ./src:/app/src
@@ -471,7 +477,7 @@ services:
       - ./validate_config.py:/app/validate_config.py
       - ./run.py:/app/run.py
       - ./env_manager.py:/app/env_manager.py
-      # Note: Using Docker logging instead of mounted log volumes
+      # Note: Using external host mount for logs instead of Docker volumes
     networks:
       - bot_network
     depends_on:
@@ -526,6 +532,7 @@ services:
       - ryan_backups:/app/backups
       - ryan_privacy:/app/privacy
       - ryan_temp:/app/temp
+      - ./logs:/app/logs  # External mount for prompt/response logs
       - ./sql:/app/sql:ro
       # Live code mounting for development (no rebuild needed)
       - ./src:/app/src
@@ -535,7 +542,7 @@ services:
       - ./validate_config.py:/app/validate_config.py
       - ./run.py:/app/run.py
       - ./env_manager.py:/app/env_manager.py
-      # Note: Using Docker logging instead of mounted log volumes
+      # Note: Using external host mount for logs instead of Docker volumes
     networks:
       - bot_network
     depends_on:
@@ -590,6 +597,7 @@ services:
       - gabriel_backups:/app/backups
       - gabriel_privacy:/app/privacy
       - gabriel_temp:/app/temp
+      - ./logs:/app/logs  # External mount for prompt/response logs
       - ./sql:/app/sql:ro
       # Live code mounting for development (no rebuild needed)
       - ./src:/app/src
@@ -599,7 +607,7 @@ services:
       - ./validate_config.py:/app/validate_config.py
       - ./run.py:/app/run.py
       - ./env_manager.py:/app/env_manager.py
-      # Note: Using Docker logging instead of mounted log volumes
+      # Note: Using external host mount for logs instead of Docker volumes
     networks:
       - bot_network
     depends_on:
@@ -654,6 +662,7 @@ services:
       - sophia_backups:/app/backups
       - sophia_privacy:/app/privacy
       - sophia_temp:/app/temp
+      - ./logs:/app/logs  # External mount for prompt/response logs
       - ./sql:/app/sql:ro
       # Live code mounting for development (no rebuild needed)
       - ./src:/app/src
@@ -663,7 +672,7 @@ services:
       - ./validate_config.py:/app/validate_config.py
       - ./run.py:/app/run.py
       - ./env_manager.py:/app/env_manager.py
-      # Note: Using Docker logging instead of mounted log volumes
+      # Note: Using external host mount for logs instead of Docker volumes
     networks:
       - bot_network
     depends_on:
