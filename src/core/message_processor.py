@@ -121,6 +121,9 @@ class MessageProcessor:
             # Phase 2: Name detection and storage
             await self._process_name_detection(message_context)
             
+            # Phase 2.5: Workflow detection and transaction processing (platform-agnostic)
+            await self._process_workflow_detection(message_context)
+            
             # Phase 3: Memory retrieval with context-aware filtering
             relevant_memories = await self._retrieve_relevant_memories(message_context)
             
@@ -242,6 +245,63 @@ class MessageProcessor:
                     logger.info("🏷️ Auto-detected name '%s' for user %s", detected_name, message_context.user_id)
         except (ImportError, AttributeError, ValueError) as e:
             logger.debug("Name detection failed: %s", str(e))
+
+    async def _process_workflow_detection(self, message_context: MessageContext):
+        """
+        🎯 PLATFORM-AGNOSTIC WORKFLOW DETECTION
+        
+        Detect workflow patterns and execute transaction actions before memory retrieval.
+        This ensures transactions are processed regardless of platform (Discord, web API, etc.).
+        """
+        try:
+            # Check if bot has workflow manager initialized
+            if not hasattr(self.bot_core, 'workflow_manager') or not self.bot_core.workflow_manager:
+                logger.debug("🎯 WORKFLOW: No workflow manager available, skipping detection")
+                return
+            
+            # Get bot name for transaction isolation
+            import os
+            bot_name = os.getenv("DISCORD_BOT_NAME", "unknown").lower()
+            
+            logger.debug("🎯 WORKFLOW: Starting detection for user %s, message: '%s'", 
+                        message_context.user_id, message_context.content[:100])
+            
+            # Detect workflow intent
+            trigger_result = await self.bot_core.workflow_manager.detect_intent(
+                message=message_context.content,
+                user_id=message_context.user_id,
+                bot_name=bot_name
+            )
+            
+            if trigger_result:
+                logger.info("🎯 WORKFLOW: Detected intent - workflow: %s, confidence: %.2f", 
+                           trigger_result.workflow_name, trigger_result.match_confidence)
+                
+                # Execute workflow action (create/update/complete transaction)
+                workflow_result = await self.bot_core.workflow_manager.execute_workflow_action(
+                    trigger_result=trigger_result,
+                    user_id=message_context.user_id,
+                    bot_name=bot_name,
+                    message=message_context.content
+                )
+                
+                # Store workflow context in message metadata for later use in prompt building
+                if not message_context.metadata:
+                    message_context.metadata = {}
+                
+                message_context.metadata['workflow_prompt_injection'] = workflow_result.get("prompt_injection")
+                message_context.metadata['workflow_result'] = workflow_result
+                message_context.metadata['workflow_transaction_id'] = workflow_result.get("transaction_id")
+                
+                logger.info("🎯 WORKFLOW: Executed action '%s', transaction: %s", 
+                           workflow_result.get("action"), workflow_result.get("transaction_id"))
+            else:
+                logger.debug("🎯 WORKFLOW: No workflow pattern matched for message")
+                
+        except Exception as e:
+            logger.error("🎯 WORKFLOW ERROR: Failed to process workflow detection: %s", e)
+            # Don't fail the entire message processing if workflow detection fails
+            logger.error("🎯 WORKFLOW ERROR: Continuing with normal message processing")
 
     async def _retrieve_relevant_memories(self, message_context: MessageContext) -> List[Dict[str, Any]]:
         """Retrieve relevant memories with context-aware filtering."""
@@ -1409,6 +1469,12 @@ class MessageProcessor:
                 pipeline_result=pipeline_result,
                 user_name=user_display_name
             )
+            
+            # 🎯 WORKFLOW INTEGRATION: Inject workflow transaction context into character prompt
+            workflow_prompt_injection = message_context.metadata.get('workflow_prompt_injection') if message_context.metadata else None
+            if workflow_prompt_injection:
+                character_prompt += f"\n\n🎯 ACTIVE TRANSACTION CONTEXT:\n{workflow_prompt_injection}"
+                logger.info("🎯 WORKFLOW: Injected transaction context into character prompt (%d chars)", len(workflow_prompt_injection))
             
             # 🚀 VECTOR-NATIVE ENHANCEMENT: Enhance character prompt with dynamic vector context
             try:

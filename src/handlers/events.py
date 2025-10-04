@@ -42,7 +42,8 @@ from src.utils.context_size_manager import (
     truncate_recent_messages,
     count_context_tokens,
 )
-from src.conversation.boundary_manager import ConversationBoundaryManager
+# REMOVED: boundary_manager - redundant with Qdrant time-based queries
+# from src.conversation.boundary_manager import ConversationBoundaryManager
 # from src.conversation.persistent_conversation_manager import PersistentConversationManager  # REMOVED: Over-engineered follow-up system
 
 from src.utils.helpers import (
@@ -112,12 +113,9 @@ class BotEventHandlers:
         # ConcurrentConversationManager for proper scatter-gather concurrency
         self.conversation_manager = getattr(bot_core, "conversation_manager", None)
         
-        # Initialize Conversation Boundary Manager for intelligent message summarization
-        # Redis removed - sessions are in-memory only, context preserved via Qdrant
-        self.boundary_manager = ConversationBoundaryManager(
-            summarization_threshold=8,  # Start summarizing after 8 messages
-            llm_client=self.llm_client,  # Pass LLM client for intelligent summarization
-        )
+        # REMOVED: Conversation Boundary Manager - redundant with Qdrant time-based queries
+        # Was used for in-memory session tracking and LLM-based conversation summaries
+        # Qdrant's 1-hour time window queries provide same functionality more efficiently
         
         # Initialize Persistent Conversation Manager for question tracking and follow-up continuity
         try:
@@ -870,34 +868,9 @@ class BotEventHandlers:
             await message.reply("I'm currently updating my systems. Please try again in a moment!", mention_author=False)
             return
 
-    async def _get_intelligent_conversation_summary(self, channel, user_id, message):
-        """Use boundary manager to create intelligent conversation summary instead of crude truncation."""
-        try:
-            # Convert timezone-aware datetime to timezone-naive for boundary manager compatibility
-            timestamp = message.created_at
-            if timestamp.tzinfo is not None:
-                timestamp = timestamp.replace(tzinfo=None)
-                
-            # Process the current message with boundary manager
-            session = await self.boundary_manager.process_message(
-                user_id=str(user_id),
-                channel_id=str(channel.id),
-                message_id=str(message.id),
-                message_content=message.content,
-                timestamp=timestamp
-            )
-            
-            # Check if we have a conversation summary from boundary manager
-            if session.context_summary and len(session.context_summary) > 20:
-                logger.info(f"🧠 Using intelligent conversation summary for user {user_id}: {len(session.context_summary)} chars")
-                return session.context_summary
-            
-            # If no summary yet, fall back to recent messages
-            return None
-            
-        except Exception as e:
-            logger.warning(f"Boundary manager summarization failed for user {user_id}: {e}")
-            return None
+    # REMOVED: _get_intelligent_conversation_summary method
+    # Was using boundary_manager for LLM-based conversation summaries
+    # Qdrant time-based queries (1-hour window) provide better context
 
     async def _get_recent_messages(self, channel, user_id, exclude_message_id):
         """Get recent conversation messages for context."""

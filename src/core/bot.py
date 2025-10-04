@@ -110,6 +110,10 @@ class DiscordBotCore:
         # Knowledge management components
         self.knowledge_router = None  # Semantic knowledge router for factual intelligence
 
+        # Roleplay components
+        self.transaction_manager = None  # Transaction state manager for roleplay interactions
+        self.workflow_manager = None  # Workflow manager for declarative transaction patterns
+
         # Production optimization components
         self.production_adapter = None
 
@@ -262,6 +266,92 @@ class DiscordBotCore:
         except Exception as e:
             self.logger.error(f"❌ Knowledge router initialization failed: {e}")
             # Don't raise - knowledge router is optional enhancement
+    
+    async def initialize_transaction_manager(self):
+        """Initialize roleplay transaction manager for stateful interactions."""
+        try:
+            from src.roleplay.transaction_manager import create_transaction_manager
+            
+            # Wait for postgres pool to be available (max 30 seconds)
+            max_wait = 30
+            wait_interval = 1
+            waited = 0
+            
+            while not self.postgres_pool and waited < max_wait:
+                await asyncio.sleep(wait_interval)
+                waited += wait_interval
+            
+            # Check if postgres pool is available
+            if not self.postgres_pool:
+                self.logger.warning("⚠️ PostgreSQL pool not available - transaction manager disabled")
+                self.transaction_manager = None
+                return
+            
+            # Create transaction manager
+            self.transaction_manager = create_transaction_manager(db_pool=self.postgres_pool)
+            
+            # Mark as initialized (pool already set)
+            self.transaction_manager._initialized = True
+            
+            self.logger.info("✅ Transaction Manager initialized for roleplay interactions")
+            
+        except Exception as e:
+            self.logger.warning(f"⚠️ Transaction manager initialization failed: {e}")
+            self.transaction_manager = None
+            # Don't raise - transaction manager is optional for roleplay bots
+    
+    async def initialize_workflow_manager(self):
+        """Initialize workflow manager for declarative transaction patterns."""
+        try:
+            from src.roleplay.workflow_manager import WorkflowManager
+            import os
+            
+            # Wait for dependencies (max 30 seconds)
+            max_wait = 30
+            wait_interval = 1
+            waited = 0
+            
+            while (not self.transaction_manager or not self.llm_client) and waited < max_wait:
+                await asyncio.sleep(wait_interval)
+                waited += wait_interval
+            
+            # Check if dependencies are available
+            if not self.transaction_manager:
+                self.logger.warning("⚠️ TransactionManager not available - workflow manager disabled")
+                self.workflow_manager = None
+                return
+            
+            if not self.llm_client:
+                self.logger.warning("⚠️ LLM client not available - workflow manager will skip LLM validation")
+            
+            # Create workflow manager
+            self.workflow_manager = WorkflowManager(
+                transaction_manager=self.transaction_manager,
+                llm_client=self.llm_client
+            )
+            
+            # Load workflows for this character (if configured)
+            character_file = os.getenv("CHARACTER_FILE") or os.getenv("CDL_DEFAULT_CHARACTER")
+            if character_file:
+                loaded = await self.workflow_manager.load_workflows_for_character(character_file)
+                if loaded:
+                    bot_name = os.getenv("DISCORD_BOT_NAME", "unknown").lower()
+                    workflow_count = self.workflow_manager.get_workflow_count(bot_name)
+                    self.logger.info(
+                        f"✅ Workflow Manager initialized with {workflow_count} workflow(s) "
+                        f"from {character_file}"
+                    )
+                else:
+                    self.logger.info(
+                        f"ℹ️ Workflow Manager initialized (no workflows configured in {character_file})"
+                    )
+            else:
+                self.logger.info("ℹ️ Workflow Manager initialized (no CHARACTER_FILE set)")
+            
+        except Exception as e:
+            self.logger.warning(f"⚠️ Workflow manager initialization failed: {e}")
+            self.workflow_manager = None
+            # Don't raise - workflow manager is optional
     
     def initialize_hybrid_emotion_analyzer(self):
         """🚀 FAST TRACK: Initialize hybrid emotion analyzer for optimal performance"""
@@ -989,6 +1079,14 @@ class DiscordBotCore:
         # Schedule async initialization of knowledge router (requires postgres pool)
         # Note: This will wait for postgres_pool to be available
         asyncio.create_task(self.initialize_knowledge_router())
+        
+        # Schedule async initialization of transaction manager (requires postgres pool)
+        # Used for roleplay bots with stateful interactions (bartenders, shops, quests)
+        asyncio.create_task(self.initialize_transaction_manager())
+        
+        # Schedule async initialization of workflow manager (requires transaction_manager + llm_client)
+        # Loads YAML workflow files for declarative transaction patterns
+        asyncio.create_task(self.initialize_workflow_manager())
 
         # Supporting systems
         self.initialize_conversation_cache()

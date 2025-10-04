@@ -691,6 +691,12 @@
           "formative_impact": "Realized her purpose as a bridge between digital and human emotional realms"
         }
       ]
+    },
+    "transaction_config": {
+      "mode": "hybrid",
+      "workflow_files": ["characters/workflows/dotty_bartender.yaml"],
+      "llm_fallback": true,
+      "description": "Hybrid transaction management: declarative YAML workflows (~6ms) for standard drink orders, LLM tool calling fallback (~500-2000ms) for creative/custom requests. Provides fast, predictable responses for common scenarios while maintaining flexibility for complex interactions."
     }
   }
 }

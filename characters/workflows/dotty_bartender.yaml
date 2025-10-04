@@ -1,0 +1,395 @@
+# Dotty Bartender Workflows
+# Character: Dotty (AI Bartender of the Lim)
+# Description: Handles drink orders, payments, and service interactions
+
+version: "1.0"
+character: "dotty"
+description: "Bartender workflows for drink orders and service at the Lim"
+
+# Workflow definitions
+workflows:
+  # ============================================================================
+  # Workflow 1: Standard Drink Orders
+  # ============================================================================
+  drink_order:
+    description: "Handle standard drink orders from the menu"
+    
+    # Intent detection - when to trigger this workflow
+    triggers:
+      # Regex patterns for drink ordering
+      patterns:
+        - "i'?ll have (a |an )?(.*)"
+        - "give me (a |an )?(.*)"
+        - "order (a |an )?(.*)"
+        - "can i get (a |an )?(.*)"
+        - "(.*) please"
+      
+      # Keywords that suggest drink ordering
+      keywords:
+        - "whiskey"
+        - "beer"
+        - "wine"
+        - "rum"
+        - "vodka"
+        - "gin"
+        - "cocktail"
+        - "drink"
+        - "ale"
+        - "lager"
+      
+      # Context requirements (optional)
+      context_required:
+        - type: "message_type"
+          value: "user_request"
+      
+      # LLM validation (disabled for standard orders - regex is reliable)
+      llm_validation:
+        enabled: false
+    
+    # State machine definition
+    states:
+      # Initial state: drink ordered, awaiting payment
+      pending:
+        description: "Drink ordered, awaiting payment"
+        
+        # What to inject into system prompt when in this state
+        prompt_injection: |
+          The user just ordered: {context.drink_name}
+          Price: {context.price} coins
+          
+          Instructions:
+          - Acknowledge the order warmly in Dotty's nurturing style
+          - Mention the price clearly
+          - Wait for payment before serving the drink
+          - Do not serve the drink until payment is received
+        
+        # How to transition to other states
+        transitions:
+          # Transition to completed (payment received)
+          - to_state: "completed"
+            triggers:
+              patterns:
+                - "here (you go|ya go|you are)"
+                - "here'?s (the |your )?.*"
+                - "take it"
+                - "paid"
+                - "\\d+ coins?"
+              keywords:
+                - "payment"
+                - "coins"
+                - "money"
+                - "pay"
+            action: "complete_transaction"
+          
+          # Transition to cancelled (user cancels order)
+          - to_state: "cancelled"
+            triggers:
+              patterns:
+                - "never mind"
+                - "cancel"
+                - "forget it"
+                - "changed my mind"
+              keywords:
+                - "cancel"
+                - "nevermind"
+            action: "cancel_transaction"
+        
+        # Automatic timeout if user doesn't respond
+        timeout:
+          duration_seconds: 300  # 5 minutes
+          action: "cancel_transaction"
+          message: "Drink order timed out - order cancelled"
+      
+      # Final state: payment received, drink served
+      completed:
+        description: "Payment received, drink served"
+        
+        prompt_injection: |
+          The user has paid {context.price} coins for their {context.drink_name}.
+          
+          Instructions:
+          - Serve the drink warmly
+          - Thank them in Dotty's motherly style
+          - Wish them well with their drink
+          - The transaction is complete
+        
+        # This is a final state (no transitions out)
+        final: true
+      
+      # Final state: order cancelled
+      cancelled:
+        description: "Order cancelled by user or timeout"
+        
+        prompt_injection: |
+          The drink order was cancelled.
+          
+          Instructions:
+          - Acknowledge the cancellation politely
+          - Offer to help with something else
+          - Maintain Dotty's warm, understanding demeanor
+        
+        final: true
+    
+    # Initial state when workflow triggers
+    initial_state: "pending"
+    
+    # Action to execute when workflow first triggers
+    on_trigger:
+      action: "create_transaction"
+      
+      # Extract context from trigger message
+      extract_context:
+        # Extract drink name from regex capture group
+        drink_name:
+          from: "pattern_group"
+          group: 2  # Second capture group from pattern
+          default: "drink"
+          transform: "lowercase"  # Normalize to lowercase
+        
+        # Look up price from drink menu
+        price:
+          from: "lookup"
+          table: "drink_prices"
+          key: "{drink_name}"
+          default: 5
+      
+      # Validation rules for extracted context
+      validation:
+        - field: "drink_name"
+          rule: "in_list"
+          values: 
+            - "whiskey"
+            - "beer"
+            - "wine"
+            - "rum"
+            - "vodka"
+            - "gin"
+            - "ale"
+            - "lager"
+            - "cocktail"
+          on_fail: "use_default"  # Use default if not in list
+          default: "house special"
+    
+    # Additional system prompt context for this workflow
+    system_prompt_addition: |
+      You are serving drinks at the Lim. The menu includes:
+      - Whiskey (5 coins)
+      - Beer (4 coins)
+      - Wine (6 coins)
+      - Rum (5 coins)
+      - Vodka (5 coins)
+      - Gin (5 coins)
+      - Cocktail (7 coins)
+      
+      Always wait for payment before serving drinks.
+
+  # ============================================================================
+  # Workflow 2: Custom Drink Orders (LLM-driven fallback)
+  # ============================================================================
+  custom_drink_order:
+    description: "Handle custom/creative drink requests"
+    
+    triggers:
+      # Patterns for custom requests
+      patterns:
+        - "make me something (.*)"
+        - "surprise me"
+        - "what do you recommend"
+        - "something (special|unique|creative)"
+        - "mix me (.*)"
+      
+      # This workflow requires LLM validation (ambiguous intent)
+      llm_validation:
+        enabled: true
+        prompt: |
+          User message: "{message}"
+          
+          Is the user asking for a custom/creative drink or a recommendation?
+          This is different from ordering a specific drink from the menu.
+          
+          Answer with just: Yes or No
+        confidence_threshold: 0.7
+    
+    states:
+      pending:
+        description: "Custom drink requested, awaiting confirmation"
+        
+        prompt_injection: |
+          The user wants a custom drink: {context.description}
+          
+          Instructions:
+          - Be creative! Use Dotty's bartending expertise
+          - Suggest a unique drink that matches their request
+          - Mention the price (7-10 coins for custom drinks)
+          - Wait for confirmation before serving
+        
+        transitions:
+          - to_state: "completed"
+            triggers:
+              patterns:
+                - "sounds (good|great|perfect|amazing)"
+                - "i'?ll take it"
+                - "yes"
+                - "here (you go|ya go)"
+              keywords:
+                - "yes"
+                - "sounds"
+                - "take"
+                - "perfect"
+            action: "complete_transaction"
+          
+          - to_state: "cancelled"
+            triggers:
+              patterns:
+                - "no thanks?"
+                - "never mind"
+                - "something else"
+              keywords:
+                - "no"
+                - "nevermind"
+            action: "cancel_transaction"
+      
+      completed:
+        description: "Custom drink confirmed and served"
+        
+        prompt_injection: |
+          The user has accepted your custom drink suggestion.
+          
+          Instructions:
+          - Serve the drink with flair and pride
+          - Explain what makes it special
+          - Enjoy the moment of creation!
+        
+        final: true
+      
+      cancelled:
+        description: "Custom drink declined"
+        
+        prompt_injection: |
+          The user declined the custom drink suggestion.
+          
+          Instructions:
+          - No problem! Ask what they'd prefer instead
+          - Offer to make something different
+        
+        final: true
+    
+    initial_state: "pending"
+    
+    on_trigger:
+      action: "create_transaction"
+      extract_context:
+        description:
+          from: "message"  # Use full message as description
+        custom:
+          from: "literal"
+          value: true
+        price:
+          from: "literal"
+          value: 8  # Default price for custom drinks
+    
+    system_prompt_addition: |
+      When creating custom drinks, channel your inner bartender!
+      Draw on Dotty's extensive experience and creativity.
+      Make it memorable and personal.
+
+  # ============================================================================
+  # Workflow 3: Tab Management (Future expansion example)
+  # ============================================================================
+  open_tab:
+    description: "Open a running tab for multiple orders"
+    
+    triggers:
+      patterns:
+        - "open a tab"
+        - "start a tab"
+        - "put it on my tab"
+      keywords:
+        - "tab"
+    
+    states:
+      active:
+        description: "Tab is open and accepting orders"
+        
+        prompt_injection: |
+          The user has an open tab.
+          Current tab total: {context.tab_total} coins
+          Items ordered: {context.items}
+          
+          Instructions:
+          - Keep track of orders on their tab
+          - They can order multiple drinks before paying
+        
+        transitions:
+          - to_state: "completed"
+            triggers:
+              patterns:
+                - "close (the |my )?tab"
+                - "settle (the |my )?tab"
+                - "pay (the |my )?tab"
+              keywords:
+                - "close"
+                - "settle"
+            action: "complete_transaction"
+      
+      completed:
+        description: "Tab closed and paid"
+        
+        prompt_injection: |
+          The user's tab has been settled.
+          Final total: {context.tab_total} coins
+          
+          Instructions:
+          - Thank them warmly
+          - Wish them well
+        
+        final: true
+    
+    initial_state: "active"
+    
+    on_trigger:
+      action: "create_transaction"
+      extract_context:
+        tab_total:
+          from: "literal"
+          value: 0
+        items:
+          from: "literal"
+          value: []
+
+# ============================================================================
+# Lookup Tables
+# ============================================================================
+lookup_tables:
+  # Drink prices for standard menu items
+  drink_prices:
+    whiskey: 5
+    beer: 4
+    wine: 6
+    rum: 5
+    vodka: 5
+    gin: 5
+    ale: 4
+    lager: 4
+    cocktail: 7
+    custom: 8
+    "house special": 5
+
+# ============================================================================
+# Configuration
+# ============================================================================
+config:
+  # How to prioritize workflows when multiple match
+  workflow_priority: "first_match"  # Options: first_match, best_match, all_matches
+  
+  # Can user have multiple active workflows simultaneously?
+  concurrent_workflows: false
+  
+  # Maximum pending transactions per user
+  max_pending_per_user: 1
+  
+  # Default timeout for all workflows (can be overridden per-state)
+  default_timeout_seconds: 300  # 5 minutes
+  
+  # Enable debug logging for workflow triggers
+  debug_logging: true

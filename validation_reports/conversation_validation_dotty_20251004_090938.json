@@ -1,0 +1,105 @@
+{
+  "bot": "dotty",
+  "timestamp": "2025-10-04T09:09:37.986440",
+  "tests": {
+    "collection_exists": {
+      "passed": true,
+      "collection": "whisperengine_memory_dotty",
+      "point_count": 436
+    },
+    "role_field_extraction": {
+      "passed": true,
+      "total_memories": 20,
+      "top_level_roles": 20,
+      "nested_roles": 0,
+      "role_distribution": {
+        "user": 10,
+        "assistant": 0,
+        "unknown": 0,
+        "bot": 10
+      }
+    },
+    "conversation_time_window": {
+      "passed": true,
+      "test_user": "672814231002939413",
+      "recent_memories_1hr": 0,
+      "total_memories_7d": 0,
+      "note": "Validates timestamp filtering capability"
+    },
+    "bot_memory_isolation": {
+      "passed": true,
+      "total_memories": 50,
+      "correct_bot": 50,
+      "wrong_bot": 0,
+      "missing_bot_name": 0,
+      "other_bots_found": {}
+    },
+    "vector_storage_format": {
+      "passed": true,
+      "total_memories": 10,
+      "named_vectors": 10,
+      "single_vectors": 0,
+      "vector_names": [
+        "emotion",
+        "temporal",
+        "interaction",
+        "personality",
+        "relationship",
+        "semantic",
+        "content"
+      ]
+    },
+    "message_alternation_preserved": {
+      "passed": true,
+      "total_messages": 20,
+      "consecutive_same_role": 9,
+      "role_sequence": [
+        "bot",
+        "user",
+        "user",
+        "user",
+        "bot",
+        "user",
+        "user",
+        "bot",
+        "bot",
+        "bot",
+        "bot",
+        "user",
+        "user",
+        "bot",
+        "user",
+        "user",
+        "bot",
+        "user",
+        "bot",
+        "bot"
+      ],
+      "note": "Consecutive same-role messages indicate no alternation filtering (correct)"
+    },
+    "conversation_thread_continuity": {
+      "passed": true,
+      "test_user": "672814231002939413",
+      "total_messages": 25,
+      "message_pairs": 24,
+      "continuous_pairs": 12,
+      "continuity_rate": 50.0,
+      "note": "Validates conversation maintains topical coherence across messages"
+    },
+    "no_redis_dependencies": {
+      "passed": true,
+      "redis_env_vars": {
+        "REDIS_HOST": "redis",
+        "REDIS_PORT": "6379",
+        "REDIS_DB": "0"
+      },
+      "redis_code_references": {}
+    }
+  },
+  "summary": {
+    "total_tests": 8,
+    "passed": 8,
+    "failed": 0,
+    "success_rate": 100.0
+  }
+}

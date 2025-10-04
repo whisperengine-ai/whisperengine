@@ -192,13 +192,10 @@ class VectorMemoryStore:
         except ImportError as e:
             logger.warning("Enhanced emotion analyzer not available: %s", e)
         
-        # Initialize 7D vector analyzer for enhanced dimensional analysis
+        # 7D vector analyzer DISABLED - using core 3D vectors only (content, emotion, semantic)
+        # Decision: Stick with proven 3-vector system rather than experimental 7D expansion
         self._vector_7d_analyzer = None
-        try:
-            self._vector_7d_analyzer = Enhanced7DVectorAnalyzer()
-            logger.info("🎯 7D Vector Analyzer initialized for enhanced dimensional intelligence")
-        except Exception as e:
-            logger.warning("7D Vector Analyzer initialization failed: %s", e)
+        logger.info("🎯 Using core 3D vector system (content, emotion, semantic)")
         
         # Performance tracking
         self.stats = {

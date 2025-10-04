@@ -25,6 +25,10 @@ from dotenv import load_dotenv
 from qdrant_client import QdrantClient
 from qdrant_client.models import Filter, FieldCondition, MatchValue, Range
 
+# Smart keepalive configuration (matches src/conversation/boundary_manager.py defaults)
+SESSION_KEEPALIVE_MINUTES = int(os.getenv('SESSION_KEEPALIVE_MINUTES', '15'))
+SESSION_KEEPALIVE_SECONDS = SESSION_KEEPALIVE_MINUTES * 60
+
 
 class ConversationContextValidator:
     """Validates conversation context system for any bot."""
@@ -514,15 +518,10 @@ class ConversationContextValidator:
                 }
                 return False
             
-            # Sort by timestamp (handle both int and string timestamps)
+            # Sort by timestamp (use timestamp_unix for proper numeric sorting)
             def get_timestamp(point):
-                ts = point.payload.get("timestamp", 0) if point.payload else 0
-                # Convert string timestamps to float
-                if isinstance(ts, str):
-                    try:
-                        return float(ts)
-                    except (ValueError, TypeError):
-                        return 0
+                # Use timestamp_unix (float) instead of timestamp (ISO string)
+                ts = point.payload.get("timestamp_unix", 0) if point.payload else 0
                 return float(ts) if ts else 0
             
             sorted_points = sorted(points, key=get_timestamp)
@@ -630,12 +629,8 @@ class ConversationContextValidator:
             user_messages = user_conversations[best_user]
             
             def get_timestamp(point):
-                ts = point.payload.get("timestamp", 0) if point.payload else 0
-                if isinstance(ts, str):
-                    try:
-                        return float(ts)
-                    except (ValueError, TypeError):
-                        return 0
+                # Use timestamp_unix (float) instead of timestamp (ISO string)
+                ts = point.payload.get("timestamp_unix", 0) if point.payload else 0
                 return float(ts) if ts else 0
             
             sorted_messages = sorted(user_messages, key=get_timestamp)
@@ -662,16 +657,23 @@ class ConversationContextValidator:
                 
                 # Check if messages are part of same conversation thread
                 # Look for:
-                # 1. Temporal proximity (within 15 minutes)
+                # 1. Temporal proximity (within 15 minutes) - PRIMARY indicator
                 curr_ts = get_timestamp(curr_msg)
                 next_ts = get_timestamp(next_msg)
                 time_gap = next_ts - curr_ts
                 
-                # 2. Topic continuity indicators
+                # 2. Topic continuity indicators (word overlap)
                 # Extract key words from current message (simple approach)
                 curr_words = set(w for w in curr_content.split() if len(w) > 4)
                 next_words = set(w for w in next_content.split() if len(w) > 4)
                 word_overlap = len(curr_words & next_words)
+                
+                # IMPROVED: Temporal proximity is PRIMARY indicator
+                # Messages within keepalive timeout are likely part of same conversation
+                # Word overlap helps but is NOT required (Q&A pairs often don't share words)
+                has_temporal_continuity = time_gap < SESSION_KEEPALIVE_SECONDS
+                has_topical_continuity = word_overlap > 0
+                has_continuity = has_temporal_continuity or (has_topical_continuity and time_gap < 3600)
                 
                 continuity_checks.append({
                     "index": i,
@@ -679,7 +681,9 @@ class ConversationContextValidator:
                     "time_gap_minutes": time_gap / 60,
                     "word_overlap": word_overlap,
                     "roles": f"{curr_role} → {next_role}",
-                    "has_continuity": time_gap < 900 and word_overlap > 0  # 15min and shared words
+                    "has_temporal_continuity": has_temporal_continuity,
+                    "has_topical_continuity": has_topical_continuity,
+                    "has_continuity": has_continuity
                 })
             
             # Analyze continuity
@@ -695,14 +699,30 @@ class ConversationContextValidator:
                 continuity_rate = (continuous_pairs / total_pairs) * 100
                 self.log(f"📈 Continuity rate: {continuity_rate:.1f}%")
                 
-                # Show some examples
-                self.log(f"\n📋 Sample conversation flow:")
-                for i, msg in enumerate(sorted_messages[:5]):
+                # Show detailed conversation flow with time gaps
+                self.log(f"\n📋 Detailed conversation flow (showing all messages with time gaps):")
+                for i, msg in enumerate(sorted_messages):
                     if not msg.payload:
                         continue
                     role = msg.payload.get("role", "unknown")
-                    content = msg.payload.get("content", "")[:60]
-                    self.log(f"   [{role}] {content}...", "DEBUG")
+                    content = msg.payload.get("content", "")[:80]
+                    
+                    # Calculate time gap from previous message
+                    time_gap_str = ""
+                    if i > 0 and i < len(continuity_checks):
+                        check = continuity_checks[i-1]
+                        gap_min = check["time_gap_minutes"]
+                        has_cont = check.get("has_continuity", False)
+                        cont_marker = "✅" if has_cont else "❌"
+                        
+                        if gap_min < 1:
+                            time_gap_str = f" [{cont_marker} {gap_min*60:.0f}s gap]"
+                        elif gap_min < 60:
+                            time_gap_str = f" [{cont_marker} {gap_min:.1f}min gap]"
+                        else:
+                            time_gap_str = f" [{cont_marker} {gap_min/60:.1f}hr gap]"
+                    
+                    self.log(f"   {i+1:2d}. [{role}] {content}...{time_gap_str}", "DEBUG")
                 
                 # Test passes if we see reasonable continuity
                 # We expect some gaps (topic shifts), but not complete randomness
