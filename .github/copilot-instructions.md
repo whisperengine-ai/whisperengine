@@ -35,6 +35,15 @@
 - **FOCUS ON IMPLEMENTATION DETAILS** rather than broad claims or implications
 - This reflects WhisperEngine's pragmatic engineering approach
 
+**🚨 CRITICAL: STOP CREATING SO MANY MD FILES!**
+- **DO NOT create new documentation files for every decision, finding, or status update**
+- **WRITE CODE FIRST** - documentation creation takes 3x longer than actual implementation
+- **Only create docs for**: major architecture changes, API references, deployment guides
+- **Use existing docs**: Update existing files instead of creating new ones
+- **No status reports, migration plans, or finding summaries** - just fix the code!
+- When user asks to "document", update existing relevant doc, don't create new file
+- Focus on **implementation velocity** over documentation bureaucracy
+
 **ALPHA/DEV PHASE**: WhisperEngine is in active development. Prioritize working features over production optimization. No production users yet - we can freely iterate and change.
 
 **🚨 CRITICAL DEV RULE: NO FEATURE FLAGS FOR LOCAL CODE!** 
@@ -602,6 +611,28 @@ existing_users = await identity_manager.find_users_by_username(username)
 ```
 
 ## Character System
+
+**Three Character Archetypes**: WhisperEngine supports three distinct types of AI roleplay characters with different AI identity handling:
+
+1. **Type 1: Real-World Based** (Elena, Marcus, Jake, Ryan, Gabriel, Sophia)
+   - Based on realistic human personas with real-world occupations
+   - `allow_full_roleplay_immersion: false` (or omit - defaults to false)
+   - Honest AI disclosure when asked directly ("I'm an AI, but...")
+   - 3-tier response for physical interaction requests (enthusiasm → AI clarification → alternatives)
+
+2. **Type 2: Pure Fantasy/Mystical** (Dream, Aethys)
+   - Fictional/mythological entities where AI nature is NOT part of narrative
+   - `allow_full_roleplay_immersion: true`
+   - NO AI disclosure - responds philosophically/mystically
+   - Maintains complete narrative immersion
+
+3. **Type 3: Narrative AI Characters** (Dotty)
+   - Characters whose AI nature IS part of their story/lore
+   - `allow_full_roleplay_immersion: true`
+   - Acknowledges AI nature IN-CHARACTER (it's part of their identity)
+   - Example: Dotty is "AI Bartender of the Lim" - being AI is her occupation/lore
+
+**See**: `docs/architecture/CHARACTER_ARCHETYPES.md` for comprehensive details, behavior examples, and implementation patterns.
 
 **CDL Integration**: JSON-based character personalities:
 ```python

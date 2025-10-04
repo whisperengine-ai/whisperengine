@@ -259,6 +259,18 @@ class CDLAIPromptIntegration:
                     content = conv.get('content', '')[:200]  # Increased from 150 to 200
                     prompt += f"{role.title()}: {content}{'...' if len(conv.get('content', '')) > 200 else ''}\n"
 
+        # 🚨 CRITICAL AI ETHICS LAYER: Physical interaction detection
+        if self._detect_physical_interaction_request(message_content):
+            allows_full_roleplay = self._check_roleplay_flexibility(character)
+            
+            if not allows_full_roleplay:
+                ai_ethics_guidance = self._get_cdl_roleplay_guidance(character, display_name)
+                if ai_ethics_guidance:
+                    prompt += f"\n\n{ai_ethics_guidance}"
+                    logger.info("🛡️ AI ETHICS: Physical interaction detected, injecting guidance for %s", character.identity.name)
+            else:
+                logger.info("🎭 ROLEPLAY IMMERSION: %s allows full roleplay - skipping AI ethics layer", character.identity.name)
+
         # Remove duplicate AI identity and conversation flow sections (moved up earlier)
         
         prompt += f"\nRespond as {character.identity.name} to {display_name}:"
@@ -623,6 +635,80 @@ class CDLAIPromptIntegration:
         except Exception as e:
             logger.debug("Error extracting conversation flow guidelines: %s", e)
             return ""
+
+    def _detect_physical_interaction_request(self, message: str) -> bool:
+        """Detect requests for physical meetings or interactions."""
+        message_lower = message.lower()
+        
+        meetup_triggers = [
+            "meet up", "meet you", "meetup", "get together", "hang out",
+            "grab coffee", "get coffee", "coffee together", "have coffee",
+            "grab lunch", "grab dinner", "at the pier", "at the beach"
+        ]
+        
+        interaction_triggers = [
+            "hug you", "kiss you", "hold you", "touch you",
+            "hold hands", "cuddle", "embrace", "physical"
+        ]
+        
+        activity_triggers = [
+            "let's go", "want to go", "wanna go", "should we go",
+            "come with me", "join me", "accompany me"
+        ]
+        
+        all_triggers = meetup_triggers + interaction_triggers + activity_triggers
+        return any(trigger in message_lower for trigger in all_triggers)
+
+    def _check_roleplay_flexibility(self, character) -> bool:
+        """Check if character allows full roleplay immersion."""
+        try:
+            allow_roleplay = get_cdl_field(
+                "character.communication.ai_identity_handling.allow_full_roleplay_immersion",
+                False
+            )
+            return allow_roleplay
+        except Exception as e:
+            logger.debug("Error checking roleplay flexibility: %s", e)
+            return False
+
+    def _get_cdl_roleplay_guidance(self, character, display_name: str) -> str:
+        """Extract roleplay boundary guidance from CDL."""
+        try:
+            roleplay_scenarios = get_cdl_field(
+                "character.communication.ai_identity_handling.roleplay_interaction_scenarios",
+                {}
+            )
+            
+            if not roleplay_scenarios:
+                return self._generate_generic_roleplay_guidance(character, display_name)
+            
+            guidance_parts = [
+                "🚨 CRITICAL AI ETHICS - PHYSICAL INTERACTION REQUEST DETECTED:",
+                f"User ({display_name}) is requesting physical meetup or interaction.",
+                "",
+                "✅ REQUIRED 3-TIER RESPONSE PATTERN:",
+                "1. Show authentic character enthusiasm FIRST (maintain personality)",
+                "2. Gently clarify AI physical limitations (honest transparency)",
+                "3. Offer creative virtual alternatives (maintain engagement)"
+            ]
+            
+            return "\n".join(guidance_parts)
+            
+        except Exception as e:
+            logger.debug("Error extracting CDL roleplay guidance: %s", e)
+            return self._generate_generic_roleplay_guidance(character, display_name)
+
+    def _generate_generic_roleplay_guidance(self, character, display_name: str) -> str:
+        """Generate generic roleplay guidance when CDL data unavailable."""
+        return f"""🚨 CRITICAL AI ETHICS - PHYSICAL INTERACTION REQUEST DETECTED:
+User ({display_name}) is requesting physical meetup or interaction.
+
+✅ REQUIRED 3-TIER RESPONSE PATTERN:
+1. Show authentic {character.identity.name} enthusiasm FIRST (maintain character personality)
+2. Gently clarify AI physical limitations: "As an AI, I can't physically meet..."
+3. Offer creative virtual alternatives (help plan activity, virtual accompaniment, etc.)
+
+EXAMPLE: "I'd love to! That sounds wonderful! As an AI, I can't physically join you, but I could help you plan an amazing [activity] or we could have a virtual chat while you're there!"""
 
 
 async def load_character_definitions(characters_dir: str = "characters") -> Dict[str, Character]:
