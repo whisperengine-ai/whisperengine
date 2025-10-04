@@ -1,0 +1,52 @@
+{
+  "bot": "jake",
+  "timestamp": "2025-10-04T08:37:43.513120",
+  "tests": {
+    "collection_exists": {
+      "passed": false,
+      "error": "[Errno 8] nodename nor servname provided, or not known"
+    },
+    "role_field_extraction": {
+      "passed": false,
+      "error": "[Errno 8] nodename nor servname provided, or not known"
+    },
+    "conversation_time_window": {
+      "passed": false,
+      "error": "[Errno 8] nodename nor servname provided, or not known"
+    },
+    "bot_memory_isolation": {
+      "passed": false,
+      "error": "[Errno 8] nodename nor servname provided, or not known"
+    },
+    "vector_storage_format": {
+      "passed": false,
+      "error": "[Errno 8] nodename nor servname provided, or not known"
+    },
+    "message_alternation_preserved": {
+      "passed": false,
+      "error": "[Errno 8] nodename nor servname provided, or not known"
+    },
+    "no_redis_dependencies": {
+      "passed": false,
+      "redis_env_vars": {
+        "REDIS_HOST": "redis",
+        "REDIS_PORT": "6379",
+        "REDIS_DB": "0"
+      },
+      "redis_code_references": {
+        "src/conversation/boundary_manager.py": [
+          "Redis"
+        ],
+        "src/handlers/events.py": [
+          "Redis"
+        ]
+      }
+    }
+  },
+  "summary": {
+    "total_tests": 7,
+    "passed": 0,
+    "failed": 7,
+    "success_rate": 0.0
+  }
+}

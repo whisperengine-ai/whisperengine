@@ -1,0 +1,96 @@
+{
+  "bot": "sophia",
+  "timestamp": "2025-10-04T08:40:09.697472",
+  "tests": {
+    "collection_exists": {
+      "passed": true,
+      "collection": "whisperengine_memory_sophia_7d",
+      "point_count": 37
+    },
+    "role_field_extraction": {
+      "passed": true,
+      "total_memories": 20,
+      "top_level_roles": 20,
+      "nested_roles": 0,
+      "role_distribution": {
+        "user": 9,
+        "assistant": 0,
+        "unknown": 0,
+        "bot": 11
+      }
+    },
+    "conversation_time_window": {
+      "passed": true,
+      "test_user": "672814231002939413",
+      "recent_memories_1hr": 0,
+      "total_memories_7d": 0,
+      "note": "Validates timestamp filtering capability"
+    },
+    "bot_memory_isolation": {
+      "passed": true,
+      "total_memories": 37,
+      "correct_bot": 37,
+      "wrong_bot": 0,
+      "missing_bot_name": 0,
+      "other_bots_found": {}
+    },
+    "vector_storage_format": {
+      "passed": true,
+      "total_memories": 10,
+      "named_vectors": 10,
+      "single_vectors": 0,
+      "vector_names": [
+        "interaction",
+        "semantic",
+        "personality",
+        "relationship",
+        "temporal",
+        "content",
+        "emotion"
+      ]
+    },
+    "message_alternation_preserved": {
+      "passed": true,
+      "total_messages": 20,
+      "consecutive_same_role": 6,
+      "role_sequence": [
+        "bot",
+        "bot",
+        "user",
+        "user",
+        "user",
+        "bot",
+        "user",
+        "bot",
+        "user",
+        "bot",
+        "user",
+        "bot",
+        "bot",
+        "bot",
+        "user",
+        "bot",
+        "user",
+        "bot",
+        "bot",
+        "user"
+      ],
+      "note": "Consecutive same-role messages indicate no alternation filtering (correct)"
+    },
+    "no_redis_dependencies": {
+      "passed": true,
+      "redis_env_vars": {
+        "REDIS_HOST": "redis",
+        "REDIS_PORT": "6379",
+        "REDIS_DB": "0"
+      },
+      "redis_code_references": {}
+    }
+  },
+  "summary": {
+    "total_tests": 7,
+    "passed": 7,
+    "failed": 0,
+    "success_rate": 100.0
+  }
+}
