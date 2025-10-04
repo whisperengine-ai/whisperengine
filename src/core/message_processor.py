@@ -160,6 +160,11 @@ class MessageProcessor:
                 message_context, ai_components
             )
             
+            # Phase 9c: User preference extraction and storage (PostgreSQL)
+            preference_stored = await self._extract_and_store_user_preferences(
+                message_context
+            )
+            
             # Calculate processing time
             end_time = datetime.now()
             processing_time_ms = int((end_time - start_time).total_seconds() * 1000)
@@ -1730,6 +1735,97 @@ class MessageProcessor:
             
         except Exception as e:
             logger.error(f"❌ Knowledge extraction failed: {e}")
+            return False
+    
+    async def _extract_and_store_user_preferences(self, message_context: MessageContext) -> bool:
+        """
+        Extract user preferences from message and store in PostgreSQL.
+        
+        This is part of Phase 5: User Preferences Integration.
+        Detects patterns like:
+        - "My name is Mark"
+        - "Call me Mark"
+        - "I prefer to be called Mark"
+        - "I go by Mark"
+        - "You can call me Mark"
+        
+        Stores in universal_users.preferences JSONB column for <1ms retrieval.
+        
+        Args:
+            message_context: The message context
+            
+        Returns:
+            True if preference was detected and stored
+        """
+        # Check if knowledge router is available
+        if not hasattr(self.bot_core, 'knowledge_router') or not self.bot_core.knowledge_router:
+            return False
+        
+        try:
+            content = message_context.content
+            
+            # Preferred name patterns with regex (case-insensitive for keywords, preserves name capitalization)
+            import re
+            
+            name_patterns = [
+                # "My name is Mark" - captures capitalized names
+                r"(?:my|My)\s+name\s+is\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)",
+                # "Call me Mark"
+                r"(?:call|Call)\s+me\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)",
+                # "I prefer to be called Mark" or "I prefer Mark"
+                r"(?:i|I)\s+prefer\s+(?:to\s+be\s+called\s+)?([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)",
+                # "I go by Mark"
+                r"(?:i|I)\s+go\s+by\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)",
+                # "You can call me Mark"
+                r"(?:you|You)\s+can\s+call\s+me\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)",
+                # "Just call me Mark"
+                r"(?:just|Just)\s+call\s+me\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)",
+                # "I'm Mark" (less formal)
+                r"(?:i|I)[''']m\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)",
+            ]
+            
+            detected_name = None
+            matched_pattern = None
+            
+            for pattern in name_patterns:
+                match = re.search(pattern, content)  # Search in original content to preserve capitalization
+                if match:
+                    detected_name = match.group(1).strip()
+                    matched_pattern = pattern
+                    logger.debug(f"🔍 PREFERENCE: Detected name '{detected_name}' with pattern: {pattern}")
+                    break
+            
+            if detected_name:
+                # Validate name (basic sanity checks)
+                if len(detected_name) < 2 or len(detected_name) > 50:
+                    logger.debug(f"⚠️ PREFERENCE: Rejected name '{detected_name}' (invalid length)")
+                    return False
+                
+                # Store in PostgreSQL with high confidence (explicit user statement)
+                stored = await self.bot_core.knowledge_router.store_user_preference(
+                    user_id=message_context.user_id,
+                    preference_key='preferred_name',
+                    preference_value=detected_name,
+                    confidence=0.95,  # High confidence for explicit statements
+                    metadata={
+                        'detected_pattern': matched_pattern,
+                        'source_message': content[:100],  # First 100 chars for debugging
+                        'channel_id': message_context.channel_id
+                    }
+                )
+                
+                if stored:
+                    logger.info(f"✅ PREFERENCE: Stored preferred name '{detected_name}' "
+                              f"for user {message_context.user_id}")
+                    return True
+                else:
+                    logger.warning(f"⚠️ PREFERENCE: Failed to store name '{detected_name}' "
+                                 f"for user {message_context.user_id}")
+            
+            return False
+            
+        except Exception as e:
+            logger.error(f"❌ Preference extraction failed: {e}")
             return False
     
     def _extract_entity_from_content(self, content: str, pattern: str, entity_type: str) -> Optional[str]:

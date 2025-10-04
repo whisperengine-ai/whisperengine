@@ -483,6 +483,152 @@ class SemanticKnowledgeRouter:
             
             logger.info(f"🔍 Found {len(entities)} entities matching '{search_query}'")
             return entities
+    
+    async def store_user_preference(
+        self,
+        user_id: str,
+        preference_type: str,
+        preference_value: str,
+        confidence: float = 1.0,
+        metadata: Optional[Dict[str, Any]] = None
+    ) -> bool:
+        """
+        Store user preference in PostgreSQL universal_users.preferences JSONB.
+        
+        This replaces vector memory preference storage for deterministic, fast retrieval.
+        Supports preferred names, timezone, language, communication style, etc.
+        
+        Args:
+            user_id: User identifier (Discord ID or universal ID)
+            preference_type: Type of preference ('preferred_name', 'timezone', 'language', etc.)
+            preference_value: Value of the preference
+            confidence: Confidence score 0-1 (default 1.0 for explicit statements)
+            metadata: Optional additional metadata
+            
+        Returns:
+            True if successful
+            
+        Example:
+            await router.store_user_preference(
+                user_id="123456789",
+                preference_type="preferred_name",
+                preference_value="Mark",
+                confidence=0.9
+            )
+        """
+        try:
+            async with self.postgres.acquire() as conn:
+                # Build preference object
+                preference_obj = {
+                    'value': preference_value,
+                    'confidence': confidence,
+                    'updated_at': datetime.now().isoformat()
+                }
+                
+                if metadata:
+                    preference_obj['metadata'] = metadata
+                
+                # Auto-create user if doesn't exist (same as store_user_fact)
+                await conn.execute("""
+                    INSERT INTO universal_users 
+                    (universal_id, primary_username, display_name, created_at, last_active, preferences)
+                    VALUES ($1, $2, $3, NOW(), NOW(), '{}'::jsonb)
+                    ON CONFLICT (universal_id) DO UPDATE SET last_active = NOW()
+                """, user_id, f"user_{user_id[-8:]}", f"User {user_id[-6:]}")
+                
+                # Update preferences JSONB (merge with existing)
+                await conn.execute("""
+                    UPDATE universal_users
+                    SET preferences = COALESCE(preferences::jsonb, '{}'::jsonb) || 
+                        jsonb_build_object($2::text, $3::jsonb)
+                    WHERE universal_id = $1
+                """, user_id, preference_type, json.dumps(preference_obj))
+                
+                logger.info(f"✅ PREFERENCE: Stored {preference_type}='{preference_value}' for user {user_id} (confidence: {confidence})")
+                return True
+                
+        except Exception as e:
+            logger.error(f"❌ Failed to store user preference: {e}")
+            return False
+    
+    async def get_user_preference(
+        self,
+        user_id: str,
+        preference_type: str
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Retrieve user preference from PostgreSQL.
+        
+        Fast, deterministic retrieval (<1ms) vs vector memory search (10-50ms).
+        
+        Args:
+            user_id: User identifier
+            preference_type: Type of preference to retrieve
+            
+        Returns:
+            Preference object with 'value', 'confidence', 'updated_at' keys, or None
+            
+        Example:
+            pref = await router.get_user_preference("123456789", "preferred_name")
+            if pref:
+                name = pref['value']  # "Mark"
+                confidence = pref['confidence']  # 0.9
+        """
+        try:
+            async with self.postgres.acquire() as conn:
+                result = await conn.fetchval("""
+                    SELECT preferences::jsonb -> $2
+                    FROM universal_users
+                    WHERE universal_id = $1
+                """, user_id, preference_type)
+                
+                if result:
+                    # Parse JSON string to dict
+                    import json
+                    pref_data = json.loads(result) if isinstance(result, str) else result
+                    logger.debug(f"🔍 PREFERENCE: Retrieved {preference_type} for user {user_id}: {pref_data.get('value')}")
+                    return pref_data
+                
+                logger.debug(f"🔍 PREFERENCE: No {preference_type} found for user {user_id}")
+                return None
+                
+        except Exception as e:
+            logger.error(f"❌ Failed to retrieve user preference: {e}")
+            return None
+    
+    async def get_all_user_preferences(
+        self,
+        user_id: str
+    ) -> Dict[str, Any]:
+        """
+        Retrieve all preferences for a user.
+        
+        Args:
+            user_id: User identifier
+            
+        Returns:
+            Dictionary of all preferences, empty dict if none found
+        """
+        try:
+            async with self.postgres.acquire() as conn:
+                result = await conn.fetchval("""
+                    SELECT preferences
+                    FROM universal_users
+                    WHERE universal_id = $1
+                """, user_id)
+                
+                if result:
+                    # Parse if string, return if already dict
+                    if isinstance(result, str):
+                        import json
+                        return json.loads(result) if result else {}
+                    return result or {}
+                
+                return {}
+                
+        except Exception as e:
+            logger.error(f"❌ Failed to retrieve all preferences: {e}")
+            return {}
 
 
 # Factory function for easy integration

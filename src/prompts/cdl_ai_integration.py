@@ -55,10 +55,23 @@ class CDLAIPromptIntegration:
 
             # STEP 2: Get user's preferred name with Discord username fallback
             preferred_name = None
-            if self.memory_manager and user_name:
+            if user_name:
                 try:
-                    from src.utils.user_preferences import get_user_preferred_name
-                    preferred_name = await get_user_preferred_name(user_id, self.memory_manager, user_name)
+                    # Phase 5: Use PostgreSQL for <1ms preference retrieval (replaces 10-50ms vector memory)
+                    if self.knowledge_router:
+                        pref_result = await self.knowledge_router.get_user_preference(
+                            user_id=user_id,
+                            preference_key='preferred_name'
+                        )
+                        if pref_result and pref_result.get('value'):
+                            preferred_name = pref_result['value']
+                            logger.debug("✅ PREFERENCE: Retrieved preferred name '%s' from PostgreSQL", preferred_name)
+                    
+                    # Fallback to legacy vector memory if PostgreSQL lookup fails
+                    if not preferred_name and self.memory_manager:
+                        from src.utils.user_preferences import get_user_preferred_name
+                        preferred_name = await get_user_preferred_name(user_id, self.memory_manager, user_name)
+                        logger.debug("🔄 PREFERENCE: Used fallback vector memory for preferred name")
                 except Exception as e:
                     logger.debug("Could not retrieve preferred name: %s", e)
 
