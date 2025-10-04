@@ -352,7 +352,7 @@ class SemanticKnowledgeRouter:
         Store a user fact in PostgreSQL with automatic relationship discovery.
         
         Args:
-            user_id: User identifier
+            user_id: User identifier (Discord ID or other platform ID)
             entity_name: Name of the entity (e.g., "pizza")
             entity_type: Type of entity (e.g., "food")
             relationship_type: Type of relationship (e.g., "likes")
@@ -369,6 +369,14 @@ class SemanticKnowledgeRouter:
         try:
             async with self.postgres.acquire() as conn:
                 async with conn.transaction():
+                    # Auto-create user in universal_users if doesn't exist
+                    # This ensures FK constraint is satisfied when storing facts
+                    await conn.execute("""
+                        INSERT INTO universal_users 
+                        (universal_id, primary_username, display_name, created_at, last_active)
+                        VALUES ($1, $2, $3, NOW(), NOW())
+                        ON CONFLICT (universal_id) DO UPDATE SET last_active = NOW()
+                    """, user_id, f"user_{user_id[-8:]}", f"User {user_id[-6:]}")
                     # Insert or update entity
                     entity_id = await conn.fetchval("""
                         INSERT INTO fact_entities (entity_type, entity_name, category, attributes)
