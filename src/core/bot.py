@@ -254,6 +254,11 @@ class DiscordBotCore:
             
             self.logger.info("✅ Semantic Knowledge Router initialized with multi-modal intelligence")
             
+            # Update character system with knowledge_router if it exists
+            if self.character_system and self.knowledge_router:
+                self.character_system.knowledge_router = self.knowledge_router
+                self.logger.info("✅ Character system updated with knowledge router integration")
+            
         except Exception as e:
             self.logger.error(f"❌ Knowledge router initialization failed: {e}")
             # Don't raise - knowledge router is optional enhancement

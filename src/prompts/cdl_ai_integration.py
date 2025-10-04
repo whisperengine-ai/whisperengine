@@ -16,9 +16,10 @@ from src.characters.cdl.manager import get_cdl_manager, get_cdl_field, get_conve
 logger = logging.getLogger(__name__)
 
 class CDLAIPromptIntegration:
-    def __init__(self, vector_memory_manager=None, llm_client=None):
+    def __init__(self, vector_memory_manager=None, llm_client=None, knowledge_router=None):
         self.memory_manager = vector_memory_manager
         self.llm_client = llm_client
+        self.knowledge_router = knowledge_router
         
         # Initialize the optimized prompt builder for size management
         from src.prompts.optimized_prompt_builder import create_optimized_prompt_builder
@@ -227,6 +228,65 @@ class CDLAIPromptIntegration:
                 prompt += f"\n\n👨‍👩‍👧‍👦 PERSONAL BACKGROUND:\n{personal_sections}"
         except Exception as e:
             logger.debug("Could not extract personal knowledge: %s", e)
+
+        # 🎯 SEMANTIC KNOWLEDGE INTEGRATION: Retrieve structured facts from PostgreSQL
+        if self.knowledge_router:
+            try:
+                # Analyze query intent to determine what facts to retrieve
+                intent = await self.knowledge_router.analyze_query_intent(message_content)
+                logger.info(f"🎯 KNOWLEDGE: Query intent detected: {intent.intent_type.value} (confidence: {intent.confidence:.2f})")
+                
+                # Retrieve character-aware facts if query has factual intent
+                if intent.confidence > 0.3 and intent.intent_type.value in ['factual_recall', 'relationship_discovery', 'entity_search']:
+                    # Get character name from CDL for character-aware retrieval
+                    character_name = character.identity.name.lower().split()[0] if character and hasattr(character, 'identity') else 'unknown'
+                    
+                    # Retrieve facts with character context
+                    facts = await self.knowledge_router.get_character_aware_facts(
+                        user_id=user_id,
+                        character_name=character_name,
+                        entity_type=intent.entity_type,
+                        limit=15
+                    )
+                    
+                    if facts:
+                        # Format facts for character-aware synthesis
+                        prompt += f"\n\n📊 KNOWN FACTS ABOUT {display_name}:\n"
+                        
+                        # Group facts by entity type for better organization
+                        facts_by_type = {}
+                        for fact in facts:
+                            entity_type = fact.get('entity_type', 'general')
+                            if entity_type not in facts_by_type:
+                                facts_by_type[entity_type] = []
+                            facts_by_type[entity_type].append(fact)
+                        
+                        # Add facts with personality-first synthesis guidance
+                        for entity_type, type_facts in sorted(facts_by_type.items()):
+                            type_label = entity_type.replace('_', ' ').title()
+                            prompt += f"\n{type_label}:\n"
+                            for fact in type_facts[:5]:  # Limit per type
+                                entity_name = fact.get('entity_name', 'unknown')
+                                relationship = fact.get('relationship_type', 'related to')
+                                confidence = fact.get('confidence', 0.0)
+                                
+                                # Include confidence for gradual knowledge building
+                                confidence_marker = "✓" if confidence > 0.8 else "~" if confidence > 0.5 else "?"
+                                prompt += f"  {confidence_marker} {relationship}: {entity_name}\n"
+                        
+                        # Add personality-first synthesis instruction
+                        prompt += f"\nInterpret these facts through {character.identity.name}'s personality and communication style."
+                        prompt += " Weave them naturally into conversation, not as robotic data delivery."
+                        
+                        logger.info(f"🎯 KNOWLEDGE: Added {len(facts)} structured facts across {len(facts_by_type)} categories")
+                    else:
+                        logger.debug("🎯 KNOWLEDGE: No facts found for query intent")
+                else:
+                    logger.debug(f"🎯 KNOWLEDGE: Skipping fact retrieval (intent: {intent.intent_type.value}, confidence: {intent.confidence:.2f})")
+                    
+            except Exception as e:
+                logger.error(f"❌ KNOWLEDGE: Fact retrieval failed: {e}")
+                # Continue without facts - don't break conversation flow
 
         # Add emotional intelligence context early to inform interpretation
         if pipeline_dict:

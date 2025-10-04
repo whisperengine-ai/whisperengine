@@ -1400,10 +1400,12 @@ class MessageProcessor:
                 cdl_integration = self.bot_core.character_system
                 logger.info("🎭 CDL: Using centralized character system for %s", user_id)
             else:
-                # Fallback: Create CDL integration instance
+                # Fallback: Create CDL integration instance with knowledge_router if available
+                knowledge_router = getattr(self.bot_core, 'knowledge_router', None) if self.bot_core else None
                 cdl_integration = CDLAIPromptIntegration(
                     vector_memory_manager=self.memory_manager,
-                    llm_client=self.llm_client
+                    llm_client=self.llm_client,
+                    knowledge_router=knowledge_router
                 )
                 logger.warning("⚠️ CDL: Using fallback CDL instance for %s - character system not initialized", user_id)
             
