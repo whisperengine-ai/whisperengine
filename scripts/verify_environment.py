@@ -77,15 +77,8 @@ async def verify_sentence_transformers() -> dict[str, Any]:
 async def verify_existing_systems() -> dict[str, Any]:
     """Verify existing bot systems are still functional."""
     try:
-        # Test graph database connectivity
-        try:
-            from src.graph_database.neo4j_connector import Neo4jConnector
-
-            connector = Neo4jConnector()
-            await connector.verify_connection()
-            graph_status = {"status": "success", "functional": True}
-        except Exception as e:
-            graph_status = {"status": "warning", "error": str(e), "functional": False}
+        # Graph database functionality moved to PostgreSQL - skip Neo4j check
+        graph_status = {"status": "success", "message": "Graph functionality moved to PostgreSQL", "functional": True}
 
         # Test memory system
         try:

@@ -222,10 +222,10 @@ class ContextSwitchDetector:
         
         # Extract the topic from the new message
         new_topic = await self._extract_primary_topic(new_message)
-        logger.info(f"🔍🔍🔍 TOPIC SHIFT ULTRA DEBUG: New topic detected: '{new_topic}', current topic: '{current_context.primary_topic}'")
+        logger.info("🔍🔍🔍 TOPIC SHIFT ULTRA DEBUG: New topic detected: '%s', current topic: '%s'", new_topic, current_context.primary_topic)
         
         # Log threshold values
-        logger.info(f"🔍🔍🔍 TOPIC SHIFT ULTRA DEBUG: Using threshold value: {self.topic_shift_threshold}")
+        logger.info("🔍🔍🔍 TOPIC SHIFT ULTRA DEBUG: Using threshold value: %s", self.topic_shift_threshold)
         
         # 1. First attempt: Direct topic extraction for clear topic comparison
         if (current_context.primary_topic != "general" and 

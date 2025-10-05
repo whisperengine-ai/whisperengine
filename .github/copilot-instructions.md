@@ -74,13 +74,14 @@
 - **Current Production Architecture**: PostgreSQL (structured) + Qdrant (semantic) + InfluxDB (temporal) + CDL (personality)
 - **See**: `docs/architecture/WHISPERENGINE_ARCHITECTURE_EVOLUTION.md` for complete evolution timeline
 
-**OBSOLETED SYSTEMS (DO NOT USE)**:
-- ❌ `src/utils/graph_memory_manager.py` (Neo4j) - use PostgreSQL graph queries
-- ❌ `src/characters/memory/graph_memory.py` (Neo4j) - use PostgreSQL relationships  
-- ❌ `src/memory/phase3_integration.py` (NEW Phase 3) - use PostgreSQL clustering
-- ❌ Vector-based fact storage - use PostgreSQL fact_entities and user_fact_relationships
-- ❌ 7D named vector systems - use simple 3D system (content, emotion, semantic)
-- ❌ Multiple memory manager layers - use single vector system + PostgreSQL integration
+**OBSOLETED SYSTEMS (CLEANED UP - October 4, 2025)**:
+- ✅ `src/utils/graph_memory_manager.py` (Neo4j) - REMOVED
+- ✅ `src/characters/memory/graph_memory.py` (Neo4j) - REMOVED  
+- ✅ `src/memory/phase3_integration.py` (NEW Phase 3) - REMOVED
+- ✅ Vector-based fact storage - use PostgreSQL fact_entities and user_fact_relationships
+- ✅ 7D named vector systems - use simple 3D system (content, emotion, semantic)
+- ✅ Multiple memory manager layers - use single vector system + PostgreSQL integration
+- ✅ Neo4j references in verification scripts and examples - CLEANED UP
 
 **🚨 CRITICAL ARCHITECTURE RULE: NO CHARACTER-SPECIFIC HARDCODED LOGIC!**
 - **NEVER hardcode character names, personalities, or character-specific behavior in Python code**
