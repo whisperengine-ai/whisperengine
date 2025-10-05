@@ -21,6 +21,7 @@ from typing import Dict, List, Optional, Any
 from dataclasses import dataclass
 
 from src.utils.production_error_handler import handle_errors, ErrorCategory, ErrorSeverity
+from src.memory.vector_memory_system import get_normalized_bot_name_from_env
 from src.adapters.platform_adapters import (
     create_discord_message_adapter,
     create_discord_attachment_adapters
@@ -42,6 +43,8 @@ class MessageContext:
     metadata: Optional[Dict[str, Any]] = None
     # Platform-specific context for features like typing indicators
     platform_context: Optional[Any] = None  # Discord channel, HTTP response object, etc.
+    # Metadata control for API responses
+    metadata_level: str = "basic"  # "basic", "standard", "extended" - controls API response payload size
 
     def __post_init__(self):
         if self.attachments is None:
@@ -164,10 +167,25 @@ class MessageProcessor:
                     message_context, conversation_context
                 )
             
+            # Phase 6.5: Bot Emotional Self-Awareness (NEW - Phase 7.6)
+            # Retrieve bot's recent emotional history for self-aware responses
+            bot_emotional_state = await self._analyze_bot_emotional_trajectory(message_context)
+            if bot_emotional_state:
+                ai_components['bot_emotional_state'] = bot_emotional_state
+                logger.debug(
+                    "🎭 BOT SELF-AWARENESS: Current state - %s (trajectory: %s)",
+                    bot_emotional_state.get('current_emotion', 'unknown'),
+                    bot_emotional_state.get('trajectory_direction', 'stable')
+                )
+            
             # Phase 7: Response generation
             response = await self._generate_response(
                 message_context, conversation_context, ai_components
             )
+            
+            # Phase 7.5: Analyze bot's emotional state from response
+            bot_emotion = await self._analyze_bot_emotion(response, message_context)
+            ai_components['bot_emotion'] = bot_emotion
             
             # Phase 8: Response validation and sanitization
             response = await self._validate_and_sanitize_response(
@@ -205,18 +223,23 @@ class MessageProcessor:
             logger.info("✅ MESSAGE PROCESSOR: Successfully processed message for user %s in %dms", 
                        message_context.user_id, processing_time_ms)
             
+            # Build enriched metadata for API consumers
+            enriched_metadata = await self._build_enriched_metadata(
+                message_context=message_context,
+                ai_components=ai_components,
+                relevant_memories=relevant_memories,
+                knowledge_stored=knowledge_stored,
+                memory_stored=memory_stored,
+                validation_result=validation_result,
+                processing_time_ms=processing_time_ms
+            )
+            
             return ProcessingResult(
                 response=response,
                 success=True,
                 processing_time_ms=processing_time_ms,
                 memory_stored=memory_stored,
-                metadata={
-                    "memory_count": len(relevant_memories) if relevant_memories else 0,
-                    "knowledge_stored": knowledge_stored,
-                    "memory_count": len(relevant_memories) if relevant_memories else 0,
-                    "ai_components": ai_components,
-                    "security_validation": validation_result
-                }
+                metadata=enriched_metadata
             )
             
         except (ValueError, KeyError, TypeError) as e:
@@ -242,7 +265,7 @@ class MessageProcessor:
         response: str,
         processing_time_ms: float
     ):
-        """Record temporal intelligence metrics if enabled."""
+        """Record temporal intelligence metrics if enabled (Phase 7.5: includes bot emotion)."""
         if not self.temporal_intelligence_enabled or not self.temporal_client or not self.confidence_analyzer:
             return
 
@@ -269,6 +292,27 @@ class MessageProcessor:
                 response_length=len(response),
                 processing_time_ms=processing_time_ms
             )
+            
+            # Phase 7.5: Record bot emotion separately in InfluxDB
+            bot_emotion = ai_components.get('bot_emotion')
+            if bot_emotion:
+                try:
+                    # Record bot emotion as separate metric for temporal tracking
+                    await self.temporal_client.record_bot_emotion(
+                        bot_name=bot_name,
+                        user_id=message_context.user_id,
+                        primary_emotion=bot_emotion.get('primary_emotion', 'neutral'),
+                        intensity=bot_emotion.get('intensity', 0.0),
+                        confidence=bot_emotion.get('confidence', 0.0)
+                    )
+                    logger.debug(
+                        "📊 TEMPORAL: Recorded bot emotion '%s' to InfluxDB (intensity: %.2f)",
+                        bot_emotion.get('primary_emotion', 'neutral'),
+                        bot_emotion.get('intensity', 0.0)
+                    )
+                except AttributeError:
+                    # record_bot_emotion method doesn't exist yet - log for now
+                    logger.debug("Bot emotion recording not yet implemented in TemporalIntelligenceClient")
             
             # Record metrics to InfluxDB (async, non-blocking)
             await asyncio.gather(
@@ -1618,6 +1662,183 @@ class MessageProcessor:
         
         return None
 
+    async def _analyze_bot_emotion(self, response: str, message_context: MessageContext) -> Optional[Dict[str, Any]]:
+        """
+        Analyze bot's emotional state from generated response text.
+        
+        Phase 7.5: Bot Emotion Tracking
+        - Analyzes the bot's response to determine character emotional state
+        - Stored in vector memory, InfluxDB, and API metadata
+        - Enables UI animations and historical emotion patterns
+        
+        Args:
+            response: Bot's generated response text
+            message_context: Context with bot name and conversation details
+            
+        Returns:
+            Dict with primary_emotion, intensity, confidence, analysis_method
+        """
+        try:
+            if not self.bot_core or not hasattr(self.bot_core, 'phase2_integration'):
+                return None
+            
+            # Use the enhanced vector emotion analyzer
+            from src.intelligence.enhanced_vector_emotion_analyzer import EnhancedVectorEmotionAnalyzer
+            
+            analyzer = EnhancedVectorEmotionAnalyzer(
+                vector_memory_manager=self.memory_manager
+            )
+            
+            # Analyze bot's response text to detect character emotion
+            emotion_results = await analyzer.analyze_emotion(
+                content=response,
+                user_id=f"bot_{get_normalized_bot_name_from_env()}",  # Bot-specific ID
+                conversation_context=[],
+                recent_emotions=None
+            )
+            
+            # Convert results to dictionary format with MIXED EMOTIONS support
+            if emotion_results:
+                # Extract mixed emotions (same as user emotion storage)
+                mixed_emotions_list = emotion_results.mixed_emotions if hasattr(emotion_results, 'mixed_emotions') else []
+                all_emotions_dict = emotion_results.all_emotions if hasattr(emotion_results, 'all_emotions') else {}
+                
+                bot_emotion_data = {
+                    'primary_emotion': emotion_results.primary_emotion,
+                    'intensity': emotion_results.intensity,
+                    'confidence': emotion_results.confidence,
+                    'analysis_method': 'vector_native',
+                    'analyzed_text': response[:100] + '...' if len(response) > 100 else response,  # Sample for debugging
+                    # Phase 7.5 Enhancement: Mixed emotions for bot (same as user)
+                    'mixed_emotions': mixed_emotions_list,
+                    'all_emotions': all_emotions_dict,
+                    'emotion_count': len([e for e in all_emotions_dict.values() if e > 0.1]) if all_emotions_dict else 1
+                }
+                
+                if mixed_emotions_list:
+                    logger.debug(
+                        "Bot emotion analysis: %s (%.2f) + mixed: %s",
+                        bot_emotion_data['primary_emotion'],
+                        bot_emotion_data['intensity'],
+                        [(e, round(i, 2)) for e, i in mixed_emotions_list[:2]]  # Log top 2 mixed emotions
+                    )
+                else:
+                    logger.debug(
+                        "Bot emotion analysis successful: %s (%.2f intensity, %.2f confidence)",
+                        bot_emotion_data['primary_emotion'],
+                        bot_emotion_data['intensity'],
+                        bot_emotion_data['confidence']
+                    )
+                return bot_emotion_data
+            
+        except Exception as e:
+            logger.debug("Bot emotion analysis failed: %s", str(e))
+        
+        return None
+
+    async def _analyze_bot_emotional_trajectory(self, message_context: MessageContext) -> Optional[Dict[str, Any]]:
+        """
+        Analyze bot's emotional trajectory from recent conversation history.
+        
+        Phase 7.6: Bot Emotional Self-Awareness
+        - Retrieves bot's recent emotional responses from vector memory
+        - Calculates emotional trajectory (improving, declining, stable)
+        - Provides emotional state for prompt building (bot knows its own emotions)
+        - Enables emotionally-aware responses (e.g., "I've been feeling down lately")
+        
+        Args:
+            message_context: Message context with user ID
+            
+        Returns:
+            Dict with current_emotion, trajectory_direction, emotional_velocity, recent_emotions
+        """
+        try:
+            if not self.memory_manager:
+                return None
+            
+            # Get bot name for querying bot-specific memories
+            bot_name = get_normalized_bot_name_from_env()
+            
+            # Retrieve bot's recent responses from vector memory
+            # Query for bot responses (role=bot) in recent conversations
+            bot_memory_query = f"emotional responses by {bot_name}"
+            
+            recent_bot_memories = await self.memory_manager.retrieve_relevant_memories(
+                user_id=message_context.user_id,
+                query=bot_memory_query,
+                limit=10  # Last 10 bot responses
+            )
+            
+            if not recent_bot_memories:
+                return None
+            
+            # Extract bot emotions from memory metadata
+            recent_emotions = []
+            for memory in recent_bot_memories:
+                if isinstance(memory, dict):
+                    metadata = memory.get('metadata', {})
+                    bot_emotion = metadata.get('bot_emotion')
+                    
+                    if bot_emotion and isinstance(bot_emotion, dict):
+                        recent_emotions.append({
+                            'emotion': bot_emotion.get('primary_emotion', 'neutral'),
+                            'intensity': bot_emotion.get('intensity', 0.0),
+                            'timestamp': memory.get('timestamp', ''),
+                            'mixed_emotions': bot_emotion.get('mixed_emotions', [])
+                        })
+            
+            if not recent_emotions:
+                return None
+            
+            # Calculate emotional trajectory
+            if len(recent_emotions) >= 2:
+                # Compare recent vs older emotions
+                recent_avg_intensity = sum(e['intensity'] for e in recent_emotions[:3]) / min(3, len(recent_emotions))
+                older_avg_intensity = sum(e['intensity'] for e in recent_emotions[-3:]) / min(3, len(recent_emotions))
+                
+                emotional_velocity = recent_avg_intensity - older_avg_intensity
+                
+                if emotional_velocity > 0.1:
+                    trajectory_direction = "intensifying"
+                elif emotional_velocity < -0.1:
+                    trajectory_direction = "calming"
+                else:
+                    trajectory_direction = "stable"
+            else:
+                emotional_velocity = 0.0
+                trajectory_direction = "stable"
+            
+            # Get current emotional state (most recent)
+            current_emotion = recent_emotions[0]['emotion']
+            current_intensity = recent_emotions[0]['intensity']
+            current_mixed = recent_emotions[0].get('mixed_emotions', [])
+            
+            bot_emotional_state = {
+                'current_emotion': current_emotion,
+                'current_intensity': current_intensity,
+                'current_mixed_emotions': current_mixed,
+                'trajectory_direction': trajectory_direction,
+                'emotional_velocity': round(emotional_velocity, 3),
+                'recent_emotions': [e['emotion'] for e in recent_emotions[:5]],
+                'emotional_context': f"{current_emotion} and {trajectory_direction}",
+                'self_awareness_available': True
+            }
+            
+            logger.debug(
+                "🎭 BOT TRAJECTORY: %s is feeling %s (%.2f intensity) - trajectory %s (velocity: %.3f)",
+                bot_name,
+                current_emotion,
+                current_intensity,
+                trajectory_direction,
+                emotional_velocity
+            )
+            
+            return bot_emotional_state
+            
+        except Exception as e:
+            logger.debug("Bot emotional trajectory analysis failed: %s", str(e))
+            return None
+
     async def _analyze_dynamic_personality(self, user_id: str, content: str, message_context: MessageContext) -> Optional[Dict[str, Any]]:
         """Analyze dynamic personality if profiler is available."""
         try:
@@ -2515,18 +2736,33 @@ class MessageProcessor:
 
     async def _store_conversation_memory(self, message_context: MessageContext, response: str, 
                                        ai_components: Dict[str, Any]) -> bool:
-        """Store conversation in memory system."""
+        """Store conversation in memory system with both user and bot emotions."""
         if not self.memory_manager:
             return False
         
         try:
             # 🛡️ FINAL SAFETY CHECK: Don't store obviously broken responses
             if self._is_response_safe_to_store(response):
+                # Extract bot emotion from ai_components (Phase 7.5)
+                bot_emotion = ai_components.get('bot_emotion')
+                
+                # Build metadata for bot response including bot emotion
+                bot_metadata = {}
+                if bot_emotion:
+                    bot_metadata['bot_emotion'] = bot_emotion
+                    logger.info(
+                        "🎭 BOT EMOTION: Storing bot emotion '%s' (intensity: %.2f, confidence: %.2f)",
+                        bot_emotion.get('primary_emotion', 'unknown'),
+                        bot_emotion.get('intensity', 0.0),
+                        bot_emotion.get('confidence', 0.0)
+                    )
+                
                 await self.memory_manager.store_conversation(
                     user_id=message_context.user_id,
                     user_message=message_context.content,
                     bot_response=response,
-                    pre_analyzed_emotion_data=ai_components.get('emotion_data')
+                    pre_analyzed_emotion_data=ai_components.get('emotion_data'),  # User emotion
+                    metadata=bot_metadata  # Bot emotion in metadata
                 )
                 
                 # Verify storage
@@ -2719,6 +2955,164 @@ class MessageProcessor:
             
         except Exception as e:
             logger.warning(f"Failed to log response to file: {e}")
+
+    async def _build_enriched_metadata(
+        self,
+        message_context: MessageContext,
+        ai_components: Dict[str, Any],
+        relevant_memories: List[Dict[str, Any]],
+        knowledge_stored: bool,
+        memory_stored: bool,
+        validation_result: Dict[str, Any],
+        processing_time_ms: int
+    ) -> Dict[str, Any]:
+        """
+        Build enriched metadata for API consumers (3rd party dashboards).
+        
+        Supports three metadata levels:
+        - "basic": Essential data only (memory_count, knowledge_stored, success flags)
+        - "standard": Basic + AI components + security validation (default)
+        - "extended": Standard + all analytics (temporal, vector memory, relationships, etc.)
+        
+        Provides comprehensive debugging and analytics data including:
+        - Memory and knowledge extraction details
+        - Vector memory intelligence
+        - Phase 5 temporal intelligence (if available)
+        - CDL character context
+        - Relationship metrics
+        - Processing pipeline breakdown
+        """
+        metadata_level = message_context.metadata_level.lower()
+        
+        # BASIC level: Minimal essential data
+        if metadata_level == "basic":
+            return {
+                "memory_count": len(relevant_memories) if relevant_memories else 0,
+                "knowledge_stored": knowledge_stored,
+                "memory_stored": memory_stored,
+                "processing_time_ms": processing_time_ms
+            }
+        
+        # STANDARD level: Basic + AI components + security (DEFAULT)
+        metadata = {
+            "memory_count": len(relevant_memories) if relevant_memories else 0,
+            "knowledge_stored": knowledge_stored,
+            "ai_components": ai_components,
+            "security_validation": validation_result
+        }
+        
+        # Return standard level if not extended
+        if metadata_level != "extended":
+            return metadata
+        
+        # EXTENDED level: Add comprehensive analytics data
+        # 1. Knowledge Extraction Details
+        metadata["knowledge_details"] = {
+            "facts_extracted": 0,  # TODO: Track actual count from knowledge extraction
+            "entities_discovered": 0,  # TODO: Track from semantic router
+            "relationships_created": 0,  # TODO: Track from graph operations
+            "extraction_attempted": True,
+            "storage_success": knowledge_stored
+        }
+        
+        # 2. Vector Memory Intelligence
+        if relevant_memories:
+            # Calculate average relevance score from memory retrieval
+            relevance_scores = []
+            for memory in relevant_memories:
+                if isinstance(memory, dict) and 'score' in memory:
+                    relevance_scores.append(float(memory['score']))
+            
+            avg_relevance = sum(relevance_scores) / len(relevance_scores) if relevance_scores else 0.0
+            
+            metadata["vector_memory"] = {
+                "memories_retrieved": len(relevant_memories),
+                "average_relevance_score": round(avg_relevance, 3),
+                "collection": os.getenv('QDRANT_COLLECTION_NAME', 'whisperengine_memory'),
+                "embedding_model": os.getenv('EMBEDDING_MODEL', 'sentence-transformers/all-MiniLM-L6-v2'),
+                "vector_dimension": int(os.getenv('VECTOR_DIMENSION', '384')),
+                "search_method": "3d_named_vectors"  # content, emotion, semantic
+            }
+        
+        # 3. Phase 5 Temporal Intelligence (if available)
+        if self.temporal_intelligence_enabled and self.confidence_analyzer:
+            try:
+                # Get confidence metrics from analyzer
+                confidence_metrics = self.confidence_analyzer.calculate_confidence_metrics(
+                    ai_components=ai_components,
+                    memory_count=len(relevant_memories) if relevant_memories else 0,
+                    processing_time_ms=processing_time_ms
+                )
+                
+                metadata["temporal_intelligence"] = {
+                    "confidence_evolution": round(confidence_metrics.overall_confidence, 3),
+                    "user_fact_confidence": round(confidence_metrics.user_fact_confidence, 3),
+                    "relationship_confidence": round(confidence_metrics.relationship_confidence, 3),
+                    "context_confidence": round(confidence_metrics.context_confidence, 3),
+                    "emotional_confidence": round(confidence_metrics.emotional_confidence, 3),
+                    "interaction_pattern": "stable",  # TODO: Calculate from temporal data
+                    "data_source": "phase5_temporal_intelligence"
+                }
+            except Exception as e:
+                logger.debug(f"Could not calculate temporal intelligence: {e}")
+        
+        # 4. CDL Character Context
+        character_file = os.getenv('CDL_DEFAULT_CHARACTER', 'characters/examples/default_assistant.json')
+        bot_name = os.getenv('DISCORD_BOT_NAME', 'Assistant')
+        
+        metadata["character_context"] = {
+            "character_name": bot_name,
+            "character_file": character_file,
+            "personality_system": "cdl",  # Character Definition Language
+            "communication_style": "authentic_character_voice",
+            "roleplay_immersion": "enabled"  # Characters maintain personality consistency
+        }
+        
+        # 5. Relationship Metrics (if available from Phase 4)
+        phase4_data = ai_components.get('phase4_intelligence', {})
+        relationship_level = phase4_data.get('relationship_level', 'acquaintance')
+        
+        # Map relationship level to approximate scores (0-100 scale)
+        relationship_mapping = {
+            'stranger': {'affection': 10, 'trust': 15, 'attunement': 20},
+            'acquaintance': {'affection': 35, 'trust': 40, 'attunement': 45},
+            'friend': {'affection': 65, 'trust': 70, 'attunement': 75},
+            'close_friend': {'affection': 85, 'trust': 88, 'attunement': 90},
+            'best_friend': {'affection': 95, 'trust': 95, 'attunement': 98}
+        }
+        
+        scores = relationship_mapping.get(relationship_level, relationship_mapping['acquaintance'])
+        
+        metadata["relationship"] = {
+            "affection": scores['affection'],
+            "trust": scores['trust'],
+            "attunement": scores['attunement'],
+            "relationship_level": relationship_level,
+            "interaction_count": len(relevant_memories) if relevant_memories else 0,
+            "memory_depth": "established" if len(relevant_memories) > 5 else "developing"
+        }
+        
+        # 6. Processing Pipeline Breakdown
+        phase4_metadata = phase4_data.get('processing_metadata', {})
+        performance_metrics = phase4_metadata.get('performance_metrics', {})
+        
+        metadata["processing_pipeline"] = {
+            "phase2_emotion_analysis_ms": round(performance_metrics.get('phase2_duration', 0) * 1000, 2),
+            "phase4_intelligence_ms": round(phase4_metadata.get('total_duration', 0) * 1000, 2),
+            "total_processing_ms": processing_time_ms,
+            "phases_executed": phase4_metadata.get('phases_executed', []),
+            "phases_completed": phase4_metadata.get('phases_completed', 0)
+        }
+        
+        # 7. Conversation Context Indicators
+        metadata["conversation_intelligence"] = {
+            "context_switches_detected": len(phase4_data.get('phase3_context_switches', [])),
+            "conversation_mode": phase4_data.get('conversation_mode', 'standard'),
+            "interaction_type": phase4_data.get('interaction_type', 'general'),
+            "response_guidance": phase4_data.get('response_guidance', 'natural_conversation')
+        }
+        
+        return metadata
 
 
 def create_message_processor(bot_core, memory_manager, llm_client, **kwargs) -> MessageProcessor:
