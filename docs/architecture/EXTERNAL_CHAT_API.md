@@ -1,99 +1,160 @@
-# WhisperEngine External Chat API
+# WhisperEngine Health Check API
 
-This document describes the external HTTP API endpoints that allow external systems to interact with WhisperEngine AI characters using the same sophisticated processing pipeline as Discord.
+**⚠️ IMPORTANT: WhisperEngine is a Discord-only bot system. Chat functionality requires Discord messages sent directly to the bots.**
+
+This document describes the HTTP health check endpoints used for container orchestration and debugging. These endpoints do NOT provide chat functionality - they are for monitoring bot health only.
 
 ## Overview
 
-The external chat API provides HTTP endpoints that abstract the complex Discord message processing logic into platform-agnostic endpoints. This allows:
+The health check API provides HTTP endpoints for:
 
-- **External applications** to integrate with WhisperEngine characters
-- **Webhooks and bots** to interact with the AI system  
-- **Web interfaces** to provide chat functionality
-- **Testing and development** with the same processing pipeline
+- **Container orchestration** - Docker health monitoring
+- **Bot status validation** - Verify bots are running
+- **Development debugging** - Check bot initialization
+- **Monitoring systems** - Integration with external monitoring
+
+⚠️ **No Chat Endpoints**: WhisperEngine removed all HTTP chat APIs. All conversation features require Discord messages sent directly to the character bots.
 
 ## Key Features
 
-✅ **Shared Processing Pipeline**: Uses the exact same message processing logic as Discord handlers  
-✅ **Memory Continuity**: Maintains conversation memory across sessions  
-✅ **Character Personalities**: Full CDL (Character Definition Language) integration  
-✅ **Security Validation**: Same security scanning as Discord messages  
-✅ **Emotion Intelligence**: Advanced emotion analysis and context  
-✅ **Platform Agnostic**: Works with any HTTP client  
+✅ **Health Monitoring**: Container health status for Docker orchestration  
+✅ **Bot Status**: Verify bot initialization and readiness  
+✅ **Development Tools**: Debug endpoints for development  
+❌ **No Chat Functionality**: Discord messages required for conversations  
+❌ **No Memory Endpoints**: Memory access only via Discord interactions  
+❌ **No Character APIs**: Character responses only via Discord  
 
 ## API Endpoints
 
 ### Base URL
-The API endpoints are served on the same port as the health server for each bot:
+The health endpoints are served on each bot's designated port:
 
 - **Elena** (Marine Biologist): `http://localhost:9091`
 - **Marcus** (AI Researcher): `http://localhost:9092` 
 - **Ryan** (Indie Game Developer): `http://localhost:9093`
 - **Gabriel** (British Gentleman): `http://localhost:9095`
 - **Sophia** (Marketing Executive): `http://localhost:9096`
-- And so on...
+- **And all other configured bots...**
 
-### 1. Single Message Chat
+### 1. Health Check
 
-**Endpoint**: `POST /api/chat`
+**Endpoint**: `GET /health`
 
-Send a single message to the AI character and receive a response.
-
-**Request Body**:
-```json
-{
-  "user_id": "string",
-  "message": "string",
-  "context": {
-    "channel_type": "dm|guild",
-    "platform": "api", 
-    "metadata": {}
-  }
-}
-```
+Check if the bot container is running and initialized properly.
 
 **Response**:
 ```json
 {
-  "success": true,
-  "response": "AI character response text",
-  "processing_time_ms": 1250,
-  "memory_stored": true,
-  "timestamp": "2024-01-15T10:30:00Z",
-  "bot_name": "Elena Rodriguez",
-  "metadata": {
-    "memory_count": 5,
-    "ai_components": {...}
+  "status": "healthy",
+  "bot_name": "Elena Rodriguez [AI DEMO]",
+  "timestamp": "2025-10-04T10:30:00Z",
+  "uptime_seconds": 3600,
+  "components": {
+    "memory_manager": "initialized",
+    "llm_client": "connected",
+    "character_system": "loaded"
   }
 }
 ```
 
 **Example**:
 ```bash
-curl -X POST http://localhost:9091/api/chat \
-  -H "Content-Type: application/json" \
-  -d '{
-    "user_id": "test_user_123",
-    "message": "Hello! Can you tell me about marine biology?",
-    "context": {
-      "channel_type": "dm",
-      "platform": "api"
-    }
-  }'
+curl http://localhost:9091/health
 ```
 
-### 2. Batch Message Processing
+### 2. Bot Status
 
-**Endpoint**: `POST /api/chat/batch`
+**Endpoint**: `GET /status`
 
-Send multiple messages in a single request (up to 10 messages).
+Get detailed information about bot configuration and status.
 
-**Request Body**:
+**Response**:
 ```json
 {
-  "messages": [
-    {
-      "user_id": "string",
-      "message": "string",
+  "bot_name": "Elena Rodriguez [AI DEMO]",
+  "character_file": "elena.json", 
+  "discord_status": "connected",
+  "memory_system": "vector",
+  "environment": "development",
+  "version": "2025.10.4"
+}
+```
+
+## Discord Integration
+
+### **How to Test Conversation Features**
+
+Since WhisperEngine is Discord-only, testing conversation features requires Discord messages:
+
+1. **Join Discord Server**: Get access to the Discord server where bots are deployed
+2. **Send Direct Messages**: Send DMs to Elena, Marcus, Ryan, etc.
+3. **Test in Channels**: Use bots in Discord channels where they're invited
+
+### **Example Discord Interactions**:
+
+```
+# Direct message to Elena bot
+You: "Hello Elena! Can you tell me about marine biology?"
+
+Elena: "¡Ay! *adjusts diving mask* You've come to the right marine biologist! 
+Ocean science is like exploring an alien world right here on Earth. From the 
+calcium carbonate structures in coral reefs to the bioluminescent creatures 
+in the deep sea - ¡Dios mío!, there's so much to discover! 
+
+What aspect interests you most? The ecosystem dynamics? Conservation efforts? 
+Or maybe the fascinating chemistry of seawater itself? 🌊🐠"
+```
+
+## Development and Testing
+
+### **Bot Logs for Debugging**:
+```bash
+# View Elena bot logs
+docker logs whisperengine-elena-bot --tail 50
+
+# View Marcus bot logs  
+docker logs whisperengine-marcus-bot --tail 50
+
+# Follow logs in real-time
+docker logs whisperengine-elena-bot -f
+```
+
+### **Multi-Bot Management**:
+```bash
+# Start specific bot
+./multi-bot.sh start elena
+
+# Check all bot status
+./multi-bot.sh status
+
+# Restart after code changes
+./multi-bot.sh restart elena
+```
+
+## Migration from HTTP Chat APIs
+
+**Previous Architecture** (REMOVED):
+- HTTP chat endpoints (`POST /api/chat`)
+- External web interfaces  
+- Webhook integrations
+- Platform-agnostic chat APIs
+
+**Current Architecture** (ACTIVE):
+- Discord-first bot system
+- Health check endpoints only
+- Container orchestration support
+- Direct Discord message processing
+
+### **Why Discord-Only?**
+
+1. **Simplified Architecture**: Single platform focus reduces complexity
+2. **Rich Discord Features**: Native Discord integrations (reactions, threads, embeds)
+3. **Community Focus**: Discord provides natural community interaction patterns  
+4. **Development Velocity**: Faster iteration without multi-platform abstractions
+
+---
+
+**For conversation features, send Discord messages directly to the character bots. HTTP endpoints are for monitoring and health checks only.**
       "context": {}
     }
   ]
@@ -106,131 +167,9 @@ Send multiple messages in a single request (up to 10 messages).
   "results": [
     {
       "index": 0,
-      "user_id": "test_user",
-      "success": true,
-      "response": "Response text",
-      "processing_time_ms": 800,
-      "memory_stored": true
-    }
-  ],
-  "total_processed": 1,
-  "timestamp": "2024-01-15T10:30:00Z",
-  "bot_name": "Elena Rodriguez"
-}
-```
+---
 
-### 3. Health and Status
-
-**Health Check**: `GET /health`
-- Basic health status
-
-**Readiness Check**: `GET /ready`  
-- Bot connection status
-
-**Bot Information**: `GET /api/bot-info`
-- Bot name, character info, capabilities
-
-**Detailed Status**: `GET /status`
-- Complete system status including API endpoints
-
-## Implementation Details
-
-### Message Processing Pipeline
-
-The external API uses the same sophisticated processing pipeline as Discord:
-
-1. **Security Validation** - Content scanning and sanitization
-2. **Name Detection** - Automatic user name storage  
-3. **Memory Retrieval** - Context-aware memory search
-4. **AI Component Processing** - Emotion analysis, context switching
-5. **CDL Character Enhancement** - Personality integration
-6. **Response Generation** - LLM processing with character context
-7. **Response Validation** - Character consistency and security
-8. **Memory Storage** - Conversation storage for future context
-
-### Memory Continuity
-
-- **User-specific memory**: Each `user_id` maintains separate conversation history
-- **Bot-specific isolation**: Elena's memories stay with Elena, Marcus's with Marcus
-- **Cross-session persistence**: Memory persists across API calls
-- **Vector-based retrieval**: Semantic search for relevant context
-
-### Character Personalities
-
-Each bot maintains its full CDL personality:
-
-- **Elena Rodriguez**: Marine biologist with warm, educational communication style
-- **Marcus Thompson**: AI researcher with analytical, precise responses  
-- **Ryan Chen**: Indie game developer with creative, technical expertise
-- **Gabriel**: British gentleman with formal, courteous manner
-- **Sophia Blake**: Marketing executive with professional, strategic insights
-
-## Usage Examples
-
-### Python with aiohttp
-```python
-import aiohttp
-import asyncio
-
-async def chat_with_elena():
-    async with aiohttp.ClientSession() as session:
-        payload = {
-            "user_id": "python_user",
-            "message": "What's the most fascinating marine creature you've studied?",
-            "context": {"channel_type": "dm", "platform": "api"}
-        }
-        
-        async with session.post(
-            "http://localhost:9091/api/chat",
-            json=payload
-        ) as response:
-            result = await response.json()
-            print(f"Elena: {result['response']}")
-
-asyncio.run(chat_with_elena())
-```
-
-### JavaScript with fetch
-```javascript
-async function chatWithMarcus() {
-    const response = await fetch('http://localhost:9092/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            user_id: 'js_user',
-            message: 'What are your thoughts on the latest developments in AI research?',
-            context: { channel_type: 'dm', platform: 'api' }
-        })
-    });
-    
-    const result = await response.json();
-    console.log(`Marcus: ${result.response}`);
-}
-```
-
-### Testing Script
-
-Use the included test script for interactive testing:
-
-```bash
-# Run the test script
-python test_external_api.py
-
-# Choose option 1 for endpoint testing
-# Choose option 2 for interactive chat
-```
-
-## Error Handling
-
-### Common HTTP Status Codes
-
-- **200**: Success - message processed successfully
-- **400**: Bad Request - invalid JSON or missing required fields
-- **500**: Internal Server Error - processing failed
-- **503**: Service Unavailable - bot components not ready
-
-### Error Response Format
-```json
+**For conversation features, send Discord messages directly to the character bots. HTTP endpoints are for monitoring and health checks only.**
 {
   "success": false,
   "error": "Error description",

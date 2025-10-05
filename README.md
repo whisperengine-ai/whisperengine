@@ -72,8 +72,8 @@ WhisperEngine creates AI Roleplay Characters that spark meaningful interactions 
 graph TB
     subgraph "User Interfaces"
         DC[Discord Bots]
-        WU[Web Interface]
-        MA[Mobile Apps*]
+        API[HTTP Chat APIs]
+        THIRD[3rd Party Integration]
     end
     
     subgraph "WhisperEngine Core"
@@ -98,6 +98,14 @@ graph TB
         end
     end
     
+    subgraph "PostgreSQL Semantic Knowledge Graph"
+        direction LR
+        PG[(PostgreSQL)]
+        FACTS[Fact Entities]
+        RELS[User Relationships]
+        GRAPH[Graph Queries]
+    end
+    
     subgraph "Vector-Native Memory System"
         direction LR
         QD[(Qdrant Vector DB)]
@@ -107,27 +115,28 @@ graph TB
     
     subgraph "Supporting Infrastructure"  
         direction LR
-        PG[(PostgreSQL)]
         RD[(Redis Cache)]
         MON[Health Monitoring]
+        HEALTH[Health Endpoints]
     end
     
     subgraph "Multi-Bot Characters"
         direction TB
         MB[Multi-Bot Manager]
-        E1[Elena Bot]
-        M1[Marcus Bot] 
-        J1[Jake Bot]
-        DR[Dream Bot]
-        R1[Ryan Bot]
-        G1[Gabriel Bot]
-        S1[Sophia Bot]
+        E1[Elena Bot<br/>:9091]
+        M1[Marcus Bot<br/>:9092] 
+        J1[Jake Bot<br/>:9097]
+        DR[Dream Bot<br/>:9094]
+        R1[Ryan Bot<br/>:9093]
+        G1[Gabriel Bot<br/>:9095]
+        S1[Sophia Bot<br/>:9096]
+        DOTTY[Dotty Bot<br/>:3007]
     end
     
     %% Connections
     DC --> BC
-    WU --> BC  
-    MA --> BC
+    API --> BC
+    THIRD --> API
     
     BC --> CDL
     BC --> ENG
@@ -149,8 +158,13 @@ graph TB
     BC --> LMS
     
     BC --> PG
+    PG --> FACTS
+    PG --> RELS
+    PG --> GRAPH
+    
     BC --> RD
     BC --> MON
+    MON --> HEALTH
     
     MB --> E1
     MB --> M1
@@ -159,6 +173,7 @@ graph TB
     MB --> R1
     MB --> G1
     MB --> S1
+    MB --> DOTTY
     
     E1 --> QD
     M1 --> QD
@@ -167,6 +182,16 @@ graph TB
     R1 --> QD
     G1 --> QD
     S1 --> QD
+    DOTTY --> QD
+    
+    E1 --> PG
+    M1 --> PG
+    J1 --> PG
+    DR --> PG
+    R1 --> PG
+    G1 --> PG
+    S1 --> PG
+    DOTTY --> PG
     
     UIS --> PG
     
@@ -176,12 +201,14 @@ graph TB
     classDef infrastructure fill:#e8f5e8
     classDef botInstance fill:#fff3e0
     classDef userInterface fill:#f1f8e9
+    classDef postgresGraph fill:#f8e1ff
     
     class QD,FE,VM vectorDB
     class OR,ANT,OAI,OLL,LMS llmProvider
-    class PG,RD,MON infrastructure
-    class E1,M1,J1,DR,R1,G1,S1 botInstance
-    class DC,WU,MA userInterface
+    class RD,MON,HEALTH infrastructure
+    class E1,M1,J1,DR,R1,G1,S1,DOTTY botInstance
+    class DC,API,THIRD userInterface
+    class PG,FACTS,RELS,GRAPH postgresGraph
 ```
 
 ### Simplified Architecture View
@@ -192,8 +219,8 @@ graph TB
 └─────────────────────────────────────────────────────────────────┘
 
 ┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
-│   Discord Bot   │    │   Web Interface  │    │  Mobile Apps*   │
-│   Multi-Char    │    │   Real-time      │    │  (Coming Soon)  │
+│   Discord Bot   │    │   HTTP Chat API  │    │  3rd Party      │
+│   Multi-Char    │    │   Rich Metadata  │    │  Integration    │
 └─────────┬───────┘    └────────┬─────────┘    └─────────┬───────┘
           │                     │                        │
           └─────────────────────┼────────────────────────┘
@@ -205,6 +232,20 @@ graph TB
 │  │ Character   │  │  Identity   │  │                         │  │
 │  │  System     │  │  System     │  │ Elena Marcus Jake Ryan  │  │
 │  └─────────────┘  └─────────────┘  └─────────────────────────┘  │
+└─────────────────────┬───────────────────────────────────────────┘
+                     │
+┌─────────────────────────────────────────────────────────────────┐
+│            PostgreSQL Semantic Knowledge Graph                 │
+│                                                                 │
+│  ┌─────────────┐    ┌─────────────┐    ┌─────────────────────┐  │
+│  │ Fact Entity │◄──►│    User     │◄──►│   Graph Queries     │  │
+│  │   Storage   │    │ Relation-   │    │                     │  │
+│  │             │    │    ships    │    │ • Semantic Search   │  │
+│  │ • Entities  │    │             │    │ • Relationship      │  │
+│  │ • Types     │    │ • Likes     │    │   Discovery         │  │
+│  │ • Relations │    │ • Dislikes  │    │ • Knowledge Graphs  │  │
+│  │ • Contexts  │    │ • Custom    │    │ • Contradiction     │  │
+│  └─────────────┘    └─────────────┘    └─────────────────────┘  │
 └─────────────────────┬───────────────────────────────────────────┘
                      │
 ┌─────────────────────────────────────────────────────────────────┐
@@ -227,11 +268,13 @@ graph TB
 │               Supporting Infrastructure                         │
 │                                                                 │
 │  ┌─────────────┐    ┌─────────────┐    ┌─────────────────────┐  │
-│  │ PostgreSQL  │    │    Redis    │    │     Monitoring      │  │
-│  │             │    │    Cache    │    │                     │  │
-│  │ • User Data │    │             │    │ • Health Checks     │  │
-│  │ • Config    │    │ • Sessions  │    │ • Performance       │  │
-│  │ • Metadata  │    │ • Cache     │    │ • Analytics         │  │
+│  │    Redis    │    │   Health    │    │   HTTP Chat APIs   │  │
+│  │    Cache    │    │ Monitoring  │    │                     │  │
+│  │             │    │             │    │ • Rich Metadata     │  │
+│  │ • Sessions  │    │ • Health    │    │ • Emotional Intel   │  │
+│  │ • Cache     │    │   Checks    │    │ • User Facts        │  │
+│  │ • Perf      │    │ • Analytics │    │ • Relationship      │  │
+│  │   Opts      │    │ • Metrics   │    │   Metrics (:9091+)  │  │
 │  └─────────────┘    └─────────────┘    └─────────────────────┘  │
 └─────────────────────────────────────────────────────────────────┘
 
@@ -249,6 +292,13 @@ graph TB
 ```
 
 ### Core Components
+
+**PostgreSQL Semantic Knowledge Graph**
+- **Fact Entity Storage**: Structured storage of user facts, preferences, and relationships
+- **Graph Queries**: Semantic relationship discovery and contradiction detection  
+- **Knowledge Extraction**: Automatic fact extraction and entity relationship mapping
+- **User Relationship Management**: Likes, dislikes, preferences with emotional context
+- **Cross-Bot Knowledge Sharing**: Shared fact base with bot-specific relationship contexts
 
 **Vector-Native Memory System**
 - **Qdrant**: Primary vector database for semantic memory storage with named vectors and advanced similarity search
@@ -278,35 +328,42 @@ graph TB
 ### Technology Stack
 
 - **Backend**: Python with async/await patterns for concurrent operations
+- **Knowledge Storage**: PostgreSQL Semantic Knowledge Graph (facts, relationships, entities)
 - **Vector Memory**: Qdrant (primary semantic storage) + FastEmbed (embedding generation)
-- **Structured Data**: PostgreSQL (configuration, user data, structured metadata)
 - **Caching Layer**: Redis (performance optimization, session management)
 - **AI Integration**: OpenRouter, Anthropic, OpenAI with intelligent routing
+- **Multi-Platform**: Discord bots + HTTP Chat APIs for 3rd party integration
 - **Deployment**: Docker Compose with multi-bot orchestration and health monitoring
 - **Testing**: Pytest with container-based integration and vector memory validation
 
 ### Data Flow Architecture
 
 ```
-User Message → Discord/Web → Universal Identity → CDL Character System → Vector Emotion Analysis
-     ↓                                                    ↓
+User Message → Discord/HTTP API → Universal Identity → CDL Character System → Vector Emotion Analysis
+     ↓                                                     ↓
 Bot-Specific Context ← Qdrant Named Vector Search ← FastEmbed Encoding ← Context Manager
      ↓                          ↓                          ↓  
-LLM Provider → Response Generation → Character Filtering → Platform Reply (Discord/Web)
+PostgreSQL Graph Query ← Fact Extraction ← Knowledge Manager ← Semantic Analysis
+     ↓                          ↓                          ↓
+LLM Provider → Response Generation → Character Filtering → Platform Reply (Discord/HTTP API)
      ↓                                                        ↓
 Vector Memory Storage ← Named Vector Embedding ← Emotional Context ← User Feedback
+     ↓                                                        ↓
+PostgreSQL Graph Update ← Fact Storage ← Knowledge Extraction ← Response Analysis
 ```
 
 **Key Data Flow Steps:**
-1. **Platform Input**: User message received via Discord or Web interface with Universal Identity
+1. **Platform Input**: User message via Discord or HTTP Chat API with Universal Identity mapping
 2. **Character Context**: CDL system applies bot-specific personality and communication style  
 3. **Vector Emotion Analysis**: Multi-dimensional emotion detection using named vector embeddings
-4. **Memory Retrieval**: Qdrant semantic search with bot-specific filtering for relevant conversation history
-5. **Context Assembly**: Combine current message, bot-filtered memories, and character personality data
-6. **LLM Generation**: Send enriched context to chosen AI provider (OpenRouter/Anthropic/OpenAI/Ollama/LM Studio)
-7. **Response Filtering**: Apply character-specific voice constraints and personality consistency checks
-8. **Vector Storage**: Store conversation with named vectors (content/emotion/semantic) and bot segmentation
-9. **Platform Delivery**: Send personalized response through Discord or Web interface with real-time updates
+4. **Memory Retrieval**: Qdrant semantic search with bot-specific filtering for conversation history
+5. **Knowledge Graph Query**: PostgreSQL semantic graph queries for fact relationships and entities
+6. **Context Assembly**: Combine current message, bot-filtered memories, graph knowledge, and character data
+7. **LLM Generation**: Send enriched context to chosen AI provider (OpenRouter/Anthropic/OpenAI/Ollama/LM Studio)
+8. **Response Filtering**: Apply character-specific voice constraints and personality consistency checks
+9. **Vector Storage**: Store conversation with named vectors (content/emotion/semantic) and bot segmentation
+10. **Knowledge Graph Update**: Extract and store new facts, relationships, and entities in PostgreSQL graph
+11. **Platform Delivery**: Send response via Discord or HTTP API with rich metadata (emotional intel, user facts, relationship metrics)
 
 ## ✨ AI Features That Set Us Apart
 
@@ -350,14 +407,30 @@ Vector Memory Storage ← Named Vector Embedding ← Emotional Context ← User 
 ### 🎭 Try Our Demo Characters
 
 **Join our Discord server to experience WhisperEngine's creative AI personalities:**
-- **🧬 Elena Rodriguez** - Marine biologist with warm, empathetic personality
-- **🤖 Marcus Thompson** - AI researcher with academic, professional communication  
-- **📸 Jake Sterling** - Adventure photographer with rugged, protective nature
-- **🎮 Ryan Chen** - Independent game developer with perfectionist creativity
-- **✨ Gabriel** - Rugged British gentleman with dry wit and charming sophistication
-- **💭 Dream of the Endless** - Mythological entity with profound, otherworldly expression
-- **💼 Sophia Blake** - Sophisticated marketing executive with luxury lifestyle
-- **🌟 Aethys** - Omnipotent entity for philosophical exploration
+- **🧬 Elena Rodriguez** - Marine biologist with warm, empathetic personality (Port 9091)
+- **🤖 Marcus Thompson** - AI researcher with academic, professional communication (Port 9092)
+- **📸 Jake Sterling** - Adventure photographer with rugged, protective nature (Port 9097)
+- **🎮 Ryan Chen** - Independent game developer with perfectionist creativity (Port 9093)
+- **✨ Gabriel** - Rugged British gentleman with dry wit and charming sophistication (Port 9095)
+- **💭 Dream of the Endless** - Mythological entity with profound, otherworldly expression (Port 9094)
+- **💼 Sophia Blake** - Sophisticated marketing executive with luxury lifestyle (Port 9096)
+- **🌟 Aethys** - Omnipotent entity for philosophical exploration (Port 3007)
+- **🍻 Dotty** - AI Bartender of the Lim with cocktail expertise and narrative immersion (Port 3007)
+
+**🔗 HTTP Chat API Access:**
+Each character also provides rich HTTP Chat API endpoints for 3rd party integration:
+```bash
+# Chat with Elena (Marine Biologist)
+curl -X POST http://localhost:9091/api/chat \
+  -H "Content-Type: application/json" \
+  -d '{"user_id": "your_id", "message": "Tell me about marine conservation"}'
+
+# Rich metadata response includes:
+# - Emotional intelligence analysis
+# - User facts and relationship metrics  
+# - AI component processing data
+# - Character personality context
+```
 
 **📋 Before You Join:**
 - **Read our [Discord Welcome Guide](docs/community/DISCORD_WELCOME_GUIDE.md)** - Learn how to interact with characters respectfully

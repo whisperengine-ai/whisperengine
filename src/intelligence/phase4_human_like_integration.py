@@ -226,18 +226,21 @@ class Phase4HumanLikeIntegration:
                     phase4_context.phase2_results = None
 
             # Step 3: Execute Phase 3 (Memory Networks) if available
-            if self.phase3_memory_networks and self.memory_manager:
+            logger.debug(f"🔍 PHASE 3 DEBUG: Checking memory_manager existence: {self.memory_manager is not None}")
+            if self.memory_manager:
                 try:
-                    logger.debug("Executing Phase 3: Vector-Native Memory Clustering")
+                    logger.debug("🚀 PHASE 3 DEBUG: Executing Phase 3: Vector-Native Memory Clustering")
                     phase3_start = datetime.now(UTC)
 
                     # Use Qdrant's native clustering instead of obsolete Phase3MemoryNetworks
+                    logger.debug(f"🔍 PHASE 3 DEBUG: Checking vector_store attribute: {hasattr(self.memory_manager, 'vector_store')}")
                     if hasattr(self.memory_manager, 'vector_store'):
+                        logger.debug(f"🚀 PHASE 3 DEBUG: Calling get_memory_clusters_for_roleplay for user {user_id}")
                         cluster_data = await self.memory_manager.vector_store.get_memory_clusters_for_roleplay(
                             user_id=user_id, 
-                            query=message,  # Use the message parameter
-                            limit=20
+                            cluster_size=20
                         )
+                        logger.debug(f"✅ PHASE 3 DEBUG: Successfully got cluster data: {type(cluster_data)}")
                         
                         phase3_results = {
                             "user_id": user_id,
@@ -314,16 +317,14 @@ class Phase4HumanLikeIntegration:
                     memory_enhancement_results = {}
                     for query_type, query_data in enhanced_queries.items():
                         try:
-                            query_results = self.enhanced_query_processor.process_enhanced_query(
-                                user_id=user_id,
-                                original_query=query_data["query"],
-                                context=query_data["context"],
-                                limit=query_data.get("limit", 10),
+                            # Use the correct method that exists in EnhancedQueryProcessor
+                            query_results = self.enhanced_query_processor.process_message(
+                                query_data["query"]
                             )
                             memory_enhancement_results[query_type] = query_results
                         except Exception as e:
                             logger.warning(
-                                f"Enhanced query processing failed for {query_type}: {e}"
+                                "Enhanced query processing failed for %s: %s", query_type, e
                             )
                             memory_enhancement_results[query_type] = None
 

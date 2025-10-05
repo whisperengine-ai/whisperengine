@@ -14,7 +14,7 @@ Debug scripts and tools for troubleshooting specific components:
 - `simple_log_test.py` - Logging system test utility
 - `simple_memory_moments_test.py` - Memory moments testing
 - `simple_test_server.py` - Server testing utility
-- `demo_character_graph_memory.py` - Character memory system demonstration
+- `demo_character_memory_integration.py` - Memory integration demo
 - `demo_character_memory_integration.py` - Memory integration demo
 - `multi_entity_relationship_demo.py` - Multi-entity relationship demo
 

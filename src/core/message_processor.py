@@ -97,6 +97,7 @@ class MessageProcessor:
         This is the main entry point that replicates the sophisticated processing
         from the Discord handlers but in a platform-agnostic way.
         """
+        logger.info(f"🚀 MESSAGE PROCESSOR DEBUG: Starting process_message for user {message_context.user_id}")
         start_time = datetime.now()
         
         try:
@@ -1057,6 +1058,7 @@ class MessageProcessor:
         8. Conversation analysis
         9. Context switch detection
         """
+        logger.info(f"🚀 AI COMPONENTS DEBUG: Starting parallel processing for user {message_context.user_id}")
         ai_components = {}
         
         try:
@@ -1099,7 +1101,11 @@ class MessageProcessor:
                 task_names.append("personality_analysis")
             
             # Task 4: Phase 4 human-like intelligence processing
+            logger.debug(f"🎯 TASK DEBUG: bot_core exists: {self.bot_core is not None}")
+            if self.bot_core:
+                logger.debug(f"🎯 TASK DEBUG: has phase2_integration: {hasattr(self.bot_core, 'phase2_integration')}")
             if self.bot_core and hasattr(self.bot_core, 'phase2_integration'):
+                logger.debug("🎯 TASK DEBUG: Creating phase4_intelligence task")
                 phase4_task = self._process_phase4_intelligence_sophisticated(
                     message_context.user_id,
                     message_context.content,
@@ -1292,14 +1298,24 @@ class MessageProcessor:
                                                        message_context: MessageContext,
                                                        conversation_context: List[Dict[str, str]]) -> Optional[Dict[str, Any]]:
         """Sophisticated Phase 4 intelligence processing with full integration."""
+        logger.debug(f"🎯 STARTING SOPHISTICATED PHASE 4 PROCESSING for user {user_id}")
         try:
             if not self.bot_core or not hasattr(self.bot_core, 'phase2_integration'):
+                logger.debug("🔍 Bot core or phase2_integration not available")
                 return None
             
             # Create adapter for Discord-specific component
             discord_message = create_discord_message_adapter(message_context)
             
-            # Process with full Phase 4 sophistication
+            # Use the stable OLD Phase 3 + Phase 4 processing method
+            # Note: NEW Phase 3 memory clustering has been obsoleted by PostgreSQL graph architecture
+            logger.info("🔄 Using stable OLD Phase 3 + Phase 4 processing method")
+            
+            # Process Phase 3 components separately (like the old working system)
+            phase3_context_switches = await self._analyze_context_switches(user_id, content, discord_message)
+            phase3_empathy_calibration = await self._calibrate_empathy_response(user_id, content, discord_message)
+            
+            # Process with old Phase 4 sophistication
             phase4_context = await self.bot_core.phase2_integration.process_phase4_intelligence(
                 user_id=user_id,
                 message=discord_message,
@@ -1307,6 +1323,11 @@ class MessageProcessor:
                 external_emotion_data=None,
                 phase2_context=None
             )
+            
+            # Add Phase 3 results to the Phase 4 context
+            if isinstance(phase4_context, dict):
+                phase4_context['phase3_context_switches'] = phase3_context_switches
+                phase4_context['phase3_empathy_calibration'] = phase3_empathy_calibration
             
             logger.debug(f"Sophisticated Phase 4 intelligence processing successful for user {user_id}")
             return phase4_context
@@ -1564,6 +1585,79 @@ class MessageProcessor:
             logger.debug("Phase 4 intelligence processing failed: %s", str(e))
         
         return None
+
+    async def _analyze_context_switches(self, user_id: str, content: str, message) -> Optional[List[Dict[str, Any]]]:
+        """Analyze context switches using Phase 3 ContextSwitchDetector."""
+        try:
+            logger.debug("Running Phase 3 context switch detection...")
+
+            if not self.bot_core or not hasattr(self.bot_core, 'context_switch_detector') or not self.bot_core.context_switch_detector:
+                logger.debug("Context switch detector not available")
+                return None
+
+            # Detect context switches
+            context_switches = await self.bot_core.context_switch_detector.detect_context_switches(
+                user_id=user_id,
+                new_message=content
+            )
+
+            logger.debug("Phase 3 context switch detection completed: %s switches detected", len(context_switches) if context_switches else 0)
+            return context_switches
+
+        except Exception as e:
+            logger.error("Phase 3 context switch detection failed: %s", str(e))
+            return None
+
+    async def _calibrate_empathy_response(self, user_id: str, content: str, message) -> Optional[Dict[str, Any]]:
+        """Calibrate empathy response using Phase 3 EmpathyCalibrator."""
+        try:
+            logger.debug("Running Phase 3 empathy calibration...")
+
+            if not self.bot_core or not hasattr(self.bot_core, 'empathy_calibrator') or not self.bot_core.empathy_calibrator:
+                logger.debug("Empathy calibrator not available")
+                return None
+
+            # First detect emotion for empathy calibration (simplified for now)
+            try:
+                from src.intelligence.empathy_calibrator import EmotionalResponseType
+                
+                # Use a simple emotion detection based on message content
+                detected_emotion = EmotionalResponseType.CONTENTMENT  # Default neutral emotion
+                if any(word in content.lower() for word in ['sad', 'upset', 'angry', 'frustrated']):
+                    detected_emotion = EmotionalResponseType.STRESS
+                elif any(word in content.lower() for word in ['happy', 'excited', 'joy', 'great']):
+                    detected_emotion = EmotionalResponseType.JOY
+                elif any(word in content.lower() for word in ['worried', 'anxious', 'nervous']):
+                    detected_emotion = EmotionalResponseType.ANXIETY
+                elif any(word in content.lower() for word in ['confused', 'lost', 'don\'t understand']):
+                    detected_emotion = EmotionalResponseType.CONFUSION
+
+                # Calibrate empathy
+                empathy_calibration = await self.bot_core.empathy_calibrator.calibrate_empathy(
+                    user_id=user_id,
+                    detected_emotion=detected_emotion,
+                    message_content=content
+                )
+
+                logger.debug("Phase 3 empathy calibration completed: %s", empathy_calibration.recommended_style.value if empathy_calibration else 'None')
+                
+                # Convert to dict format for JSON serialization
+                if empathy_calibration:
+                    return {
+                        'empathy_style': empathy_calibration.recommended_style.value,
+                        'confidence': empathy_calibration.confidence_score,
+                        'guidance': empathy_calibration.guidance_text,
+                        'personalization_factors': empathy_calibration.personalization_factors
+                    }
+                return None
+
+            except ImportError:
+                logger.debug("EmotionalResponseType not available for empathy calibration")
+                return None
+
+        except Exception as e:
+            logger.error("Phase 3 empathy calibration failed: %s", str(e))
+            return None
 
     def detect_context_patterns(self, message: str, conversation_history: List[Dict[str, str]], 
                                vector_boost: bool = True, confidence_threshold: float = 0.7) -> Dict[str, Any]:

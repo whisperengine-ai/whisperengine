@@ -1,34 +1,36 @@
-# Integration Guide: Adding External Chat API to Existing WhisperEngine Bots
+# Integration Guide: WhisperEngine Discord Bot Health Monitoring
 
-This guide shows how the External Chat API integrates with existing WhisperEngine bots without requiring code changes.
+**⚠️ IMPORTANT: WhisperEngine is Discord-only. This guide covers health monitoring endpoints, not chat functionality.**
+
+This guide shows how health check endpoints integrate with existing WhisperEngine bots for monitoring and debugging.
 
 ## Automatic Integration
 
-The External Chat API is automatically available on all WhisperEngine bots through the enhanced health server. No additional setup is required.
+Health check endpoints are automatically available on all WhisperEngine bots through the health server. No additional setup is required.
 
 ### How It Works
 
-1. **Shared Components**: The API uses the same `memory_manager`, `llm_client`, and AI components as Discord
-2. **Same Processing Pipeline**: External API calls go through identical message processing as Discord messages
-3. **No Code Changes**: Existing Discord bots gain API capabilities automatically
+1. **Container Health**: Docker orchestration can monitor bot health
+2. **Development Debugging**: Check bot initialization and component status
+3. **Monitoring Integration**: External monitoring systems can track bot status
+4. **No Discord Dependency**: Health checks work even if Discord is unavailable
 
 ### Available Endpoints
 
 When you start any bot with `./multi-bot.sh start <bot_name>`, these endpoints become available:
 
-**Health & Status:**
-- `GET /health` - Basic health check
-- `GET /ready` - Bot readiness status  
-- `GET /status` - Detailed system status
-- `GET /api/bot-info` - Bot and character information
+**Health & Status Only:**
+- `GET /health` - Basic health check for container orchestration
+- `GET /status` - Detailed bot configuration and system status
 
-**Chat API:**
-- `POST /api/chat` - Single message processing
-- `POST /api/chat/batch` - Batch message processing
+**No Chat Endpoints:**
+- ❌ All chat APIs have been removed
+- ❌ External chat functionality discontinued  
+- ✅ Discord messages required for conversations
 
 ### Port Mapping
 
-Each bot runs on its own port with all endpoints available:
+Each bot runs on its own port for health monitoring:
 
 - **Elena** (Marine Biologist): Port 9091
 - **Marcus** (AI Researcher): Port 9092
@@ -39,45 +41,58 @@ Each bot runs on its own port with all endpoints available:
 - **Jake** (Adventure Photographer): Port 9097
 - **Aethys** (Omnipotent): Port 3007
 
-### Testing Integration
+### Testing Health Endpoints
 
 ```bash
 # Start any bot
 ./multi-bot.sh start elena
 
-# Test the API
-curl -X POST http://localhost:9091/api/chat \
-  -H "Content-Type: application/json" \
-  -d '{
-    "user_id": "test_user",
-    "message": "Hello Elena! Tell me about marine biology.",
-    "context": {"channel_type": "dm", "platform": "api"}
-  }'
+# Test health endpoint
+curl http://localhost:9091/health
 
-# Use the interactive test client
-python test_external_api.py
+# Check bot status
+curl http://localhost:9091/status
+
+# Monitor bot logs
+docker logs whisperengine-elena-bot -f
 ```
 
-### Memory Continuity
+### Discord Integration
 
-- API conversations use the same memory system as Discord
-- Each `user_id` maintains separate conversation history
-- Memory persists across API calls and Discord interactions
-- Bot-specific memory isolation is maintained
+**For conversation features:**
+- Send Discord DMs to Elena, Marcus, Ryan, etc.
+- Use bots in Discord channels where they're invited
+- All AI intelligence, memory, and character features work via Discord
 
-### Character Consistency
+**Example Discord Interaction:**
+```
+You → Elena (via Discord DM): "Hello! Tell me about marine biology."
 
-- Same CDL personalities as Discord interactions
-- Identical response generation and validation
-- Character-appropriate behavior and knowledge
-- No behavioral differences between platforms
+Elena: "¡Ay! *adjusts diving mask* You've come to the right marine biologist! 
+The ocean is like an alien world right here on Earth, filled with calcium 
+carbonate coral structures and bioluminescent deep-sea creatures. 
+What aspect interests you most? 🌊🐠"
+```
+
+### Container Orchestration
+
+Health endpoints enable Docker/Kubernetes monitoring:
+
+```yaml
+# Docker Compose health check example
+healthcheck:
+  test: ["CMD", "curl", "-f", "http://localhost:9091/health"]
+  interval: 30s
+  timeout: 10s
+  retries: 3
+```
 
 ## Architecture Benefits
 
-✅ **Zero Configuration** - Works out of the box with existing bots  
-✅ **Shared Intelligence** - Same AI pipeline as Discord  
-✅ **Memory Continuity** - Persistent conversation context  
-✅ **Character Fidelity** - Identical personalities across platforms  
-✅ **No Performance Impact** - API calls don't affect Discord performance  
+✅ **Container Health Monitoring** - Docker orchestration support  
+✅ **Development Debugging** - Bot status visibility during development  
+✅ **Production Monitoring** - External monitoring system integration  
+✅ **Discord Focus** - All conversation intelligence via Discord only  
+✅ **No Performance Impact** - Health checks don't affect Discord performance  
 
 The External Chat API provides a seamless way to extend WhisperEngine capabilities to external systems while maintaining the sophisticated AI processing that makes each character unique.
