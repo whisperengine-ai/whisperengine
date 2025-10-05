@@ -198,12 +198,18 @@ class EnhancedHealthServer:
         {
             "user_id": "string",
             "message": "string", 
+            "metadata_level": "basic|standard|extended",  // Optional, defaults to "standard"
             "context": {
                 "channel_type": "dm|guild",
                 "platform": "api",
                 "metadata": {}
             }
         }
+        
+        Metadata Levels:
+        - basic: Minimal essential data (memory_count, knowledge_stored, success flags)
+        - standard: Basic + AI components + security validation (DEFAULT)
+        - extended: Standard + all analytics (temporal, vector memory, relationships, etc.)
         """
         try:
             # Initialize message processor if not done yet
@@ -234,6 +240,14 @@ class EnhancedHealthServer:
                     status=400
                 )
 
+            # Get metadata level (basic, standard, extended)
+            metadata_level = request_data.get('metadata_level', 'standard').lower()
+            if metadata_level not in ['basic', 'standard', 'extended']:
+                return web.json_response(
+                    {'error': 'metadata_level must be "basic", "standard", or "extended"'}, 
+                    status=400
+                )
+
             # Create message context
             context_data = request_data.get('context', {})
             message_context = MessageContext(
@@ -241,10 +255,12 @@ class EnhancedHealthServer:
                 content=request_data['message'],
                 platform='api',
                 channel_type=context_data.get('channel_type', 'dm'),
-                metadata=context_data.get('metadata', {})
+                metadata=context_data.get('metadata', {}),
+                metadata_level=metadata_level  # Pass metadata level control
             )
 
-            logger.info("🌐 EXTERNAL API: Processing message for user %s", message_context.user_id)
+            logger.info("🌐 EXTERNAL API: Processing message for user %s (metadata_level=%s)", 
+                       message_context.user_id, metadata_level)
 
             # Process message through the same pipeline as Discord
             processing_result = await self.message_processor.process_message(message_context)

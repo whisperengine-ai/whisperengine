@@ -304,6 +304,38 @@ class CDLAIPromptIntegration:
                 if comprehensive_context:
                     guidance_parts = []
                     
+                    # 🎭 BOT EMOTIONAL SELF-AWARENESS (Phase 7.6 - NEW)
+                    bot_emotional_state = comprehensive_context.get('bot_emotional_state')
+                    if bot_emotional_state and isinstance(bot_emotional_state, dict):
+                        current_emotion = bot_emotional_state.get('current_emotion', 'neutral')
+                        current_intensity = bot_emotional_state.get('current_intensity', 0.0)
+                        trajectory = bot_emotional_state.get('trajectory_direction', 'stable')
+                        emotional_context = bot_emotional_state.get('emotional_context', '')
+                        mixed_emotions = bot_emotional_state.get('current_mixed_emotions', [])
+                        
+                        # Build bot emotional awareness guidance
+                        emotion_guidance = f"🎭 YOUR EMOTIONAL STATE: You are currently feeling {current_emotion}"
+                        if current_intensity > 0.7:
+                            emotion_guidance += f" (strongly, intensity: {current_intensity:.2f})"
+                        elif current_intensity > 0.4:
+                            emotion_guidance += f" (moderately, intensity: {current_intensity:.2f})"
+                        
+                        # Add mixed emotions if present
+                        if mixed_emotions:
+                            mixed_str = ", ".join([f"{e} ({i:.2f})" for e, i in mixed_emotions[:2]])
+                            emotion_guidance += f" with undertones of {mixed_str}"
+                        
+                        # Add emotional trajectory awareness
+                        if trajectory == "intensifying":
+                            emotion_guidance += ". Your emotions have been intensifying in recent conversations"
+                        elif trajectory == "calming":
+                            emotion_guidance += ". Your emotions have been calming down recently"
+                        
+                        emotion_guidance += ". Be authentic to this emotional state in your response - let it naturally influence your tone and word choice"
+                        
+                        guidance_parts.append(emotion_guidance)
+                        logger.debug(f"🎭 BOT SELF-AWARE: Added emotional state to prompt - {emotional_context}")
+                    
                     # Context Switch Detection (Phase 3)
                     context_switches = comprehensive_context.get('context_switches')
                     if context_switches and isinstance(context_switches, dict):

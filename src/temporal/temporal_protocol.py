@@ -11,17 +11,21 @@ from .confidence_analyzer import ConfidenceAnalyzer, create_confidence_analyzer
 logger = logging.getLogger(__name__)
 
 
-def create_temporal_intelligence_system() -> tuple[TemporalIntelligenceClient, ConfidenceAnalyzer]:
+def create_temporal_intelligence_system(knowledge_router=None) -> tuple[TemporalIntelligenceClient, ConfidenceAnalyzer]:
     """
     Create complete temporal intelligence system
+    
+    Args:
+        knowledge_router: Optional PostgreSQL knowledge router for actual relationship scores
     
     Returns:
         tuple: (TemporalIntelligenceClient, ConfidenceAnalyzer)
     """
     temporal_client = create_temporal_intelligence_client()
-    confidence_analyzer = create_confidence_analyzer()
+    confidence_analyzer = create_confidence_analyzer(knowledge_router=knowledge_router)
     
-    logger.info("Temporal intelligence system initialized (enabled: %s)", temporal_client.enabled)
+    logger.info("Temporal intelligence system initialized (enabled: %s, postgres_integration: %s)", 
+                temporal_client.enabled, knowledge_router is not None)
     return temporal_client, confidence_analyzer
 
 
