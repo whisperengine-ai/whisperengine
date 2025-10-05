@@ -7,11 +7,11 @@
 Your WhisperEngine instance includes:
 
 - **🤖 Discord Bot** - AI-powered with personality and memory
-- **🧠 ChromaDB** - Vector database for semantic memory
-- **⚡ Redis** - Fast conversation caching
+- **🔍 Qdrant** - Vector database for semantic memory (384D embeddings)
+- **⚡ Redis** - Fast conversation caching  
 - **🐘 PostgreSQL** - Persistent data storage
 - **🏥 Health Monitoring** - Container health checks on port 9090
-- **🕸️ Neo4j** - Optional graph relationships (disabled by default)
+- **� InfluxDB** - Optional temporal intelligence metrics
 
 ## ⚙️ Configuration Files
 
@@ -95,8 +95,8 @@ curl http://localhost:9090/metrics
 
 # Individual service logs
 docker-compose logs redis
-docker-compose logs postgres
-docker-compose logs chromadb
+docker-compose logs postgres  
+docker-compose logs qdrant
 ```
 
 ## 🎭 Personality Customization

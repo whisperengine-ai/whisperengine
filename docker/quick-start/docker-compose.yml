@@ -7,21 +7,16 @@ services:
     container_name: whisperengine-bot
     restart: unless-stopped
     
+    # User provides their own .env file with Discord token, API keys, etc.
     env_file:
       - .env
       
-    environment:
-      # Health check configuration
-      - HEALTH_CHECK_PORT=9090
-      - HEALTH_CHECK_HOST=0.0.0.0
-      # CDL Character Configuration
-      - CDL_DEFAULT_CHARACTER=${CDL_DEFAULT_CHARACTER:-characters/default_assistant.json}
-      
     volumes:
-      # Mount config directory for personality templates
-      - ./config:/app/config:ro
-      # Mount characters directory for easy character management
-      - ./characters:/app/characters:ro
+      # Mount user's CDL character file
+      # User should place their character.json file in the same directory as docker-compose.yml
+      - ./character.json:/app/characters/character.json:ro
+      # Optional: Mount entire characters directory if user has multiple characters
+      # - ./characters:/app/characters:ro
       
     ports:
       - "9090:9090"  # Health check endpoints

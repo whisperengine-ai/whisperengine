@@ -43,7 +43,7 @@ COPY . .
 
 # Create user and directories
 RUN useradd --create-home appuser && \
-    mkdir -p chromadb_data backups privacy_data temp_images logs data && \
+    mkdir -p backups privacy_data temp_images logs data && \
     chown -R appuser:appuser /app
 
 USER appuser
@@ -146,7 +146,7 @@ COPY ${SYSTEM_PROMPT_SOURCE} ./system_prompt.md
 
 # Create user
 RUN adduser -D -s /bin/sh appuser && \
-    mkdir -p chromadb_data backups privacy_data temp_images logs data && \
+    mkdir -p backups privacy_data temp_images logs data && \
     chown -R appuser:appuser /app
 
 USER appuser
