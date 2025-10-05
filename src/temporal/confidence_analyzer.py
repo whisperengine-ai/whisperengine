@@ -4,7 +4,8 @@ Calculates confidence metrics from conversation data and AI components
 """
 
 import logging
-from typing import Dict, Any
+import os
+from typing import Dict, Any, Optional
 
 from .temporal_intelligence_client import ConfidenceMetrics, RelationshipMetrics, ConversationQualityMetrics
 
@@ -16,8 +17,15 @@ class ConfidenceAnalyzer:
     Analyzes conversation data to calculate confidence metrics for temporal tracking
     """
 
-    def __init__(self):
+    def __init__(self, knowledge_router=None):
+        """
+        Initialize confidence analyzer
+        
+        Args:
+            knowledge_router: Optional PostgreSQL knowledge router for actual relationship scores
+        """
         self.logger = logging.getLogger(__name__)
+        self.knowledge_router = knowledge_router
 
     def calculate_confidence_metrics(
         self,
@@ -87,59 +95,97 @@ class ConfidenceAnalyzer:
             overall_confidence=overall_confidence
         )
 
-    def calculate_relationship_metrics(
+    async def calculate_relationship_metrics(
         self,
+        user_id: str,
         ai_components: Dict[str, Any],
         conversation_history_length: int = 0
     ) -> RelationshipMetrics:
         """
-        Calculate relationship progression metrics
+        Calculate relationship progression metrics using actual PostgreSQL scores
+        
+        CRITICAL: Queries PostgreSQL for ACTUAL relationship scores (trust, affection, attunement)
+        instead of using estimates. This ensures InfluxDB temporal tracking reflects real data.
         
         Args:
+            user_id: User identifier for PostgreSQL query
             ai_components: AI pipeline results
             conversation_history_length: Length of conversation history
             
         Returns:
-            RelationshipMetrics: Calculated relationship measurements
+            RelationshipMetrics: Calculated relationship measurements using actual scores
         """
         
-        # Base trust on emotion analysis and conversation length
-        trust_level = 0.5  # Default baseline
-        if 'emotion_analysis' in ai_components:
-            emotion_data = ai_components['emotion_analysis']
-            primary_emotion = emotion_data.get('primary_emotion', 'neutral')
-            intensity = emotion_data.get('intensity', 0.5)
-            
-            # Positive emotions increase trust
-            if primary_emotion in ['joy', 'surprise']:
-                trust_level += intensity * 0.2
-            elif primary_emotion in ['anger', 'fear', 'disgust']:
-                trust_level -= intensity * 0.1
-                
-        # Longer conversations indicate higher trust
-        trust_level += min(0.3, conversation_history_length * 0.02)
-        trust_level = max(0.1, min(0.9, trust_level))  # Clamp to reasonable range
+        # Try to get ACTUAL relationship scores from PostgreSQL
+        trust_level = 0.5  # Fallback baseline
+        affection_level = 0.4  # Fallback baseline
+        attunement_level = 0.5  # Fallback baseline
         
-        # Affection based on emotional resonance and interaction quality
-        affection_level = 0.4  # Default baseline
-        if 'phase4_intelligence' in ai_components:
-            phase4_data = ai_components['phase4_intelligence']
-            interaction_type = phase4_data.get('interaction_type', 'general')
+        if self.knowledge_router:
+            try:
+                bot_name = os.getenv('DISCORD_BOT_NAME', 'assistant').lower()
+                
+                # Query PostgreSQL for actual relationship scores
+                actual_scores = await self.knowledge_router.get_relationship_scores(
+                    user_id=user_id,
+                    bot_name=bot_name
+                )
+                
+                if actual_scores:
+                    # PostgreSQL stores 0-100 scale, convert to 0-1 for InfluxDB
+                    trust_level = actual_scores.get('trust', 40.0) / 100.0
+                    affection_level = actual_scores.get('affection', 35.0) / 100.0
+                    attunement_level = actual_scores.get('attunement', 45.0) / 100.0
+                    
+                    self.logger.debug(
+                        "✅ Using ACTUAL PostgreSQL relationship scores for %s: trust=%.2f, affection=%.2f, attunement=%.2f",
+                        user_id, trust_level, affection_level, attunement_level
+                    )
+                else:
+                    self.logger.debug("No PostgreSQL scores found for %s, using fallback estimates", user_id)
+                    
+            except Exception as e:
+                self.logger.warning("Could not fetch actual relationship scores from PostgreSQL: %s", e)
+                # Continue with fallback estimates below
+        else:
+            self.logger.debug("No knowledge_router available, using estimate-based relationship metrics")
+        
+        # If PostgreSQL scores not available, fall back to estimates
+        if trust_level == 0.5 and affection_level == 0.4:  # Still using defaults
+            # Base trust on emotion analysis and conversation length
+            if 'emotion_analysis' in ai_components:
+                emotion_data = ai_components['emotion_analysis']
+                primary_emotion = emotion_data.get('primary_emotion', 'neutral')
+                intensity = emotion_data.get('intensity', 0.5)
+                
+                # Positive emotions increase trust
+                if primary_emotion in ['joy', 'surprise']:
+                    trust_level += intensity * 0.2
+                elif primary_emotion in ['anger', 'fear', 'disgust']:
+                    trust_level -= intensity * 0.1
+                    
+            # Longer conversations indicate higher trust
+            trust_level += min(0.3, conversation_history_length * 0.02)
+            trust_level = max(0.1, min(0.9, trust_level))  # Clamp to reasonable range
             
-            # Personal interactions indicate higher affection
-            if interaction_type in ['personal', 'emotional_support']:
-                affection_level += 0.2
-            elif interaction_type == 'general':
-                affection_level += 0.1
+            # Affection based on emotional resonance and interaction quality
+            if 'phase4_intelligence' in ai_components:
+                phase4_data = ai_components['phase4_intelligence']
+                interaction_type = phase4_data.get('interaction_type', 'general')
                 
-        # Attunement based on context understanding and response appropriateness
-        attunement_level = 0.5  # Default
-        if 'context_analysis' in ai_components:
-            context_data = ai_components['context_analysis']
-            confidence_scores = context_data.get('confidence_scores', {})
-            if confidence_scores:
-                attunement_level = sum(confidence_scores.values()) / len(confidence_scores)
-                
+                # Personal interactions indicate higher affection
+                if interaction_type in ['personal', 'emotional_support']:
+                    affection_level += 0.2
+                elif interaction_type == 'general':
+                    affection_level += 0.1
+                    
+            # Attunement based on context understanding and response appropriateness
+            if 'context_analysis' in ai_components:
+                context_data = ai_components['context_analysis']
+                confidence_scores = context_data.get('confidence_scores', {})
+                if confidence_scores:
+                    attunement_level = sum(confidence_scores.values()) / len(confidence_scores)
+                    
         # Interaction quality based on overall system performance
         interaction_quality = (trust_level + affection_level + attunement_level) / 3
         
@@ -222,7 +268,17 @@ class ConfidenceAnalyzer:
         )
 
 
+
+
 # Factory function
-def create_confidence_analyzer() -> ConfidenceAnalyzer:
-    """Create and return confidence analyzer instance"""
-    return ConfidenceAnalyzer()
+def create_confidence_analyzer(knowledge_router=None) -> ConfidenceAnalyzer:
+    """
+    Create and return confidence analyzer instance
+    
+    Args:
+        knowledge_router: Optional PostgreSQL knowledge router for actual relationship scores
+        
+    Returns:
+        ConfidenceAnalyzer: Configured analyzer instance
+    """
+    return ConfidenceAnalyzer(knowledge_router=knowledge_router)

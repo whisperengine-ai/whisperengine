@@ -316,6 +316,62 @@ class TemporalIntelligenceClient:
             logger.error("Failed to record bot emotion: %s", e)
             return False
 
+    async def record_user_emotion(
+        self,
+        bot_name: str,
+        user_id: str,
+        primary_emotion: str,
+        intensity: float,
+        confidence: float,
+        session_id: Optional[str] = None,
+        timestamp: Optional[datetime] = None
+    ) -> bool:
+        """
+        Record user emotion metrics to InfluxDB (Phase 7.5)
+        
+        Captures user's emotional state during conversation for temporal analysis.
+        Critical for understanding user emotional patterns and character tuning.
+        
+        Args:
+            bot_name: Name of the bot
+            user_id: User identifier
+            primary_emotion: User's primary detected emotion (joy, sadness, anger, etc.)
+            intensity: Emotion intensity (0.0-1.0)
+            confidence: Emotion detection confidence (0.0-1.0)
+            session_id: Optional session identifier for grouping
+            timestamp: Optional timestamp (defaults to current time)
+            
+        Returns:
+            bool: Success status
+        """
+        if not self.enabled:
+            return False
+
+        try:
+            point = Point("user_emotion") \
+                .tag("bot", bot_name) \
+                .tag("user_id", user_id) \
+                .tag("emotion", primary_emotion)
+            
+            if session_id:
+                point = point.tag("session_id", session_id)
+                
+            point = point \
+                .field("intensity", intensity) \
+                .field("confidence", confidence)
+            
+            if timestamp:
+                point = point.time(timestamp)
+                
+            self.write_api.write(bucket=os.getenv('INFLUXDB_BUCKET'), record=point)
+            logger.debug("Recorded user emotion '%s' for %s/%s (intensity: %.2f)", 
+                        primary_emotion, bot_name, user_id, intensity)
+            return True
+            
+        except (ValueError, ConnectionError, KeyError) as e:
+            logger.error("Failed to record user emotion: %s", e)
+            return False
+
     async def get_confidence_trend(
         self,
         bot_name: str,

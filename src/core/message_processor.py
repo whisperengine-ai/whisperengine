@@ -88,7 +88,7 @@ class MessageProcessor:
         self.image_processor = image_processor
         self.conversation_cache = conversation_cache
         
-        # Phase 5: Initialize temporal intelligence
+        # Phase 5: Initialize temporal intelligence with PostgreSQL integration
         self.temporal_intelligence_enabled = os.getenv('ENABLE_TEMPORAL_INTELLIGENCE', 'true').lower() == 'true'
         self.temporal_client = None
         self.confidence_analyzer = None
@@ -96,8 +96,14 @@ class MessageProcessor:
         if self.temporal_intelligence_enabled:
             try:
                 from src.temporal.temporal_protocol import create_temporal_intelligence_system
-                self.temporal_client, self.confidence_analyzer = create_temporal_intelligence_system()
-                logger.info("Temporal intelligence initialized (enabled: %s)", self.temporal_client.enabled)
+                
+                # Pass knowledge_router for actual PostgreSQL relationship scores
+                knowledge_router = getattr(bot_core, 'knowledge_router', None) if bot_core else None
+                self.temporal_client, self.confidence_analyzer = create_temporal_intelligence_system(
+                    knowledge_router=knowledge_router
+                )
+                logger.info("Temporal intelligence initialized (enabled: %s, postgres_integration: %s)", 
+                           self.temporal_client.enabled, knowledge_router is not None)
             except ImportError:
                 logger.warning("Temporal intelligence not available - install influxdb-client")
                 self.temporal_intelligence_enabled = False
@@ -280,8 +286,9 @@ class MessageProcessor:
                 processing_time_ms=processing_time_ms
             )
             
-            # Calculate relationship metrics
-            relationship_metrics = self.confidence_analyzer.calculate_relationship_metrics(
+            # Calculate relationship metrics (using actual PostgreSQL scores)
+            relationship_metrics = await self.confidence_analyzer.calculate_relationship_metrics(
+                user_id=message_context.user_id,
                 ai_components=ai_components,
                 conversation_history_length=len(relevant_memories) if relevant_memories else 0
             )
@@ -313,6 +320,27 @@ class MessageProcessor:
                 except AttributeError:
                     # record_bot_emotion method doesn't exist yet - log for now
                     logger.debug("Bot emotion recording not yet implemented in TemporalIntelligenceClient")
+            
+            # Phase 7.5: Record user emotion to InfluxDB (CRITICAL FIX)
+            user_emotion = ai_components.get('emotion_data')
+            if user_emotion:
+                try:
+                    # Record user emotion for temporal tracking and character tuning
+                    await self.temporal_client.record_user_emotion(
+                        bot_name=bot_name,
+                        user_id=message_context.user_id,
+                        primary_emotion=user_emotion.get('primary_emotion', 'neutral'),
+                        intensity=user_emotion.get('intensity', 0.0),
+                        confidence=user_emotion.get('confidence', 0.0)
+                    )
+                    logger.debug(
+                        "📊 TEMPORAL: Recorded user emotion '%s' to InfluxDB (intensity: %.2f)",
+                        user_emotion.get('primary_emotion', 'neutral'),
+                        user_emotion.get('intensity', 0.0)
+                    )
+                except AttributeError:
+                    # record_user_emotion method doesn't exist yet - log for now
+                    logger.debug("User emotion recording not yet implemented in TemporalIntelligenceClient")
             
             # Record metrics to InfluxDB (async, non-blocking)
             await asyncio.gather(

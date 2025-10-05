@@ -99,14 +99,16 @@ async def test_phase5_temporal_intelligence():
         print(f"❌ Failed to calculate confidence metrics: {e}")
         return False
     
-    # Test 5: Test relationship metrics
+    # Test 5: Test relationship metrics (updated to async with user_id)
     try:
-        relationship_metrics = confidence_analyzer.calculate_relationship_metrics(
+        # Note: This will use fallback estimates since we don't have knowledge_router in test
+        relationship_metrics = await confidence_analyzer.calculate_relationship_metrics(
+            user_id="test_user_123",
             ai_components=sample_ai_components,
             conversation_history_length=10
         )
         
-        print("✅ Relationship metrics calculated:")
+        print("✅ Relationship metrics calculated (using estimates - no PostgreSQL in test):")
         print(f"   Trust level: {relationship_metrics.trust_level:.2f}")
         print(f"   Affection level: {relationship_metrics.affection_level:.2f}")
         print(f"   Attunement level: {relationship_metrics.attunement_level:.2f}")
