@@ -13,31 +13,71 @@ Your WhisperEngine instance includes:
 - **🏥 Health Monitoring** - Container health checks on port 9090
 - **� InfluxDB** - Optional temporal intelligence metrics
 
-## ⚙️ Configuration Files
+## ⚙️ What You Need to Provide
 
-| File | Purpose | Visibility |
-|------|---------|------------|
-| **`.env`** | Main configuration (used by Docker) | Hidden (use `ls -la`) |
-| **`env.example`** | Visible copy for reference | Visible |
-| **`characters/`** | Bot character definitions directory | Visible |
-| **`docker-compose.yml`** | Service definitions | Visible |
+### Required Files (User-Provided):
 
-## 🎯 Next Steps
+| File | Purpose | Example |
+|------|---------|---------|
+| **`.env`** | Your configuration (Discord token, API keys, etc.) | See `.env.minimal` for template |
+| **`character.json`** | Your CDL character definition | Your custom AI personality |
+| **`docker-compose.yml`** | Already provided in this directory | - |
 
-### ⚠️ Important: Docker Hub Images
-**Note**: The quick-start uses pre-built images from Docker Hub. For maximum security:
-- **Production**: Build your own images using the main repository
-- **Development**: Use the development setup from the main repo
-- **Quick Testing**: This setup is perfect for trying WhisperEngine
+### Optional:
+| File | Purpose |
+|------|---------|
+| **`characters/`** | Directory with multiple character files | Mount as `./characters:/app/characters:ro` |
 
-### 1. Configure Your Bot Token
-Edit your `.env` file and set:
+## 🚀 Quick Setup
+
+### 1. Create Your Configuration
 ```bash
-DISCORD_BOT_TOKEN=your_actual_discord_bot_token_here
+# Copy the template and customize it
+cp .env.minimal .env
+nano .env  # Add your Discord token, LLM API settings, etc.
 ```
 
-**Get a Discord Bot Token:**
-1. Go to https://discord.com/developers/applications
+### 2. Provide Your Character
+```bash
+# Create or copy your CDL character file
+# Place it as character.json in the same directory as docker-compose.yml
+cp your-character.json character.json
+```
+
+### 3. Deploy
+```bash
+docker-compose up -d
+```
+
+## 💾 Data Persistence Options
+
+### Default: Docker Named Volumes
+```bash
+# Data is stored in Docker's internal directory
+# Persists between container restarts/updates
+docker volume ls  # See volumes: whisperengine_redis_data, etc.
+```
+
+### Alternative: Host Filesystem Mounts
+For easier backup and direct access to data:
+
+```bash
+# 1. Create data directories
+mkdir -p data/{redis,postgres,qdrant}
+
+# 2. Edit docker-compose.yml - uncomment the host mount lines:
+# - ./data/redis:/data
+# - ./data/postgres:/var/lib/postgresql/data  
+# - ./data/qdrant:/qdrant/storage
+
+# 3. Comment out the named volume lines
+```
+
+**Benefits of host mounts:**
+- ✅ Easy backup (`cp -r data/ backup/`)
+- ✅ Direct file access for debugging
+- ✅ Clear data location (`./data/`)
+- ✅ Portable between systems
 2. Create a new application
 3. Go to "Bot" section
 4. Copy the token

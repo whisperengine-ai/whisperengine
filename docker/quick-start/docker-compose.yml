@@ -41,7 +41,10 @@ services:
     restart: unless-stopped
     command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
     volumes:
+      # Option 1: Named volume (default - managed by Docker)
       - redis_data:/data
+      # Option 2: Host filesystem mount (uncomment for external access)
+      # - ./data/redis:/data
     ports:
       - "${REDIS_PORT:-6379}:6379"
       
@@ -55,7 +58,10 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-bot_password_change_me}
       POSTGRES_INITDB_ARGS: "--auth-host=scram-sha-256"
     volumes:
+      # Option 1: Named volume (default - managed by Docker)
       - postgres_data:/var/lib/postgresql/data
+      # Option 2: Host filesystem mount (uncomment for external access)
+      # - ./data/postgres:/var/lib/postgresql/data
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
       
@@ -67,12 +73,22 @@ services:
       - QDRANT__SERVICE__HTTP_PORT=6333
       - QDRANT__SERVICE__GRPC_PORT=6334
     volumes:
+      # Option 1: Named volume (default - managed by Docker)
       - qdrant_data:/qdrant/storage
+      # Option 2: Host filesystem mount (uncomment for external access)
+      # - ./data/qdrant:/qdrant/storage
     ports:
       - "6333:6333"
       - "6334:6334"
 
 volumes:
+  # Named volumes (managed by Docker)
+  # Data persists between container restarts but stored in Docker's internal directory
+  # Use 'docker volume ls' to see volumes, 'docker volume inspect <name>' for location
   redis_data:
   postgres_data:
   qdrant_data:
+  
+  # Alternative: Use host filesystem mounts instead (uncomment volume lines above)
+  # Benefits: Easy backup, direct file access, clear data location
+  # Create directories: mkdir -p data/{redis,postgres,qdrant}
