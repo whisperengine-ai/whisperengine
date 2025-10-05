@@ -94,7 +94,7 @@ CREATE TABLE IF NOT EXISTS user_fact_relationships (
     
     -- Constraints
     UNIQUE(user_id, entity_id, relationship_type),
-    CHECK(relationship_type IN ('likes', 'dislikes', 'knows', 'visited', 'wants', 'owns', 'prefers', 'interested_in'))
+    CHECK(LENGTH(relationship_type) > 0 AND LENGTH(relationship_type) <= 50)  -- Flexible validation
 );
 
 -- Indexes for high-performance queries
