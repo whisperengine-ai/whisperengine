@@ -3,6 +3,7 @@ FROM python:3.13-slim AS base
 
 # Build arguments for flexible configuration
 ARG CDL_CHARACTER_SOURCE=characters/default_assistant.json
+ARG DOWNLOAD_MODELS=false
 
 # Environment variables
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -64,25 +65,33 @@ RUN --mount=type=cache,target=/root/.cache/pip \
     pip install --no-cache-dir -r requirements-discord.txt && \
     pip install --no-cache-dir -r requirements-vector-memory.txt
 
-    # Copy model download script and download all models during build
-    COPY scripts/download_models.py ./scripts/
-    # Use VADER-only emotion analysis (no PyTorch required)
-    ENV ENABLE_ROBERTA_EMOTION=false
-    RUN python scripts/download_models.py
+# Copy model download script and conditionally download models
+COPY scripts/download_models.py ./scripts/
+# Use VADER-only emotion analysis (no PyTorch required)
+ENV ENABLE_ROBERTA_EMOTION=false
 
-    # Set environment variables for offline model usage
-    ENV SENTENCE_TRANSFORMERS_HOME=/app/models \
-        TRANSFORMERS_CACHE=/app/models \
-        HF_HOME=/app/models \
-        TORCH_HOME=/app/models
+# Download models during build for releases, skip for development
+RUN if [ "$DOWNLOAD_MODELS" = "true" ]; then \
+        echo "🚀 RELEASE BUILD: Downloading models for instant startup..."; \
+        python scripts/download_models.py && \
+        echo "✅ Models pre-downloaded for release"; \
+    else \
+        echo "🔧 DEV BUILD: Skipping model download (will download on first run)"; \
+    fi
 
-    # Copy only necessary application files
-    COPY src/ ./src/
-    COPY pyproject.toml validate_config.py env_manager.py run.py ./
-    COPY characters/ ./characters/
-    COPY config/ ./config/
+# Set environment variables for offline model usage
+ENV SENTENCE_TRANSFORMERS_HOME=/app/models \
+    TRANSFORMERS_CACHE=/app/models \
+    HF_HOME=/app/models \
+    TORCH_HOME=/app/models
 
-    # Create non-root user and directories
+# Copy only necessary application files
+COPY src/ ./src/
+COPY pyproject.toml validate_config.py env_manager.py run.py ./
+COPY characters/ ./characters/
+COPY config/ ./config/
+
+# Create non-root user and directories
 RUN useradd --create-home --no-log-init appuser && \
     mkdir -p backups privacy_data temp_images logs data && \
     chown -R appuser:appuser /app && \

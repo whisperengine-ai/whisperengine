@@ -1,0 +1,173 @@
+name: 🐳 Docker Build and Push
+
+on:
+  push:
+    branches: [ main, develop ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      push_to_registry:
+        description: 'Push to Docker Hub'
+        required: false
+        default: true
+        type: boolean
+
+env:
+  REGISTRY: docker.io
+  IMAGE_NAME: whisperengine/whisperengine
+
+jobs:
+  docker-build-push:
+    name: 🐳 Build and Push Docker Image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          platforms: linux/amd64,linux/arm64
+
+      - name: Determine version and push settings
+        id: meta
+        run: |
+          # Determine version
+          if [[ "${{ github.ref_type }}" == "tag" ]]; then
+            VERSION="${{ github.ref_name }}"
+          elif [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+            VERSION="latest"
+          else
+            VERSION="dev-$(git rev-parse --short HEAD)"
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          
+          # Determine if we should push
+          SHOULD_PUSH="false"
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            SHOULD_PUSH="${{ github.event.inputs.push_to_registry }}"
+          elif [[ "${{ github.event_name }}" == "push" ]] && [[ "${{ github.ref }}" == "refs/heads/main" || "${{ github.ref_type }}" == "tag" ]]; then
+            # Only push on main branch pushes or tags, and only if we have credentials
+            # Support both DOCKERHUB_* and DOCKER_* secret naming conventions
+            if { [[ -n "${{ secrets.DOCKERHUB_USERNAME }}" && -n "${{ secrets.DOCKERHUB_TOKEN }}" ]] || [[ -n "${{ secrets.DOCKER_USERNAME }}" && -n "${{ secrets.DOCKER_PASSWORD }}" ]]; }; then
+              SHOULD_PUSH="true"
+            fi
+          fi
+          echo "should_push=$SHOULD_PUSH" >> $GITHUB_OUTPUT
+          
+          echo "Version: $VERSION"
+          echo "Should push: $SHOULD_PUSH"
+
+      - name: Log in to Docker Hub
+        if: steps.meta.outputs.should_push == 'true'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ secrets.DOCKERHUB_USERNAME || secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN || secrets.DOCKER_PASSWORD }}
+
+      - name: Extract metadata
+        id: docker_meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=${{ steps.meta.outputs.version }}
+            type=sha,prefix={{branch}}-
+
+      - name: Determine build configuration
+        id: build_config
+        run: |
+          # Enable model downloads for release builds (tags) for instant startup
+          if [[ "${{ github.ref_type }}" == "tag" ]]; then
+            DOWNLOAD_MODELS="true"
+            BUILD_TYPE="🚀 RELEASE BUILD"
+            echo "Models will be pre-downloaded for instant startup"
+          else
+            DOWNLOAD_MODELS="false" 
+            BUILD_TYPE="🔧 DEVELOPMENT BUILD"
+            echo "Models will download on first run (faster builds)"
+          fi
+          echo "download_models=$DOWNLOAD_MODELS" >> $GITHUB_OUTPUT
+          echo "build_type=$BUILD_TYPE" >> $GITHUB_OUTPUT
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./docker/Dockerfile.multi-stage
+          target: production
+          platforms: linux/amd64,linux/arm64
+          push: ${{ steps.meta.outputs.should_push }}
+          tags: ${{ steps.docker_meta.outputs.tags }}
+          labels: ${{ steps.docker_meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            VERSION=${{ steps.meta.outputs.version }}
+            BUILD_DATE=${{ fromJSON(steps.docker_meta.outputs.json).labels['org.opencontainers.image.created'] }}
+            DOWNLOAD_MODELS=${{ steps.build_config.outputs.download_models }}
+
+      - name: Generate build summary
+        run: |
+          echo "## 🐳 Docker Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Property | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Build Type | ${{ steps.build_config.outputs.build_type }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Version | \`${{ steps.meta.outputs.version }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Models Pre-downloaded | ${{ steps.build_config.outputs.download_models == 'true' && '✅ Yes (instant startup)' || '❌ No (download on first run)' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Pushed to Registry | ${{ steps.meta.outputs.should_push == 'true' && '✅ Yes' || '❌ No' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Platforms | linux/amd64, linux/arm64 |" >> $GITHUB_STEP_SUMMARY
+          echo "| Registry | ${{ env.REGISTRY }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Image | ${{ env.IMAGE_NAME }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [[ "${{ steps.meta.outputs.should_push }}" == "true" ]]; then
+            echo "### 🚀 Usage" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Pull the image:" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
+            echo "docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Run with Docker Compose:" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
+            echo "curl -sSL https://raw.githubusercontent.com/whisperengine-ai/whisperengine/main/docker/quick-start/docker-compose.yml -o docker-compose.yml" >> $GITHUB_STEP_SUMMARY
+            echo "docker-compose up -d" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "### ℹ️ Image Built Locally" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Image was built but not pushed to registry." >> $GITHUB_STEP_SUMMARY
+            if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+              echo "Pull request builds are not pushed to the registry." >> $GITHUB_STEP_SUMMARY
+            elif [[ -z "${{ secrets.DOCKERHUB_USERNAME || secrets.DOCKER_USERNAME }}" || -z "${{ secrets.DOCKERHUB_TOKEN || secrets.DOCKER_PASSWORD }}" ]]; then
+              echo "Docker Hub credentials not configured. Set DOCKERHUB_USERNAME/DOCKERHUB_TOKEN or DOCKER_USERNAME/DOCKER_PASSWORD secrets to enable pushing." >> $GITHUB_STEP_SUMMARY
+            fi
+          fi
+
+      - name: Test image (if pushed)
+        if: steps.meta.outputs.should_push == 'true'
+        run: |
+          echo "🧪 Testing pushed image..."
+          docker run --rm \
+            -e ENV_MODE=testing \
+            -e SKIP_ONBOARDING=true \
+            -e DEBUG_MODE=true \
+            --entrypoint python \
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.version }} \
+            -c "print('✅ Image test passed - Python and basic imports work')"
