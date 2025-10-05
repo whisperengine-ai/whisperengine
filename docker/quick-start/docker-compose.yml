@@ -35,19 +35,7 @@ services:
       - qdrant
       
   # Minimal required services
-  redis:
-    image: redis:7-alpine
-    container_name: whisperengine-redis
-    restart: unless-stopped
-    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
-    volumes:
-      # Option 1: Named volume (default - managed by Docker)
-      - redis_data:/data
-      # Option 2: Host filesystem mount (uncomment for external access)
-      # - ./data/redis:/data
-    ports:
-      - "${REDIS_PORT:-6379}:6379"
-      
+  # Infrastructure Services
   postgres:
     image: postgres:16-alpine
     container_name: whisperengine-postgres
@@ -85,10 +73,9 @@ volumes:
   # Named volumes (managed by Docker)
   # Data persists between container restarts but stored in Docker's internal directory
   # Use 'docker volume ls' to see volumes, 'docker volume inspect <name>' for location
-  redis_data:
   postgres_data:
   qdrant_data:
   
   # Alternative: Use host filesystem mounts instead (uncomment volume lines above)
   # Benefits: Easy backup, direct file access, clear data location
-  # Create directories: mkdir -p data/{redis,postgres,qdrant}
+  # Create directories: mkdir -p data/{postgres,qdrant}

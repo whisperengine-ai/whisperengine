@@ -1,4 +1,9 @@
-# 🎭 WhisperEngine Quick Start
+# 🎭 WYour WhisperEngine instance includes:
+
+- **🤖 Discord Bot** - AI-powered with personality and memory
+- **🔍 Qdrant** - Vector database for semantic memory (384D embeddings)
+- **🐘 PostgreSQL** - Persistent data storage
+- **🏥 Health Monitoring** - Container health checks on port 9090gine Quick Start
 
 **Congratulations!** You've successfully set up WhisperEngine using our quick-start script.
 
@@ -55,7 +60,7 @@ docker-compose up -d
 ```bash
 # Data is stored in Docker's internal directory
 # Persists between container restarts/updates
-docker volume ls  # See volumes: whisperengine_redis_data, etc.
+docker volume ls  # See volumes: whisperengine_postgres_data, etc.
 ```
 
 ### Alternative: Host Filesystem Mounts
@@ -63,10 +68,9 @@ For easier backup and direct access to data:
 
 ```bash
 # 1. Create data directories
-mkdir -p data/{redis,postgres,qdrant}
+mkdir -p data/{postgres,qdrant}
 
 # 2. Edit docker-compose.yml - uncomment the host mount lines:
-# - ./data/redis:/data
 # - ./data/postgres:/var/lib/postgresql/data  
 # - ./data/qdrant:/qdrant/storage
 
@@ -78,6 +82,25 @@ mkdir -p data/{redis,postgres,qdrant}
 - ✅ Direct file access for debugging
 - ✅ Clear data location (`./data/`)
 - ✅ Portable between systems
+
+## 🌐 Cross-Platform Compatibility
+
+✅ **Works on all platforms:**
+- **macOS** (Intel & Apple Silicon)
+- **Linux** (x86_64 & ARM64)  
+- **Windows** (WSL2 + Docker Desktop)
+
+✅ **Multi-architecture Docker images:**
+- Automatically pulls correct image for your CPU architecture
+- `linux/amd64` and `linux/arm64` supported
+
+### Requirements
+- **Docker**: Docker Desktop (macOS/Windows) or Docker Engine (Linux)
+- **Memory**: 4GB+ RAM recommended (2GB minimum)
+- **Storage**: 10GB+ free disk space
+- **Ports**: 5432, 6333, 6334, 9090 available
+
+> 📖 **Detailed setup guide**: See `CROSS_PLATFORM_DOCKER.md` for platform-specific instructions and troubleshooting.
 2. Create a new application
 3. Go to "Bot" section
 4. Copy the token
