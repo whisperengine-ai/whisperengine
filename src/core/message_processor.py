@@ -85,6 +85,20 @@ class MessageProcessor:
         self.image_processor = image_processor
         self.conversation_cache = conversation_cache
         
+        # Phase 5: Initialize temporal intelligence
+        self.temporal_intelligence_enabled = os.getenv('ENABLE_TEMPORAL_INTELLIGENCE', 'true').lower() == 'true'
+        self.temporal_client = None
+        self.confidence_analyzer = None
+        
+        if self.temporal_intelligence_enabled:
+            try:
+                from src.temporal.temporal_protocol import create_temporal_intelligence_system
+                self.temporal_client, self.confidence_analyzer = create_temporal_intelligence_system()
+                logger.info("Temporal intelligence initialized (enabled: %s)", self.temporal_client.enabled)
+            except ImportError:
+                logger.warning("Temporal intelligence not available - install influxdb-client")
+                self.temporal_intelligence_enabled = False
+        
         # Track processing state for debugging
         self._last_security_validation = None
         self._last_emotional_context = None
@@ -179,6 +193,15 @@ class MessageProcessor:
             end_time = datetime.now()
             processing_time_ms = int((end_time - start_time).total_seconds() * 1000)
             
+            # Phase 5: Record temporal intelligence metrics
+            await self._record_temporal_metrics(
+                message_context=message_context,
+                ai_components=ai_components,
+                relevant_memories=relevant_memories,
+                response=response,
+                processing_time_ms=processing_time_ms
+            )
+            
             logger.info("✅ MESSAGE PROCESSOR: Successfully processed message for user %s in %dms", 
                        message_context.user_id, processing_time_ms)
             
@@ -210,6 +233,68 @@ class MessageProcessor:
                 error_message=str(e),
                 processing_time_ms=processing_time_ms
             )
+
+    async def _record_temporal_metrics(
+        self,
+        message_context: MessageContext,
+        ai_components: Dict[str, Any],
+        relevant_memories: List[Dict[str, Any]],
+        response: str,
+        processing_time_ms: float
+    ):
+        """Record temporal intelligence metrics if enabled."""
+        if not self.temporal_intelligence_enabled or not self.temporal_client or not self.confidence_analyzer:
+            return
+
+        try:
+            # Get bot name from environment
+            bot_name = os.getenv('DISCORD_BOT_NAME', 'unknown')
+            
+            # Calculate confidence metrics
+            confidence_metrics = self.confidence_analyzer.calculate_confidence_metrics(
+                ai_components=ai_components,
+                memory_count=len(relevant_memories) if relevant_memories else 0,
+                processing_time_ms=processing_time_ms
+            )
+            
+            # Calculate relationship metrics
+            relationship_metrics = self.confidence_analyzer.calculate_relationship_metrics(
+                ai_components=ai_components,
+                conversation_history_length=len(relevant_memories) if relevant_memories else 0
+            )
+            
+            # Calculate conversation quality metrics
+            quality_metrics = self.confidence_analyzer.calculate_conversation_quality(
+                ai_components=ai_components,
+                response_length=len(response),
+                processing_time_ms=processing_time_ms
+            )
+            
+            # Record metrics to InfluxDB (async, non-blocking)
+            await asyncio.gather(
+                self.temporal_client.record_confidence_evolution(
+                    bot_name=bot_name,
+                    user_id=message_context.user_id,
+                    confidence_metrics=confidence_metrics
+                ),
+                self.temporal_client.record_relationship_progression(
+                    bot_name=bot_name,
+                    user_id=message_context.user_id,
+                    relationship_metrics=relationship_metrics
+                ),
+                self.temporal_client.record_conversation_quality(
+                    bot_name=bot_name,
+                    user_id=message_context.user_id,
+                    quality_metrics=quality_metrics
+                ),
+                return_exceptions=True  # Don't fail message processing if temporal recording fails
+            )
+            
+            logger.debug("Recorded temporal metrics for %s/%s", bot_name, message_context.user_id)
+            
+        except Exception as e:
+            # Log but don't fail message processing
+            logger.warning("Failed to record temporal metrics: %s", str(e))
 
     async def _validate_security(self, message_context: MessageContext) -> Dict[str, Any]:
         """Validate message security and sanitize content."""
