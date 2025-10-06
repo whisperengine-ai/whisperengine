@@ -79,38 +79,65 @@ class SemanticKnowledgeRouter:
         logger.info("🎯 SemanticKnowledgeRouter initialized with multi-modal intelligence")
     
     def _build_intent_patterns(self) -> Dict[QueryIntent, Dict[str, List[str]]]:
-        """Build pattern dictionaries for intent classification"""
+        """Build pattern dictionaries for intent classification - ChatGPT-style expanded patterns"""
         return {
             QueryIntent.FACTUAL_RECALL: {
-                "keywords": ["what", "which", "list", "show", "tell me about"],
-                "entities": ["food", "hobby", "place", "person", "like", "prefer", "favorite"],
-                "verbs": ["like", "love", "prefer", "know", "visit", "own", "want"]
+                "keywords": [
+                    # Direct questions
+                    "what", "which", "list", "show", "tell me about", "give me", "name",
+                    # ChatGPT-style natural patterns
+                    "do i have", "what are my", "what's my", "remind me", "i have", "my",
+                    # Book/collection patterns
+                    "books", "collection", "library", "shelf", "titles", "equipment",
+                    # Preference patterns
+                    "favorite", "preferred", "like", "love", "enjoy", "want", "need"
+                ],
+                "entities": [
+                    "food", "hobby", "place", "person", "book", "art", "music", "movie",
+                    "equipment", "tool", "device", "preference", "style", "genre", "author"
+                ],
+                "verbs": [
+                    "like", "love", "prefer", "know", "visit", "own", "want", "need",
+                    "collect", "read", "watch", "listen", "use", "practice", "study"
+                ]
             },
             QueryIntent.CONVERSATION_STYLE: {
-                "keywords": ["how", "when", "where did we", "remember", "conversation", "talked about"],
-                "entities": ["said", "mentioned", "discussed", "spoke about"],
-                "verbs": ["talk", "say", "mention", "discuss", "speak"]
+                "keywords": [
+                    "how", "when", "where did we", "remember", "conversation", "talked about",
+                    "discussed", "mentioned", "said", "told me", "we spoke", "chat"
+                ],
+                "entities": ["said", "mentioned", "discussed", "spoke about", "conversation"],
+                "verbs": ["talk", "say", "mention", "discuss", "speak", "chat", "converse"]
             },
             QueryIntent.TEMPORAL_ANALYSIS: {
-                "keywords": ["change", "changed", "evolve", "grow", "trend", "over time"],
-                "entities": ["history", "timeline", "progression", "development"],
-                "verbs": ["become", "grow", "develop", "evolve", "change"]
+                "keywords": [
+                    "change", "changed", "evolve", "grow", "trend", "over time", "progress",
+                    "development", "history", "timeline", "before", "after", "now vs then"
+                ],
+                "entities": ["history", "timeline", "progression", "development", "evolution"],
+                "verbs": ["become", "grow", "develop", "evolve", "change", "progress", "improve"]
             },
             QueryIntent.RELATIONSHIP_DISCOVERY: {
-                "keywords": ["similar", "like", "related", "connected", "alternative"],
-                "entities": ["similar to", "like", "alternative", "related"],
-                "verbs": ["compare", "relate", "connect"]
+                "keywords": [
+                    "similar", "like", "related", "connected", "alternative", "recommend",
+                    "suggest", "compare", "other", "else", "also", "too", "as well"
+                ],
+                "entities": ["similar to", "like", "alternative", "related", "recommendation"],
+                "verbs": ["compare", "relate", "connect", "recommend", "suggest"]
             },
             QueryIntent.ENTITY_SEARCH: {
-                "keywords": ["find", "search", "look for", "about"],
-                "entities": ["information", "details", "data"],
-                "verbs": ["find", "search", "discover", "explore"]
+                "keywords": [
+                    "find", "search", "look for", "about", "information", "details",
+                    "anything about", "know about", "heard of", "familiar with"
+                ],
+                "entities": ["information", "details", "data", "facts", "knowledge"],
+                "verbs": ["find", "search", "discover", "explore", "locate", "identify"]
             }
         }
     
     async def analyze_query_intent(self, query: str) -> IntentAnalysisResult:
         """
-        Analyze query to determine intent and routing strategy.
+        Analyze query to determine intent and routing strategy with fuzzy matching.
         
         Args:
             query: User's natural language query
@@ -120,41 +147,56 @@ class SemanticKnowledgeRouter:
         """
         query_lower = query.lower()
         
-        # Score each intent type
+        # Score each intent type with fuzzy matching
         intent_scores = {}
         for intent_type, patterns in self._intent_patterns.items():
             score = 0.0
             matched_keywords = []
             
-            # Check keywords
+            # Check keywords with fuzzy matching
             for keyword in patterns.get("keywords", []):
+                # Exact match gets full score
                 if keyword in query_lower:
                     score += 2.0
                     matched_keywords.append(keyword)
+                # Fuzzy match gets partial score (ChatGPT-style partial matching)
+                elif any(word in query_lower for word in keyword.split()):
+                    score += 1.0
+                    matched_keywords.append(f"~{keyword}")
             
-            # Check entities
+            # Check entities with fuzzy matching
             for entity in patterns.get("entities", []):
                 if entity in query_lower:
                     score += 1.5
                     matched_keywords.append(entity)
+                # Fuzzy entity matching
+                elif any(word in query_lower for word in entity.split()):
+                    score += 0.8
+                    matched_keywords.append(f"~{entity}")
             
-            # Check verbs
+            # Check verbs with fuzzy matching
             for verb in patterns.get("verbs", []):
                 if verb in query_lower:
                     score += 1.0
                     matched_keywords.append(verb)
+                # Fuzzy verb matching (stem matching)
+                elif any(query_lower.find(verb[:4]) != -1 for _ in [verb] if len(verb) > 4):
+                    score += 0.5
+                    matched_keywords.append(f"~{verb}")
             
             if score > 0:
                 intent_scores[intent_type] = (score, matched_keywords)
         
-        # Determine primary intent
+        # Determine primary intent with lower threshold for more liberal matching
         if intent_scores:
             primary_intent = max(intent_scores.items(), key=lambda x: x[1][0])
             intent_type, (confidence, keywords) = primary_intent
+            # Normalize confidence to 0-1 range but keep it more liberal
+            confidence = min(confidence / 4.0, 1.0)  # Lower divisor = higher confidence
         else:
-            # Default to factual recall for unknown queries
+            # Default to factual recall for unknown queries (ChatGPT-style assumption)
             intent_type = QueryIntent.FACTUAL_RECALL
-            confidence = 0.3
+            confidence = 0.3  # Slightly higher default confidence
             keywords = []
         
         # Extract entity type if present
@@ -174,19 +216,28 @@ class SemanticKnowledgeRouter:
         )
     
     def _extract_entity_type(self, query: str) -> Optional[str]:
-        """Extract entity type from query"""
+        """Extract entity type from query - ChatGPT-style expanded categorization"""
         entity_keywords = {
-            "food": ["food", "eat", "meal", "restaurant", "cuisine", "dish", "pizza", "pasta"],
-            "hobby": ["hobby", "hobbies", "activity", "activities", "interest", "do for fun"],
-            "place": ["place", "location", "city", "country", "visit", "travel", "destination"],
-            "person": ["person", "people", "friend", "family", "know", "met"],
-            "media": ["movie", "film", "show", "series", "book", "music", "game"],
-            "activity": ["activity", "activities", "do", "doing", "play", "playing"]
+            "food": ["food", "eat", "meal", "restaurant", "cuisine", "dish", "pizza", "pasta", "cooking", "recipe"],
+            "hobby": ["hobby", "hobbies", "activity", "activities", "interest", "do for fun", "enjoy doing", "passion"],
+            "place": ["place", "location", "city", "country", "visit", "travel", "destination", "live", "been to"],
+            "person": ["person", "people", "friend", "family", "colleague", "know", "met", "relationship"],
+            "book": ["book", "books", "read", "reading", "author", "novel", "title", "library", "literature"],
+            "art": ["art", "artwork", "drawing", "painting", "sketch", "artistic", "creative", "visual", "design"],
+            "music": ["music", "song", "album", "artist", "band", "listen", "genre", "sound", "audio"],
+            "movie": ["movie", "movies", "film", "cinema", "watch", "director", "actor", "show", "series"],
+            "equipment": ["equipment", "tool", "tools", "device", "devices", "gear", "hardware", "machine"],
+            "preference": ["like", "prefer", "favorite", "love", "enjoy", "want", "need", "choose"],
+            "work": ["work", "job", "career", "profession", "office", "company", "project", "task"],
+            "study": ["study", "learn", "education", "school", "course", "class", "subject", "research"],
+            "general": ["thing", "stuff", "item", "something", "anything", "everything"]
         }
         
+        # Check for entity type keywords with fuzzy matching
         for entity_type, keywords in entity_keywords.items():
-            if any(kw in query for kw in keywords):
-                return entity_type
+            for keyword in keywords:
+                if keyword in query:
+                    return entity_type
         
         return None
     

@@ -241,18 +241,27 @@ class CDLAIPromptIntegration:
                 intent = await self.knowledge_router.analyze_query_intent(message_content)
                 logger.info(f"🎯 KNOWLEDGE: Query intent detected: {intent.intent_type.value} (confidence: {intent.confidence:.2f})")
                 
-                # Retrieve character-aware facts if query has factual intent
-                if intent.confidence > 0.3 and intent.intent_type.value in ['factual_recall', 'relationship_discovery', 'entity_search']:
+                # Lower confidence threshold for more liberal memory sprinkling (ChatGPT-like)
+                if intent.confidence > 0.2 and intent.intent_type.value in ['factual_recall', 'relationship_discovery', 'entity_search']:
                     # Get character name from CDL for character-aware retrieval
                     character_name = character.identity.name.lower().split()[0] if character and hasattr(character, 'identity') else 'unknown'
                     
-                    # Retrieve facts with character context
-                    facts = await self.knowledge_router.get_character_aware_facts(
-                        user_id=user_id,
-                        character_name=character_name,
-                        entity_type=intent.entity_type,
-                        limit=15
-                    )
+                    # Route to appropriate search method based on intent
+                    if intent.intent_type.value == 'entity_search':
+                        # Use full-text search for entity discovery
+                        facts = await self.knowledge_router.search_entities(
+                            search_query=message_content,
+                            entity_type=intent.entity_type,
+                            limit=15
+                        )
+                    else:
+                        # Use character-aware facts for direct recall
+                        facts = await self.knowledge_router.get_character_aware_facts(
+                            user_id=user_id,
+                            character_name=character_name,
+                            entity_type=intent.entity_type,
+                            limit=15
+                        )
                     
                     if facts:
                         # Format facts for character-aware synthesis
@@ -287,7 +296,58 @@ class CDLAIPromptIntegration:
                     else:
                         logger.debug("🎯 KNOWLEDGE: No facts found for query intent")
                 else:
-                    logger.debug(f"🎯 KNOWLEDGE: Skipping fact retrieval (intent: {intent.intent_type.value}, confidence: {intent.confidence:.2f})")
+                    # ChatGPT-style contextual memory sprinkling for all other queries
+                    # Even if intent confidence is low, try to find relevant memories
+                    character_name = character.identity.name.lower().split()[0] if character and hasattr(character, 'identity') else 'unknown'
+                    
+                    # Try multiple search approaches for better memory coverage
+                    contextual_facts = []
+                    
+                    # 1. Try keyword-based search
+                    try:
+                        keyword_facts = await self.knowledge_router.search_entities(
+                            search_query=message_content,
+                            limit=5
+                        )
+                        contextual_facts.extend(keyword_facts)
+                    except:
+                        pass
+                    
+                    # 2. Try general user facts if no specific matches
+                    if len(contextual_facts) < 3:
+                        try:
+                            general_facts = await self.knowledge_router.get_character_aware_facts(
+                                user_id=user_id,
+                                character_name=character_name,
+                                limit=8
+                            )
+                            contextual_facts.extend(general_facts)
+                        except:
+                            pass
+                    
+                    # Add contextual facts if found (ChatGPT-style subtle integration)
+                    if contextual_facts:
+                        unique_facts = []
+                        seen_entities = set()
+                        for fact in contextual_facts:
+                            entity_name = fact.get('entity_name', '')
+                            if entity_name and entity_name not in seen_entities:
+                                unique_facts.append(fact)
+                                seen_entities.add(entity_name)
+                                if len(unique_facts) >= 5:  # Limit for natural integration
+                                    break
+                        
+                        if unique_facts:
+                            prompt += f"\n\n💭 CONTEXTUAL MEMORIES:\n"
+                            for fact in unique_facts:
+                                entity_name = fact.get('entity_name', 'unknown')
+                                relationship = fact.get('relationship_type', 'related to')
+                                prompt += f"  • {relationship}: {entity_name}\n"
+                            
+                            prompt += "\nWeave these memories naturally into conversation when relevant - don't force them."
+                            logger.debug(f"🎯 CONTEXTUAL: Added {len(unique_facts)} background memories")
+                
+                    logger.debug(f"🎯 KNOWLEDGE: Skipping primary fact retrieval (intent: {intent.intent_type.value}, confidence: {intent.confidence:.2f})")
             except Exception as e:
                 logger.error(f"❌ KNOWLEDGE: Fact retrieval failed: {e}")
                 

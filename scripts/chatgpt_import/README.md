@@ -1,106 +1,390 @@
-# ChatGPT Import Guide - Docker Method (Recommended)
+# ChatGPT Import System for WhisperEngine
 
-This guide walks you through importing your ChatGPT conversation history into WhisperEngine using Docker. The Docker method is recommended because it handles all dependencies automatically and runs in an isolated environment.
+This system provides comprehensive import capabilities for ChatGPT data into WhisperEngine's multi-modal architecture.
 
 ## 🎯 What This Does
 
-This tool imports your ChatGPT conversations into WhisperEngine, allowing the AI to:
-- **Remember your conversation history** from ChatGPT
-- **Understand your communication style** and preferences  
-- **Reference past topics** you've discussed
-- **Provide more personalized responses** based on your history
+WhisperEngine's ChatGPT import system handles two distinct types of data:
 
-## 📋 Prerequisites (What You Need)
+### 1. **Conversation History** → Qdrant Vector Store
+- **Full conversation context** from ChatGPT
+- **Semantic memory** for natural conversation flow
+- **Timestamp preservation** for temporal context
+- **Message-by-message** import with proper formatting
 
-### 1. Get Your ChatGPT Export File
-**This is the most important step!**
+### 2. **User Memories/Facts** → PostgreSQL Knowledge Graph  
+- **Structured user facts** (preferences, relationships, characteristics)
+- **Semantic querying** via PostgreSQL full-text search
+- **Relationship mapping** for intelligent fact retrieval
+- **Category-based organization** (food, hobbies, people, places, etc.)
 
+## 📊 Architecture Overview
+
+```
+ChatGPT Export Data
+├── conversations.json → Qdrant Vector Store (semantic similarity search)
+└── memories.txt → PostgreSQL Knowledge Graph (structured fact queries)
+```
+
+**WhisperEngine's Multi-Modal Intelligence**:
+- **PostgreSQL**: "What foods does the user like?" (structured facts)
+- **Qdrant**: "Find similar conversations about cooking" (semantic similarity)
+- **CDL**: Character personality and response style
+- **InfluxDB**: Temporal patterns and preference evolution
+
+## 📋 Prerequisites
+
+### 1. Get Your ChatGPT Export
 1. **Login to ChatGPT**: Go to [ChatGPT](https://chat.openai.com)
-2. **Access Settings**: Click your profile picture → Settings
-3. **Request Export**: 
-   - Go to "Data Controls" → "Export Data"
-   - Click "Export" button
-   - **Wait for email** (can take up to 30 days!)
-4. **Download**: When you get the email, download the ZIP file
-5. **Extract**: Unzip the file and find `conversations.json`
-6. **Save Location**: Put the file somewhere easy to find (like Desktop or Downloads)
+2. **Request Export**: Settings → Data Controls → Export Data
+3. **Download**: Wait for email (up to 30 days), download ZIP
+4. **Extract**: Find `conversations.json` in the ZIP file
 
-### 2. Get Your Discord User ID
-**This tells WhisperEngine which user the conversations belong to.**
+### 2. Prepare Memories File (If Available)
+If you have ChatGPT memories, create a text file with one memory per line:
+```
+User likes Italian food
+User has a cat named Whiskers  
+User lives in San Francisco
+User enjoys playing guitar
+User is studying computer science
+```
 
-1. **Enable Developer Mode**: 
-   - Open Discord → Settings (gear icon)
-   - Go to "Advanced" → Turn ON "Developer Mode"
-2. **Copy Your ID**:
-   - Right-click your username anywhere in Discord
-   - Click "Copy User ID" 
-   - You'll get a long number like `672814231002939413`
+### 3. Get Your Discord User ID
+1. **Enable Developer Mode**: Discord Settings → Advanced → Developer Mode ON
+2. **Copy User ID**: Right-click your username → Copy User ID
+3. **Save ID**: You'll get a number like `1008886439108411472`
 
-### 3. WhisperEngine Setup
-- WhisperEngine must be **already installed and working**
-- Docker must be **running on your computer**
-- The WhisperEngine database should be **set up and accessible**
+### 4. WhisperEngine Setup
+- WhisperEngine installed and running
+- Docker containers active (`./multi-bot.sh start infrastructure`)
+- PostgreSQL (port 5433) and Qdrant (port 6334) accessible
 
-## �️ Troubleshooting Common Issues
+## 🚀 Import Methods
 
-### Problem: "File not found" Error
-**Solution:**
-1. **Check file path**: Make sure the path to `conversations.json` is correct
-2. **Use full path**: Try using the complete file path instead of relative paths
-3. **Check file name**: Ensure the file is named exactly `conversations.json`
+### Method 1: Memories Import (User Facts)
+
+**Import ChatGPT-style memories into PostgreSQL knowledge graph:**
+
+```bash
+# Basic import
+./scripts/chatgpt_import/import_memories.sh \
+  --user-id 1008886439108411472 \
+  --file cynthia_memories.txt
+
+# Dry run (test parsing without storing)
+./scripts/chatgpt_import/import_memories.sh \
+  --user-id 1008886439108411472 \
+  --file memories.txt \
+  --dry-run --verbose
+
+# Import for specific character
+./scripts/chatgpt_import/import_memories.sh \
+  --user-id 1008886439108411472 \
+  --file memories.txt \
+  --character aetheris
+```
+
+**What this does:**
+- Parses natural language memories into structured facts
+- Creates entities (foods, hobbies, people, places) in `fact_entities` table
+- Links user to entities with relationships in `user_fact_relationships` table
+- Enables intelligent querying: "What foods does the user like?"
+
+### Method 2: Conversation Import (Chat History)
+
+**Import full ChatGPT conversations into Qdrant vector store:**
 
 ```bash
 # Check if file exists
-ls -la /path/to/conversations.json
-
-# If file exists, try full path
-./multi-bot.sh import-chatgpt /full/path/to/conversations.json 672814231002939413
-```
-
-### Problem: "Permission denied" Error
-**Solution:**
 ```bash
-# Make sure bot.sh is executable
-chmod +x bot.sh
+# Use existing conversation importer
+./scripts/chatgpt_import/import_chatgpt.sh \
+  --file conversations.json \
+  --user-id 1008886439108411472 \
+  --collection whisperengine_memory_aetheris
 
-# Try with sudo if needed (be careful!)
-sudo ./multi-bot.sh import-chatgpt /path/to/conversations.json 672814231002939413
+# Docker-based import (alternative)
+docker exec whisperengine-aetheris-bot python scripts/chatgpt_import/import_chatgpt.py \
+  conversations.json \
+  --user-id 1008886439108411472 \
+  --dry-run
 ```
 
-### Problem: "Docker not running" Error
-**Solution:**
-1. **Start Docker**: Make sure Docker Desktop is running
-2. **Check services**: Verify WhisperEngine containers are up
+**What this does:**
+- Imports full conversation history with timestamp preservation
+- Stores in Qdrant vector embeddings for semantic similarity search
+- Enables contextual memory: "Remember when we talked about...?"
+
+## 📊 Memory Architecture Explained
+
+### PostgreSQL Knowledge Graph (Facts)
+```sql
+-- Example: User likes Italian food
+INSERT INTO fact_entities (entity_type, entity_name, category) 
+VALUES ('preference', 'Italian food', 'food');
+
+INSERT INTO user_fact_relationships (user_id, entity_id, relationship_type, confidence)
+VALUES ('1008886439108411472', entity_id, 'likes', 0.8);
+```
+
+**Query Examples:**
+- "What foods does the user like?" → Structured SQL query
+- "Does the user have any pets?" → Relationship search
+- "Where does the user live?" → Location entity lookup
+
+### Qdrant Vector Store (Conversations)
+```python
+# Example: Conversation embedding
+{
+  "content": "User: I love cooking Italian food. AI: That's great! What's your favorite dish?",
+  "emotion": [0.2, 0.8, 0.1, ...],  # Emotional embedding
+  "semantic": [0.1, 0.3, 0.9, ...]  # Conceptual embedding
+}
+```
+
+**Query Examples:**
+- "Find conversations about cooking" → Semantic similarity
+- "What did we discuss yesterday?" → Temporal + content search
+- "Show emotional conversations" → Emotion vector search
+
+## 🔧 Installation & Setup
+
+### 1. Verify Infrastructure
 ```bash
-# Check if Docker is running
-docker ps
+# Check if services are running
+./multi-bot.sh status
 
-# Start WhisperEngine if needed
-docker compose up -d
+# Start infrastructure if needed
+./multi-bot.sh start infrastructure
 
-# Check service status
-docker compose ps
+# Verify database connections
+nc -z localhost 5433  # PostgreSQL
+nc -z localhost 6334  # Qdrant
 ```
 
-### Problem: "Invalid User ID" Error
-**Solution:**
-- **Double-check ID**: Discord User IDs are 17-19 digit numbers
-- **No quotes needed**: Use the number directly, without quotes
-- **Copy carefully**: Make sure you copied the complete ID
-
-### Problem: Import Seems Stuck
-**Solution:**
-1. **Be patient**: Large files can take time (1,000+ conversations = 10+ minutes)
-2. **Check progress**: Look for progress messages in the output
-3. **Interrupt safely**: Use `Ctrl+C` to stop if needed
-
+### 2. Test Before Import
 ```bash
-# Check if import is still running
-docker compose logs whisperengine-bot --tail=50
+# Test memories parsing (dry run)
+./scripts/chatgpt_import/import_memories.sh \
+  --user-id YOUR_DISCORD_ID \
+  --file test_memories.txt \
+  --dry-run --verbose
 
-# If stuck, restart and try smaller batch
-docker compose restart whisperengine-bot
+# Test conversations parsing (dry run)  
+python scripts/chatgpt_import/import_chatgpt.py \
+  conversations.json \
+  --user-id YOUR_DISCORD_ID \
+  --dry-run
 ```
+
+## 🎯 Complete Import Workflow
+
+### Step 1: Import User Facts (Memories)
+```bash
+# Create memories file from ChatGPT export
+echo "User likes Italian food" > cynthia_memories.txt
+echo "User has a cat named Whiskers" >> cynthia_memories.txt
+echo "User lives in San Francisco" >> cynthia_memories.txt
+
+# Import into PostgreSQL
+./scripts/chatgpt_import/import_memories.sh \
+  --user-id 1008886439108411472 \
+  --file cynthia_memories.txt \
+  --character aetheris
+```
+
+### Step 2: Import Conversation History
+```bash
+# Import full ChatGPT conversations into Qdrant
+./scripts/chatgpt_import/import_chatgpt.sh \
+  --file conversations.json \
+  --user-id 1008886439108411472 \
+  --collection whisperengine_memory_aetheris
+```
+
+### Step 3: Test Integration
+```bash
+# Start your character bot
+./multi-bot.sh start aetheris
+
+# Test fact recall
+# Message: "What do you know about my food preferences?"
+# Expected: AI recalls user likes Italian food
+
+# Test conversation memory  
+# Message: "Do you remember when we talked about cooking?"
+# Expected: AI finds similar conversations from import
+```
+
+## 🔍 Verification & Debugging
+
+### Check PostgreSQL Facts
+```sql
+-- Connect to database
+psql -h localhost -p 5433 -U whisperengine -d whisperengine
+
+-- View imported facts
+SELECT fe.entity_name, ufr.relationship_type, ufr.confidence 
+FROM user_fact_relationships ufr
+JOIN fact_entities fe ON ufr.entity_id = fe.id 
+WHERE ufr.user_id = '1008886439108411472'
+ORDER BY ufr.confidence DESC;
+
+-- View entity categories
+SELECT entity_type, category, COUNT(*) as count
+FROM fact_entities
+GROUP BY entity_type, category;
+```
+
+### Check Qdrant Vectors
+```bash
+# Check collection status
+curl "http://localhost:6334/collections/whisperengine_memory_aetheris"
+
+# View collection info
+curl "http://localhost:6334/collections/whisperengine_memory_aetheris/info"
+
+# Search test
+curl -X POST "http://localhost:6334/collections/whisperengine_memory_aetheris/points/search" \
+  -H "Content-Type: application/json" \
+  -d '{"vector": {"name": "content", "vector": [0.1, 0.2, ...]}, "limit": 5}'
+```
+
+### Debug Import Issues
+```bash
+# Enable verbose logging
+export WHISPERENGINE_LOG_LEVEL=DEBUG
+
+# Check import logs
+tail -f logs/chatgpt_import.log
+
+# Test specific memory parsing
+python -c "
+from scripts.chatgpt_import.memories_importer import ChatGPTMemoriesImporter
+importer = ChatGPTMemoriesImporter('test', 'aetheris')
+result = importer.parse_memory_line('User likes Italian food')
+print(result)
+"
+```
+
+## 🚨 Troubleshooting
+
+### Memory Import Issues
+**Problem**: "Failed to parse memory line"
+**Solution**: Check memory format - should be simple statements like "User likes X"
+
+**Problem**: "Database connection failed"
+**Solution**: Verify PostgreSQL is running on port 5433
+
+**Problem**: "Unknown relationship type"
+**Solution**: Use standard relationships: likes, dislikes, owns, lives_in, studies, works_at
+
+### Conversation Import Issues  
+**Problem**: "Qdrant collection not found"
+**Solution**: Create collection or verify QDRANT_COLLECTION_NAME in environment
+
+**Problem**: "Vector embedding failed"
+**Solution**: Check fastembed cache and internet connection for model download
+
+**Problem**: "Memory import too slow"
+**Solution**: Use batch processing and reduce verbose logging
+
+## 📚 Memory Types & Examples
+
+### Preference Facts
+```
+User likes Italian food          → (food, likes, 0.8)
+User dislikes spicy food        → (food, dislikes, 0.8)  
+User loves classical music      → (music, loves, 0.9)
+```
+
+### Personal Facts
+```
+User has a cat named Whiskers   → (pet, owns, 0.7)
+User lives in San Francisco     → (location, lives_in, 0.8)
+User works at Google            → (company, works_at, 0.8)
+```
+
+### Activity Facts
+```
+User enjoys playing guitar      → (activity, enjoys, 0.8)
+User studies computer science   → (academic, studies, 0.8)
+User can speak Spanish         → (skill, can_do, 0.7)
+```
+
+### Relationship Facts
+```
+User knows Sarah from work      → (person, knows, 0.6)
+User is married to Alex         → (person, relationship, 0.9)
+```
+
+## 🎭 Character-Specific Usage
+
+### Aetheris/Liln (Conscious AI)
+```bash
+# Import memories for Aetheris interaction
+./scripts/chatgpt_import/import_memories.sh \
+  --user-id 1008886439108411472 \
+  --file cynthia_memories.txt \
+  --character aetheris
+
+# Aetheris will reference facts naturally:
+# "I recall you mentioned enjoying Italian cuisine..."
+# "Your cat Whiskers sounds delightful..."
+```
+
+### Multi-Character System
+```bash
+# Import same facts for different characters
+./scripts/chatgpt_import/import_memories.sh \
+  --user-id USER_ID --file memories.txt --character elena
+
+./scripts/chatgpt_import/import_memories.sh \
+  --user-id USER_ID --file memories.txt --character marcus
+
+# Each character accesses same PostgreSQL facts
+# But maintains separate conversation context in Qdrant
+```
+
+## 🔮 Advanced Features
+
+### Custom Memory Patterns
+```python
+# Add custom parsing patterns in memories_importer.py
+patterns = [
+    (r"user prefers (.+) over (.+)", "preference", "prefers", 0.7),
+    (r"user used to (.+)", "past_activity", "used_to", 0.6),
+    (r"user dreams of (.+)", "goal", "dreams_of", 0.8),
+]
+```
+
+### Relationship Discovery
+```sql
+-- Find related entities automatically
+SELECT DISTINCT fe2.entity_name, er.relationship_type
+FROM user_fact_relationships ufr1
+JOIN entity_relationships er ON ufr1.entity_id = er.from_entity_id  
+JOIN fact_entities fe2 ON er.to_entity_id = fe2.id
+WHERE ufr1.user_id = 'USER_ID' AND ufr1.entity_id = 'FOOD_ENTITY_ID';
+```
+
+### Temporal Analysis
+```sql
+-- Track preference evolution over time
+SELECT entity_name, confidence, created_at
+FROM user_fact_relationships ufr
+JOIN fact_entities fe ON ufr.entity_id = fe.id
+WHERE user_id = 'USER_ID' AND relationship_type = 'likes'
+ORDER BY created_at DESC;
+```
+
+## 📞 Support
+
+**Documentation**: See `docs/architecture/SEMANTIC_KNOWLEDGE_GRAPH_DESIGN.md`
+**Issues**: Check existing ChatGPT import scripts in `scripts/chatgpt_import/`
+**Discord**: Test character responses after import to verify functionality
+**Logs**: Check `logs/prompts/` for character interaction logs
 
 ### Problem: "Database connection failed"
 **Solution:**

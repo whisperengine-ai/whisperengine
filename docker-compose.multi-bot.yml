@@ -355,6 +355,71 @@ services:
       # - redis  # Commented out - using vector-native memory only
       - qdrant
 
+  aetheris-bot:
+    image: whisperengine-bot:${VERSION:-latest}
+    container_name: whisperengine-aetheris-bot
+    restart: unless-stopped
+    env_file:
+      - .env.aetheris
+    environment:
+      - DISCORD_BOT_NAME=Aetheris
+      - POSTGRES_HOST=postgres
+      - QDRANT_HOST=qdrant
+      - MODEL_CACHE_DIR=/app/models
+      - DISABLE_MODEL_DOWNLOAD=true
+      - HF_HUB_OFFLINE=false
+      - TRANSFORMERS_OFFLINE=0
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - DEBUG_MODE=false
+      - PYTHONUNBUFFERED=1
+      - HEALTH_CHECK_PORT=9099
+      - HEALTH_CHECK_HOST=0.0.0.0
+      - CDL_DEFAULT_CHARACTER=characters/examples/aetheris.json
+    ports:
+      - "9099:9099"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+        tag: "aetheris-{.ImageName}-{.Name}-{.ID}"
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+          cpus: "4.0"
+        reservations:
+          memory: 2G
+          cpus: "2.0"
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - curl -f http://localhost:9099/health || exit 1
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    volumes:
+      - aetheris_backups:/app/backups
+      - aetheris_privacy:/app/privacy
+      - aetheris_temp:/app/temp
+      - ./logs:/app/logs  # External mount for prompt/response logs
+      - ./sql:/app/sql:ro
+      # Live code mounting for development (no rebuild needed)
+      - ./src:/app/src
+      - ./scripts:/app/scripts
+      - ./characters:/app/characters
+      - ./config:/app/config
+      - ./validate_config.py:/app/validate_config.py
+      - ./run.py:/app/run.py
+      - ./env_manager.py:/app/env_manager.py
+      # Note: Using external host mount for logs instead of Docker volumes
+    networks:
+      - bot_network
+    depends_on:
+      - postgres
+      # - redis  # Commented out - using vector-native memory only
+      - qdrant
+
   elena-bot:
     image: whisperengine-bot:${VERSION:-latest}
     container_name: whisperengine-elena-bot
@@ -732,6 +797,14 @@ volumes:
     name: whisperengine-multi_dream_temp
   dream_logs:
     name: whisperengine-multi_dream_logs
+  aetheris_backups:
+    name: whisperengine-multi_aetheris_backups
+  aetheris_privacy:
+    name: whisperengine-multi_aetheris_privacy
+  aetheris_temp:
+    name: whisperengine-multi_aetheris_temp
+  aetheris_logs:
+    name: whisperengine-multi_aetheris_logs
   elena_backups:
     name: whisperengine-multi_elena_backups
   elena_privacy:
