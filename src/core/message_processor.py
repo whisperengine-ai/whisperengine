@@ -108,6 +108,23 @@ class MessageProcessor:
                 logger.warning("Temporal intelligence not available - install influxdb-client")
                 self.temporal_intelligence_enabled = False
         
+        # Sprint 1 TrendWise: Initialize trend analysis and confidence adaptation
+        self.trend_analyzer = None
+        self.confidence_adapter = None
+        
+        if self.temporal_intelligence_enabled and self.temporal_client:
+            try:
+                from src.analytics.trend_analyzer import create_trend_analyzer
+                from src.adaptation.confidence_adapter import create_confidence_adapter
+                
+                self.trend_analyzer = create_trend_analyzer(self.temporal_client)
+                self.confidence_adapter = create_confidence_adapter(self.trend_analyzer)
+                logger.info("Sprint 1 TrendWise: Trend analysis and confidence adaptation initialized")
+            except ImportError as e:
+                logger.warning("TrendWise components not available: %s", e)
+                self.trend_analyzer = None
+                self.confidence_adapter = None
+        
         # Initialize fidelity metrics collector for performance tracking
         try:
             from src.monitoring.fidelity_metrics_collector import get_fidelity_metrics_collector
@@ -1042,6 +1059,44 @@ class MessageProcessor:
         """Build conversation context with AI intelligence guidance integrated."""
         # Start with basic conversation context
         conversation_context = await self._build_conversation_context(message_context, relevant_memories)
+        
+        # Sprint 1 TrendWise: Add confidence adaptation guidance
+        if self.confidence_adapter:
+            try:
+                bot_name = get_normalized_bot_name_from_env()
+                adaptation_params = await self.confidence_adapter.adjust_response_style(
+                    user_id=message_context.user_id,
+                    bot_name=bot_name
+                )
+                
+                if adaptation_params:
+                    # Generate adaptation guidance for system prompt
+                    adaptation_guidance = self.confidence_adapter.generate_adaptation_guidance(
+                        adaptation_params
+                    )
+                    
+                    # Apply system prompt additions to existing system message
+                    for i, msg in enumerate(conversation_context):
+                        if msg.get("role") == "system":
+                            if adaptation_guidance and hasattr(adaptation_guidance, 'system_prompt_additions'):
+                                additional_guidance = " ".join(adaptation_guidance.system_prompt_additions)
+                                conversation_context[i]["content"] += f" {additional_guidance}"
+                            break
+                    
+                    # Store adaptation context for monitoring
+                    ai_components['trendwise_adaptation'] = {
+                        'response_style': adaptation_params.response_style.value,
+                        'explanation_level': adaptation_params.explanation_level.value,
+                        'detail_enhancement': adaptation_params.detail_enhancement,
+                        'adaptation_reason': adaptation_params.adaptation_reason,
+                        'parameters': adaptation_params
+                    }
+                    logger.info("📈 TRENDWISE: Applied confidence adaptation for %s (style: %s, reason: %s)",
+                               message_context.user_id, adaptation_params.response_style.value, 
+                               adaptation_params.adaptation_reason)
+                
+            except Exception as e:
+                logger.warning("TrendWise adaptation failed: %s", e)
         
         # Add AI intelligence guidance to system messages
         ai_guidance = self._build_ai_intelligence_guidance(ai_components)
