@@ -32,6 +32,11 @@ try:
     ROBERTA_AVAILABLE = True
 except ImportError:
     ROBERTA_AVAILABLE = False
+
+# 🚨 CRITICAL: RoBERTa Token Limit Configuration
+# j-hartmann/emotion-english-distilroberta-base has a 514 token hard limit
+ROBERTA_MAX_TOKENS = 514
+ROBERTA_SAFE_TOKEN_LIMIT = 400  # Leave buffer for encoding/padding
     
 # VADER Integration  
 try:
@@ -231,6 +236,41 @@ class EnhancedVectorEmotionAnalyzer:
         
         logger.info("EnhancedVectorEmotionAnalyzer initialized with vector integration")
     
+    def _check_roberta_token_limit(self, content: str) -> Tuple[bool, str]:
+        """
+        Check if content exceeds RoBERTa token limits and provide safe truncation.
+        
+        Args:
+            content: The text content to check
+            
+        Returns:
+            Tuple of (is_safe, processed_content)
+            - is_safe: True if content is within limits, False if truncated
+            - processed_content: Original content if safe, truncated if too long
+        """
+        # Simple token estimation: ~4 characters per token (conservative estimate)
+        estimated_tokens = len(content) // 4
+        
+        if estimated_tokens <= ROBERTA_SAFE_TOKEN_LIMIT:
+            return True, content
+            
+        # Content is too long - truncate to safe limit
+        safe_char_limit = ROBERTA_SAFE_TOKEN_LIMIT * 4
+        truncated_content = content[:safe_char_limit]
+        
+        # Try to truncate at word boundary for better semantic preservation
+        if len(truncated_content) < len(content):
+            last_space = truncated_content.rfind(' ')
+            if last_space > safe_char_limit * 0.8:  # Only use word boundary if it's not too short
+                truncated_content = truncated_content[:last_space]
+        
+        logger.warning(
+            f"🚨 ROBERTA TOKEN LIMIT: Content truncated from {len(content)} to {len(truncated_content)} chars "
+            f"(estimated {estimated_tokens} → {len(truncated_content)//4} tokens)"
+        )
+        
+        return False, truncated_content
+    
     async def analyze_emotion(
         self, 
         content: str, 
@@ -398,9 +438,28 @@ class EnhancedVectorEmotionAnalyzer:
                     # Use shared classifier
                     self._roberta_classifier = self.__class__._shared_roberta_classifier
                     
-                    # Analyze emotions with RoBERTa
+                    # 🚨 CRITICAL: Check RoBERTa token limits before analysis
+                    is_safe, processed_content = self._check_roberta_token_limit(content)
+                    if not is_safe:
+                        logger.warning(
+                            "🚨 ROBERTA TOKEN LIMIT: Content was truncated to fit RoBERTa 514 token limit. "
+                            "Results may be incomplete. Consider using fallback emotion analysis."
+                        )
+                        # For extremely long content, we might want to skip RoBERTa entirely
+                        # and go straight to VADER or return neutral emotion
+                        estimated_original_tokens = len(content) // 4
+                        if estimated_original_tokens > ROBERTA_MAX_TOKENS * 2:  # Much too long
+                            logger.info(
+                                f"🚨 ROBERTA TOKEN LIMIT: Content too long ({estimated_original_tokens} tokens), "
+                                "skipping RoBERTa and using neutral emotion"
+                            )
+                            emotion_scores["neutral"] = 0.9
+                            emotion_scores["unknown"] = 0.1
+                            return emotion_scores
+                    
+                    # Analyze emotions with RoBERTa (using processed content)
                     logger.debug(f"🤖 ROBERTA ANALYSIS: Running RoBERTa inference on content")
-                    results = self._roberta_classifier(content)
+                    results = self._roberta_classifier(processed_content)
                     logger.info(f"🤖 ROBERTA ANALYSIS: RoBERTa completed with {len(results[0])} emotion results")
                     
                     # Process RoBERTa results

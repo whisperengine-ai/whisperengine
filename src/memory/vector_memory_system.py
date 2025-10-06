@@ -369,9 +369,9 @@ class VectorMemoryStore:
             collection_names = [c.name for c in collections]
 
             if self.collection_name not in collection_names:
-                # 🎯 QDRANT FEATURE: Enhanced 7D named vectors for multi-dimensional intelligence
+                # 🎯 QDRANT FEATURE: 3D named vectors for multi-dimensional intelligence (CURRENT SYSTEM)
                 vectors_config = {
-                    # Main content vector for semantic similarity (30% weight)
+                    # Main content vector for semantic similarity
                     "content": VectorParams(
                         size=self.embedding_dimension,
                         distance=Distance.COSINE,
@@ -382,7 +382,7 @@ class VectorMemoryStore:
                         )
                     ),
                     
-                    # Emotional context vector for sentiment-aware search (20% weight)
+                    # Emotional context vector for sentiment-aware search
                     "emotion": VectorParams(
                         size=self.embedding_dimension,
                         distance=Distance.COSINE,
@@ -392,53 +392,13 @@ class VectorMemoryStore:
                         )
                     ),
                     
-                    # Semantic concept vector for contradiction detection (10% weight)
+                    # Semantic concept vector for concept/personality context
                     "semantic": VectorParams(
                         size=self.embedding_dimension,
                         distance=Distance.COSINE,
                         hnsw_config=models.HnswConfigDiff(
                             m=16,
                             ef_construct=128
-                        )
-                    ),
-                    
-                    # Relationship context vector for bond-appropriate responses (15% weight)
-                    "relationship": VectorParams(
-                        size=self.embedding_dimension,
-                        distance=Distance.COSINE,
-                        hnsw_config=models.HnswConfigDiff(
-                            m=16,
-                            ef_construct=128
-                        )
-                    ),
-                    
-                    # Personality trait vector for character consistency (15% weight)
-                    "personality": VectorParams(
-                        size=self.embedding_dimension,
-                        distance=Distance.COSINE,
-                        hnsw_config=models.HnswConfigDiff(
-                            m=16,
-                            ef_construct=128
-                        )
-                    ),
-                    
-                    # Interaction style vector for communication patterns (5% weight)
-                    "interaction": VectorParams(
-                        size=self.embedding_dimension,
-                        distance=Distance.COSINE,
-                        hnsw_config=models.HnswConfigDiff(
-                            m=8,   # Lower connectivity for interaction patterns
-                            ef_construct=64
-                        )
-                    ),
-                    
-                    # Temporal flow vector for conversation timing (5% weight)
-                    "temporal": VectorParams(
-                        size=self.embedding_dimension,
-                        distance=Distance.COSINE,
-                        hnsw_config=models.HnswConfigDiff(
-                            m=8,   # Lower connectivity for temporal patterns
-                            ef_construct=64
                         )
                     )
                 }                # 🚀 QDRANT FEATURE: Optimized configuration for performance
@@ -478,39 +438,38 @@ class VectorMemoryStore:
         """
         🎯 CRITICAL: Validate existing collection has all required vectors and indexes
         
-        This ensures that legacy collections (3 vectors) are properly upgraded
-        to the current 7-vector schema with all required indexes.
+        This ensures that collections have the current 3-vector schema (content, emotion, semantic).
         """
         try:
             # Get current collection configuration
             collection_info = self.client.get_collection(self.collection_name)
             current_vectors = collection_info.config.params.vectors
             
-            # Expected 7 named vectors
+            # Expected 3 named vectors (current system)
             expected_vectors = {
-                "content", "emotion", "semantic", "relationship", 
-                "personality", "interaction", "temporal"
+                "content", "emotion", "semantic"
             }
             
             if isinstance(current_vectors, dict):
                 current_vector_names = set(current_vectors.keys())
                 missing_vectors = expected_vectors - current_vector_names
+                extra_vectors = current_vector_names - expected_vectors
                 
                 if missing_vectors:
-                    logger.warning(f"🚨 COLLECTION UPGRADE: Missing vectors {missing_vectors}")
+                    logger.warning(f"🚨 COLLECTION SCHEMA: Missing vectors {missing_vectors}")
                     logger.warning(f"🚨 Current vectors: {current_vector_names}")
-                    logger.warning(f"🚨 This collection needs to be recreated with full 7-vector schema")
+                    logger.warning(f"🚨 This collection needs to be recreated with 3-vector schema")
                     
                     # For now, log the issue but don't auto-recreate to avoid data loss
                     logger.error(f"❌ CRITICAL: Collection '{self.collection_name}' has incomplete vector schema!")
                     logger.error(f"❌ Please recreate collection or run migration script")
-                    
-                    # Could add auto-recreation here but it would delete all memories
-                    # raise Exception(f"Collection {self.collection_name} requires 7-vector upgrade")
+                elif extra_vectors:
+                    logger.info(f"📊 Collection has legacy vectors {extra_vectors} - will use current 3-vector subset")
+                    logger.info(f"✅ Collection has required 3 vectors: {expected_vectors}")
                 else:
-                    logger.info(f"✅ Collection has all 7 required vectors: {current_vector_names}")
+                    logger.info(f"✅ Collection has correct 3-vector schema: {current_vector_names}")
             else:
-                logger.warning(f"🚨 LEGACY COLLECTION: Single vector detected, needs 7-vector upgrade")
+                logger.warning(f"🚨 LEGACY COLLECTION: Single vector detected, needs 3-vector upgrade")
                 logger.error(f"❌ CRITICAL: Collection '{self.collection_name}' uses legacy single-vector schema!")
             
             # Always ensure payload indexes exist (safe to call multiple times)
