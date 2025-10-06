@@ -512,7 +512,7 @@ class MessageProcessor:
             logger.error("🎯 WORKFLOW ERROR: Continuing with normal message processing")
 
     async def _retrieve_relevant_memories(self, message_context: MessageContext) -> List[Dict[str, Any]]:
-        """Retrieve relevant memories with context-aware filtering."""
+        """Retrieve relevant memories with context-aware filtering and MemoryBoost optimization."""
         if not self.memory_manager:
             logger.warning("Memory manager not available; skipping memory retrieval.")
             return []
@@ -525,7 +525,53 @@ class MessageProcessor:
             classified_context = self._classify_message_context(message_context)
             logger.debug("Message context classified: %s", classified_context.context_type.value)
 
-            # Try optimized memory retrieval first if available
+            # 🚀 SPRINT 2: Try MemoryBoost enhanced retrieval first if available
+            if hasattr(self.memory_manager, 'retrieve_relevant_memories_with_memoryboost'):
+                try:
+                    # Build conversation context for MemoryBoost optimization
+                    conversation_context = self._build_conversation_context_for_memoryboost(message_context)
+                    
+                    # Use MemoryBoost enhanced retrieval
+                    memoryboost_result = await self.memory_manager.retrieve_relevant_memories_with_memoryboost(
+                        user_id=message_context.user_id,
+                        query=message_context.content,
+                        limit=20,
+                        conversation_context=conversation_context,
+                        apply_quality_scoring=True,
+                        apply_optimizations=True
+                    )
+                    
+                    relevant_memories = memoryboost_result.get('memories', [])
+                    optimization_metadata = memoryboost_result.get('optimization_metadata', {})
+                    performance_metrics = memoryboost_result.get('performance_metrics', {})
+                    
+                    # Calculate actual retrieval timing
+                    memory_end_time = datetime.now()
+                    retrieval_time_ms = int((memory_end_time - memory_start_time).total_seconds() * 1000)
+                    
+                    logger.info("🚀 MEMORYBOOST: Enhanced retrieval returned %d memories in %dms (optimizations: %d, improvement: %.2f%%)", 
+                               len(relevant_memories), 
+                               retrieval_time_ms,
+                               optimization_metadata.get('optimizations_count', 0),
+                               optimization_metadata.get('performance_improvement', 0.0) * 100)
+                    
+                    # Record MemoryBoost metrics to InfluxDB
+                    if self.fidelity_metrics and relevant_memories:
+                        self._record_memoryboost_metrics(
+                            message_context=message_context,
+                            memories=relevant_memories,
+                            optimization_metadata=optimization_metadata,
+                            performance_metrics=performance_metrics,
+                            retrieval_time_ms=retrieval_time_ms
+                        )
+                    
+                    return relevant_memories
+                    
+                except Exception as e:
+                    logger.warning("MemoryBoost retrieval failed, falling back to optimized retrieval: %s", str(e))
+                    # Continue to optimized retrieval fallback
+
+            # Try optimized memory retrieval as fallback if MemoryBoost is not available
             if hasattr(self.memory_manager, 'retrieve_relevant_memories_optimized'):
                 try:
                     query_type = self._classify_query_type(message_context.content)
@@ -629,6 +675,121 @@ class MessageProcessor:
             'context_type': getattr(context, 'context_type', None),
             'security_level': getattr(context, 'security_level', None)
         }
+
+    def _build_conversation_context_for_memoryboost(self, message_context: MessageContext) -> str:
+        """
+        🚀 SPRINT 2: Build conversation context for MemoryBoost optimization.
+        
+        Creates a rich context string that MemoryBoost can use to optimize
+        memory retrieval based on conversation patterns and user intent.
+        """
+        try:
+            context_parts = []
+            
+            # Add message content and intent
+            context_parts.append(f"User query: {message_context.content}")
+            
+            # Add platform context
+            if hasattr(message_context, 'platform') and message_context.platform:
+                context_parts.append(f"Platform: {message_context.platform}")
+            
+            # Add channel type context
+            if hasattr(message_context, 'channel_type') and message_context.channel_type:
+                context_parts.append(f"Context: {message_context.channel_type}")
+            
+            # Classify query type for context
+            query_type = self._classify_query_type(message_context.content)
+            context_parts.append(f"Query type: {query_type}")
+            
+            # Add temporal context
+            context_parts.append(f"Time: {datetime.now().strftime('%Y-%m-%d %H:%M')}")
+            
+            # Add user context if available
+            context_parts.append(f"User: {message_context.user_id}")
+            
+            return " | ".join(context_parts)
+            
+        except Exception as e:
+            logger.warning("Error building MemoryBoost conversation context: %s", str(e))
+            return message_context.content  # Fallback to just the message content
+
+    def _record_memoryboost_metrics(
+        self,
+        message_context: MessageContext,
+        memories: List[Dict[str, Any]],
+        optimization_metadata: Dict[str, Any],
+        performance_metrics: Dict[str, Any],
+        retrieval_time_ms: int
+    ) -> None:
+        """
+        🚀 SPRINT 2: Record MemoryBoost metrics to InfluxDB for analytics.
+        
+        Records detailed metrics about MemoryBoost performance including
+        optimization effectiveness, quality scoring results, and performance impact.
+        """
+        try:
+            if not self.fidelity_metrics:
+                return
+            
+            # Record standard memory quality metrics
+            relevance_scores = [mem.get('quality_score', mem.get('score', 0.7)) for mem in memories]
+            avg_relevance = sum(relevance_scores) / len(relevance_scores) if relevance_scores else 0.7
+            
+            vector_similarities = [mem.get('score', 0.8) for mem in memories]
+            avg_similarity = sum(vector_similarities) / len(vector_similarities) if vector_similarities else 0.8
+            
+            self.fidelity_metrics.record_memory_quality(
+                user_id=message_context.user_id,
+                operation="memoryboost_retrieval",
+                relevance_score=avg_relevance,
+                retrieval_time_ms=retrieval_time_ms,
+                memory_count=len(memories),
+                vector_similarity=avg_similarity
+            )
+            
+            # Record MemoryBoost-specific metrics
+            if hasattr(self.fidelity_metrics, 'record_custom_metric'):
+                # Record optimization metrics
+                self.fidelity_metrics.record_custom_metric(
+                    metric_name="memoryboost_optimizations",
+                    user_id=message_context.user_id,
+                    tags={
+                        'quality_scoring_applied': optimization_metadata.get('quality_scoring_applied', False),
+                        'optimizations_applied': optimization_metadata.get('optimizations_applied', False),
+                        'operation': 'memory_retrieval'
+                    },
+                    fields={
+                        'optimizations_count': optimization_metadata.get('optimizations_count', 0),
+                        'performance_improvement': optimization_metadata.get('performance_improvement', 0.0),
+                        'base_retrieval_time_ms': performance_metrics.get('base_retrieval_time_ms', 0),
+                        'quality_scoring_time_ms': performance_metrics.get('quality_scoring_time_ms', 0),
+                        'optimization_time_ms': performance_metrics.get('optimization_time_ms', 0),
+                        'total_time_ms': performance_metrics.get('total_time_ms', retrieval_time_ms)
+                    }
+                )
+                
+                # Record quality distribution
+                if memories:
+                    quality_scores = [mem.get('quality_score', 0.7) for mem in memories]
+                    boost_factors = [mem.get('boost_factor', 1.0) for mem in memories]
+                    
+                    self.fidelity_metrics.record_custom_metric(
+                        metric_name="memoryboost_quality_distribution",
+                        user_id=message_context.user_id,
+                        tags={'operation': 'quality_analysis'},
+                        fields={
+                            'avg_quality_score': sum(quality_scores) / len(quality_scores),
+                            'max_quality_score': max(quality_scores),
+                            'min_quality_score': min(quality_scores),
+                            'avg_boost_factor': sum(boost_factors) / len(boost_factors),
+                            'max_boost_factor': max(boost_factors),
+                            'memories_boosted': len([b for b in boost_factors if b > 1.0]),
+                            'memories_penalized': len([b for b in boost_factors if b < 1.0])
+                        }
+                    )
+            
+        except Exception as e:
+            logger.warning("Error recording MemoryBoost metrics: %s", str(e))
 
     async def _build_conversation_context(self, message_context: MessageContext, 
                                         relevant_memories: List[Dict[str, Any]]) -> List[Dict[str, str]]:
