@@ -798,7 +798,7 @@ if __name__ == '__main__':
     Usage:
         export POSTGRES_HOST=localhost
         export POSTGRES_PORT=5433
-        python tests/automated/test_sprint3_relationship_tuner_validation.py
+        python tests/automated/test_relationship_evolution_validation.py
     """
     print("\n" + "="*70)
     print("SPRINT 3 RELATIONSHIPTUNER VALIDATION SUITE")

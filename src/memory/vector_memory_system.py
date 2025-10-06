@@ -4941,7 +4941,142 @@ class VectorMemoryManager:
             limit=max_memories
         )
 
+    def initialize_memoryboost_components(
+        self,
+        trend_analyzer=None,
+        temporal_client=None
+    ) -> None:
+        """
+        Initialize MemoryBoost components for enhanced memory optimization.
+        
+        Args:
+            trend_analyzer: TrendWise InfluxDB analyzer instance
+            temporal_client: InfluxDB client for metrics storage
+        """
+        try:
+            # Set up logger if not already available
+            if not hasattr(self, 'logger'):
+                import logging
+                self.logger = logging.getLogger(__name__)
+                
+            # Initialize Memory Effectiveness Analyzer
+            from src.memory.memory_effectiveness import create_memory_effectiveness_analyzer
+            self._effectiveness_analyzer = create_memory_effectiveness_analyzer(
+                memory_manager=self,
+                trend_analyzer=trend_analyzer,
+                temporal_client=temporal_client
+            )
+            
+            # Initialize Vector Relevance Optimizer
+            from src.memory.relevance_optimizer import create_vector_relevance_optimizer
+            self._relevance_optimizer = create_vector_relevance_optimizer(
+                memory_manager=self,
+                effectiveness_analyzer=self._effectiveness_analyzer
+            )
+            
+            self.logger.info("✅ MemoryBoost components initialized successfully")
+            
+        except Exception as e:
+            # Set up logger if not already available for error logging
+            if not hasattr(self, 'logger'):
+                import logging
+                self.logger = logging.getLogger(__name__)
+            self.logger.error("Failed to initialize MemoryBoost components: %s", str(e))
+            self._effectiveness_analyzer = None
+            self._relevance_optimizer = None
 
+    def _get_bot_name(self) -> str:
+        """Get bot name from environment for MemoryBoost operations."""
+        try:
+            from src.utils.helpers import get_normalized_bot_name_from_env
+            return get_normalized_bot_name_from_env()
+        except Exception:
+            # Fallback to environment variable
+            return os.getenv('DISCORD_BOT_NAME', 'unknown')
+
+    async def analyze_memory_effectiveness(
+        self,
+        user_id: str,
+        days_back: int = 14
+    ) -> Dict[str, Any]:
+        """
+        Analyze memory effectiveness for a user using MemoryBoost analytics.
+        
+        Args:
+            user_id: User identifier
+            days_back: Days of history to analyze
+            
+        Returns:
+            Dictionary with effectiveness analysis results
+        """
+        try:
+            if not hasattr(self, '_effectiveness_analyzer') or not self._effectiveness_analyzer:
+                return {'error': 'MemoryBoost effectiveness analyzer not initialized'}
+            
+            bot_name = self._get_bot_name()
+            
+            # Get effectiveness metrics
+            effectiveness_metrics = await self._effectiveness_analyzer.analyze_memory_performance(
+                user_id=user_id,
+                bot_name=bot_name,
+                days_back=days_back
+            )
+            
+            # Get optimization recommendations
+            recommendations = await self._effectiveness_analyzer.get_memory_optimization_recommendations(
+                user_id=user_id,
+                bot_name=bot_name
+            )
+            
+            return {
+                'effectiveness_metrics': {
+                    pattern.value: {
+                        'success_rate': metrics.success_rate,
+                        'usage_count': metrics.usage_count,
+                        'improvement_factor': metrics.improvement_factor,
+                        'confidence_boost': metrics.confidence_boost
+                    }
+                    for pattern, metrics in effectiveness_metrics.items()
+                },
+                'recommendations': recommendations,
+                'analysis_confidence': recommendations.get('confidence', 0.5),
+                'last_updated': recommendations.get('analysis_timestamp')
+            }
+            
+        except Exception as e:
+            self.logger.error("Error analyzing memory effectiveness: %s", str(e))
+            return {'error': str(e)}
+
+    async def get_memory_optimization_stats(self) -> Dict[str, Any]:
+        """
+        Get MemoryBoost optimization statistics and performance metrics.
+        
+        Returns:
+            Dictionary with optimization statistics
+        """
+        try:
+            stats = {
+                'memoryboost_enabled': hasattr(self, '_effectiveness_analyzer') and self._effectiveness_analyzer is not None,
+                'components_initialized': {
+                    'effectiveness_analyzer': hasattr(self, '_effectiveness_analyzer') and self._effectiveness_analyzer is not None,
+                    'relevance_optimizer': hasattr(self, '_relevance_optimizer') and self._relevance_optimizer is not None
+                }
+            }
+            
+            # Get optimizer statistics if available
+            if hasattr(self, '_relevance_optimizer') and self._relevance_optimizer:
+                optimizer_stats = getattr(self._relevance_optimizer, '_optimization_stats', {})
+                stats['optimization_performance'] = optimizer_stats
+            
+            return stats
+            
+        except Exception as e:
+            self.logger.error("Error getting MemoryBoost stats: %s", str(e))
+            return {'error': str(e)}
+
+
+if __name__ == "__main__":
+    asyncio.run(test_vector_memory_system())
 # Example usage and testing
 async def test_vector_memory_system():
     """Test the new vector memory system - LOCAL DEPLOYMENT"""
@@ -5118,131 +5253,4 @@ async def test_vector_memory_system():
                     'total_time_ms': (time.time() - start_time) * 1000
                 }
             }
-
-    def initialize_memoryboost_components(
-        self,
-        trend_analyzer=None,
-        temporal_client=None
-    ) -> None:
-        """
-        Initialize MemoryBoost components for enhanced memory optimization.
-        
-        Args:
-            trend_analyzer: TrendWise InfluxDB analyzer instance
-            temporal_client: InfluxDB client for metrics storage
-        """
-        try:
-            # Initialize Memory Effectiveness Analyzer
-            from src.memory.memory_effectiveness import create_memory_effectiveness_analyzer
-            self._effectiveness_analyzer = create_memory_effectiveness_analyzer(
-                memory_manager=self,
-                trend_analyzer=trend_analyzer,
-                temporal_client=temporal_client
-            )
             
-            # Initialize Vector Relevance Optimizer
-            from src.memory.relevance_optimizer import create_vector_relevance_optimizer
-            self._relevance_optimizer = create_vector_relevance_optimizer(
-                memory_manager=self,
-                effectiveness_analyzer=self._effectiveness_analyzer
-            )
-            
-            self.logger.info("✅ MemoryBoost components initialized successfully")
-            
-        except Exception as e:
-            self.logger.error("Failed to initialize MemoryBoost components: %s", str(e))
-            self._effectiveness_analyzer = None
-            self._relevance_optimizer = None
-
-    def _get_bot_name(self) -> str:
-        """Get bot name from environment for MemoryBoost operations."""
-        try:
-            from src.utils.helpers import get_normalized_bot_name_from_env
-            return get_normalized_bot_name_from_env()
-        except Exception:
-            # Fallback to environment variable
-            return os.getenv('DISCORD_BOT_NAME', 'unknown')
-
-    async def analyze_memory_effectiveness(
-        self,
-        user_id: str,
-        days_back: int = 14
-    ) -> Dict[str, Any]:
-        """
-        Analyze memory effectiveness for a user using MemoryBoost analytics.
-        
-        Args:
-            user_id: User identifier
-            days_back: Days of history to analyze
-            
-        Returns:
-            Dictionary with effectiveness analysis results
-        """
-        try:
-            if not hasattr(self, '_effectiveness_analyzer') or not self._effectiveness_analyzer:
-                return {'error': 'MemoryBoost effectiveness analyzer not initialized'}
-            
-            bot_name = self._get_bot_name()
-            
-            # Get effectiveness metrics
-            effectiveness_metrics = await self._effectiveness_analyzer.analyze_memory_performance(
-                user_id=user_id,
-                bot_name=bot_name,
-                days_back=days_back
-            )
-            
-            # Get optimization recommendations
-            recommendations = await self._effectiveness_analyzer.get_memory_optimization_recommendations(
-                user_id=user_id,
-                bot_name=bot_name
-            )
-            
-            return {
-                'effectiveness_metrics': {
-                    pattern.value: {
-                        'success_rate': metrics.success_rate,
-                        'usage_count': metrics.usage_count,
-                        'improvement_factor': metrics.improvement_factor,
-                        'confidence_boost': metrics.confidence_boost
-                    }
-                    for pattern, metrics in effectiveness_metrics.items()
-                },
-                'recommendations': recommendations,
-                'analysis_confidence': recommendations.get('confidence', 0.5),
-                'last_updated': recommendations.get('analysis_timestamp')
-            }
-            
-        except Exception as e:
-            self.logger.error("Error analyzing memory effectiveness: %s", str(e))
-            return {'error': str(e)}
-
-    async def get_memory_optimization_stats(self) -> Dict[str, Any]:
-        """
-        Get MemoryBoost optimization statistics and performance metrics.
-        
-        Returns:
-            Dictionary with optimization statistics
-        """
-        try:
-            stats = {
-                'memoryboost_enabled': hasattr(self, '_effectiveness_analyzer') and self._effectiveness_analyzer is not None,
-                'components_initialized': {
-                    'effectiveness_analyzer': hasattr(self, '_effectiveness_analyzer') and self._effectiveness_analyzer is not None,
-                    'relevance_optimizer': hasattr(self, '_relevance_optimizer') and self._relevance_optimizer is not None
-                }
-            }
-            
-            # Get optimizer statistics if available
-            if hasattr(self, '_relevance_optimizer') and self._relevance_optimizer:
-                optimizer_stats = getattr(self._relevance_optimizer, '_optimization_stats', {})
-                stats['optimization_performance'] = optimizer_stats
-            
-            return stats
-            
-        except Exception as e:
-            self.logger.error("Error getting MemoryBoost stats: %s", str(e))
-            return {'error': str(e)}
-
-
-if __name__ == "__main__":
-    asyncio.run(test_vector_memory_system())

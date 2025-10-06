@@ -48,11 +48,12 @@ logger = logging.getLogger(__name__)
 
 class MetricType(Enum):
     """Types of fidelity-first metrics to track"""
-    FIDELITY_SCORE = "fidelity_score"
-    CHARACTER_CONSISTENCY = "character_consistency"
-    OPTIMIZATION_RATIO = "optimization_ratio"
-    MEMORY_QUALITY = "memory_quality"
-    RESPONSE_TIME = "response_time"
+    # v2: Fixed integer field type preservation for all measurements
+    FIDELITY_SCORE = "fidelity_score_v2"
+    CHARACTER_CONSISTENCY = "character_consistency_v2"
+    OPTIMIZATION_RATIO = "optimization_ratio_v2"
+    MEMORY_QUALITY = "memory_quality_v2"
+    RESPONSE_TIME = "response_time_v2"
     # TOKEN_USAGE = "token_usage"  # REMOVED: Never used
     # SYSTEM_PERFORMANCE = "system_performance"  # REMOVED: Already tracked by ConcurrentConversationManager
     # USER_ENGAGEMENT = "user_engagement"  # REMOVED: Redundant with temporal intelligence
@@ -289,14 +290,22 @@ class FidelityMetricsCollector:
             logger.warning("Invalid metric value for %s: %s", metric.metric_type, metric.value)
             return None
         
-        # Add additional fields (validate types)
+        # Add additional fields (validate types and preserve int/float distinction)
         for key, value in metric.fields.items():
             if value is not None:
-                if isinstance(value, (int, float)) and not (isinstance(value, float) and (value != value)):  # Check for NaN
-                    point = point.field(key, float(value))
-                elif isinstance(value, str):
+                if isinstance(value, bool):
+                    # Boolean must be checked before int (bool is subclass of int in Python)
                     point = point.field(key, value)
-                elif isinstance(value, bool):
+                elif isinstance(value, int):
+                    # Preserve integers as integers (important for InfluxDB schema)
+                    point = point.field(key, int(value))
+                elif isinstance(value, float):
+                    # Check for NaN
+                    if value == value:  # NaN != NaN, so this filters out NaN
+                        point = point.field(key, float(value))
+                    else:
+                        logger.debug("Skipping NaN value for field %s", key)
+                elif isinstance(value, str):
                     point = point.field(key, value)
                 else:
                     logger.debug("Skipping unsupported field type for %s: %s", key, type(value))

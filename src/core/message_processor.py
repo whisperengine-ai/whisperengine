@@ -27,6 +27,10 @@ from src.adapters.platform_adapters import (
     create_discord_attachment_adapters
 )
 
+# Sprint 3: RelationshipTuner components
+from src.relationships.evolution_engine import create_relationship_evolution_engine
+from src.relationships.trust_recovery import create_trust_recovery_system
+
 logger = logging.getLogger(__name__)
 
 
@@ -125,6 +129,11 @@ class MessageProcessor:
                 self.trend_analyzer = None
                 self.confidence_adapter = None
         
+        # Sprint 3 RelationshipTuner: Lazy initialization (postgres_pool may not be ready yet)
+        self.relationship_engine = None
+        self.trust_recovery = None
+        self._sprint3_init_attempted = False  # Track if we've tried initializing
+        
         # Initialize fidelity metrics collector for performance tracking
         try:
             from src.monitoring.fidelity_metrics_collector import get_fidelity_metrics_collector
@@ -209,6 +218,12 @@ class MessageProcessor:
                     bot_emotional_state.get('current_emotion', 'unknown'),
                     bot_emotional_state.get('trajectory_direction', 'stable')
                 )
+            
+            # Phase 6.7: Adaptive Learning Intelligence (Relationship & Confidence)
+            # Retrieve relationship scores and conversation trends BEFORE response generation
+            await self._enrich_ai_components_with_adaptive_learning(
+                message_context, ai_components, relevant_memories
+            )
             
             # Phase 7: Response generation
             response = await self._generate_response(
@@ -408,9 +423,183 @@ class MessageProcessor:
             
             logger.debug("Recorded temporal metrics for %s/%s", bot_name, message_context.user_id)
             
+            # Sprint 3: Lazy initialization and update of dynamic relationship scores
+            await self._ensure_sprint3_initialized()
+            
+            if self.relationship_engine:
+                try:
+                    # Map quality_metrics to ConversationQuality enum (Sprint 1)
+                    from src.relationships.evolution_engine import ConversationQuality
+                    
+                    # Calculate overall quality score from metrics
+                    avg_quality = (
+                        quality_metrics.engagement_score +
+                        quality_metrics.satisfaction_score +
+                        quality_metrics.natural_flow_score +
+                        quality_metrics.emotional_resonance +
+                        quality_metrics.topic_relevance
+                    ) / 5.0
+                    
+                    # Map to ConversationQuality enum
+                    if avg_quality >= 0.85:
+                        conversation_quality = ConversationQuality.EXCELLENT
+                    elif avg_quality >= 0.70:
+                        conversation_quality = ConversationQuality.GOOD
+                    elif avg_quality >= 0.50:
+                        conversation_quality = ConversationQuality.AVERAGE
+                    elif avg_quality >= 0.30:
+                        conversation_quality = ConversationQuality.POOR
+                    else:
+                        conversation_quality = ConversationQuality.FAILED
+                    
+                    # Get RoBERTa emotion data (Sprint 2)
+                    emotion_data = ai_components.get('emotion_data', {})
+                    
+                    # Calculate and update relationship scores
+                    update = await self.relationship_engine.calculate_dynamic_relationship_score(
+                        user_id=message_context.user_id,
+                        bot_name=bot_name,
+                        conversation_quality=conversation_quality,
+                        emotion_data=emotion_data
+                    )
+                    
+                    if update:
+                        logger.info(
+                            "🔄 RELATIONSHIP: Trust/affection/attunement updated for %s/%s - "
+                            "trust: %.3f (%+.3f), affection: %.3f (%+.3f), attunement: %.3f (%+.3f)",
+                            bot_name, message_context.user_id,
+                            update.new_scores.trust, update.changes.get('trust', 0.0),
+                            update.new_scores.affection, update.changes.get('affection', 0.0),
+                            update.new_scores.attunement, update.changes.get('attunement', 0.0)
+                        )
+                    
+                except Exception as e:
+                    logger.warning("Relationship evolution update failed: %s", str(e))
+            
         except Exception as e:
             # Log but don't fail message processing
             logger.warning("Failed to record temporal metrics: %s", str(e))
+    
+    async def _ensure_sprint3_initialized(self):
+        """Lazy initialization of Sprint 3 components (postgres_pool may not be ready at __init__ time)."""
+        if self._sprint3_init_attempted:
+            return  # Already tried, don't spam logs
+        
+        self._sprint3_init_attempted = True
+        
+        # Check if postgres_pool is now available
+        postgres_pool = getattr(self.bot_core, 'postgres_pool', None) if self.bot_core else None
+        
+        if postgres_pool and self.temporal_client:
+            try:
+                self.relationship_engine = create_relationship_evolution_engine(
+                    postgres_pool=postgres_pool,
+                    temporal_client=self.temporal_client
+                )
+                self.trust_recovery = create_trust_recovery_system(
+                    postgres_pool=postgres_pool
+                )
+                logger.info("Relationship Evolution: Dynamic relationship scoring initialized (lazy)")
+            except ImportError as e:
+                logger.warning("RelationshipTuner components not available: %s", e)
+                self.relationship_engine = None
+                self.trust_recovery = None
+        else:
+            logger.debug("Sprint 3 RelationshipTuner: Still waiting for postgres_pool (postgres_pool=%s, temporal_client=%s)",
+                        postgres_pool is not None, self.temporal_client is not None)
+    
+    async def _enrich_ai_components_with_adaptive_learning(
+        self,
+        message_context: MessageContext,
+        ai_components: Dict[str, Any],
+        relevant_memories: List[Dict[str, Any]]
+    ):
+        """
+        🎯 ADAPTIVE LEARNING ENRICHMENT: Enrich AI components with relationship and confidence intelligence.
+        
+        Retrieves and adds adaptive learning data to ai_components for LLM prompt injection:
+        - Relationship State: Current trust, affection, and attunement scores
+        - Conversation Confidence: Quality trends and confidence metrics
+        - Emotion Analysis: RoBERTa emotion metadata (already in ai_components)
+        
+        This data is later extracted by CDL integration and injected into the system prompt,
+        allowing AI characters to adapt behavior based on relationship depth and conversation quality.
+        """
+        try:
+            # Ensure relationship evolution system is initialized
+            await self._ensure_sprint3_initialized()
+            
+            if not self.relationship_engine:
+                logger.debug("Sprint 1-3: Relationship engine not available for prompt injection")
+                return
+            
+            bot_name = os.getenv('DISCORD_BOT_NAME', 'unknown')
+            
+            # SPRINT 3: Get current relationship scores
+            try:
+                scores = await self.relationship_engine._get_current_scores(
+                    user_id=message_context.user_id,
+                    bot_name=bot_name
+                )
+                
+                if scores:
+                    ai_components['relationship_state'] = {
+                        'trust': float(scores.trust),
+                        'affection': float(scores.affection),
+                        'attunement': float(scores.attunement),
+                        'interaction_count': int(scores.interaction_count),
+                        'relationship_depth': self._calculate_relationship_depth(scores)
+                    }
+                    logger.info(
+                        "🎯 RELATIONSHIP: Added relationship scores - trust=%.3f, affection=%.3f, attunement=%.3f",
+                        scores.trust, scores.affection, scores.attunement
+                    )
+            except Exception as e:
+                logger.debug("Sprint 3: Could not retrieve relationship scores: %s", e)
+            
+            # SPRINT 1: Get conversation quality trends (if trend_analyzer available)
+            # TODO: Implement temporal trend retrieval for prompt injection
+            # For now, use confidence metrics as a proxy for conversation quality
+            if self.confidence_analyzer and len(relevant_memories) > 0:
+                try:
+                    # Calculate current confidence metrics as quality indicator
+                    confidence_metrics = self.confidence_analyzer.calculate_confidence_metrics(
+                        ai_components=ai_components,
+                        memory_count=len(relevant_memories),
+                        processing_time_ms=0.0
+                    )
+                    
+                    ai_components['conversation_confidence'] = {
+                        'overall_confidence': confidence_metrics.overall_confidence,
+                        'context_confidence': confidence_metrics.context_confidence,
+                        'emotional_confidence': confidence_metrics.emotional_confidence
+                    }
+                    logger.info(
+                        "🎯 CONFIDENCE: Added conversation quality metrics - overall=%.2f",
+                        confidence_metrics.overall_confidence
+                    )
+                except Exception as e:
+                    logger.debug("Sprint 1: Could not calculate confidence metrics: %s", e)
+            
+            # Sprint 2 RoBERTa data is already in ai_components['emotion_data']
+            
+        except Exception as e:
+            logger.warning("Failed to enrich AI components with adaptive learning data: %s", str(e))
+    
+    def _calculate_relationship_depth(self, scores) -> str:
+        """Calculate human-readable relationship depth from scores."""
+        avg_score = (float(scores.trust) + float(scores.affection) + float(scores.attunement)) / 3.0
+        
+        if avg_score >= 0.8:
+            return "deep_bond"
+        elif avg_score >= 0.6:
+            return "strong_connection"
+        elif avg_score >= 0.4:
+            return "growing_relationship"
+        elif avg_score >= 0.2:
+            return "acquaintance"
+        else:
+            return "new_connection"
 
     async def _validate_security(self, message_context: MessageContext) -> Dict[str, Any]:
         """Validate message security and sanitize content."""
@@ -2559,6 +2748,25 @@ class MessageProcessor:
                 except Exception as e:
                     logger.debug(f"Failed to add context analysis to pipeline: {e}")
             
+            # 🎯 ADAPTIVE LEARNING INTEGRATION: Add relationship and confidence data to COMPREHENSIVE CONTEXT
+            # This must happen BEFORE comprehensive context is copied to pipeline!
+            relationship_data = ai_components.get('relationship_state')
+            confidence_data = ai_components.get('conversation_confidence')
+            
+            if relationship_data or confidence_data:
+                # Get or create comprehensive_context in ai_components
+                if 'comprehensive_context' not in ai_components:
+                    ai_components['comprehensive_context'] = {}
+                
+                # Add adaptive learning data INSIDE comprehensive_context (CDL integration reads from here)
+                if relationship_data:
+                    ai_components['comprehensive_context']['relationship_state'] = relationship_data
+                    logger.info("🎯 RELATIONSHIP: Added relationship data to comprehensive_context for prompt injection")
+                
+                if confidence_data:
+                    ai_components['comprehensive_context']['conversation_confidence'] = confidence_data
+                    logger.info("🎯 CONFIDENCE: Added confidence data to comprehensive_context for prompt injection")
+            
             # 🚀 COMPREHENSIVE CONTEXT INTEGRATION: Add all AI components to pipeline
             comprehensive_context = ai_components.get('comprehensive_context')
             if comprehensive_context and isinstance(comprehensive_context, dict):
@@ -2568,7 +2776,7 @@ class MessageProcessor:
                 else:
                     pipeline_result.enhanced_context = comprehensive_context.copy()
                 
-                logger.info("🎯 CDL: Enhanced pipeline with comprehensive context from sophisticated AI processing")
+                logger.info("🎯 CDL: Enhanced pipeline with comprehensive context from sophisticated AI processing (includes Sprint 1-3)")
             
             # Use centralized character system if available, otherwise create new instance
             if self.bot_core and hasattr(self.bot_core, 'character_system'):

@@ -39,11 +39,6 @@ class PerformanceCommands:
             """Show fidelity-first performance dashboard"""
             await self._fidelity_dashboard_handler(ctx, hours)
         
-        @self.bot.command(name="system_health", aliases=["health_detailed"])
-        async def system_health(ctx):
-            """Show detailed system health information"""
-            await self._system_health_handler(ctx)
-        
         @self.bot.command(name="flush_metrics")
         async def flush_metrics(ctx):
             """Flush performance metrics to InfluxDB (admin only)"""
@@ -241,83 +236,6 @@ class PerformanceCommands:
         except Exception as e:
             logger.error("Error in fidelity dashboard handler: %s", str(e))
             await ctx.send("❌ **Error:** Could not generate fidelity dashboard.")
-    
-    @handle_errors(
-        category=ErrorCategory.SYSTEM_RESOURCE,
-        severity=ErrorSeverity.MEDIUM,
-        operation="system_health"
-    )
-    async def _system_health_handler(self, ctx):
-        """Handle system health command"""
-        
-        try:
-            # Import health monitor
-            try:
-                from src.monitoring.health_monitor import get_health_monitor
-                health_monitor = get_health_monitor()
-                system_health = await health_monitor.check_system_health()
-                
-                embed = discord.Embed(
-                    title="🏥 System Health Report",
-                    description="Comprehensive system component status",
-                    color=0x2ECC71 if system_health.overall_status.value == "healthy" else 0xE74C3C,
-                    timestamp=datetime.now(timezone.utc)
-                )
-                
-                # Overall status
-                embed.add_field(
-                    name="📊 Overall Status",
-                    value=f"**Status:** {system_health.overall_status.value.title()}\n"
-                          f"**Uptime:** {system_health.uptime}\n"
-                          f"**Performance Score:** {system_health.performance_score:.1f}/100\n"
-                          f"**Total Errors:** {system_health.total_errors}",
-                    inline=False
-                )
-                
-                # Component status
-                components_text = []
-                for comp_type, comp_health in system_health.components.items():
-                    status_emoji = {
-                        "healthy": "✅",
-                        "warning": "⚠️", 
-                        "critical": "❌",
-                        "unknown": "❓"
-                    }.get(comp_health.status.value, "❓")
-                    
-                    components_text.append(f"{status_emoji} **{comp_type.value.replace('_', ' ').title()}**")
-                
-                if components_text:
-                    embed.add_field(
-                        name="🔧 Components",
-                        value="\n".join(components_text),
-                        inline=True
-                    )
-                
-                embed.set_footer(text="For performance metrics, use !performance")
-                
-            except ImportError:
-                embed = discord.Embed(
-                    title="🏥 Basic System Health",
-                    description="Health monitor not available, showing basic metrics",
-                    color=0xF39C12
-                )
-                
-                # Fallback to performance monitor health
-                health = self.performance_monitor.get_system_health()
-                embed.add_field(
-                    name="📊 Performance Health",
-                    value=f"**Status:** {health['overall_health'].title()}\n"
-                          f"**Memory:** {health['memory_usage_mb']:.0f}MB\n"
-                          f"**CPU:** {health['cpu_percent']:.1f}%\n"
-                          f"**Operations:** {health['active_operations']}",
-                    inline=False
-                )
-            
-            await ctx.send(embed=embed)
-            
-        except Exception as e:
-            logger.error("Error in system health handler: %s", str(e))
-            await ctx.send("❌ **Error:** Could not retrieve system health information.")
     
     @handle_errors(
         category=ErrorCategory.SYSTEM_RESOURCE,

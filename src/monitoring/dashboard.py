@@ -16,6 +16,9 @@ import weakref
 from .health_monitor import get_health_monitor, HealthStatus, ComponentType
 from .error_tracker import get_error_tracker, ErrorSeverity, ErrorCategory
 
+# Initialize logger BEFORE any code that might use it
+logger = logging.getLogger(__name__)
+
 # Engagement tracker disabled - replaced with InfluxDB metrics
 try:
     from .engagement_tracker import get_engagement_tracker, InteractionType
@@ -25,8 +28,6 @@ except ImportError:
     ENGAGEMENT_TRACKER_AVAILABLE = False
     get_engagement_tracker = None
     InteractionType = None
-
-logger = logging.getLogger(__name__)
 
 # Optional web dependencies
 try:
@@ -392,7 +393,9 @@ class MonitoringDashboard:
             try:
                 # Trigger component updates
                 await self.health_monitor.check_system_health(full_check=False)
-                self.engagement_tracker.cleanup_old_sessions()
+                # Engagement tracker disabled - using InfluxDB metrics instead
+                if self.engagement_tracker:
+                    self.engagement_tracker.cleanup_old_sessions()
                 self.error_tracker.cleanup_old_errors()
                 
                 self.last_update = datetime.now()

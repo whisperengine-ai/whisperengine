@@ -396,8 +396,15 @@ class CDLAIPromptIntegration:
                 if hasattr(pipeline_result, '__dict__'):
                     pipeline_dict = pipeline_result.__dict__
                 
-                # Extract comprehensive context
-                comprehensive_context = pipeline_dict.get('comprehensive_context', {})
+                # Extract comprehensive context from enhanced_context (where it's actually stored)
+                comprehensive_context = pipeline_dict.get('enhanced_context', {})
+                if not comprehensive_context:
+                    # Fallback: Try direct comprehensive_context attribute
+                    comprehensive_context = pipeline_dict.get('comprehensive_context', {})
+                
+                logger.debug(f"🔍 CDL DEBUG: pipeline_dict keys: {list(pipeline_dict.keys())}")
+                logger.debug(f"🔍 CDL DEBUG: comprehensive_context found: {bool(comprehensive_context)}, keys: {list(comprehensive_context.keys()) if isinstance(comprehensive_context, dict) else 'N/A'}")
+                
                 if comprehensive_context:
                     guidance_parts = []
                     
@@ -509,6 +516,50 @@ class CDLAIPromptIntegration:
                         confidence = emotion_analysis.get('confidence', 0)
                         if primary_emotion and confidence > 0.5:
                             guidance_parts.append(f"🎭 EMOTION: Detected {primary_emotion} (confidence: {confidence:.2f}) - respond with appropriate empathy")
+                    
+                    # 🎯 ADAPTIVE LEARNING INTELLIGENCE
+                    # Inject relationship depth, conversation quality, and confidence metrics
+                    relationship_data = comprehensive_context.get('relationship_state')
+                    if relationship_data and isinstance(relationship_data, dict):
+                        relationship_depth = relationship_data.get('relationship_depth', 'new_connection')
+                        trust = relationship_data.get('trust', 0.5)
+                        affection = relationship_data.get('affection', 0.5)
+                        attunement = relationship_data.get('attunement', 0.5)
+                        interactions = relationship_data.get('interaction_count', 0)
+                        
+                        # Build human-readable relationship guidance
+                        depth_descriptions = {
+                            'deep_bond': 'You share a deep, established bond - be warm, personal, and deeply attuned',
+                            'strong_connection': 'You have a strong connection - be friendly, comfortable, and supportive',
+                            'growing_relationship': 'Your relationship is developing - be engaging, open, and attentive',
+                            'acquaintance': 'You are becoming acquainted - be welcoming, respectful, and encouraging',
+                            'new_connection': 'This is a new connection - be inviting, warm, and establish rapport'
+                        }
+                        
+                        depth_guidance = depth_descriptions.get(relationship_depth, 'Respond authentically')
+                        
+                        guidance_parts.append(
+                            f"💝 RELATIONSHIP: {depth_guidance} "
+                            f"(Trust: {trust:.2f}, Affection: {affection:.2f}, Attunement: {attunement:.2f}, "
+                            f"Interactions: {interactions})"
+                        )
+                    
+                    confidence_data = comprehensive_context.get('conversation_confidence')
+                    if confidence_data and isinstance(confidence_data, dict):
+                        overall_conf = confidence_data.get('overall_confidence', 0.7)
+                        context_conf = confidence_data.get('context_confidence', 0.7)
+                        
+                        if overall_conf > 0.8:
+                            conf_guidance = "high confidence conversation - feel comfortable being detailed and specific"
+                        elif overall_conf > 0.6:
+                            conf_guidance = "moderate confidence - balance clarity with openness to exploration"
+                        else:
+                            conf_guidance = "exploratory conversation - ask clarifying questions and build understanding"
+                        
+                        guidance_parts.append(
+                            f"📊 CONFIDENCE: {conf_guidance} "
+                            f"(Overall: {overall_conf:.2f}, Context: {context_conf:.2f})"
+                        )
                     
                     if guidance_parts:
                         prompt += f"\n\n🤖 AI INTELLIGENCE GUIDANCE:\n" + "\n".join(f"• {part}" for part in guidance_parts) + "\n"

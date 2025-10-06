@@ -466,26 +466,11 @@ class RelationshipEvolutionEngine:
         emotion_variance: float
     ) -> None:
         """Record relationship update event to InfluxDB for trend analysis."""
-        if not self.temporal_client:
-            return
-        
-        try:
-            # Store relationship evolution event in InfluxDB
-            # This enables Sprint 3 trust recovery to detect trends
-            await self.temporal_client.store_relationship_update(
-                user_id=user_id,
-                bot_name=bot_name,
-                trust_delta=trust_delta,
-                affection_delta=affection_delta,
-                attunement_delta=attunement_delta,
-                conversation_quality=quality.value,
-                emotion_variance=emotion_variance,
-                timestamp=datetime.now()
-            )
-            
-        except Exception as e:
-            self.logger.error(f"Error recording relationship update event: {e}")
-            # Non-fatal - relationship scores still updated in PostgreSQL
+        # TODO: Re-enable InfluxDB recording after aligning RelationshipMetrics with evolution engine data model
+        # The current RelationshipMetrics dataclass requires interaction_quality and communication_comfort
+        # which are not readily available in the evolution engine update context
+        # For now, relationship data is still persisted in PostgreSQL
+        return
     
     def _generate_update_reason(
         self,

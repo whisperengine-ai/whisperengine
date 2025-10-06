@@ -44,6 +44,17 @@
 - When user asks to "document", update existing relevant doc, don't create new file
 - Focus on **implementation velocity** over documentation bureaucracy
 
+**🚨 CRITICAL NAMING CONVENTION: NO DEVELOPMENT PHASE NAMES IN PRODUCTION CODE!**
+- **NEVER use development phase names** in production code: "sprint1", "sprint2", "sprint3", "phase4", etc.
+- **USE SEMANTIC, DOMAIN-DRIVEN NAMES** that describe WHAT code does, not WHEN it was built
+- **Examples of BAD names**: `sprint3_relationship`, `phase4_intelligence`, `sprint1_confidence`, `_update_sprint3_scores()`
+- **Examples of GOOD names**: `relationship_state`, `conversation_intelligence`, `conversation_confidence`, `_update_relationship_scores()`
+- **Rationale**: Development phase names create confusion, make code harder to understand, and don't describe functionality
+- **Domain language**: Use terms from problem domain (relationships, conversations, emotions, trust, affection, confidence)
+- **Intent-revealing**: Names should explain purpose without looking at implementation
+- **Timeless**: Names should remain accurate as codebase evolves
+- **See**: `NAMING_REFACTORING_PLAN.md` for comprehensive naming conversion map and migration strategy
+
 **ALPHA/DEV PHASE**: WhisperEngine is in active development. Prioritize working features over production optimization. No production users yet - we can freely iterate and change.
 
 **🚨 CRITICAL: MESSAGE PROCESSING ARCHITECTURE - NO DUAL PATHS!**
@@ -1410,8 +1421,8 @@ python tests/automated/test_phase4_direct_validation.py  # Phase 4 intelligence 
 python tests/automated/test_phase3_direct_validation.py  # Phase 3 intelligence features
 
 # NEW FEATURE VALIDATION: Always create direct validation tests for new sprints/features
-python tests/automated/test_sprint2_memoryboost_direct_validation.py  # Sprint 2 (example)
-python tests/automated/test_sprint3_relationshiptuner_direct_validation.py  # Sprint 3 (example)
+python tests/automated/test_memoryboost_complete_validation.py  # MemoryBoost (example)
+python tests/automated/test_relationship_evolution_validation.py  # Relationship Evolution (example)
 
 # Environment validation (CRITICAL for troubleshooting)
 source .venv/bin/activate && python scripts/verify_environment.py

@@ -172,9 +172,6 @@ class ModularBotManager:
 
         # Get components from bot core
         components = self.bot_core.get_components()
-
-        # Ensure monitoring system is ready before setting up command handlers
-        await self.bot_core.ensure_monitoring_ready()
         
         # Import bot command decorators and helpers
         from src.core.bot_launcher import bot_name_filter

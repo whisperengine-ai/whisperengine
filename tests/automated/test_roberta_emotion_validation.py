@@ -15,7 +15,7 @@ Tests:
 6. Fallback works when RoBERTa metadata unavailable
 
 Usage:
-    python tests/automated/test_sprint2_roberta_validation.py
+    python tests/automated/test_roberta_emotion_validation.py
 """
 
 import asyncio
@@ -34,7 +34,7 @@ sys.path.insert(0, str(project_root))
 os.environ.setdefault('FASTEMBED_CACHE_PATH', '/tmp/fastembed_cache')
 os.environ.setdefault('QDRANT_HOST', 'localhost')
 os.environ.setdefault('QDRANT_PORT', '6334')
-os.environ.setdefault('QDRANT_COLLECTION_NAME', 'test_sprint2_roberta')
+os.environ.setdefault('QDRANT_COLLECTION_NAME', 'test_roberta_emotion')
 os.environ.setdefault('DISCORD_BOT_NAME', 'TestBot')
 
 from src.intelligence.enhanced_vector_emotion_analyzer import EnhancedVectorEmotionAnalyzer

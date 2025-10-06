@@ -344,7 +344,7 @@ Test Details:
 - `src/memory/relevance_optimizer.py` - Payload passing
 
 **Testing**:
-- `tests/automated/test_sprint2_roberta_validation.py` - Complete validation suite
+- `tests/automated/test_roberta_emotion_validation.py` - Complete validation suite
 
 **Documentation**:
 - `SPRINT_2_ROBERTA_MODERNIZATION.md` - Sprint 2 implementation details
