@@ -46,6 +46,14 @@ from src.memory.context_aware_memory_security import (
 # Import 7D vector analysis components
 from src.intelligence.enhanced_7d_vector_analyzer import Enhanced7DVectorAnalyzer
 
+# Import multi-vector intelligence system for Sprint 2 enhancement
+from src.memory.multi_vector_intelligence import (
+    create_multi_vector_search_coordinator,
+    MultiVectorSearchCoordinator,
+    QueryType,
+    VectorStrategy
+)
+
 logger = logging.getLogger(__name__)
 
 
@@ -196,6 +204,16 @@ class VectorMemoryStore:
         # Decision: Stick with proven 3-vector system rather than experimental 7D expansion
         self._vector_7d_analyzer = None
         logger.info("🎯 Using core 3D vector system (content, emotion, semantic)")
+        
+        # Initialize multi-vector intelligence coordinator for Sprint 2 enhancement
+        try:
+            self._multi_vector_coordinator = create_multi_vector_search_coordinator(
+                vector_memory_system=self
+            )
+            logger.info("Multi-vector intelligence coordinator initialized successfully")
+        except Exception as e:
+            logger.warning(f"Failed to initialize multi-vector coordinator: {e}")
+            self._multi_vector_coordinator = None
         
         # Performance tracking
         self.stats = {
@@ -3705,6 +3723,16 @@ class VectorMemoryManager:
         except Exception as e:
             logger.warning("🚀 MEMORYBOOST: Component initialization failed, continuing without MemoryBoost: %s", str(e))
         
+        # 🎯 SPRINT 2 ENHANCEMENT: Initialize multi-vector intelligence coordinator
+        try:
+            self._multi_vector_coordinator = create_multi_vector_search_coordinator(
+                vector_memory_system=self.vector_store
+            )
+            logger.info("🎯 Multi-vector intelligence coordinator initialized for enhanced search")
+        except Exception as e:
+            logger.warning(f"🎯 Multi-vector coordinator initialization failed: {e}")
+            self._multi_vector_coordinator = None
+        
         logger.info("VectorMemoryManager initialized - local-first single source of truth ready")
     
     async def get_conversation_context(self, 
@@ -3920,6 +3948,23 @@ class VectorMemoryManager:
             # 🚀 SIMPLIFIED: Trust vector embeddings for semantic search
             # RoBERTa-enhanced emotional metadata from storage provides the intelligence
             # No need for query-time emotion analysis - embeddings capture meaning naturally
+            
+            # 🎯 SPRINT 2 ENHANCEMENT: Multi-vector intelligence for emotion/semantic vectors
+            if self._multi_vector_coordinator:
+                try:
+                    logger.debug(f"🎯 Using multi-vector intelligence for query: '{query}'")
+                    multi_vector_result = await self._multi_vector_coordinator.intelligent_multi_vector_search(
+                        query=query,
+                        user_id=user_id,
+                        limit=limit
+                    )
+                    
+                    if multi_vector_result.memories:
+                        logger.debug(f"🎯 MULTI-VECTOR: Retrieved {len(multi_vector_result.memories)} memories using {multi_vector_result.fusion_strategy} strategy")
+                        return multi_vector_result.memories
+                        
+                except Exception as e:
+                    logger.warning(f"Multi-vector search failed, falling back to standard search: {e}")
             
             # 🚀 PERFORMANCE: Use optimized search if query optimizer available
             try:
