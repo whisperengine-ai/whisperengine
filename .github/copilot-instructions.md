@@ -49,6 +49,7 @@
 - **USE SEMANTIC, DOMAIN-DRIVEN NAMES** that describe WHAT code does, not WHEN it was built
 - **Examples of BAD names**: `sprint3_relationship`, `phase4_intelligence`, `sprint1_confidence`, `_update_sprint3_scores()`
 - **Examples of GOOD names**: `relationship_state`, `conversation_intelligence`, `conversation_confidence`, `_update_relationship_scores()`
+- **Examples of GOOD names**: `relationship_state`, `conversation_intelligence`, `conversation_confidence`, `_update_relationship_scores()`
 - **Rationale**: Development phase names create confusion, make code harder to understand, and don't describe functionality
 - **Domain language**: Use terms from problem domain (relationships, conversations, emotions, trust, affection, confidence)
 - **Intent-revealing**: Names should explain purpose without looking at implementation

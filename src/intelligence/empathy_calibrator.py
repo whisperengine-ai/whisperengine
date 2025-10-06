@@ -112,10 +112,10 @@ class EmpathyCalibrator:
         }
         
         # Learning parameters (configurable via environment)
-        self.min_interactions_for_confidence = int(os.getenv("PHASE3_EMPATHY_MIN_INTERACTIONS", "3"))
-        self.effectiveness_threshold = float(os.getenv("PHASE3_EMPATHY_EFFECTIVENESS_THRESHOLD", "0.6"))
-        self.learning_rate = float(os.getenv("PHASE3_EMPATHY_LEARNING_RATE", "0.1"))
-        self.confidence_threshold = float(os.getenv("PHASE3_EMPATHY_CONFIDENCE_THRESHOLD", "0.7"))
+        self.min_interactions_for_confidence = int(os.getenv("EMPATHY_MIN_INTERACTIONS_FOR_CONFIDENCE", "3"))
+        self.effectiveness_threshold = float(os.getenv("EMPATHY_EFFECTIVENESS_THRESHOLD", "0.6"))
+        self.learning_rate = float(os.getenv("EMPATHY_LEARNING_RATE", "0.1"))
+        self.confidence_threshold = float(os.getenv("EMPATHY_CONFIDENCE_THRESHOLD", "0.7"))
         
         logger.info(
             "Empathy Calibrator initialized with parameters: "

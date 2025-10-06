@@ -89,6 +89,7 @@
 - USE SEMANTIC, DOMAIN-DRIVEN NAMES that describe WHAT code does, not WHEN built
 - Examples of BAD names: sprint3_relationship, phase4_intelligence, sprint1_confidence
 - Examples of GOOD names: relationship_state, conversation_intelligence, conversation_confidence
+- Examples of GOOD names: relationship_state, conversation_intelligence, conversation_confidence
 ```
 
 ### Implementation Phases

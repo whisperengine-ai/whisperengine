@@ -246,13 +246,13 @@ class ProactiveConversationEngagementEngine:
 
         # Use environment variables with fallbacks
         stagnation_threshold_minutes = stagnation_threshold_minutes or int(
-            os.getenv("PHASE4_ENGAGEMENT_STAGNATION_THRESHOLD_MINUTES", "5")
+            os.getenv("ENGAGEMENT_STAGNATION_THRESHOLD_MINUTES", "5")
         )
         engagement_check_interval_minutes = engagement_check_interval_minutes or int(
-            os.getenv("PHASE4_ENGAGEMENT_CHECK_INTERVAL_MINUTES", "3")
+            os.getenv("ENGAGEMENT_CHECK_INTERVAL_MINUTES", "3")
         )
         max_proactive_suggestions_per_hour = max_proactive_suggestions_per_hour or int(
-            os.getenv("PHASE4_ENGAGEMENT_MAX_SUGGESTIONS_PER_HOUR", "8")
+            os.getenv("ENGAGEMENT_MAX_SUGGESTIONS_PER_HOUR", "8")
         )
 
         self.stagnation_threshold = timedelta(minutes=stagnation_threshold_minutes)
@@ -904,7 +904,7 @@ class ProactiveConversationEngagementEngine:
             try:
                 import asyncio
                 # Run Phase 4 analysis for better topic detection
-                async def get_phase4_topics():
+                async def get_conversation_intelligence_topics():
                     analysis = await self.personality_profiler.analyze_conversation(
                         "proactive_analysis", 
                         "topic_extraction",
@@ -913,16 +913,16 @@ class ProactiveConversationEngagementEngine:
                     )
                     return analysis.topics_discussed
                 
-                # Get Phase 4 topics
-                phase4_topics = asyncio.run(get_phase4_topics())
-                if phase4_topics:
-                    themes.extend(phase4_topics)
-                    logger.debug(f"Phase 4 detected themes: {phase4_topics}")
+                # Get conversation intelligence topics
+                conversation_intelligence_topics = asyncio.run(get_conversation_intelligence_topics())
+                if conversation_intelligence_topics:
+                    themes.extend(conversation_intelligence_topics)
+                    logger.debug(f"Conversation intelligence detected themes: {conversation_intelligence_topics}")
                     
             except Exception as e:
-                logger.debug(f"Phase 4 topic analysis unavailable: {e}")
+                logger.debug(f"Conversation intelligence topic analysis unavailable: {e}")
         
-        # If no Phase 4 themes detected, use minimal intelligent fallback
+        # If no conversation intelligence themes detected, use minimal intelligent fallback
         if not themes:
             content_lower = content.lower()
             

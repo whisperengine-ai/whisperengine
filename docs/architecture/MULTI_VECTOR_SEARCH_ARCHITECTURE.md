@@ -153,7 +153,7 @@ results = await vector_store.search_with_multi_vectors(
 python tests/automated/test_multi_vector_intelligence_validation.py
 
 # Integration testing
-python tests/automated/test_sprint2_memoryboost_validation.py
+python tests/automated/test_memoryboost_complete_validation.py
 ```
 
 ### Validation Criteria

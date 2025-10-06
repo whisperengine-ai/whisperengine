@@ -92,14 +92,14 @@ class ContextSwitchDetector:
         self.vector_store = vector_memory_store
         
         # Detection thresholds (configurable via environment)
-        self.topic_shift_threshold = float(os.getenv("PHASE3_TOPIC_SHIFT_THRESHOLD", "0.4"))
-        self.emotional_shift_threshold = float(os.getenv("PHASE3_EMOTIONAL_SHIFT_THRESHOLD", "0.3"))
-        self.conversation_mode_threshold = float(os.getenv("PHASE3_CONVERSATION_MODE_THRESHOLD", "0.5"))
-        self.urgency_change_threshold = float(os.getenv("PHASE3_URGENCY_CHANGE_THRESHOLD", "0.4"))
+        self.topic_shift_threshold = float(os.getenv("CONTEXT_SWITCH_TOPIC_SHIFT_THRESHOLD", "0.4"))
+        self.emotional_shift_threshold = float(os.getenv("CONTEXT_SWITCH_EMOTIONAL_SHIFT_THRESHOLD", "0.3"))
+        self.conversation_mode_threshold = float(os.getenv("CONTEXT_SWITCH_CONVERSATION_MODE_THRESHOLD", "0.5"))
+        self.urgency_change_threshold = float(os.getenv("CONTEXT_SWITCH_URGENCY_CHANGE_THRESHOLD", "0.4"))
         
         # Analysis parameters
-        self.max_memories_for_analysis = int(os.getenv("PHASE3_MAX_MEMORIES", "50"))
-        self.analysis_timeout = int(os.getenv("PHASE3_ANALYSIS_TIMEOUT", "60"))
+        self.max_memories_for_analysis = int(os.getenv("CONTEXT_SWITCH_MAX_MEMORIES", "50"))
+        self.analysis_timeout = int(os.getenv("CONTEXT_SWITCH_ANALYSIS_TIMEOUT", "60"))
         
         # Context state tracking
         self.user_contexts = {}  # user_id -> ConversationContext

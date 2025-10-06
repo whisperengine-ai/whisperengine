@@ -202,7 +202,7 @@ python -m pytest tests/unit/memory/test_memory_effectiveness.py::test_score_memo
 ### Integration Tests
 ```bash
 # Test full pipeline with real conversations
-python tests/automated/test_sprint2_roberta_modernization.py
+python tests/automated/test_roberta_emotion_validation.py
 
 # Compare before/after scores on same memories
 python tests/automated/compare_emotional_impact_scoring.py
