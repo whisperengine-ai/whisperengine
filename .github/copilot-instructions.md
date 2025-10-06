@@ -65,6 +65,17 @@
 - When implementing LOCAL dependencies, make them work directly - don't hide them behind flags
 - Use stubs/no-op implementations for missing EXTERNAL dependencies, not feature flags
 
+**🚨 CRITICAL REQUIREMENT: DIRECT VALIDATION TESTING FOR ALL NEW FEATURES**
+- **MANDATORY**: Every new feature/sprint MUST include direct Python validation testing
+- **USE PATTERN**: Follow `tests/automated/test_*_direct_validation.py` pattern established in WhisperEngine
+- **ADVANTAGES**: Complete access to internal APIs, no HTTP timeouts, full metadata visibility, immediate debugging
+- **TESTING HIERARCHY**: 1) Direct Python validation (PRIMARY), 2) HTTP API testing (secondary), 3) Discord testing (user-facing)
+- **SPRINT REQUIREMENT**: Each sprint must include dedicated direct validation test creation as final deliverable
+- **EXAMPLE**: `test_trendwise_direct_validation.py` achieved 100% test success rate for TrendWise adaptive learning
+- **INTEGRATION**: Direct tests validate component initialization, API calls, mock data processing, and message processor integration
+- **SUCCESS CRITERIA**: All direct validation tests must pass before sprint completion
+- **DOCUMENTATION**: Include test results and validation status in sprint completion reports
+
 **🚨 CRITICAL ARCHITECTURE EVOLUTION (October 2025): POSTGRESQL GRAPH ERA**
 - **WhisperEngine has OBSOLETED "vector-native everything" approaches** in favor of multi-modal architecture
 - **PostgreSQL Semantic Knowledge Graph** is the PRIMARY approach for facts, relationships, and structured data
@@ -1337,13 +1348,18 @@ ENABLE_MEMORY_SYSTEM=true          # Creates phantom features
 
 **Testing Commands**: Essential testing and validation workflows:
 ```bash
-# PREFERRED: Direct Python validation (PRIMARY method)
+# PREFERRED: Direct Python validation (PRIMARY method for all new features)
 export FASTEMBED_CACHE_PATH="/tmp/fastembed_cache"
 export QDRANT_HOST="localhost" 
 export QDRANT_PORT="6334"
 source .venv/bin/activate
+python tests/automated/test_trendwise_direct_validation.py  # TrendWise adaptive learning features
 python tests/automated/test_phase4_direct_validation.py  # Phase 4 intelligence features
 python tests/automated/test_phase3_direct_validation.py  # Phase 3 intelligence features
+
+# NEW FEATURE VALIDATION: Always create direct validation tests for new sprints/features
+python tests/automated/test_sprint2_memoryboost_direct_validation.py  # Sprint 2 (example)
+python tests/automated/test_sprint3_relationshiptuner_direct_validation.py  # Sprint 3 (example)
 
 # Environment validation (CRITICAL for troubleshooting)
 source .venv/bin/activate && python scripts/verify_environment.py

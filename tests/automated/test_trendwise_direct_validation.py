@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
 """
-Sprint 1: TrendWise Direct Validation Suite
+TrendWise Direct Validation Suite
 
-Tests Sprint 1 TrendWise features using direct Python calls to internal APIs instead of HTTP requests.
-This provides more reliable testing without network timeouts and direct access to all data structures.
+Tests TrendWise adaptive trend analysis features using direct Python calls to internal APIs 
+instead of HTTP requests. This provides more reliable testing without network timeouts 
+and direct access to all data structures.
+
+Part of WhisperEngine Adaptive Learning System validation.
 """
 
 import asyncio
@@ -32,7 +35,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 class TrendWiseDirectValidationSuite:
-    """Direct validation of Sprint 1 TrendWise features using internal Python APIs."""
+    """Direct validation of TrendWise adaptive trend analysis features using internal Python APIs."""
     
     def __init__(self):
         self.trend_analyzer = None
