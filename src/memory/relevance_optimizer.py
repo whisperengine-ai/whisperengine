@@ -317,13 +317,17 @@ class VectorRelevanceOptimizer:
             scored_results = []
             
             for result in memory_results:
-                # Get quality score for this memory
+                # 🎭 SPRINT 2 ENHANCEMENT: Extract payload for RoBERTa metadata
+                memory_payload = result.get('payload', None)
+                
+                # Get quality score for this memory with RoBERTa metadata
                 quality_score = await self.effectiveness_analyzer.score_memory_quality(
                     memory_id=result.get('id', ''),
                     user_id=user_id,
                     bot_name=bot_name,
                     memory_content=result.get('content', ''),
-                    memory_type=result.get('memory_type', 'conversation')
+                    memory_type=result.get('memory_type', 'conversation'),
+                    memory_payload=memory_payload  # 🚀 Pass RoBERTa metadata
                 )
                 
                 # Apply quality score to similarity score

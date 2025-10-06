@@ -183,10 +183,14 @@ class MemoryEffectivenessAnalyzer:
         user_id: str,
         bot_name: str,
         memory_content: str,
-        memory_type: str
+        memory_type: str,
+        memory_payload: Dict[str, Any] = None
     ) -> MemoryQualityScore:
         """
         Score individual memory quality based on usage patterns and outcomes.
+        
+        🚀 SPRINT 2 ENHANCEMENT: Now accepts memory_payload with RoBERTa metadata
+        for superior emotional impact scoring.
         
         Args:
             memory_id: Unique memory identifier
@@ -194,6 +198,7 @@ class MemoryEffectivenessAnalyzer:
             bot_name: Bot associated with memory
             memory_content: Content of the memory
             memory_type: Type of memory (conversation, fact, etc.)
+            memory_payload: Qdrant payload with RoBERTa metadata (optional)
             
         Returns:
             Quality score with optimization recommendations
@@ -213,8 +218,10 @@ class MemoryEffectivenessAnalyzer:
             )
             
             temporal_relevance = self._calculate_temporal_relevance(usage_stats)
+            
+            # 🎭 SPRINT 2: Pass payload to emotional impact calculation
             emotional_impact = await self._calculate_emotional_impact(
-                memory_content, user_id, bot_name
+                memory_content, user_id, bot_name, memory_payload
             )
             
             # Combined quality score
@@ -492,19 +499,83 @@ class MemoryEffectivenessAnalyzer:
         self,
         memory_content: str,
         user_id: str,
-        bot_name: str
+        bot_name: str,
+        memory_payload: Dict[str, Any] = None
     ) -> float:
-        """Calculate emotional impact score for memory."""
+        """
+        Calculate emotional impact score for memory using RoBERTa metadata.
+        
+        🎯 SPRINT 2 ENHANCEMENT: Leverages stored RoBERTa emotion analysis metadata
+        instead of keyword matching for superior accuracy.
+        
+        Args:
+            memory_content: Memory text content
+            user_id: User identifier
+            bot_name: Bot name
+            memory_payload: Qdrant payload with RoBERTa metadata (optional)
+            
+        Returns:
+            Emotional impact score (0-1)
+        """
         try:
-            # Simplified emotional impact calculation
-            # Look for emotional keywords, sentiment indicators
-            emotional_keywords = ['love', 'hate', 'happy', 'sad', 'excited', 'worried', 'important', 'special']
+            # 🚀 PRIORITY 1: Use RoBERTa metadata from payload if available
+            if memory_payload:
+                # Extract RoBERTa confidence (primary indicator of emotional significance)
+                roberta_confidence = memory_payload.get('roberta_confidence', None)
+                
+                if roberta_confidence is not None and roberta_confidence > 0:
+                    # Base score from RoBERTa confidence
+                    base_score = roberta_confidence
+                    
+                    # 🎭 ENHANCEMENT: Boost for emotional complexity (multi-emotion)
+                    is_multi_emotion = memory_payload.get('is_multi_emotion', False)
+                    emotion_variance = memory_payload.get('emotion_variance', 0.0)
+                    
+                    if is_multi_emotion and emotion_variance > 0:
+                        # Complex emotions are more impactful (up to +30% boost)
+                        complexity_multiplier = 1.0 + (emotion_variance * 0.3)
+                        base_score *= complexity_multiplier
+                    
+                    # 🎯 ENHANCEMENT: Boost for emotionally clear memories
+                    emotion_dominance = memory_payload.get('emotion_dominance', 1.0)
+                    if emotion_dominance > 0.8:
+                        # Strong, clear emotions are more impactful (+10% boost)
+                        base_score *= 1.1
+                    
+                    # 🧠 ENHANCEMENT: Check emotional intensity
+                    emotional_intensity = memory_payload.get('emotional_intensity', 0.0)
+                    if emotional_intensity > 0.7:
+                        # High intensity emotions are more memorable (+15% boost)
+                        base_score *= 1.15
+                    
+                    # Normalize to 0-1 range
+                    emotional_score = min(base_score, 1.0)
+                    
+                    self.logger.debug(
+                        f"🎭 Emotional impact (RoBERTa): {emotional_score:.3f} "
+                        f"(conf={roberta_confidence:.3f}, var={emotion_variance:.3f}, "
+                        f"dom={emotion_dominance:.3f}, int={emotional_intensity:.3f})"
+                    )
+                    
+                    return emotional_score
+                else:
+                    self.logger.debug("RoBERTa confidence not available in payload, using fallback")
+            
+            # 🔄 FALLBACK: Keyword-based analysis if RoBERTa metadata unavailable
+            # This maintains backward compatibility with older memories
+            self.logger.debug("Using fallback keyword-based emotional impact calculation")
+            
+            emotional_keywords = [
+                'love', 'hate', 'happy', 'sad', 'excited', 'worried', 'important', 'special',
+                'angry', 'frustrated', 'anxious', 'grateful', 'proud', 'scared', 'joy',
+                'disappointment', 'surprise', 'disgust', 'fear', 'trust'
+            ]
             
             content_lower = memory_content.lower()
             emotional_score = sum(1 for keyword in emotional_keywords if keyword in content_lower)
             
-            # Normalize to 0-1 scale
-            return min(emotional_score / 10.0, 1.0)
+            # Normalize to 0-1 scale (expanded keyword list = max 20)
+            return min(emotional_score / 20.0, 1.0)
             
         except Exception as e:
             self.logger.error(f"Error calculating emotional impact: {e}")
