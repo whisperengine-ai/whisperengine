@@ -349,10 +349,12 @@ class InfluxDBTrendAnalyzer:
         x = list(range(len(values)))
         slope = self._calculate_slope(x, values)
         
-        # Determine trend direction
+        # Determine trend direction based on slope significance first
+        # Only classify as volatile if slope is insignificant AND volatility is high
         if abs(slope) < 0.001:  # Very small slope
             direction = TrendDirection.STABLE
-        elif volatility > self.volatility_threshold:
+        elif abs(slope) < 0.01 and volatility > self.volatility_threshold:
+            # Only volatile if both slope is weak AND volatility is high
             direction = TrendDirection.VOLATILE
         elif slope > 0:
             direction = TrendDirection.IMPROVING

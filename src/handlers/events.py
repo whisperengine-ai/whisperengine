@@ -107,7 +107,7 @@ class BotEventHandlers:
         self.character_system = getattr(bot_core, "character_system", None)
         # Legacy emotion engine removed - vector-native system handles this
         self.local_emotion_engine = None
-        # Redis profile/memory cache (if enabled)
+        # Redis profile/memory cache - DISABLED (vector-native architecture)
         self.profile_memory_cache = getattr(bot_core, "profile_memory_cache", None)
         
         # ConcurrentConversationManager for proper scatter-gather concurrency
@@ -262,66 +262,56 @@ class BotEventHandlers:
         """
         Handle bot ready event.
 
-        Initializes PostgreSQL pool, starts job scheduler, sets up heartbeat monitoring,
-        and configures bot presence.
+        Initializes PostgreSQL pool for semantic knowledge graph and roleplay features, 
+        sets up heartbeat monitoring, and configures bot presence.
         """
         logger.info(f"{self.bot.user} has connected to Discord!")
         logger.info(f"Bot is connected to {len(self.bot.guilds)} guilds")
 
-        # Initialize PostgreSQL pool for Universal Identity (NOT for user profiles - those use vector memory)
+        # Initialize PostgreSQL pool for semantic knowledge graph and roleplay features
         if self.postgres_pool is None:
             try:
-                logger.info("Initializing PostgreSQL connection pool for Universal Identity...")
-                # Use environment variables for PostgreSQL connection
-                # PostgreSQL initialization removed - using vector-native storage only
-                # (Can be re-enabled later for web UI Universal Identity integration)
-                self.postgres_pool = None
-                self.bot_core.postgres_pool = None
-                logger.info("ℹ️ PostgreSQL disabled - using vector-native storage for Discord-only operation")
+                logger.info("Initializing PostgreSQL connection pool for semantic knowledge graph...")
+                # PostgreSQL is now actively used for:
+                # 1. Semantic Knowledge Router (fact_entities, user_fact_relationships tables)
+                # 2. Transaction Manager (roleplay state management)  
+                # 3. Multi-modal data intelligence architecture
+                # The bot_core handles PostgreSQL initialization asynchronously
+                
+                # Wait for bot_core to initialize PostgreSQL pool
+                import asyncio
+                max_wait = 10  # seconds
+                wait_interval = 0.5
+                waited = 0
+                
+                while not self.bot_core.postgres_pool and waited < max_wait:
+                    await asyncio.sleep(wait_interval)
+                    waited += wait_interval
+                
+                self.postgres_pool = self.bot_core.postgres_pool
+                
+                if self.postgres_pool:
+                    logger.info("✅ PostgreSQL connection established for semantic knowledge features")
+                else:
+                    logger.warning("⚠️ PostgreSQL pool not available - semantic knowledge features disabled")
 
             except ConnectionError as e:
                 # Clean error message for PostgreSQL connection failures
                 logger.error(f"PostgreSQL connection failed: {e}")
-                logger.warning("Bot will continue without PostgreSQL support")
+                logger.warning("Bot will continue without PostgreSQL-based semantic knowledge features")
             except Exception as e:
                 logger.error(f"Unexpected error initializing PostgreSQL: {e}")
-                logger.warning("Bot will continue without PostgreSQL support")
+                logger.warning("Bot will continue without PostgreSQL-based semantic knowledge features")
 
-        # Initialize Redis conversation cache if using Redis
-        if self.conversation_cache and hasattr(self.conversation_cache, "initialize"):
-            try:
-                logger.info("Initializing Redis conversation cache...")
-                await self.conversation_cache.initialize()
-                logger.info("✅ Redis conversation cache initialized successfully")
-            except ConnectionError as e:
-                # Clean error message for Redis connection failures
-                logger.error(f"Redis connection failed: {e}")
-                logger.warning("Bot will continue with in-memory conversation cache")
-            except Exception as e:
-                logger.error(f"Unexpected error initializing Redis conversation cache: {e}")
-                logger.warning("Bot will continue with limited conversation cache functionality")
+        # Redis conversation cache is CURRENTLY DISABLED in WhisperEngine multi-bot architecture
+        # Vector-native memory system (Qdrant) + PostgreSQL semantic knowledge graph handle all data storage
+        # Redis references remain for potential future re-enabling but are not active
+        # Only PostgreSQL (port 5433) and Qdrant (port 6334) are currently used
 
-        # Start job scheduler if available
-        if self.job_scheduler:
-            try:
-                await self.job_scheduler.start()
-                logger.info("✅ Job scheduler started successfully")
-            except Exception as e:
-                logger.error(f"Failed to start job scheduler: {e}")
+        # Job scheduler is NOT currently implemented in WhisperEngine
+        # References remain for potential future scheduled tasks (memory cleanup, maintenance, etc.)
+        # Current architecture handles all operations on-demand without scheduled jobs
 
-        # Universal Chat Orchestrator - DEPRECATED (Discord-only processing now)
-        # if self.chat_orchestrator is None:
-        #     try:
-        #         logger.info("🌐 Initializing Universal Chat Orchestrator...")
-        #         success = await self.setup_universal_chat()
-        #         if success:
-        #             logger.info("✅ Universal Chat Orchestrator ready for Discord integration")
-        #         else:
-        #             logger.warning(
-        #                 "⚠️ Universal Chat Orchestrator initialization failed - using fallback"
-        #             )
-        #     except Exception as e:
-        #         logger.error(f"Failed to initialize Universal Chat Orchestrator: {e}")
 
         # Initialize Production Optimization System if available
         if hasattr(self.bot_core, "production_adapter") and self.bot_core.production_adapter:
@@ -553,7 +543,8 @@ class BotEventHandlers:
         # AI identity questions are now handled naturally through CDL character responses
         # No more dirty filter patterns - let characters respond authentically
 
-        # (User preferred name detection and storage via Postgres has been removed. See LLM tool calling roadmap for new approach.)
+        # Note: Automatic name storage now uses vector memory system with LLM extraction
+        # (See src/utils/automatic_name_storage.py for current implementation)
 
         # Initialize variables early
         enhanced_system_prompt = None
