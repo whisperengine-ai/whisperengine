@@ -34,18 +34,7 @@ class ConversationSession:
     context_cache: dict[str, Any] = field(default_factory=dict)
 
 
-@dataclass
-class ConversationLoadMetrics:
-    """Tracks conversation processing load and performance"""
-
-    active_sessions: int = 0
-    messages_per_second: float = 0.0
-    avg_response_time: float = 0.0
-    concurrent_users: int = 0
-    queue_length: int = 0
-    cpu_utilization: float = 0.0
-    memory_usage_mb: float = 0.0
-    thread_pool_utilization: float = 0.0
+# ConversationLoadMetrics removed - replaced with InfluxDB via FidelityMetricsCollector
 
 
 class ConversationQueue:
@@ -189,8 +178,9 @@ class ConcurrentConversationManager:
         self.thread_pool = ThreadPoolExecutor(max_workers=max_workers_threads)
         self.process_pool = ProcessPoolExecutor(max_workers=max_workers_processes)
 
-        # Performance tracking
-        self.metrics = ConversationLoadMetrics()
+        # Performance tracking (InfluxDB via FidelityMetricsCollector)
+        from src.monitoring.fidelity_metrics_collector import get_fidelity_metrics_collector
+        self.fidelity_metrics = get_fidelity_metrics_collector()
         self.processing_times: deque = deque(maxlen=1000)
         self.message_timestamps: deque = deque(maxlen=1000)
 
@@ -600,13 +590,14 @@ class ConcurrentConversationManager:
                 logger.info(f"Cleaned up {len(inactive_sessions)} inactive sessions")
 
     async def _metrics_collector(self):
-        """Collect performance metrics"""
+        """Collect performance metrics and send to InfluxDB"""
 
         while self.running:
             try:
+                # Calculate current metrics
                 with self._session_lock:
-                    self.metrics.active_sessions = len(self.active_sessions)
-                    self.metrics.concurrent_users = len(self.active_sessions)
+                    active_sessions = len(self.active_sessions)
+                    concurrent_users = len(self.active_sessions)
 
                 # Calculate messages per second
                 current_time = time.time()
@@ -617,25 +608,35 @@ class ConcurrentConversationManager:
                 while self.message_timestamps and self.message_timestamps[0] < minute_ago:
                     self.message_timestamps.popleft()
 
-                self.metrics.messages_per_second = len(self.message_timestamps) / 60.0
+                messages_per_second = len(self.message_timestamps) / 60.0
 
                 # Calculate average response time
+                avg_response_time = 0.0
                 if self.processing_times:
-                    self.metrics.avg_response_time = float(np.mean(list(self.processing_times)))
+                    avg_response_time = float(np.mean(list(self.processing_times)))
 
                 # Queue length
                 queue_stats = self.conversation_queue.get_stats()
-                self.metrics.queue_length = sum(queue_stats.values())
+                queue_length = sum(queue_stats.values())
 
-                # Thread pool utilization
-                if hasattr(self.thread_pool, "_threads"):
-                    active_threads = sum(1 for t in self.thread_pool._threads if t.is_alive())
-                    self.metrics.thread_pool_utilization = active_threads / self.max_workers_threads
+                # Send metrics to InfluxDB
+                self.fidelity_metrics.record_performance_metric(
+                    operation="concurrent_conversation_manager",
+                    duration_ms=avg_response_time * 1000,
+                    success=True,
+                    metadata={
+                        "active_sessions": int(active_sessions),  # Ensure integer type
+                        "concurrent_users": int(concurrent_users),  # Ensure integer type  
+                        "messages_per_second": float(messages_per_second),
+                        "queue_length": int(queue_length),  # Ensure integer type
+                        "session_utilization": float(active_sessions / self.max_concurrent_sessions)
+                    }
+                )
 
                 await asyncio.sleep(5)  # Update every 5 seconds
 
             except Exception as e:
-                logger.error(f"Metrics collector error: {e}")
+                logger.error("Metrics collector error: %s", e)
                 await asyncio.sleep(5)
 
     async def _cache_cleaner(self):
@@ -691,26 +692,39 @@ class ConcurrentConversationManager:
                 await asyncio.sleep(10)
 
     def get_performance_stats(self) -> dict[str, Any]:
-        """Get comprehensive performance statistics"""
+        """Get comprehensive performance statistics (calculated dynamically)"""
 
         queue_stats = self.conversation_queue.get_stats()
 
         with self._session_lock:
+            active_sessions = len(self.active_sessions)
             channel_stats = {
                 channel: len(users) for channel, users in self.channel_sessions.items()
             }
 
+        # Calculate current metrics dynamically
+        messages_per_second = 0.0
+        if self.message_timestamps:
+            current_time = time.time()
+            minute_ago = current_time - 60
+            recent_messages = [ts for ts in self.message_timestamps if ts >= minute_ago]
+            messages_per_second = len(recent_messages) / 60.0
+
+        avg_response_time = 0.0
+        if self.processing_times:
+            avg_response_time = float(np.mean(list(self.processing_times)))
+
         return {
             "sessions": {
-                "active_sessions": self.metrics.active_sessions,
+                "active_sessions": active_sessions,
                 "max_sessions": self.max_concurrent_sessions,
-                "utilization": self.metrics.active_sessions / self.max_concurrent_sessions,
+                "utilization": active_sessions / self.max_concurrent_sessions,
             },
             "performance": {
-                "messages_per_second": self.metrics.messages_per_second,
-                "avg_response_time_ms": self.metrics.avg_response_time * 1000,
-                "queue_length": self.metrics.queue_length,
-                "thread_pool_utilization": self.metrics.thread_pool_utilization,
+                "messages_per_second": messages_per_second,
+                "avg_response_time_ms": avg_response_time * 1000,
+                "queue_length": sum(queue_stats.values()),
+                "data_source": "calculated_dynamically",  # Note: metrics now in InfluxDB
             },
             "queues": queue_stats,
             "channels": {

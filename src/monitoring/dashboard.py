@@ -14,8 +14,17 @@ from pathlib import Path
 import weakref
 
 from .health_monitor import get_health_monitor, HealthStatus, ComponentType
-from .engagement_tracker import get_engagement_tracker, InteractionType
 from .error_tracker import get_error_tracker, ErrorSeverity, ErrorCategory
+
+# Engagement tracker disabled - replaced with InfluxDB metrics
+try:
+    from .engagement_tracker import get_engagement_tracker, InteractionType
+    ENGAGEMENT_TRACKER_AVAILABLE = True
+except ImportError:
+    logger.debug("Engagement tracker not available - using InfluxDB metrics instead")
+    ENGAGEMENT_TRACKER_AVAILABLE = False
+    get_engagement_tracker = None
+    InteractionType = None
 
 logger = logging.getLogger(__name__)
 
@@ -59,7 +68,7 @@ class MonitoringDashboard:
         
         # Component managers
         self.health_monitor = get_health_monitor()
-        self.engagement_tracker = get_engagement_tracker()
+        self.engagement_tracker = get_engagement_tracker() if ENGAGEMENT_TRACKER_AVAILABLE else None
         self.error_tracker = get_error_tracker()
         
         # Web application
@@ -181,7 +190,10 @@ class MonitoringDashboard:
         """Handle engagement metrics API request."""
         try:
             days = int(request.query.get('days', 7))
-            report = self.engagement_tracker.export_engagement_report(days)
+            if self.engagement_tracker:
+                report = self.engagement_tracker.export_engagement_report(days)
+            else:
+                report = {'message': 'Engagement tracking disabled - using InfluxDB metrics', 'days': days}
             return web.json_response(report)
         except Exception as e:
             logger.error("Error getting engagement data: %s", e)
@@ -190,8 +202,12 @@ class MonitoringDashboard:
     async def _handle_engagement_summary(self, request):
         """Handle engagement summary API request."""
         try:
-            summary = self.engagement_tracker.generate_engagement_summary()
-            return web.json_response(summary.to_dict())
+            if self.engagement_tracker:
+                summary = self.engagement_tracker.generate_engagement_summary()
+                return web.json_response(summary.to_dict())
+            else:
+                summary = {'message': 'Engagement tracking disabled - using InfluxDB metrics'}
+                return web.json_response(summary)
         except Exception as e:
             logger.error("Error getting engagement summary: %s", e)
             return web.json_response({'error': str(e)}, status=500)

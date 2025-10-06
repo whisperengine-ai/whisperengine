@@ -37,9 +37,9 @@ class MetricType(Enum):
     CONFIDENCE_EVOLUTION = "confidence_evolution"
     RELATIONSHIP_PROGRESSION = "relationship_progression" 
     CONVERSATION_QUALITY = "conversation_quality"
-    CHARACTER_AUTHENTICITY = "character_authenticity"
-    USER_ENGAGEMENT = "user_engagement"
-    EMOTIONAL_INTELLIGENCE = "emotional_intelligence"
+    # CHARACTER_AUTHENTICITY = "character_authenticity"  # REMOVED: No implementation
+    # USER_ENGAGEMENT = "user_engagement"  # REMOVED: Use conversation_quality.engagement_score instead
+    # EMOTIONAL_INTELLIGENCE = "emotional_intelligence"  # REMOVED: Use bot_emotion/user_emotion instead
 
 
 @dataclass

@@ -108,6 +108,15 @@ class MessageProcessor:
                 logger.warning("Temporal intelligence not available - install influxdb-client")
                 self.temporal_intelligence_enabled = False
         
+        # Initialize fidelity metrics collector for performance tracking
+        try:
+            from src.monitoring.fidelity_metrics_collector import get_fidelity_metrics_collector
+            self.fidelity_metrics = get_fidelity_metrics_collector()
+            logger.debug("Fidelity metrics collector initialized")
+        except ImportError:
+            logger.warning("Fidelity metrics collector not available")
+            self.fidelity_metrics = None
+        
         # Track processing state for debugging
         self._last_security_validation = None
         self._last_emotional_context = None
@@ -216,6 +225,24 @@ class MessageProcessor:
             # Calculate processing time
             end_time = datetime.now()
             processing_time_ms = int((end_time - start_time).total_seconds() * 1000)
+            
+            # Record per-message performance metrics to InfluxDB
+            if self.fidelity_metrics:
+                self.fidelity_metrics.record_performance_metric(
+                    operation="message_processing",
+                    duration_ms=processing_time_ms,
+                    success=True,
+                    user_id=message_context.user_id,
+                    metadata={
+                        "platform": str(message_context.platform),
+                        "memory_count": int(len(relevant_memories) if relevant_memories else 0),
+                        "memory_stored": bool(memory_stored),
+                        "knowledge_stored": bool(knowledge_stored),
+                        "response_length": int(len(response) if response else 0),
+                        "has_attachments": bool(message_context.attachments),
+                        "channel_type": str(message_context.channel_type or "unknown")
+                    }
+                )
             
             # Phase 5: Record temporal intelligence metrics
             await self._record_temporal_metrics(
@@ -474,6 +501,9 @@ class MessageProcessor:
             return []
 
         try:
+            # Start timing memory retrieval
+            memory_start_time = datetime.now()
+            
             # Create platform-agnostic message context classification
             classified_context = self._classify_message_context(message_context)
             logger.debug("Message context classified: %s", classified_context.context_type.value)
@@ -505,7 +535,31 @@ class MessageProcessor:
                         limit=20
                     )
                     
-                    logger.info("🚀 MEMORY: Optimized retrieval returned %d memories", len(relevant_memories))
+                    # Calculate actual retrieval timing
+                    memory_end_time = datetime.now()
+                    retrieval_time_ms = int((memory_end_time - memory_start_time).total_seconds() * 1000)
+                    
+                    logger.info("🚀 MEMORY: Optimized retrieval returned %d memories in %dms", len(relevant_memories), retrieval_time_ms)
+                    
+                    # Record memory quality metrics to InfluxDB with ACTUAL timing
+                    if self.fidelity_metrics and relevant_memories:
+                        # Calculate average relevance score (if available)
+                        relevance_scores = [mem.get('relevance_score', 0.7) for mem in relevant_memories]
+                        avg_relevance = sum(relevance_scores) / len(relevance_scores) if relevance_scores else 0.7
+                        
+                        # Calculate average vector similarity (if available)
+                        vector_similarities = [mem.get('vector_similarity', 0.8) for mem in relevant_memories]
+                        avg_similarity = sum(vector_similarities) / len(vector_similarities) if vector_similarities else 0.8
+                        
+                        self.fidelity_metrics.record_memory_quality(
+                            user_id=message_context.user_id,
+                            operation="optimized_retrieval",
+                            relevance_score=avg_relevance,
+                            retrieval_time_ms=retrieval_time_ms,  # ACTUAL timing
+                            memory_count=len(relevant_memories),
+                            vector_similarity=avg_similarity
+                        )
+                    
                     return relevant_memories
                     
                 except (AttributeError, ValueError, TypeError) as e:
@@ -521,6 +575,10 @@ class MessageProcessor:
             )
             
             logger.info("🔍 MEMORY: Retrieved %d memories via context-aware fallback", len(relevant_memories))
+            
+            # REMOVED: Fake estimated memory metrics for fallback - not useful
+            # Fallback doesn't provide real relevance/similarity scores
+            
             return relevant_memories
             
         except (AttributeError, ValueError, TypeError) as e:

@@ -240,11 +240,10 @@ class ModularBotManager:
             # Visual emotion commands - REMOVED: superseded by vector-native multimodal approach
             logger.info("ℹ️ Visual emotion handlers removed - using vector-native multimodal approach")
 
-            # Simple Performance monitoring commands - ENABLED (no circular dependencies)
-            from src.handlers.simple_performance_commands import create_simple_performance_commands
-            self.command_handlers["performance"] = create_simple_performance_commands(self.bot)
-            await self.command_handlers["performance"].register_commands()
-            logger.info("✅ Simple performance monitoring commands enabled (basic metrics available)")
+            # Performance monitoring commands - ENABLED (InfluxDB-based metrics only)
+            from src.handlers.performance_commands import setup_performance_commands
+            await setup_performance_commands(self.bot)
+            logger.info("✅ Performance monitoring commands enabled (InfluxDB metrics only)")
 
             # ℹ️ Multi-entity handlers removed - using vector-native memory approach
 

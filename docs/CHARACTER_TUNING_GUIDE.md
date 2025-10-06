@@ -1,8 +1,19 @@
 # WhisperEngine Character Tuning Guide
 
-**Version**: 1.0  
-**Last Updated**: October 5, 2025  
+**Version**: 1.1  
+**Last Updated**: October 6, 2025  
 **Status**: Production Guide
+
+## 🚨 IMPORTANT: Post-Cleanup Architecture (October 2025)
+
+**This guide has been updated following a comprehensive metrics cleanup** where we eliminated ~60% of redundant and phantom metrics. The metrics, queries, and target ranges in this guide reflect **only the essential metrics currently being collected**.
+
+**What Changed:**
+- ✅ **Cleaned Data**: All InfluxDB field type conflicts resolved
+- ✅ **Real Measurements**: Replaced fake timing with actual performance data  
+- ✅ **Consolidated Systems**: FidelityMetricsCollector (5 metrics) + TemporalIntelligenceClient (3 metrics)
+- ❌ **Removed**: SYSTEM_PERFORMANCE, CHARACTER_AUTHENTICITY, USER_ENGAGEMENT, EMOTIONAL_INTELLIGENCE, TOKEN_USAGE
+- 📊 **Current Schema**: bot_emotion, character_consistency, confidence_evolution, conversation_quality, fidelity_score, optimization_ratio, relationship_progression, response_time, user_emotion
 
 ## Overview
 
@@ -24,28 +35,42 @@ WhisperEngine follows a **personality-first, data-driven tuning approach**:
 
 ## 🎯 Tuning Metrics & Target Ranges
 
-### Primary Metrics (InfluxDB)
+### Primary Metrics (InfluxDB) - Post-Cleanup Architecture
 
-| Metric | Measurement | Target Range | Alert Threshold |
-|--------|-------------|--------------|-----------------|
-| **Confidence Evolution** | `confidence_evolution` | 0.75 - 0.95 | < 0.65 |
-| **User Fact Confidence** | `user_fact_confidence` | 0.70 - 0.90 | < 0.60 |
-| **Context Confidence** | `context_confidence` | 0.65 - 0.85 | < 0.55 |
-| **Relationship Affection** | `relationship_metrics` (affection) | 40 - 85 | Growth < 0.5/day |
-| **Relationship Trust** | `relationship_metrics` (trust) | 35 - 80 | Growth < 0.4/day |
-| **Relationship Attunement** | `relationship_metrics` (attunement) | 45 - 90 | Growth < 0.6/day |
-| **Bot Emotion Intensity** | `bot_emotion` (intensity) | 0.50 - 0.85 | > 80% neutral |
-| **Bot Emotion Diversity** | `bot_emotion` (variance) | 0.30 - 0.70 | < 0.20 |
-| **User Emotion Detection** | `user_emotion` (confidence) | 0.70 - 0.90 | < 0.60 |
+**Note**: Following comprehensive metrics audit (Oct 2025), we eliminated ~60% of redundant metrics. The table below reflects only the essential metrics currently collected.
 
-### Secondary Metrics (Vector Memory)
+| Metric | Measurement | Fields | Target Range | Alert Threshold |
+|--------|-------------|--------|--------------|-----------------|
+| **Confidence Evolution** | `confidence_evolution` | `overall_confidence`, `emotional_confidence`, `context_confidence`, `relationship_confidence`, `user_fact_confidence` | 0.40 - 0.80 | < 0.30 |
+| **Relationship Progression** | `relationship_progression` | `affection_level`, `trust_level`, `attunement_level`, `communication_comfort`, `interaction_quality` | 0.30 - 0.70 | Growth < 0.05/day |
+| **Bot Emotion Intelligence** | `bot_emotion` | `intensity`, `confidence` | intensity: 0.50 - 0.90 | intensity < 0.30 |
+| **User Emotion Detection** | `user_emotion` | `intensity`, `confidence` | confidence: 0.60 - 0.90 | confidence < 0.40 |
+| **Conversation Quality** | `conversation_quality` | `engagement_score`, `depth_score`, `satisfaction_score` | 0.50 - 0.85 | < 0.40 |
+| **Character Consistency** | `character_consistency` | `personality_adherence`, `domain_accuracy` | 0.70 - 0.95 | < 0.60 |
+| **Response Performance** | `response_time` | `value` (ms), metadata fields | < 3000ms | > 5000ms |
+| **Fidelity Optimization** | `fidelity_score`, `optimization_ratio` | `value` (0.0-1.0) | 0.60 - 0.90 | < 0.50 |
+
+### Secondary Metrics (System Performance)
+
+**Note**: Many secondary metrics were removed during cleanup. These represent the remaining essential system metrics.
 
 | Metric | Source | Target Range | Alert Threshold |
 |--------|--------|--------------|-----------------|
-| **Memory Retrieval Quality** | Qdrant similarity scores | 0.75 - 0.95 | < 0.65 |
-| **Conversation Continuity** | Context switch detection | 85% - 95% | < 75% |
-| **CDL Personality Adherence** | Manual review + LLM eval | 90% - 98% | < 85% |
-| **Response Time** | Processing duration | < 2.5s | > 4s |
+| **Memory Retrieval Quality** | Vector similarity scores | 0.65 - 0.90 | < 0.50 |
+| **CDL Personality Adherence** | character_consistency measurement | 0.70 - 0.95 | < 0.60 |
+| **Response Time** | response_time measurement | < 3000ms | > 5000ms |
+| **Fidelity Optimization** | optimization_ratio measurement | 0.60 - 0.90 | < 0.50 |
+
+### Removed Metrics (October 2025 Cleanup)
+
+The following metrics were eliminated as **redundant or phantom metrics**:
+- ❌ `SYSTEM_PERFORMANCE` - Redundant with ConcurrentConversationManager
+- ❌ `CHARACTER_AUTHENTICITY` - Never implemented (phantom metric)
+- ❌ `USER_ENGAGEMENT` - Redundant with conversation_quality
+- ❌ `EMOTIONAL_INTELLIGENCE` - Redundant with bot_emotion/user_emotion
+- ❌ `TOKEN_USAGE` - Never implemented
+- ❌ Duplicate response time tracking
+- ❌ Fake timing measurements (replaced with real measurements)
 
 ---
 
@@ -103,12 +128,13 @@ def generate_baseline_report(bot_name, days=14):
     print(f"📅 Period: Last {days} days")
     print("=" * 80)
     
-    # Query 1: Confidence Evolution
+    # Query 1: Overall Confidence Evolution
     confidence_query = f'''
     from(bucket: "performance_metrics")
       |> range(start: -{days}d)
       |> filter(fn: (r) => r.bot == "{bot_name}")
       |> filter(fn: (r) => r._measurement == "confidence_evolution")
+      |> filter(fn: (r) => r._field == "overall_confidence")
       |> mean()
     '''
     
@@ -118,17 +144,17 @@ def generate_baseline_report(bot_name, days=14):
         for record in table.records:
             confidence_avg = record.get_value()
     
-    print(f"\n1. Confidence Evolution")
+    print(f"\n1. Overall Confidence Evolution")
     print(f"   Average: {confidence_avg:.3f}")
-    print(f"   Status: {'✅ Good' if confidence_avg >= 0.75 else '⚠️ Needs Tuning' if confidence_avg >= 0.65 else '🔴 Critical'}")
+    print(f"   Status: {'✅ Good' if confidence_avg >= 0.40 else '⚠️ Needs Tuning' if confidence_avg >= 0.30 else '🔴 Critical'}")
     
     # Query 2: Relationship Growth Rate
     relationship_query = f'''
     from(bucket: "performance_metrics")
       |> range(start: -{days}d)
       |> filter(fn: (r) => r.bot == "{bot_name}")
-      |> filter(fn: (r) => r._measurement == "relationship_metrics")
-      |> filter(fn: (r) => r._field == "affection" or r._field == "trust" or r._field == "attunement")
+      |> filter(fn: (r) => r._measurement == "relationship_progression")
+      |> filter(fn: (r) => r._field == "affection_level" or r._field == "trust_level" or r._field == "attunement_level")
       |> derivative(unit: 1d)
       |> mean()
     '''
@@ -140,28 +166,28 @@ def generate_baseline_report(bot_name, days=14):
         for record in table.records:
             field = record.values.get('_field')
             growth = record.get_value()
-            status = '✅ Good' if growth >= 0.5 else '⚠️ Slow' if growth >= 0.3 else '🔴 Stalled'
-            print(f"   {field.capitalize()}: {growth:.2f}/day - {status}")
+            status = '✅ Good' if growth >= 0.05 else '⚠️ Slow' if growth >= 0.02 else '🔴 Stalled'
+            print(f"   {field.replace('_', ' ').title()}: {growth:.3f}/day - {status}")
     
-    # Query 3: Bot Emotion Diversity
+    # Query 3: Bot Emotion Intensity
     emotion_query = f'''
     from(bucket: "performance_metrics")
       |> range(start: -{days}d)
       |> filter(fn: (r) => r.bot == "{bot_name}")
       |> filter(fn: (r) => r._measurement == "bot_emotion")
       |> filter(fn: (r) => r._field == "intensity")
-      |> stddev()
+      |> mean()
     '''
     
     emotion_result = query_api.query(emotion_query)
-    emotion_variance = 0.0
+    emotion_intensity = 0.0
     for table in emotion_result:
         for record in table.records:
-            emotion_variance = record.get_value()
+            emotion_intensity = record.get_value()
     
-    print(f"\n3. Bot Emotion Diversity")
-    print(f"   Variance: {emotion_variance:.3f}")
-    print(f"   Status: {'✅ Good' if emotion_variance >= 0.30 else '⚠️ Too Neutral' if emotion_variance >= 0.20 else '🔴 Flat'}")
+    print(f"\n3. Bot Emotion Intensity")
+    print(f"   Average: {emotion_intensity:.3f}")
+    print(f"   Status: {'✅ Good' if emotion_intensity >= 0.50 else '⚠️ Too Low' if emotion_intensity >= 0.30 else '🔴 Flat'}")
     
     # Query 4: Most Common Bot Emotions
     emotion_dist_query = f'''
@@ -180,23 +206,23 @@ def generate_baseline_report(bot_name, days=14):
     print(f"\n4. Top Bot Emotions (by frequency)")
     for table in emotion_dist:
         for record in table.records:
-            emotion = record.values.get('emotion')
+            emotion = record.values.get('emotion', 'unknown')
             count = record.get_value()
             print(f"   {emotion}: {count} occurrences")
     
     print("\n" + "=" * 80)
     print("\n💡 Recommendations:")
     
-    # Generate recommendations
-    if confidence_avg < 0.65:
+    # Generate recommendations based on actual target ranges
+    if confidence_avg < 0.30:
         print("   🔴 CRITICAL: Low confidence - Review CDL personality complexity")
-    elif confidence_avg < 0.75:
+    elif confidence_avg < 0.40:
         print("   ⚠️  WARNING: Moderate confidence - Consider simplifying CDL traits")
     
-    if emotion_variance < 0.20:
+    if emotion_intensity < 0.30:
         print("   🔴 CRITICAL: Bot emotions too flat - Increase emotion sensitivity")
-    elif emotion_variance < 0.30:
-        print("   ⚠️  WARNING: Low emotion diversity - Review emotion detection thresholds")
+    elif emotion_intensity < 0.50:
+        print("   ⚠️  WARNING: Low emotion intensity - Review emotion detection thresholds")
     
     client.close()
 
@@ -222,35 +248,41 @@ python scripts/generate_baseline_report.py ryan
 
 | Symptom | Root Cause | Tuning Target |
 |---------|------------|---------------|
-| Confidence < 0.65 | CDL personality too complex/contradictory | Simplify CDL traits (Section 3.1) |
-| Relationship growth < 0.5/day | Scoring too conservative | Increase relationship multipliers (Section 3.2) |
-| Bot emotion variance < 0.20 | Emotion detection under-sensitive | Lower emotion thresholds (Section 3.3) |
-| Context confidence < 0.55 | Insufficient conversation history | Increase context window (Section 3.4) |
-| Memory retrieval < 0.65 | Vector similarity too loose | Tighten similarity threshold (Section 3.5) |
-| Response time > 4s | Over-fetching context | Reduce memory retrieval count (Section 3.6) |
+| Overall confidence < 0.30 | CDL personality too complex/contradictory | Simplify CDL traits (Section 3.1) |
+| Relationship growth < 0.05/day | Scoring too conservative | Increase relationship multipliers (Section 3.2) |
+| Bot emotion intensity < 0.30 | Emotion detection under-sensitive | Lower emotion thresholds (Section 3.3) |
+| Context confidence < 0.30 | Insufficient conversation history | Increase context window (Section 3.4) |
+| Memory retrieval < 0.50 | Vector similarity too loose | Tighten similarity threshold (Section 3.5) |
+| Response time > 5000ms | Over-fetching context | Reduce memory retrieval count (Section 3.6) |
+| Character consistency < 0.60 | CDL personality conflicts | Review and align CDL traits (Section 3.1) |
+| Conversation quality < 0.40 | Poor engagement patterns | Improve response generation (Section 3.7) |
 
 ### 2.2 Decision Tree
 
 ```
 Start: Low Performance Metric Detected
   │
-  ├─> Confidence < 0.65?
+  ├─> Overall confidence < 0.30?
   │   └─> YES → Section 3.1: Tune CDL Personality
   │   └─> NO → Continue
   │
-  ├─> Relationship growth < 0.5/day?
+  ├─> Relationship growth < 0.05/day?
   │   └─> YES → Section 3.2: Tune Relationship Scoring
   │   └─> NO → Continue
   │
-  ├─> Bot emotion variance < 0.20?
+  ├─> Bot emotion intensity < 0.30?
   │   └─> YES → Section 3.3: Tune Emotion Sensitivity
   │   └─> NO → Continue
   │
-  ├─> Context confidence < 0.55?
+  ├─> Context confidence < 0.30?
   │   └─> YES → Section 3.4: Tune Context Window
   │   └─> NO → Continue
   │
-  └─> Memory retrieval < 0.65?
+  ├─> Character consistency < 0.60?
+  │   └─> YES → Section 3.1: Review CDL Alignment
+  │   └─> NO → Continue
+  │
+  └─> Memory retrieval < 0.50?
       └─> YES → Section 3.5: Tune Vector Search
       └─> NO → All metrics healthy ✅
 ```
@@ -261,7 +293,7 @@ Start: Low Performance Metric Detected
 
 ### 3.1 Tuning CDL Personality (Confidence Issues)
 
-**When to use**: Confidence evolution < 0.65, personality inconsistency detected
+**When to use**: Overall confidence < 0.30, personality inconsistency detected
 
 **Problem**: CDL personality has too many contradictory traits or overly complex characteristics
 
@@ -337,11 +369,12 @@ Start: Low Performance Metric Detected
 **Validation Query**:
 ```bash
 # After 5-7 days of tuning
-influx query --org whisperengine \
+influx query --org whisperengine --token whisperengine-fidelity-first-metrics-token \
   'from(bucket: "performance_metrics")
    |> range(start: -14d)
    |> filter(fn: (r) => r.bot == "elena")
    |> filter(fn: (r) => r._measurement == "confidence_evolution")
+   |> filter(fn: (r) => r._field == "overall_confidence")
    |> aggregateWindow(every: 7d, fn: mean)
    |> yield(name: "mean")'
 
@@ -353,7 +386,7 @@ influx query --org whisperengine \
 
 ### 3.2 Tuning Relationship Scoring (Growth Issues)
 
-**When to use**: Relationship affection/trust/attunement growth < 0.5 points/day
+**When to use**: Relationship affection/trust/attunement growth < 0.05 points/day
 
 **Problem**: Relationship scoring algorithm too conservative, users feel unrecognized
 
@@ -421,22 +454,23 @@ def _calculate_stage_multiplier(self, current_metrics: Dict[str, float]) -> floa
 **Validation Query**:
 ```bash
 # Check relationship growth rate after tuning
-influx query --org whisperengine \
+influx query --org whisperengine --token whisperengine-fidelity-first-metrics-token \
   'from(bucket: "performance_metrics")
    |> range(start: -14d)
    |> filter(fn: (r) => r.bot == "elena")
-   |> filter(fn: (r) => r._measurement == "relationship_metrics")
+   |> filter(fn: (r) => r._measurement == "relationship_progression")
+   |> filter(fn: (r) => r._field == "affection_level" or r._field == "trust_level" or r._field == "attunement_level")
    |> derivative(unit: 1d)
    |> mean()'
 
-# Target: affection growth 0.8-1.2/day (was 0.3-0.5/day)
+# Target: affection growth 0.08-0.12/day (was 0.02-0.05/day)
 ```
 
 ---
 
 ### 3.3 Tuning Emotion Sensitivity (Flat Emotions)
 
-**When to use**: Bot emotion variance < 0.20, intensity consistently < 0.50
+**When to use**: Bot emotion intensity < 0.30, consistently low emotional expression
 
 **Problem**: Emotion analyzer under-weights emotional content, bot feels robotic
 
@@ -526,27 +560,27 @@ class EnhancedVectorEmotionAnalyzer:
         )
 ```
 
-**Expected Impact**: Emotion variance +50-100%, intensity average +30%, bot feels more human
+**Expected Impact**: Emotion intensity average +30%, bot feels more human
 
 **Validation Query**:
 ```bash
-# Check emotion diversity after tuning
-influx query --org whisperengine \
+# Check emotion intensity after tuning
+influx query --org whisperengine --token whisperengine-fidelity-first-metrics-token \
   'from(bucket: "performance_metrics")
    |> range(start: -7d)
    |> filter(fn: (r) => r.bot == "elena")
    |> filter(fn: (r) => r._measurement == "bot_emotion")
    |> filter(fn: (r) => r._field == "intensity")
-   |> stddev()'
+   |> mean()'
 
-# Target: variance 0.30-0.50 (was < 0.20)
+# Target: intensity 0.50-0.90 (was < 0.30)
 ```
 
 ---
 
 ### 3.4 Tuning Context Window (Context Issues)
 
-**When to use**: Context confidence < 0.55, responses miss conversation context
+**When to use**: Context confidence < 0.30, responses miss conversation context
 
 **Problem**: Conversation history window too small, bot misses important context
 
@@ -612,7 +646,7 @@ def _build_context_for_prompt(self, conversation_history, relevant_memories):
 
 ### 3.5 Tuning Vector Search (Memory Quality Issues)
 
-**When to use**: Memory retrieval similarity < 0.65, irrelevant memories retrieved
+**When to use**: Memory retrieval similarity < 0.50, irrelevant memories retrieved
 
 **Problem**: Vector similarity threshold too loose, retrieving low-quality memories
 
@@ -706,7 +740,7 @@ def _rank_memories_by_importance(self, results):
 
 ### 3.6 Tuning Performance (Response Time Issues)
 
-**When to use**: Response time > 4s, processing too slow
+**When to use**: Response time > 5000ms, processing too slow
 
 **Problem**: Over-fetching context or inefficient memory retrieval
 

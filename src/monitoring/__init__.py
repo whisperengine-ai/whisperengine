@@ -14,8 +14,15 @@ from pathlib import Path
 
 # Import monitoring components
 from .health_monitor import get_health_monitor, initialize_health_monitoring, HealthStatus
-from .engagement_tracker import get_engagement_tracker, InteractionType
 from .error_tracker import get_error_tracker, track_error, ErrorSeverity, ErrorCategory, ErrorContext
+
+# Placeholder for InteractionType (removed with engagement_tracker)
+from enum import Enum
+
+class InteractionType(Enum):
+    """Stub for interaction types - engagement tracking moved to InfluxDB"""
+    MESSAGE = "message"
+    COMMAND = "command"
 
 logger = logging.getLogger(__name__)
 
@@ -91,10 +98,8 @@ class MonitoringManager:
                 await initialize_health_monitoring(self.config.get('health_monitor', {}))
                 logger.info("Health monitoring initialized")
             
-            # Initialize engagement tracking
-            if self.enable_engagement_tracking:
-                self.engagement_tracker = get_engagement_tracker(self.config.get('engagement_tracker', {}))
-                logger.info("Engagement tracking initialized")
+            # Engagement tracking disabled - replaced with InfluxDB via FidelityMetricsCollector
+            self.engagement_tracker = None
             
             # Initialize error tracking
             if self.enable_error_tracking:

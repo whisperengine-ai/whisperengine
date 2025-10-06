@@ -7,6 +7,7 @@ Tracks character consistency, optimization ratios, memory quality, and performan
 
 import asyncio
 import logging
+import os
 import time
 from datetime import datetime, timezone
 from typing import Dict, List, Optional, Any, Union
@@ -52,9 +53,9 @@ class MetricType(Enum):
     OPTIMIZATION_RATIO = "optimization_ratio"
     MEMORY_QUALITY = "memory_quality"
     RESPONSE_TIME = "response_time"
-    TOKEN_USAGE = "token_usage"
-    SYSTEM_PERFORMANCE = "system_performance"
-    USER_ENGAGEMENT = "user_engagement"
+    # TOKEN_USAGE = "token_usage"  # REMOVED: Never used
+    # SYSTEM_PERFORMANCE = "system_performance"  # REMOVED: Already tracked by ConcurrentConversationManager
+    # USER_ENGAGEMENT = "user_engagement"  # REMOVED: Redundant with temporal intelligence
 
 
 @dataclass
@@ -97,15 +98,16 @@ class FidelityMetricsCollector:
     """
     
     def __init__(self, 
-                 influxdb_url: str = "http://localhost:8086",
-                 influxdb_token: str = "whisperengine-fidelity-first-metrics-token",
-                 influxdb_org: str = "whisperengine",
-                 influxdb_bucket: str = "performance_metrics"):
+                 influxdb_url: Optional[str] = None,
+                 influxdb_token: Optional[str] = None,
+                 influxdb_org: Optional[str] = None,
+                 influxdb_bucket: Optional[str] = None):
         
-        self.influxdb_url = influxdb_url
-        self.influxdb_token = influxdb_token
-        self.influxdb_org = influxdb_org
-        self.influxdb_bucket = influxdb_bucket
+        # Use environment variables with fallback defaults
+        self.influxdb_url = influxdb_url or os.getenv('INFLUXDB_URL', 'http://localhost:8086')
+        self.influxdb_token = influxdb_token or os.getenv('INFLUXDB_TOKEN', 'whisperengine-fidelity-first-metrics-token')
+        self.influxdb_org = influxdb_org or os.getenv('INFLUXDB_ORG', 'whisperengine')
+        self.influxdb_bucket = influxdb_bucket or os.getenv('INFLUXDB_BUCKET', 'performance_metrics')
         
         # InfluxDB client (lazy initialization)
         self._client: Optional[Any] = None
@@ -197,7 +199,7 @@ class FidelityMetricsCollector:
                             memory_count: int, vector_similarity: float):
         """Record memory system quality metrics"""
         try:
-            # Memory quality score
+            # Memory quality score (ONLY record this - timing handled by main performance tracking)
             self.record_metric(FidelityMetric(
                 metric_type=MetricType.MEMORY_QUALITY,
                 value=relevance_score,
@@ -211,17 +213,7 @@ class FidelityMetricsCollector:
                 }
             ))
             
-            # Response time for memory operations
-            self.record_metric(FidelityMetric(
-                metric_type=MetricType.RESPONSE_TIME,
-                value=retrieval_time_ms,
-                bot_name=self.bot_name,
-                user_id=user_id,
-                operation=f"memory_{operation}",
-                tags={
-                    "operation_type": "memory_retrieval"
-                }
-            ))
+            # REMOVED: Redundant response time tracking - already tracked by record_performance_metric
             
         except Exception as e:
             logger.error(f"Error recording memory quality metrics: {e}")
@@ -245,40 +237,13 @@ class FidelityMetricsCollector:
                 fields=metadata or {}
             ))
             
-            # System performance snapshot
-            process = psutil.Process()
-            self.record_metric(FidelityMetric(
-                metric_type=MetricType.SYSTEM_PERFORMANCE,
-                value=process.cpu_percent(),
-                bot_name=self.bot_name,
-                operation=operation,
-                fields={
-                    "memory_mb": process.memory_info().rss / 1024 / 1024,
-                    "cpu_percent": process.cpu_percent(),
-                    "operation_duration_ms": duration_ms,
-                    "operation_success": 1 if success else 0
-                }
-            ))
+            # REMOVED: Redundant system performance snapshot per operation
+            # System performance is already tracked every 5s by ConcurrentConversationManager
             
         except Exception as e:
             logger.error(f"Error recording performance metrics: {e}")
     
-    def record_user_engagement(self, user_id: str, engagement_score: float,
-                             conversation_length: int, response_quality: float):
-        """Record user engagement metrics"""
-        try:
-            self.record_metric(FidelityMetric(
-                metric_type=MetricType.USER_ENGAGEMENT,
-                value=engagement_score,
-                bot_name=self.bot_name,
-                user_id=user_id,
-                fields={
-                    "conversation_length": conversation_length,
-                    "response_quality": response_quality
-                }
-            ))
-        except Exception as e:
-            logger.error(f"Error recording user engagement metrics: {e}")
+    # REMOVED: record_user_engagement method - redundant with temporal intelligence
     
     def record_metric(self, metric: FidelityMetric):
         """Record a generic metric to InfluxDB or buffer"""
@@ -312,16 +277,29 @@ class FidelityMetricsCollector:
         if metric.operation:
             point = point.tag("operation", metric.operation)
         
-        # Add custom tags
+        # Add custom tags (validate string values)
         for key, value in metric.tags.items():
-            point = point.tag(key, value)
+            if value is not None:
+                point = point.tag(key, str(value))
         
-        # Add value as main field
-        point = point.field("value", metric.value)
+        # Add value as main field (validate numeric)
+        if isinstance(metric.value, (int, float)) and not (isinstance(metric.value, float) and (metric.value != metric.value)):  # Check for NaN
+            point = point.field("value", float(metric.value))
+        else:
+            logger.warning("Invalid metric value for %s: %s", metric.metric_type, metric.value)
+            return None
         
-        # Add additional fields
+        # Add additional fields (validate types)
         for key, value in metric.fields.items():
-            point = point.field(key, value)
+            if value is not None:
+                if isinstance(value, (int, float)) and not (isinstance(value, float) and (value != value)):  # Check for NaN
+                    point = point.field(key, float(value))
+                elif isinstance(value, str):
+                    point = point.field(key, value)
+                elif isinstance(value, bool):
+                    point = point.field(key, value)
+                else:
+                    logger.debug("Skipping unsupported field type for %s: %s", key, type(value))
         
         return point
     
