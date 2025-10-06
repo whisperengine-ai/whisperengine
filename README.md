@@ -130,7 +130,6 @@ graph TB
         R1[Ryan Bot<br/>:9093]
         G1[Gabriel Bot<br/>:9095]
         S1[Sophia Bot<br/>:9096]
-        DOTTY[Dotty Bot<br/>:3007]
     end
     
     %% Connections
@@ -268,13 +267,14 @@ graph TB
 │               Supporting Infrastructure                         │
 │                                                                 │
 │  ┌─────────────┐    ┌─────────────┐    ┌─────────────────────┐  │
-│  │    Redis    │    │   Health    │    │   HTTP Chat APIs   │  │
-│  │    Cache    │    │ Monitoring  │    │                     │  │
-│  │             │    │             │    │ • Rich Metadata     │  │
-│  │ • Sessions  │    │ • Health    │    │ • Emotional Intel   │  │
-│  │ • Cache     │    │   Checks    │    │ • User Facts        │  │
-│  │ • Perf      │    │ • Analytics │    │ • Relationship      │  │
-│  │   Opts      │    │ • Metrics   │    │   Metrics (:9091+)  │  │
+
+│  │   Health    │    │   HTTP Chat APIs   │  │
+│  │ Monitoring  │    │                     │  │
+│  │             │    │ • Rich Metadata     │  │
+│  │ • Health    │    │ • Emotional Intel   │  │
+│  │   Checks    │    │ • User Facts        │  │
+│  │ • Analytics │    │ • Relationship      │  │
+│  │ • Metrics   │    │   Metrics (:9091+)  │  │
 │  └─────────────┘    └─────────────┘    └─────────────────────┘  │
 └─────────────────────────────────────────────────────────────────┘
 
@@ -313,28 +313,31 @@ graph TB
 - **Character Categories**: Pre-built templates (warm, professional, creative, mystical, custom)
 - **Author Control**: Custom instructions, introductions, and personality fine-tuning
 
+
 **Multi-Bot Infrastructure** 
-- **Shared Core**: Single infrastructure (PostgreSQL + Redis + Qdrant) supporting multiple personalities
-- **Character Isolation**: Individual `.env.{bot-name}` configurations for personality separation
+- **Shared Core**: Single infrastructure (PostgreSQL + Qdrant + InfluxDB) supporting multiple personalities
+- **Character Isolation**: Individual `.env.{bot-name}` configurations for personality separation and memory isolation
 - **Dynamic Discovery**: Auto-generated Docker Compose with template-based scaling
 - **Resource Efficiency**: Shared vector embeddings and memory optimizations across characters
 
+
 **Production-Grade Systems**
 - Comprehensive error handling with graceful degradation
-- Health monitoring across all system components
-- Performance optimization with intelligent caching
+- Health monitoring across all system components (InfluxDB dashboards, no custom UI)
+- Performance optimization with vector-native memory and async pipeline
 - Docker-first development with container orchestration
+
 
 ### Technology Stack
 
 - **Backend**: Python with async/await patterns for concurrent operations
 - **Knowledge Storage**: PostgreSQL Semantic Knowledge Graph (facts, relationships, entities)
 - **Vector Memory**: Qdrant (primary semantic storage) + FastEmbed (embedding generation)
-- **Caching Layer**: Redis (performance optimization, session management)
-- **AI Integration**: OpenRouter, Anthropic, OpenAI with intelligent routing
+- **Time-Series Analytics**: InfluxDB for adaptive learning, confidence, and trend analysis
+- **AI Integration**: OpenRouter, Anthropic, OpenAI, Mistral, Ollama, LM Studio with intelligent routing
 - **Multi-Platform**: Discord bots + HTTP Chat APIs for 3rd party integration
 - **Deployment**: Docker Compose with multi-bot orchestration and health monitoring
-- **Testing**: Pytest with container-based integration and vector memory validation
+- **Testing**: Direct Python validation, container-based integration, and vector memory validation
 
 ### Data Flow Architecture
 
@@ -365,11 +368,13 @@ PostgreSQL Graph Update ← Fact Storage ← Knowledge Extraction ← Response A
 10. **Knowledge Graph Update**: Extract and store new facts, relationships, and entities in PostgreSQL graph
 11. **Platform Delivery**: Send response via Discord or HTTP API with rich metadata (emotional intel, user facts, relationship metrics)
 
-## ✨ AI Features That Set Us Apart
+
+## ✨ Latest Features & Adaptive Learning
 
 ### Advanced Conversation Intelligence
 
 **Vector-Native Emotional Intelligence**
+- **RoBERTa Emotion Analysis**: Every message analyzed for emotional content, with 12+ fields stored per memory
 - **Semantic Emotion Analysis**: Vector-based emotion detection using conversation embeddings
 - **Contextual Mood Tracking**: Multi-dimensional emotional state modeling across conversation history
 - **Adaptive Response Generation**: Personality-driven emotional response patterns
@@ -387,20 +392,20 @@ PostgreSQL Graph Update ← Fact Storage ← Knowledge Extraction ← Response A
 - Author-controlled custom speaking instructions and introductions
 - Multi-category personality templates with override capabilities
 
-### Production-Ready Intelligence
+### Adaptive Learning System (2025+)
 
-**Advanced Conversation Intelligence**
-- **Human-like Conversation Patterns**: Natural response timing and conversation flow management
-- **Multi-thread Context Management**: Vector-based context switching across conversation threads
-- **Semantic Emoji Intelligence**: Vector-powered emoji reactions based on conversation sentiment
-- **Engagement Protocols**: Personality-driven interaction patterns and proactive conversation initiation
+- **TrendWise**: Confidence adaptation via InfluxDB historical analysis
+- **MemoryBoost**: Intelligent memory relevance optimization
+- **RelationshipTuner**: Dynamic relationship progression and trust recovery
+- **CharacterEvolution**: Adaptive character parameter tuning and CDL optimization
+- **KnowledgeFusion**: Cross-datastore intelligence integration
+- **IntelligenceOrchestrator**: Unified learning pipeline and predictive adaptation
 
-**Vector-Native Performance Optimization**
-- **Concurrent Vector Operations**: Scatter-gather patterns for parallel memory retrieval and storage
-- **Intelligent Embedding Caching**: Redis-based caching for frequently accessed embeddings
-- **Optimized Similarity Search**: High-performance Qdrant queries with relevance scoring and filtering
-- **Memory Efficiency**: Shared vector spaces across multiple bot personalities
-- **Async Pipeline Processing**: Non-blocking conversation analysis and memory operations
+**Monitoring**: All analytics and feedback loops use InfluxDB built-in dashboards (no custom UI)
+
+**Direct Validation Testing**: Every feature validated with direct Python tests before deployment
+
+**Fidelity-First Design**: Preserves character authenticity and conversation quality throughout the pipeline
 
 ## 🚀 Quick Start
 
@@ -415,7 +420,6 @@ PostgreSQL Graph Update ← Fact Storage ← Knowledge Extraction ← Response A
 - **💭 Dream of the Endless** - Mythological entity with profound, otherworldly expression (Port 9094)
 - **💼 Sophia Blake** - Sophisticated marketing executive with luxury lifestyle (Port 9096)
 - **🌟 Aethys** - Omnipotent entity for philosophical exploration (Port 3007)
-- **🍻 Dotty** - AI Bartender of the Lim with cocktail expertise and narrative immersion (Port 3007)
 
 **🔗 HTTP Chat API Access:**
 Each character also provides rich HTTP Chat API endpoints for 3rd party integration:
@@ -743,12 +747,13 @@ Real-time system health monitoring across all critical components:
 !engagement      # User interaction metrics
 ```
 
+
 **Monitored Components:**
 - System Resources (CPU, Memory, Disk, GPU if available)
 - LLM Service Connectivity & Performance (OpenRouter, Anthropic, OpenAI, Ollama, LM Studio)
 - **Qdrant Vector Database**: Query performance, index health, memory usage, named vector operations
 - **PostgreSQL**: Connection health, query performance, data integrity, Universal Identity storage
-- **Redis Cache**: Hit rates, memory usage, connection stability, session management
+- **InfluxDB**: Trend analysis, adaptive learning feedback loops, dashboard monitoring
 - **Vector Memory Operations**: FastEmbed embedding generation, similarity search performance, bot segmentation
 - **Web Interface**: WebSocket connections, real-time messaging, Universal Identity authentication
 - Discord Bot Status & Multi-Platform Latency
