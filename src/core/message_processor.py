@@ -1794,6 +1794,15 @@ class MessageProcessor:
                 tasks.append(emotion_task)
                 task_names.append("emotion_analysis")
             
+            # Task 1.5: Advanced Multi-Modal Emotional Intelligence
+            advanced_emotion_task = self._analyze_advanced_emotion_intelligence(
+                message_context.user_id,
+                message_context.content,
+                message_context
+            )
+            tasks.append(advanced_emotion_task)
+            task_names.append("advanced_emotion_intelligence")
+            
             # Task 2: Enhanced context analysis using hybrid detector
             context_task = self._analyze_enhanced_context(
                 message_context.content,
@@ -1904,6 +1913,24 @@ class MessageProcessor:
             ai_components['context_analysis'] = ai_components.get('context_analysis')
             ai_components['personality_context'] = ai_components.get('personality_analysis')
             ai_components['phase4_context'] = ai_components.get('phase4_intelligence')
+            
+            # Advanced Emotion Intelligence integration
+            advanced_emotion = ai_components.get('advanced_emotion_intelligence')
+            if advanced_emotion:
+                # Enhance existing emotion_data with advanced insights
+                if ai_components['emotion_data']:
+                    # Merge advanced data with existing RoBERTa analysis
+                    ai_components['emotion_data'].update({
+                        'advanced_analysis': advanced_emotion,
+                        'multi_modal': True,
+                        'secondary_emotions': advanced_emotion.get('secondary_emotions', []),
+                        'emotional_trajectory': advanced_emotion.get('emotional_trajectory', []),
+                        'cultural_context': advanced_emotion.get('cultural_context')
+                    })
+                else:
+                    # Use advanced analysis as primary emotion data
+                    ai_components['emotion_data'] = advanced_emotion
+                logger.info("🎭 Enhanced emotion analysis with advanced multi-modal intelligence")
             
             # Build comprehensive context from all AI components
             comprehensive_context = {}
@@ -2315,6 +2342,68 @@ class MessageProcessor:
             
         except Exception as e:
             logger.debug("Bot emotion analysis failed: %s", str(e))
+        
+        return None
+
+    async def _analyze_advanced_emotion_intelligence(self, user_id: str, content: str, message_context: MessageContext) -> Optional[Dict[str, Any]]:
+        """
+        Analyze emotions using advanced multi-modal intelligence with RoBERTa + emoji synthesis.
+        
+        Advanced Emotional Intelligence:
+        - Uses existing RoBERTa emotion analysis as foundation
+        - Enhances with emoji emotion mapping and synthesis rules
+        - Supports 15 emotions (7 RoBERTa + 8 synthesis: love, contempt, pride, awe, confusion)
+        - Multi-modal analysis combining text sentiment with visual emoji signals
+        
+        Args:
+            user_id: User identifier for conversation context
+            content: Message content to analyze
+            message_context: Full message context
+            
+        Returns:
+            Dict with enhanced emotion analysis including multi-modal scores
+        """
+        try:
+            # Import the advanced emotion detector
+            from src.intelligence.advanced_emotion_detector import AdvancedEmotionDetector
+            
+            # Initialize with memory manager for context
+            detector = AdvancedEmotionDetector(
+                memory_manager=self.memory_manager
+            )
+            
+            # Perform advanced multi-modal emotion analysis
+            emotion_results = await detector.detect_advanced_emotions(
+                text=content,
+                user_id=user_id,
+                context={}  # Could be enhanced with conversation context
+            )
+            
+            if emotion_results:
+                # Convert AdvancedEmotionalState to standardized format for AI components
+                advanced_emotion_data = {
+                    'primary_emotion': emotion_results.primary_emotion,
+                    'intensity': emotion_results.emotional_intensity,
+                    'confidence': 0.8,  # Default confidence for advanced analysis
+                    'analysis_method': 'advanced_multi_modal',
+                    'secondary_emotions': emotion_results.secondary_emotions,
+                    'emoji_analysis': emotion_results.emoji_analysis,
+                    'text_indicators': emotion_results.text_indicators,
+                    'emotional_trajectory': emotion_results.emotional_trajectory,
+                    'pattern_type': emotion_results.pattern_type,
+                    'cultural_context': emotion_results.cultural_context
+                }
+                
+                logger.debug(
+                    "Advanced emotion analysis successful: %s (%.2f intensity, pattern: %s)",
+                    advanced_emotion_data['primary_emotion'],
+                    advanced_emotion_data['intensity'],
+                    advanced_emotion_data['pattern_type'] or 'stable'
+                )
+                return advanced_emotion_data
+                
+        except Exception as e:
+            logger.debug("Advanced emotion intelligence analysis failed: %s", str(e))
         
         return None
 

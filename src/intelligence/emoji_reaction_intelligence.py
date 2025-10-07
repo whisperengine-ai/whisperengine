@@ -47,6 +47,11 @@ class EmojiReactionData:
 class EmojiEmotionMapper:
     """Maps emojis to emotional reaction types with confidence scoring."""
     
+    def __init__(self):
+        """Initialize emoji emotion mapper and ensure Unicode emojis are loaded."""
+        # Ensure Unicode emojis are initialized
+        self._initialize_unicode_emojis()
+    
     # Comprehensive emoji mapping with confidence scores
     EMOJI_EMOTION_MAP = {
         # Strong Positive
