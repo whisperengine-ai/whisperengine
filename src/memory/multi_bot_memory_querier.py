@@ -13,6 +13,7 @@ advanced multi-bot queries while maintaining data isolation by default.
 
 import os
 import logging
+import glob
 from datetime import datetime
 from typing import List, Dict, Any, Optional, Set, Union
 from qdrant_client import models
@@ -49,13 +50,48 @@ class MultiBotMemoryQuerier:
         
         self.vector_store = self.memory_manager.vector_store
     
+    async def _discover_bot_collections(self) -> Dict[str, str]:
+        """
+        Dynamically discover bot collections from environment files
+        Following WhisperEngine's character-agnostic architecture
+        
+        Returns:
+            Dict mapping bot_name -> collection_name
+        """
+        bot_collections = {}
+        
+        # Find all .env.* files in the project root
+        env_files = glob.glob('/Users/markcastillo/git/whisperengine/.env.*')
+        
+        for env_file in env_files:
+            # Skip template and local files
+            if 'template' in env_file or 'local' in env_file:
+                continue
+                
+            # Extract bot name from filename (.env.botname)
+            bot_name = os.path.basename(env_file).replace('.env.', '')
+            
+            # Read the collection name from the env file
+            try:
+                with open(env_file, 'r') as f:
+                    for line in f:
+                        if line.startswith('QDRANT_COLLECTION_NAME='):
+                            collection_name = line.split('=', 1)[1].strip()
+                            bot_collections[bot_name] = collection_name
+                            break
+            except Exception as e:
+                logger.warning(f"Failed to read collection name from {env_file}: {e}")
+        
+        logger.info(f"Discovered {len(bot_collections)} bot collections: {list(bot_collections.keys())}")
+        return bot_collections
+    
     async def query_all_bots(self, 
                             query: str, 
                             user_id: str, 
                             top_k: int = 10,
                             min_score: float = 0.0) -> Dict[str, List[Dict]]:
         """
-        Query across ALL bots' memories
+        Query across ALL bots' memories using their dedicated collections
         
         Use cases:
         - Admin debugging and analysis
@@ -78,37 +114,43 @@ class MultiBotMemoryQuerier:
             # Get query embedding
             query_embedding = list(self.vector_store.embedder.embed([query]))[0]
             
-            # Search WITHOUT bot_name filter = global search
-            search_results = self.vector_store.client.search(
-                collection_name=self.vector_store.collection_name,
-                query_vector=models.NamedVector(name="content", vector=query_embedding),  # ✅ FIXED: Named vector format
-                query_filter=models.Filter(
-                    must=[
-                        models.FieldCondition(key="user_id", match=models.MatchValue(value=user_id))
-                        # No bot_name filter = search all bots
-                    ]
-                ),
-                limit=top_k,
-                score_threshold=min_score,
-                with_payload=True
-            )
+            # 🎯 NEW ARCHITECTURE: Dynamically discover bot collections from environment files
+            bot_collections = await self._discover_bot_collections()
             
-            # Group results by bot
             results_by_bot = {}
-            for result in search_results:
-                bot_name = result.payload.get('bot_name', 'unknown')
-                if bot_name not in results_by_bot:
-                    results_by_bot[bot_name] = []
-                
-                results_by_bot[bot_name].append({
-                    'content': result.payload.get('content', ''),
-                    'score': result.score,
-                    'timestamp': result.payload.get('timestamp', ''),
-                    'memory_type': result.payload.get('memory_type', ''),
-                    'confidence': result.payload.get('confidence', 0.0),
-                    'source': result.payload.get('source', ''),
-                    'significance': result.payload.get('overall_significance', 0.0)
-                })
+            
+            for bot_name, collection_name in bot_collections.items():
+                try:
+                    # Query each bot's collection individually
+                    search_results = self.vector_store.client.search(
+                        collection_name=collection_name,
+                        query_vector=models.NamedVector(name="content", vector=query_embedding),
+                        query_filter=models.Filter(
+                            must=[
+                                models.FieldCondition(key="user_id", match=models.MatchValue(value=user_id))
+                                # 🎯 NO bot_name filter needed - collection is already bot-specific
+                            ]
+                        ),
+                        limit=top_k,
+                        score_threshold=min_score,
+                        with_payload=True
+                    )
+                    
+                    if search_results:
+                        results_by_bot[bot_name] = []
+                        for result in search_results:
+                            results_by_bot[bot_name].append({
+                                'content': result.payload.get('content', '') if result.payload else '',
+                                'score': result.score,
+                                'timestamp': result.payload.get('timestamp', '') if result.payload else '',
+                                'memory_type': result.payload.get('memory_type', '') if result.payload else '',
+                                'confidence': result.payload.get('confidence', 0.0) if result.payload else 0.0,
+                                'source': result.payload.get('source', '') if result.payload else '',
+                                'significance': result.payload.get('overall_significance', 0.0) if result.payload else 0.0
+                            })
+                    
+                except Exception as e:
+                    logger.warning(f"Failed to query {bot_name} collection {collection_name}: {e}")
             
             logger.info(f"Global query found memories from {len(results_by_bot)} bots")
             return results_by_bot
@@ -124,7 +166,7 @@ class MultiBotMemoryQuerier:
                                  top_k: int = 10,
                                  min_score: float = 0.0) -> Dict[str, List[Dict]]:
         """
-        Query specific subset of bots
+        Query specific subset of bots using their dedicated collections
         
         Use cases:
         - Team-based analysis (e.g., all analytical bots)
@@ -148,37 +190,48 @@ class MultiBotMemoryQuerier:
             # Get query embedding
             query_embedding = list(self.vector_store.embedder.embed([query]))[0]
             
-            # Search with bot_name filter for specific bots
-            search_results = self.vector_store.client.search(
-                collection_name=self.vector_store.collection_name,
-                query_vector=models.NamedVector(name="content", vector=query_embedding),  # ✅ FIXED: Named vector format
-                query_filter=models.Filter(
-                    must=[
-                        models.FieldCondition(key="user_id", match=models.MatchValue(value=user_id)),
-                        models.FieldCondition(key="bot_name", match=models.MatchAny(any=bot_names))
-                    ]
-                ),
-                limit=top_k,
-                score_threshold=min_score,
-                with_payload=True
-            )
+            # 🎯 NEW ARCHITECTURE: Dynamically discover bot collections from environment files
+            bot_collections = await self._discover_bot_collections()
             
-            # Group results by bot
             results_by_bot = {}
-            for result in search_results:
-                bot_name = result.payload.get('bot_name', 'unknown')
-                if bot_name not in results_by_bot:
-                    results_by_bot[bot_name] = []
+            
+            for bot_name in bot_names:
+                if bot_name not in bot_collections:
+                    logger.warning(f"Unknown bot name: {bot_name}")
+                    continue
                 
-                results_by_bot[bot_name].append({
-                    'content': result.payload.get('content', ''),
-                    'score': result.score,
-                    'timestamp': result.payload.get('timestamp', ''),
-                    'memory_type': result.payload.get('memory_type', ''),
-                    'confidence': result.payload.get('confidence', 0.0),
-                    'source': result.payload.get('source', ''),
-                    'significance': result.payload.get('overall_significance', 0.0)
-                })
+                collection_name = bot_collections[bot_name]
+                try:
+                    # Query the specific bot's collection
+                    search_results = self.vector_store.client.search(
+                        collection_name=collection_name,
+                        query_vector=models.NamedVector(name="content", vector=query_embedding),
+                        query_filter=models.Filter(
+                            must=[
+                                models.FieldCondition(key="user_id", match=models.MatchValue(value=user_id))
+                                # 🎯 NO bot_name filter needed - collection is already bot-specific
+                            ]
+                        ),
+                        limit=top_k,
+                        score_threshold=min_score,
+                        with_payload=True
+                    )
+                    
+                    if search_results:
+                        results_by_bot[bot_name] = []
+                        for result in search_results:
+                            results_by_bot[bot_name].append({
+                                'content': result.payload.get('content', '') if result.payload else '',
+                                'score': result.score,
+                                'timestamp': result.payload.get('timestamp', '') if result.payload else '',
+                                'memory_type': result.payload.get('memory_type', '') if result.payload else '',
+                                'confidence': result.payload.get('confidence', 0.0) if result.payload else 0.0,
+                                'source': result.payload.get('source', '') if result.payload else '',
+                                'significance': result.payload.get('overall_significance', 0.0) if result.payload else 0.0
+                            })
+                
+                except Exception as e:
+                    logger.warning(f"Failed to query {bot_name} collection {collection_name}: {e}")
             
             logger.info(f"Selective query found memories from {len(results_by_bot)} of {len(bot_names)} requested bots")
             return results_by_bot

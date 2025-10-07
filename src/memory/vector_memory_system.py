@@ -511,7 +511,7 @@ class VectorMemoryStore:
             ("semantic_key", models.PayloadSchemaType.KEYWORD, "Semantic grouping"),
             ("emotional_context", models.PayloadSchemaType.KEYWORD, "Emotional context"),
             ("content_hash", models.PayloadSchemaType.INTEGER, "Content hash (deduplication)"),
-            ("bot_name", models.PayloadSchemaType.KEYWORD, "Bot-specific memory isolation"),
+            # 🎯 REMOVED: bot_name index - collection isolation makes this redundant
         ]
         
         created_count = 0
@@ -737,13 +737,12 @@ class VectorMemoryStore:
             content_hash = hash(content_normalized)
             
             # 🚀 QDRANT FEATURE: Check for exact duplicates using optimized index
-            current_bot_name = get_normalized_bot_name_from_env()
+            # 🎯 COLLECTION ISOLATION: No bot_name filter needed - each collection is bot-specific
             existing = self.client.scroll(
                 collection_name=self.collection_name,
                 scroll_filter=models.Filter(
                     must=[
                         models.FieldCondition(key="user_id", match=models.MatchValue(value=memory.user_id)),
-                        models.FieldCondition(key="bot_name", match=models.MatchValue(value=current_bot_name)),
                         models.FieldCondition(key="content_hash", match=models.MatchValue(value=content_hash))
                     ]
                 ),
@@ -765,7 +764,7 @@ class VectorMemoryStore:
             # Enhanced payload optimized for Qdrant operations
             qdrant_payload = {
                 "user_id": memory.user_id,
-                "bot_name": get_normalized_bot_name_from_env(),  # 🎯 NORMALIZED Bot-specific memory segmentation
+                # 🎯 REMOVED: bot_name field - collection isolation makes this redundant
                 "memory_type": memory.memory_type.value,
                 "content": memory.content,
                 "timestamp": memory.timestamp.isoformat(),
@@ -1233,15 +1232,15 @@ class VectorMemoryStore:
             logger.info(f"🔍 DEBUG: Collection: {self.collection_name}")
             
             # Show what bot name is being used for filtering
-            current_bot_name = get_normalized_bot_name_from_env()
-            logger.info(f"🔍 DEBUG: Filtering by bot_name: '{current_bot_name}'")
+            # 🎯 COLLECTION ISOLATION: No bot_name filter needed - each collection is bot-specific
+            logger.info(f"🔍 DEBUG: Collection-based filtering (no bot_name needed): '{self.collection_name}'")
             
             scroll_result = self.client.scroll(
                 collection_name=self.collection_name,
                 scroll_filter=models.Filter(
                     must=[
                         models.FieldCondition(key="user_id", match=models.MatchValue(value=user_id)),
-                        models.FieldCondition(key="bot_name", match=models.MatchValue(value=get_normalized_bot_name_from_env())),  # 🎯 NORMALIZED Bot-specific filtering
+                        # 🎯 REMOVED: bot_name filter - collection isolation makes this redundant
                         models.FieldCondition(key="memory_type", match=models.MatchValue(value="conversation")),
                         models.FieldCondition(key="timestamp_unix", range=Range(gte=recent_timestamp))
                     ]
@@ -1254,7 +1253,7 @@ class VectorMemoryStore:
             
             logger.info(f"🔍 DEBUG: Qdrant query conditions:")
             logger.info(f"  - user_id: {user_id}")
-            logger.info(f"  - bot_name: {current_bot_name}")
+            logger.info(f"  - collection: {self.collection_name} (bot-specific)")
             logger.info(f"  - memory_type: conversation")
             logger.info(f"  - timestamp_unix >= {recent_timestamp}")
             logger.info(f"🔍 DEBUG: Found {len(scroll_result[0])} conversation memories")
@@ -2230,8 +2229,8 @@ class VectorMemoryStore:
         try:
             # Use direct Qdrant search since we're in VectorMemoryStore
             filter_conditions = [
-                models.FieldCondition(key="user_id", match=models.MatchValue(value=user_id)),
-                models.FieldCondition(key="bot_name", match=models.MatchValue(value=get_normalized_bot_name_from_env()))  # 🎯 FIXED: Add bot filtering
+                models.FieldCondition(key="user_id", match=models.MatchValue(value=user_id))
+                # 🎯 REMOVED: bot_name filter - collection isolation makes this redundant
             ]
 
             results = self.client.search(
@@ -2324,10 +2323,10 @@ class VectorMemoryStore:
                 return await self._handle_temporal_query_with_qdrant(query, user_id, top_k)
             
             # Regular semantic search continues below...
-            current_bot_name = get_normalized_bot_name_from_env()
+            # 🎯 COLLECTION ISOLATION: No bot_name filter needed - each collection is bot-specific
             must_conditions = [
-                models.FieldCondition(key="user_id", match=models.MatchValue(value=user_id)),
-                models.FieldCondition(key="bot_name", match=models.MatchValue(value=current_bot_name))  # 🎯 NORMALIZED Bot-specific filtering
+                models.FieldCondition(key="user_id", match=models.MatchValue(value=user_id))
+                # 🎯 REMOVED: bot_name filter - collection isolation makes this redundant
             ]
             
             if memory_types:
@@ -2454,13 +2453,13 @@ class VectorMemoryStore:
             recent_cutoff_timestamp = recent_cutoff_dt.timestamp()
             
             # Get recent conversation messages in chronological order
-            current_bot_name = get_normalized_bot_name_from_env()
+            # 🎯 COLLECTION ISOLATION: No bot_name filter needed - each collection is bot-specific
             scroll_result = self.client.scroll(
                 collection_name=self.collection_name,
                 scroll_filter=models.Filter(
                     must=[
                         models.FieldCondition(key="user_id", match=models.MatchValue(value=user_id)),
-                        models.FieldCondition(key="bot_name", match=models.MatchValue(value=current_bot_name)),  # 🎯 Bot-specific filtering
+                        # 🎯 REMOVED: bot_name filter - collection isolation makes this redundant
                         models.FieldCondition(key="memory_type", match=models.MatchValue(value="conversation")),
                         models.FieldCondition(key="timestamp_unix", range=Range(gte=recent_cutoff_timestamp))
                     ]
@@ -2482,7 +2481,7 @@ class VectorMemoryStore:
                     query_filter=models.Filter(
                         must=[
                             models.FieldCondition(key="user_id", match=models.MatchValue(value=user_id)),
-                            models.FieldCondition(key="bot_name", match=models.MatchValue(value=current_bot_name)),  # 🎯 Bot-specific filtering
+                            # 🎯 REMOVED: bot_name filter - collection isolation makes this redundant
                             models.FieldCondition(key="memory_type", match=models.MatchAny(any=["conversation", "fact", "preference"]))
                         ]
                     ),
@@ -2621,10 +2620,10 @@ class VectorMemoryStore:
                 personality_embedding = await self.generate_embedding(f"personality: {personality_context}")
             
             # 🎯 QDRANT FEATURE: Multi-vector search with weighted combinations
-            current_bot_name = get_normalized_bot_name_from_env()
+            # 🎯 COLLECTION ISOLATION: No bot_name filter needed - each collection is bot-specific
             base_filter_conditions: List[models.Condition] = [
-                models.FieldCondition(key="user_id", match=models.MatchValue(value=user_id)),
-                models.FieldCondition(key="bot_name", match=models.MatchValue(value=current_bot_name))  # 🎯 FIXED: Add bot filtering
+                models.FieldCondition(key="user_id", match=models.MatchValue(value=user_id))
+                # 🎯 REMOVED: bot_name filter - collection isolation makes this redundant
             ]
             
             if memory_types:
@@ -2887,7 +2886,7 @@ class VectorMemoryStore:
                 }
             
             # 🎯 QDRANT RECOMMENDATION: Find semantically similar conversations
-            current_bot_name = get_normalized_bot_name_from_env()
+            # 🎯 COLLECTION ISOLATION: No bot_name needed - each collection is bot-specific
             
             if recent_message_id:
                 # Use existing message ID for recommendation
@@ -2898,7 +2897,7 @@ class VectorMemoryStore:
                         query_filter=models.Filter(
                             must=[
                                 models.FieldCondition(key="user_id", match=models.MatchValue(value=user_id)),
-                                models.FieldCondition(key="bot_name", match=models.MatchValue(value=current_bot_name)),
+                                # 🎯 REMOVED: bot_name filter - collection isolation makes this redundant
                                 models.FieldCondition(key="memory_type", match=models.MatchValue(value="conversation"))
                             ]
                         ),
@@ -2922,7 +2921,7 @@ class VectorMemoryStore:
                     query_filter=models.Filter(
                         must=[
                             models.FieldCondition(key="user_id", match=models.MatchValue(value=user_id)),
-                            models.FieldCondition(key="bot_name", match=models.MatchValue(value=current_bot_name)),
+                            # 🎯 REMOVED: bot_name filter - collection isolation makes this redundant
                             models.FieldCondition(key="memory_type", match=models.MatchValue(value="conversation"))
                         ]
                     ),
@@ -4618,14 +4617,8 @@ class VectorMemoryManager:
                 )
             ]
             
-            # Add bot_name filtering for memory isolation
-            current_bot_name = get_normalized_bot_name_from_env()
-            must_conditions.append(
-                models.FieldCondition(
-                    key="bot_name",
-                    match=models.MatchValue(value=current_bot_name)
-                )
-            )
+            # 🎯 COLLECTION ISOLATION: No bot_name filter needed - each collection is bot-specific
+            # 🎯 REMOVED: bot_name filtering since collections are already bot-specific
             
             # Scroll through recent conversations (no vector search needed)
             scroll_result = self.vector_store.client.scroll(
