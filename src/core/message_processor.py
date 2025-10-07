@@ -402,7 +402,7 @@ class MessageProcessor:
                     logger.debug("User emotion recording not yet implemented in TemporalIntelligenceClient")
             
             # Record metrics to InfluxDB (async, non-blocking)
-            await asyncio.gather(
+            temporal_tasks = [
                 self.temporal_client.record_confidence_evolution(
                     bot_name=bot_name,
                     user_id=message_context.user_id,
@@ -418,6 +418,29 @@ class MessageProcessor:
                     user_id=message_context.user_id,
                     quality_metrics=quality_metrics
                 ),
+            ]
+            
+            # Add memory aging metrics if available
+            memory_aging = ai_components.get('memory_aging_intelligence')
+            if memory_aging:
+                try:
+                    memory_aging_task = self.temporal_client.record_memory_aging_metrics(
+                        bot_name=bot_name,
+                        user_id=message_context.user_id,
+                        health_status=memory_aging.get('health_status', 'unknown'),
+                        total_memories=memory_aging.get('total_memories', 0),
+                        memories_flagged=memory_aging.get('memories_flagged', 0),
+                        flagged_ratio=memory_aging.get('flagged_ratio', 0.0),
+                        processing_time=memory_aging.get('processing_time', 0.0)
+                    )
+                    temporal_tasks.append(memory_aging_task)
+                    logger.debug("📊 TEMPORAL: Added memory aging metrics to batch recording")
+                except AttributeError:
+                    # record_memory_aging_metrics method doesn't exist yet - skip for now
+                    logger.debug("Memory aging metrics recording not yet implemented in TemporalIntelligenceClient")
+            
+            await asyncio.gather(
+                *temporal_tasks,
                 return_exceptions=True  # Don't fail message processing if temporal recording fails
             )
             
@@ -2513,6 +2536,24 @@ class MessageProcessor:
                     memory_aging_data['memories_flagged'],
                     memory_aging_data['flagged_ratio'] * 100
                 )
+                
+                # Record memory aging metrics to InfluxDB for temporal analysis
+                if hasattr(self, 'temporal_client') and self.temporal_client:
+                    try:
+                        await self.temporal_client.record_memory_aging_metrics(
+                            bot_name=os.getenv('DISCORD_BOT_NAME', 'unknown'),
+                            user_id=user_id,
+                            health_status=memory_aging_data['health_status'],
+                            total_memories=memory_aging_data['total_memories'],
+                            memories_flagged=memory_aging_data['memories_flagged'],
+                            flagged_ratio=memory_aging_data['flagged_ratio'],
+                            processing_time=memory_aging_data['processing_time']
+                        )
+                        logger.debug("📊 TEMPORAL: Recorded memory aging metrics to InfluxDB")
+                    except AttributeError:
+                        # record_memory_aging_metrics method doesn't exist yet - log for now
+                        logger.debug("Memory aging metrics recording not yet implemented in TemporalIntelligenceClient")
+                
                 return memory_aging_data
                 
         except Exception as e:
