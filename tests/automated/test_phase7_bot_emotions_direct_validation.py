@@ -348,3 +348,32 @@ async def main():
     print("\n" + "=" * 80)
     print("WhisperEngine Phase 7.5 & 7.6 Bot Emotional Intelligence")
     print("Direct Validation Test Suite")
+    print("=" * 80)
+    print(f"Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print("Testing direct Python API calls (preferred method)")
+    print()
+    
+    # Initialize validator
+    validator = Phase7BotEmotionValidator()
+    
+    # Initialize components
+    if not await validator.initialize():
+        print("❌ Failed to initialize components. Exiting.")
+        return False
+    
+    # Run all tests
+    await validator.test_1_bot_emotion_analysis()
+    await validator.test_2_mixed_emotions_storage()
+    await validator.test_3_end_to_end_message_processing()
+    
+    # Print summary
+    validator.print_summary()
+    
+    # Return success status
+    total = len(validator.test_results)
+    passed = sum(1 for r in validator.test_results if r["passed"])
+    return passed == total
+
+
+if __name__ == "__main__":
+    asyncio.run(main())

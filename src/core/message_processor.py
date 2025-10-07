@@ -2263,10 +2263,8 @@ class MessageProcessor:
             Dict with primary_emotion, intensity, confidence, analysis_method
         """
         try:
-            if not self.bot_core or not hasattr(self.bot_core, 'phase2_integration'):
-                return None
-            
-            # Use the enhanced vector emotion analyzer
+            # Enhanced Phase 7.5: Don't require bot_core for emotion analysis
+            # Use the enhanced vector emotion analyzer directly
             from src.intelligence.enhanced_vector_emotion_analyzer import EnhancedVectorEmotionAnalyzer
             
             analyzer = EnhancedVectorEmotionAnalyzer(
@@ -2422,6 +2420,78 @@ class MessageProcessor:
         except Exception as e:
             logger.debug("Bot emotional trajectory analysis failed: %s", str(e))
             return None
+
+    async def _build_bot_emotional_state(self, message_context: MessageContext) -> Optional[Dict[str, Any]]:
+        """
+        Build comprehensive bot emotional state for prompt integration.
+        
+        Phase 7.6: Bot Emotional Self-Awareness
+        - Combines current emotion and trajectory analysis
+        - Provides emotional context for CDL prompt building
+        - Enables bot to reference its own emotional state in responses
+        
+        Args:
+            message_context: Message context with user ID
+            
+        Returns:
+            Dict with complete bot emotional state for prompt integration
+        """
+        try:
+            # Get bot emotional trajectory
+            trajectory_data = await self._analyze_bot_emotional_trajectory(message_context)
+            
+            if not trajectory_data:
+                return None
+            
+            bot_name = get_normalized_bot_name_from_env()
+            
+            # Build comprehensive emotional state
+            emotional_state = {
+                'bot_name': bot_name,
+                'current_emotional_context': trajectory_data.get('emotional_context', 'neutral'),
+                'self_awareness': {
+                    'current_emotion': trajectory_data.get('current_emotion', 'neutral'),
+                    'intensity': trajectory_data.get('current_intensity', 0.5),
+                    'trajectory': trajectory_data.get('trajectory_direction', 'stable'),
+                    'velocity': trajectory_data.get('emotional_velocity', 0.0)
+                },
+                'emotional_memory': {
+                    'recent_emotions': trajectory_data.get('recent_emotions', []),
+                    'pattern': trajectory_data.get('trajectory_direction', 'stable'),
+                    'context_available': True
+                },
+                'prompt_integration': {
+                    'emotional_awareness_prompt': self._generate_emotional_awareness_prompt(trajectory_data),
+                    'self_reference_allowed': True,
+                    'emotional_continuity': True
+                }
+            }
+            
+            logger.debug(
+                "🎭 BOT STATE: %s emotional state built - %s (%s)",
+                bot_name,
+                emotional_state['self_awareness']['current_emotion'],
+                emotional_state['self_awareness']['trajectory']
+            )
+            
+            return emotional_state
+            
+        except Exception as e:
+            logger.debug("Bot emotional state building failed: %s", str(e))
+            return None
+    
+    def _generate_emotional_awareness_prompt(self, trajectory_data: Dict[str, Any]) -> str:
+        """Generate emotional awareness prompt fragment for CDL integration."""
+        current_emotion = trajectory_data.get('current_emotion', 'neutral')
+        trajectory = trajectory_data.get('trajectory_direction', 'stable')
+        intensity = trajectory_data.get('current_intensity', 0.5)
+        
+        if trajectory == "intensifying":
+            return f"You've been feeling increasingly {current_emotion} (intensity: {intensity:.1f})"
+        elif trajectory == "calming":
+            return f"Your {current_emotion} feelings have been settling (intensity: {intensity:.1f})"
+        else:
+            return f"You're feeling {current_emotion} with stable emotions (intensity: {intensity:.1f})"
 
     async def _analyze_dynamic_personality(self, user_id: str, content: str, message_context: MessageContext) -> Optional[Dict[str, Any]]:
         """Analyze dynamic personality if profiler is available."""

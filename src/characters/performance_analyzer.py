@@ -18,7 +18,7 @@ maintaining character authenticity and consistency.
 import logging
 from typing import Dict, List, Optional, Any
 from datetime import datetime
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass
 from enum import Enum
 
 logger = logging.getLogger(__name__)
@@ -114,11 +114,13 @@ class CharacterPerformanceAnalyzer:
                  memory_effectiveness_analyzer=None, 
                  relationship_evolution_engine=None,
                  cdl_parser=None,
+                 cdl_database_manager=None,
                  postgres_pool=None):
         self.trend_analyzer = trend_analyzer
         self.memory_effectiveness_analyzer = memory_effectiveness_analyzer
         self.relationship_evolution_engine = relationship_evolution_engine
         self.cdl_parser = cdl_parser
+        self.cdl_database_manager = cdl_database_manager
         self.postgres_pool = postgres_pool
         self.logger = logging.getLogger(__name__)
         
@@ -541,22 +543,18 @@ class CharacterPerformanceAnalyzer:
             return []
     
     async def _load_character_cdl_data(self, bot_name: str) -> Optional[Dict[str, Any]]:
-        """Load character CDL data for analysis"""
+        """Load character CDL data for analysis from database"""
         try:
-            if not self.cdl_parser:
-                self.logger.warning("CDL parser not available")
+            if not self.cdl_database_manager:
+                self.logger.warning("CDL database manager not available")
                 return None
             
-            # Construct character file path
-            character_file = f"characters/examples/{bot_name.lower()}.json"
+            # Load character data from PostgreSQL database
+            character_data = await self.cdl_database_manager.get_character_by_name(bot_name.lower())
             
-            # Load character data
-            character = await self.cdl_parser.parse_file(character_file)
+            return character_data if character_data else None
             
-            # Convert to dictionary for analysis
-            return asdict(character) if character else None
-            
-        except (ValueError, TypeError, FileNotFoundError) as e:
+        except (ValueError, TypeError, AttributeError) as e:
             self.logger.error("Error loading CDL data for %s: %s", bot_name, e)
             return None
     
@@ -590,6 +588,7 @@ def create_character_performance_analyzer(trend_analyzer=None,
                                         memory_effectiveness_analyzer=None,
                                         relationship_evolution_engine=None,
                                         cdl_parser=None,
+                                        cdl_database_manager=None,
                                         postgres_pool=None) -> CharacterPerformanceAnalyzer:
     """
     Factory function to create a CharacterPerformanceAnalyzer with proper dependencies.
@@ -598,7 +597,8 @@ def create_character_performance_analyzer(trend_analyzer=None,
         trend_analyzer: Sprint 1 TrendWise analyzer
         memory_effectiveness_analyzer: Sprint 2 MemoryBoost analyzer  
         relationship_evolution_engine: Sprint 3 RelationshipTuner engine
-        cdl_parser: CDL system parser
+        cdl_parser: CDL system parser (legacy)
+        cdl_database_manager: CDL database manager (primary)
         postgres_pool: Database connection pool
         
     Returns:
@@ -609,5 +609,6 @@ def create_character_performance_analyzer(trend_analyzer=None,
         memory_effectiveness_analyzer=memory_effectiveness_analyzer,
         relationship_evolution_engine=relationship_evolution_engine,
         cdl_parser=cdl_parser,
+        cdl_database_manager=cdl_database_manager,
         postgres_pool=postgres_pool
     )

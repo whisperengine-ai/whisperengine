@@ -100,12 +100,28 @@ class EnhancedHealthServer:
 
     def _make_json_serializable(self, obj):
         """Convert objects to JSON-serializable format"""
+        from enum import Enum
+        from datetime import datetime, date
+        from decimal import Decimal
+        
         if isinstance(obj, ContextSwitch):
             return obj.to_dict()
+        elif isinstance(obj, Enum):
+            # Handle all Enum types (including EngagementStrategy)
+            return obj.value
+        elif isinstance(obj, (datetime, date)):
+            # Handle datetime objects
+            return obj.isoformat()
+        elif isinstance(obj, Decimal):
+            # Handle Decimal objects
+            return float(obj)
         elif isinstance(obj, dict):
             return {k: self._make_json_serializable(v) for k, v in obj.items()}
         elif isinstance(obj, list):
             return [self._make_json_serializable(item) for item in obj]
+        elif hasattr(obj, 'to_dict') and callable(getattr(obj, 'to_dict')):
+            # Handle objects with to_dict method
+            return obj.to_dict()
         else:
             return obj
 
