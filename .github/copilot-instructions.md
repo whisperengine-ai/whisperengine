@@ -453,7 +453,8 @@ python tests/automated/test_[feature]_direct_validation.py
 1. **FIRST**: Direct Python validation for feature logic and AI components
 2. **SECOND**: HTTP testing for integration validation  
 3. **THIRD**: Discord testing for user-facing features
-4. **USE**: `./multi-bot.sh logs [bot]` and `docker logs whisperengine-[bot]-bot` for debugging
+4. **CRITICAL**: Always validate end-to-end prompt engineering via `logs/prompts/*` files when testing new features
+5. **USE**: `./multi-bot.sh logs [bot]` and `docker logs whisperengine-[bot]-bot` for debugging
 
 ### Web Interface Development
 
@@ -537,6 +538,7 @@ cat logs/prompts/Elena_20251004_205238_672814231002939413.json   # Full prompt +
 3. **🎭 Validate character integration** - Check CDL system prompt enhancement
 4. **⚠️ Look for recursive patterns** - Check for LLM failure indicators in responses
 5. **🔄 Compare multiple conversations** - Pattern analysis across different users/sessions
+6. **🚨 CRITICAL: VALIDATE END-TO-END PROMPT ENGINEERING** - When testing new features, ALWAYS check `logs/prompts/*` files to confirm features are properly integrated into the system prompt and producing expected LLM prompt injection
 
 **Environment Validation**: Critical for troubleshooting setup issues:
 ```bash

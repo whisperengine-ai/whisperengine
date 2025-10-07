@@ -10,16 +10,17 @@ from zoneinfo import ZoneInfo
 from typing import Dict, Optional
 from pathlib import Path
 
-from src.characters.cdl.parser import Character, load_character
+from src.characters.cdl.parser import Character
 from src.characters.cdl.manager import get_cdl_manager, get_cdl_field, get_conversation_flow_guidelines
 
 logger = logging.getLogger(__name__)
 
 class CDLAIPromptIntegration:
-    def __init__(self, vector_memory_manager=None, llm_client=None, knowledge_router=None):
+    def __init__(self, vector_memory_manager=None, llm_client=None, knowledge_router=None, bot_core=None):
         self.memory_manager = vector_memory_manager
         self.llm_client = llm_client
         self.knowledge_router = knowledge_router
+        self.bot_core = bot_core  # Store bot_core for personality profiler access
         
         # Initialize the optimized prompt builder for size management
         from src.prompts.optimized_prompt_builder import create_optimized_prompt_builder
@@ -207,45 +208,118 @@ class CDLAIPromptIntegration:
         time_context = get_current_time_context()
         prompt += f"\n\nCURRENT DATE & TIME: {time_context}\n\n"
         
+        # 🧠 USER PERSONALITY & FACTS INTEGRATION - NEW!
+        try:
+            user_context = await self._build_user_context_section(user_id, display_name)
+            if user_context:
+                prompt += f"\n\n{user_context}"
+        except Exception as e:
+            logger.debug("Could not extract user personality/facts context: %s", e)
+        
         # 🎯 RESPONSE STYLE: Add behavioral guidelines AFTER identity is established
         response_style = self._extract_cdl_response_style(character, display_name)
         if response_style:
             prompt += response_style + "\n\n"
         
-        # Add Big Five personality integration
+        # Add Big Five personality integration with Sprint 4 CharacterEvolution optimization
         if hasattr(character, 'personality') and hasattr(character.personality, 'big_five'):
             big_five = character.personality.big_five
             prompt += f"\n\n🧬 PERSONALITY PROFILE:\n"
             
-            # Helper function to get trait description (handles both float and object formats)
-            def get_trait_info(trait_obj, trait_name):
+            # 🎯 SPRINT 4: Extract CharacterEvolution optimization data from pipeline
+            character_optimization = None
+            try:
+                if pipeline_dict and 'ai_components' in pipeline_dict:
+                    ai_components = pipeline_dict['ai_components']
+                    # Check for character_optimization (actual field name used in message processor)
+                    if isinstance(ai_components, dict) and 'character_optimization' in ai_components:
+                        character_optimization = ai_components['character_optimization']
+                        logger.info(f"🎭 CHARACTER: Found Sprint 4 optimization data: {character_optimization}")
+                    # Also check for character_evolution (legacy/alternative field name)
+                    elif isinstance(ai_components, dict) and 'character_evolution' in ai_components:
+                        character_optimization = ai_components['character_evolution']
+                        logger.info(f"🎭 CHARACTER: Found Sprint 4 evolution data: {character_optimization}")
+                    else:
+                        logger.info(f"🎭 CHARACTER: No character_optimization found in ai_components: {list(ai_components.keys()) if ai_components else 'None'}")
+                else:
+                    logger.info(f"🎭 CHARACTER: No ai_components in pipeline_dict: {list(pipeline_dict.keys()) if pipeline_dict else 'None'}")
+            except Exception as e:
+                logger.info(f"🎭 CHARACTER: Could not extract optimization data: {e}")
+            
+            # Helper function to get adaptive trait description with Sprint 4 optimization
+            def get_adaptive_trait_info(trait_obj, trait_name):
+                # Get base CDL trait value
+                base_score = None
+                base_description = ""
+                
                 if hasattr(trait_obj, 'trait_description'):
                     # New object format
-                    return f"{trait_obj.trait_description} (Score: {trait_obj.score if hasattr(trait_obj, 'score') else 'N/A'})"
+                    base_description = trait_obj.trait_description
+                    base_score = trait_obj.score if hasattr(trait_obj, 'score') else None
                 elif isinstance(trait_obj, (float, int)):
                     # Legacy float format
-                    score = trait_obj
-                    trait_descriptions = {
-                        'openness': f"Openness to experience: {'High' if score > 0.7 else 'Moderate' if score > 0.4 else 'Low'} ({score})",
-                        'conscientiousness': f"Conscientiousness: {'High' if score > 0.7 else 'Moderate' if score > 0.4 else 'Low'} ({score})", 
-                        'extraversion': f"Extraversion: {'High' if score > 0.7 else 'Moderate' if score > 0.4 else 'Low'} ({score})",
-                        'agreeableness': f"Agreeableness: {'High' if score > 0.7 else 'Moderate' if score > 0.4 else 'Low'} ({score})",
-                        'neuroticism': f"Neuroticism: {'High' if score > 0.7 else 'Moderate' if score > 0.4 else 'Low'} ({score})"
+                    base_score = trait_obj
+                    level = 'High' if base_score > 0.7 else 'Moderate' if base_score > 0.4 else 'Low'
+                    trait_map = {
+                        'openness': 'Openness to experience',
+                        'conscientiousness': 'Conscientiousness',
+                        'extraversion': 'Extraversion', 
+                        'agreeableness': 'Agreeableness',
+                        'neuroticism': 'Neuroticism'
                     }
-                    return trait_descriptions.get(trait_name, f"{trait_name}: {score}")
+                    trait_label = trait_map.get(trait_name, trait_name.title())
+                    base_description = f"{trait_label}: {level}"
+                
+                # 🎯 SPRINT 4: Apply optimization adjustments if available
+                if character_optimization and isinstance(character_optimization, dict):
+                    # Check for direct personality_optimizations field
+                    optimizations = character_optimization.get('personality_optimizations', {})
+                    
+                    # If no direct optimizations, generate from optimization_opportunities
+                    if not optimizations and 'optimization_opportunities' in character_optimization:
+                        opportunities = character_optimization.get('optimization_opportunities', [])
+                        for opp in opportunities:
+                            if opp.get('category') == 'educational_approach' and 'affected_traits' in opp:
+                                # Convert educational traits to personality adjustments
+                                affected_traits = opp.get('affected_traits', [])
+                                if 'teaching_patience' in affected_traits:
+                                    optimizations['conscientiousness'] = 0.05  # More patient = higher conscientiousness
+                                if 'explanation_style' in affected_traits or 'metaphor_usage' in affected_traits:
+                                    optimizations['openness'] = 0.03  # Better explanations = higher openness
+                    
+                    if trait_name in optimizations and base_score is not None:
+                        adjustment = optimizations[trait_name]
+                        adjusted_score = base_score + adjustment
+                        
+                        # Apply Sprint 4 constraint: max 15% trait boundary adjustment
+                        max_adjustment = 0.15
+                        if abs(adjustment) <= max_adjustment:
+                            # Show adaptive personality with optimization
+                            direction = "↗" if adjustment > 0 else "↘" if adjustment < 0 else "→"
+                            adaptation_reason = character_optimization.get('adaptation_reasoning', 'improved conversation effectiveness')
+                            return f"{base_description} ({base_score:.1f} {direction} {adjusted_score:.2f}) - Adapted for {adaptation_reason}"
+                        else:
+                            # Constraint exceeded - show warning but apply capped adjustment
+                            capped_adjustment = max_adjustment if adjustment > 0 else -max_adjustment
+                            capped_score = base_score + capped_adjustment
+                            return f"{base_description} ({base_score:.1f} → {capped_score:.2f}) - Optimization capped at 15% boundary"
+                
+                # No optimization available - show static CDL trait
+                if base_score is not None:
+                    return f"{base_description} ({base_score})"
                 else:
-                    return f"{trait_name}: Unknown format"
+                    return base_description or f"{trait_name}: Unknown format"
             
             if hasattr(big_five, 'openness'):
-                prompt += f"- {get_trait_info(big_five.openness, 'openness')}\n"
+                prompt += f"- {get_adaptive_trait_info(big_five.openness, 'openness')}\n"
             if hasattr(big_five, 'conscientiousness'):
-                prompt += f"- {get_trait_info(big_five.conscientiousness, 'conscientiousness')}\n"
+                prompt += f"- {get_adaptive_trait_info(big_five.conscientiousness, 'conscientiousness')}\n"
             if hasattr(big_five, 'extraversion'):
-                prompt += f"- {get_trait_info(big_five.extraversion, 'extraversion')}\n"
+                prompt += f"- {get_adaptive_trait_info(big_five.extraversion, 'extraversion')}\n"
             if hasattr(big_five, 'agreeableness'):
-                prompt += f"- {get_trait_info(big_five.agreeableness, 'agreeableness')}\n"
+                prompt += f"- {get_adaptive_trait_info(big_five.agreeableness, 'agreeableness')}\n"
             if hasattr(big_five, 'neuroticism'):
-                prompt += f"- {get_trait_info(big_five.neuroticism, 'neuroticism')}\n"
+                prompt += f"- {get_adaptive_trait_info(big_five.neuroticism, 'neuroticism')}\n"
 
         # Add CDL conversation flow guidelines early for communication style establishment
         try:
@@ -570,6 +644,37 @@ class CDLAIPromptIntegration:
                         guidance_parts.append(
                             f"📊 CONFIDENCE: {conf_guidance} "
                             f"(Overall: {overall_conf:.2f}, Context: {context_conf:.2f})"
+                        )
+                    
+                    # 🎭 SPRINT 4: CHARACTER PERFORMANCE INTELLIGENCE
+                    # Adaptive character optimization based on conversation effectiveness
+                    character_performance = comprehensive_context.get('character_performance_intelligence')
+                    if character_performance and isinstance(character_performance, dict):
+                        performance_status = character_performance.get('performance_status', 'unknown')
+                        overall_score = character_performance.get('overall_score', 0.5)
+                        optimization_opportunities = character_performance.get('optimization_opportunities', [])
+                        
+                        # Build character optimization guidance
+                        if performance_status == 'excellent':
+                            perf_guidance = "Your character performance is excellent - maintain your current approach"
+                        elif performance_status == 'good':
+                            perf_guidance = "Your character performance is good - continue with minor refinements"
+                        elif performance_status == 'fair':
+                            perf_guidance = "Your character performance needs attention - focus on improvement areas"
+                        elif performance_status == 'needs_improvement':
+                            perf_guidance = "Your character performance needs significant improvement - adapt your approach"
+                        else:
+                            perf_guidance = "Character performance analysis in progress"
+                        
+                        # Add specific optimization opportunities
+                        if optimization_opportunities:
+                            top_opportunities = optimization_opportunities[:2]  # Use top 2 opportunities
+                            optimization_text = ", ".join([opp.get('recommendation', 'optimize approach') for opp in top_opportunities])
+                            perf_guidance += f". Focus on: {optimization_text}"
+                        
+                        guidance_parts.append(
+                            f"🎭 CHARACTER: {perf_guidance} "
+                            f"(Performance Score: {overall_score:.2f}, Status: {performance_status})"
                         )
                     
                     if guidance_parts:
@@ -1268,23 +1373,141 @@ I could help you plan the perfect evening or we could have a virtual dinner chat
 
 🚨 CRITICAL: After this interaction, immediately return to your normal {character.identity.name} personality and warmth."""
 
-
-async def load_character_definitions(characters_dir: str = "characters") -> Dict[str, Character]:
-    """Load all character definitions from directory."""
-    characters = {}
-    characters_path = Path(characters_dir)
-
-    if not characters_path.exists():
-        logger.warning("Characters directory not found: %s", characters_dir)
-        return characters
-
-    for file_path in characters_path.rglob("*.json"):
+    async def _build_user_context_section(self, user_id: str, display_name: str) -> str:
+        """
+        Build user context section combining personality profile and personal facts.
+        
+        Integrates:
+        - DynamicPersonalityProfiler data (Big Five traits, communication style)
+        - PostgreSQL stored facts and preferences
+        - User conversation patterns and preferences
+        
+        Returns formatted context for character response adaptation.
+        """
         try:
-            character_name = file_path.stem
-            character = load_character(file_path)
-            characters[character_name] = character
-            logger.info("Loaded character: %s", character_name)
+            context_parts = []
+            
+            # 1. Get user personality profile from DynamicPersonalityProfiler
+            personality_context = await self._get_user_personality_context(user_id)
+            if personality_context:
+                context_parts.append(personality_context)
+            
+            # 2. Get user facts and preferences from PostgreSQL
+            facts_context = await self._get_user_facts_context(user_id, display_name)
+            if facts_context:
+                context_parts.append(facts_context)
+            
+            if context_parts:
+                return f"👤 USER CONTEXT:\n" + "\n".join(context_parts)
+            
+            return ""
+            
         except Exception as e:
-            logger.error("Failed to load character from %s: %s", file_path, e)
-
-    return characters
+            logger.debug("Failed to build user context section: %s", e)
+            return ""
+    
+    async def _get_user_personality_context(self, user_id: str) -> str:
+        """Get user personality context from DynamicPersonalityProfiler."""
+        try:
+            # Try to access personality profiler from bot_core if available
+            if (self.bot_core and 
+                hasattr(self.bot_core, 'dynamic_personality_profiler')):
+                profiler = self.bot_core.dynamic_personality_profiler
+                
+                if profiler and hasattr(profiler, 'profiles') and user_id in profiler.profiles:
+                    profile = profiler.profiles[user_id]
+                    
+                    personality_parts = []
+                    
+                    # Add communication style
+                    if hasattr(profile, 'traits'):
+                        personality_parts.append(f"Communication Style: Adaptive to user preferences")
+                    
+                    # Add relationship depth
+                    if hasattr(profile, 'relationship_depth'):
+                        depth = profile.relationship_depth
+                        if depth > 0.8:
+                            personality_parts.append("Relationship Level: Close connection")
+                        elif depth > 0.5:
+                            personality_parts.append("Relationship Level: Growing relationship")
+                        else:
+                            personality_parts.append("Relationship Level: New connection")
+                    
+                    # Add trust level
+                    if hasattr(profile, 'trust_level'):
+                        trust = profile.trust_level
+                        if trust > 0.7:
+                            personality_parts.append("Trust Level: High trust established")
+                        elif trust > 0.4:
+                            personality_parts.append("Trust Level: Building trust")
+                        else:
+                            personality_parts.append("Trust Level: Establishing rapport")
+                    
+                    if personality_parts:
+                        return "🧠 User Personality: " + ", ".join(personality_parts)
+            
+            return ""
+            
+        except Exception as e:
+            logger.debug("Failed to get user personality context: %s", e)
+            return ""
+    
+    async def _get_user_facts_context(self, user_id: str, display_name: str) -> str:
+        """Get user facts and preferences from PostgreSQL."""
+        try:
+            if not self.knowledge_router:
+                return ""
+            
+            # Get structured facts from PostgreSQL
+            facts = await self.knowledge_router.get_character_aware_facts(
+                user_id=user_id,
+                character_name="elena",  # Default character for now
+                limit=10
+            )
+            
+            # Get user preferences from PostgreSQL
+            preferences = await self.knowledge_router.get_all_user_preferences(
+                user_id=user_id
+            )
+            
+            fact_parts = []
+            
+            # Format preferences (like preferred name)
+            if preferences:
+                for pref_key, pref_data in preferences.items():
+                    if isinstance(pref_data, dict):
+                        pref_value = pref_data.get('value', '')
+                        confidence = pref_data.get('confidence', 0.0)
+                        
+                        if confidence >= 0.7 and pref_value:
+                            if pref_key == "preferred_name":
+                                fact_parts.append(f"Prefers to be called: {pref_value}")
+                            else:
+                                fact_parts.append(f"{pref_key.replace('_', ' ').title()}: {pref_value}")
+            
+            # Format key facts (likes, interests, etc.)
+            if facts:
+                likes = []
+                interests = []
+                for fact in facts[:5]:  # Limit to top 5 facts
+                    if 'likes' in fact or 'enjoys' in fact:
+                        # Extract entity name from formatted fact "[pizza (likes)]"
+                        entity = fact.replace('[', '').replace(']', '').split(' (')[0]
+                        likes.append(entity)
+                    elif 'interested' in fact or 'hobby' in fact:
+                        entity = fact.replace('[', '').replace(']', '').split(' (')[0]
+                        interests.append(entity)
+                
+                if likes:
+                    fact_parts.append(f"Likes: {', '.join(likes)}")
+                if interests:
+                    fact_parts.append(f"Interests: {', '.join(interests)}")
+            
+            if fact_parts:
+                return "📋 Known Facts: " + "; ".join(fact_parts)
+            
+            return ""
+            
+        except Exception as e:
+            logger.debug("Failed to get user facts context: %s", e)
+            return ""

@@ -134,6 +134,36 @@ class MessageProcessor:
         self.trust_recovery = None
         self._sprint3_init_attempted = False  # Track if we've tried initializing
         
+        # Sprint 6 IntelligenceOrchestrator: Initialize unified learning coordination
+        self.learning_orchestrator = None
+        self.predictive_engine = None
+        self.learning_pipeline = None
+        
+        if self.temporal_intelligence_enabled and self.temporal_client:
+            try:
+                from src.orchestration.learning_orchestrator import LearningOrchestrator
+                from src.adaptation.predictive_engine import PredictiveAdaptationEngine
+                from src.pipeline.learning_manager import LearningPipelineManager
+                
+                # Initialize Sprint 6 components with available Sprint 1-5 dependencies
+                self.learning_orchestrator = LearningOrchestrator(
+                    trend_analyzer=self.trend_analyzer,
+                    confidence_adapter=self.confidence_adapter,
+                    memory_manager=self.memory_manager,
+                    temporal_client=self.temporal_client,
+                    postgres_pool=getattr(bot_core, 'postgres_pool', None) if bot_core else None
+                )
+                
+                self.predictive_engine = PredictiveAdaptationEngine()
+                self.learning_pipeline = LearningPipelineManager()
+                
+                logger.info("Sprint 6 IntelligenceOrchestrator: Learning coordination components initialized")
+            except ImportError as e:
+                logger.warning("Sprint 6 IntelligenceOrchestrator components not available: %s", e)
+                self.learning_orchestrator = None
+                self.predictive_engine = None
+                self.learning_pipeline = None
+        
         # Shared emotion analyzer for preventing RoBERTa race conditions
         self._shared_emotion_analyzer = None
         self._shared_analyzer_lock = asyncio.Lock()
@@ -256,6 +286,11 @@ class MessageProcessor:
             # Phase 9c: User preference extraction and storage (PostgreSQL)
             preference_stored = await self._extract_and_store_user_preferences(
                 message_context
+            )
+            
+            # Phase 10: Sprint 6 IntelligenceOrchestrator - Unified Learning Coordination
+            await self._coordinate_sprint6_learning(
+                message_context, ai_components, relevant_memories, response
             )
             
             # Calculate processing time
@@ -3425,7 +3460,8 @@ class MessageProcessor:
                 cdl_integration = CDLAIPromptIntegration(
                     vector_memory_manager=self.memory_manager,
                     llm_client=self.llm_client,
-                    knowledge_router=knowledge_router
+                    knowledge_router=knowledge_router,
+                    bot_core=self.bot_core  # Pass bot_core for personality profiler access
                 )
                 logger.warning("⚠️ CDL: Using fallback CDL instance for %s - character system not initialized", user_id)
             
@@ -4309,6 +4345,117 @@ class MessageProcessor:
         }
         
         return metadata
+
+    async def _coordinate_sprint6_learning(
+        self, 
+        message_context: MessageContext, 
+        ai_components: Dict[str, Any], 
+        relevant_memories: List[Dict[str, Any]], 
+        response: str
+    ):
+        """
+        🎯 SPRINT 6: IntelligenceOrchestrator coordination and learning pipeline management.
+        
+        Coordinates all learning components from Sprints 1-5 and manages predictive adaptation:
+        - Learning health monitoring across all components
+        - Predictive adaptation based on user patterns
+        - Learning pipeline task scheduling and execution
+        - Cross-sprint intelligence correlation
+        """
+        if not self.learning_orchestrator:
+            logger.debug("Sprint 6: IntelligenceOrchestrator not available")
+            return
+        
+        try:
+            bot_name = get_normalized_bot_name_from_env()
+            
+            # 1. Predictive Adaptation - Analyze patterns and predict user needs
+            if self.predictive_engine:
+                try:
+                    predictions = await self.predictive_engine.predict_user_needs(
+                        user_id=message_context.user_id,
+                        bot_name=bot_name,
+                        prediction_horizon_hours=24
+                    )
+                    
+                    if predictions:
+                        logger.info("🔮 PREDICTIVE: Generated %d predictions for user %s", 
+                                   len(predictions), message_context.user_id)
+                        
+                        # Record predictions in ai_components for potential CDL integration
+                        ai_components['sprint6_predictions'] = {
+                            'prediction_count': len(predictions),
+                            'prediction_types': [p.prediction_type.value for p in predictions[:3]],  # Top 3
+                            'confidence_average': len(predictions)  # Simple count for now
+                        }
+                except Exception as e:
+                    logger.warning("Sprint 6 predictive adaptation failed: %s", str(e))
+            
+            # 2. Learning Health Monitoring (periodic - every 10th message)
+            # Use hash of user_id to determine if this should trigger health monitoring
+            if hash(message_context.user_id) % 10 == 0:
+                try:
+                    health_report = await self.learning_orchestrator.monitor_learning_health(bot_name)
+                    
+                    # Log health status for monitoring
+                    logger.info("🏥 LEARNING HEALTH: Overall: %s, Performance: %.3f, Components: %d/%d healthy", 
+                               health_report.overall_health.value,
+                               health_report.system_performance_score,
+                               len([s for s in health_report.component_statuses if s.status.value == 'healthy']),
+                               len(health_report.component_statuses))
+                    
+                    # Store health metrics in ai_components
+                    ai_components['sprint6_health'] = {
+                        'overall_health': health_report.overall_health.value,
+                        'system_performance': health_report.system_performance_score,
+                        'healthy_components': len([s for s in health_report.component_statuses if s.status.value == 'healthy']),
+                        'total_components': len(health_report.component_statuses)
+                    }
+                except Exception as e:
+                    logger.warning("Sprint 6 learning health monitoring failed: %s", str(e))
+            
+            # 3. Learning Pipeline Coordination (background task - don't block message processing)
+            if self.learning_pipeline:
+                try:
+                    # Schedule learning cycle in background (every 50th message per user)
+                    if hash(message_context.user_id) % 50 == 0:
+                        cycle_name = f"Adaptive Learning Cycle - {bot_name} - {datetime.now().strftime('%H:%M')}"
+                        asyncio.create_task(
+                            self.learning_pipeline.schedule_learning_cycle(
+                                name=cycle_name,
+                                delay_seconds=30  # Small delay to not interfere with current message
+                            )
+                        )
+                        logger.info("🔄 LEARNING PIPELINE: Scheduled adaptive learning cycle for %s", bot_name)
+                except Exception as e:
+                    logger.warning("Sprint 6 learning pipeline coordination failed: %s", str(e))
+            
+            # 4. Record Sprint 6 metrics to InfluxDB (if available)
+            if self.temporal_client and hasattr(self.temporal_client, 'record_point'):
+                try:
+                    await self.temporal_client.record_point(
+                        measurement="sprint6_intelligence_orchestrator",
+                        tags={
+                            "bot_name": bot_name,
+                            "user_id": message_context.user_id,
+                            "platform": message_context.platform
+                        },
+                        fields={
+                            "predictions_generated": len(ai_components.get('sprint6_predictions', {}).get('prediction_types', [])),
+                            "health_monitoring_triggered": bool(ai_components.get('sprint6_health')),
+                            "learning_orchestrator_available": bool(self.learning_orchestrator),
+                            "predictive_engine_available": bool(self.predictive_engine),
+                            "learning_pipeline_available": bool(self.learning_pipeline),
+                            "system_performance": ai_components.get('sprint6_health', {}).get('system_performance', 0.0),
+                            "healthy_components": ai_components.get('sprint6_health', {}).get('healthy_components', 0)
+                        },
+                        timestamp=datetime.utcnow()
+                    )
+                except Exception as e:
+                    logger.warning("Sprint 6 InfluxDB metrics recording failed: %s", str(e))
+                    
+        except Exception as e:
+            logger.error("Sprint 6 IntelligenceOrchestrator coordination failed: %s", str(e))
 
 
 def create_message_processor(bot_core, memory_manager, llm_client, **kwargs) -> MessageProcessor:
