@@ -1834,6 +1834,15 @@ class MessageProcessor:
             tasks.append(memory_aging_task)
             task_names.append("memory_aging_intelligence")
             
+            # Task 1.9: Character Performance Intelligence
+            character_performance_task = self._analyze_character_performance_intelligence(
+                message_context.user_id,
+                message_context,
+                conversation_context
+            )
+            tasks.append(character_performance_task)
+            task_names.append("character_performance_intelligence")
+            
             # Task 2: Enhanced context analysis using hybrid detector
             context_task = self._analyze_enhanced_context(
                 message_context.content,
@@ -1978,6 +1987,22 @@ class MessageProcessor:
                            memory_aging.get('health_status', 'unknown'),
                            memory_aging.get('total_memories', 0),
                            memory_aging.get('flagged_ratio', 0) * 100)
+            
+            # Character Performance Intelligence integration
+            character_performance = ai_components.get('character_performance_intelligence')
+            if character_performance:
+                # Add character optimization insights for conversation enhancement
+                ai_components['character_optimization'] = {
+                    'performance_status': character_performance.get('performance_status', 'unknown'),
+                    'overall_score': character_performance.get('overall_score', 0.5),
+                    'optimization_opportunities': character_performance.get('optimization_opportunities', []),
+                    'trait_correlations': character_performance.get('trait_correlations', {}),
+                    'needs_optimization': character_performance.get('performance_status') in ['fair', 'needs_improvement']
+                }
+                logger.info("🎭 Added character performance intelligence: %s performance (%.3f score, %d opportunities)",
+                           character_performance.get('performance_status', 'unknown'),
+                           character_performance.get('overall_score', 0.5),
+                           len(character_performance.get('optimization_opportunities', [])))
             
             # Build comprehensive context from all AI components
             comprehensive_context = {}
@@ -2558,6 +2583,93 @@ class MessageProcessor:
                 
         except Exception as e:
             logger.debug("Memory aging intelligence analysis failed: %s", str(e))
+        
+        return None
+
+    async def _analyze_character_performance_intelligence(self, user_id: str, message_context: MessageContext, 
+                                                        conversation_context: List[Dict[str, str]]) -> Optional[Dict[str, Any]]:
+        """
+        Analyze character performance and identify optimization opportunities.
+        
+        Character Performance Intelligence:
+        - Analyzes character effectiveness across Sprint 1-3 metrics
+        - Identifies CDL parameter optimization opportunities
+        - Correlates personality traits with conversation success
+        - Provides data-driven character adaptation insights
+        
+        Args:
+            user_id: User identifier for performance analysis
+            message_context: Context for character-specific analysis
+            conversation_context: Recent conversation history for effectiveness analysis
+            
+        Returns:
+            Dict with character performance analysis and optimization opportunities
+        """
+        try:
+            # Import character performance components
+            from src.characters.performance_analyzer import CharacterPerformanceAnalyzer
+            from src.characters.cdl_optimizer import create_cdl_parameter_optimizer
+            
+            # Get bot name for character-specific analysis
+            bot_name = os.getenv('DISCORD_BOT_NAME', 'unknown')
+            
+            # Initialize performance analyzer
+            performance_analyzer = CharacterPerformanceAnalyzer(
+                postgres_pool=getattr(self.bot_core, 'postgres_pool', None) if self.bot_core else None
+            )
+            
+            # Analyze character effectiveness across Sprint 1-3 metrics
+            effectiveness_analysis = await performance_analyzer.analyze_character_effectiveness(
+                bot_name=bot_name,
+                days_back=14,
+                user_id=user_id  # Optional parameter for user-specific analysis
+            )
+            
+            # Identify optimization opportunities
+            optimization_opportunities = await performance_analyzer.identify_optimization_opportunities(
+                bot_name=bot_name
+            )
+            
+            # Correlate personality traits with conversation outcomes
+            trait_correlations = await performance_analyzer.correlate_personality_traits_with_outcomes(
+                bot_name=bot_name
+            )
+            
+            if effectiveness_analysis:
+                # Calculate overall character performance score from CharacterEffectivenessData
+                overall_score = effectiveness_analysis.overall_effectiveness
+                
+                # Determine character performance status
+                if overall_score >= 0.8:
+                    performance_status = "excellent"
+                elif overall_score >= 0.6:
+                    performance_status = "good"
+                elif overall_score >= 0.4:
+                    performance_status = "fair"
+                else:
+                    performance_status = "needs_improvement"
+                
+                character_performance_data = {
+                    'performance_status': performance_status,
+                    'overall_score': round(overall_score, 3),
+                    'effectiveness_analysis': effectiveness_analysis,
+                    'optimization_opportunities': optimization_opportunities or [],
+                    'trait_correlations': trait_correlations or {},
+                    'bot_name': bot_name,
+                    'analysis_period_days': 14,
+                    'analysis_method': 'character_performance_intelligence'
+                }
+                
+                logger.debug(
+                    "Character performance analysis: %s performance (%.3f overall score, %d opportunities)",
+                    character_performance_data['performance_status'],
+                    character_performance_data['overall_score'],
+                    len(character_performance_data['optimization_opportunities'])
+                )
+                return character_performance_data
+                
+        except Exception as e:
+            logger.debug("Character performance intelligence analysis failed: %s", str(e))
         
         return None
 
