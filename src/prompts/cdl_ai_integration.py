@@ -852,37 +852,29 @@ class CDLAIPromptIntegration:
                     return truncated_prompt
                 return prompt
 
-    async def load_character(self, character_file: str) -> Character:
+    async def load_character(self, character_file: Optional[str] = None) -> Character:
         """
-        Load a character from file with CDL validation.
+        Load a character from database - DATABASE-ONLY approach.
         
-        Uses CDL Manager singleton for caching - loads once, uses everywhere.
+        Uses database CDL Manager for normalized database access.
+        The character_file parameter is kept for compatibility but ignored.
         """
         try:
-            # Use singleton CDL Manager for cached Character object
-            from src.characters.cdl.manager import get_cdl_manager
+            # DATABASE-ONLY: Use normalized database manager
+            from src.characters.cdl.database_manager import get_database_cdl_manager
             
-            logger.info("🔍 CDL: Loading character via singleton manager (cached)")
-            cdl_manager = get_cdl_manager()
+            logger.info("🔍 CDL: Loading character from DATABASE-ONLY (normalized schema)")
+            db_manager = get_database_cdl_manager()
             
-            # Get cached Character object from singleton
-            character = cdl_manager.get_character_object()
-            logger.info("✅ CDL: Using cached character from singleton: %s", character.identity.name)
+            # Get Character object from database
+            character = db_manager.get_character_object()
+            logger.info("✅ CDL: Loaded character from database: %s", character.identity.name)
             
             return character
             
         except Exception as e:
-            logger.error("Failed to load character from singleton: %s", e)
-            logger.warning("⚠️ CDL: Falling back to direct file load")
-            
-            # Fallback to direct load if singleton fails
-            try:
-                character = load_character(character_file)
-                logger.info("✅ CDL: Fallback load successful: %s", character.identity.name)
-                return character
-            except Exception as fallback_error:
-                logger.error("Failed to load character via fallback: %s", fallback_error)
-                raise
+            logger.error("❌ DATABASE-ONLY: Failed to load character from database: %s", e)
+            raise RuntimeError(f"Database-only character loading failed: {e}")
 
     async def _extract_cdl_personal_knowledge_sections(self, character, message_content: str) -> str:
         """Extract relevant personal knowledge sections from CDL based on message context."""

@@ -2649,11 +2649,43 @@ class MessageProcessor:
                 else:
                     performance_status = "needs_improvement"
                 
+                # Convert CharacterEffectivenessData to JSON-serializable dict
+                effectiveness_dict = {
+                    'bot_name': effectiveness_analysis.bot_name,
+                    'analysis_period_days': effectiveness_analysis.analysis_period_days,
+                    'overall_effectiveness': effectiveness_analysis.overall_effectiveness,
+                    'conversation_quality_avg': effectiveness_analysis.conversation_quality_avg,
+                    'confidence_trend_direction': effectiveness_analysis.confidence_trend_direction,
+                    'memory_effectiveness_score': effectiveness_analysis.memory_effectiveness_score,
+                    'relationship_progression_rate': effectiveness_analysis.relationship_progression_rate,
+                    'trust_building_success': effectiveness_analysis.trust_building_success,
+                    'user_engagement_level': effectiveness_analysis.user_engagement_level,
+                    'data_points': effectiveness_analysis.data_points,
+                    'statistical_confidence': effectiveness_analysis.statistical_confidence,
+                    'analysis_timestamp': effectiveness_analysis.analysis_timestamp.isoformat() if effectiveness_analysis.analysis_timestamp else None
+                } if effectiveness_analysis else {}
+                
+                # Convert OptimizationOpportunity objects to JSON-serializable dicts
+                opportunities_dict = []
+                if optimization_opportunities:
+                    for opp in optimization_opportunities:
+                        opportunities_dict.append({
+                            'category': opp.category.value if hasattr(opp.category, 'value') else str(opp.category),
+                            'confidence_score': opp.confidence_score,
+                            'impact_potential': opp.impact_potential,
+                            'current_performance': opp.current_performance,
+                            'target_performance': opp.target_performance,
+                            'affected_traits': opp.affected_traits,
+                            'evidence_metrics': opp.evidence_metrics,
+                            'recommendation': opp.recommendation,
+                            'priority': opp.priority
+                        })
+                
                 character_performance_data = {
                     'performance_status': performance_status,
                     'overall_score': round(overall_score, 3),
-                    'effectiveness_analysis': effectiveness_analysis,
-                    'optimization_opportunities': optimization_opportunities or [],
+                    'effectiveness_analysis': effectiveness_dict,
+                    'optimization_opportunities': opportunities_dict,
                     'trait_correlations': trait_correlations or {},
                     'bot_name': bot_name,
                     'analysis_period_days': 14,

@@ -28,11 +28,11 @@ class EnhancedJSONBCDLManager:
                 logger.debug("🎭 CACHE HIT: Retrieved %s from cache", normalized_name)
                 return self._cache[normalized_name]
             
-            # Query database using materialized view for performance
+            # Query database using characters_v2 table for enhanced JSONB data
             async with self.pool.acquire() as conn:
                 result = await conn.fetchrow("""
-                    SELECT cdl_data, workflow_data, metadata, active_workflows
-                    FROM character_profiles_v2 
+                    SELECT cdl_data, workflow_data, metadata
+                    FROM characters_v2 
                     WHERE normalized_name = $1
                 """, normalized_name)
                 
@@ -44,8 +44,7 @@ class EnhancedJSONBCDLManager:
                 character_data = {
                     'cdl_data': result['cdl_data'],
                     'workflow_data': result['workflow_data'] or {},
-                    'metadata': result['metadata'] or {},
-                    'active_workflows': result['active_workflows'] or []
+                    'metadata': result['metadata'] or {}
                 }
                 
                 # Cache the result

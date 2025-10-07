@@ -25,13 +25,25 @@ class EnhancedJSONBCDLAdapter:
             return
             
         try:
-            # Create PostgreSQL connection pool directly
+            import os
+            
+            # Use environment variables for database connection
+            postgres_host = os.getenv('POSTGRES_HOST', 'localhost')
+            postgres_port = int(os.getenv('POSTGRES_PORT', '5432'))
+            postgres_user = os.getenv('POSTGRES_USER', 'whisperengine')
+            postgres_password = os.getenv('POSTGRES_PASSWORD', 'whisperengine_password')
+            postgres_db = os.getenv('POSTGRES_DB', 'whisperengine')
+            
+            logger.info("Connecting to PostgreSQL: host=%s, port=%s, user=%s, db=%s", 
+                       postgres_host, postgres_port, postgres_user, postgres_db)
+            
+            # Create PostgreSQL connection pool using environment variables
             postgres_pool = await asyncpg.create_pool(
-                host='localhost',
-                port=5433,
-                user='whisperengine',
-                password='whisperengine_pass',
-                database='whisperengine',
+                host=postgres_host,
+                port=postgres_port,
+                user=postgres_user,
+                password=postgres_password,
+                database=postgres_db,
                 min_size=1,
                 max_size=10
             )
