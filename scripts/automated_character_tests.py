@@ -4,7 +4,7 @@ Automated Character Testing Script for WhisperEngine
 Converts manual test plans into automated HTTP API tests using the same infrastructure as smoke tests.
 
 Based on manual test plans for Dream, Marcus, Sophia, and Gabriel characters.
-Tests character personality, domain expertise, and 7D vector memory integration.
+Tests character personality, domain expertise, and 3D vector memory integration.
 """
 
 import asyncio

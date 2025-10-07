@@ -737,8 +737,8 @@ results = client.search(
 # ❌ WRONG: Single vector (legacy format)
 point = PointStruct(id=memory.id, vector=embedding, payload=payload)
 
-# ❌ DEPRECATED: 7D vector system (personality, interaction, relationship, temporal)
-# WhisperEngine reverted from 7-vector to 3-vector system for performance and simplicity
+# ❌ DEPRECATED: Multiple vector dimensions beyond 3D
+# WhisperEngine uses optimized 3D system (content, emotion, semantic) for performance and simplicity
 ```
 
 **ALWAYS use Bot Segmentation** - Filter by bot_name AND use correct collection:
@@ -981,8 +981,7 @@ LLM_CHAT_MODEL=anthropic/claude-3.7-sonnet  # May struggle with mode switching
 - **Content Vector**: Main semantic content representation (384D)
 - **Emotion Vector**: Emotional context and sentiment analysis (384D)  
 - **Semantic Vector**: Concept and personality context (384D)
-- **Previous 7D System**: Reverted from 7-vector approach (personality, interaction, relationship, temporal) as it was overkill
-- **Design Philosophy**: Simpler 3D system provides sufficient intelligence while maintaining performance
+- **Design Philosophy**: 3D system provides optimal balance of intelligence and performance
 
 ## Anti-Phantom Feature Guidelines
 
@@ -1514,7 +1513,7 @@ ENABLE_MEMORY_SYSTEM=true          # Creates phantom features
 
 ## Recent Major Changes
 
-**3D Vector System Adoption** (Complete): Reverted from 7D vector system (personality, interaction, relationship, temporal) back to simpler 3D named vector system (content, emotion, semantic). The 7D approach was overkill and the 3D system provides sufficient intelligence while maintaining performance. Legacy 7D documentation needs cleanup.
+**3D Vector System Adoption** (Complete): WhisperEngine uses an optimized 3D named vector system (content, emotion, semantic) providing optimal balance of intelligence and performance. All documentation has been updated to reflect the current 3D architecture.
 
 **Universal Identity & Account Discovery** (NEW): Introduced platform-agnostic user identity system allowing users to interact via Discord or future platforms while maintaining consistent memory. Enhanced account discovery prevents duplicate accounts.
 

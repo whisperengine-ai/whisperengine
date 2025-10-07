@@ -78,10 +78,10 @@ def validate_vector_format():
                     if missing:
                         print(f"     ⚠️  Missing expected vectors: {', '.join(missing)}")
                     
-                    has_7d = bool(set(vector_names) & optional_vectors)
-                    if has_7d:
-                        present_7d = set(vector_names) & optional_vectors
-                        print(f"     🎯 7D vectors present: {', '.join(present_7d)}")
+                    has_enhanced = bool(set(vector_names) & optional_vectors)
+                    if has_enhanced:
+                        present_enhanced = set(vector_names) & optional_vectors
+                        print(f"     🎯 Enhanced vectors present: {', '.join(present_enhanced)}")
                     
                     compatible.append(collection_name)
                     

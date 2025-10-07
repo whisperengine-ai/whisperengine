@@ -8,7 +8,7 @@ WhisperEngine now supports automated character testing through HTTP chat APIs on
 
 - **Character Personality**: Responses match expected personality traits
 - **Domain Expertise**: Characters demonstrate knowledge in their professional areas  
-- **7D Vector Memory**: Integration with enhanced memory system
+- **3D Vector Memory**: Integration with enhanced memory system
 - **Response Quality**: Appropriate response length and engagement
 - **API Functionality**: Health checks and chat endpoints working correctly
 
