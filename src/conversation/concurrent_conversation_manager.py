@@ -126,7 +126,6 @@ class ConcurrentConversationManager:
 
     def __init__(
         self,
-        advanced_thread_manager=None,
         memory_batcher=None,
         emotion_engine=None,
         max_concurrent_sessions: int = 1000,
@@ -139,7 +138,6 @@ class ConcurrentConversationManager:
         Initialize concurrent conversation manager
 
         Args:
-            advanced_thread_manager: Advanced thread manager instance
             memory_batcher: Memory batching system
             emotion_engine: Emotion processing engine
             max_concurrent_sessions: Maximum concurrent conversation sessions
@@ -147,7 +145,6 @@ class ConcurrentConversationManager:
             session_keepalive_minutes: Keepalive timeout - session expires if no activity
             max_workers_threads: Thread pool size for I/O operations (auto-detected if None)
             max_workers_processes: Process pool size for CPU operations (auto-detected if None)
-            session_timeout_minutes: Session timeout in minutes
         """
         import os
         
@@ -160,7 +157,6 @@ class ConcurrentConversationManager:
         if max_workers_processes is None:
             max_workers_processes = min(int(os.getenv("MAX_WORKER_PROCESSES", cpu_count)), 8)
             
-        self.advanced_thread_manager = advanced_thread_manager
         self.memory_batcher = memory_batcher
         self.emotion_engine = emotion_engine
 
@@ -301,17 +297,12 @@ class ConcurrentConversationManager:
             if cached_context:
                 task_data["context"].update(cached_context)
 
-            # Process through thread manager if available
-            if self.advanced_thread_manager:
-                thread_result = await self.advanced_thread_manager.process_user_message(
-                    task_data["user_id"], task_data["message"], task_data["context"]
-                )
-            else:
-                thread_result = {
-                    "current_thread": "default",
-                    "thread_analysis": {"keywords": []},
-                    "response_guidance": {"tone": "helpful"},
-                }
+            # Default thread result - advanced thread manager removed as phantom feature
+            thread_result = {
+                "current_thread": "default",
+                "thread_analysis": {"keywords": []},
+                "response_guidance": {"tone": "helpful"},
+            }
 
             # Process emotions concurrently if available
             emotion_result = None

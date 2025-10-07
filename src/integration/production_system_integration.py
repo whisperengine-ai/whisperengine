@@ -146,7 +146,6 @@ class ProductionSystemIntegrator:
             )
 
             # Use real components when available, fallback to simplified versions
-            advanced_thread_manager = None
             emotion_engine = None
 
             # Try to use real emotion engine if available
@@ -243,17 +242,7 @@ class ProductionSystemIntegrator:
                 emotion_engine = SimplifiedEmotionEngine()
                 logger.info("✅ Using simplified emotion engine (real engine not available)")
 
-            # For advanced_thread_manager, use a simplified version for now
-            class SimpleThreadManager:
-                async def process_user_message(self, user_id: str, message: str, context: dict):
-                    """Simple thread management for conversation tracking"""
-                    thread_id = f"thread_{hash(f'{user_id}_{message}') % 1000}"
-                    return {"thread_id": thread_id, "user_id": user_id, "status": "processed"}
-
-            advanced_thread_manager = SimpleThreadManager()
-
             self.components["conversation_manager"] = ConcurrentConversationManager(
-                advanced_thread_manager=advanced_thread_manager,
                 emotion_engine=emotion_engine,
                 memory_batcher=self.components.get(
                     "memory_batcher"

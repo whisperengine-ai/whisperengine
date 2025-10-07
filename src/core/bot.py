@@ -77,10 +77,8 @@ class DiscordBotCore:
         self.memory_manager = None
         self.safe_memory_manager = None
         self.profile_memory_cache = None
-        self.conversation_cache = None
         self.image_processor = None
         self.health_monitor = None
-        self.backup_manager = None
         self.voice_manager = None
         self.voice_support_enabled = False  # Will be set during voice initialization
         self.local_emotion_engine = None
@@ -94,17 +92,14 @@ class DiscordBotCore:
         self.postgres_config = None
 
         # AI enhancement components
-        self.personality_profiler = None
-        self.graph_personality_manager = None
+        self.dynamic_personality_profiler = None
         self.phase2_integration = None
         
         # Character system components
         self.character_system = None
         self.character_file = None
-        self.phase3_memory_networks = None
         self.context_switch_detector = None  # Phase 3 Advanced Intelligence
         self.empathy_calibrator = None  # Phase 3 Advanced Intelligence
-        self.graph_emotion_manager = None  # Reference to update later with external emotion AI
 
         # Knowledge management components
         self.knowledge_router = None  # Semantic knowledge router for factual intelligence
@@ -116,16 +111,8 @@ class DiscordBotCore:
         # Production optimization components
         self.production_adapter = None
 
-        # Multi-Entity Relationship components
-        self.multi_entity_manager = None
-        self.ai_self_bridge = None
-
         # Concurrent Conversation Management
         self.conversation_manager = None
-
-        # Add properties for batch initialization
-        self._batched_memory_manager = None
-        self._needs_batch_init = False
 
     def initialize_bot(self):
         """Initialize the Discord bot instance with proper configuration."""
@@ -197,9 +184,6 @@ class DiscordBotCore:
             # Set as THE memory manager (clean, simple)
             self.safe_memory_manager = memory_manager
             self.memory_manager = memory_manager
-
-            # self.backup_manager = BackupManager()  # REMOVED - Vector-native architecture
-            self.backup_manager = None  # Vector memory system handles persistence differently
             
             self.logger.info("✅ Memory System initialized with type: %s", memory_type)
 
@@ -379,16 +363,9 @@ class DiscordBotCore:
     async def initialize_phase4_components(self):
         """Initialize Phase 4.2 and 4.3 components asynchronously."""
         try:
-            # Initialize Phase 4.2: Advanced Thread Manager
-            if not hasattr(self, 'thread_manager') or self.thread_manager is None:
-                try:
-                    from src.conversation.advanced_thread_manager import create_advanced_conversation_thread_manager
-                    self.thread_manager = await create_advanced_conversation_thread_manager()
-                    self.logger.info("✅ Phase 4.2: Advanced Thread Manager initialized")
-                except Exception as e:
-                    self.logger.warning(f"Phase 4.2 thread manager not available: {e}")
-                    self.logger.debug("Continuing without advanced thread management features")
-                    self.thread_manager = None
+            # Phase 4.2: Advanced Thread Manager removed as phantom feature
+            self.thread_manager = None
+            self.logger.info("✅ Phase 4.2: Advanced Thread Manager removed (phantom feature)")
 
             # Initialize Phase 4.3: Proactive Engagement Engine
             if not hasattr(self, 'engagement_engine') or self.engagement_engine is None:
@@ -419,7 +396,7 @@ class DiscordBotCore:
                     self.engagement_engine = await create_engagement_engine(
                         engagement_engine_type=os.getenv("ENGAGEMENT_ENGINE_TYPE", "full"),
                         thread_manager=getattr(self, 'thread_manager', None),
-                        memory_moments=getattr(self, 'memory_moments', None),
+                        memory_moments=None,  # Memory moments removed (phantom feature)
                         emotional_engine=emotion_analyzer or (getattr(self.phase2_integration, 'emotional_context_engine', None) if hasattr(self, 'phase2_integration') else None),
                         personality_profiler=getattr(self, 'dynamic_personality_profiler', None)
                     )
@@ -467,19 +444,13 @@ class DiscordBotCore:
             else:
                 self.logger.warning("⚠️ Empathy Calibrator not available for integration")
             
-            # Phase 4.1: Memory-Triggered Moments
-            if hasattr(self, 'memory_moments') and self.memory_moments:
-                self.bot.memory_moments = self.memory_moments
-                self.logger.info("✅ Memory-Triggered Moments integrated with Discord bot")
-            else:
-                self.logger.warning("⚠️ Memory-Triggered Moments not available for integration")
+            # Phase 4.1: Memory-Triggered Moments - REMOVED (phantom feature)
+            # Memory moments removed - vector memory provides conversation continuity
+            self.logger.debug("💭 Memory-Triggered Moments removed (phantom feature) - vector memory provides this functionality")
             
-            # Phase 4.2: Advanced Thread Manager
-            if hasattr(self, 'thread_manager') and self.thread_manager:
-                self.bot.thread_manager = self.thread_manager
-                self.logger.info("✅ Advanced Thread Manager integrated with Discord bot")
-            else:
-                self.logger.warning("⚠️ Advanced Thread Manager not available for integration")
+            # Phase 4.2: Advanced Thread Manager - REMOVED (phantom feature)
+            # Thread manager was removed as phantom feature - no integration needed
+            self.logger.debug("🧵 Advanced Thread Manager removed (phantom feature) - skipping integration")
             
             # Phase 4.3: Proactive Engagement Engine
             if hasattr(self, 'engagement_engine') and self.engagement_engine:
@@ -503,10 +474,8 @@ class DiscordBotCore:
                 active_features.append("Context Switch Detection")
             if hasattr(self.bot, 'engagement_engine') and self.bot.engagement_engine:
                 active_features.append("Proactive Engagement")
-            if hasattr(self.bot, 'memory_moments') and self.bot.memory_moments:
-                active_features.append("Memory-Triggered Moments")
-            if hasattr(self.bot, 'thread_manager') and self.bot.thread_manager:
-                active_features.append("Advanced Thread Management")
+            # Memory-Triggered Moments removed (phantom feature)
+            # Advanced Thread Manager removed (phantom feature)
                 
             if active_features:
                 self.logger.info(f"🎉 Advanced Conversation Features ACTIVE: {', '.join(active_features)}")
@@ -555,9 +524,7 @@ class DiscordBotCore:
 
     def initialize_ai_enhancements(self):
         """Initialize advanced AI enhancement systems."""
-        # Legacy personality profiler removed - vector-native system handles personality analysis
-        self.personality_profiler = None
-        self.graph_personality_manager = None
+        # Vector-native personality analysis replaces legacy components
         self.logger.info("📊 Using vector-native personality analysis (CDL + embedding intelligence)")
 
         # Initialize Dynamic Personality Profiler
@@ -593,13 +560,8 @@ class DiscordBotCore:
             # For backward compatibility, also set as phase2_integration
             # This allows existing code to work during transition
             self.phase2_integration = self.simplified_emotion_manager
-            
-            # Update emotion manager with simplified system if it exists
-            if hasattr(self, "graph_emotion_manager") and self.graph_emotion_manager:
-                self.graph_emotion_manager.simplified_emotion_manager = self.simplified_emotion_manager
-                self.logger.info("✅ Updated emotion manager with Simplified Emotion system")
 
-            # Also update the memory manager's emotion manager if it exists
+            # Memory manager emotion integration (if available)
             if (
                 hasattr(self, "memory_manager")
                 and self.memory_manager
@@ -616,15 +578,8 @@ class DiscordBotCore:
             self.simplified_emotion_manager = None
             self.phase2_integration = None
 
-        # Legacy emotion engine removed - vector-native system handles emotion analysis
-        self.local_emotion_engine = None
-        self.logger.info("🌐 Using vector-native emotion analysis (embedding intelligence)")
-
-        # Phase 3 Memory Networks now handled natively by Qdrant vector store
-        # Use memory_manager.vector_store.get_memory_clusters_for_roleplay() for clustering
-        # Semantic search provides superior pattern detection and relevance scoring
+        # Vector-native memory networks replace Phase 3 memory networks
         self.logger.info("🕸️ Memory Networks: Using Vector-Native Qdrant Intelligence")
-        self.phase3_memory_networks = None  # Obsolete - Qdrant handles this natively
 
         # Initialize Phase 3 Advanced Intelligence Components
         self.logger.info("🧠 Initializing Phase 3: Advanced Intelligence Components...")
@@ -668,56 +623,21 @@ class DiscordBotCore:
             self.context_switch_detector = None
             self.empathy_calibrator = None
 
-        # Initialize Phase 4.1: Memory-Triggered Personality Moments
-        self.logger.info("💭 Initializing Phase 4.1: Memory-Triggered Personality Moments...")
-        try:
-            # All AI features are always enabled - unified AI system
-            from src.personality.memory_moments import MemoryTriggeredMoments
-
-            if self.memory_manager and (
-                hasattr(self, "phase2_integration") and self.phase2_integration
-            ):
-                self.memory_moments = MemoryTriggeredMoments(
-                    memory_manager=self.memory_manager,
-                    emotional_context_engine=(
-                        self.phase2_integration.emotional_context_engine
-                        if hasattr(self.phase2_integration, "emotional_context_engine")
-                        else None
-                    ),
-                    personality_profiler=getattr(self, "personality_profiler", None),
-                )
-                self.logger.info("✅ Phase 4.1: Memory-Triggered Personality Moments initialized")
-            else:
-                self.logger.warning(
-                    "⚠️ Cannot initialize Memory Moments - missing memory manager or Phase 2 integration"
-                )
-                self.memory_moments = None
-
-        except Exception as e:
-            self.logger.error(f"Failed to initialize Phase 4.1 memory moments: {e}")
-            self.logger.warning("⚠️ Continuing without memory-triggered personality features")
-            self.memory_moments = None
+        # Initialize Phase 4.1: Memory-Triggered Personality Moments - REMOVED (phantom feature)
+        self.logger.info("💭 Phase 4.1: Memory-Triggered Personality Moments removed (phantom feature)")
+        self.memory_moments = None
+        self.logger.debug("🧠 Memory-triggered personality moments removed - vector memory provides this functionality")
 
         # Initialize Phase 4.2: Advanced Thread Manager
-        self.logger.info("🧵 Initializing Phase 4.2: Advanced Thread Manager...")
-        try:
-            from src.conversation.advanced_thread_manager import create_advanced_conversation_thread_manager
-            
-            # Initialize advanced thread manager asynchronously (will be awaited later)
-            self._thread_manager_task = None
-            self.thread_manager = None
-            self.logger.info("✅ Phase 4.2: Advanced Thread Manager scheduled for initialization")
-            
-        except Exception as e:
-            self.logger.warning(f"Phase 4.2 thread manager not available: {e}")
-            self.logger.debug("⚠️ Continuing without advanced thread management features")
-            self.thread_manager = None
+        # Phase 4.2: Advanced Thread Manager removed as phantom feature
+        self.logger.info("🧵 Phase 4.2: Advanced Thread Manager removed (phantom feature)")
+        self._thread_manager_task = None
+        self.thread_manager = None
+        self.logger.info("✅ Phase 4.2: Advanced Thread Manager removed")
 
         # Initialize Phase 4.3: Proactive Engagement Engine
         self.logger.info("⚡ Initializing Phase 4.3: Proactive Engagement Engine...")
         try:
-            from src.conversation.engagement_protocol import create_engagement_engine
-            
             # Initialize proactive engagement engine asynchronously (will be awaited later)
             self._engagement_engine_task = None
             self.engagement_engine = None
@@ -754,18 +674,8 @@ class DiscordBotCore:
         """Initialize vector-native conversation context (Redis removed for simplification)."""
         self.logger.info("Using vector-native conversation context (Redis disabled)")
 
-        try:
-            # Use vector memory system for conversation context instead of Redis cache
-            # This provides smarter semantic context rather than just chronological cache
-            self.conversation_cache = None  # Disabled - using vector memory directly
-            self.profile_memory_cache = None  # Disabled - vector memory handles this
-            
-            self.logger.info("✅ Vector-native conversation context enabled (Redis cache disabled)")
-
-        except Exception as e:
-            self.logger.error(f"Failed to initialize conversation context: {e}")
-            self.conversation_cache = None
-            self.profile_memory_cache = None
+        # Vector memory system provides superior semantic context vs Redis chronological cache
+        self.logger.info("✅ Vector-native conversation context enabled (Redis cache disabled)")
 
     def initialize_health_monitor(self):
         """Initialize the health monitoring system."""
@@ -780,9 +690,8 @@ class DiscordBotCore:
             self.health_monitor = HealthMonitor(
                 memory_manager=self.memory_manager,
                 llm_client=self.llm_client,
-                conversation_cache=self.conversation_cache,
+                conversation_cache=None,  # Removed phantom feature - using vector memory
                 emotion_manager=emotion_mgr,
-                backup_manager=self.backup_manager,
             )
             self.logger.info("Health monitor initialized successfully")
 
@@ -904,33 +813,6 @@ class DiscordBotCore:
             self.postgres_config = None
             return False
 
-    def initialize_multi_entity_system(self):
-        """Initialize the multi-entity relationship system."""
-        try:
-            self.logger.info("🌐 Initializing Multi-Entity Relationship System...")
-
-            # Initialize multi-entity relationship manager
-            # Multi-entity relationship management removed - using vector-native memory
-            self.multi_entity_manager = None
-
-            # Note: Schema initialization will happen when first database operation is called
-            self.logger.info("📊 Multi-entity schema will be initialized on first use")
-
-            # Initialize AI Self bridge
-            # AI Self bridge removed - using vector-native memory
-            self.ai_self_bridge = None
-
-            self.logger.info("✅ Multi-Entity Relationship System initialized successfully!")
-            self.logger.info("🎭 Characters can now be connected to users and AI Self")
-
-        except Exception as e:
-            self.logger.error(f"Failed to initialize multi-entity relationship system: {e}")
-            self.logger.warning("Bot will continue without multi-entity features")
-            self.multi_entity_manager = None
-            self.ai_self_bridge = None
-
-        # Note: PostgreSQL pool is now initialized separately in initialize_postgres_pool()
-        # for use with semantic knowledge graph
 
     def initialize_supporting_systems(self):
         """Initialize supporting systems like heartbeat monitor and conversation history."""
@@ -1020,10 +902,6 @@ class DiscordBotCore:
         
         # LLM Tool Integration removed - memory system simplified
 
-        # Schedule async initialization of batch optimizer
-        if self._needs_batch_init:
-            asyncio.create_task(self.initialize_batch_optimizer())
-
         # Schedule async initialization of PostgreSQL pool (required for knowledge router)
         asyncio.create_task(self.initialize_postgres_pool())
         
@@ -1052,7 +930,6 @@ class DiscordBotCore:
         self.initialize_ai_enhancements()
         self.initialize_voice_system()
         self.initialize_production_optimization()
-        self.initialize_multi_entity_system()
         # PostgreSQL initialization removed - using vector-native storage only
 
         # Schedule async initialization of concurrent conversation manager
@@ -1082,25 +959,18 @@ class DiscordBotCore:
             "llm_client": self.llm_client,
             "memory_manager": self.memory_manager,
             "llm_tool_manager": None,  # LLM tool manager removed in memory system simplification
-            "conversation_cache": self.conversation_cache,
             "image_processor": self.image_processor,
             "health_monitor": self.health_monitor,
-            "backup_manager": self.backup_manager,
             "voice_manager": self.voice_manager,
             "shutdown_manager": self.shutdown_manager,
             "heartbeat_monitor": self.heartbeat_monitor,
             "conversation_history": self.conversation_history,
             "postgres_config": self.postgres_config,
-            "personality_profiler": self.personality_profiler,
             "dynamic_personality_profiler": getattr(self, "dynamic_personality_profiler", None),
-            "graph_personality_manager": self.graph_personality_manager,
             "phase2_integration": self.phase2_integration,
-            "phase3_memory_networks": self.phase3_memory_networks,
             "context_switch_detector": getattr(self, "context_switch_detector", None),
             "empathy_calibrator": getattr(self, "empathy_calibrator", None),
             "memory_moments": getattr(self, "memory_moments", None),
             "production_adapter": self.production_adapter,
-            "multi_entity_manager": self.multi_entity_manager,
-            "ai_self_bridge": self.ai_self_bridge,
             "conversation_manager": self.conversation_manager,
         }

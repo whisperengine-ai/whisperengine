@@ -144,7 +144,6 @@ class ConfigurationValidator:
                 'format': 'true or false'
             },
             
-            # Phantom Feature Configuration
             'ENABLE_LOCAL_EMOTION_ENGINE': {
                 'category': ConfigCategory.FEATURES,
                 'level': ValidationLevel.OPTIONAL,
@@ -167,43 +166,12 @@ class ConfigurationValidator:
                 'suggestion': 'Enable AI-driven conversation initiation',
                 'format': 'true or false'
             },
-            'ENABLE_ADVANCED_THREAD_MANAGER': {
-                'category': ConfigCategory.FEATURES,
-                'level': ValidationLevel.OPTIONAL,
-                'validator': self._validate_boolean,
-                'suggestion': 'Enable advanced conversation thread management',
-                'format': 'true or false'
-            },
             'ENABLE_CONCURRENT_CONVERSATION_MANAGER': {
                 'category': ConfigCategory.FEATURES,
                 'level': ValidationLevel.OPTIONAL,
                 'validator': self._validate_boolean,
                 'suggestion': 'Enable parallel conversation handling',
                 'format': 'true or false'
-            },
-
-            
-            # Phantom Feature Performance Settings
-            'VECTORIZED_EMOTION_MAX_WORKERS': {
-                'category': ConfigCategory.PERFORMANCE,
-                'level': ValidationLevel.OPTIONAL,
-                'validator': self._validate_positive_integer,
-                'suggestion': 'Set worker count for emotion batch processing (1-16)',
-                'format': 'Positive integer, recommended: 2-8'
-            },
-            'THREAD_MANAGER_MAX_ACTIVE_THREADS': {
-                'category': ConfigCategory.PERFORMANCE,
-                'level': ValidationLevel.OPTIONAL,
-                'validator': self._validate_positive_integer,
-                'suggestion': 'Set maximum concurrent conversation threads (5-100)',
-                'format': 'Positive integer, recommended: 10-50'
-            },
-            'MAX_PHANTOM_FEATURE_MEMORY_MB': {
-                'category': ConfigCategory.PERFORMANCE,
-                'level': ValidationLevel.OPTIONAL,
-                'validator': self._validate_positive_integer,
-                'suggestion': 'Set memory limit for phantom features (512-4096 MB)',
-                'format': 'Positive integer in MB, recommended: 1024-2048'
             }
         }
     

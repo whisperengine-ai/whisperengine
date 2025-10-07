@@ -723,6 +723,15 @@ class CDLAIPromptIntegration:
             logger.warning("📏 UNIFIED OPTIMIZATION TRIGGERED: %d words > %d limit, applying intelligent fidelity-first trimming", 
                        word_count, self.optimized_builder.max_words)
             try:
+                # 🚨 CRITICAL FIX: Preserve character identity from original prompt
+                # Extract character identity line from the original prompt (first meaningful line)
+                character_identity = ""
+                prompt_lines = prompt.split('\n')
+                for line in prompt_lines:
+                    if line.strip() and line.startswith(f"You are {character.identity.name}"):
+                        character_identity = line.strip()
+                        break
+                
                 # Convert pipeline_result to dict for compatibility with build_character_prompt
                 pipeline_dict = {}
                 if pipeline_result and hasattr(pipeline_result, '__dict__'):
@@ -744,6 +753,19 @@ class CDLAIPromptIntegration:
                         'needs_memory_context': bool(relevant_memories or conversation_history)
                     }
                 )
+                
+                # 🚨 CRITICAL FIX: Ensure character identity is preserved at the start
+                if character_identity and not optimized_prompt.startswith(character_identity):
+                    # If we extracted a character identity and the optimized prompt doesn't start with it,
+                    # prepend it to maintain character identity
+                    optimized_prompt = f"{character_identity}\n\n{optimized_prompt}"
+                    logger.info("🎭 CHARACTER IDENTITY: Preserved character identity in optimized prompt")
+                elif not character_identity:
+                    # Fallback: ensure some form of character identity exists
+                    identity_check = f"You are {character.identity.name}"
+                    if not optimized_prompt.startswith(identity_check):
+                        optimized_prompt = f"{identity_check}, a {character.identity.occupation}.\n\n{optimized_prompt}"
+                        logger.info("🎭 CHARACTER IDENTITY: Added fallback character identity to optimized prompt")
                 
                 # Record fidelity metrics for intelligent optimization
                 optimized_word_count = len(optimized_prompt.split())

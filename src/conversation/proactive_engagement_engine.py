@@ -27,10 +27,10 @@ Proactive Engagement Capabilities:
 - Personality-driven engagement strategies
 
 Integration Points:
-- MemoryTriggeredMoments for conversation connections
-- AdvancedConversationThreadManager for multi-thread context
-- EmotionalContextEngine for emotional engagement
-- DynamicPersonalityProfiler for personalized strategies
+- Memory-triggered moments for conversation enhancement
+- Emotional context engine for engagement prioritization  
+- Dynamic personality profiler for conversation adaptation
+- Universal chat platform for multi-platform support
 """
 
 import logging
@@ -44,18 +44,11 @@ from enum import Enum
 from typing import Any, Union
 
 # Import existing systems for integration
-try:
-    from src.conversation.advanced_thread_manager import (
-        AdvancedConversationThreadManager,
-        ConversationThreadAdvanced,
-        ConversationThreadState,
-    )
-except ImportError:
-    # Import failed - thread manager components not available
-    pass
+# Note: Advanced thread manager was removed as phantom feature
+# Note: Memory-triggered moments was removed as phantom feature
 
 # Import local dependencies - all should be available in our codebase
-from src.personality.memory_moments import ConversationContext, MemoryTriggeredMoments
+# from src.personality.memory_moments import ConversationContext, MemoryTriggeredMoments  # REMOVED (phantom feature)
 from src.intelligence.emotional_context_engine import EmotionalContext, EmotionalContextEngine
 from src.intelligence.enhanced_vector_emotion_analyzer import EnhancedVectorEmotionAnalyzer
 from src.intelligence.dynamic_personality_profiler import (
@@ -214,8 +207,8 @@ class ProactiveConversationEngagementEngine:
 
     def __init__(
         self,
-        thread_manager: AdvancedConversationThreadManager | None = None,
-        memory_moments: MemoryTriggeredMoments | None = None,
+        thread_manager: Any | None = None,
+        memory_moments: Any | None = None,  # DEPRECATED: Memory moments removed (phantom feature)
         emotional_engine: Union[EmotionalContextEngine, EnhancedVectorEmotionAnalyzer, None] = None,
         personality_profiler: DynamicPersonalityProfiler | None = None,
         memory_manager: Any | None = None,
@@ -228,7 +221,7 @@ class ProactiveConversationEngagementEngine:
 
         Args:
             thread_manager: Advanced conversation thread manager
-            memory_moments: Memory-triggered moments system
+            memory_moments: DEPRECATED - Memory moments removed as phantom feature
             emotional_engine: Emotional context engine or Enhanced Vector Emotion Analyzer
             personality_profiler: Dynamic personality profiler
             memory_manager: Vector memory manager for conversation history and patterns
@@ -239,7 +232,7 @@ class ProactiveConversationEngagementEngine:
         import os
         
         self.thread_manager = thread_manager
-        self.memory_moments = memory_moments
+        self.memory_moments = None  # Memory moments removed (phantom feature)
         self.emotional_engine = emotional_engine
         self.personality_profiler = personality_profiler
         self.memory_manager = memory_manager
@@ -282,6 +275,58 @@ class ProactiveConversationEngagementEngine:
             "ProactiveConversationEngagementEngine initialized with %d minute stagnation threshold",
             stagnation_threshold_minutes,
         )
+
+    async def analyze_engagement_potential(
+        self,
+        user_id: str,
+        message: Any,
+        conversation_history: list[dict[str, Any]]
+    ) -> dict[str, Any]:
+        """
+        Adapter method for MessageProcessor integration.
+        
+        This method provides the interface expected by MessageProcessor while
+        delegating to the main analyze_conversation_engagement method.
+        """
+        try:
+            # Convert message to content string
+            content = getattr(message, 'content', str(message)) if hasattr(message, 'content') else str(message)
+            
+            # Create context_id from user_id
+            context_id = f"context_{user_id}"
+            
+            # Convert conversation_history to expected format
+            recent_messages = []
+            for msg in conversation_history[-10:]:  # Last 10 messages
+                if isinstance(msg, dict):
+                    recent_messages.append({
+                        "content": msg.get("content", ""),
+                        "timestamp": msg.get("timestamp", ""),
+                        "user_id": user_id
+                    })
+            
+            # Add current message to context
+            recent_messages.append({
+                "content": content,
+                "timestamp": datetime.now().isoformat(),
+                "user_id": user_id
+            })
+            
+            # Call the main engagement analysis method
+            return await self.analyze_conversation_engagement(
+                user_id=user_id,
+                context_id=context_id,
+                recent_messages=recent_messages,
+                current_thread_info=None
+            )
+            
+        except Exception as e:
+            logger.warning("Engagement potential analysis failed: %s", str(e))
+            return {
+                "engagement_potential": 0.5,
+                "analysis_status": "failed",
+                "error": str(e)
+            }
 
     async def analyze_conversation_engagement(
         self,
@@ -673,25 +718,8 @@ class ProactiveConversationEngagementEngine:
                 }
             )
 
-        # Generate memory-based connections if available
-        if self.memory_moments:
-            try:
-                memory_connections = await self._generate_memory_connections(
-                    user_id, recent_messages
-                )
-
-                for connection in memory_connections[:1]:  # Top 1 memory connection
-                    recommendations.append(
-                        {
-                            "type": "memory_connection",
-                            "strategy": EngagementStrategy.MEMORY_CONNECTION,
-                            "content": connection["prompt"],
-                            "connection_strength": connection["relevance_score"],
-                            "memory_context": connection["memory_context"],
-                        }
-                    )
-            except Exception as e:
-                logger.warning("Failed to generate memory connections: %s", e)
+        # Memory-based connections removed (phantom feature)
+        # Vector memory manager already provides conversation continuity
 
         # Sort recommendations by engagement potential
         recommendations.sort(
@@ -1054,52 +1082,7 @@ class ProactiveConversationEngagementEngine:
             except Exception as e:
                 engagement_logger.warning("🧠 ENGAGEMENT: Vector memory connections failed: %s", e)
 
-        # Use memory moments for additional context if available
-        if self.memory_moments:
-            engagement_logger.debug("🧠 ENGAGEMENT: Using memory moments for additional context")
-            try:
-                # Analyze recent conversation for memory connections
-                memory_connections = (
-                    await self.memory_moments.analyze_conversation_for_memories(
-                        user_id=user_id,
-                        context_id=f"proactive_engagement_{user_id}",
-                        message=recent_content,
-                    )
-                )
-                engagement_logger.info("🧠 ENGAGEMENT: MEMORY MOMENTS triggered - Found %d memory connections", len(memory_connections))
-
-                # Convert memory connections to engagement prompts
-                for connection in memory_connections[:2]:  # Top 2 connections
-                    # Get a natural callback if available
-                    if hasattr(connection, "source_memory") and hasattr(
-                        connection, "connection_type"
-                    ):
-                        connection_type = getattr(connection, "connection_type", "general")
-
-                        if connection_type == "similar_topic":
-                            prompt = "This conversation reminds me of something we discussed before. Would you like to explore that connection further?"
-                        elif connection_type == "emotional_echo":
-                            prompt = "I sense a familiar emotional resonance here - it echoes something meaningful from our past conversations."
-                        elif connection_type == "personal_growth":
-                            prompt = "This seems to connect to your personal journey that we've touched on before. How has your perspective evolved?"
-                        else:
-                            prompt = "This brings back memories of our previous conversations. There might be a deeper connection here worth exploring."
-
-                        connections.append(
-                            {
-                                "prompt": prompt,
-                                "relevance_score": getattr(
-                                    connection, "connection_strength", 0.7
-                                ),
-                                "memory_context": connection_type,
-                                "memory_connection": connection,
-                            }
-                        )
-
-            except Exception as memory_error:
-                logger.debug(
-                    "Memory moments connection failed, using simple fallback: %s", memory_error
-                )
+        # Memory moments removed (phantom feature) - vector memory provides conversation continuity
 
         # If no connections found, create a simple fallback
         if not connections:
@@ -1299,9 +1282,7 @@ async def create_proactive_engagement_engine(
         from src.conversation.thread_management.conversation_thread_manager import ConversationThreadManager
         logger.info("Thread manager components available for full integration")
     except ImportError:
-        logger.warning(
-            "AdvancedConversationThreadManager not available - limited thread integration"
-        )
+        logger.debug("Thread manager removed - was phantom feature")
 
     # All local dependencies should be available since we import them directly
     engine = ProactiveConversationEngagementEngine(

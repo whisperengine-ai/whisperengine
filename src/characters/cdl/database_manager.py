@@ -515,7 +515,6 @@ class DatabaseCDLManager:
                         
         except Exception as e:
             logger.debug("Error reconstructing personal knowledge: %s", e)
-            )
             
             # Create metadata
             metadata = CharacterMetadata(
