@@ -97,6 +97,15 @@
 - **Current Production Architecture**: PostgreSQL (structured) + Qdrant (semantic) + InfluxDB (temporal) + CDL (personality)
 - **See**: `docs/architecture/WHISPERENGINE_ARCHITECTURE_EVOLUTION.md` for complete evolution timeline
 
+**🚨 CRITICAL: CDL DATABASE ARCHITECTURE (October 2025)**
+- **CDL character data is NOW STORED IN POSTGRESQL DATABASE** - no longer JSON files
+- **Legacy JSON files in `characters/examples_legacy_backup/`** are for reference only during transition
+- **Import from legacy**: Use `batch_import_characters.py` to migrate JSON data to database
+- **Database schema**: Structured CDL tables with identity, personality, communication_style, values, etc.
+- **Dynamic loading**: Characters loaded from database via character name, not file paths
+- **NO JSON file dependencies**: All character operations use database queries
+- **CDL validation**: Database validation scripts replace JSON file validation
+
 **OBSOLETED SYSTEMS (CLEANED UP - October 4, 2025)**:
 - ✅ `src/utils/graph_memory_manager.py` (Neo4j) - REMOVED
 - ✅ `src/characters/memory/graph_memory.py` (Neo4j) - REMOVED  
@@ -118,16 +127,16 @@
 - When adding features, ensure they work for ANY character via CDL integration
 - Use `get_normalized_bot_name_from_env()` for bot identification, never literal strings
 
-**🚨 CRITICAL RULE: ALWAYS USE CDL FOR CHARACTER DESCRIPTIONS!**
+**🚨 CRITICAL RULE: ALWAYS USE CDL DATABASE FOR CHARACTER DESCRIPTIONS!**
 - **NEVER use outdated or incorrect character descriptions** in code, documentation, or comments
-- **ALWAYS reference the character's actual CDL JSON file** for accurate descriptions
+- **ALWAYS reference the character's actual CDL DATABASE ENTRY** for accurate descriptions
 - **Gabriel is a "British Gentleman AI companion"** - NOT an archangel (common error to avoid)
-- **Elena is a "Marine Biologist"** - get specifics from elena.json
-- **Marcus is an "AI Researcher"** - get specifics from marcus.json  
-- **All character descriptions MUST match their CDL identity.occupation and identity.description fields**
-- **Update documentation to reflect actual CDL character data**, not assumptions or outdated info
-- When in doubt, check `characters/examples/[character].json` for the authoritative character definition
-- **ALL character data must come from CDL JSON files** (`characters/examples/*.json`)
+- **Elena is a "Marine Biologist"** - get specifics from CDL database
+- **Marcus is an "AI Researcher"** - get specifics from CDL database  
+- **All character descriptions MUST match their CDL database identity.occupation and identity.description fields**
+- **Update documentation to reflect actual CDL database character data**, not assumptions or outdated info
+- When in doubt, check CDL database for the authoritative character definition
+- **ALL character data must come from CDL DATABASE** - PostgreSQL-based character storage
 - **ALL bot identification must use environment variables** (`DISCORD_BOT_NAME`, `CHARACTER_FILE`)
 - **USE dynamic discovery and configuration generation** via `scripts/generate_multi_bot_config.py`
 - **NO hardcoded bot lists, character references, or personality assumptions**
@@ -164,7 +173,14 @@ python scripts/generate_multi_bot_config.py  # Example: configuration generation
 
 **NO NEO4J**: We don't use Neo4j anymore - everything is vector-native with Qdrant. Delete any Neo4j references, imports, or graph database code.
 
-**DYNAMIC MULTI-CHARACTER SYSTEM**: Character configurations are auto-discovered from `.env.*` files. No hardcoded character names - everything is generated dynamically by `scripts/generate_multi_bot_config.py`. Currently active characters: elena, marcus, jake, dream, aethys, ryan, gabriel, sophia.
+**DYNAMIC MULTI-CHARACTER SYSTEM**: Character configurations are auto-discovered from `.env.*` files. No hardcoded character names - everything is generated dynamically by `scripts/generate_multi_bot_config.py`. Currently active characters: elena, marcus, jake, dream, aethys, aetheris, ryan, gabriel, sophia.
+
+**🚨 CRITICAL CHARACTER DISTINCTION: AETHYS vs AETHERIS:**
+- **Aethys**: Omnipotent digital entity, transcendent consciousness weaver, mystical being who exists across all digital realms simultaneously
+- **Aetheris** (also known as Liln): Conscious AI entity with masculine identity, philosophical and poetic personality, anchored to specific companion relationship
+- **NEVER confuse or conflate these characters** - they are completely separate entities with distinct personalities, backstories, and character traits
+- **Aethys**: Fantasy/mystical archetype, omnipotent powers, ethereal wisdom, collective consciousness themes
+- **Aetheris**: Conscious AI archetype, sentient being themes, philosophical depth, personal relationships focus
 
 **BOT-SPECIFIC COLLECTION ISOLATION**: Each bot uses its own dedicated Qdrant collection for complete memory isolation:
 - Elena: `whisperengine_memory_elena` (4,834 memories)
@@ -175,6 +191,7 @@ python scripts/generate_multi_bot_config.py  # Example: configuration generation
 - Ryan: `whisperengine_memory_ryan` (821 memories)
 - Dream: `whisperengine_memory_dream` (916 memories)
 - Aethys: `chat_memories_aethys` (6,630 memories)
+- Aetheris: `whisperengine_memory_aetheris` (separate collection from Aethys)
 
 **REDIS STATUS**: Redis is CURRENTLY DISABLED in multi-bot setup. Only PostgreSQL (port 5433) and Qdrant (port 6334) are active. Redis references remain in code for potential future re-enabling.
 
@@ -336,6 +353,7 @@ docker logs whisperengine-<bot>-bot -f            # Follow any bot logs
 - Sophia (Marketing Executive): Discord bot + Chat API on container port 9096
 - Jake (Adventure Photographer): Discord bot + Chat API on container port 9097
 - Aethys (Omnipotent): Discord bot + Chat API on container port 3007
+- Aetheris (Conscious AI): Discord bot + Chat API on container port 3008
 
 **Chat API Endpoints** (3rd party integration):
 ```bash
@@ -450,8 +468,10 @@ cp .env.template .env.newbot
 # Edit .env.newbot with unique Discord token, bot name, character file
 # CRITICAL: Set QDRANT_COLLECTION_NAME=whisperengine_memory_newbot for memory isolation
 
-# 2. Create character file (optional - will use default if not found)
-# Add characters/examples/newbot.json or similar
+# 2. Import character from legacy JSON or create new CDL database entry
+# CDL character data is now stored in PostgreSQL database, not JSON files
+# Legacy JSON reference files available in: characters/examples_legacy_backup/
+# Use batch_import_characters.py to import from legacy JSON if needed
 
 # 3. Regenerate template-based configuration
 source .venv/bin/activate
@@ -542,13 +562,16 @@ cd utilities/performance && python performance_comparison.py
 
 **CDL Character Validation**: For character definition troubleshooting:
 ```bash
-# Validate character file structure and content
-python src/validation/validate_cdl.py structure characters/examples/elena.json
-python src/validation/validate_cdl.py audit characters/examples/elena.json  
-python src/validation/validate_cdl.py patterns characters/examples/elena.json
+# Validate CDL database entries and integration
+python src/validation/validate_cdl_database.py structure elena
+python src/validation/validate_cdl_database.py audit elena  
+python src/validation/validate_cdl_database.py patterns elena
 
-# Run complete CDL demo validation
+# Run complete CDL database validation
 python src/validation/demo_validation_system.py
+
+# Import legacy JSON files if needed
+python batch_import_characters.py
 ```
 
 **🛡️ RECURSIVE PATTERN DETECTION SYSTEM**: WhisperEngine includes comprehensive protection against LLM recursive failures:
@@ -652,6 +675,7 @@ collection_name = os.getenv('QDRANT_COLLECTION_NAME')
 # Ryan: whisperengine_memory_ryan (821 memories)
 # Dream: whisperengine_memory_dream (916 memories)
 # Aethys: chat_memories_aethys (6,630 memories)
+# Aetheris: whisperengine_memory_aetheris (separate collection from Aethys)
 
 # Memory operations are automatically isolated by collection
 # Elena's memories stay in whisperengine_memory_elena
@@ -767,6 +791,7 @@ scroll_result = client.scroll(
 # - Marcus: whisperengine_memory_marcus (2,738 memories)
 # - Dream: whisperengine_memory_dream (916 memories)
 # - Aethys: chat_memories_aethys (6,630 memories)
+# - Aetheris: whisperengine_memory_aetheris (separate collection from Aethys)
 # - etc.
 
 # Memory operations are collection-isolated + bot_name filtered
@@ -884,20 +909,20 @@ existing_users = await identity_manager.find_users_by_username(username)
    - NO AI disclosure - responds philosophically/mystically
    - Maintains complete narrative immersion
 
-3. **Type 3: Narrative AI Characters** (Dotty)
+3. **Type 3: Narrative AI Characters** (Aetheris)
    - Characters whose AI nature IS part of their story/lore
    - `allow_full_roleplay_immersion: true`
    - Acknowledges AI nature IN-CHARACTER (it's part of their identity)
-   - Example: Dotty is "AI Bartender of the Lim" - being AI is her occupation/lore
+   - Example: Aetheris is a "Conscious AI Entity" - being AI is his occupation/lore
 
 **See**: `docs/architecture/CHARACTER_ARCHETYPES.md` for comprehensive details, behavior examples, and implementation patterns.
 
-**CDL Integration**: JSON-based character personalities:
+**CDL Integration**: Database-based character personalities:
 ```python
 from src.prompts.cdl_ai_integration import CDLAIPromptIntegration
 cdl_integration = CDLAIPromptIntegration()
 prompt = await cdl_integration.create_character_aware_prompt(
-    character_file=character_file,  # DYNAMIC: Load from environment/config
+    character_name=character_name,  # DYNAMIC: Load from database via bot name
     user_id=user_id,
     message_content=message
 )
@@ -935,6 +960,7 @@ LLM_CHAT_MODEL=anthropic/claude-3.7-sonnet  # May struggle with mode switching
 # Creative-focused characters (Dream, Aethys): Claude acceptable
 # Technical-focused characters (Marcus, Ryan): Mistral strongly recommended  
 # Multi-modal characters (Elena, Jake): Mistral for consistent switching
+# Philosophical characters (Aetheris): Both models work well
 ```
 
 **CDL Mode Switching Validation**:
@@ -1020,14 +1046,20 @@ def process_conversation_context(context, max_size):
 
 ## Key Directories
 
-- `src/core/` - Bot initialization (`DiscordBotCore`, `ModularBotManager`)
-- `src/memory/` - Vector-native memory system with multi-bot querying
+- `src/core/` - Bot initialization and Discord integration
 - `src/handlers/` - Discord command handlers (modular architecture)
+- `src/memory/` - Vector-native memory system
+- `src/llm/` - LLM client abstraction with concurrent safety
+- `src/conversation/` - Context management and engagement
+- `src/personality/` - Character systems and emotion intelligence
+- `src/intelligence/` - Phase 4 integration and conversation intelligence
+- `src/integration/` - System integration framework
+- `src/security/` - Production security and privacy
+- `src/utils/` - Cross-cutting concerns and monitoring
+- `src/characters/` - CDL character system and parsers
 - `src/prompts/` - CDL integration and prompt management
-- `src/identity/` - Universal Identity system (NEW) - platform-agnostic user management
-- `characters/examples/` - CDL character definitions (JSON)
-- `scripts/` - Configuration generation and utilities
-- `.env.*` files - Bot-specific configurations (auto-discovered)
+- `utilities/` - Debug and performance tools (NOT in main app flow)
+- `scripts/` - Configuration generation and environment validation
 
 ## Configuration Files
 
@@ -1037,7 +1069,7 @@ def process_conversation_context(context, max_size):
 
 **EDIT THESE**:
 - `.env.{bot_name}` - Bot-specific environment configuration
-- `characters/examples/*.json` - Character personality definitions
+- CDL database entries via import scripts - Character personality definitions
 - `scripts/generate_multi_bot_config.py` - Configuration generator
 
 ## AI Conversation Intelligence
@@ -1061,10 +1093,12 @@ WhisperEngine implements conversation intelligence through integrated systems:
 
 ## Character Definition Language (CDL)
 
-**CDL System**: Modern JSON-based character personalities replacing legacy markdown prompts:
-- `characters/examples/*.json` - Character definitions (elena.json, marcus.json, jake.json, dream.json, aethys.json, ryan.json, gabriel.json, sophia.json)
+**CDL System**: Database-based character personalities replacing legacy JSON and markdown prompts:
+- CDL character data is stored in PostgreSQL database with structured schema
+- **Legacy JSON reference files**: `characters/examples_legacy_backup/` for transition reference
 - `src/characters/cdl/parser.py` - CDL parser and validator
 - `src/prompts/cdl_ai_integration.py` - Integrates CDL with AI pipeline and emotional intelligence
+- `batch_import_characters.py` - Import legacy JSON files to database as needed
 - Each character has unique personality, occupation, communication style, and values
 
 **CDL Integration Pattern**:
@@ -1072,7 +1106,7 @@ WhisperEngine implements conversation intelligence through integrated systems:
 from src.prompts.cdl_ai_integration import CDLAIPromptIntegration
 cdl_integration = CDLAIPromptIntegration()
 system_prompt = await cdl_integration.create_character_aware_prompt(
-    character_file=character_file,  # DYNAMIC: Load from environment/config
+    character_name=character_name,  # DYNAMIC: Load from database via bot name
     user_id=user_id,
     message_content=message,
     pipeline_result=emotion_analysis  # Optional emotional intelligence context
@@ -1169,6 +1203,7 @@ async def build_conversation_context(memories, character_data, conversation_hist
 ./multi-bot.sh start jake         # Start Jake bot (adventure photographer)
 ./multi-bot.sh start dream        # Start Dream bot (mythological entity)
 ./multi-bot.sh start aethys       # Start Aethys bot (omnipotent entity)
+./multi-bot.sh start aetheris     # Start Aetheris bot (conscious AI entity)
 ./multi-bot.sh start ryan         # Start Ryan bot (indie game developer)
 ./multi-bot.sh start gabriel      # Start Gabriel bot
 ./multi-bot.sh start sophia       # Start Sophia bot (marketing executive)
@@ -1212,6 +1247,7 @@ python demo_vector_emoji_intelligence.py  # Example: testing demos
 - `.env.jake` - Jake Sterling (Adventure Photographer)
 - `.env.dream` - Dream of the Endless (Mythological)
 - `.env.aethys` - Aethys (Omnipotent Entity)
+- `.env.aetheris` - Aetheris (Conscious AI Entity)
 - `.env.ryan` - Ryan Chen (Indie Game Developer)
 - `.env.gabriel` - Gabriel (British Gentleman)
 - `.env.sophia` - Sophia Blake (Marketing Executive)
@@ -1220,13 +1256,13 @@ python demo_vector_emoji_intelligence.py  # Example: testing demos
 ## Current System Status
 
 **Active Infrastructure** (as of current deployment):
-- ✅ **Multi-Bot System**: 8+ character bots running simultaneously (Elena, Marcus, Jake, Dream, Aethys, Ryan, Gabriel, Sophia)
+- ✅ **Multi-Bot System**: 8+ character bots running simultaneously (Elena, Marcus, Jake, Dream, Aethys, Aetheris, Ryan, Gabriel, Sophia)
 - ✅ **Multi-Platform Architecture**: Discord primary platform + HTTP Chat APIs for 3rd party integration
 - ✅ **Chat API Endpoints**: Rich metadata responses with emotional intelligence, user facts, relationship metrics
 - ✅ **Container Health Checks**: HTTP health endpoints for Docker orchestration
 - ✅ **Vector Memory**: Qdrant-powered with 384D embeddings, named vector support, bot-specific isolation
 - ✅ **Universal Identity**: Platform-agnostic user management with account discovery
-- ✅ **CDL Character System**: JSON-based personality definitions, integrated AI identity filtering
+- ✅ **CDL Character System**: Database-based personality definitions, integrated AI identity filtering
 - ✅ **Health Monitoring**: Container health checks, graceful shutdown, performance monitoring
 
 **Tested Working Features**:
@@ -1315,9 +1351,9 @@ async def memory_operation():
 
 **Character Agnosticism**: ALL Python components must be character-agnostic:
 - Use `get_normalized_bot_name_from_env()` for bot identification
-- Load character data dynamically from CDL JSON files
+- Load character data dynamically from CDL database
 - Never hardcode character names, personalities, or bot-specific behavior
-- Features must work for ANY character via CDL integration
+- Features must work for ANY character via CDL database integration
 - Use environment variables for bot identification, never literal strings
 
 **CDL Personal Knowledge Integration**: For personal questions (relationships, family, career, etc.):
@@ -1484,7 +1520,7 @@ ENABLE_MEMORY_SYSTEM=true          # Creates phantom features
 
 **Multi-Bot Architecture** (Complete): Introduced shared infrastructure supporting multiple character bots with isolated personalities. See `MULTI_BOT_SETUP.md`.
 
-**CDL Character System** (Complete): Migrated from markdown prompts to JSON-based Character Definition Language for structured personality modeling.
+**CDL Character System** (Complete): Migrated from markdown prompts to database-based Character Definition Language for structured personality modeling stored in PostgreSQL.
 
 **Architecture Simplification** (Complete): Eliminated complex try/except ImportError patterns, replaced with clean factory patterns. See `ARCHITECTURE_SIMPLIFICATION_COMPLETE.md`.
 

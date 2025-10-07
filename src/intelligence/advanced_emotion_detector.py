@@ -175,6 +175,82 @@ class AdvancedEmotionDetector:
                 timestamp=datetime.utcnow()
             )
     
+    @handle_errors(category=ErrorCategory.MEMORY_SYSTEM, severity=ErrorSeverity.MEDIUM)
+    async def detect_advanced_emotions_with_roberta_result(self, 
+                                                         text: str, 
+                                                         user_id: str,
+                                                         roberta_result,
+                                                         context: Optional[Dict[str, Any]] = None) -> AdvancedEmotionalState:
+        """
+        Perform advanced multi-modal emotion detection using existing RoBERTa results.
+        
+        This method is called serially after basic emotion analysis to avoid RoBERTa model race conditions.
+        Uses existing RoBERTa analysis results instead of re-analyzing.
+        
+        Args:
+            text: Message text for emoji/pattern analysis
+            user_id: User identifier for temporal analysis
+            roberta_result: Existing EmotionAnalysisResult from basic analysis
+            context: Optional context information
+            
+        Returns:
+            AdvancedEmotionalState with 12+ emotion support and multi-modal analysis
+        """
+        try:
+            self.logger.debug(f"🎭 SERIAL EMOTION: Using existing RoBERTa result: {roberta_result.primary_emotion} ({roberta_result.confidence:.3f})")
+            
+            # Step 1: Use provided RoBERTa analysis (no re-analysis)
+            # roberta_result is already available from basic analysis
+            
+            # Step 2: Extract emojis and use existing emoji intelligence  
+            emoji_analysis = self._analyze_emojis_with_existing_system(text)
+            
+            # Step 3: Advanced emotion synthesis (RoBERTa → 12+ emotions)
+            primary_emotion, secondary_emotions = self._synthesize_advanced_emotions(
+                roberta_result, emoji_analysis, text
+            )
+            
+            # Step 4: Calculate emotional intensity using RoBERTa data
+            intensity = self._calculate_emotional_intensity_from_roberta(
+                roberta_result, emoji_analysis, text
+            )
+            
+            # Step 5: Temporal pattern analysis (if memory available)
+            temporal_trajectory, pattern_type = await self._analyze_temporal_patterns(user_id, primary_emotion)
+            
+            # Step 6: Cultural adaptation
+            cultural_adaptation = self._apply_cultural_adaptation(primary_emotion, text)
+            
+            # Create advanced emotional state
+            emotional_state = AdvancedEmotionalState(
+                primary_emotion=primary_emotion,
+                secondary_emotions=secondary_emotions,
+                emotional_intensity=intensity,
+                emoji_analysis=emoji_analysis,
+                text_indicators=self._extract_roberta_indicators(roberta_result),
+                emotional_trajectory=temporal_trajectory,
+                pattern_type=pattern_type,
+                cultural_context=cultural_adaptation.get('expression_style') if cultural_adaptation else None,
+                timestamp=datetime.utcnow()
+            )
+            
+            self.logger.info(f"🎭 SERIAL EMOTION: Advanced synthesis complete: {primary_emotion} (intensity: {intensity:.2f})")
+            if secondary_emotions:
+                self.logger.info(f"   Secondary emotions: {', '.join(secondary_emotions)}")
+            
+            return emotional_state
+            
+        except Exception as e:
+            self.logger.error(f"❌ SERIAL EMOTION: Advanced emotion detection failed: {e}")
+            # Fallback to basic emotional state using roberta_result
+            fallback_emotion = roberta_result.primary_emotion if roberta_result else "neutral"
+            fallback_intensity = roberta_result.intensity if roberta_result and hasattr(roberta_result, 'intensity') else 0.5
+            return AdvancedEmotionalState(
+                primary_emotion=fallback_emotion,
+                emotional_intensity=fallback_intensity,
+                timestamp=datetime.utcnow()
+            )
+    
     def _analyze_emojis_with_existing_system(self, text: str) -> Dict[str, float]:
         """Analyze emoji content using existing EmojiEmotionMapper system."""
         emoji_analysis = {}

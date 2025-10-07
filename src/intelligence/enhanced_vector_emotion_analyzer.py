@@ -18,8 +18,10 @@ Architecture: RoBERTa → VADER → Keywords → Embeddings
 Performance: Accuracy over speed (emotional intelligence is core value)
 """
 
+import asyncio
 import logging
 import os
+import threading
 import time
 from dataclasses import dataclass
 from datetime import datetime
@@ -151,6 +153,8 @@ class EnhancedVectorEmotionAnalyzer:
     
     # 🔥 PERFORMANCE: Shared RoBERTa classifier to avoid loading model multiple times
     _shared_roberta_classifier = None
+    # 🔒 THREAD SAFETY: Lock for concurrent access to shared RoBERTa classifier
+    _roberta_classifier_lock = threading.Lock()
     
     def __init__(self, vector_memory_manager=None):
         """Initialize the enhanced emotion analyzer"""
@@ -424,43 +428,45 @@ class EnhancedVectorEmotionAnalyzer:
             if ROBERTA_AVAILABLE:
                 logger.info(f"🤖 ROBERTA ANALYSIS: RoBERTa transformer available, starting analysis")
                 try:
-                    # 🔥 PERFORMANCE FIX: Initialize RoBERTa classifier as class variable to avoid repeated loading
-                    if not hasattr(self.__class__, '_shared_roberta_classifier') or self.__class__._shared_roberta_classifier is None:
-                        logger.info("🤖 ROBERTA ANALYSIS: Initializing shared RoBERTa emotion classifier...")
-                        self.__class__._shared_roberta_classifier = pipeline(
-                            "text-classification",
-                            model="j-hartmann/emotion-english-distilroberta-base",
-                            return_all_scores=True,
-                            device=-1  # Force CPU to avoid GPU issues
-                        )
-                        logger.info("🤖 ROBERTA ANALYSIS: ✅ RoBERTa emotion classifier initialized and cached")
-                    
-                    # Use shared classifier
-                    self._roberta_classifier = self.__class__._shared_roberta_classifier
-                    
-                    # 🚨 CRITICAL: Check RoBERTa token limits before analysis
-                    is_safe, processed_content = self._check_roberta_token_limit(content)
-                    if not is_safe:
-                        logger.warning(
-                            "🚨 ROBERTA TOKEN LIMIT: Content was truncated to fit RoBERTa 514 token limit. "
-                            "Results may be incomplete. Consider using fallback emotion analysis."
-                        )
-                        # For extremely long content, we might want to skip RoBERTa entirely
-                        # and go straight to VADER or return neutral emotion
-                        estimated_original_tokens = len(content) // 4
-                        if estimated_original_tokens > ROBERTA_MAX_TOKENS * 2:  # Much too long
-                            logger.info(
-                                f"🚨 ROBERTA TOKEN LIMIT: Content too long ({estimated_original_tokens} tokens), "
-                                "skipping RoBERTa and using neutral emotion"
+                    # � THREAD SAFETY: Protect shared RoBERTa classifier access
+                    with self.__class__._roberta_classifier_lock:
+                        # �🔥 PERFORMANCE FIX: Initialize RoBERTa classifier as class variable to avoid repeated loading
+                        if not hasattr(self.__class__, '_shared_roberta_classifier') or self.__class__._shared_roberta_classifier is None:
+                            logger.info("🤖 ROBERTA ANALYSIS: Initializing shared RoBERTa emotion classifier...")
+                            self.__class__._shared_roberta_classifier = pipeline(
+                                "text-classification",
+                                model="j-hartmann/emotion-english-distilroberta-base",
+                                return_all_scores=True,
+                                device=-1  # Force CPU to avoid GPU issues
                             )
-                            emotion_scores["neutral"] = 0.9
-                            emotion_scores["unknown"] = 0.1
-                            return emotion_scores
-                    
-                    # Analyze emotions with RoBERTa (using processed content)
-                    logger.debug(f"🤖 ROBERTA ANALYSIS: Running RoBERTa inference on content")
-                    results = self._roberta_classifier(processed_content)
-                    logger.info(f"🤖 ROBERTA ANALYSIS: RoBERTa completed with {len(results[0])} emotion results")
+                            logger.info("🤖 ROBERTA ANALYSIS: ✅ RoBERTa emotion classifier initialized and cached")
+                        
+                        # Use shared classifier
+                        self._roberta_classifier = self.__class__._shared_roberta_classifier
+                        
+                        # 🚨 CRITICAL: Check RoBERTa token limits before analysis
+                        is_safe, processed_content = self._check_roberta_token_limit(content)
+                        if not is_safe:
+                            logger.warning(
+                                "🚨 ROBERTA TOKEN LIMIT: Content was truncated to fit RoBERTa 514 token limit. "
+                                "Results may be incomplete. Consider using fallback emotion analysis."
+                            )
+                            # For extremely long content, we might want to skip RoBERTa entirely
+                            # and go straight to VADER or return neutral emotion
+                            estimated_original_tokens = len(content) // 4
+                            if estimated_original_tokens > ROBERTA_MAX_TOKENS * 2:  # Much too long
+                                logger.info(
+                                    f"🚨 ROBERTA TOKEN LIMIT: Content too long ({estimated_original_tokens} tokens), "
+                                    "skipping RoBERTa and using neutral emotion"
+                                )
+                                emotion_scores["neutral"] = 0.9
+                                emotion_scores["unknown"] = 0.1
+                                return emotion_scores
+                        
+                        # 🔒 CRITICAL: Analyze emotions with RoBERTa (thread-safe access to shared classifier)
+                        logger.debug(f"🤖 ROBERTA ANALYSIS: Running RoBERTa inference on content")
+                        results = self._roberta_classifier(processed_content)
+                        logger.info(f"🤖 ROBERTA ANALYSIS: RoBERTa completed with {len(results[0])} emotion results")
                     
                     # Process RoBERTa results
                     for result in results[0]:  # First (only) text result

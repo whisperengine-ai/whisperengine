@@ -68,11 +68,11 @@ class CDLAIPromptIntegration:
 
     async def create_unified_character_prompt(
         self,
-        character_file: str,
         user_id: str,
         message_content: str,
         pipeline_result=None,  # Accept any type - will be converted to dict if needed
-        user_name: Optional[str] = None
+        user_name: Optional[str] = None,
+        character_file: Optional[str] = None  # Legacy compatibility - ignored in database-only mode
     ) -> str:
         """
         🎯 UNIFIED CHARACTER PROMPT CREATION - ALL FEATURES IN ONE PATH
@@ -159,6 +159,11 @@ class CDLAIPromptIntegration:
 
         except Exception as e:
             logger.error("🚨 UNIFIED: CDL integration failed: %s", str(e))
+            
+            # 🔍 Import traceback to get exact line where error occurred
+            import traceback
+            logger.error(f"🔍 TRACEBACK: {traceback.format_exc()}")
+            
             raise
 
     async def _build_unified_prompt(
@@ -405,6 +410,12 @@ class CDLAIPromptIntegration:
                 logger.debug(f"🔍 CDL DEBUG: pipeline_dict keys: {list(pipeline_dict.keys())}")
                 logger.debug(f"🔍 CDL DEBUG: comprehensive_context found: {bool(comprehensive_context)}, keys: {list(comprehensive_context.keys()) if isinstance(comprehensive_context, dict) else 'N/A'}")
                 
+                # 🔍 CRITICAL DEBUGGING: Check comprehensive_context type before processing
+                logger.debug(f"🔍 CDL DEBUG: comprehensive_context type: {type(comprehensive_context)}")
+                if not isinstance(comprehensive_context, dict):
+                    logger.error(f"🚨 FOUND ISSUE: comprehensive_context is {type(comprehensive_context)}, not dict: {comprehensive_context}")
+                    raise TypeError(f"comprehensive_context should be dict but is {type(comprehensive_context)}: {comprehensive_context}")
+                
                 if comprehensive_context:
                     guidance_parts = []
                     
@@ -634,16 +645,26 @@ class CDLAIPromptIntegration:
         # Add enhanced emotional intelligence context using Sprint 5 Advanced Emotional Intelligence
         if pipeline_dict:
             emotion_data = pipeline_dict.get('emotion_analysis', {})
-            if emotion_data:
+            logger.debug(f"🔍 CDL DEBUG: emotion_data type: {type(emotion_data)}, is_dict: {isinstance(emotion_data, dict)}")
+            if emotion_data and isinstance(emotion_data, dict):
                 primary_emotion = emotion_data.get('primary_emotion', '')
                 confidence = emotion_data.get('confidence', 0)
                 
                 if primary_emotion:
                     # Extract Sprint 5 advanced emotional intelligence data
                     advanced_analysis = emotion_data.get('advanced_analysis', {})
-                    secondary_emotions = advanced_analysis.get('secondary_emotions', [])
-                    emotional_trajectory = advanced_analysis.get('emotional_trajectory', [])
-                    cultural_context = advanced_analysis.get('cultural_context', {})
+                    logger.debug(f"🔍 CDL DEBUG: advanced_analysis type: {type(advanced_analysis)}, is_dict: {isinstance(advanced_analysis, dict)}")
+                    
+                    if isinstance(advanced_analysis, dict):
+                        secondary_emotions = advanced_analysis.get('secondary_emotions', [])
+                        emotional_trajectory = advanced_analysis.get('emotional_trajectory', [])
+                        cultural_context = advanced_analysis.get('cultural_context', {})
+                    else:
+                        logger.warning(f"🚨 CDL WARNING: advanced_analysis is not a dict: {type(advanced_analysis)}")
+                        secondary_emotions = []
+                        emotional_trajectory = []
+                        cultural_context = {}
+                    
                     is_multi_modal = emotion_data.get('multi_modal', False)
                     
                     # Build rich emotional context prompt
@@ -664,12 +685,15 @@ class CDLAIPromptIntegration:
                             prompt += f"\n🌊 EMOTIONAL TREND: Complex emotional state - be especially attentive to nuances"
                     
                     # Add cultural context awareness
-                    if cultural_context:
+                    if cultural_context and isinstance(cultural_context, dict):
                         expression_style = cultural_context.get('expression_style', '')
                         if expression_style == 'direct':
                             prompt += f"\n🗺️ CULTURAL CONTEXT: Direct communication style - be clear and straightforward"
                         elif expression_style == 'indirect':
                             prompt += f"\n🗺️ CULTURAL CONTEXT: Indirect communication style - read between the lines"
+                    elif cultural_context and isinstance(cultural_context, str):
+                        # Handle case where cultural_context is a string (like "western")
+                        prompt += f"\n🗺️ CULTURAL CONTEXT: {cultural_context} communication style"
                     
                     # Add multi-modal analysis indicator
                     if is_multi_modal:

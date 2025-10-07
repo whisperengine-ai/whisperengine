@@ -131,7 +131,7 @@ class BotConfigDiscovery:
         """Generate YAML for a single bot service."""
         
         environment_vars = [
-            f"DISCORD_BOT_NAME={config['display_name']}",
+            f"DISCORD_BOT_NAME={bot_name}",  # Use lowercase bot_name, not display_name
             "POSTGRES_HOST=postgres",
             # "REDIS_HOST=redis",  # Commented out - using vector-native memory only
             "QDRANT_HOST=qdrant",

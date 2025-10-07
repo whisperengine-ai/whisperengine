@@ -134,6 +134,10 @@ class MessageProcessor:
         self.trust_recovery = None
         self._sprint3_init_attempted = False  # Track if we've tried initializing
         
+        # Shared emotion analyzer for preventing RoBERTa race conditions
+        self._shared_emotion_analyzer = None
+        self._shared_analyzer_lock = asyncio.Lock()
+        
         # Initialize fidelity metrics collector for performance tracking
         try:
             from src.monitoring.fidelity_metrics_collector import get_fidelity_metrics_collector
@@ -230,8 +234,8 @@ class MessageProcessor:
                 message_context, conversation_context, ai_components
             )
             
-            # Phase 7.5: Analyze bot's emotional state from response
-            bot_emotion = await self._analyze_bot_emotion(response, message_context)
+            # Phase 7.5: Analyze bot's emotional state from response (SERIAL to avoid RoBERTa conflicts)
+            bot_emotion = await self._analyze_bot_emotion_with_shared_analyzer(response, message_context, ai_components)
             ai_components['bot_emotion'] = bot_emotion
             
             # Phase 8: Response validation and sanitization
@@ -1817,14 +1821,8 @@ class MessageProcessor:
                 tasks.append(emotion_task)
                 task_names.append("emotion_analysis")
             
-            # Task 1.5: Advanced Multi-Modal Emotional Intelligence
-            advanced_emotion_task = self._analyze_advanced_emotion_intelligence(
-                message_context.user_id,
-                message_context.content,
-                message_context
-            )
-            tasks.append(advanced_emotion_task)
-            task_names.append("advanced_emotion_intelligence")
+            # NOTE: Advanced emotion analysis moved to serial execution after parallel tasks
+            # to avoid RoBERTa model race conditions
             
             # Task 1.8: Memory Aging Intelligence (if enabled)
             memory_aging_task = self._analyze_memory_aging_intelligence(
@@ -1946,6 +1944,28 @@ class MessageProcessor:
                     idx += 1
             
             # 🚀 SOPHISTICATED RESULT INTEGRATION: Merge components with intelligent prioritization
+            
+            # 🎭 SERIAL ADVANCED EMOTION ANALYSIS: Run after basic analysis to avoid race conditions
+            basic_emotion_result = ai_components.get('emotion_analysis')
+            if basic_emotion_result:
+                logger.info("🎭 SERIAL EMOTION: Running advanced emotion analysis with basic results")
+                try:
+                    advanced_emotion_result = await self._analyze_advanced_emotion_intelligence_with_basic(
+                        message_context.user_id,
+                        message_context.content,
+                        message_context,
+                        basic_emotion_result  # Pass the basic analysis result
+                    )
+                    if advanced_emotion_result:
+                        ai_components['advanced_emotion_intelligence'] = advanced_emotion_result
+                        logger.info("🎭 SERIAL EMOTION: Advanced analysis completed successfully")
+                    else:
+                        logger.warning("🎭 SERIAL EMOTION: Advanced analysis returned None")
+                except Exception as e:
+                    logger.warning(f"🎭 SERIAL EMOTION: Advanced analysis failed: {e}")
+                    ai_components['advanced_emotion_intelligence'] = None
+            else:
+                logger.warning("🎭 SERIAL EMOTION: No basic emotion analysis available for advanced processing")
             
             # Extract core components for backward compatibility
             ai_components['emotion_data'] = ai_components.get('emotion_analysis')
@@ -2317,9 +2337,12 @@ class MessageProcessor:
             # Use the enhanced vector emotion analyzer from the bot core
             from src.intelligence.enhanced_vector_emotion_analyzer import EnhancedVectorEmotionAnalyzer
             
-            analyzer = EnhancedVectorEmotionAnalyzer(
-                vector_memory_manager=self.memory_manager
-            )
+            # Store analyzer in instance variable for later reuse (bot emotion analysis)
+            async with self._shared_analyzer_lock:
+                self._shared_emotion_analyzer = EnhancedVectorEmotionAnalyzer(
+                    vector_memory_manager=self.memory_manager
+                )
+                analyzer = self._shared_emotion_analyzer
             
             # Analyze emotion with vector intelligence (use the correct method name)
             emotion_results = await analyzer.analyze_emotion(
@@ -2336,6 +2359,7 @@ class MessageProcessor:
                     'intensity': emotion_results.intensity,
                     'confidence': emotion_results.confidence,
                     'analysis_method': 'vector_native'
+                    # NOTE: analyzer instance stored separately to avoid JSON serialization issues
                 }
                 logger.debug("Vector emotion analysis successful for user %s", user_id)
                 return emotion_data
@@ -2345,7 +2369,8 @@ class MessageProcessor:
         
         return None
 
-    async def _analyze_bot_emotion(self, response: str, message_context: MessageContext) -> Optional[Dict[str, Any]]:
+    async def _analyze_bot_emotion(self, response: str, message_context: MessageContext, 
+                                   analyzer = None) -> Optional[Dict[str, Any]]:
         """
         Analyze bot's emotional state from generated response text.
         
@@ -2357,18 +2382,18 @@ class MessageProcessor:
         Args:
             response: Bot's generated response text
             message_context: Context with bot name and conversation details
+            analyzer: Optional shared emotion analyzer to prevent RoBERTa conflicts
             
         Returns:
             Dict with primary_emotion, intensity, confidence, analysis_method
         """
         try:
-            # Enhanced Phase 7.5: Don't require bot_core for emotion analysis
-            # Use the enhanced vector emotion analyzer directly
-            from src.intelligence.enhanced_vector_emotion_analyzer import EnhancedVectorEmotionAnalyzer
-            
-            analyzer = EnhancedVectorEmotionAnalyzer(
-                vector_memory_manager=self.memory_manager
-            )
+            # Enhanced Phase 7.5: Use shared analyzer if provided to prevent RoBERTa race conditions
+            if analyzer is None:
+                from src.intelligence.enhanced_vector_emotion_analyzer import EnhancedVectorEmotionAnalyzer
+                analyzer = EnhancedVectorEmotionAnalyzer(
+                    vector_memory_manager=self.memory_manager
+                )
             
             # Analyze bot's response text to detect character emotion
             emotion_results = await analyzer.analyze_emotion(
@@ -2414,6 +2439,83 @@ class MessageProcessor:
             
         except Exception as e:
             logger.debug("Bot emotion analysis failed: %s", str(e))
+        
+        return None
+
+    async def _analyze_bot_emotion_with_shared_analyzer(self, response: str, message_context: MessageContext, 
+                                                       ai_components: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """
+        Analyze bot's emotional state using shared analyzer to prevent RoBERTa race conditions.
+        
+        Phase 7.5: Bot Emotion Tracking (Serial Execution)
+        - Uses the same analyzer instance from user emotion analysis to prevent conflicts
+        - Follows the same pattern as advanced emotion analysis serialization
+        
+        Args:
+            response: Bot's generated response text
+            message_context: Context with bot name and conversation details
+            ai_components: AI processing results containing emotion analyzer info
+            
+        Returns:
+            Dict with primary_emotion, intensity, confidence, analysis_method
+        """
+        try:
+            # Use shared analyzer if available (from user emotion analysis)
+            async with self._shared_analyzer_lock:
+                if self._shared_emotion_analyzer:
+                    logger.debug("🎭 BOT EMOTION: Using shared RoBERTa analyzer to prevent race conditions")
+                    analyzer = self._shared_emotion_analyzer
+                else:
+                    logger.debug("🎭 BOT EMOTION: Creating new analyzer (no shared analyzer available)")
+                    from src.intelligence.enhanced_vector_emotion_analyzer import EnhancedVectorEmotionAnalyzer
+                    analyzer = EnhancedVectorEmotionAnalyzer(
+                        vector_memory_manager=self.memory_manager
+                    )
+            
+            # Analyze bot's response text to detect character emotion
+            emotion_results = await analyzer.analyze_emotion(
+                content=response,
+                user_id=f"bot_{get_normalized_bot_name_from_env()}",  # Bot-specific ID
+                conversation_context=[],
+                recent_emotions=None
+            )
+            
+            # Convert results to dictionary format with MIXED EMOTIONS support
+            if emotion_results:
+                # Extract mixed emotions (same as user emotion storage)
+                mixed_emotions_list = emotion_results.mixed_emotions if hasattr(emotion_results, 'mixed_emotions') else []
+                all_emotions_dict = emotion_results.all_emotions if hasattr(emotion_results, 'all_emotions') else {}
+                
+                bot_emotion_data = {
+                    'primary_emotion': emotion_results.primary_emotion,
+                    'intensity': emotion_results.intensity,
+                    'confidence': emotion_results.confidence,
+                    'analysis_method': 'vector_native_shared_analyzer',
+                    'analyzed_text': response[:100] + '...' if len(response) > 100 else response,  # Sample for debugging
+                    # Phase 7.5 Enhancement: Mixed emotions for bot (same as user)
+                    'mixed_emotions': mixed_emotions_list,
+                    'all_emotions': all_emotions_dict,
+                    'emotion_count': len([e for e in all_emotions_dict.values() if e > 0.1]) if all_emotions_dict else 1
+                }
+                
+                if mixed_emotions_list:
+                    logger.debug(
+                        "Bot emotion analysis (shared): %s (%.2f) + mixed: %s",
+                        bot_emotion_data['primary_emotion'],
+                        bot_emotion_data['intensity'],
+                        [(e, round(i, 2)) for e, i in mixed_emotions_list[:2]]  # Log top 2 mixed emotions
+                    )
+                else:
+                    logger.debug(
+                        "Bot emotion analysis (shared): %s (%.2f intensity, %.2f confidence)",
+                        bot_emotion_data['primary_emotion'],
+                        bot_emotion_data['intensity'],
+                        bot_emotion_data['confidence']
+                    )
+                return bot_emotion_data
+            
+        except Exception as e:
+            logger.debug("Bot emotion analysis (shared) failed: %s", str(e))
         
         return None
 
@@ -2476,6 +2578,87 @@ class MessageProcessor:
                 
         except Exception as e:
             logger.debug("Advanced emotion intelligence analysis failed: %s", str(e))
+        
+        return None
+
+    async def _analyze_advanced_emotion_intelligence_with_basic(self, user_id: str, content: str, message_context: MessageContext, basic_emotion_result) -> Optional[Dict[str, Any]]:
+        """
+        Analyze emotions using advanced multi-modal intelligence with existing basic emotion results.
+        
+        This method is called serially after basic emotion analysis to avoid RoBERTa model race conditions.
+        Uses the existing basic emotion analysis as foundation instead of re-analyzing.
+        
+        Args:
+            user_id: User identifier for conversation context
+            content: Message content to analyze  
+            message_context: Full message context
+            basic_emotion_result: Result from basic emotion analysis (_analyze_emotion_vector_native)
+            
+        Returns:
+            Dict with enhanced emotion analysis including multi-modal scores
+        """
+        try:
+            # Import the advanced emotion detector
+            from src.intelligence.advanced_emotion_detector import AdvancedEmotionDetector
+            
+            # Initialize with memory manager for context  
+            detector = AdvancedEmotionDetector(
+                memory_manager=self.memory_manager
+            )
+            
+            # Convert basic emotion result to EmotionAnalysisResult format expected by AdvancedEmotionDetector
+            if basic_emotion_result and hasattr(basic_emotion_result, 'primary_emotion'):
+                # Already in EmotionAnalysisResult format
+                roberta_result = basic_emotion_result
+            elif isinstance(basic_emotion_result, dict):
+                # Convert dict format to EmotionAnalysisResult
+                from src.intelligence.enhanced_vector_emotion_analyzer import EmotionAnalysisResult
+                roberta_result = EmotionAnalysisResult(
+                    primary_emotion=basic_emotion_result.get('primary_emotion', 'neutral'),
+                    confidence=basic_emotion_result.get('confidence', 0.5),
+                    intensity=basic_emotion_result.get('intensity', 0.5),
+                    all_emotions=basic_emotion_result.get('all_emotions', {}),
+                    emotional_trajectory=basic_emotion_result.get('emotional_trajectory', []),
+                    context_emotions=basic_emotion_result.get('context_emotions', {}),
+                    analysis_time_ms=basic_emotion_result.get('analysis_time_ms', 0)
+                )
+            else:
+                logger.warning("🎭 SERIAL EMOTION: Invalid basic emotion result format, skipping advanced analysis")
+                return None
+            
+            # Perform advanced emotion analysis using existing basic results (no re-analysis)
+            emotion_results = await detector.detect_advanced_emotions_with_roberta_result(
+                text=content,
+                user_id=user_id, 
+                roberta_result=roberta_result,
+                context={}
+            )
+            
+            if emotion_results:
+                # Convert AdvancedEmotionalState to standardized format for AI components
+                advanced_emotion_data = {
+                    'primary_emotion': emotion_results.primary_emotion,
+                    'intensity': emotion_results.emotional_intensity,
+                    'confidence': 0.8,  # Default confidence for advanced analysis
+                    'analysis_method': 'advanced_multi_modal_serial',
+                    'secondary_emotions': emotion_results.secondary_emotions,
+                    'emoji_analysis': emotion_results.emoji_analysis,
+                    'text_indicators': emotion_results.text_indicators,
+                    'emotional_trajectory': emotion_results.emotional_trajectory,
+                    'pattern_type': emotion_results.pattern_type,
+                    'cultural_context': emotion_results.cultural_context
+                }
+                
+                logger.debug(
+                    "🎭 SERIAL EMOTION: Advanced analysis successful: %s (%.2f intensity, pattern: %s)",
+                    advanced_emotion_data['primary_emotion'],
+                    advanced_emotion_data['intensity'],
+                    advanced_emotion_data['pattern_type'] or 'stable'
+                )
+                return advanced_emotion_data
+                
+        except Exception as e:
+            logger.debug("🎭 SERIAL EMOTION: Advanced emotion intelligence analysis failed: %s", str(e))
         
         return None
 
@@ -3060,17 +3243,9 @@ class MessageProcessor:
                 message_context.user_id, conversation_context, message_context, ai_components
             )
             
-            # Apply emotion enhancement
-            emotion_enhanced_context = await self._add_mixed_emotion_context(
-                enhanced_context if enhanced_context else conversation_context,
-                message_context.content,
-                message_context.user_id,
-                ai_components.get('emotion_data'),
-                ai_components.get('external_emotion_data')
-            )
-            
-            # Choose final context
-            final_context = emotion_enhanced_context if emotion_enhanced_context else conversation_context
+            # 🎭 CRITICAL FIX: Use enhanced context if CDL enhancement succeeded, otherwise use original
+            # The emotion enhancement is already included in CDL enhancement, so no need for separate step
+            final_context = enhanced_context if enhanced_context else conversation_context
             
             # 📝 COMPREHENSIVE PROMPT LOGGING: Log full prompts to file for review
             await self._log_full_prompt_to_file(final_context, message_context.user_id)
@@ -3149,18 +3324,12 @@ class MessageProcessor:
             import os
             logger.info("🎭 CDL CHARACTER DEBUG: Starting sophisticated enhancement for user %s", user_id)
             
-            # Use CDL_DEFAULT_CHARACTER directly from environment - no dependency on CDL handler
-            character_file = os.getenv("CDL_DEFAULT_CHARACTER")
-            
-            if not character_file:
-                logger.info("🎭 CDL CHARACTER DEBUG: No CDL_DEFAULT_CHARACTER environment variable set")
-                return None
-            
+            # Use database-only character loading (character_file parameter is legacy compatibility)
             bot_name = os.getenv("DISCORD_BOT_NAME", "Unknown")
-            logger.info("🎭 CDL CHARACTER: Using %s bot default character (%s) for user %s", 
-                       bot_name, character_file, user_id)
+            logger.info("🎭 CDL CHARACTER: Using database-only character loading for %s bot, user %s", 
+                       bot_name, user_id)
             
-            logger.info("🎭 CDL CHARACTER: User %s has active character: %s", user_id, character_file)
+            logger.info("🎭 CDL CHARACTER: User %s using database character for bot: %s", user_id, bot_name)
             
             # Import CDL integration modules
             from src.prompts.cdl_ai_integration import CDLAIPromptIntegration
@@ -3172,14 +3341,25 @@ class MessageProcessor:
                 user_id=user_id,
                 message_content=message_context.content,
                 timestamp=datetime.now(),
-                # Map emotion data to emotional_state
-                emotional_state=str(ai_components.get('external_emotion_data')) if ai_components.get('external_emotion_data') else str(ai_components.get('emotion_data')) if ai_components.get('emotion_data') else None,
+                # Map emotion data to emotional_state - keep as dict for processing, convert to str only if needed
+                emotional_state=ai_components.get('external_emotion_data') or ai_components.get('emotion_data'),
                 mood_assessment=ai_components.get('external_emotion_data') if isinstance(ai_components.get('external_emotion_data'), dict) else None,
                 # Map personality data 
                 personality_profile=ai_components.get('personality_context') if isinstance(ai_components.get('personality_context'), dict) else None,
                 # Map phase4 data
                 enhanced_context=ai_components.get('phase4_context') if isinstance(ai_components.get('phase4_context'), dict) else None
             )
+            
+            # 🎭 CRITICAL FIX: Add emotion_analysis mapping for CDL integration  
+            # The CDL system looks for 'emotion_analysis' in pipeline_dict, but we store under 'emotion_data'
+            emotion_data = ai_components.get('emotion_data')
+            logger.debug(f"🎭 DEBUG: emotion_data type: {type(emotion_data)}, content: {emotion_data}")
+            if emotion_data and isinstance(emotion_data, dict):
+                # Add emotion_analysis as direct attribute to pipeline result for CDL integration
+                setattr(pipeline_result, 'emotion_analysis', emotion_data)
+                logger.info("🎭 EMOTION FIX: Added emotion_analysis attribute to pipeline for CDL integration")
+            else:
+                logger.warning(f"🎭 EMOTION WARNING: emotion_data is not a dict - type: {type(emotion_data)}, value: {emotion_data}")
             
             # 🎯 SOPHISTICATED CONTEXT ANALYSIS INTEGRATION: Add context analysis insights to pipeline result
             context_analysis = ai_components.get('context_analysis')
@@ -3254,11 +3434,11 @@ class MessageProcessor:
             
             # 🚀 FULL INTELLIGENCE: Use complete character-aware prompt with all emotional intelligence
             character_prompt = await cdl_integration.create_unified_character_prompt(
-                character_file=character_file,
                 user_id=user_id,
                 message_content=message_context.content,
                 pipeline_result=pipeline_result,
                 user_name=user_display_name
+                # character_file parameter removed - using database-only approach
             )
             
             # 🎯 WORKFLOW INTEGRATION: Inject workflow transaction context into character prompt
@@ -3300,7 +3480,8 @@ class MessageProcessor:
             # Clone the conversation context and replace/enhance system message
             enhanced_context = conversation_context.copy()
             
-            # Find system message and replace with character-aware prompt
+            # 🚨 CRITICAL FIX: Replace ONLY the first system message with character prompt
+            # but PRESERVE any additional system messages (RELEVANT MEMORIES, CONVERSATION FLOW)
             system_message_found = False
             for i, msg in enumerate(enhanced_context):
                 if msg.get('role') == 'system':
@@ -3309,7 +3490,8 @@ class MessageProcessor:
                         'content': character_prompt
                     }
                     system_message_found = True
-                    logger.info("🎭 CDL CHARACTER: Replaced system message with character prompt (%d chars)", len(character_prompt))
+                    logger.info("🎭 CDL CHARACTER: Replaced FIRST system message with character prompt (%d chars)", len(character_prompt))
+                    # 🚨 CRITICAL: Don't break here! Let other system messages (memories, conversation flow) remain
                     break
             
             # If no system message found, add character prompt as first message
@@ -3320,72 +3502,18 @@ class MessageProcessor:
                 })
                 logger.info("🎭 CDL CHARACTER: Added character prompt as new system message (%d chars)", len(character_prompt))
             
-            logger.info("🎭 CDL CHARACTER: Enhanced conversation context with %s personality", character_file)
+            # 🚨 DEBUG: Log what system messages we have in final enhanced context
+            system_msg_count = sum(1 for msg in enhanced_context if msg.get('role') == 'system')
+            logger.info("🎭 CDL CHARACTER: Final enhanced context has %d system messages and %d total messages", 
+                       system_msg_count, len(enhanced_context))
+            
+            logger.info("🎭 CDL CHARACTER: Enhanced conversation context with database-only character for %s", bot_name)
             return enhanced_context
             
         except Exception as e:
             logger.error("🎭 CDL CHARACTER ERROR: Failed to apply character enhancement: %s", e)
             logger.error("🎭 CDL CHARACTER ERROR: Falling back to original conversation context")
             return None
-            try:
-                from src.prompts.vector_native_prompt_manager import create_vector_native_prompt_manager
-                
-                # Create vector-native prompt manager
-                vector_prompt_manager = create_vector_native_prompt_manager(
-                    vector_memory_system=self.memory_manager,
-                    personality_engine=None  # Reserved for future use
-                )
-                
-                # Extract emotional context from pipeline for vector enhancement
-                emotional_context = None
-                if pipeline_result and hasattr(pipeline_result, 'emotional_state'):
-                    emotional_context = pipeline_result.emotional_state
-                
-                # Enhance character prompt with vector-native context
-                vector_enhanced_prompt = await vector_prompt_manager.create_contextualized_prompt(
-                    base_prompt=character_prompt,
-                    user_id=user_id,
-                    current_message=message_context.content,
-                    emotional_context=emotional_context
-                )
-                
-                logger.info(f"🎯 VECTOR-NATIVE: Enhanced character prompt with dynamic context ({len(vector_enhanced_prompt)} chars)")
-                character_prompt = vector_enhanced_prompt
-                
-            except Exception as e:
-                logger.debug(f"Vector-native prompt enhancement unavailable, using CDL-only: {e}")
-                # Continue with CDL-only character prompt
-            
-            # Clone the conversation context and replace/enhance system message
-            enhanced_context = conversation_context.copy()
-            
-            # Find system message and replace with character-aware prompt
-            system_message_found = False
-            for i, msg in enumerate(enhanced_context):
-                if msg.get('role') == 'system':
-                    enhanced_context[i] = {
-                        'role': 'system',
-                        'content': character_prompt
-                    }
-                    system_message_found = True
-                    logger.info(f"🎭 CDL CHARACTER: Replaced system message with character prompt ({len(character_prompt)} chars)")
-                    break
-            
-            # If no system message found, add character prompt as first message
-            if not system_message_found:
-                enhanced_context.insert(0, {
-                    'role': 'system', 
-                    'content': character_prompt
-                })
-                logger.info(f"🎭 CDL CHARACTER: Added character prompt as new system message ({len(character_prompt)} chars)")
-            
-            logger.info(f"🎭 CDL CHARACTER: Enhanced conversation context with {character_file} personality")
-            return enhanced_context
-            
-        except Exception as e:
-            logger.error(f"🎭 CDL CHARACTER ERROR: Failed to apply character enhancement: {e}")
-            logger.error(f"🎭 CDL CHARACTER ERROR: Falling back to original conversation context")
-            return conversation_context
 
     async def _add_mixed_emotion_context(self, conversation_context: List[Dict[str, str]], 
                                        content: str, user_id: str, emotion_data, external_emotion_data) -> List[Dict[str, str]]:

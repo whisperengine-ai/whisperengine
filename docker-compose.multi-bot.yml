@@ -131,7 +131,7 @@ services:
     env_file:
       - .env.jake
     environment:
-      - DISCORD_BOT_NAME=Jake
+      - DISCORD_BOT_NAME=jake
       - POSTGRES_HOST=postgres
       - QDRANT_HOST=qdrant
       - MODEL_CACHE_DIR=/app/models
@@ -196,7 +196,7 @@ services:
     env_file:
       - .env.marcus
     environment:
-      - DISCORD_BOT_NAME=Marcus
+      - DISCORD_BOT_NAME=marcus
       - POSTGRES_HOST=postgres
       - QDRANT_HOST=qdrant
       - MODEL_CACHE_DIR=/app/models
@@ -261,7 +261,7 @@ services:
     env_file:
       - .env.dotty
     environment:
-      - DISCORD_BOT_NAME=Dotty
+      - DISCORD_BOT_NAME=dotty
       - POSTGRES_HOST=postgres
       - QDRANT_HOST=qdrant
       - MODEL_CACHE_DIR=/app/models
@@ -326,7 +326,7 @@ services:
     env_file:
       - .env.dream
     environment:
-      - DISCORD_BOT_NAME=Dream
+      - DISCORD_BOT_NAME=dream
       - POSTGRES_HOST=postgres
       - QDRANT_HOST=qdrant
       - MODEL_CACHE_DIR=/app/models
@@ -391,7 +391,7 @@ services:
     env_file:
       - .env.aetheris
     environment:
-      - DISCORD_BOT_NAME=Aetheris
+      - DISCORD_BOT_NAME=aetheris
       - POSTGRES_HOST=postgres
       - QDRANT_HOST=qdrant
       - MODEL_CACHE_DIR=/app/models
@@ -456,7 +456,7 @@ services:
     env_file:
       - .env.elena
     environment:
-      - DISCORD_BOT_NAME=Elena
+      - DISCORD_BOT_NAME=elena
       - POSTGRES_HOST=postgres
       - QDRANT_HOST=qdrant
       - MODEL_CACHE_DIR=/app/models
@@ -521,7 +521,7 @@ services:
     env_file:
       - .env.aethys
     environment:
-      - DISCORD_BOT_NAME=Aethys
+      - DISCORD_BOT_NAME=aethys
       - POSTGRES_HOST=postgres
       - QDRANT_HOST=qdrant
       - MODEL_CACHE_DIR=/app/models
@@ -586,7 +586,7 @@ services:
     env_file:
       - .env.ryan
     environment:
-      - DISCORD_BOT_NAME=Ryan
+      - DISCORD_BOT_NAME=ryan
       - POSTGRES_HOST=postgres
       - QDRANT_HOST=qdrant
       - MODEL_CACHE_DIR=/app/models
@@ -651,7 +651,7 @@ services:
     env_file:
       - .env.gabriel
     environment:
-      - DISCORD_BOT_NAME=Gabriel
+      - DISCORD_BOT_NAME=gabriel
       - POSTGRES_HOST=postgres
       - QDRANT_HOST=qdrant
       - MODEL_CACHE_DIR=/app/models
@@ -716,7 +716,7 @@ services:
     env_file:
       - .env.sophia
     environment:
-      - DISCORD_BOT_NAME=Sophia
+      - DISCORD_BOT_NAME=sophia
       - POSTGRES_HOST=postgres
       - QDRANT_HOST=qdrant
       - MODEL_CACHE_DIR=/app/models
