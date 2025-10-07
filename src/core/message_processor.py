@@ -1803,6 +1803,14 @@ class MessageProcessor:
             tasks.append(advanced_emotion_task)
             task_names.append("advanced_emotion_intelligence")
             
+            # Task 1.8: Memory Aging Intelligence (if enabled)
+            memory_aging_task = self._analyze_memory_aging_intelligence(
+                message_context.user_id,
+                message_context
+            )
+            tasks.append(memory_aging_task)
+            task_names.append("memory_aging_intelligence")
+            
             # Task 2: Enhanced context analysis using hybrid detector
             context_task = self._analyze_enhanced_context(
                 message_context.content,
@@ -1931,6 +1939,22 @@ class MessageProcessor:
                     # Use advanced analysis as primary emotion data
                     ai_components['emotion_data'] = advanced_emotion
                 logger.info("🎭 Enhanced emotion analysis with advanced multi-modal intelligence")
+            
+            # Memory Aging Intelligence integration
+            memory_aging = ai_components.get('memory_aging_intelligence')
+            if memory_aging:
+                # Add memory health context for AI conversation optimization
+                ai_components['memory_health'] = {
+                    'status': memory_aging.get('health_status', 'unknown'),
+                    'optimization_needed': memory_aging.get('health_status') in ['poor', 'fair'],
+                    'total_memories': memory_aging.get('total_memories', 0),
+                    'prunable_ratio': memory_aging.get('flagged_ratio', 0),
+                    'analysis_time': memory_aging.get('processing_time', 0)
+                }
+                logger.info("🧠 Added memory aging intelligence: %s health (%d memories, %.1f%% prunable)",
+                           memory_aging.get('health_status', 'unknown'),
+                           memory_aging.get('total_memories', 0),
+                           memory_aging.get('flagged_ratio', 0) * 100)
             
             # Build comprehensive context from all AI components
             comprehensive_context = {}
@@ -2404,6 +2428,95 @@ class MessageProcessor:
                 
         except Exception as e:
             logger.debug("Advanced emotion intelligence analysis failed: %s", str(e))
+        
+        return None
+
+    async def _analyze_memory_aging_intelligence(self, user_id: str, message_context: MessageContext) -> Optional[Dict[str, Any]]:
+        """
+        Analyze memory aging patterns and perform intelligent memory management.
+        
+        Memory Aging Intelligence:
+        - Evaluates memory health and identifies optimization opportunities
+        - Performs selective memory aging to prevent unbounded growth
+        - Preserves high-value memories while pruning low-value content
+        - Provides memory health metrics for conversation optimization
+        
+        Args:
+            user_id: User identifier for memory analysis
+            message_context: Context for conversation-aware aging
+            
+        Returns:
+            Dict with memory health metrics and aging results
+        """
+        try:
+            # Check if memory aging is enabled
+            import os
+            if os.getenv('MEMORY_AGING_ENABLED', 'false').lower() != 'true':
+                logger.debug("Memory aging intelligence disabled via environment")
+                return None
+                
+            # Import memory aging components
+            from src.memory.aging.aging_policy import MemoryAgingPolicy
+            from src.memory.aging.aging_runner import MemoryAgingRunner
+            
+            # Create aging policy with safe defaults
+            aging_policy = MemoryAgingPolicy(
+                importance_weight=0.6,
+                recency_weight=0.3,
+                access_weight=0.1,
+                decay_lambda=float(os.getenv('MEMORY_DECAY_LAMBDA', '0.01')),
+                prune_threshold=float(os.getenv('MEMORY_PRUNE_THRESHOLD', '0.2'))
+            )
+            
+            # Create aging runner
+            aging_runner = MemoryAgingRunner(
+                memory_manager=self.memory_manager,
+                policy=aging_policy
+            )
+            
+            # Perform memory aging analysis (dry run by default for conversation processing)
+            aging_results = await aging_runner.run(
+                user_id=user_id,
+                dry_run=True  # Always dry run during conversation processing
+            )
+            
+            if aging_results:
+                # Calculate memory health metrics
+                total_memories = aging_results['scanned']
+                flagged_ratio = aging_results['flagged'] / total_memories if total_memories > 0 else 0
+                preserved_ratio = aging_results['preserved'] / total_memories if total_memories > 0 else 0
+                
+                # Determine memory health status
+                if flagged_ratio > 0.4:
+                    health_status = "poor"  # >40% flagged for pruning
+                elif flagged_ratio > 0.2:
+                    health_status = "fair"  # >20% flagged for pruning
+                else:
+                    health_status = "good"  # <20% flagged for pruning
+                
+                memory_aging_data = {
+                    'health_status': health_status,
+                    'total_memories': total_memories,
+                    'memories_flagged': aging_results['flagged'],
+                    'memories_preserved': aging_results['preserved'],
+                    'flagged_ratio': round(flagged_ratio, 3),
+                    'preserved_ratio': round(preserved_ratio, 3),
+                    'processing_time': aging_results['elapsed_seconds'],
+                    'aging_enabled': True,
+                    'analysis_method': 'memory_aging_intelligence'
+                }
+                
+                logger.debug(
+                    "Memory aging analysis: %s health (%d total, %d flagged, %.1f%% prunable)",
+                    memory_aging_data['health_status'],
+                    memory_aging_data['total_memories'],
+                    memory_aging_data['memories_flagged'],
+                    memory_aging_data['flagged_ratio'] * 100
+                )
+                return memory_aging_data
+                
+        except Exception as e:
+            logger.debug("Memory aging intelligence analysis failed: %s", str(e))
         
         return None
 
