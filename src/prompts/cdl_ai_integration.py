@@ -631,15 +631,51 @@ class CDLAIPromptIntegration:
                 logger.error(f"❌ KNOWLEDGE: Fact retrieval failed: {e}")
                 # Continue without facts - don't break conversation flow
 
-        # Add emotional intelligence context early to inform interpretation
+        # Add enhanced emotional intelligence context using Sprint 5 Advanced Emotional Intelligence
         if pipeline_dict:
             emotion_data = pipeline_dict.get('emotion_analysis', {})
             if emotion_data:
                 primary_emotion = emotion_data.get('primary_emotion', '')
                 confidence = emotion_data.get('confidence', 0)
+                
                 if primary_emotion:
-                    prompt += f"\n\n🎭 USER EMOTIONAL STATE: {primary_emotion} (confidence: {confidence:.2f})"
-                    prompt += f"\nRespond with appropriate empathy and emotional intelligence."
+                    # Extract Sprint 5 advanced emotional intelligence data
+                    advanced_analysis = emotion_data.get('advanced_analysis', {})
+                    secondary_emotions = advanced_analysis.get('secondary_emotions', [])
+                    emotional_trajectory = advanced_analysis.get('emotional_trajectory', [])
+                    cultural_context = advanced_analysis.get('cultural_context', {})
+                    is_multi_modal = emotion_data.get('multi_modal', False)
+                    
+                    # Build rich emotional context prompt
+                    if secondary_emotions and len(secondary_emotions) > 0:
+                        secondary_str = ', '.join(secondary_emotions[:2])  # Limit to 2 for clarity
+                        prompt += f"\n\n🎭 USER EMOTIONAL STATE: {primary_emotion} with undertones of {secondary_str} (confidence: {confidence:.2f})"
+                    else:
+                        prompt += f"\n\n🎭 USER EMOTIONAL STATE: {primary_emotion} (confidence: {confidence:.2f})"
+                    
+                    # Add emotional trajectory context
+                    if emotional_trajectory and len(emotional_trajectory) > 0:
+                        trajectory_pattern = emotional_trajectory[-1] if emotional_trajectory else 'stable'
+                        if trajectory_pattern in ['intensifying', 'escalating']:
+                            prompt += f"\n📈 EMOTIONAL TREND: Their emotions are intensifying - respond with extra sensitivity"
+                        elif trajectory_pattern in ['calming', 'settling']:
+                            prompt += f"\n📉 EMOTIONAL TREND: Their emotions are calming - provide gentle support"
+                        elif trajectory_pattern in ['fluctuating', 'mixed']:
+                            prompt += f"\n🌊 EMOTIONAL TREND: Complex emotional state - be especially attentive to nuances"
+                    
+                    # Add cultural context awareness
+                    if cultural_context:
+                        expression_style = cultural_context.get('expression_style', '')
+                        if expression_style == 'direct':
+                            prompt += f"\n🗺️ CULTURAL CONTEXT: Direct communication style - be clear and straightforward"
+                        elif expression_style == 'indirect':
+                            prompt += f"\n🗺️ CULTURAL CONTEXT: Indirect communication style - read between the lines"
+                    
+                    # Add multi-modal analysis indicator
+                    if is_multi_modal:
+                        prompt += f"\n📱 ANALYSIS: Multi-modal emotion detection (text + emoji + patterns) - high accuracy"
+                    
+                    prompt += f"\nRespond with nuanced empathy matching their emotional complexity and communication style."
 
         # Add memory context intelligence
         if relevant_memories:
