@@ -1,0 +1,112 @@
+[
+  {
+    "character_name": "Dream",
+    "character_id": 2,
+    "traits_count": 5,
+    "styles_count": 32,
+    "values_count": 5,
+    "anti_patterns_count": 4,
+    "knowledge_count": 21,
+    "migration_timestamp": "2025-10-06T16:18:14.599910",
+    "status": "completed"
+  },
+  {
+    "character_name": "Dotty",
+    "character_id": 3,
+    "traits_count": 10,
+    "styles_count": 60,
+    "values_count": 24,
+    "anti_patterns_count": 4,
+    "knowledge_count": 23,
+    "migration_timestamp": "2025-10-06T16:18:14.670031",
+    "status": "completed"
+  },
+  {
+    "character_name": "Gabriel",
+    "character_id": 4,
+    "traits_count": 12,
+    "styles_count": 42,
+    "values_count": 9,
+    "anti_patterns_count": 5,
+    "knowledge_count": 15,
+    "migration_timestamp": "2025-10-06T16:18:14.726897",
+    "status": "completed"
+  },
+  {
+    "character_name": "Aetheris",
+    "character_id": 5,
+    "traits_count": 12,
+    "styles_count": 21,
+    "values_count": 7,
+    "anti_patterns_count": 5,
+    "knowledge_count": 9,
+    "migration_timestamp": "2025-10-06T16:18:14.757053",
+    "status": "completed"
+  },
+  {
+    "character_name": "Sophia Blake",
+    "character_id": 6,
+    "traits_count": 0,
+    "styles_count": 9,
+    "values_count": 0,
+    "anti_patterns_count": 1,
+    "knowledge_count": 15,
+    "migration_timestamp": "2025-10-06T16:18:14.770938",
+    "status": "completed"
+  },
+  {
+    "character_name": "Jake Sterling",
+    "character_id": 7,
+    "traits_count": 5,
+    "styles_count": 38,
+    "values_count": 9,
+    "anti_patterns_count": 1,
+    "knowledge_count": 22,
+    "migration_timestamp": "2025-10-06T16:18:14.809008",
+    "status": "completed"
+  },
+  {
+    "character_name": "Elena Rodriguez",
+    "character_id": 8,
+    "traits_count": 9,
+    "styles_count": 56,
+    "values_count": 24,
+    "anti_patterns_count": 5,
+    "knowledge_count": 22,
+    "migration_timestamp": "2025-10-06T16:18:14.867771",
+    "status": "completed"
+  },
+  {
+    "character_name": "Ryan Chen",
+    "character_id": 9,
+    "traits_count": 8,
+    "styles_count": 50,
+    "values_count": 23,
+    "anti_patterns_count": 5,
+    "knowledge_count": 21,
+    "migration_timestamp": "2025-10-06T16:18:14.920729",
+    "status": "completed"
+  },
+  {
+    "character_name": "Aethys",
+    "character_id": 10,
+    "traits_count": 5,
+    "styles_count": 25,
+    "values_count": 6,
+    "anti_patterns_count": 0,
+    "knowledge_count": 20,
+    "migration_timestamp": "2025-10-06T16:18:14.949604",
+    "status": "completed"
+  },
+  {
+    "character_name": "Dr. Marcus Thompson",
+    "character_id": 11,
+    "traits_count": 11,
+    "styles_count": 35,
+    "values_count": 27,
+    "anti_patterns_count": 1,
+    "knowledge_count": 20,
+    "migration_timestamp": "2025-10-06T16:18:14.996597",
+    "status": "completed"
+  }
+]

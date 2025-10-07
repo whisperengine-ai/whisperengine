@@ -82,6 +82,35 @@ services:
       timeout: 10s
       retries: 3
 
+  # CDL Web UI for character authoring and management
+  cdl-web-ui:
+    build:
+      context: ./cdl-web-ui
+      dockerfile: Dockerfile
+    container_name: whisperengine-cdl-web-ui
+    restart: unless-stopped
+    environment:
+      # PostgreSQL connection (same as WhisperEngine bots)
+      PGHOST: postgres
+      PGPORT: 5432
+      PGDATABASE: whisperengine
+      PGUSER: whisperengine
+      PGPASSWORD: whisperengine_password
+      # Next.js configuration
+      NODE_ENV: production
+      NEXT_TELEMETRY_DISABLED: 1
+    ports:
+      - "3001:3000"
+    depends_on:
+      - postgres
+    networks:
+      - bot_network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:3000/api/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
   # ===== SHARED BOT IMAGE BUILD =====
   whisperengine-bot-builder:
     build:
