@@ -142,6 +142,294 @@ class CDLAIPromptIntegration:
         
         return ""
 
+    async def generate_curiosity_questions(
+        self,
+        user_id: str,
+        character_name: str,
+        semantic_router=None
+    ) -> list:
+        """
+        🎯 STEP 7: Intelligent Question Generation
+        
+        Analyze user facts for knowledge gaps and generate natural follow-up questions.
+        Characters ask deeper questions about established interests to build richer understanding.
+        
+        Examples:
+        - Known: User loves marine biology (confidence 0.9) → Unknown: How they learned about it
+        - Generate: "How did you first get interested in marine biology?"
+        
+        Args:
+            user_id: User identifier
+            character_name: Character asking questions (for personality matching)
+            semantic_router: Router for fact retrieval (optional, uses self.semantic_router if available)
+            
+        Returns:
+            List of generated curiosity questions with metadata
+        """
+        if not semantic_router and not self.semantic_router:
+            return []
+        
+        router = semantic_router or self.semantic_router
+        
+        try:
+            # Get user facts to identify knowledge gaps
+            facts = await router.get_character_aware_facts(
+                user_id=user_id,
+                character_name=character_name,
+                limit=50
+            )
+            
+            if not facts:
+                return []
+            
+            # Filter for high-confidence facts (established interests)
+            high_confidence_facts = []
+            for fact in facts:
+                confidence = fact.get('confidence', 0.0)
+                if confidence > 0.8:  # High confidence threshold
+                    high_confidence_facts.append(fact)
+            
+            if not high_confidence_facts:
+                return []
+            
+            # Generate gap analysis questions
+            curiosity_questions = []
+            
+            for fact in high_confidence_facts[:5]:  # Limit to top 5 facts
+                entity_name = fact.get('entity_name', '')
+                relationship = fact.get('relationship_type', '')
+                confidence = fact.get('confidence', 0.0)
+                
+                if not entity_name:
+                    continue
+                
+                # Analyze what we DON'T know about this entity
+                gap_questions = await self._identify_knowledge_gaps(
+                    entity_name, relationship, confidence, facts, character_name
+                )
+                
+                curiosity_questions.extend(gap_questions)
+            
+            # Character-specific filtering and personality matching
+            personality_matched_questions = await self._filter_questions_by_character_personality(
+                curiosity_questions, character_name
+            )
+            
+            # Remove duplicates and prioritize
+            unique_questions = self._deduplicate_and_prioritize_questions(personality_matched_questions)
+            
+            return unique_questions[:3]  # Return top 3 questions
+            
+        except Exception as e:
+            logger.debug(f"Failed to generate curiosity questions: {e}")
+            return []
+
+    async def _identify_knowledge_gaps(
+        self, 
+        entity_name: str, 
+        relationship: str, 
+        confidence: float,
+        all_facts: list,
+        character_name: str
+    ) -> list:
+        """Identify specific knowledge gaps around an entity"""
+        gap_questions = []
+        
+        # Common knowledge gap patterns
+        gap_patterns = {
+            'origin': {
+                'keywords': ['learned', 'discovered', 'started', 'began', 'introduction'],
+                'question_templates': [
+                    f"How did you first get interested in {entity_name}?",
+                    f"What got you into {entity_name}?",
+                    f"When did you start with {entity_name}?"
+                ]
+            },
+            'experience': {
+                'keywords': ['experience', 'time', 'duration', 'years', 'practice'],
+                'question_templates': [
+                    f"How long have you been into {entity_name}?",
+                    f"What's your experience with {entity_name} been like?",
+                    f"How much experience do you have with {entity_name}?"
+                ]
+            },
+            'specifics': {
+                'keywords': ['favorite', 'preferred', 'type', 'style', 'aspect'],
+                'question_templates': [
+                    f"What aspects of {entity_name} do you enjoy most?",
+                    f"What's your favorite thing about {entity_name}?",
+                    f"What type of {entity_name} interests you most?"
+                ]
+            },
+            'location': {
+                'keywords': ['where', 'location', 'place', 'local'],
+                'question_templates': [
+                    f"Where do you usually {relationship.replace('likes', 'enjoy').replace('interested in', 'explore')} {entity_name}?",
+                    f"Do you have a favorite place for {entity_name}?",
+                    f"Where do you go for {entity_name}?"
+                ]
+            },
+            'community': {
+                'keywords': ['people', 'friends', 'community', 'others', 'share'],
+                'question_templates': [
+                    f"Do you share your interest in {entity_name} with others?",
+                    f"Have you met others through {entity_name}?",
+                    f"Who introduced you to {entity_name}?"
+                ]
+            }
+        }
+        
+        # Check which gaps exist
+        for gap_type, pattern in gap_patterns.items():
+            # Look for existing facts that would fill this gap
+            gap_filled = False
+            for fact in all_facts:
+                fact_text = f"{fact.get('entity_name', '')} {fact.get('relationship_type', '')}"
+                if any(keyword in fact_text.lower() for keyword in pattern['keywords']):
+                    if entity_name.lower() in fact_text.lower():
+                        gap_filled = True
+                        break
+            
+            # If gap not filled, generate question
+            if not gap_filled:
+                # Choose appropriate template based on entity and relationship
+                template = self._select_best_question_template(
+                    pattern['question_templates'], entity_name, relationship, character_name
+                )
+                
+                if template:
+                    gap_questions.append({
+                        'question': template,
+                        'gap_type': gap_type,
+                        'entity': entity_name,
+                        'confidence_score': confidence,
+                        'relevance': self._calculate_question_relevance(gap_type, entity_name, character_name)
+                    })
+        
+        return gap_questions
+
+    def _select_best_question_template(
+        self, 
+        templates: list, 
+        entity_name: str, 
+        relationship: str,
+        character_name: str
+    ) -> str:
+        """Select the best question template based on entity type and character personality"""
+        
+        # Character-specific preferences
+        character_lower = character_name.lower()
+        
+        # Activity-based entities (diving, photography, hiking)
+        activity_entities = ['diving', 'photography', 'hiking', 'climbing', 'swimming', 'running', 'cycling']
+        
+        # Food entities
+        food_entities = ['pizza', 'sushi', 'thai food', 'italian', 'chinese', 'mexican']
+        
+        # Topic/subject entities (marine biology, AI, science)
+        topic_entities = ['biology', 'science', 'ai', 'technology', 'research', 'music', 'art']
+        
+        # Select based on entity type and character
+        entity_lower = entity_name.lower()
+        
+        if any(activity in entity_lower for activity in activity_entities):
+            # For activities, prefer experience and location questions
+            return templates[0] if 'How did you' in templates[0] else (templates[1] if len(templates) > 1 else templates[0])
+        
+        elif any(food in entity_lower for food in food_entities):
+            # For food, prefer discovery and specifics
+            return templates[0] if 'How did you' in templates[0] else (templates[2] if len(templates) > 2 else templates[0])
+        
+        elif any(topic in entity_lower for topic in topic_entities):
+            # For topics, prefer origin and aspects
+            return templates[0] if 'How did you' in templates[0] else templates[0]
+        
+        # Default to first template
+        return templates[0] if templates else ""
+
+    async def _filter_questions_by_character_personality(self, questions: list, character_name: str) -> list:
+        """Filter questions to match character personality and expertise"""
+        if not questions:
+            return []
+        
+        character_lower = character_name.lower()
+        filtered_questions = []
+        
+        for question_data in questions:
+            question = question_data['question']
+            entity = question_data['entity']
+            gap_type = question_data['gap_type']
+            
+            # Character-specific filtering
+            should_include = True
+            personality_boost = 0.0
+            
+            # Elena (Marine Biologist) - naturally curious about environmental and scientific topics
+            if 'elena' in character_lower:
+                if any(topic in entity.lower() for topic in ['biology', 'marine', 'ocean', 'diving', 'science', 'research', 'environmental']):
+                    personality_boost = 0.3
+                elif gap_type in ['origin', 'experience']:  # Elena likes understanding how people discover science
+                    personality_boost = 0.2
+            
+            # Marcus (AI Researcher) - interested in technology and learning processes
+            elif 'marcus' in character_lower:
+                if any(topic in entity.lower() for topic in ['ai', 'technology', 'programming', 'research', 'learning', 'analysis']):
+                    personality_boost = 0.3
+                elif gap_type in ['specifics', 'experience']:  # Marcus likes technical details
+                    personality_boost = 0.2
+            
+            # Jake (Adventure Photographer) - interested in experiences and locations
+            elif 'jake' in character_lower:
+                if any(topic in entity.lower() for topic in ['photography', 'travel', 'adventure', 'hiking', 'climbing', 'outdoor']):
+                    personality_boost = 0.3
+                elif gap_type in ['location', 'experience']:  # Jake focuses on where and how
+                    personality_boost = 0.2
+            
+            # General curiosity boost for all characters
+            if gap_type == 'origin':  # How they got started
+                personality_boost += 0.1
+            
+            # Update relevance score with personality matching
+            question_data['relevance'] += personality_boost
+            
+            if should_include:
+                filtered_questions.append(question_data)
+        
+        return filtered_questions
+
+    def _calculate_question_relevance(self, gap_type: str, entity_name: str, character_name: str) -> float:
+        """Calculate relevance score for a question (0.0-1.0)"""
+        base_relevance = {
+            'origin': 0.8,      # How they got started - high value
+            'experience': 0.7,   # How long they've been doing it
+            'specifics': 0.6,    # What aspects they like
+            'location': 0.5,     # Where they do it
+            'community': 0.4     # Social aspects
+        }
+        
+        return base_relevance.get(gap_type, 0.5)
+
+    def _deduplicate_and_prioritize_questions(self, questions: list) -> list:
+        """Remove similar questions and prioritize by relevance"""
+        if not questions:
+            return []
+        
+        # Sort by relevance score (highest first)
+        sorted_questions = sorted(questions, key=lambda q: q['relevance'], reverse=True)
+        
+        # Remove duplicates based on entity and gap type
+        seen_combinations = set()
+        unique_questions = []
+        
+        for question_data in sorted_questions:
+            combination = (question_data['entity'], question_data['gap_type'])
+            
+            if combination not in seen_combinations:
+                seen_combinations.add(combination)
+                unique_questions.append(question_data)
+        
+        return unique_questions
+
     async def create_unified_character_prompt(
         self,
         user_id: str,
@@ -785,6 +1073,32 @@ class CDLAIPromptIntegration:
                             f"🎭 CHARACTER: {perf_guidance} "
                             f"(Performance Score: {overall_score:.2f}, Status: {performance_status})"
                         )
+                    
+                    # 🎯 STEP 7: Intelligent Question Generation - Add curiosity questions
+                    try:
+                        if self.semantic_router:
+                            curiosity_questions = await self.generate_curiosity_questions(
+                                user_id=user_id,
+                                character_name=character.identity.name.lower().split()[0],
+                                semantic_router=self.semantic_router
+                            )
+                            
+                            if curiosity_questions:
+                                # Add question generation guidance
+                                questions_text = []
+                                for q in curiosity_questions[:2]:  # Limit to 2 for prompt space
+                                    gap_type = q.get('gap_type', 'unknown')
+                                    question = q.get('question', '')
+                                    if question:
+                                        questions_text.append(f"{question} (exploring {gap_type})")
+                                
+                                if questions_text:
+                                    guidance_parts.append(
+                                        f"❓ CURIOSITY: Consider naturally weaving in: {' OR '.join(questions_text[:1])}"
+                                    )
+                                    logger.info("🎯 QUESTION GENERATION: Added %d curiosity questions to guidance", len(questions_text))
+                    except Exception as e:
+                        logger.debug("Could not generate curiosity questions: %s", e)
                     
                     if guidance_parts:
                         prompt += f"\n\n🤖 AI INTELLIGENCE GUIDANCE:\n" + "\n".join(f"• {part}" for part in guidance_parts) + "\n"
