@@ -351,10 +351,16 @@ class CDLAIPromptIntegration:
         # Add response guidelines (length constraints, formatting rules, etc.)
         try:
             response_guidelines = await self._get_response_guidelines(character)
+            logger.info(f"🔍 RESPONSE GUIDELINES: Retrieved guidelines length={len(response_guidelines) if response_guidelines else 0}")
             if response_guidelines:
                 prompt += f"\n\n📏 RESPONSE FORMAT & LENGTH CONSTRAINTS:\n{response_guidelines}"
+                logger.info(f"✅ RESPONSE GUIDELINES: Added to prompt")
+            else:
+                logger.warning(f"⚠️ RESPONSE GUIDELINES: No guidelines returned from _get_response_guidelines")
         except Exception as e:
-            logger.debug("Could not extract response guidelines: %s", e)
+            logger.error(f"❌ RESPONSE GUIDELINES ERROR: Could not extract response guidelines: {e}")
+            import traceback
+            logger.error(f"❌ TRACEBACK: {traceback.format_exc()}")
 
         # Add personal knowledge sections (relationships, family, career, etc.)
         try:
@@ -1536,12 +1542,12 @@ I could help you plan the perfect evening or we could have a virtual dinner chat
             logger.debug("Failed to get user facts context: %s", e)
             return ""
 
-    async def _get_response_guidelines(self, character) -> str:
+    async def _get_response_guidelines(self, character) -> str:  # character param kept for API compatibility
         """Get response guidelines including length constraints and formatting rules"""
         try:
             from src.characters.cdl.enhanced_cdl_manager import create_enhanced_cdl_manager
+            from src.memory.vector_memory_system import get_normalized_bot_name_from_env
             import asyncpg
-            import os
             
             # Create database connection
             DATABASE_URL = f"postgresql://{os.getenv('POSTGRES_USER', 'whisperengine')}:{os.getenv('POSTGRES_PASSWORD', 'whisperengine_password')}@{os.getenv('POSTGRES_HOST', 'localhost')}:{os.getenv('POSTGRES_PORT', '5433')}/{os.getenv('POSTGRES_DB', 'whisperengine')}"
@@ -1550,20 +1556,20 @@ I could help you plan the perfect evening or we could have a virtual dinner chat
             try:
                 enhanced_manager = create_enhanced_cdl_manager(pool)
                 
-                # Get character name - handle both new and legacy character objects
-                character_name = None
-                if hasattr(character, 'identity') and hasattr(character.identity, 'name'):
-                    character_name = character.identity.name.lower().replace(' ', '_')
-                elif hasattr(character, 'name'):
-                    character_name = character.name.lower().replace(' ', '_')
+                # Get bot name from environment (e.g., "elena", "marcus") - this is the database key
+                bot_name = get_normalized_bot_name_from_env()
+                logger.info(f"🔍 _get_response_guidelines: bot_name={bot_name}")
                 
-                if not character_name:
+                if not bot_name:
+                    logger.warning("⚠️ _get_response_guidelines: No bot name found")
                     return ""
                 
-                # Get response guidelines from database
-                guidelines = await enhanced_manager.get_response_guidelines(character_name)
+                # Get response guidelines from database using bot name as key
+                guidelines = await enhanced_manager.get_response_guidelines(bot_name)
+                logger.info(f"🔍 _get_response_guidelines: Retrieved {len(guidelines)} guidelines from database")
                 
                 if not guidelines:
+                    logger.warning(f"⚠️ _get_response_guidelines: No guidelines found for bot_name={bot_name}")
                     return ""
                 
                 # Format guidelines by priority and type
@@ -1572,20 +1578,21 @@ I could help you plan the perfect evening or we could have a virtual dinner chat
                 formatting_rules = []
                 
                 for guideline in guidelines:
+                    logger.info(f"🔍 Processing guideline: type={guideline.guideline_type}, critical={guideline.is_critical}, content={guideline.guideline_content[:50]}...")
+                    # Don't add redundant prefixes - content already has CRITICAL/IMPORTANT labels
                     if guideline.is_critical and guideline.guideline_type == 'response_length':
-                        critical_guidelines.append(f"⚠️  CRITICAL: {guideline.guideline_content}")
+                        critical_guidelines.append(f"⚠️  {guideline.guideline_content}")
                     elif guideline.guideline_type == 'response_length':
-                        important_guidelines.append(f"📏 IMPORTANT: {guideline.guideline_content}")
+                        important_guidelines.append(f"📏 {guideline.guideline_content}")
                     elif guideline.guideline_type == 'core_principle':
-                        critical_guidelines.append(f"🎯 CORE: {guideline.guideline_content}")
+                        critical_guidelines.append(f"🎯 {guideline.guideline_content}")
                     elif guideline.guideline_type == 'formatting_rule':
-                        formatting_rules.append(f"📝 FORMAT: {guideline.guideline_content}")
+                        formatting_rules.append(f"📝 {guideline.guideline_content}")
                 
                 # Build response guidelines section
                 guidelines_text = []
                 
                 if critical_guidelines:
-                    guidelines_text.append("🎯 DISCORD CONVERSATION FLOW REQUIREMENTS:")
                     guidelines_text.extend(critical_guidelines[:3])  # Top 3 critical guidelines
                 
                 if important_guidelines:
