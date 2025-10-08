@@ -143,3 +143,6 @@ characters/examples/gabriel.json
 .env.dotty
 .env.aetheris
 characters/examples/aetheris.json
+characters/examples_legacy_backup/aetheris.json
+.gitignore
+characters/examples_legacy_backup/gabriel.json

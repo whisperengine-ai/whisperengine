@@ -69,10 +69,6 @@ class EnhancedUserFactExtractor:
         elif len(matches) == 1:
             return matches[0]
         
-        # Handle other patterns
-        if discord_name.lower().startswith('mark'):
-            return 'Mark'
-        
         return None
     
     def extract_user_facts(self, memories: List[Dict], discord_metadata: Dict = None) -> List[str]:

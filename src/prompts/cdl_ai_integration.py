@@ -11,7 +11,7 @@ from typing import Dict, Optional
 from pathlib import Path
 
 from src.characters.cdl.parser import Character
-from src.characters.cdl.manager import get_cdl_manager, get_cdl_field, get_conversation_flow_guidelines
+from src.characters.cdl.simple_cdl_manager import get_simple_cdl_manager
 
 logger = logging.getLogger(__name__)
 
@@ -252,22 +252,28 @@ class CDLAIPromptIntegration:
                 base_score = None
                 base_description = ""
                 
+                # Trait name mapping
+                trait_map = {
+                    'openness': 'Openness to experience',
+                    'conscientiousness': 'Conscientiousness',
+                    'extraversion': 'Extraversion', 
+                    'agreeableness': 'Agreeableness',
+                    'neuroticism': 'Neuroticism'
+                }
+                trait_label = trait_map.get(trait_name, trait_name.title())
+                
                 if hasattr(trait_obj, 'trait_description'):
-                    # New object format
-                    base_description = trait_obj.trait_description
+                    # New object format from database
                     base_score = trait_obj.score if hasattr(trait_obj, 'score') else None
+                    if base_score is None and hasattr(trait_obj, 'value'):
+                        base_score = trait_obj.value
+                    # Build proper description with trait name
+                    level = 'High' if base_score and base_score > 0.7 else 'Moderate' if base_score and base_score > 0.4 else 'Low'
+                    base_description = f"{trait_label}: {level}"
                 elif isinstance(trait_obj, (float, int)):
                     # Legacy float format
                     base_score = trait_obj
                     level = 'High' if base_score > 0.7 else 'Moderate' if base_score > 0.4 else 'Low'
-                    trait_map = {
-                        'openness': 'Openness to experience',
-                        'conscientiousness': 'Conscientiousness',
-                        'extraversion': 'Extraversion', 
-                        'agreeableness': 'Agreeableness',
-                        'neuroticism': 'Neuroticism'
-                    }
-                    trait_label = trait_map.get(trait_name, trait_name.title())
                     base_description = f"{trait_label}: {level}"
                 
                 # 🎯 SPRINT 4: Apply optimization adjustments if available
@@ -341,6 +347,14 @@ class CDLAIPromptIntegration:
                 prompt += f"\n\n🎬 CONVERSATION FLOW & CONTEXT:\n{' '.join(combined_guidance)}"
         except Exception as e:
             logger.debug("Could not extract conversation flow guidance: %s", e)
+
+        # Add response guidelines (length constraints, formatting rules, etc.)
+        try:
+            response_guidelines = await self._get_response_guidelines(character)
+            if response_guidelines:
+                prompt += f"\n\n📏 RESPONSE FORMAT & LENGTH CONSTRAINTS:\n{response_guidelines}"
+        except Exception as e:
+            logger.debug("Could not extract response guidelines: %s", e)
 
         # Add personal knowledge sections (relationships, family, career, etc.)
         try:
@@ -983,27 +997,27 @@ class CDLAIPromptIntegration:
 
     async def load_character(self, character_file: Optional[str] = None) -> Character:
         """
-        Load a character from database - DATABASE-ONLY approach.
+        Load a character from database using enhanced CDL manager.
         
-        Uses database CDL Manager for normalized database access.
+        Uses enhanced database CDL Manager for comprehensive character data access.
         The character_file parameter is kept for compatibility but ignored.
         """
         try:
-            # DATABASE-ONLY: Use normalized database manager
-            from src.characters.cdl.database_manager import get_database_cdl_manager
+            # Use enhanced CDL manager for comprehensive character data
+            from src.characters.cdl.simple_cdl_manager import get_simple_cdl_manager
             
-            logger.info("🔍 CDL: Loading character from DATABASE-ONLY (normalized schema)")
-            db_manager = get_database_cdl_manager()
+            logger.info("🔍 CDL: Loading character from enhanced RDBMS (comprehensive schema)")
+            cdl_manager = get_simple_cdl_manager()
             
-            # Get Character object from database
-            character = db_manager.get_character_object()
-            logger.info("✅ CDL: Loaded character from database: %s", character.identity.name)
+            # Get Character object from database (bot name from environment)
+            character = cdl_manager.get_character_object()
+            logger.info("✅ CDL: Loaded character from enhanced database: %s", character.identity.name)
             
             return character
             
         except Exception as e:
-            logger.error("❌ DATABASE-ONLY: Failed to load character from database: %s", e)
-            raise RuntimeError(f"Database-only character loading failed: {e}")
+            logger.error("❌ ENHANCED CDL: Failed to load character from database: %s", e)
+            raise RuntimeError(f"Enhanced CDL character loading failed: {e}")
 
     async def _extract_cdl_personal_knowledge_sections(self, character, message_content: str) -> str:
         """Extract relevant personal knowledge sections from CDL based on message context."""
@@ -1216,57 +1230,63 @@ class CDLAIPromptIntegration:
             return ""
 
     def _extract_conversation_flow_guidelines(self, character) -> str:
-        """Extract conversation flow guidelines from CDL character definition using CDL Manager."""
+        """Extract conversation flow guidelines directly from character object."""
         try:
-            # Use CDL Manager instead of re-reading file
-            flow_guidelines = get_conversation_flow_guidelines()
-            if not flow_guidelines:
-                return ""
-            
             guidance_parts = []
             
-            # Extract platform-specific guidance (Discord) - UNIFIED PATH
-            discord_guidance = get_cdl_field("character.communication.conversation_flow_guidance.platform_awareness.discord", {})
+            # Access communication data directly from character object
+            if hasattr(character, 'communication'):
+                comm = character.communication
+                
+                # Extract conversation flow guidance from communication object
+                if hasattr(comm, 'conversation_flow_guidance'):
+                    flow_guidance = comm.conversation_flow_guidance
+                    
+                    # Platform-specific guidance (Discord)
+                    platform_discord = flow_guidance.get('platform_awareness', {}).get('discord', {})
+                    if platform_discord:
+                        max_length = platform_discord.get('max_response_length', '')
+                        if max_length:
+                            guidance_parts.append(f"🚨 CRITICAL LENGTH LIMIT: {max_length}")
+                        
+                        collab_style = platform_discord.get('collaboration_style', '')
+                        if collab_style:
+                            guidance_parts.append(f"CONVERSATION STYLE: {collab_style}")
+                        
+                        avoid = platform_discord.get('avoid', '')
+                        if avoid:
+                            guidance_parts.append(f"❌ NEVER: {avoid}")
+                        
+                        prefer = platform_discord.get('prefer', '')
+                        if prefer:
+                            guidance_parts.append(f"✅ ALWAYS: {prefer}")
+                    
+                    # Flow optimization guidance
+                    flow_opt = flow_guidance.get('flow_optimization', {})
+                    if flow_opt:
+                        auth_engagement = flow_opt.get('character_authentic_engagement', '')
+                        if auth_engagement:
+                            guidance_parts.append(f"ENGAGEMENT PATTERN: {auth_engagement}")
+                        
+                        length_mgmt = flow_opt.get('length_management', '')
+                        if length_mgmt:
+                            guidance_parts.append(f"LENGTH STRATEGY: {length_mgmt}")
+                        
+                        rhythm = flow_opt.get('conversation_rhythm', '')
+                        if rhythm:
+                            guidance_parts.append(f"CONVERSATION RHYTHM: {rhythm}")
             
-            if discord_guidance:
-                max_length = discord_guidance.get('max_response_length', '')
-                if max_length:
-                    guidance_parts.append(f"🚨 CRITICAL LENGTH LIMIT: {max_length}")
-                
-                collab_style = discord_guidance.get('collaboration_style', '')
-                if collab_style:
-                    guidance_parts.append(f"CONVERSATION STYLE: {collab_style}")
-                
-                avoid = discord_guidance.get('avoid', '')
-                if avoid:
-                    guidance_parts.append(f"❌ NEVER: {avoid}")
-                
-                prefer = discord_guidance.get('prefer', '')
-                if prefer:
-                    guidance_parts.append(f"✅ ALWAYS: {prefer}")
-            
-            # Extract flow optimization guidance - UNIFIED PATH
-            flow_opt = get_cdl_field("character.communication.conversation_flow_guidance.flow_optimization", {})
-            
-            if flow_opt:
-                auth_engagement = flow_opt.get('character_authentic_engagement', '')
-                if auth_engagement:
-                    guidance_parts.append(f"ENGAGEMENT PATTERN: {auth_engagement}")
-                
-                length_mgmt = flow_opt.get('length_management', '')
-                if length_mgmt:
-                    guidance_parts.append(f"LENGTH STRATEGY: {length_mgmt}")
-                
-                rhythm = flow_opt.get('conversation_rhythm', '')
-                if rhythm:
-                    guidance_parts.append(f"CONVERSATION RHYTHM: {rhythm}")
-            
-            # Add extra emphasis for Discord length limits
-            if guidance_parts:
+            # Add Discord length limits as default if no specific guidance
+            if not guidance_parts:
+                guidance_parts = [
+                    "🎯 DISCORD CONVERSATION FLOW REQUIREMENTS:",
+                    "⚠️  CRITICAL: If your response approaches 2000 characters, STOP and ask a follow-up question instead!"
+                ]
+            else:
                 guidance_parts.insert(0, "🎯 DISCORD CONVERSATION FLOW REQUIREMENTS:")
                 guidance_parts.append("⚠️  CRITICAL: If your response approaches 2000 characters, STOP and ask a follow-up question instead!")
             
-            return "\n".join(guidance_parts) if guidance_parts else ""
+            return "\n".join(guidance_parts)
             
         except Exception as e:
             logger.debug("Error extracting conversation flow guidelines: %s", e)
@@ -1312,24 +1332,24 @@ class CDLAIPromptIntegration:
         return detected
 
     def _check_roleplay_flexibility(self, character) -> bool:
-        """Check if character allows full roleplay immersion."""
+        """Check if character allows full roleplay immersion directly from character object."""
         try:
-            allow_roleplay = get_cdl_field(
-                "character.communication.ai_identity_handling.allow_full_roleplay_immersion",
-                False
-            )
-            return allow_roleplay
+            # Check character object's allow_full_roleplay_immersion attribute directly
+            return getattr(character, 'allow_full_roleplay_immersion', False)
         except Exception as e:
             logger.debug("Error checking roleplay flexibility: %s", e)
             return False
 
     def _get_cdl_roleplay_guidance(self, character, display_name: str) -> str:
-        """Extract roleplay boundary guidance from CDL."""
+        """Extract roleplay boundary guidance directly from character object."""
         try:
-            roleplay_scenarios = get_cdl_field(
-                "character.communication.ai_identity_handling.roleplay_interaction_scenarios",
-                {}
-            )
+            # Access AI identity handling from character communication
+            roleplay_scenarios = {}
+            if hasattr(character, 'communication'):
+                comm = character.communication
+                if hasattr(comm, 'ai_identity_handling'):
+                    ai_handling = comm.ai_identity_handling
+                    roleplay_scenarios = ai_handling.get('roleplay_interaction_scenarios', {})
             
             if not roleplay_scenarios:
                 return self._generate_generic_roleplay_guidance(character, display_name)
@@ -1458,10 +1478,14 @@ I could help you plan the perfect evening or we could have a virtual dinner chat
             if not self.knowledge_router:
                 return ""
             
+            # Get character name from environment (character-agnostic)
+            from src.memory.vector_memory_system import get_normalized_bot_name_from_env
+            character_name = get_normalized_bot_name_from_env()
+            
             # Get structured facts from PostgreSQL
             facts = await self.knowledge_router.get_character_aware_facts(
                 user_id=user_id,
-                character_name="elena",  # Default character for now
+                character_name=character_name,
                 limit=10
             )
             
@@ -1510,4 +1534,75 @@ I could help you plan the perfect evening or we could have a virtual dinner chat
             
         except Exception as e:
             logger.debug("Failed to get user facts context: %s", e)
+            return ""
+
+    async def _get_response_guidelines(self, character) -> str:
+        """Get response guidelines including length constraints and formatting rules"""
+        try:
+            from src.characters.cdl.enhanced_cdl_manager import create_enhanced_cdl_manager
+            import asyncpg
+            import os
+            
+            # Create database connection
+            DATABASE_URL = f"postgresql://{os.getenv('POSTGRES_USER', 'whisperengine')}:{os.getenv('POSTGRES_PASSWORD', 'whisperengine_password')}@{os.getenv('POSTGRES_HOST', 'localhost')}:{os.getenv('POSTGRES_PORT', '5433')}/{os.getenv('POSTGRES_DB', 'whisperengine')}"
+            pool = await asyncpg.create_pool(DATABASE_URL)
+            
+            try:
+                enhanced_manager = create_enhanced_cdl_manager(pool)
+                
+                # Get character name - handle both new and legacy character objects
+                character_name = None
+                if hasattr(character, 'identity') and hasattr(character.identity, 'name'):
+                    character_name = character.identity.name.lower().replace(' ', '_')
+                elif hasattr(character, 'name'):
+                    character_name = character.name.lower().replace(' ', '_')
+                
+                if not character_name:
+                    return ""
+                
+                # Get response guidelines from database
+                guidelines = await enhanced_manager.get_response_guidelines(character_name)
+                
+                if not guidelines:
+                    return ""
+                
+                # Format guidelines by priority and type
+                critical_guidelines = []
+                important_guidelines = []
+                formatting_rules = []
+                
+                for guideline in guidelines:
+                    if guideline.is_critical and guideline.guideline_type == 'response_length':
+                        critical_guidelines.append(f"⚠️  CRITICAL: {guideline.guideline_content}")
+                    elif guideline.guideline_type == 'response_length':
+                        important_guidelines.append(f"📏 IMPORTANT: {guideline.guideline_content}")
+                    elif guideline.guideline_type == 'core_principle':
+                        critical_guidelines.append(f"🎯 CORE: {guideline.guideline_content}")
+                    elif guideline.guideline_type == 'formatting_rule':
+                        formatting_rules.append(f"📝 FORMAT: {guideline.guideline_content}")
+                
+                # Build response guidelines section
+                guidelines_text = []
+                
+                if critical_guidelines:
+                    guidelines_text.append("🎯 DISCORD CONVERSATION FLOW REQUIREMENTS:")
+                    guidelines_text.extend(critical_guidelines[:3])  # Top 3 critical guidelines
+                
+                if important_guidelines:
+                    guidelines_text.extend(important_guidelines[:2])  # Top 2 important guidelines
+                
+                if formatting_rules:
+                    guidelines_text.extend(formatting_rules[:2])  # Top 2 formatting rules
+                
+                if guidelines_text:
+                    return "\n" + "\n".join(guidelines_text)
+                
+                return ""
+                
+            finally:
+                await pool.close()
+                
+        except Exception as e:
+            logger.debug("Could not load response guidelines: %s", e)
+            return ""
             return ""
