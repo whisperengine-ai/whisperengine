@@ -112,6 +112,20 @@ class MessageProcessor:
                 logger.warning("Temporal intelligence not available - install influxdb-client")
                 self.temporal_intelligence_enabled = False
         
+        # STAGE 2: Enhanced AI Ethics for Character Learning
+        self.enhanced_ai_ethics = None
+        
+        try:
+            from src.ethics.enhanced_ai_ethics_integrator import create_enhanced_ai_ethics_integrator
+            # Initialize with temporal client for attachment monitoring
+            self.enhanced_ai_ethics = create_enhanced_ai_ethics_integrator(
+                attachment_monitor=None,  # Will use default with temporal_client
+                ethics_integration=None   # Will use default
+            )
+            logger.info("🛡️ Enhanced AI Ethics initialized with attachment monitoring and learning ethics")
+        except ImportError as e:
+            logger.warning("Enhanced AI Ethics not available: %s", e)
+        
         # TrendWise Adaptive Learning: Initialize trend analysis and confidence adaptation
         self.trend_analyzer = None
         self.confidence_adapter = None
@@ -270,6 +284,39 @@ class MessageProcessor:
             bot_emotion = await self._analyze_bot_emotion_with_shared_analyzer(response, message_context, ai_components)
             ai_components['bot_emotion'] = bot_emotion
             
+            # STAGE 2: Enhanced AI Ethics for Character Learning - Monitor and enhance response
+            if self.enhanced_ai_ethics:
+                try:
+                    # Get character data for archetype determination
+                    character_data = ai_components.get('character_data')
+                    if character_data:
+                        # Get recent user messages for attachment analysis (simplified for initial integration)
+                        recent_messages = [message_context.content]  # Start with current message
+                        
+                        enhanced_response = await self.enhanced_ai_ethics.enhance_character_response(
+                            character=character_data,
+                            user_id=message_context.user_id,
+                            bot_name=get_normalized_bot_name_from_env(),
+                            base_response=response,
+                            recent_user_messages=recent_messages,
+                            conversation_context={
+                                'ai_components': ai_components,
+                                'platform': message_context.platform,
+                                'conversation_metadata': getattr(message_context, 'metadata', {})
+                            }
+                        )
+                        
+                        # Apply the enhanced response if different
+                        if enhanced_response != response:
+                            logger.info("🛡️ ENHANCED AI ETHICS: Applied ethical enhancement for user %s", message_context.user_id)
+                            response = enhanced_response
+                    
+                    # Store ethics processing flag for metadata
+                    ai_components['enhanced_ai_ethics_processed'] = True
+                    
+                except Exception as e:
+                    logger.warning("Enhanced AI Ethics processing failed: %s", e)
+
             # Phase 8: Response validation and sanitization
             response = await self._validate_and_sanitize_response(
                 response, message_context
