@@ -204,6 +204,209 @@ class SimpleCDLManager:
                 self.communication = self._create_communication_object(data.get('communication', {}))
                 self.allow_full_roleplay_immersion = data.get('allow_full_roleplay_immersion', False)
                 
+                # Store enhanced data for lazy-loading personal knowledge sections
+                self._enhanced_data = data
+                self._relationships = None
+                self._backstory = None
+                self._current_life = None
+                self._skills_and_expertise = None
+                self._interests_and_hobbies = None
+            
+            # Lazy-loading properties for personal knowledge extraction
+            
+            @property
+            def relationships(self):
+                """Lazy-load relationships from enhanced data"""
+                if self._relationships is None:
+                    self._relationships = self._create_relationships_object()
+                    logger.debug("🔗 Lazy-loaded relationships: %s important relationships", 
+                               len(self._relationships.important_relationships) if self._relationships else 0)
+                return self._relationships
+            
+            @property
+            def backstory(self):
+                """Lazy-load backstory from enhanced data"""
+                if self._backstory is None:
+                    self._backstory = self._create_backstory_object()
+                    logger.debug("📖 Lazy-loaded backstory: family=%s, career=%s", 
+                               bool(self._backstory.family_background) if self._backstory else False,
+                               bool(self._backstory.career_background) if self._backstory else False)
+                return self._backstory
+            
+            @property
+            def current_life(self):
+                """Lazy-load current_life from enhanced data"""
+                if self._current_life is None:
+                    self._current_life = self._create_current_life_object()
+                return self._current_life
+            
+            @property
+            def skills_and_expertise(self):
+                """Lazy-load skills_and_expertise from enhanced data"""
+                if self._skills_and_expertise is None:
+                    self._skills_and_expertise = self._create_skills_and_expertise_object()
+                return self._skills_and_expertise
+            
+            @property
+            def interests_and_hobbies(self):
+                """Lazy-load interests_and_hobbies from enhanced data"""
+                if self._interests_and_hobbies is None:
+                    self._interests_and_hobbies = self._create_interests_and_hobbies_object()
+                return self._interests_and_hobbies
+            
+            # Object creation methods for lazy-loaded properties
+            
+            def _create_relationships_object(self):
+                """Create relationships object from enhanced data"""
+                class Relationships:
+                    def __init__(self, enhanced_data):
+                        relationships_list = enhanced_data.get('relationships', [])
+                        # Extract relationship status from first relationship if available
+                        self.status = None
+                        if relationships_list and len(relationships_list) > 0:
+                            # Derive status from relationship types
+                            rel_types = [r.get('relationship_type', '') for r in relationships_list]
+                            if any('partner' in rt.lower() or 'spouse' in rt.lower() for rt in rel_types):
+                                self.status = 'In a relationship'
+                            elif any('family' in rt.lower() for rt in rel_types):
+                                self.status = 'Single with family connections'
+                            else:
+                                self.status = 'Single'
+                        
+                        # Extract important relationships
+                        self.important_relationships = [
+                            f"{r.get('related_entity', 'Unknown')} ({r.get('relationship_type', 'Unknown')})"
+                            for r in relationships_list[:5]  # Top 5 relationships
+                        ] if relationships_list else []
+                
+                return Relationships(self._enhanced_data)
+            
+            def _create_backstory_object(self):
+                """Create backstory object from enhanced data"""
+                class Backstory:
+                    def __init__(self, enhanced_data):
+                        background_dict = enhanced_data.get('background', {})
+                        
+                        # Extract family background
+                        self.family_background = self._extract_background('personal', background_dict)
+                        
+                        # Extract career background
+                        self.career_background = self._extract_background('career', background_dict)
+                        
+                        # Extract formative experiences (combine education and early experiences)
+                        education_bg = self._extract_background('education', background_dict)
+                        personal_bg = self._extract_background('personal', background_dict)
+                        self.formative_experiences = f"{education_bg}; {personal_bg}" if education_bg and personal_bg else (education_bg or personal_bg)
+                    
+                    def _extract_background(self, category, background_dict):
+                        """Extract background entries for a specific category"""
+                        if not background_dict or category not in background_dict:
+                            return None
+                        
+                        category_entries = background_dict.get(category, [])
+                        if not category_entries:
+                            return None
+                        
+                        # Combine descriptions from all entries in category
+                        descriptions = [
+                            entry.get('description', '') 
+                            for entry in category_entries 
+                            if entry.get('description')
+                        ]
+                        return '; '.join(descriptions) if descriptions else None
+                
+                return Backstory(self._enhanced_data)
+            
+            def _create_current_life_object(self):
+                """Create current_life object from enhanced data"""
+                class CurrentLife:
+                    def __init__(self, enhanced_data):
+                        # Extract family info from relationships
+                        relationships_list = enhanced_data.get('relationships', [])
+                        family_rels = [
+                            r for r in relationships_list 
+                            if 'family' in r.get('relationship_type', '').lower()
+                        ]
+                        self.family = ', '.join([
+                            f"{r.get('related_entity')} ({r.get('relationship_type')})"
+                            for r in family_rels[:3]
+                        ]) if family_rels else None
+                        
+                        # Extract occupation details from abilities/background
+                        abilities_dict = enhanced_data.get('abilities', {})
+                        professional_abilities = abilities_dict.get('professional', [])
+                        self.occupation_details = ', '.join([
+                            a.get('ability_name', '')
+                            for a in professional_abilities[:3]
+                        ]) if professional_abilities else None
+                        
+                        # Create daily routine object
+                        self.daily_routine = self._create_daily_routine(enhanced_data)
+                    
+                    def _create_daily_routine(self, enhanced_data):
+                        """Create daily routine from background/abilities data"""
+                        class DailyRoutine:
+                            def __init__(self, enhanced_data):
+                                # Extract work schedule from background
+                                background_dict = enhanced_data.get('background', {})
+                                career_entries = background_dict.get('career', [])
+                                self.work_schedule = career_entries[0].get('description') if career_entries else None
+                                
+                                # Extract weekend/evening activities from interests
+                                # (This will be populated once we query character_interests)
+                                self.weekend_activities = []
+                                self.evening_routine = None
+                        
+                        return DailyRoutine(enhanced_data)
+                
+                return CurrentLife(self._enhanced_data)
+            
+            def _create_skills_and_expertise_object(self):
+                """Create skills_and_expertise object from enhanced data"""
+                class SkillsAndExpertise:
+                    def __init__(self, enhanced_data):
+                        # Extract education from background
+                        background_dict = enhanced_data.get('background', {})
+                        education_entries = background_dict.get('education', [])
+                        self.education = '; '.join([
+                            entry.get('description', '')
+                            for entry in education_entries
+                            if entry.get('description')
+                        ]) if education_entries else None
+                        
+                        # Extract professional skills from abilities
+                        abilities_dict = enhanced_data.get('abilities', {})
+                        professional_abilities = abilities_dict.get('professional', [])
+                        self.professional_skills = ', '.join([
+                            f"{a.get('ability_name')} (Level {a.get('proficiency_level', 5)})"
+                            for a in professional_abilities
+                        ]) if professional_abilities else None
+                
+                return SkillsAndExpertise(self._enhanced_data)
+            
+            def _create_interests_and_hobbies_object(self):
+                """Create interests_and_hobbies object from enhanced data"""
+                # Check if enhanced data has interests
+                # Note: Enhanced manager doesn't currently query character_interests table
+                # We'll return a simple string summarizing any interest-related data
+                
+                # For now, create a simple string representation
+                # This can be enhanced once we integrate character_interests table query
+                abilities_dict = self._enhanced_data.get('abilities', {})
+                
+                # Look for non-professional abilities that might indicate hobbies
+                hobby_categories = ['personal', 'social', 'creative', 'physical']
+                hobbies = []
+                for category in hobby_categories:
+                    if category in abilities_dict:
+                        category_abilities = abilities_dict[category]
+                        hobbies.extend([
+                            a.get('ability_name', '')
+                            for a in category_abilities
+                        ])
+                
+                return ', '.join(hobbies) if hobbies else 'Various personal interests'
+                
             def _create_identity_object(self, identity_data):
                 class Identity:
                     def __init__(self, data):
@@ -272,6 +475,11 @@ class SimpleCDLManager:
                         }
                 
                 return Communication(communication_data)
+        
+        # Log available enhanced data sections
+        if self._character_data:
+            enhanced_keys = [k for k in self._character_data.keys() if k not in ['identity', 'personality', 'communication_style', 'values_and_beliefs', 'allow_full_roleplay_immersion']]
+            logger.info("✨ SimpleCharacter created with enhanced data sections: %s", enhanced_keys)
                 
         return SimpleCharacter(self._character_data)
 

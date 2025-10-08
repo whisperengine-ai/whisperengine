@@ -260,9 +260,11 @@ class MessageProcessor:
             )
             
             # Phase 7: Response generation
+            print(f"🎯 PHASE 7 START: About to call _generate_response for user {message_context.user_id}", flush=True)
             response = await self._generate_response(
                 message_context, conversation_context, ai_components
             )
+            print(f"✅ PHASE 7 DONE: _generate_response returned {len(response)} chars", flush=True)
             
             # Phase 7.5: Analyze bot's emotional state from response (SERIAL to avoid RoBERTa conflicts)
             bot_emotion = await self._analyze_bot_emotion_with_shared_analyzer(response, message_context, ai_components)
@@ -3516,6 +3518,7 @@ class MessageProcessor:
             user_display_name = message_context.metadata.get('discord_author_name') if message_context.metadata else None
             
             # 🚀 FULL INTELLIGENCE: Use complete character-aware prompt with all emotional intelligence
+            print(f"🚀 ABOUT TO CALL create_unified_character_prompt for user {user_id}", flush=True)
             character_prompt = await cdl_integration.create_unified_character_prompt(
                 user_id=user_id,
                 message_content=message_context.content,
@@ -3523,6 +3526,7 @@ class MessageProcessor:
                 user_name=user_display_name
                 # character_file parameter removed - using database-only approach
             )
+            print(f"✅ RETURNED FROM create_unified_character_prompt - prompt length: {len(character_prompt)}", flush=True)
             
             # 🎯 WORKFLOW INTEGRATION: Inject workflow transaction context into character prompt
             workflow_prompt_injection = message_context.metadata.get('workflow_prompt_injection') if message_context.metadata else None

@@ -585,8 +585,10 @@ class BotEventHandlers:
         comprehensive_context = None
 
         # Use unified MessageProcessor if available (preferred), fallback to complex manual processing
+        print(f"🔍 DM HANDLER: Checking message_processor status: {self.message_processor is not None}", flush=True)
         if self.message_processor:
             try:
+                print(f"🎯 DM HANDLER: MessageProcessor exists, about to use it for user {user_id}", flush=True)
                 logger.info("🚀 Using unified MessageProcessor for DM processing")
                 
                 # Import MessageContext for creating platform-agnostic context

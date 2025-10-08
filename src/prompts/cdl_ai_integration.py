@@ -16,11 +16,14 @@ from src.characters.cdl.simple_cdl_manager import get_simple_cdl_manager
 logger = logging.getLogger(__name__)
 
 class CDLAIPromptIntegration:
-    def __init__(self, vector_memory_manager=None, llm_client=None, knowledge_router=None, bot_core=None):
+    def __init__(self, vector_memory_manager=None, llm_client=None, knowledge_router=None, bot_core=None, semantic_router=None):
         self.memory_manager = vector_memory_manager
         self.llm_client = llm_client
         self.knowledge_router = knowledge_router
+        self.semantic_router = semantic_router  # NEW: Store semantic router for user facts cross-pollination
         self.bot_core = bot_core  # Store bot_core for personality profiler access
+        self._graph_manager = None  # Cache for CharacterGraphManager
+        self._graph_manager_initialized = False
         
         # Initialize the optimized prompt builder for size management
         from src.prompts.optimized_prompt_builder import create_optimized_prompt_builder
@@ -364,11 +367,16 @@ class CDLAIPromptIntegration:
 
         # Add personal knowledge sections (relationships, family, career, etc.)
         try:
-            personal_sections = await self._extract_cdl_personal_knowledge_sections(character, message_content)
+            personal_sections = await self._extract_cdl_personal_knowledge_sections(character, message_content, user_id)
             if personal_sections:
                 prompt += f"\n\n👨‍👩‍👧‍👦 PERSONAL BACKGROUND:\n{personal_sections}"
+                logger.info(f"✅ PERSONAL KNOWLEDGE: Added {len(personal_sections)} chars to prompt")
+            else:
+                logger.warning("⚠️ PERSONAL KNOWLEDGE: No sections returned from extraction")
         except Exception as e:
-            logger.debug("Could not extract personal knowledge: %s", e)
+            logger.error(f"❌ PERSONAL KNOWLEDGE ERROR: Could not extract personal knowledge: {e}")
+            import traceback
+            logger.error(f"❌ TRACEBACK: {traceback.format_exc()}")
 
         # 🎯 SEMANTIC KNOWLEDGE INTEGRATION: Retrieve structured facts from PostgreSQL
         if self.knowledge_router:
@@ -1056,93 +1064,199 @@ STOP WRITING after 2-4 sentences. Do not continue.
             logger.error("❌ ENHANCED CDL: Failed to load character from database: %s", e)
             raise RuntimeError(f"Enhanced CDL character loading failed: {e}")
 
-    async def _extract_cdl_personal_knowledge_sections(self, character, message_content: str) -> str:
-        """Extract relevant personal knowledge sections from CDL based on message context."""
+    async def _get_graph_manager(self):
+        """Get or initialize CharacterGraphManager (cached)"""
+        if not self._graph_manager_initialized:
+            try:
+                print("🎯 GRAPH INIT: Starting CharacterGraphManager initialization...", flush=True)
+                logger.info("🎯 GRAPH INIT: Starting CharacterGraphManager initialization...")
+                from src.characters.cdl.character_graph_manager import create_character_graph_manager
+                from src.characters.cdl.simple_cdl_manager import get_simple_cdl_manager
+                
+                print("🎯 GRAPH INIT: Getting CDL manager...", flush=True)
+                logger.info("🎯 GRAPH INIT: Getting CDL manager...")
+                cdl_manager = get_simple_cdl_manager()
+                print("🎯 GRAPH INIT: Getting database pool...", flush=True)
+                logger.info("🎯 GRAPH INIT: Getting database pool...")
+                postgres_pool = await cdl_manager._get_database_pool()
+                
+                print("🎯 GRAPH INIT: Creating CharacterGraphManager...", flush=True)
+                logger.info("🎯 GRAPH INIT: Creating CharacterGraphManager...")
+                self._graph_manager = create_character_graph_manager(postgres_pool, semantic_router=self.semantic_router)
+                self._graph_manager_initialized = True
+                print("✅ GRAPH INIT: CharacterGraphManager initialized successfully!", flush=True)
+                logger.info("✅ GRAPH INIT: CharacterGraphManager initialized successfully!")
+            except Exception as e:
+                print(f"❌ GRAPH INIT FAILED: {e}", flush=True)
+                logger.error(f"❌ GRAPH INIT FAILED: Could not initialize CharacterGraphManager: {e}")
+                import traceback
+                traceback.print_exc()
+                logger.error(f"❌ TRACEBACK: {traceback.format_exc()}")
+                self._graph_manager = None
+                self._graph_manager_initialized = True  # Mark as initialized to avoid retrying
+        
+        return self._graph_manager
+
+    async def _extract_cdl_personal_knowledge_sections(self, character, message_content: str, user_id: Optional[str] = None) -> str:
+        """
+        Extract relevant personal knowledge sections using CharacterGraphManager.
+        
+        STEP 1: Basic graph intelligence integration - replaces direct property access
+        with importance-weighted, multi-dimensional graph queries.
+        
+        STEP 2: Cross-pollination with user facts - connects character knowledge
+        with user interests and mentioned entities.
+        
+        Args:
+            character: Character object
+            message_content: User message content
+            user_id: Optional user ID for cross-pollination with user facts
+        """
+        print(f"🔍 EXTRACTION START: Called for character={character.identity.name}, message='{message_content[:50]}...'", flush=True)
+        logger.info(f"🔍 EXTRACTION START: Called for character={character.identity.name}, message='{message_content[:50]}...'")
+        try:
+            # 🎯 STEP 1: Get CharacterGraphManager (cached)
+            print("🎯 Getting graph manager...", flush=True)
+            graph_manager = await self._get_graph_manager()
+            
+            if not graph_manager:
+                print("⚠️ GRAPH: Manager not available, using fallback", flush=True)
+                logger.warning("📊 GRAPH: Manager not available, using fallback")
+                return await self._extract_personal_knowledge_fallback(character, message_content)
+            
+            logger.info(f"📊 GRAPH: Starting personal knowledge extraction for message: '{message_content[:50]}...'")
+            personal_sections = []
+            message_lower = message_content.lower()
+            
+            # 🎯 GRAPH INTELLIGENCE: Use intent detection and graph queries
+            from src.characters.cdl.character_graph_manager import CharacterKnowledgeIntent
+            
+            # Extract relationship info if message seems relationship-focused
+            if any(keyword in message_lower for keyword in ['relationship', 'partner', 'dating', 'married', 'family']):
+                result = await graph_manager.query_character_knowledge(
+                    character_name=character.identity.name,
+                    query_text=message_content,
+                    intent=CharacterKnowledgeIntent.FAMILY,
+                    limit=3,
+                    user_id=user_id
+                )
+                
+                if not result.is_empty():
+                    # Format background entries with importance weighting
+                    for bg in result.background[:3]:
+                        importance = bg.get('importance_level', 5)
+                        stars = '⭐' * min(importance, 5)
+                        personal_sections.append(f"{stars} {bg['description']}")
+                    
+                    # Format relationships with strength weighting
+                    for rel in result.relationships[:3]:
+                        strength = rel.get('relationship_strength', 5)
+                        personal_sections.append(f"Relationship: {rel['related_entity']} (strength: {strength}/10) - {rel.get('description', '')}")
+            
+            # Extract family info if message mentions family
+            if any(keyword in message_lower for keyword in ['family', 'parents', 'siblings', 'children', 'mother', 'father']):
+                result = await graph_manager.query_character_knowledge(
+                    character_name=character.identity.name,
+                    query_text=message_content,
+                    intent=CharacterKnowledgeIntent.FAMILY,
+                    limit=3,
+                    user_id=user_id
+                )
+                
+                if not result.is_empty():
+                    for bg in result.background:
+                        importance = bg.get('importance_level', 5)
+                        personal_sections.append(f"Family ({importance}/10 importance): {bg['description']}")
+                    
+                    # Include family relationships
+                    for rel in result.relationships:
+                        if any(family_term in rel['related_entity'].lower() for family_term in ['mother', 'father', 'sister', 'brother', 'parent']):
+                            personal_sections.append(f"Family: {rel['related_entity']} - {rel.get('description', '')}")
+            
+            # Extract career/work info if message mentions work/career
+            if any(keyword in message_lower for keyword in ['work', 'job', 'career', 'education', 'study', 'university', 'college', 'professional']):
+                logger.info("📊 GRAPH: Career keywords detected, querying character knowledge...")
+                result = await graph_manager.query_character_knowledge(
+                    character_name=character.identity.name,
+                    query_text=message_content,
+                    intent=CharacterKnowledgeIntent.CAREER,
+                    limit=3,
+                    user_id=user_id
+                )
+                
+                logger.info(f"📊 GRAPH: Career query returned - Background: {len(result.background)}, Abilities: {len(result.abilities)}, Memories: {len(result.memories)}")
+                
+                if not result.is_empty():
+                    # Format career background with importance
+                    for bg in result.background:
+                        importance = bg.get('importance_level', 5)
+                        career_entry = f"Career ({importance}/10 importance): {bg['description']}"
+                        personal_sections.append(career_entry)
+                        logger.info(f"📊 GRAPH: Added career background: {career_entry[:80]}...")
+                    
+                    # Format professional abilities with proficiency
+                    for ability in result.abilities:
+                        proficiency = ability.get('proficiency_level', 5)
+                        ability_entry = f"Professional Skill: {ability['ability_name']} (proficiency: {proficiency}/10)"
+                        personal_sections.append(ability_entry)
+                        logger.info(f"📊 GRAPH: Added ability: {ability_entry}")
+                else:
+                    logger.warning("📊 GRAPH: Career query returned empty results!")
+            
+            # Extract hobbies/interests if message mentions interests/leisure
+            if any(keyword in message_lower for keyword in ['hobby', 'hobbies', 'interest', 'interests', 'free time', 'fun', 'enjoy', 'like']):
+                result = await graph_manager.query_character_knowledge(
+                    character_name=character.identity.name,
+                    query_text=message_content,
+                    intent=CharacterKnowledgeIntent.HOBBIES,
+                    limit=3,
+                    user_id=user_id
+                )
+                
+                if not result.is_empty():
+                    for bg in result.background:
+                        personal_sections.append(f"Interest: {bg['description']}")
+                    
+                    for ability in result.abilities:
+                        if ability.get('category') in ['hobby', 'personal', 'recreation']:
+                            personal_sections.append(f"Hobby Skill: {ability['ability_name']}")
+            
+            # 📊 FALLBACK: If no graph results, use direct property access (legacy compatibility)
+            if not personal_sections:
+                logger.warning("📊 GRAPH: No graph results found, triggering fallback method")
+                return await self._extract_personal_knowledge_fallback(character, message_content)
+            
+            result_text = "\n".join(personal_sections) if personal_sections else ""
+            if result_text:
+                logger.info(f"📊 GRAPH: Successfully extracted {len(personal_sections)} personal knowledge sections using graph intelligence")
+            
+            return result_text
+            
+        except Exception as e:
+            logger.warning("Could not extract personal knowledge via graph manager: %s", e)
+            # Final fallback
+            return await self._extract_personal_knowledge_fallback(character, message_content)
+
+    async def _extract_personal_knowledge_fallback(self, character, message_content: str) -> str:
+        """Fallback: Direct property access for personal knowledge extraction"""
         try:
             personal_sections = []
             message_lower = message_content.lower()
             
-            # 🎯 ENHANCED CONTEXT-AWARE EXTRACTION: Check actual CDL structure dynamically
-            
-            # Extract relationship info if message seems relationship-focused
-            if any(keyword in message_lower for keyword in ['relationship', 'partner', 'dating', 'married', 'family']):
-                # Check character.relationships (actual CDL structure)
-                if hasattr(character, 'relationships') and character.relationships:
-                    rel_info = character.relationships
-                    if hasattr(rel_info, 'status') and rel_info.status:
-                        personal_sections.append(f"Relationship Status: {rel_info.status}")
-                    if hasattr(rel_info, 'important_relationships') and rel_info.important_relationships:
-                        personal_sections.append(f"Key Relationships: {', '.join(rel_info.important_relationships[:3])}")
-                
-                # Check character.current_life for family info (actual CDL structure)
-                if hasattr(character, 'current_life') and character.current_life:
-                    current_life = character.current_life
-                    if hasattr(current_life, 'family') and current_life.family:
-                        personal_sections.append(f"Family Context: {current_life.family}")
-            
-            # Extract family info if message mentions family
-            if any(keyword in message_lower for keyword in ['family', 'parents', 'siblings', 'children', 'mother', 'father']):
-                # Check character.backstory for family background (actual CDL structure)
+            # Original direct property access code
+            if any(keyword in message_lower for keyword in ['family', 'parents']):
                 if hasattr(character, 'backstory') and character.backstory:
-                    backstory = character.backstory
-                    if hasattr(backstory, 'family_background') and backstory.family_background:
-                        personal_sections.append(f"Family Background: {backstory.family_background}")
-                    if hasattr(backstory, 'formative_experiences') and backstory.formative_experiences:
-                        personal_sections.append(f"Family Influences: {backstory.formative_experiences}")
+                    if hasattr(character.backstory, 'family_background') and character.backstory.family_background:
+                        personal_sections.append(f"Family: {character.backstory.family_background}")
             
-            # Extract career/work info if message mentions work/career
-            if any(keyword in message_lower for keyword in ['work', 'job', 'career', 'education', 'study', 'university', 'college', 'professional']):
-                # Check character.skills_and_expertise (if exists)
+            if any(keyword in message_lower for keyword in ['work', 'career']):
                 if hasattr(character, 'skills_and_expertise') and character.skills_and_expertise:
-                    skills = character.skills_and_expertise
-                    if hasattr(skills, 'education') and skills.education:
-                        personal_sections.append(f"Education: {skills.education}")
-                    if hasattr(skills, 'professional_skills') and skills.professional_skills:
-                        personal_sections.append(f"Professional Skills: {skills.professional_skills}")
-                
-                # Check character.current_life for current work (actual CDL structure)
-                if hasattr(character, 'current_life') and character.current_life:
-                    current_life = character.current_life
-                    if hasattr(current_life, 'occupation_details') and current_life.occupation_details:
-                        personal_sections.append(f"Current Work: {current_life.occupation_details}")
-                    if hasattr(current_life, 'daily_routine') and current_life.daily_routine:
-                        # Extract work-related routine info
-                        routine = current_life.daily_routine
-                        if hasattr(routine, 'work_schedule') and routine.work_schedule:
-                            personal_sections.append(f"Work Schedule: {routine.work_schedule}")
-                
-                # Check character.backstory for career background
-                if hasattr(character, 'backstory') and character.backstory:
-                    backstory = character.backstory
-                    if hasattr(backstory, 'career_background') and backstory.career_background:
-                        personal_sections.append(f"Career Background: {backstory.career_background}")
-                    if hasattr(backstory, 'formative_experiences') and backstory.formative_experiences:
-                        # Include if career-relevant
-                        formative = backstory.formative_experiences
-                        if any(work_term in formative.lower() for work_term in ['work', 'career', 'job', 'business', 'education']):
-                            personal_sections.append(f"Career Influences: {formative}")
-            
-            # Extract hobbies/interests if message mentions interests/leisure
-            if any(keyword in message_lower for keyword in ['hobby', 'hobbies', 'interest', 'interests', 'free time', 'fun', 'enjoy', 'like']):
-                # Check character.interests_and_hobbies (if exists)  
-                if hasattr(character, 'interests_and_hobbies') and character.interests_and_hobbies:
-                    interests = character.interests_and_hobbies
-                    personal_sections.append(f"Interests: {interests}")
-                
-                # Check character.current_life for leisure activities
-                if hasattr(character, 'current_life') and character.current_life:
-                    current_life = character.current_life
-                    if hasattr(current_life, 'daily_routine') and current_life.daily_routine:
-                        routine = current_life.daily_routine
-                        if hasattr(routine, 'weekend_activities') and routine.weekend_activities:
-                            personal_sections.append(f"Weekend Activities: {', '.join(routine.weekend_activities)}")
-                        if hasattr(routine, 'evening_routine') and routine.evening_routine:
-                            personal_sections.append(f"Evening Routine: {routine.evening_routine}")
+                    if hasattr(character.skills_and_expertise, 'education') and character.skills_and_expertise.education:
+                        personal_sections.append(f"Education: {character.skills_and_expertise.education}")
             
             return "\n".join(personal_sections) if personal_sections else ""
-            
         except Exception as e:
-            logger.debug("Could not extract personal knowledge: %s", e)
+            logger.debug("Fallback extraction failed: %s", e)
             return ""
 
     def _detect_communication_scenarios(self, message_content: str, character, display_name: str) -> list:

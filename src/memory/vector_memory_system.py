@@ -4704,6 +4704,7 @@ class VectorMemoryManager:
             # This ensures user/assistant messages are properly interleaved in time order
             sorted_results = list(reversed(recent_results))
             
+            print(f"🔥🔥🔥 MEMORY SYSTEM TEST PRINT: Retrieved {len(sorted_results)} conversations", flush=True)
             logger.info(f"🕒 CONVERSATION HISTORY: Retrieved {len(sorted_results)} most recent conversations in chronological order for user {user_id}")
             
             return sorted_results

@@ -1,0 +1,1 @@
+/opt/homebrew/Cellar/python@3.13/3.13.7/Frameworks/Python.framework/Versions/3.13/Resources/Python.app/Contents/MacOS/Python: can't open file '/Users/markcastillo/git/whisperengine/migrations/generate_missing_cdl_data.py': [Errno 2] No such file or directory
