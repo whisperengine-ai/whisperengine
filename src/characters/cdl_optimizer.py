@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-CDL Parameter Optimizer - Sprint 4: CharacterEvolution
+CDL Parameter Optimizer - Character Evolution Performance System
 
 Enables data-driven CDL parameter adjustments that maintain character authenticity
 while improving conversation effectiveness based on performance analysis.

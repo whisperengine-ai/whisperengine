@@ -363,7 +363,7 @@ class SimplifiedEmotionManager:
         try:
             # Import Phase 4 integration
             logger.info("🚀 PHASE 4 DEBUG: Importing Phase4HumanLikeIntegration...")
-            from .phase4_human_like_integration import Phase4HumanLikeIntegration
+            from .human_like_conversation_integration import Phase4HumanLikeIntegration
             logger.info("✅ PHASE 4 DEBUG: Phase4HumanLikeIntegration imported successfully")
             
             # Create Phase 4 integration instance if not already created

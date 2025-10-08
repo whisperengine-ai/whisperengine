@@ -67,10 +67,10 @@ class ConfidenceAnalyzer:
         
         # Calculate relationship confidence from Phase 4 data
         relationship_confidence = 0.5  # Default
-        if 'phase4_intelligence' in ai_components:
-            phase4_data = ai_components['phase4_intelligence']
+        if 'conversation_intelligence' in ai_components:
+            conversation_intelligence_data = ai_components['conversation_intelligence']
             # Use relationship level as confidence indicator
-            relationship_level = phase4_data.get('relationship_level', 'acquaintance')
+            relationship_level = conversation_intelligence_data.get('relationship_level', 'acquaintance')
             relationship_mapping = {
                 'stranger': 0.2,
                 'acquaintance': 0.4,

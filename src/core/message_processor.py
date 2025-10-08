@@ -27,7 +27,7 @@ from src.adapters.platform_adapters import (
     create_discord_attachment_adapters
 )
 
-# Sprint 3: RelationshipTuner components
+# Relationship Intelligence components
 from src.relationships.evolution_engine import create_relationship_evolution_engine
 from src.relationships.trust_recovery import create_trust_recovery_system
 
@@ -112,7 +112,7 @@ class MessageProcessor:
                 logger.warning("Temporal intelligence not available - install influxdb-client")
                 self.temporal_intelligence_enabled = False
         
-        # Sprint 1 TrendWise: Initialize trend analysis and confidence adaptation
+        # TrendWise Adaptive Learning: Initialize trend analysis and confidence adaptation
         self.trend_analyzer = None
         self.confidence_adapter = None
         
@@ -123,18 +123,18 @@ class MessageProcessor:
                 
                 self.trend_analyzer = create_trend_analyzer(self.temporal_client)
                 self.confidence_adapter = create_confidence_adapter(self.trend_analyzer)
-                logger.info("Sprint 1 TrendWise: Trend analysis and confidence adaptation initialized")
+                logger.info("TrendWise Adaptive Learning: Trend analysis and confidence adaptation initialized")
             except ImportError as e:
                 logger.warning("TrendWise components not available: %s", e)
                 self.trend_analyzer = None
                 self.confidence_adapter = None
         
-        # Sprint 3 RelationshipTuner: Lazy initialization (postgres_pool may not be ready yet)
+        # Relationship Intelligence: Lazy initialization (postgres_pool may not be ready yet)
         self.relationship_engine = None
         self.trust_recovery = None
-        self._sprint3_init_attempted = False  # Track if we've tried initializing
+        self._relationship_init_attempted = False  # Track if we've tried initializing
         
-        # Sprint 6 IntelligenceOrchestrator: Initialize unified learning coordination
+        # Learning Intelligence Orchestrator: Initialize unified learning coordination
         self.learning_orchestrator = None
         self.predictive_engine = None
         self.learning_pipeline = None
@@ -145,7 +145,7 @@ class MessageProcessor:
                 from src.adaptation.predictive_engine import PredictiveAdaptationEngine
                 from src.pipeline.learning_manager import LearningPipelineManager
                 
-                # Initialize Sprint 6 components with available Sprint 1-5 dependencies
+                # Initialize Learning Intelligence components with available adaptive learning dependencies
                 self.learning_orchestrator = LearningOrchestrator(
                     trend_analyzer=self.trend_analyzer,
                     confidence_adapter=self.confidence_adapter,
@@ -157,9 +157,9 @@ class MessageProcessor:
                 self.predictive_engine = PredictiveAdaptationEngine()
                 self.learning_pipeline = LearningPipelineManager()
                 
-                logger.info("Sprint 6 IntelligenceOrchestrator: Learning coordination components initialized")
+                logger.info("Learning Intelligence Orchestrator: Learning coordination components initialized")
             except ImportError as e:
-                logger.warning("Sprint 6 IntelligenceOrchestrator components not available: %s", e)
+                logger.warning("Learning Intelligence Orchestrator components not available: %s", e)
                 self.learning_orchestrator = None
                 self.predictive_engine = None
                 self.learning_pipeline = None
@@ -288,8 +288,8 @@ class MessageProcessor:
                 message_context
             )
             
-            # Phase 10: Sprint 6 IntelligenceOrchestrator - Unified Learning Coordination
-            await self._coordinate_sprint6_learning(
+            # Phase 10: Learning Intelligence Orchestrator - Unified Learning Coordination
+            await self._coordinate_learning_intelligence(
                 message_context, ai_components, relevant_memories, response
             )
             
@@ -485,12 +485,12 @@ class MessageProcessor:
             
             logger.debug("Recorded temporal metrics for %s/%s", bot_name, message_context.user_id)
             
-            # Sprint 3: Lazy initialization and update of dynamic relationship scores
-            await self._ensure_sprint3_initialized()
+            # Relationship Intelligence: Lazy initialization and update of dynamic relationship scores
+            await self._ensure_relationship_initialized()
             
             if self.relationship_engine:
                 try:
-                    # Map quality_metrics to ConversationQuality enum (Sprint 1)
+                    # Map quality_metrics to ConversationQuality enum (TrendWise)
                     from src.relationships.evolution_engine import ConversationQuality
                     
                     # Calculate overall quality score from metrics
@@ -514,7 +514,7 @@ class MessageProcessor:
                     else:
                         conversation_quality = ConversationQuality.FAILED
                     
-                    # Get RoBERTa emotion data (Sprint 2)
+                    # Get RoBERTa emotion data (Enhanced Emotion Intelligence)
                     emotion_data = ai_components.get('emotion_data', {})
                     
                     # Calculate and update relationship scores
@@ -542,12 +542,12 @@ class MessageProcessor:
             # Log but don't fail message processing
             logger.warning("Failed to record temporal metrics: %s", str(e))
     
-    async def _ensure_sprint3_initialized(self):
-        """Lazy initialization of Sprint 3 components (postgres_pool may not be ready at __init__ time)."""
-        if self._sprint3_init_attempted:
+    async def _ensure_relationship_initialized(self):
+        """Lazy initialization of Relationship Intelligence components (postgres_pool may not be ready at __init__ time)."""
+        if self._relationship_init_attempted:
             return  # Already tried, don't spam logs
         
-        self._sprint3_init_attempted = True
+        self._relationship_init_attempted = True
         
         # Check if postgres_pool is now available
         postgres_pool = getattr(self.bot_core, 'postgres_pool', None) if self.bot_core else None
@@ -567,7 +567,7 @@ class MessageProcessor:
                 self.relationship_engine = None
                 self.trust_recovery = None
         else:
-            logger.debug("Sprint 3 RelationshipTuner: Still waiting for postgres_pool (postgres_pool=%s, temporal_client=%s)",
+            logger.debug("Relationship Intelligence: Still waiting for postgres_pool (postgres_pool=%s, temporal_client=%s)",
                         postgres_pool is not None, self.temporal_client is not None)
     
     async def _enrich_ai_components_with_adaptive_learning(
@@ -589,15 +589,15 @@ class MessageProcessor:
         """
         try:
             # Ensure relationship evolution system is initialized
-            await self._ensure_sprint3_initialized()
+            await self._ensure_relationship_initialized()
             
             if not self.relationship_engine:
-                logger.debug("Sprint 1-3: Relationship engine not available for prompt injection")
+                logger.debug("Relationship Intelligence: Relationship engine not available for prompt injection")
                 return
             
             bot_name = os.getenv('DISCORD_BOT_NAME', 'unknown')
             
-            # SPRINT 3: Get current relationship scores
+            # RELATIONSHIP INTELLIGENCE: Get current relationship scores
             try:
                 scores = await self.relationship_engine._get_current_scores(
                     user_id=message_context.user_id,
@@ -617,9 +617,9 @@ class MessageProcessor:
                         scores.trust, scores.affection, scores.attunement
                     )
             except Exception as e:
-                logger.debug("Sprint 3: Could not retrieve relationship scores: %s", e)
+                logger.debug("Relationship Intelligence: Could not retrieve relationship scores: %s", e)
             
-            # SPRINT 1: Get conversation quality trends (if trend_analyzer available)
+            # TRENDWISE ANALYTICS: Get conversation quality trends (if trend_analyzer available)
             # TODO: Implement temporal trend retrieval for prompt injection
             # For now, use confidence metrics as a proxy for conversation quality
             if self.confidence_analyzer and len(relevant_memories) > 0:
@@ -641,9 +641,9 @@ class MessageProcessor:
                         confidence_metrics.overall_confidence
                     )
                 except Exception as e:
-                    logger.debug("Sprint 1: Could not calculate confidence metrics: %s", e)
+                    logger.debug("TrendWise Analytics: Could not calculate confidence metrics: %s", e)
             
-            # Sprint 2 RoBERTa data is already in ai_components['emotion_data']
+            # Enhanced Emotion Intelligence RoBERTa data is already in ai_components['emotion_data']
             
         except Exception as e:
             logger.warning("Failed to enrich AI components with adaptive learning data: %s", str(e))
@@ -776,7 +776,7 @@ class MessageProcessor:
             classified_context = self._classify_message_context(message_context)
             logger.debug("Message context classified: %s", classified_context.context_type.value)
 
-            # 🚀 SPRINT 2: Try MemoryBoost enhanced retrieval first if available
+            # 🚀 MEMORYBOOST: Try enhanced memory retrieval first if available
             if hasattr(self.memory_manager, 'retrieve_relevant_memories_with_memoryboost'):
                 try:
                     # Build conversation context for MemoryBoost optimization
@@ -929,7 +929,7 @@ class MessageProcessor:
 
     def _build_conversation_context_for_memoryboost(self, message_context: MessageContext) -> str:
         """
-        🚀 SPRINT 2: Build conversation context for MemoryBoost optimization.
+        🚀 MEMORYBOOST: Build conversation context for memory optimization.
         
         Creates a rich context string that MemoryBoost can use to optimize
         memory retrieval based on conversation patterns and user intent.
@@ -973,7 +973,7 @@ class MessageProcessor:
         retrieval_time_ms: int
     ) -> None:
         """
-        🚀 SPRINT 2: Record MemoryBoost metrics to InfluxDB for analytics.
+        🚀 MEMORYBOOST: Record memory optimization metrics to InfluxDB for analytics.
         
         Records detailed metrics about MemoryBoost performance including
         optimization effectiveness, quality scoring results, and performance impact.
@@ -1472,7 +1472,7 @@ class MessageProcessor:
         # Start with basic conversation context
         conversation_context = await self._build_conversation_context(message_context, relevant_memories)
         
-        # Sprint 1 TrendWise: Add confidence adaptation guidance
+        # TrendWise Adaptive Learning: Add confidence adaptation guidance
         if self.confidence_adapter:
             try:
                 bot_name = get_normalized_bot_name_from_env()
@@ -1785,10 +1785,10 @@ class MessageProcessor:
                 guidance_parts.append(f"🔄 TOPIC TRANSITION: {switch_type} detected (confidence: {confidence:.2f}) - acknowledge the shift naturally")
         
         # Proactive Engagement Analysis (Phase 4.3)
-        phase4_3_engagement = comprehensive_context.get('phase4_3_engagement_analysis')
-        if phase4_3_engagement and isinstance(phase4_3_engagement, dict):
-            intervention_needed = phase4_3_engagement.get('intervention_needed', False)
-            engagement_strategy = phase4_3_engagement.get('recommended_strategy')
+        proactive_engagement_analysis = comprehensive_context.get('proactive_engagement_analysis')
+        if proactive_engagement_analysis and isinstance(proactive_engagement_analysis, dict):
+            intervention_needed = proactive_engagement_analysis.get('intervention_needed', False)
+            engagement_strategy = proactive_engagement_analysis.get('recommended_strategy')
             if intervention_needed and engagement_strategy:
                 guidance_parts.append(f"🎯 ENGAGEMENT: Use {engagement_strategy} strategy to enhance conversation quality")
         
@@ -1900,17 +1900,16 @@ class MessageProcessor:
             if self.bot_core:
                 logger.debug(f"🎯 TASK DEBUG: has phase2_integration: {hasattr(self.bot_core, 'phase2_integration')}")
             if self.bot_core and hasattr(self.bot_core, 'phase2_integration'):
-                logger.debug("🎯 TASK DEBUG: Creating phase4_intelligence task")
-                phase4_task = self._process_phase4_intelligence_sophisticated(
+                logger.debug("🎯 TASK DEBUG: Creating conversation_intelligence task")
+                conversation_intelligence_task = self._process_conversation_intelligence_sophisticated(
                     message_context.user_id,
                     message_context.content,
                     message_context,
                     conversation_context
                 )
-                tasks.append(phase4_task)
-                task_names.append("phase4_intelligence")
-            
-            # Task 5: Thread management analysis (Phase 4.2)
+                
+                tasks.append(conversation_intelligence_task)
+                task_names.append("conversation_intelligence")            # Task 5: Thread management analysis (Phase 4.2)
             if self.bot_core and hasattr(self.bot_core, 'phase4_thread_manager'):
                 thread_task = self._process_thread_management(
                     message_context.user_id,
@@ -2007,7 +2006,7 @@ class MessageProcessor:
             ai_components['external_emotion_data'] = ai_components.get('emotion_analysis')
             ai_components['context_analysis'] = ai_components.get('context_analysis')
             ai_components['personality_context'] = ai_components.get('personality_analysis')
-            ai_components['phase4_context'] = ai_components.get('phase4_intelligence')
+            ai_components['conversation_context'] = ai_components.get('conversation_intelligence')
             
             # Advanced Emotion Intelligence integration
             advanced_emotion = ai_components.get('advanced_emotion_intelligence')
@@ -2062,14 +2061,14 @@ class MessageProcessor:
             # Build comprehensive context from all AI components
             comprehensive_context = {}
             
-            # Add Phase 4 intelligence context
-            if ai_components.get('phase4_intelligence'):
-                phase4_context = ai_components['phase4_intelligence']
-                if hasattr(phase4_context, '__dict__'):
+            # Add conversation intelligence context
+            if ai_components.get('conversation_intelligence'):
+                conversation_context = ai_components['conversation_intelligence']
+                if hasattr(conversation_context, '__dict__'):
                     comprehensive_context.update({
-                        'phase4_context': phase4_context,
-                        'interaction_type': getattr(phase4_context, 'interaction_type', None),
-                        'conversation_mode': getattr(phase4_context, 'conversation_mode', None),
+                        'conversation_context': conversation_context,
+                        'interaction_type': getattr(conversation_context, 'interaction_type', None),
+                        'conversation_mode': getattr(conversation_context, 'conversation_mode', None),
                     })
             
             # Add thread management results (Phase 4.2)
@@ -2079,7 +2078,7 @@ class MessageProcessor:
             
             # Add proactive engagement results (Phase 4.3)
             if ai_components.get('proactive_engagement'):
-                comprehensive_context['phase4_3_engagement_analysis'] = ai_components['proactive_engagement']
+                comprehensive_context['proactive_engagement_analysis'] = ai_components['proactive_engagement']
                 logger.info("🧠 Added Phase 4.3 Proactive Engagement results to context")
             
             # Add human-like memory optimization
@@ -2161,7 +2160,7 @@ class MessageProcessor:
                 'detection_method': 'fallback'
             }
 
-    async def _process_phase4_intelligence_sophisticated(self, user_id: str, content: str, 
+    async def _process_conversation_intelligence_sophisticated(self, user_id: str, content: str, 
                                                        message_context: MessageContext,
                                                        conversation_context: List[Dict[str, str]]) -> Optional[Dict[str, Any]]:
         """Sophisticated Phase 4 intelligence processing with full integration."""
@@ -2179,11 +2178,11 @@ class MessageProcessor:
             logger.info("🔄 Using stable OLD Phase 3 + Phase 4 processing method")
             
             # Process Phase 3 components separately (like the old working system)
-            phase3_context_switches = await self._analyze_context_switches(user_id, content, discord_message)
+            conversation_context_switches = await self._analyze_context_switches(user_id, content, discord_message)
             phase3_empathy_calibration = await self._calibrate_empathy_response(user_id, content, discord_message)
             
-            # Process with old Phase 4 sophistication
-            phase4_context = await self.bot_core.phase2_integration.process_phase4_intelligence(
+            # Process with conversation intelligence sophistication
+            conversation_context_result = await self.bot_core.phase2_integration.process_phase4_intelligence(
                 user_id=user_id,
                 message=discord_message,
                 recent_messages=conversation_context,
@@ -2191,13 +2190,13 @@ class MessageProcessor:
                 phase2_context=None
             )
             
-            # Add Phase 3 results to the Phase 4 context
-            if isinstance(phase4_context, dict):
-                phase4_context['phase3_context_switches'] = phase3_context_switches
-                phase4_context['phase3_empathy_calibration'] = phase3_empathy_calibration
+            # Add Phase 3 results to the conversation intelligence context
+            if isinstance(conversation_context_result, dict):
+                conversation_context_result['conversation_context_switches'] = conversation_context_switches
+                conversation_context_result['phase3_empathy_calibration'] = phase3_empathy_calibration
             
-            logger.debug(f"Sophisticated Phase 4 intelligence processing successful for user {user_id}")
-            return phase4_context
+            logger.debug(f"Sophisticated conversation intelligence processing successful for user {user_id}")
+            return conversation_context_result
             
         except Exception as e:
             logger.debug(f"Sophisticated Phase 4 intelligence processing failed: {e}")
@@ -2810,7 +2809,7 @@ class MessageProcessor:
         Analyze character performance and identify optimization opportunities.
         
         Character Performance Intelligence:
-        - Analyzes character effectiveness across Sprint 1-3 metrics
+        - Analyzes character effectiveness across adaptive learning metrics
         - Identifies CDL parameter optimization opportunities
         - Correlates personality traits with conversation success
         - Provides data-driven character adaptation insights
@@ -2836,7 +2835,7 @@ class MessageProcessor:
                 postgres_pool=getattr(self.bot_core, 'postgres_pool', None) if self.bot_core else None
             )
             
-            # Analyze character effectiveness across Sprint 1-3 metrics
+            # Analyze character effectiveness across adaptive learning metrics
             effectiveness_analysis = await performance_analyzer.analyze_character_effectiveness(
                 bot_name=bot_name,
                 days_back=14,
@@ -3125,7 +3124,7 @@ class MessageProcessor:
         
         return None
 
-    async def _process_phase4_intelligence(self, user_id: str, content: str, message_context: MessageContext, emotion_data: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    async def _process_conversation_intelligence(self, user_id: str, content: str, message_context: MessageContext, emotion_data: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
         """Process Phase 4 human-like intelligence if available."""
         try:
             if not self.bot_core or not hasattr(self.bot_core, 'phase2_integration'):
@@ -3134,8 +3133,8 @@ class MessageProcessor:
             # Create adapter for Discord-specific component
             discord_message = create_discord_message_adapter(message_context)
             
-            # Use Phase 4 integration if available
-            phase4_context = await self.bot_core.phase2_integration.process_phase4_intelligence(
+            # Use conversation intelligence integration if available
+            conversation_context_result = await self.bot_core.phase2_integration.process_phase4_intelligence(
                 user_id=user_id,
                 message=discord_message,
                 recent_messages=[],
@@ -3143,11 +3142,11 @@ class MessageProcessor:
                 phase2_context=emotion_data
             )
             
-            logger.debug("Phase 4 intelligence processing successful for user %s", user_id)
-            return phase4_context
+            logger.debug("Conversation intelligence processing successful for user %s", user_id)
+            return conversation_context_result
             
         except Exception as e:
-            logger.debug("Phase 4 intelligence processing failed: %s", str(e))
+            logger.debug("Conversation intelligence processing failed: %s", str(e))
         
         return None
 
@@ -3448,7 +3447,7 @@ class MessageProcessor:
                 else:
                     pipeline_result.enhanced_context = comprehensive_context.copy()
                 
-                logger.info("🎯 CDL: Enhanced pipeline with comprehensive context from sophisticated AI processing (includes Sprint 1-3)")
+                logger.info("🎯 CDL: Enhanced pipeline with comprehensive context from sophisticated AI processing (includes adaptive learning features)")
             
             # Use centralized character system if available, otherwise create new instance
             if self.bot_core and hasattr(self.bot_core, 'character_system'):
@@ -4301,8 +4300,8 @@ class MessageProcessor:
         }
         
         # 5. Relationship Metrics (if available from Phase 4)
-        phase4_data = ai_components.get('phase4_intelligence', {})
-        relationship_level = phase4_data.get('relationship_level', 'acquaintance')
+        conversation_intelligence_data = ai_components.get('conversation_intelligence', {})
+        relationship_level = conversation_intelligence_data.get('relationship_level', 'acquaintance')
         
         # Map relationship level to approximate scores (0-100 scale)
         relationship_mapping = {
@@ -4325,28 +4324,28 @@ class MessageProcessor:
         }
         
         # 6. Processing Pipeline Breakdown
-        phase4_metadata = phase4_data.get('processing_metadata', {})
-        performance_metrics = phase4_metadata.get('performance_metrics', {})
+        conversation_intelligence_metadata = conversation_intelligence_data.get('processing_metadata', {})
+        performance_metrics = conversation_intelligence_metadata.get('performance_metrics', {})
         
         metadata["processing_pipeline"] = {
             "phase2_emotion_analysis_ms": round(performance_metrics.get('phase2_duration', 0) * 1000, 2),
-            "phase4_intelligence_ms": round(phase4_metadata.get('total_duration', 0) * 1000, 2),
+            "conversation_intelligence_ms": round(conversation_intelligence_metadata.get('total_duration', 0) * 1000, 2),
             "total_processing_ms": processing_time_ms,
-            "phases_executed": phase4_metadata.get('phases_executed', []),
-            "phases_completed": phase4_metadata.get('phases_completed', 0)
+            "phases_executed": conversation_intelligence_metadata.get('phases_executed', []),
+            "phases_completed": conversation_intelligence_metadata.get('phases_completed', 0)
         }
         
         # 7. Conversation Context Indicators
         metadata["conversation_intelligence"] = {
-            "context_switches_detected": len(phase4_data.get('phase3_context_switches', [])),
-            "conversation_mode": phase4_data.get('conversation_mode', 'standard'),
-            "interaction_type": phase4_data.get('interaction_type', 'general'),
-            "response_guidance": phase4_data.get('response_guidance', 'natural_conversation')
+            "context_switches_detected": len(conversation_intelligence_data.get('conversation_context_switches', [])),
+            "conversation_mode": conversation_intelligence_data.get('conversation_mode', 'standard'),
+            "interaction_type": conversation_intelligence_data.get('interaction_type', 'general'),
+            "response_guidance": conversation_intelligence_data.get('response_guidance', 'natural_conversation')
         }
         
         return metadata
 
-    async def _coordinate_sprint6_learning(
+    async def _coordinate_learning_intelligence(
         self, 
         message_context: MessageContext, 
         ai_components: Dict[str, Any], 
@@ -4354,16 +4353,16 @@ class MessageProcessor:
         response: str
     ):
         """
-        🎯 SPRINT 6: IntelligenceOrchestrator coordination and learning pipeline management.
+        🎯 LEARNING INTELLIGENCE: Orchestrator coordination and learning pipeline management.
         
-        Coordinates all learning components from Sprints 1-5 and manages predictive adaptation:
+        Coordinates all learning components and manages predictive adaptation:
         - Learning health monitoring across all components
         - Predictive adaptation based on user patterns
         - Learning pipeline task scheduling and execution
-        - Cross-sprint intelligence correlation
+        - Cross-component intelligence correlation
         """
         if not self.learning_orchestrator:
-            logger.debug("Sprint 6: IntelligenceOrchestrator not available")
+            logger.debug("Learning Intelligence Orchestrator: Not available")
             return
         
         try:
@@ -4383,13 +4382,13 @@ class MessageProcessor:
                                    len(predictions), message_context.user_id)
                         
                         # Record predictions in ai_components for potential CDL integration
-                        ai_components['sprint6_predictions'] = {
+                        ai_components['learning_predictions'] = {
                             'prediction_count': len(predictions),
                             'prediction_types': [p.prediction_type.value for p in predictions[:3]],  # Top 3
                             'confidence_average': len(predictions)  # Simple count for now
                         }
                 except Exception as e:
-                    logger.warning("Sprint 6 predictive adaptation failed: %s", str(e))
+                    logger.warning("Learning Intelligence predictive adaptation failed: %s", str(e))
             
             # 2. Learning Health Monitoring (periodic - every 10th message)
             # Use hash of user_id to determine if this should trigger health monitoring
@@ -4405,7 +4404,7 @@ class MessageProcessor:
                                len(health_report.component_statuses))
                     
                     # Store health metrics in ai_components
-                    ai_components['sprint6_health'] = {
+                    ai_components['learning_health'] = {
                         'overall_health': health_report.overall_health.value,
                         'system_performance': health_report.system_performance_score,
                         'healthy_components': len([s for s in health_report.component_statuses if s.status.value == 'healthy']),
@@ -4434,20 +4433,20 @@ class MessageProcessor:
             if self.temporal_client and hasattr(self.temporal_client, 'record_point'):
                 try:
                     await self.temporal_client.record_point(
-                        measurement="sprint6_intelligence_orchestrator",
+                        measurement="learning_intelligence_orchestrator",
                         tags={
                             "bot_name": bot_name,
                             "user_id": message_context.user_id,
                             "platform": message_context.platform
                         },
                         fields={
-                            "predictions_generated": len(ai_components.get('sprint6_predictions', {}).get('prediction_types', [])),
-                            "health_monitoring_triggered": bool(ai_components.get('sprint6_health')),
+                            "predictions_generated": len(ai_components.get('learning_predictions', {}).get('prediction_types', [])),
+                            "health_monitoring_triggered": bool(ai_components.get('learning_health')),
                             "learning_orchestrator_available": bool(self.learning_orchestrator),
                             "predictive_engine_available": bool(self.predictive_engine),
                             "learning_pipeline_available": bool(self.learning_pipeline),
-                            "system_performance": ai_components.get('sprint6_health', {}).get('system_performance', 0.0),
-                            "healthy_components": ai_components.get('sprint6_health', {}).get('healthy_components', 0)
+                            "system_performance": ai_components.get('learning_health', {}).get('system_performance', 0.0),
+                            "healthy_components": ai_components.get('learning_health', {}).get('healthy_components', 0)
                         },
                         timestamp=datetime.utcnow()
                     )

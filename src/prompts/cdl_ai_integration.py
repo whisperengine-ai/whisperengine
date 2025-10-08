@@ -567,10 +567,10 @@ class CDLAIPromptIntegration:
                             guidance_parts.append(f"🎯 INTENT SHIFT: {previous_intent} → {current_intent} - adjust response focus")
                     
                     # Proactive Engagement Analysis (Phase 4.3)
-                    phase4_3_engagement = comprehensive_context.get('phase4_3_engagement_analysis')
-                    if phase4_3_engagement and isinstance(phase4_3_engagement, dict):
-                        intervention_needed = phase4_3_engagement.get('intervention_needed', False)
-                        engagement_strategy = phase4_3_engagement.get('recommended_strategy')
+                    proactive_engagement_analysis = comprehensive_context.get('proactive_engagement_analysis')
+                    if proactive_engagement_analysis and isinstance(proactive_engagement_analysis, dict):
+                        intervention_needed = proactive_engagement_analysis.get('intervention_needed', False)
+                        engagement_strategy = proactive_engagement_analysis.get('recommended_strategy')
                         if intervention_needed and engagement_strategy:
                             guidance_parts.append(f"🎯 ENGAGEMENT: Use {engagement_strategy} strategy to enhance conversation quality")
                     

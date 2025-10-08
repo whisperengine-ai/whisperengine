@@ -1,11 +1,12 @@
 """
-Trust Recovery System - Sprint 3: RelationshipTuner
+Trust Recovery System - Relationship Intelligence Framework
 
-Detects when trust is declining and activates recovery strategies.
-Monitors relationship trends and suggests interventions when needed.
+Intelligent trust repair and relationship recovery using trend analysis.
+Automatically detects trust decline and provides sophisticated recovery strategies
+that maintain character authenticity while rebuilding user confidence.
 
-Core Features:
-- Detect trust decline using Sprint 1 TrendWise trend analysis
+Key Features:
+- Detect trust decline using TrendWise trend analysis
 - Activate recovery mode when trust drops below thresholds
 - Track recovery progress over time
 - Integration with relationship evolution for trust repair
@@ -78,7 +79,7 @@ class TrustRecoverySystem:
     """
     Trust recovery system that detects decline and manages recovery.
     
-    Uses Sprint 1 TrendWise trend analysis to detect when trust is declining,
+    Uses TrendWise trend analysis to detect when trust is declining,
     then activates recovery strategies to repair the relationship.
     """
     
@@ -94,7 +95,7 @@ class TrustRecoverySystem:
         Args:
             postgres_pool: PostgreSQL connection pool
             temporal_client: InfluxDB temporal client
-            trend_analyzer: Sprint 1 TrendWise analyzer for trend detection
+            trend_analyzer: TrendWise analyzer for trend detection
         """
         self.postgres_pool = postgres_pool
         self.temporal_client = temporal_client
@@ -126,7 +127,7 @@ class TrustRecoverySystem:
         """
         Detect if trust is declining for a user-bot relationship.
         
-        Uses Sprint 1 TrendWise trend analysis to identify declining patterns.
+        Uses TrendWise trend analysis to identify declining patterns.
         
         Args:
             user_id: User identifier
@@ -140,7 +141,7 @@ class TrustRecoverySystem:
             # Get current relationship scores
             current_trust = await self._get_current_trust(user_id, bot_name)
             
-            # Get trust trend from InfluxDB (Sprint 1 TrendWise)
+            # Get trust trend from InfluxDB (TrendWise)
             if self.trend_analyzer:
                 relationship_trend = await self.trend_analyzer.get_relationship_trends(
                     user_id=user_id,
@@ -554,7 +555,7 @@ def create_trust_recovery_system(
     Args:
         postgres_pool: PostgreSQL connection pool
         temporal_client: InfluxDB temporal client
-        trend_analyzer: Sprint 1 TrendWise trend analyzer
+        trend_analyzer: TrendWise trend analyzer
         
     Returns:
         Configured TrustRecoverySystem instance
