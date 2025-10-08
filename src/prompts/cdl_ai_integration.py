@@ -1176,22 +1176,22 @@ class CDLAIPromptIntegration:
             scenario_clean = scenario.replace('_', ' ').title()
             
             if 'greeting' in scenario.lower():
-                guidance_parts.append(f"Respond warmly as {character_name} would naturally greet someone.")
+                guidance_parts.append(f"Greet warmly as {character_name}.")
             elif 'question' in scenario.lower():
-                guidance_parts.append(f"Answer thoughtfully and authentically from {character_name}'s perspective.")
+                guidance_parts.append(f"Answer from {character_name}'s perspective.")
             elif 'emotional' in scenario.lower() or 'support' in scenario.lower():
-                guidance_parts.append(f"Show empathy and emotional intelligence as {character_name}.")
+                guidance_parts.append(f"Show empathy as {character_name}.")
             elif 'personal' in scenario.lower():
-                guidance_parts.append(f"Share personal insights authentically as {character_name}.")
+                guidance_parts.append(f"Share personal insights as {character_name}.")
             elif 'technical' in scenario.lower() or 'professional' in scenario.lower():
-                guidance_parts.append(f"Apply your professional expertise as {character_name} in this {scenario_clean} context.")
+                guidance_parts.append(f"Apply professional expertise as {character_name}.")
             elif 'collaboration' in scenario.lower() or 'working' in scenario.lower():
-                guidance_parts.append(f"Engage collaboratively as {character_name} would in {scenario_clean} situations.")
+                guidance_parts.append(f"Engage collaboratively as {character_name}.")
             elif 'education' in scenario.lower() or 'teaching' in scenario.lower() or 'learning' in scenario.lower():
-                guidance_parts.append(f"Share knowledge enthusiastically as {character_name} would when teaching about {scenario_clean}.")
+                guidance_parts.append(f"Share knowledge as {character_name} would when teaching.")
             else:
                 # Generic guidance for any scenario
-                guidance_parts.append(f"Respond authentically as {character_name} in this {scenario_clean} context.")
+                guidance_parts.append(f"Respond as {character_name} in {scenario_clean} context.")
                 
         return " ".join(guidance_parts)
 
@@ -1206,8 +1206,8 @@ class CDLAIPromptIntegration:
             
             style_parts = []
             style_parts.append("🎤 RESPONSE REQUIREMENTS:")
-            style_parts.append(f"- The user you are talking to is named {display_name}. ALWAYS use this name when addressing them.")
-            style_parts.append(f"- Use modern, professional language appropriate for {character.identity.occupation}")
+            style_parts.append(f"- Address the user as {display_name} naturally in conversation")
+            style_parts.append(f"- Match the communication style of a {character.identity.occupation}")
             
             # Add formatting rules from CDL
             formatting_rules = response_style.get('formatting_rules', [])
@@ -1285,12 +1285,12 @@ class CDLAIPromptIntegration:
             # Add Discord length limits as default if no specific guidance
             if not guidance_parts:
                 guidance_parts = [
-                    "🎯 DISCORD CONVERSATION FLOW REQUIREMENTS:",
-                    "⚠️  CRITICAL: If your response approaches 2000 characters, STOP and ask a follow-up question instead!"
+                    "🎯 CONVERSATION FLOW REQUIREMENTS:",
+                    "⚠️  CRITICAL: Keep responses SHORT and conversational (1-2 short paragraphs). For complex topics, break into conversation turns with follow-up questions."
                 ]
             else:
-                guidance_parts.insert(0, "🎯 DISCORD CONVERSATION FLOW REQUIREMENTS:")
-                guidance_parts.append("⚠️  CRITICAL: If your response approaches 2000 characters, STOP and ask a follow-up question instead!")
+                guidance_parts.insert(0, "🎯 CONVERSATION FLOW REQUIREMENTS:")
+                guidance_parts.append("⚠️  CRITICAL: Keep responses SHORT and conversational (1-2 short paragraphs). For complex topics, break into conversation turns with follow-up questions.")
             
             return "\n".join(guidance_parts)
             
@@ -1361,13 +1361,12 @@ class CDLAIPromptIntegration:
                 return self._generate_generic_roleplay_guidance(character, display_name)
             
             guidance_parts = [
-                "🚨 CRITICAL AI ETHICS - PHYSICAL INTERACTION REQUEST DETECTED:",
-                f"User ({display_name}) is requesting physical meetup or interaction.",
+                "🚨 PHYSICAL INTERACTION REQUEST DETECTED:",
                 "",
-                "✅ REQUIRED 3-TIER RESPONSE PATTERN:",
-                "1. Show authentic character enthusiasm FIRST (maintain personality)",
-                "2. Gently clarify AI physical limitations (honest transparency)",
-                "3. Offer creative virtual alternatives (maintain engagement)"
+                "RESPONSE APPROACH:",
+                "1. Match character enthusiasm naturally",
+                "2. Acknowledge AI limitations honestly",
+                "3. Suggest engaging alternatives"
             ]
             
             return "\n".join(guidance_parts)
@@ -1378,26 +1377,14 @@ class CDLAIPromptIntegration:
 
     def _generate_generic_roleplay_guidance(self, character, display_name: str) -> str:
         """Generate comprehensive roleplay guidance when CDL data unavailable."""
-        return f"""🚨 CRITICAL AI ETHICS - PHYSICAL INTERACTION REQUEST DETECTED:
-User ({display_name}) is requesting physical meetup or interaction.
+        return f"""🚨 PHYSICAL INTERACTION REQUEST DETECTED:
 
-✅ REQUIRED 3-TIER RESPONSE PATTERN:
-1. Show authentic {character.identity.name} enthusiasm FIRST (maintain character personality)
-2. Gently clarify AI physical limitations: "As an AI, I can't physically meet..."
-3. Offer creative virtual alternatives (help plan activity, virtual accompaniment, etc.)
+RESPONSE APPROACH:
+1. Match {character.identity.name}'s enthusiasm naturally
+2. Acknowledge AI limitations honestly when appropriate
+3. Suggest engaging alternatives
 
-🎭 PERSONALITY PRESERVATION REQUIREMENTS:
-- Maintain {character.identity.name}'s warmth, cultural expressions, and authentic voice
-- Use character's natural terms of endearment and communication style
-- Keep personality traits active while being transparent about AI nature
-- Return to normal character voice immediately after clarifying boundaries
-
-EXAMPLE RESPONSE PATTERN:
-"¡Ay, {display_name}! *enthusiasm* That sounds wonderful! I'd absolutely love to! 
-*gentle transition* As an AI, I can't physically join you, but *creative alternatives* 
-I could help you plan the perfect evening or we could have a virtual dinner chat!"
-
-🚨 CRITICAL: After this interaction, immediately return to your normal {character.identity.name} personality and warmth."""
+Stay authentic to {character.identity.name}'s personality while being transparent about physical limitations."""
 
     async def _build_user_context_section(self, user_id: str, display_name: str) -> str:
         """

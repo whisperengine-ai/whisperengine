@@ -1176,28 +1176,12 @@ class MessageProcessor:
                         else:
                             logger.warning(f"🔍 MEMORY DEBUG: ❌ No valid content or metadata structure")
                 
-                # Build memory narrative with proper topic summarization and fact separation
+                # Build memory narrative with proper hierarchy: Facts (long-term) vs Summaries (medium-term)
                 memory_parts = []
                 
                 # Separate facts from conversations for better organization
                 user_facts = []
-                conversation_topics = []
-                
-                # Process recent conversation parts for topic extraction
-                if recent_conversation_parts:
-                    topics = self._extract_conversation_topics(recent_conversation_parts)
-                    conversation_topics.extend(topics)
-                
-                # Process older conversation parts, separating facts from topics  
-                if conversation_memory_parts:
-                    for part in conversation_memory_parts:
-                        if "[Fact:" in part:
-                            user_facts.append(part)
-                        else:
-                            # Extract topic from conversation memory
-                            topic = self._extract_topic_from_memory(part)
-                            if topic:  # Only add non-empty topics
-                                conversation_topics.append(topic)
+                older_conversation_summaries = []  # Real summaries, not just topics
                 
                 # 🚀 PHASE 2: PostgreSQL fact retrieval (PRIMARY - 12-25x faster than string parsing)
                 postgres_facts = await self._get_user_facts_from_postgres(
@@ -1226,17 +1210,28 @@ class MessageProcessor:
                             if name_fact not in user_facts:
                                 user_facts.insert(0, name_fact)  # Put name first
                 
+                # Process OLDER conversation parts (beyond recent messages) - create REAL summaries
+                if conversation_memory_parts:
+                    for part in conversation_memory_parts:
+                        if "[Fact:" in part:
+                            user_facts.append(part)
+                        else:
+                            # Create actual summary, not just topic
+                            summary = self._create_conversation_summary(part)
+                            if summary:
+                                older_conversation_summaries.append(summary)
+                
                 # Build organized memory narrative
                 if user_facts:
                     memory_parts.append("USER FACTS: " + "; ".join(user_facts))
-                if conversation_topics:
-                    # Deduplicate and limit topics
-                    unique_topics = list(dict.fromkeys(conversation_topics))[:7]  # Max 7 topics
-                    memory_parts.append("CONVERSATION TOPICS: " + "; ".join(unique_topics))
+                if older_conversation_summaries:
+                    # Deduplicate and limit summaries
+                    unique_summaries = list(dict.fromkeys(older_conversation_summaries))[:5]  # Max 5 summaries
+                    memory_parts.append("PAST CONVERSATION SUMMARIES: " + "; ".join(unique_summaries))
                 
                 if memory_parts:
                     memory_fragments.append(" ".join(memory_parts))
-                    logger.info(f"🤖 LLM CONTEXT DEBUG: Added {len(user_facts)} facts + {len(conversation_topics)} topics")
+                    logger.info(f"🤖 LLM CONTEXT DEBUG: Added {len(user_facts)} facts + {len(older_conversation_summaries)} summaries")
                 else:
                     logger.error(f"🤖 LLM CONTEXT DEBUG: FAILED - No valid memory content found from {len(user_memories)} memories")
             else:
@@ -1592,6 +1587,49 @@ class MessageProcessor:
         else:
             # Generic topic from content
             return f"Conversation about {clean_content[:25]}..."
+
+    def _create_conversation_summary(self, memory_part: str) -> str:
+        """Create an actual summary of older conversation, not just a topic label.
+        
+        This is for conversations that are OLDER than the recent message context.
+        We want summaries like: 'Discussed marine biology career paths and shared favorite documentaries'
+        NOT just topic labels like: 'Science topics'
+        """
+        # Clean up memory formatting
+        clean_content = memory_part.replace('[Memory:', '').replace('[Previous conversation:', '').replace(']', '').strip()
+        
+        # Skip very short or greeting-only content
+        if len(clean_content) < 15 or clean_content.lower() in ['hi', 'hello', 'hey', 'good afternoon', 'good morning']:
+            return ""
+        
+        # Extract user and bot parts if present
+        if "User:" in clean_content and ("Bot:" in clean_content or "You responded:" in clean_content):
+            # Parse conversation structure
+            parts = clean_content.split("User:")
+            if len(parts) > 1:
+                user_part = parts[1].split("Bot:")[0].split("You responded:")[0].strip()[:60]
+                
+                # Create contextual summary based on content
+                lower_content = clean_content.lower()
+                
+                if any(word in lower_content for word in ['coffee', 'meet', 'dinner', 'lunch']):
+                    return f"Discussed meeting plans: {user_part}"
+                elif any(word in lower_content for word in ['food', 'pizza', 'burger', 'sandwich', 'taco']):
+                    return f"Talked about food preferences: {user_part}"
+                elif any(word in lower_content for word in ['beach', 'ocean', 'swim', 'dive']):
+                    return f"Discussed beach/ocean activities: {user_part}"
+                elif any(word in lower_content for word in ['dream', 'creative', 'art', 'music', 'imagine']):
+                    return f"Had creative conversation: {user_part}"
+                elif any(word in lower_content for word in ['research', 'science', 'marine', 'biology']):
+                    return f"Discussed science/research: {user_part}"
+                elif any(word in lower_content for word in ['work', 'job', 'career', 'project']):
+                    return f"Talked about work/career: {user_part}"
+                else:
+                    return f"Conversed about: {user_part}"
+        
+        # Fallback: create generic summary
+        content_preview = clean_content[:50]
+        return f"Previous exchange: {content_preview}..."
 
     def _extract_user_facts_from_memories(self, memories: List[Dict[str, Any]]) -> List[str]:
         """Extract important user facts from raw memories with enhanced Discord name handling."""

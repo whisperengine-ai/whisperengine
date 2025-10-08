@@ -27,6 +27,11 @@ class OptimizedPromptBuilder:
         self.optional_sections = []
         
         # Initialize conversation summarizer if LLM client provided
+        # NOTE: AdvancedConversationSummarizer is initialized but NOT currently used in prompt building
+        # REASON: Makes 2x LLM API calls (topic extraction + natural summary) per conversation
+        # IMPACT: Adds 500ms-2s latency + 2x token cost on EVERY message with >10 history
+        # DECISION: Use lightweight keyword-based _create_intelligence_enhanced_summary() instead
+        # FUTURE: Consider enabling with caching for conversations >50 messages where quality matters
         self.conversation_summarizer = None
         if llm_client:
             try:
@@ -315,12 +320,19 @@ class OptimizedPromptBuilder:
                 recent_limit = min(3, len(history))  # Standard 3 exchanges
             
             # 🚀 ENHANCED: Use Qdrant recommendation API with intelligence-informed summarization
+            # NOTE: Currently using lightweight _create_intelligence_enhanced_summary() (keyword-based)
+            # NOT using self.conversation_summarizer.create_conversation_summary() because:
+            #   - Makes 2x LLM API calls (topic extraction + natural summary)
+            #   - Adds 500ms-2s latency per message
+            #   - Doubles token costs for every message with conversation history
+            # DECISION: Keyword-based summary is "good enough" for prompt context compression
+            # FUTURE: Consider LLM summarization for conversations >50 messages with caching
             if len(history) > 4 and self.memory_manager and hasattr(self.memory_manager, 'vector_store'):
                 try:
                     # Enhanced pattern-based summary with intelligence context
                     older_messages = history[:-self._calculate_optimal_recent_window(history)]
                     if older_messages:
-                        # Intelligence-informed topic extraction
+                        # Intelligence-informed topic extraction (lightweight, no LLM calls)
                         summary = self._create_intelligence_enhanced_summary(
                             older_messages, 
                             intelligence_insights
@@ -465,7 +477,26 @@ class OptimizedPromptBuilder:
             return insights
     
     def _create_intelligence_enhanced_summary(self, older_messages: list, insights: Dict) -> str:
-        """Create conversation summary enhanced with intelligence insights"""
+        """
+        Create conversation summary enhanced with intelligence insights
+        
+        DESIGN DECISION: Lightweight keyword-based approach (no LLM calls)
+        
+        WHY NOT USE AdvancedConversationSummarizer.create_conversation_summary()?
+        - That method makes 2x LLM API calls (topic extraction + natural summary generation)
+        - Adds 500ms-2s latency to EVERY message response
+        - Doubles token costs for all conversations with history
+        - Called frequently in prompt building pipeline (performance critical path)
+        
+        CURRENT APPROACH: Keyword extraction + intelligence context enhancement
+        - Zero LLM calls - pure Python analysis
+        - <1ms execution time
+        - Zero additional API costs
+        - "Good enough" quality for prompt context compression
+        
+        WHEN TO RECONSIDER: If conversation quality suffers for very long histories (>50 messages),
+        implement caching strategy to use LLM summarization once per conversation session.
+        """
         try:
             # Base topic extraction
             topics = set()

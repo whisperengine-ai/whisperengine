@@ -3915,7 +3915,14 @@ class VectorMemoryManager:
         query: str,
         limit: int = 25  # 🔧 ENHANCED: Increased from 15 to 25 for chunked conversation reassembly
     ) -> List[Dict[str, Any]]:
-        """Retrieve memories relevant to the given query using vector similarity."""
+        """
+        Retrieve memories relevant to the given query using intelligent vector selection.
+        
+        🚀 MULTI-VECTOR INTELLIGENCE: Automatically selects appropriate named vector based on query intent:
+        - Emotional queries → emotion vector (feelings, mood, emotional state)
+        - Pattern queries → semantic vector (relationship patterns, behavioral trends)
+        - Content queries → content vector (semantic meaning, topics, facts)
+        """
         import time
         
         start_time = time.time()
@@ -3943,6 +3950,47 @@ class VectorMemoryManager:
                 
                 logger.debug(f"🎯 TEMPORAL SEARCH: Retrieved {len(formatted_results)} memories in {(time.time() - start_time)*1000:.1f}ms")
                 return formatted_results
+            
+            # 🎭 INTELLIGENT VECTOR SELECTION: Route to appropriate named vector based on query intent
+            query_lower = query.lower()
+            
+            # Emotional queries → use emotion vector for better emotional context matching
+            emotional_keywords = ['feel', 'feeling', 'felt', 'mood', 'emotion', 'emotional', 
+                                 'happy', 'sad', 'angry', 'excited', 'worried', 'anxious',
+                                 'joyful', 'depressed', 'upset', 'frustrated', 'content']
+            if any(keyword in query_lower for keyword in emotional_keywords):
+                logger.info(f"🎭 EMOTIONAL QUERY DETECTED: '{query}' - Using emotion vector search")
+                try:
+                    emotion_results = await self.vector_store.search_with_emotional_context(
+                        content_query=query,
+                        emotional_query=query,  # Use same query for emotion matching
+                        user_id=user_id,
+                        top_k=limit
+                    )
+                    
+                    if emotion_results:
+                        formatted_results = []
+                        for r in emotion_results:
+                            formatted_results.append({
+                                "content": r.get("content", ""),
+                                "score": r.get("score", 0.0),
+                                "timestamp": r.get("timestamp", ""),
+                                "metadata": r.get("metadata", {}),
+                                "memory_type": r.get("memory_type", "conversation"),
+                                "emotional": True,
+                                "search_type": "emotion_vector"
+                            })
+                        
+                        logger.debug(f"🎭 EMOTION VECTOR: Retrieved {len(formatted_results)} memories in {(time.time() - start_time)*1000:.1f}ms")
+                        return formatted_results
+                except Exception as e:
+                    logger.warning(f"Emotion vector search failed, falling back to content: {e}")
+            
+            # Default: Content vector for semantic meaning and topics
+            # NOTE: Pattern/semantic vector routing disabled due to infinite recursion
+            # get_memory_clusters_for_roleplay() internally calls retrieve_relevant_memories()
+            # TODO: Refactor to prevent recursion before re-enabling pattern routing
+            logger.debug(f"🧠 CONTENT QUERY: '{query}' - Using content vector (default)")
             
             # 🚀 SIMPLIFIED: Trust vector embeddings for semantic search
             # RoBERTa-enhanced emotional metadata from storage provides the intelligence
