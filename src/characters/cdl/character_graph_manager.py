@@ -173,7 +173,7 @@ class CharacterGraphManager:
         
         # Query based on intent
         background = await self._query_background(character_id, intent, limit)
-        memories = await self._query_memories(character_id, intent, query_text, limit)
+        memories = await self._query_memories(character_id, intent, query_text, limit, user_id)
         relationships = await self._query_relationships(character_id, intent, limit)
         abilities = await self._query_abilities(character_id, intent, limit)
         
@@ -305,18 +305,55 @@ class CharacterGraphManager:
         character_id: int,
         intent: CharacterKnowledgeIntent,
         query_text: str,
-        limit: int
+        limit: int,
+        user_id: Optional[str] = None
     ) -> List[Dict[str, Any]]:
         """
         Query character memories with trigger-based activation.
         
-        Returns memories triggered by query keywords or matching intent.
+        Returns memories triggered by:
+        1. Direct query keywords from message
+        2. User fact entities from knowledge base (if user_id provided)
+        
+        ENHANCEMENT: This implementation includes the memory trigger enhancement
+        that activates character memories when user facts match memory triggers.
+        For example, if the user has mentioned "diving" as a hobby,
+        Elena's diving-related memories will automatically surface.
         """
         async with self.postgres.acquire() as conn:
             # Extract potential trigger keywords from query
             trigger_keywords = self._extract_trigger_keywords(query_text, intent)
             
-            if not trigger_keywords:
+            # ENHANCEMENT: Add user fact entities as additional triggers
+            user_fact_triggers = []
+            if user_id and self.semantic_router:
+                try:
+                    # Get user facts and extract entity names as additional triggers
+                    from src.knowledge.semantic_router import IntentAnalysisResult, QueryIntent
+                    
+                    # Create a general intent for fact retrieval
+                    general_intent = IntentAnalysisResult(
+                        intent_type=QueryIntent.FACTUAL_RECALL,
+                        entity_type=None,  # Get all entity types
+                        relationship_type=None,  # Get all relationships
+                        confidence=0.9,
+                        keywords=[]
+                    )
+                    
+                    # Get user facts and extract entity names as triggers
+                    user_facts = await self.semantic_router.get_user_facts(user_id, intent=general_intent, limit=10)
+                    user_fact_triggers = [fact['entity_name'].lower() for fact in user_facts if 'entity_name' in fact]
+                    
+                    if user_fact_triggers:
+                        logger.info("🔍 Memory triggering: Using %d user fact entities as additional memory triggers", 
+                                    len(user_fact_triggers))
+                except Exception as e:
+                    logger.error("❌ Error getting user facts for memory triggering: %s", e)
+            
+            # Combine query triggers and user fact triggers
+            combined_triggers = list(set(trigger_keywords + user_fact_triggers))  # Deduplicate
+            
+            if not combined_triggers:
                 return []
             
             query = """
@@ -336,7 +373,7 @@ class CharacterGraphManager:
                 LIMIT $3
             """
             
-            rows = await conn.fetch(query, character_id, trigger_keywords, limit)
+            rows = await conn.fetch(query, character_id, combined_triggers, limit)
             
             results = []
             for row in rows:
@@ -781,8 +818,18 @@ class CharacterGraphManager:
             return []
             
         try:
+            # Create a general intent for fact retrieval
+            from src.knowledge.semantic_router import IntentAnalysisResult, QueryIntent
+            general_intent = IntentAnalysisResult(
+                intent_type=QueryIntent.FACTUAL_RECALL,
+                entity_type=None,  # Get all entity types
+                relationship_type=None,  # Get all relationships
+                confidence=0.9,
+                keywords=[]
+            )
+            
             # Use the semantic router to get user facts
-            user_facts = await self.semantic_router.get_user_facts(user_id, limit=10)
+            user_facts = await self.semantic_router.get_user_facts(user_id, intent=general_intent, limit=10)
             return user_facts
         except Exception as e:
             logger.error("Error getting user facts: %s", e)
