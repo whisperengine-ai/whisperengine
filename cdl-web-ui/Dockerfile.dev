@@ -1,0 +1,27 @@
+# Development Dockerfile for hot reloading
+FROM node:18-alpine AS development
+
+# Install dependencies for development
+RUN apk add --no-cache libc6-compat
+
+WORKDIR /app
+
+# Copy package files
+COPY package.json package-lock.json* ./
+
+# Install all dependencies (including dev dependencies)
+RUN npm ci
+
+# Copy source code
+COPY . .
+
+# Expose the development port
+EXPOSE 3000
+
+# Set environment for hot reloading
+ENV NODE_ENV=development
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV WATCHPACK_POLLING=true
+
+# Start the development server with hot reloading
+CMD ["npm", "run", "dev"]

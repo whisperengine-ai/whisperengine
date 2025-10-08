@@ -50,17 +50,11 @@ class BotConfigDiscovery:
                 # Read health check port from env file
                 health_port = self._extract_health_port(env_file)
                 
-                # Get character file from environment variable only (no auto-discovery)
-                character_file = self._find_character_file(bot_name)
-                
-                # Skip this bot if character file is not properly configured
-                if character_file is None:
-                    print(f"⚠️  Skipping {bot_name} bot - character file not properly configured")
-                    continue
+                # WhisperEngine now uses database-based CDL storage - no JSON files required
+                # Character data is loaded dynamically from PostgreSQL database
                 
                 bot_configs[bot_name] = {
                     "env_file": str(env_file),
-                    "character_file": character_file,
                     "health_port": health_port,
                     "service_name": f"{bot_name}-bot",
                     "container_name": f"whisperengine-{bot_name}-bot",
@@ -205,9 +199,11 @@ class BotConfigDiscovery:
     networks:
       - bot_network
     depends_on:
-      - postgres
-      # - redis  # Commented out - using vector-native memory only
-      - qdrant"""
+      postgres:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+      # - redis  # Commented out - using vector-native memory only"""
         
         return service_yaml
 

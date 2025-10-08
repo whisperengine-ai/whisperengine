@@ -77,10 +77,10 @@ export default function Home() {
         </div>
 
         <div className="text-center mt-16">
-                      <div className="bg-white rounded-lg p-4 shadow">
-              <h3 className="text-lg font-medium mb-2">Database Status</h3>
-              <p className="text-gray-900">{status}</p>
-            </div>
+          <div className="bg-white rounded-lg p-4 shadow max-w-md mx-auto">
+            <h3 className="text-lg font-medium mb-2">🚀 Character Authoring Platform</h3>
+            <p className="text-gray-900">Ready for character creation and template management</p>
+          </div>
         </div>
       </div>
     </div>

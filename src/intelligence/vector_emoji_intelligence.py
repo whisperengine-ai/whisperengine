@@ -375,8 +375,8 @@ class VectorEmojiIntelligence:
                 "anger": ["angry", "mad", "furious", "annoyed", "frustrated", "😠", "😡", "🤬"],
                 "fear": ["scared", "afraid", "worried", "anxious", "nervous", "😰", "😱", "😨"],
                 "surprise": ["surprised", "shocked", "wow", "omg", "😲", "😱", "🤯"],
-                "neutral": ["okay", "sure", "maybe", "alright", "fine", "🤔", "�"],
-                "disgust": ["gross", "disgusting", "awful", "terrible", "yuck", "🤢", "�"]
+                "neutral": ["okay", "sure", "maybe", "alright", "fine", "🤔"],
+                "disgust": ["gross", "disgusting", "awful", "terrible", "yuck", "🤢"]
                 # Note: Extended emotions like gratitude, excitement map to core emotions via taxonomy
             }
             

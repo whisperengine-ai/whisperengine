@@ -64,7 +64,7 @@ class FailFastEmotionAnalyzer:
             from transformers import pipeline
             self._roberta_classifier = pipeline(
                 "text-classification",
-                model="j-hartmann/emotion-english-distilroberta-base",
+                model="cardiffnlp/twitter-roberta-base-emotion-multilabel-latest",
                 return_all_scores=True
             )
             self.roberta_available = True

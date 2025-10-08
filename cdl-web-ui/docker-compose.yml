@@ -1,0 +1,22 @@
+services:
+  cdl-web-ui:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3001:3000"
+    environment:
+      - NODE_ENV=production
+      - NEXT_TELEMETRY_DISABLED=1
+      - PGHOST=host.docker.internal
+      - PGPORT=5433
+      - PGDATABASE=whisperengine
+      - PGUSER=whisperengine
+      - PGPASSWORD=whisperengine_password
+    networks:
+      - cdl-network
+    restart: unless-stopped
+
+networks:
+  cdl-network:
+    driver: bridge

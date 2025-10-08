@@ -1,7 +1,30 @@
+'use client'
+
+import { useState } from 'react'
 import Link from 'next/link'
 import CharacterCreateForm from '@/components/CharacterCreateForm'
+import CharacterTemplateWizard from '@/components/CharacterTemplateWizard'
+import { CharacterTemplate } from '@/data/characterTemplates'
 
 export default function NewCharacterPage() {
+  const [mode, setMode] = useState<'wizard' | 'custom' | 'form'>('wizard')
+  const [selectedTemplate, setSelectedTemplate] = useState<CharacterTemplate | null>(null)
+
+  const handleTemplateSelected = (template: CharacterTemplate) => {
+    setSelectedTemplate(template)
+    setMode('form')
+  }
+
+  const handleCustomCreate = () => {
+    setSelectedTemplate(null)
+    setMode('form')
+  }
+
+  const handleBackToWizard = () => {
+    setMode('wizard')
+    setSelectedTemplate(null)
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Navigation */}
@@ -37,22 +60,61 @@ export default function NewCharacterPage() {
 
       {/* Main Content */}
       <div className="container mx-auto px-4 py-8">
-        <div className="mb-8">
-          <div className="flex items-center space-x-4 mb-4">
-            <Link 
-              href="/characters" 
-              className="text-blue-600 hover:text-blue-800 font-medium"
-            >
-              ← Back to Characters
-            </Link>
-          </div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Create New Character</h1>
-          <p className="text-gray-600">
-            Define a new AI character with comprehensive personality, communication style, and behavioral patterns.
-          </p>
-        </div>
+        {mode === 'wizard' && (
+          <CharacterTemplateWizard
+            onTemplateSelected={handleTemplateSelected}
+            onCustomCreate={handleCustomCreate}
+          />
+        )}
 
-        <CharacterCreateForm />
+        {mode === 'form' && (
+          <>
+            <div className="mb-8">
+              <div className="flex items-center space-x-4 mb-4">
+                <Link 
+                  href="/characters" 
+                  className="text-blue-600 hover:text-blue-800 font-medium"
+                >
+                  ← Back to Characters
+                </Link>
+                <span className="text-gray-300">|</span>
+                <button
+                  onClick={handleBackToWizard}
+                  className="text-blue-600 hover:text-blue-800 font-medium"
+                >
+                  ← Back to Template Wizard
+                </button>
+              </div>
+              <div className="flex items-center space-x-4 mb-4">
+                <h1 className="text-3xl font-bold text-gray-900">
+                  {selectedTemplate ? `Create ${selectedTemplate.name}` : 'Create Custom Character'}
+                </h1>
+                {selectedTemplate && (
+                  <span className="text-2xl">{selectedTemplate.icon}</span>
+                )}
+              </div>
+              <p className="text-gray-600">
+                {selectedTemplate 
+                  ? `Using the ${selectedTemplate.name} template with pre-configured learning capabilities. Customize as needed.`
+                  : 'Define a new AI character with comprehensive personality, communication style, and behavioral patterns.'
+                }
+              </p>
+              {selectedTemplate && (
+                <div className="mt-4 p-4 bg-blue-50 rounded-lg">
+                  <h3 className="font-semibold text-blue-900 mb-2">Template Benefits:</h3>
+                  <ul className="text-blue-800 text-sm space-y-1">
+                    <li>• Pre-configured learning profile with {selectedTemplate.learningProfile.adaptabilityLevel} adaptability</li>
+                    <li>• Optimized for {selectedTemplate.category.replace('_', ' ')} use cases</li>
+                    <li>• Built-in attachment monitoring and ethical boundaries</li>
+                    <li>• {selectedTemplate.learningProfile.growthAreas.length} growth areas configured</li>
+                  </ul>
+                </div>
+              )}
+            </div>
+
+            <CharacterCreateForm initialTemplate={selectedTemplate} />
+          </>
+        )}
       </div>
     </div>
   )

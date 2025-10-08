@@ -2594,7 +2594,7 @@ class MessageProcessor:
             # Use shared analyzer if available (from user emotion analysis)
             async with self._shared_analyzer_lock:
                 if self._shared_emotion_analyzer:
-                    logger.debug("🎭 BOT EMOTION: Using shared RoBERTa analyzer to prevent race conditions")
+                    logger.debug("🎭 BOT EMOTION: Using shared emotion analyzer")
                     analyzer = self._shared_emotion_analyzer
                 else:
                     logger.debug("🎭 BOT EMOTION: Creating new analyzer (no shared analyzer available)")
@@ -2602,6 +2602,10 @@ class MessageProcessor:
                     analyzer = EnhancedVectorEmotionAnalyzer(
                         vector_memory_manager=self.memory_manager
                     )
+            
+            # 🎭 BOT EMOTION DEBUG: Log what text is actually being analyzed for bot emotion
+            logger.info(f"🎭 BOT EMOTION DEBUG: Analyzing bot response text: '{response[:100]}{'...' if len(response) > 100 else ''}'")
+            logger.info(f"🎭 BOT EMOTION DEBUG: Response length: {len(response)} chars")
             
             # Analyze bot's response text to detect character emotion
             emotion_results = await analyzer.analyze_emotion(

@@ -452,10 +452,12 @@ class EnhancedVectorEmotionAnalyzer:
                     with self.__class__._roberta_classifier_lock:
                         # �🔥 PERFORMANCE FIX: Initialize RoBERTa classifier as class variable to avoid repeated loading
                         if not hasattr(self.__class__, '_shared_roberta_classifier') or self.__class__._shared_roberta_classifier is None:
-                            logger.info("🤖 ROBERTA ANALYSIS: Initializing shared RoBERTa emotion classifier (11-emotion Cardiff NLP model)...")
+                            # Get model name from environment variable
+                            model_name = os.getenv("ROBERTA_EMOTION_MODEL_NAME", "cardiffnlp/twitter-roberta-base-emotion-multilabel-latest")
+                            logger.info(f"🤖 ROBERTA ANALYSIS: Initializing shared RoBERTa emotion classifier ({model_name})...")
                             self.__class__._shared_roberta_classifier = pipeline(
                                 "text-classification",
-                                model="cardiffnlp/twitter-roberta-base-emotion-multilabel-latest",
+                                model=model_name,
                                 return_all_scores=True,
                                 device=-1  # Force CPU to avoid GPU issues
                             )
@@ -1474,13 +1476,23 @@ class EnhancedVectorEmotionAnalyzer:
                 logger.info(f"🎭 CONTEXT ADJUSTMENT: Detected passion/excitement - redistributed {neutral_reduction:.3f} from neutral to joy")
             
             elif care_matches >= 1:  # More sensitive - only need 1 match
-                # Redistribute some neutral to a caring emotion mix  
+                # Check if this is actual concern vs joyful caring (like "I love my new cat")
+                joy_indicators = ['new', 'got', 'cute', 'adorable', 'sweet', 'love', 'amazing', 'wonderful']
+                has_joy_context = any(indicator in content_lower for indicator in joy_indicators)
+                
+                # Redistribute some neutral to appropriate emotion
                 neutral_reduction = min(0.3, adjusted_scores.get('neutral', 0) * 0.4)  # More aggressive
                 adjusted_scores['neutral'] = adjusted_scores.get('neutral', 0) - neutral_reduction
-                # Mix of joy (caring/positive) and slight concern
-                adjusted_scores['joy'] = adjusted_scores.get('joy', 0) + neutral_reduction * 0.7
-                adjusted_scores['sadness'] = adjusted_scores.get('sadness', 0) + neutral_reduction * 0.3
-                logger.info(f"🎭 CONTEXT ADJUSTMENT: Detected caring/concern - redistributed {neutral_reduction:.3f} from neutral")
+                
+                if has_joy_context:
+                    # Joyful caring (like new pet) - redirect to pure joy, not sadness
+                    adjusted_scores['joy'] = adjusted_scores.get('joy', 0) + neutral_reduction
+                    logger.info(f"🎭 CONTEXT ADJUSTMENT: Detected joyful caring - redistributed {neutral_reduction:.3f} from neutral to joy")
+                else:
+                    # Concerned caring - mix of joy and slight concern
+                    adjusted_scores['joy'] = adjusted_scores.get('joy', 0) + neutral_reduction * 0.7
+                    adjusted_scores['sadness'] = adjusted_scores.get('sadness', 0) + neutral_reduction * 0.3
+                    logger.info(f"🎭 CONTEXT ADJUSTMENT: Detected concerned caring - redistributed {neutral_reduction:.3f} from neutral")
         
         return adjusted_scores
 

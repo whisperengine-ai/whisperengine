@@ -1,7 +1,9 @@
 'use client'
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { CharacterTemplate } from '@/data/characterTemplates'
 
 // Enhanced CDL data structure for creation
 interface CDLData {
@@ -86,7 +88,11 @@ interface FormData {
   cdl_data: CDLData
 }
 
-export default function CharacterCreateForm() {
+interface CharacterCreateFormProps {
+  initialTemplate?: CharacterTemplate | null
+}
+
+export default function CharacterCreateForm({ initialTemplate }: CharacterCreateFormProps) {
   const router = useRouter()
   const [activeTab, setActiveTab] = useState<'identity' | 'personality' | 'communication' | 'knowledge'>('identity')
   const [isLoading, setIsLoading] = useState(false)
@@ -167,6 +173,25 @@ export default function CharacterCreateForm() {
       }
     }
   })
+
+  // Populate form with template data when provided
+  useEffect(() => {
+    if (initialTemplate) {
+      setFormData(prevData => ({
+        ...prevData,
+        name: initialTemplate.name,
+        normalized_name: initialTemplate.name.toLowerCase().replace(/[^a-z0-9]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, ''),
+        bot_name: initialTemplate.name.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 20),
+        character_archetype: initialTemplate.cdlData.communication.ai_identity_handling.allow_full_roleplay_immersion ? 'fantasy' : 'real-world',
+        allow_full_roleplay_immersion: initialTemplate.cdlData.communication.ai_identity_handling.allow_full_roleplay_immersion,
+        cdl_data: {
+          ...initialTemplate.cdlData,
+          // Keep the existing personal_knowledge structure from the form
+          personal_knowledge: prevData.cdl_data.personal_knowledge
+        }
+      }))
+    }
+  }, [initialTemplate])
 
   // Update normalized name when name changes
   const handleNameChange = (name: string) => {

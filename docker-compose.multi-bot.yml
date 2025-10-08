@@ -52,11 +52,12 @@ services:
       - qdrant_data:/qdrant/storage
     networks:
       - bot_network
-    # healthcheck:
-    #   test: ["CMD-SHELL", "wget --quiet --tries=1 --spider http://localhost:6333/ || exit 1"]
-    #   interval: 30s
-    #   timeout: 10s
-    #   retries: 3
+    healthcheck:
+      test: ["CMD-SHELL", "wget --quiet --tries=1 --spider http://localhost:6333/health || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
 
   influxdb:
     image: influxdb:2.7-alpine
@@ -124,71 +125,6 @@ services:
     # It doesn't run as a container - just builds the image
 
   # ===== BOT SERVICES (populated dynamically) =====
-  jake-bot:
-    image: whisperengine-bot:${VERSION:-latest}
-    container_name: whisperengine-jake-bot
-    restart: unless-stopped
-    env_file:
-      - .env.jake
-    environment:
-      - DISCORD_BOT_NAME=jake
-      - POSTGRES_HOST=postgres
-      - QDRANT_HOST=qdrant
-      - MODEL_CACHE_DIR=/app/models
-      - DISABLE_MODEL_DOWNLOAD=true
-      - HF_HUB_OFFLINE=false
-      - TRANSFORMERS_OFFLINE=0
-      - LOG_LEVEL=${LOG_LEVEL:-INFO}
-      - DEBUG_MODE=false
-      - PYTHONUNBUFFERED=1
-      - HEALTH_CHECK_PORT=9097
-      - HEALTH_CHECK_HOST=0.0.0.0
-      - CDL_DEFAULT_CHARACTER=characters/examples/jake.json
-    ports:
-      - "9097:9097"
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
-        tag: "jake-{.ImageName}-{.Name}-{.ID}"
-    deploy:
-      resources:
-        limits:
-          memory: 4G
-          cpus: "4.0"
-        reservations:
-          memory: 2G
-          cpus: "2.0"
-    healthcheck:
-      test:
-        - CMD-SHELL
-        - curl -f http://localhost:9097/health || exit 1
-      interval: 30s
-      timeout: 10s
-      retries: 3
-    volumes:
-      - jake_backups:/app/backups
-      - jake_privacy:/app/privacy
-      - jake_temp:/app/temp
-      - ./logs:/app/logs  # External mount for prompt/response logs
-      - ./sql:/app/sql:ro
-      # Live code mounting for development (no rebuild needed)
-      - ./src:/app/src
-      - ./scripts:/app/scripts
-      - ./characters:/app/characters
-      - ./config:/app/config
-      - ./validate_config.py:/app/validate_config.py
-      - ./run.py:/app/run.py
-      - ./env_manager.py:/app/env_manager.py
-      # Note: Using external host mount for logs instead of Docker volumes
-    networks:
-      - bot_network
-    depends_on:
-      - postgres
-      # - redis  # Commented out - using vector-native memory only
-      - qdrant
-
   marcus-bot:
     image: whisperengine-bot:${VERSION:-latest}
     container_name: whisperengine-marcus-bot
@@ -250,9 +186,11 @@ services:
     networks:
       - bot_network
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
       # - redis  # Commented out - using vector-native memory only
-      - qdrant
 
   dotty-bot:
     image: whisperengine-bot:${VERSION:-latest}
@@ -315,9 +253,11 @@ services:
     networks:
       - bot_network
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
       # - redis  # Commented out - using vector-native memory only
-      - qdrant
 
   dream-bot:
     image: whisperengine-bot:${VERSION:-latest}
@@ -380,9 +320,11 @@ services:
     networks:
       - bot_network
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
       # - redis  # Commented out - using vector-native memory only
-      - qdrant
 
   aetheris-bot:
     image: whisperengine-bot:${VERSION:-latest}
@@ -445,9 +387,11 @@ services:
     networks:
       - bot_network
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
       # - redis  # Commented out - using vector-native memory only
-      - qdrant
 
   elena-bot:
     image: whisperengine-bot:${VERSION:-latest}
@@ -510,9 +454,11 @@ services:
     networks:
       - bot_network
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
       # - redis  # Commented out - using vector-native memory only
-      - qdrant
 
   aethys-bot:
     image: whisperengine-bot:${VERSION:-latest}
@@ -575,9 +521,11 @@ services:
     networks:
       - bot_network
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
       # - redis  # Commented out - using vector-native memory only
-      - qdrant
 
   ryan-bot:
     image: whisperengine-bot:${VERSION:-latest}
@@ -640,9 +588,11 @@ services:
     networks:
       - bot_network
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
       # - redis  # Commented out - using vector-native memory only
-      - qdrant
 
   gabriel-bot:
     image: whisperengine-bot:${VERSION:-latest}
@@ -705,9 +655,11 @@ services:
     networks:
       - bot_network
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
       # - redis  # Commented out - using vector-native memory only
-      - qdrant
 
   sophia-bot:
     image: whisperengine-bot:${VERSION:-latest}
@@ -770,9 +722,11 @@ services:
     networks:
       - bot_network
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
       # - redis  # Commented out - using vector-native memory only
-      - qdrant
 
 # ===== NETWORKS =====
 networks:
@@ -794,14 +748,6 @@ volumes:
     name: whisperengine-multi_influxdb_config
   
   # Bot-specific volumes (populated dynamically)
-  jake_backups:
-    name: whisperengine-multi_jake_backups
-  jake_privacy:
-    name: whisperengine-multi_jake_privacy
-  jake_temp:
-    name: whisperengine-multi_jake_temp
-  jake_logs:
-    name: whisperengine-multi_jake_logs
   marcus_backups:
     name: whisperengine-multi_marcus_backups
   marcus_privacy:

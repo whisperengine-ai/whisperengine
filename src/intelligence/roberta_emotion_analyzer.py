@@ -99,7 +99,7 @@ class RoBertaEmotionAnalyzer:
                 logger.info("Initializing RoBERTa emotion classifier...")
                 self.roberta_classifier = pipeline(
                     "text-classification",
-                    model="j-hartmann/emotion-english-distilroberta-base",
+                    model="cardiffnlp/twitter-roberta-base-emotion-multilabel-latest",
                     return_all_scores=True
                 )
                 logger.info("✅ RoBERTa emotion classifier initialized")
