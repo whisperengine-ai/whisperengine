@@ -81,32 +81,29 @@ class WorkflowManager:
     # Workflow Loading
     # =========================================================================
     
-    async def load_workflows_for_character(self, character_file: str) -> bool:
+    async def load_workflows_for_character(self, character_name: str) -> bool:
         """
-        Load workflows from CDL character file reference
+        Load workflows from database-based character configuration
         
         Args:
-            character_file: Path to CDL JSON file
+            character_name: Character name (e.g., 'jake', 'elena')
             
         Returns:
             True if workflows loaded successfully, False otherwise
         """
         try:
-            # 1. Load CDL file to get workflow file references
-            cdl_data = await self._load_cdl_file(character_file)
+            # 1. Load character data from database to get workflow file references
+            character_data = await self._load_character_from_database(character_name)
             
-            # Look for transaction_config in character section
-            character_data = cdl_data.get("character", {})
+            # Look for transaction_config in character data
             transaction_config = character_data.get("transaction_config", {})
             workflow_files = transaction_config.get("workflow_files", [])
             
             if not workflow_files:
-                self.logger.info(f"No workflow files configured for {character_file}")
+                self.logger.info(f"No workflow files configured for character '{character_name}'")
                 return False
             
             # 2. Load each workflow file
-            character_name = character_data.get("identity", {}).get("name", "unknown")
-            
             for workflow_file_path in workflow_files:
                 await self._load_workflow_file(workflow_file_path, character_name)
             
@@ -114,17 +111,23 @@ class WorkflowManager:
             return True
             
         except Exception as e:
-            self.logger.error(f"❌ Failed to load workflows for {character_file}: {e}")
+            self.logger.error(f"❌ Failed to load workflows for character '{character_name}': {e}")
             return False
     
-    async def _load_cdl_file(self, character_file: str) -> Dict[str, Any]:
-        """Load CDL JSON file"""
-        file_path = Path(character_file)
-        if not file_path.exists():
-            raise FileNotFoundError(f"CDL file not found: {character_file}")
+    async def _load_character_from_database(self, character_name: str) -> Dict[str, Any]:
+        """Load character data from database - NO-OP during CDL migration"""
+        # TODO: Implement workflow-specific character data loading once CDL migration is complete
+        # For now, return empty transaction_config to allow system to work without workflows
+        self.logger.info("📝 Workflow Manager: CDL migration in progress - no workflows configured for '%s'", character_name)
         
-        with open(file_path, 'r', encoding='utf-8') as f:
-            return json.load(f)
+        return {
+            "identity": {
+                "name": character_name
+            },
+            "transaction_config": {
+                "workflow_files": []  # No workflows during migration
+            }
+        }
     
     async def _load_workflow_file(self, workflow_file: str, character_name: str):
         """

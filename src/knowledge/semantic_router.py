@@ -342,6 +342,7 @@ class SemanticKnowledgeRouter:
             List of character-aware facts
         """
         async with self.postgres.acquire() as conn:
+            # Simplified query without character_interactions table (not yet implemented)
             query = """
                 SELECT 
                     fe.entity_name,
@@ -349,22 +350,16 @@ class SemanticKnowledgeRouter:
                     ufr.confidence,
                     ufr.relationship_type,
                     ufr.emotional_context,
-                    COUNT(ci.id) as mention_count,
-                    MAX(ci.created_at) as last_mentioned,
-                    AVG(CASE WHEN ufr.emotional_context = 'happy' THEN 1.0 
-                             WHEN ufr.emotional_context = 'excited' THEN 1.0
-                             ELSE 0.5 END) as happiness_score
+                    1 as mention_count,
+                    ufr.created_at as last_mentioned,
+                    CASE WHEN ufr.emotional_context IN ('happy', 'excited', 'joy') THEN 1.0 
+                         ELSE 0.5 END as happiness_score
                 FROM user_fact_relationships ufr
                 JOIN fact_entities fe ON ufr.entity_id = fe.id
-                LEFT JOIN character_interactions ci ON ci.user_id = ufr.user_id 
-                    AND ci.character_name = $2
-                    AND ci.entity_references @> jsonb_build_array(fe.entity_name::text)
                 WHERE ufr.user_id = $1
                   AND ($3::TEXT IS NULL OR fe.entity_type = $3)
-                  AND (ufr.mentioned_by_character = $2 OR ci.id IS NOT NULL)
-                GROUP BY fe.entity_name, fe.category, ufr.confidence, 
-                         ufr.relationship_type, ufr.emotional_context
-                ORDER BY mention_count DESC, ufr.confidence DESC
+                  AND (ufr.mentioned_by_character = $2 OR ufr.mentioned_by_character IS NULL)
+                ORDER BY ufr.confidence DESC, ufr.created_at DESC
                 LIMIT $4
             """
             

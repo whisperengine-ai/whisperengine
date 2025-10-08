@@ -67,7 +67,7 @@ class CDLEmojiIntegration:
                     "confidence": confidence
                 }
             
-            logger.debug("🎭 CDL EMOJI INTEGRATION: Starting emoji enhancement for %s", character_file)
+            logger.debug("🎭 CDL EMOJI INTEGRATION: Starting emoji enhancement for character: %s", character_file)
             
             # Detect excitement level for appropriate emoji intensity
             excitement = self._detect_excitement_level(user_message, bot_response, context)
@@ -94,7 +94,7 @@ class CDLEmojiIntegration:
             
             logger.debug("🎭 CDL EMOJI INTEGRATION: Enhancement complete - %d emojis added, confidence: %.2f", 
                         len(emoji_response.emoji_additions), emoji_response.confidence)
-            logger.debug("🎭 CDL emoji enhancement for %s: %d emojis added", character_file, len(emoji_response.emoji_additions))
+            logger.debug("🎭 CDL emoji enhancement for character %s: %d emojis added", character_file, len(emoji_response.emoji_additions))
             
             return emoji_response.response_text, emoji_metadata
             

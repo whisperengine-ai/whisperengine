@@ -12,9 +12,16 @@ but applied to character personal knowledge.
 """
 
 import logging
+import asyncio
 from typing import Dict, List, Optional, Any
 from enum import Enum
 from dataclasses import dataclass
+
+try:
+    import asyncpg
+    ASYNCPG_AVAILABLE = True
+except ImportError:
+    ASYNCPG_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
 
@@ -67,16 +74,18 @@ class CharacterGraphManager:
     Mirrors SemanticKnowledgeRouter architecture but for character data.
     """
     
-    def __init__(self, postgres_pool, semantic_router=None):
+    def __init__(self, postgres_pool, semantic_router=None, memory_manager=None):
         """
         Initialize character graph manager.
         
         Args:
             postgres_pool: AsyncPG connection pool
             semantic_router: Optional SemanticKnowledgeRouter for user facts integration
+            memory_manager: Optional VectorMemorySystem for emotional context analysis
         """
         self.postgres = postgres_pool
         self.semantic_router = semantic_router
+        self.memory_manager = memory_manager
         
         # Intent patterns for query routing
         self._intent_patterns = self._build_intent_patterns()
@@ -387,6 +396,28 @@ class CharacterGraphManager:
                     'triggers': row['triggers'],
                     'created_date': row['created_date']
                 })
+            
+            # ENHANCEMENT: Emotional Context Synchronization
+            # If user_id provided, apply emotional filtering to prioritize
+            # memories that match the user's current emotional state
+            if user_id and self.memory_manager and results:
+                try:
+                    emotional_context = await self._get_user_emotional_context(user_id, limit=5)
+                    user_emotion = emotional_context['primary_emotion']
+                    user_intensity = emotional_context['emotional_intensity']
+                    
+                    # Re-rank memories based on emotional alignment
+                    results = self._rank_by_emotional_alignment(
+                        memories=results,
+                        user_emotion=user_emotion,
+                        user_intensity=user_intensity
+                    )
+                    
+                    logger.info("🎭 Emotional synchronization: Re-ranked %d memories for emotion '%s'",
+                               len(results), user_emotion)
+                except Exception as e:
+                    logger.error("❌ Error in emotional synchronization: %s", e)
+                    # Continue with unfiltered results
             
             return results
     
@@ -852,49 +883,70 @@ class CharacterGraphManager:
         if not entity_names:
             return []
             
-        async with self.postgres.acquire() as conn:
-            # Query character interests that match user fact entities
-            shared_interests = []
+        try:
+            # Use asyncio.wait_for with timeout to prevent blocking on pool acquisition
+            connection_task = self.postgres.acquire()
+            conn = await asyncio.wait_for(connection_task, timeout=2.0)
             
-            # Check character_background (hobbies, interests)
-            interests_query = """
-                SELECT 
-                    title,
-                    category,
-                    description,
-                    importance_level
-                FROM character_background
-                WHERE character_id = $1
-                  AND category IN ('interests', 'hobbies')
-                  AND (
-                      title ILIKE ANY($2::TEXT[])
-                      OR description ILIKE ANY($3::TEXT[])
-                  )
-                ORDER BY importance_level DESC
-                LIMIT $4
-            """
-            
-            # Format entity names for LIKE queries
-            like_patterns = [f"%{name}%" for name in entity_names]
-            
-            rows = await conn.fetch(
-                interests_query,
-                character_id,
-                entity_names,
-                like_patterns,
-                limit
-            )
-            
-            for row in rows:
-                shared_interests.append({
-                    'title': row['title'],
-                    'category': row['category'],
-                    'description': row['description'],
-                    'importance_level': row['importance_level'],
-                    'source': 'background'
-                })
+            try:
+                # Query character interests that match user fact entities
+                shared_interests = []
                 
-            return shared_interests
+                # Check character_background (hobbies, interests)
+                interests_query = """
+                    SELECT 
+                        title,
+                        category,
+                        description,
+                        importance_level
+                    FROM character_background
+                    WHERE character_id = $1
+                      AND category IN ('interests', 'hobbies')
+                      AND (
+                          title ILIKE ANY($2::TEXT[])
+                          OR description ILIKE ANY($3::TEXT[])
+                      )
+                    ORDER BY importance_level DESC
+                    LIMIT $4
+                """
+                
+                # Format entity names for LIKE queries
+                like_patterns = [f"%{name}%" for name in entity_names]
+                
+                rows = await asyncio.wait_for(
+                    conn.fetch(
+                        interests_query,
+                        character_id,
+                        entity_names,
+                        like_patterns,
+                        limit
+                    ),
+                    timeout=3.0
+                )
+                
+                for row in rows:
+                    shared_interests.append({
+                        'title': row['title'],
+                        'category': row['category'],
+                        'description': row['description'],
+                        'importance_level': row['importance_level'],
+                        'source': 'background'
+                    })
+                    
+                return shared_interests
+            finally:
+                # Always release connection back to pool
+                await self.postgres.release(conn)
+        except (asyncio.TimeoutError, ConnectionError, OSError) as e:
+            logger.warning("🔗 CROSS-POLLINATION: Database connection error in _find_shared_interests: %s", str(e))
+            return []
+        except Exception as e:
+            # Keep more specific asyncpg errors if available
+            if ASYNCPG_AVAILABLE and hasattr(e, '__module__') and 'asyncpg' in str(e.__module__):
+                logger.warning("🔗 CROSS-POLLINATION: AsyncPG error in _find_shared_interests: %s", str(e))
+            else:
+                logger.warning("🔗 CROSS-POLLINATION: Unexpected error in _find_shared_interests: %s", str(e))
+            return []
     
     async def _find_relevant_abilities(
         self,
@@ -913,48 +965,69 @@ class CharacterGraphManager:
         if not entity_names:
             return []
             
-        async with self.postgres.acquire() as conn:
-            # Query character abilities related to user facts
-            abilities_query = """
-                SELECT 
-                    ability_name,
-                    category,
-                    description,
-                    proficiency_level,
-                    usage_frequency
-                FROM character_abilities
-                WHERE character_id = $1
-                  AND (
-                      ability_name ILIKE ANY($2::TEXT[])
-                      OR description ILIKE ANY($3::TEXT[])
-                      OR category ILIKE ANY($3::TEXT[])
-                  )
-                ORDER BY proficiency_level DESC
-                LIMIT $4
-            """
+        try:
+            # Use asyncio.wait_for with timeout to prevent blocking on pool acquisition
+            connection_task = self.postgres.acquire()
+            conn = await asyncio.wait_for(connection_task, timeout=2.0)
             
-            # Format entity names for LIKE queries
-            like_patterns = [f"%{name}%" for name in entity_names]
-            
-            rows = await conn.fetch(
-                abilities_query,
-                character_id,
-                entity_names,
-                like_patterns,
-                limit
-            )
-            
-            relevant_abilities = []
-            for row in rows:
-                relevant_abilities.append({
-                    'ability_name': row['ability_name'],
-                    'category': row['category'],
-                    'description': row['description'],
-                    'proficiency_level': row['proficiency_level'],
-                    'usage_frequency': row['usage_frequency']
-                })
+            try:
+                # Query character abilities related to user facts
+                abilities_query = """
+                    SELECT 
+                        ability_name,
+                        category,
+                        description,
+                        proficiency_level,
+                        usage_frequency
+                    FROM character_abilities
+                    WHERE character_id = $1
+                      AND (
+                          ability_name ILIKE ANY($2::TEXT[])
+                          OR description ILIKE ANY($3::TEXT[])
+                          OR category ILIKE ANY($3::TEXT[])
+                      )
+                    ORDER BY proficiency_level DESC
+                    LIMIT $4
+                """
                 
-            return relevant_abilities
+                # Format entity names for LIKE queries
+                like_patterns = [f"%{name}%" for name in entity_names]
+                
+                rows = await asyncio.wait_for(
+                    conn.fetch(
+                        abilities_query,
+                        character_id,
+                        entity_names,
+                        like_patterns,
+                        limit
+                    ),
+                    timeout=3.0
+                )
+                
+                relevant_abilities = []
+                for row in rows:
+                    relevant_abilities.append({
+                        'ability_name': row['ability_name'],
+                        'category': row['category'],
+                        'description': row['description'],
+                        'proficiency_level': row['proficiency_level'],
+                        'usage_frequency': row['usage_frequency']
+                    })
+                    
+                return relevant_abilities
+            finally:
+                # Always release connection back to pool
+                await self.postgres.release(conn)
+        except (asyncio.TimeoutError, ConnectionError, OSError) as e:
+            logger.warning("🔗 CROSS-POLLINATION: Database connection error in _find_relevant_abilities: %s", str(e))
+            return []
+        except Exception as e:
+            # Keep more specific asyncpg errors if available
+            if ASYNCPG_AVAILABLE and hasattr(e, '__module__') and 'asyncpg' in str(e.__module__):
+                logger.warning("🔗 CROSS-POLLINATION: AsyncPG error in _find_relevant_abilities: %s", str(e))
+            else:
+                logger.warning("🔗 CROSS-POLLINATION: Unexpected error in _find_relevant_abilities: %s", str(e))
+            return []
     
     async def _find_character_knowledge_about_user_facts(
         self,
@@ -973,58 +1046,272 @@ class CharacterGraphManager:
         if not entity_names:
             return []
             
-        async with self.postgres.acquire() as conn:
-            # Query character memories related to user facts
-            memories_query = """
-                SELECT 
-                    title,
-                    description,
-                    memory_type,
-                    emotional_impact,
-                    importance_level
-                FROM character_memories
-                WHERE character_id = $1
-                  AND (
-                      title ILIKE ANY($2::TEXT[])
-                      OR description ILIKE ANY($2::TEXT[])
-                  )
-                ORDER BY importance_level DESC
-                LIMIT $3
-            """
+        try:
+            # Use asyncio.wait_for with timeout to prevent blocking on pool acquisition
+            connection_task = self.postgres.acquire()
+            conn = await asyncio.wait_for(connection_task, timeout=2.0)
             
-            # Format entity names for LIKE queries
-            like_patterns = [f"%{name}%" for name in entity_names]
+            try:
+                # Query character memories related to user facts
+                memories_query = """
+                    SELECT 
+                        title,
+                        description,
+                        memory_type,
+                        emotional_impact,
+                        importance_level
+                    FROM character_memories
+                    WHERE character_id = $1
+                      AND (
+                          title ILIKE ANY($2::TEXT[])
+                          OR description ILIKE ANY($2::TEXT[])
+                      )
+                    ORDER BY importance_level DESC
+                    LIMIT $3
+                """
+                
+                # Format entity names for LIKE queries
+                like_patterns = [f"%{name}%" for name in entity_names]
+                
+                rows = await asyncio.wait_for(
+                    conn.fetch(
+                        memories_query,
+                        character_id,
+                        like_patterns,
+                        limit
+                    ),
+                    timeout=3.0
+                )
+                
+                character_knowledge = []
+                for row in rows:
+                    character_knowledge.append({
+                        'title': row['title'],
+                        'description': row['description'],
+                        'memory_type': row['memory_type'],
+                        'emotional_impact': row['emotional_impact'],
+                        'importance_level': row['importance_level'],
+                        'source': 'memory'
+                    })
+                    
+                return character_knowledge
+            finally:
+                # Always release connection back to pool
+                await self.postgres.release(conn)
+        except (asyncio.TimeoutError, ConnectionError, OSError) as e:
+            logger.warning("🔗 CROSS-POLLINATION: Database connection error in _find_character_knowledge_about_user_facts: %s", str(e))
+            return []
+        except Exception as e:
+            # Keep more specific asyncpg errors if available
+            if ASYNCPG_AVAILABLE and hasattr(e, '__module__') and 'asyncpg' in str(e.__module__):
+                logger.warning("🔗 CROSS-POLLINATION: AsyncPG error in _find_character_knowledge_about_user_facts: %s", str(e))
+            else:
+                logger.warning("🔗 CROSS-POLLINATION: Unexpected error in _find_character_knowledge_about_user_facts: %s", str(e))
+            return []
+
+
+    async def _get_user_emotional_context(
+        self,
+        user_id: str,
+        limit: int = 5
+    ) -> Dict[str, Any]:
+        """
+        Get user's recent emotional context from conversation history.
+        
+        Uses RoBERTa emotion analysis data stored in Qdrant to determine
+        the user's current emotional state for emotionally-aligned memory retrieval.
+        
+        Args:
+            user_id: User ID
+            limit: Number of recent messages to analyze
             
-            rows = await conn.fetch(
-                memories_query,
-                character_id,
-                like_patterns,
-                limit
+        Returns:
+            Dict with emotional context:
+            {
+                'primary_emotion': str,
+                'emotional_intensity': float,
+                'secondary_emotions': List[str],
+                'emotional_variance': float
+            }
+        """
+        if not self.memory_manager:
+            # No memory manager available - return neutral
+            return {
+                'primary_emotion': 'neutral',
+                'emotional_intensity': 0.5,
+                'secondary_emotions': [],
+                'emotional_variance': 0.0
+            }
+        
+        try:
+            # Get recent conversation history with emotional data
+            recent_messages = await self.memory_manager.get_conversation_history(
+                user_id=user_id,
+                limit=limit
             )
             
-            character_knowledge = []
-            for row in rows:
-                character_knowledge.append({
-                    'title': row['title'],
-                    'description': row['description'],
-                    'memory_type': row['memory_type'],
-                    'emotional_impact': row['emotional_impact'],
-                    'importance_level': row['importance_level'],
-                    'source': 'memory'
-                })
+            if not recent_messages:
+                return {
+                    'primary_emotion': 'neutral',
+                    'emotional_intensity': 0.5,
+                    'secondary_emotions': [],
+                    'emotional_variance': 0.0
+                }
+            
+            # Extract emotional data from recent messages
+            emotions = []
+            intensities = []
+            secondary_emotions_set = set()
+            
+            for msg in recent_messages:
+                metadata = msg.get('metadata', {})
                 
-            return character_knowledge
+                # Get primary emotion
+                emotion = metadata.get('emotional_context', 'neutral')
+                emotions.append(emotion)
+                
+                # Get emotional intensity
+                intensity = metadata.get('emotional_intensity', 0.5)
+                intensities.append(intensity)
+                
+                # Collect secondary emotions
+                for i in range(1, 4):  # secondary_emotion_1, 2, 3
+                    secondary = metadata.get(f'secondary_emotion_{i}')
+                    if secondary:
+                        secondary_emotions_set.add(secondary)
+            
+            # Determine primary emotion (most frequent in recent messages)
+            from collections import Counter
+            emotion_counts = Counter(emotions)
+            primary_emotion = emotion_counts.most_common(1)[0][0] if emotions else 'neutral'
+            
+            # Calculate average emotional intensity
+            avg_intensity = sum(intensities) / len(intensities) if intensities else 0.5
+            
+            # Calculate emotional variance
+            if len(intensities) > 1:
+                variance = max(intensities) - min(intensities)
+            else:
+                variance = 0.0
+            
+            logger.info("🎭 User emotional context: primary=%s, intensity=%.2f, variance=%.2f",
+                       primary_emotion, avg_intensity, variance)
+            
+            return {
+                'primary_emotion': primary_emotion,
+                'emotional_intensity': avg_intensity,
+                'secondary_emotions': list(secondary_emotions_set),
+                'emotional_variance': variance
+            }
+            
+        except Exception as e:
+            logger.error("❌ Error getting user emotional context: %s", e)
+            return {
+                'primary_emotion': 'neutral',
+                'emotional_intensity': 0.5,
+                'secondary_emotions': [],
+                'emotional_variance': 0.0
+            }
+    
+    def _rank_by_emotional_alignment(
+        self,
+        memories: List[Dict[str, Any]],
+        user_emotion: str,
+        user_intensity: float
+    ) -> List[Dict[str, Any]]:
+        """
+        Re-rank memories based on emotional alignment with user's current state.
+        
+        Creates emotionally intelligent memory prioritization:
+        - User feeling joy → prioritize joyful character memories
+        - User feeling sad → prioritize empathetic/comforting memories
+        - User feeling excited → prioritize exciting/energetic memories
+        
+        Args:
+            memories: List of character memories
+            user_emotion: User's current primary emotion
+            user_intensity: User's emotional intensity (0-1)
+            
+        Returns:
+            Re-ranked list of memories
+        """
+        # Define emotional compatibility mapping
+        # Maps user emotions to compatible character memory emotions
+        emotional_compatibility = {
+            'joy': {'positive': 1.0, 'exciting': 0.9, 'inspiring': 0.8, 'funny': 0.9},
+            'happiness': {'positive': 1.0, 'exciting': 0.9, 'inspiring': 0.8, 'funny': 0.9},
+            'excited': {'exciting': 1.0, 'positive': 0.9, 'inspiring': 0.8, 'adventurous': 1.0},
+            'excitement': {'exciting': 1.0, 'positive': 0.9, 'inspiring': 0.8, 'adventurous': 1.0},
+            'sadness': {'empathetic': 1.0, 'comforting': 1.0, 'reflective': 0.8, 'melancholic': 0.7},
+            'sad': {'empathetic': 1.0, 'comforting': 1.0, 'reflective': 0.8, 'melancholic': 0.7},
+            'anger': {'empathetic': 0.9, 'intense': 0.8, 'passionate': 0.7, 'challenging': 0.6},
+            'angry': {'empathetic': 0.9, 'intense': 0.8, 'passionate': 0.7, 'challenging': 0.6},
+            'fear': {'comforting': 1.0, 'reassuring': 1.0, 'protective': 0.9, 'empathetic': 0.8},
+            'anxiety': {'comforting': 1.0, 'reassuring': 1.0, 'calming': 1.0, 'empathetic': 0.8},
+            'anxious': {'comforting': 1.0, 'reassuring': 1.0, 'calming': 1.0, 'empathetic': 0.8},
+            'surprise': {'exciting': 0.8, 'positive': 0.7, 'curious': 0.9, 'adventurous': 0.8},
+            'surprised': {'exciting': 0.8, 'positive': 0.7, 'curious': 0.9, 'adventurous': 0.8},
+            'neutral': {},  # No emotional preference
+            'disgust': {'empathetic': 0.7, 'challenging': 0.6, 'intense': 0.5},
+            'love': {'positive': 1.0, 'romantic': 1.0, 'warm': 1.0, 'inspiring': 0.8}
+        }
+        
+        # Get compatibility scores for user's emotion
+        compatibility_scores = emotional_compatibility.get(user_emotion.lower(), {})
+        
+        if not compatibility_scores:
+            # No emotional filtering for neutral or unknown emotions
+            return memories
+        
+        # Score each memory based on emotional alignment
+        scored_memories = []
+        for memory in memories:
+            emotional_impact = memory.get('emotional_impact', '').lower()
+            
+            # Calculate emotional alignment score
+            # Base score from compatibility mapping
+            alignment_score = 0.5  # Default neutral score
+            
+            for emotion_key, score in compatibility_scores.items():
+                if emotion_key in emotional_impact:
+                    alignment_score = max(alignment_score, score)
+            
+            # Adjust score based on user's emotional intensity
+            # High intensity → prefer high-impact memories
+            # Low intensity → prefer gentle memories
+            intensity_factor = memory.get('importance_level', 5) / 10.0  # Normalize to 0-1
+            intensity_alignment = 1.0 - abs(user_intensity - intensity_factor)
+            
+            # Combined score
+            final_score = (alignment_score * 0.7) + (intensity_alignment * 0.3)
+            
+            scored_memories.append({
+                **memory,
+                'emotional_alignment_score': final_score
+            })
+        
+        # Sort by emotional alignment, then by importance
+        scored_memories.sort(
+            key=lambda m: (
+                m.get('emotional_alignment_score', 0.5),
+                m.get('importance_level', 5)
+            ),
+            reverse=True
+        )
+        
+        return scored_memories
 
 
-def create_character_graph_manager(postgres_pool, semantic_router=None) -> CharacterGraphManager:
+def create_character_graph_manager(postgres_pool, semantic_router=None, memory_manager=None) -> CharacterGraphManager:
     """
     Factory function to create CharacterGraphManager instance.
     
     Args:
         postgres_pool: AsyncPG connection pool
         semantic_router: Optional SemanticKnowledgeRouter for user facts integration
+        memory_manager: Optional VectorMemorySystem for emotional context analysis
         
     Returns:
         CharacterGraphManager instance
     """
-    return CharacterGraphManager(postgres_pool, semantic_router)
+    return CharacterGraphManager(postgres_pool, semantic_router, memory_manager)

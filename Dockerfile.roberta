@@ -20,25 +20,26 @@ COPY requirements-core.txt requirements-discord.txt ./
 RUN pip install --no-cache-dir -r requirements-core.txt -r requirements-discord.txt
 
 # PRE-LOAD ROBERTA MODELS DURING BUILD (Critical for instant startup)
-# Download j-hartmann/emotion-english-distilroberta-base (~250MB)
+# Download cardiffnlp/twitter-roberta-base-emotion-multilabel-latest (11 emotions)
 RUN python -c "
 from transformers import AutoTokenizer, AutoModelForSequenceClassification, pipeline
 import os
 
-print('🚀 Pre-loading RoBERTa emotion model during Docker build...')
+print('🚀 Pre-loading Cardiff NLP 11-emotion model during Docker build...')
 
-# Download and cache the model
-model_name = 'j-hartmann/emotion-english-distilroberta-base'
+# Download and cache the 11-emotion model
+model_name = 'cardiffnlp/twitter-roberta-base-emotion-multilabel-latest'
 tokenizer = AutoTokenizer.from_pretrained(model_name)
 model = AutoModelForSequenceClassification.from_pretrained(model_name)
 
 # Test the pipeline to ensure it's fully cached
-classifier = pipeline('text-classification', model=model, tokenizer=tokenizer, return_all_scores=True)
+classifier = pipeline('text-classification', model=model, tokenizer=tokenizer, return_all_scores=True, device=-1)
 test_result = classifier('I am happy and excited about this!')
 
-print('✅ RoBERTa model pre-loaded and cached successfully')
-print(f'   Model size: ~250MB cached in container')
-print(f'   Emotions detected: {len(test_result[0])}')
+print('✅ Cardiff NLP 11-emotion model pre-loaded and cached successfully')
+print(f'   Model: cardiffnlp/twitter-roberta-base-emotion-multilabel-latest')
+print(f'   Emotions: anger, anticipation, disgust, fear, joy, love, optimism, pessimism, sadness, surprise, trust')
+print(f'   Emotions detected: {len(test_result[0])} (should be 11)')
 "
 
 # Copy application code

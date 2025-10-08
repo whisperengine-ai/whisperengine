@@ -110,30 +110,23 @@ class TransactionManager:
         self.db_pool = db_pool
         self._initialized = False
     
-    async def initialize(
-        self,
-        host: str = "localhost",
-        port: int = 5433,
-        database: str = "whisperengine",
-        user: str = "whisperengine",
-        password: str = "dev_password_123"
-    ):
-        """Initialize PostgreSQL connection pool"""
+    async def initialize(self):
+        """Initialize PostgreSQL connection pool using centralized manager"""
         if not self.db_pool:
             try:
-                self.db_pool = await asyncpg.create_pool(
-                    host=host,
-                    port=port,
-                    database=database,
-                    user=user,
-                    password=password,
-                    min_size=2,
-                    max_size=10
-                )
-                logger.info("✅ TransactionManager initialized with PostgreSQL")
-                self._initialized = True
+                # Try to use centralized pool manager first
+                from src.database.postgres_pool_manager import get_postgres_pool
+                self.db_pool = await get_postgres_pool()
+                
+                if self.db_pool:
+                    logger.info("✅ TransactionManager using centralized PostgreSQL pool")
+                    self._initialized = True
+                else:
+                    logger.error("❌ TransactionManager: No centralized PostgreSQL pool available")
+                    self._initialized = False
+                    
             except Exception as e:
-                logger.error(f"❌ Failed to initialize TransactionManager: {e}")
+                logger.error("❌ Failed to get centralized PostgreSQL pool for TransactionManager: %s", str(e))
                 self._initialized = False
         else:
             self._initialized = True

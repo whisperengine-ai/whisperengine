@@ -3350,35 +3350,37 @@ class MessageProcessor:
             await self._log_llm_response_to_file(response, message_context.user_id)
             
             # 🎭 CDL EMOJI ENHANCEMENT: Add character-appropriate emojis to text response
+            # TODO: Migrate emoji system to database-only character loading
+            # Current emoji system still uses JSON files - needs database integration
             try:
-                character_file = os.getenv("CDL_DEFAULT_CHARACTER")
-                if character_file:
-                    from src.intelligence.cdl_emoji_integration import create_cdl_emoji_integration
+                # Use bot name from environment (database-only approach)
+                bot_name = get_normalized_bot_name_from_env()
+                if bot_name:
+                    # TODO: Update emoji system to use database character data instead of JSON files
+                    # For now, skip emoji enhancement during CDL migration
+                    logger.debug("🎭 CDL EMOJI: Skipping emoji enhancement during database migration (character: %s)", bot_name)
                     
-                    cdl_emoji_integration = create_cdl_emoji_integration()
+                    # NO-OP: Emoji system requires database migration to work with character names
+                    # Currently expects JSON file paths which are deprecated
+                    emoji_metadata = {
+                        "cdl_emoji_applied": False,
+                        "reason": "emoji_system_migration_pending",
+                        "character": bot_name
+                    }
                     
-                    # Extract just the filename if full path is provided
-                    if "/" in character_file:
-                        character_file = character_file.split("/")[-1]
-                    
-                    # Enhance response with CDL-appropriate emojis (ADDS to text, doesn't replace)
-                    enhanced_response, emoji_metadata = cdl_emoji_integration.enhance_bot_response(
-                        character_file=character_file,
-                        user_id=message_context.user_id,
-                        user_message=message_context.content,
-                        bot_response=response,
-                        context={
-                            'emotional_context': ai_components.get('emotion_data'),
-                            'conversation_history': conversation_context[:3] if conversation_context else []
-                        }
-                    )
+                    logger.debug("🎭 CDL EMOJI: Emoji enhancement disabled - database migration required")
                     
                     if emoji_metadata.get("cdl_emoji_applied", False):
-                        response = enhanced_response
                         logger.info(f"🎭 CDL EMOJI: Enhanced response with {len(emoji_metadata.get('emoji_additions', []))} emojis "
                                   f"({emoji_metadata.get('placement_style', 'unknown')} style)")
                     else:
-                        logger.debug(f"🎭 CDL EMOJI: No enhancement applied - {emoji_metadata.get('reason', 'unknown')}")
+                        reason = emoji_metadata.get('reason', 'unknown')
+                        if reason == "emoji_system_migration_pending":
+                            logger.debug("🎭 CDL EMOJI: Emoji system migration pending - enhancement skipped")
+                        else:
+                            logger.debug(f"🎭 CDL EMOJI: No enhancement applied - {reason}")
+                else:
+                    logger.debug("🎭 CDL EMOJI: No bot name available - skipping emoji enhancement")
             except Exception as e:
                 logger.error(f"CDL emoji enhancement failed (non-critical): {e}")
                 # Continue with original response if CDL emoji enhancement fails

@@ -78,16 +78,16 @@ def download_embedding_models():
         return False
 
 def download_roberta_emotion_models():
-    """Download RoBERTa emotion models during Docker build for instant startup"""
+    """Download RoBERTa 28-emotion model during Docker build for instant startup"""
     try:
         from transformers import AutoTokenizer, AutoModelForSequenceClassification, pipeline
         
         models_dir = Path("/app/models/emotion")
         models_dir.mkdir(parents=True, exist_ok=True)
         
-        # Primary RoBERTa emotion model
-        model_name = "j-hartmann/emotion-english-distilroberta-base"
-        logger.info(f"📥 Downloading RoBERTa emotion model ({model_name})...")
+        # Primary Cardiff NLP 11-emotion model (upgraded from SamLowe 28-emotion)
+        model_name = "cardiffnlp/twitter-roberta-base-emotion-multilabel-latest"
+        logger.info(f"📥 Downloading Cardiff NLP 11-emotion model ({model_name})...")
         
         # Download tokenizer and model (this caches them in HuggingFace cache)
         tokenizer = AutoTokenizer.from_pretrained(model_name)
@@ -98,38 +98,44 @@ def download_roberta_emotion_models():
             "text-classification", 
             model=model, 
             tokenizer=tokenizer, 
-            return_all_scores=True
+            return_all_scores=True,
+            device=-1  # Force CPU
         )
         
         # Test emotion analysis to verify model works
         test_result = classifier("I am so happy and excited about this!")
         emotions_detected = len(test_result[0])
         
-        logger.info(f"✅ RoBERTa emotion model verification successful")
-        logger.info(f"📊 Emotions detected: {emotions_detected} (expected: 7)")
+        logger.info(f"✅ Cardiff NLP 11-emotion model verification successful")
+        logger.info(f"📊 Emotions detected: {emotions_detected} (expected: 11)")
         
         # Save model info
         model_info = {
             "model_name": model_name,
-            "emotions": ["anger", "disgust", "fear", "joy", "neutral", "sadness", "surprise"],
-            "accuracy": "~88-90% on emotion classification",
-            "size_mb": "~250MB",
-            "model_type": "roberta_transformers",
+            "emotions": [
+                "anger", "anticipation", "disgust", "fear", "joy", "love", 
+                "optimism", "pessimism", "sadness", "surprise", "trust"
+            ],
+            "accuracy": "~85-90% on emotion classification",
+            "size_mb": "~300MB",
+            "model_type": "roberta_transformers_11_emotions",
             "architecture": "hybrid_emotion",
             "verified": True,
-            "test_emotions": emotions_detected
+            "test_emotions": emotions_detected,
+            "upgraded_from": "SamLowe/roberta-base-go_emotions (28 emotions)"
         }
         
         import json
         with open(models_dir / "roberta_model_info.json", 'w') as f:
             json.dump(model_info, f, indent=2)
         
-        logger.info(f"✅ RoBERTa emotion model ready: {model_name}")
-        logger.info(f"📊 Model size: ~250MB cached for instant startup")
+        logger.info(f"✅ Cardiff NLP 11-emotion model ready: {model_name}")
+        logger.info(f"📊 Model size: ~300MB cached for instant startup")
+        logger.info(f"🎯 Detects nuanced emotions: optimism, anticipation, trust, pessimism, and more!")
         
         return True
     except Exception as e:
-        logger.error(f"❌ Failed to download RoBERTa emotion models: {e}")
+        logger.error(f"❌ Failed to download RoBERTa 28-emotion model: {e}")
         logger.error(f"💡 RoBERTa will be downloaded at runtime (slower first startup)")
         return False
 
@@ -146,11 +152,13 @@ def create_model_config():
             "conversation_understanding": "excellent"
         },
         "emotion_models": {
-            "primary": "j-hartmann/emotion-english-distilroberta-base",
-            "type": "roberta_transformers",
+            "primary": "cardiffnlp/twitter-roberta-base-emotion-multilabel-latest",
+            "type": "roberta_transformers_11_emotions",
             "architecture": "hybrid",
             "fallbacks": ["vader", "keywords"],
-            "cache_dir": "~/.cache/huggingface"
+            "cache_dir": "~/.cache/huggingface",
+            "emotions_count": 11,
+            "upgraded_from": "SamLowe (28 emotions)"
         },
         "architecture": "hybrid_vector_emotion",
         "emotion_analysis": "roberta_vader_keywords",
@@ -203,13 +211,13 @@ def verify_downloads():
     if os.path.exists(hf_cache):
         logger.info(f"✅ HuggingFace cache found: {hf_cache}")
         
-        # Look for RoBERTa model components
+        # Look for Cardiff NLP 11-emotion model components
         import glob
-        model_dirs = glob.glob(f"{hf_cache}/**/j-hartmann--emotion-english-distilroberta-base", recursive=True)
+        model_dirs = glob.glob(f"{hf_cache}/**/cardiffnlp--twitter-roberta-base-emotion-multilabel-latest", recursive=True)
         if model_dirs:
-            logger.info(f"✅ Found RoBERTa model directories: {len(model_dirs)} locations")
+            logger.info(f"✅ Found Cardiff NLP 11-emotion model directories: {len(model_dirs)} locations")
         else:
-            logger.warning("⚠️  RoBERTa model directory not found in HuggingFace cache")
+            logger.warning("⚠️  Cardiff NLP 11-emotion model directory not found in HuggingFace cache")
     else:
         logger.warning(f"⚠️  HuggingFace cache not found: {hf_cache}")
     

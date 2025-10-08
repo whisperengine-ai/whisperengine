@@ -9,7 +9,6 @@ that works with our clean RDBMS schema (no JSON/JSONB).
 import logging
 import os
 import asyncio
-import asyncpg
 from typing import Dict, Any, Optional
 
 logger = logging.getLogger(__name__)
@@ -35,16 +34,19 @@ class SimpleCDLManager:
         return self._character_name
         
     async def _get_database_pool(self):
-        """Get database connection pool"""
+        """Get database connection pool from centralized manager"""
         if self._pool is None:
-            postgres_host = os.getenv('POSTGRES_HOST', 'localhost')
-            postgres_port = int(os.getenv('POSTGRES_PORT', '5432'))
-            postgres_user = os.getenv('POSTGRES_USER', 'whisperengine')
-            postgres_password = os.getenv('POSTGRES_PASSWORD', 'whisperengine_password')
-            postgres_db = os.getenv('POSTGRES_DB', 'whisperengine')
-            
-            database_url = f"postgresql://{postgres_user}:{postgres_password}@{postgres_host}:{postgres_port}/{postgres_db}"
-            self._pool = await asyncpg.create_pool(database_url, min_size=1, max_size=5)
+            try:
+                from src.database.postgres_pool_manager import get_postgres_pool
+                self._pool = await get_postgres_pool()
+                if self._pool:
+                    logger.info("✅ CDL manager using centralized PostgreSQL pool")
+                else:
+                    logger.error("❌ CDL manager: No PostgreSQL pool available from centralized manager")
+                    raise RuntimeError("Centralized PostgreSQL pool not available")
+            except Exception as e:
+                logger.error("❌ CDL manager failed to get centralized pool: %s", str(e))
+                raise RuntimeError(f"Failed to get centralized PostgreSQL pool: {e}")
             
         return self._pool
         

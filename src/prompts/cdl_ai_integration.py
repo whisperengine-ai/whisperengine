@@ -1071,21 +1071,54 @@ STOP WRITING after 2-4 sentences. Do not continue.
                 print("🎯 GRAPH INIT: Starting CharacterGraphManager initialization...", flush=True)
                 logger.info("🎯 GRAPH INIT: Starting CharacterGraphManager initialization...")
                 from src.characters.cdl.character_graph_manager import create_character_graph_manager
-                from src.characters.cdl.simple_cdl_manager import get_simple_cdl_manager
                 
-                print("🎯 GRAPH INIT: Getting CDL manager...", flush=True)
-                logger.info("🎯 GRAPH INIT: Getting CDL manager...")
-                cdl_manager = get_simple_cdl_manager()
-                print("🎯 GRAPH INIT: Getting database pool...", flush=True)
-                logger.info("🎯 GRAPH INIT: Getting database pool...")
-                postgres_pool = await cdl_manager._get_database_pool()
+                # Use bot's existing PostgreSQL pool instead of creating a new one
+                postgres_pool = None
+                if self.bot_core and hasattr(self.bot_core, 'postgres_pool'):
+                    postgres_pool = self.bot_core.postgres_pool
+                    print("🎯 GRAPH INIT: Using bot's existing PostgreSQL pool", flush=True)
+                    logger.info("🎯 GRAPH INIT: Using bot's existing PostgreSQL pool")
+                
+                # If bot pool not available, try centralized pool manager
+                if not postgres_pool:
+                    try:
+                        from src.database.postgres_pool_manager import get_postgres_pool
+                        postgres_pool = await get_postgres_pool()
+                        if postgres_pool:
+                            print("🎯 GRAPH INIT: Using centralized PostgreSQL pool", flush=True)
+                            logger.info("🎯 GRAPH INIT: Using centralized PostgreSQL pool")
+                        else:
+                            print("🎯 GRAPH INIT: Centralized pool not available", flush=True)
+                            logger.warning("🎯 GRAPH INIT: Centralized pool not available")
+                    except Exception as e:
+                        print(f"🎯 GRAPH INIT: Failed to get centralized pool: {e}", flush=True)
+                        logger.warning("🎯 GRAPH INIT: Failed to get centralized pool: %s", str(e))
+                
+                # Final fallback to CDL manager's pool
+                if not postgres_pool:
+                    print("🎯 GRAPH INIT: Using CDL manager fallback pool...", flush=True)
+                    logger.warning("🎯 GRAPH INIT: Using CDL manager fallback pool...")
+                    from src.characters.cdl.simple_cdl_manager import get_simple_cdl_manager
+                    cdl_manager = get_simple_cdl_manager()
+                    postgres_pool = await cdl_manager._get_database_pool()
+                
+                if not postgres_pool:
+                    logger.error("❌ GRAPH INIT: No PostgreSQL pool available")
+                    return None
                 
                 print("🎯 GRAPH INIT: Creating CharacterGraphManager...", flush=True)
                 logger.info("🎯 GRAPH INIT: Creating CharacterGraphManager...")
-                self._graph_manager = create_character_graph_manager(postgres_pool, semantic_router=self.semantic_router)
+                
+                # PRODUCTION INTEGRATION: Pass memory_manager for emotional context synchronization
+                self._graph_manager = create_character_graph_manager(
+                    postgres_pool, 
+                    semantic_router=self.semantic_router,
+                    memory_manager=self.memory_manager  # NEW: Enables emotional context synchronization
+                )
+                
                 self._graph_manager_initialized = True
                 print("✅ GRAPH INIT: CharacterGraphManager initialized successfully!", flush=True)
-                logger.info("✅ GRAPH INIT: CharacterGraphManager initialized successfully!")
+                logger.info("✅ GRAPH INIT: CharacterGraphManager initialized with memory_manager for emotional sync!")
             except Exception as e:
                 print(f"❌ GRAPH INIT FAILED: {e}", flush=True)
                 logger.error(f"❌ GRAPH INIT FAILED: Could not initialize CharacterGraphManager: {e}")
@@ -1221,7 +1254,74 @@ STOP WRITING after 2-4 sentences. Do not continue.
                         if ability.get('category') in ['hobby', 'personal', 'recreation']:
                             personal_sections.append(f"Hobby Skill: {ability['ability_name']}")
             
-            # 📊 FALLBACK: If no graph results, use direct property access (legacy compatibility)
+            # � STEP 2: CROSS-POLLINATION - Connect character knowledge with user facts
+            has_postgres = hasattr(graph_manager, 'postgres') if graph_manager else False
+            postgres_value = graph_manager.postgres if graph_manager and hasattr(graph_manager, 'postgres') else None
+            print(f"🔍 DEBUG: Checking cross-pollination conditions - user_id={user_id}, graph_manager={graph_manager is not None}, has_postgres={has_postgres}, postgres_value={postgres_value}", flush=True)
+            logger.info(f"🔍 DEBUG: Checking cross-pollination conditions - user_id={user_id}, graph_manager={graph_manager is not None}, has_postgres={has_postgres}")
+            
+            if user_id and graph_manager and hasattr(graph_manager, 'postgres') and graph_manager.postgres:
+                try:
+                    logger.info(f"🔗 CROSS-POLLINATION: Querying character-user connections for user_id={user_id}")
+                    print(f"🔗 CROSS-POLLINATION: Querying character-user connections for user_id={user_id}", flush=True)
+                    
+                    # Get character ID from database
+                    character_id_result = await graph_manager.postgres.fetchval(
+                        "SELECT id FROM characters WHERE name = $1",
+                        character.identity.name
+                    )
+                    
+                    if character_id_result:
+                        cross_poll_results = await graph_manager.query_cross_pollination(
+                            character_id=character_id_result,
+                            user_id=user_id,
+                            limit=3
+                        )
+                        
+                        # Add shared interests
+                        for interest in cross_poll_results.get('shared_interests', []):
+                            personal_sections.append(
+                                f"🔗 Shared Interest: {interest.get('description', '')} "
+                                f"(connects with your interest in {interest.get('user_entity', '')})"
+                            )
+                            logger.info(f"🔗 CROSS-POLL: Added shared interest: {interest.get('description', '')[:50]}...")
+                        
+                        # Add relevant abilities
+                        for ability in cross_poll_results.get('relevant_abilities', []):
+                            personal_sections.append(
+                                f"🔗 Relevant Skill: {ability.get('ability_name', '')} "
+                                f"(relates to your {ability.get('user_entity', '')})"
+                            )
+                            logger.info(f"🔗 CROSS-POLL: Added relevant ability: {ability.get('ability_name', '')}")
+                        
+                        # Add character knowledge about user facts
+                        for knowledge in cross_poll_results.get('character_knowledge_about_user_facts', []):
+                            personal_sections.append(
+                                f"🔗 Related Knowledge: {knowledge.get('description', '')} "
+                                f"(relevant to your {knowledge.get('user_entity', '')})"
+                            )
+                            logger.info(f"🔗 CROSS-POLL: Added related knowledge: {knowledge.get('description', '')[:50]}...")
+                        
+                        if any(cross_poll_results.values()):
+                            logger.info(f"🔗 CROSS-POLLINATION: Successfully added {sum(len(v) for v in cross_poll_results.values())} cross-pollinated sections")
+                        else:
+                            logger.info("🔗 CROSS-POLLINATION: No connections found between character and user facts")
+                    else:
+                        logger.warning(f"🔗 CROSS-POLLINATION: Could not find character ID for {character.identity.name}")
+                        
+                except Exception as e:
+                    error_msg = str(e)
+                    if "another operation is in progress" in error_msg:
+                        logger.warning(f"🔗 CROSS-POLLINATION: PostgreSQL pool busy, skipping cross-pollination for this request")
+                        print(f"🔗 CROSS-POLLINATION: PostgreSQL pool busy, skipping cross-pollination for this request", flush=True)
+                    else:
+                        logger.warning(f"🔗 CROSS-POLLINATION: Error querying connections: {e}")
+                        print(f"🔗 CROSS-POLLINATION: Error querying connections: {e}", flush=True)
+            else:
+                logger.info(f"🔗 CROSS-POLLINATION: Conditions not met - user_id={user_id is not None}, graph_manager={graph_manager is not None}, has_postgres={has_postgres}")
+                print(f"🔗 CROSS-POLLINATION: Conditions not met - user_id={user_id is not None}, graph_manager={graph_manager is not None}, has_postgres={has_postgres}", flush=True)
+            
+            # �📊 FALLBACK: If no graph results, use direct property access (legacy compatibility)
             if not personal_sections:
                 logger.warning("📊 GRAPH: No graph results found, triggering fallback method")
                 return await self._extract_personal_knowledge_fallback(character, message_content)

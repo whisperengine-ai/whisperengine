@@ -61,11 +61,11 @@ class CrossPollinationTestSuite:
         logger.info("🔧 Setting up cross-pollination test suite...")
         
         try:
-            # PostgreSQL connection
-            postgres_host = os.getenv('POSTGRES_HOST', 'postgres')  # Docker service name
-            postgres_port = int(os.getenv('POSTGRES_PORT', '5432'))  # Internal Docker port
-            postgres_user = os.getenv('POSTGRES_USER', 'postgres')
-            postgres_password = os.getenv('POSTGRES_PASSWORD', 'mysecretpassword')
+            # PostgreSQL connection - use localhost for external testing
+            postgres_host = os.getenv('POSTGRES_HOST', 'localhost')  # Use localhost for external testing
+            postgres_port = int(os.getenv('POSTGRES_PORT', '5433'))  # External Docker port (5433)
+            postgres_user = os.getenv('POSTGRES_USER', 'whisperengine')  # WhisperEngine user
+            postgres_password = os.getenv('POSTGRES_PASSWORD', 'whisperengine_password')
             postgres_db = os.getenv('POSTGRES_DB', 'whisperengine')
 
             # Create connection pool

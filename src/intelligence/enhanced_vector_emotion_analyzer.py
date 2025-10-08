@@ -182,7 +182,8 @@ class EnhancedVectorEmotionAnalyzer:
             "sadness": ["sad", "unhappy", "depressed", "melancholy", "sorrowful", "grief", 
                        "disappointed", "heartbroken", "down", "blue", "gloomy", "miserable", "crying",
                        "tragedy", "loss", "tears", "devastated", "crushed", "despair", "desolate",
-                       "mournful", "dejected", "forlorn", "disheartened", "crestfallen", "woeful"],
+                       "mournful", "dejected", "forlorn", "disheartened", "crestfallen", "woeful",
+                       "feeling down", "feeling low", "heavy heart", "concerned about"],
             "anger": ["angry", "mad", "furious", "rage", "irritated", "annoyed", "frustrated", 
                      "outraged", "livid", "incensed", "hostile", "aggressive", "hate", "disgusted",
                      "appalled", "infuriated", "upset", "bothered", "irate", "enraged", "seething",
@@ -194,6 +195,9 @@ class EnhancedVectorEmotionAnalyzer:
             "excitement": ["excited", "thrilled", "energetic", "enthusiastic", "pumped", 
                           "eager", "anticipation", "can't wait", "hyped", "electrified", "exhilarated",
                           "animated", "spirited", "vivacious", "dynamic", "charged"],
+            "hope": ["hopeful", "optimistic", "positive", "encouraging", "promising", "bright",
+                    "looking forward", "confident", "believing", "faith", "trust", "better days",
+                    "things will improve", "feeling better", "more hopeful"],
             "gratitude": ["grateful", "thankful", "appreciate", "blessed", "fortunate", 
                          "thank you", "thanks", "indebted", "obliged", "recognition", "appreciative",
                          "beholden", "grateful for", "much appreciated"],
@@ -206,7 +210,12 @@ class EnhancedVectorEmotionAnalyzer:
                         "dumbfounded", "taken aback"],
             "anxiety": ["anxious", "stressed", "overwhelmed", "pressure", "tension",
                        "worried", "nervous", "uneasy", "restless", "troubled", "distressed",
-                       "frazzled", "agitated", "jittery", "on edge", "wound up"],
+                       "frazzled", "agitated", "jittery", "on edge", "wound up", 
+                       "weighing on my mind", "weighing on me", "heavy on my mind", "burdening me",
+                       "can't stop thinking", "keeps me up", "haunting me"],
+            "frustration": ["frustrated", "annoying", "irritating", "exasperating", "maddening",
+                           "disappointing", "setback", "obstacle", "blocked", "stuck", "helpless",
+                           "can't seem to", "nothing works", "tried everything"],
             "contentment": ["content", "satisfied", "peaceful", "calm", "serene", "relaxed",
                            "comfortable", "at ease", "tranquil", "balanced", "fulfilled", "placid",
                            "composed", "untroubled", "at peace", "mellow"],
@@ -337,10 +346,21 @@ class EnhancedVectorEmotionAnalyzer:
             
             # Step 7: Combine all emotion analyses (including emoji analysis)
             logger.debug(f"🎭 STEP 7: Combining all emotion analyses")
-            final_emotions = self._combine_emotion_analyses(
-                keyword_emotions, vector_emotions, context_emotions, emoji_emotions
-            )
-            logger.info(f"🎭 STEP 6 RESULT: Final combined emotions: {final_emotions}")
+            
+            # 🔥 FIX: If RoBERTa detected strong emotion, use it directly (don't dilute with weak signals)
+            max_keyword_emotion = max((score for score in keyword_emotions.values()), default=0.0) if keyword_emotions else 0.0
+            has_strong_roberta_signal = max_keyword_emotion > 0.5  # RoBERTa detected strong emotion (>50%)
+            
+            if has_strong_roberta_signal:
+                logger.info(f"🎭 STEP 7 RESULT: RoBERTa has strong signal (max={max_keyword_emotion:.3f}), using RoBERTa directly")
+                final_emotions = keyword_emotions  # Use RoBERTa results directly, skip dilution
+            else:
+                logger.info(f"🎭 STEP 7 RESULT: No strong RoBERTa signal (max={max_keyword_emotion:.3f}), combining all analyses")
+                final_emotions = self._combine_emotion_analyses(
+                    keyword_emotions, vector_emotions, context_emotions, emoji_emotions
+                )
+            
+            logger.info(f"🎭 STEP 7 RESULT: Final combined emotions: {final_emotions}")
             
             # Step 7: Determine primary emotion and confidence
             primary_emotion, confidence = self._determine_primary_emotion(final_emotions)
@@ -432,14 +452,14 @@ class EnhancedVectorEmotionAnalyzer:
                     with self.__class__._roberta_classifier_lock:
                         # �🔥 PERFORMANCE FIX: Initialize RoBERTa classifier as class variable to avoid repeated loading
                         if not hasattr(self.__class__, '_shared_roberta_classifier') or self.__class__._shared_roberta_classifier is None:
-                            logger.info("🤖 ROBERTA ANALYSIS: Initializing shared RoBERTa emotion classifier...")
+                            logger.info("🤖 ROBERTA ANALYSIS: Initializing shared RoBERTa emotion classifier (11-emotion Cardiff NLP model)...")
                             self.__class__._shared_roberta_classifier = pipeline(
                                 "text-classification",
-                                model="j-hartmann/emotion-english-distilroberta-base",
+                                model="cardiffnlp/twitter-roberta-base-emotion-multilabel-latest",
                                 return_all_scores=True,
                                 device=-1  # Force CPU to avoid GPU issues
                             )
-                            logger.info("🤖 ROBERTA ANALYSIS: ✅ RoBERTa emotion classifier initialized and cached")
+                            logger.info("🤖 ROBERTA ANALYSIS: ✅ RoBERTa 11-emotion classifier initialized and cached")
                         
                         # Use shared classifier
                         self._roberta_classifier = self.__class__._shared_roberta_classifier
@@ -468,18 +488,33 @@ class EnhancedVectorEmotionAnalyzer:
                         results = self._roberta_classifier(processed_content)
                         logger.info(f"🤖 ROBERTA ANALYSIS: RoBERTa completed with {len(results[0])} emotion results")
                     
-                    # Process RoBERTa results
+                    # 🔥 CARDIFF NLP FIX: Select HIGHEST emotion BEFORE mapping to preserve fidelity
+                    # Problem: Aggregating multiple emotions (pessimism + sadness) artificially inflates scores
+                    # Solution: Find the single strongest emotion in 11-emotion space, THEN map to 7-emotion taxonomy
+                    raw_emotions = {}  # Store all 11 emotions with original labels
                     for result in results[0]:  # First (only) text result
                         raw_label = result["label"]
                         confidence = result["score"]
+                        raw_emotions[raw_label] = confidence
+                        logger.info(f"🤖 ROBERTA ANALYSIS: Cardiff detected {raw_label}: {confidence:.3f}")
+                    
+                    # Find the HIGHEST emotion in 11-emotion space
+                    if raw_emotions:
+                        max_emotion = max(raw_emotions.items(), key=lambda x: x[1])
+                        max_label, max_confidence = max_emotion
+                        logger.info(f"🤖 ROBERTA ANALYSIS: Highest emotion: {max_label} ({max_confidence:.3f})")
                         
-                        # 🔥 CRITICAL FIX: j-hartmann model returns actual emotion names, not LABEL_0 format
-                        # Map j-hartmann emotion labels to standardized names
-                        emotion_label = self._map_roberta_emotion_label(raw_label)
+                        # NOW map the single highest emotion to 7-emotion taxonomy
+                        emotion_label = self._map_roberta_emotion_label(max_label)
+                        emotion_scores[emotion_label] = max_confidence
+                        logger.info(f"🤖 ROBERTA ANALYSIS: Mapped to primary: {max_label} → {emotion_label}: {max_confidence:.3f}")
                         
-                        # Map RoBERTa labels to our emotion dimensions
-                        emotion_scores[emotion_label] = confidence
-                        logger.info(f"🤖 ROBERTA ANALYSIS: RoBERTa detected {raw_label} → {emotion_label}: {confidence:.3f}")
+                        # Store secondary emotions for context (don't let them override primary)
+                        for raw_label, confidence in sorted(raw_emotions.items(), key=lambda x: x[1], reverse=True)[1:4]:
+                            mapped = self._map_roberta_emotion_label(raw_label)
+                            if mapped not in emotion_scores:
+                                emotion_scores[mapped] = confidence * 0.5  # Reduce secondary emotion influence
+                                logger.debug(f"🤖 ROBERTA ANALYSIS: Secondary emotion: {raw_label} → {mapped}: {confidence:.3f} (weighted: {confidence * 0.5:.3f})")
                     
                     # 🔥 ENHANCED: Apply conversation context adjustments for better emotional detection
                     emotion_scores = self._apply_conversation_context_adjustments(content, emotion_scores)
@@ -488,8 +523,10 @@ class EnhancedVectorEmotionAnalyzer:
                     max_non_neutral = max((score for emotion, score in emotion_scores.items() if emotion != 'neutral'), default=0.0)
                     neutral_score = emotion_scores.get('neutral', 0.0)
                     has_strong_emotion = any(score > 0.3 for emotion, score in emotion_scores.items() if emotion != 'neutral')
-                    # 🔧 TUNING: Lowered neutral threshold from 0.88 to 0.75 for less neutral bias
-                    has_competitive_emotion = max_non_neutral > 0.08 and neutral_score < 0.75
+                    # 🔧 28-EMOTION OPTIMIZATION: Lowered thresholds to leverage 28-emotion RoBERTa model
+                    # Even small non-neutral signals (>5%) are meaningful with 28 emotions
+                    # Raised neutral threshold to 0.75 to prefer RoBERTa over VADER fallback
+                    has_competitive_emotion = max_non_neutral > 0.05 and neutral_score < 0.75
                     
                     # Use RoBERTa if we have significant non-neutral emotions
                     if has_strong_emotion or has_competitive_emotion:
@@ -872,9 +909,23 @@ class EnhancedVectorEmotionAnalyzer:
         if not emotions:
             return "neutral", 0.3
         
-        # Find the emotion with highest score
-        primary_emotion = max(emotions.items(), key=lambda x: x[1])
-        emotion_name, confidence = primary_emotion
+        # 🔥 FIX: Don't let neutral win if there's a strong competing emotion
+        # This prevents "neutral: 1.0" from beating "anger: 0.867" when RoBERTa detects both
+        non_neutral_emotions = {k: v for k, v in emotions.items() if k != 'neutral'}
+        max_non_neutral = max(non_neutral_emotions.values()) if non_neutral_emotions else 0.0
+        neutral_score = emotions.get('neutral', 0.0)
+        
+        # Use non-neutral emotion if it's significant (>0.3) and competitive with neutral
+        if max_non_neutral > 0.3 and max_non_neutral > neutral_score * 0.5:
+            # Find the strongest non-neutral emotion
+            primary_emotion = max(non_neutral_emotions.items(), key=lambda x: x[1])
+            emotion_name, confidence = primary_emotion
+            logger.info(f"🎭 PRIMARY EMOTION: Chose {emotion_name} ({confidence:.3f}) over neutral ({neutral_score:.3f})")
+        else:
+            # No strong non-neutral emotion, use whatever is highest (including neutral)
+            primary_emotion = max(emotions.items(), key=lambda x: x[1])
+            emotion_name, confidence = primary_emotion
+            logger.info(f"🎭 PRIMARY EMOTION: No strong alternative, chose {emotion_name} ({confidence:.3f})")
         
         # Apply confidence adjustments
         confidence = min(confidence * 1.2, 1.0)  # Slight confidence boost
@@ -1435,30 +1486,40 @@ class EnhancedVectorEmotionAnalyzer:
 
     def _map_roberta_emotion_label(self, raw_label: str) -> str:
         """
-        Map j-hartmann RoBERTa emotion labels to standardized emotion names.
+        Map RoBERTa emotion labels to standardized emotion names.
         
-        j-hartmann/emotion-english-distilroberta-base returns:
-        - anger, disgust, fear, joy, neutral, sadness, surprise
+        Cardiff NLP twitter-roberta-base-emotion-multilabel-latest (11 emotions):
+        anger, anticipation, disgust, fear, joy, love, optimism, pessimism, sadness, surprise, trust
         
-        This method normalizes them to our emotion taxonomy.
+        Maps 11 emotions to our 7 core emotion taxonomy for system compatibility.
         """
         label_mapping = {
+            # Core 7 emotions (direct mappings)
             "anger": "anger",
             "disgust": "disgust", 
             "fear": "fear",
             "joy": "joy",
-            "neutral": "neutral",
             "sadness": "sadness",
-            "surprise": "surprise"
+            "surprise": "surprise",
+            
+            # Cardiff NLP 11-emotion mappings to core 7
+            "optimism": "joy",           # ✅ "feeling more hopeful" → joy
+            "pessimism": "sadness",      # Negative outlook → sadness
+            "love": "joy",               # Positive emotion → joy
+            "trust": "joy",              # Positive emotion → joy
+            "anticipation": "surprise",  # Future-focused → surprise
+            
+            # Neutral handling (if present)
+            "neutral": "neutral"
         }
         
         # Normalize to lowercase and map
         normalized_label = raw_label.lower().strip()
         mapped_emotion = label_mapping.get(normalized_label, normalized_label)
         
-        # Log mapping for debugging
+        # Log mapping for debugging (show 11→7 conversions)
         if normalized_label != mapped_emotion:
-            logger.debug(f"🎭 EMOTION MAPPING: {raw_label} → {mapped_emotion}")
+            logger.info(f"🎭 EMOTION MAPPING (11→7): {raw_label} → {mapped_emotion}")
             
         return mapped_emotion
 

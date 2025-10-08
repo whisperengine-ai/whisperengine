@@ -192,25 +192,27 @@ class DiscordBotCore:
             raise
     
     def initialize_character_system(self):
-        """Initialize CDL character system for personality-driven responses."""
+        """Initialize CDL character system for personality-driven responses (database-only)."""
         try:
             from src.prompts.cdl_ai_integration import CDLAIPromptIntegration
             
-            # Get character file from environment
-            self.character_file = os.getenv('CDL_DEFAULT_CHARACTER')
+            # Database-only CDL loading - ignore CDL_DEFAULT_CHARACTER environment variable
+            # Character is determined by DISCORD_BOT_NAME environment variable
+            bot_name = os.getenv('DISCORD_BOT_NAME', 'unknown')
             
-            if self.character_file:
-                # Initialize CDL AI integration system with required dependencies
-                self.character_system = CDLAIPromptIntegration(
-                    vector_memory_manager=self.memory_manager,
-                    llm_client=self.llm_client
-                )
-                self.logger.info(f"✅ Character system initialized with file: {self.character_file}")
-            else:
-                self.logger.warning("⚠️ No CDL_DEFAULT_CHARACTER specified - character system disabled")
+            # Initialize CDL AI integration system with required dependencies
+            self.character_system = CDLAIPromptIntegration(
+                vector_memory_manager=self.memory_manager,
+                llm_client=self.llm_client
+            )
+            
+            # Set character_file to None to indicate database-only mode
+            self.character_file = None
+            
+            self.logger.info("✅ Character system initialized with database-only CDL for bot: %s", bot_name)
                 
         except Exception as e:
-            self.logger.error(f"❌ Character system initialization failed: {e}")
+            self.logger.error("❌ Character system initialization failed: %s", str(e))
             # Don't raise - character system is optional
     
     async def initialize_knowledge_router(self):
@@ -313,23 +315,22 @@ class DiscordBotCore:
                 llm_client=self.llm_client
             )
             
-            # Load workflows for this character (if configured)
-            character_file = os.getenv("CHARACTER_FILE") or os.getenv("CDL_DEFAULT_CHARACTER")
-            if character_file:
-                loaded = await self.workflow_manager.load_workflows_for_character(character_file)
+            # Load workflows for this character using bot name from environment
+            bot_name = os.getenv("DISCORD_BOT_NAME", "unknown").lower()
+            if bot_name and bot_name != "unknown":
+                loaded = await self.workflow_manager.load_workflows_for_character(bot_name)
                 if loaded:
-                    bot_name = os.getenv("DISCORD_BOT_NAME", "unknown").lower()
                     workflow_count = self.workflow_manager.get_workflow_count(bot_name)
                     self.logger.info(
                         f"✅ Workflow Manager initialized with {workflow_count} workflow(s) "
-                        f"from {character_file}"
+                        f"for character '{bot_name}'"
                     )
                 else:
                     self.logger.info(
-                        f"ℹ️ Workflow Manager initialized (no workflows configured in {character_file})"
+                        f"ℹ️ Workflow Manager initialized (no workflows configured for character '{bot_name}')"
                     )
             else:
-                self.logger.info("ℹ️ Workflow Manager initialized (no CHARACTER_FILE set)")
+                self.logger.info("ℹ️ Workflow Manager initialized (no DISCORD_BOT_NAME set)")
             
         except Exception as e:
             self.logger.warning(f"⚠️ Workflow manager initialization failed: {e}")
@@ -767,47 +768,36 @@ class DiscordBotCore:
 
     async def initialize_postgres_pool(self):
         """
-        Initialize PostgreSQL connection pool for semantic knowledge graph.
+        Initialize PostgreSQL connection pool using centralized pool manager.
         
         This runs asynchronously and is required for the knowledge_router.
         """
         try:
-            self.logger.info("🐘 Initializing PostgreSQL connection pool...")
+            self.logger.info("🐘 Initializing PostgreSQL connection pool via centralized manager...")
             
-            import asyncpg
+            # Use centralized pool manager instead of creating our own pool
+            from src.database.postgres_pool_manager import get_postgres_pool
             
-            # Get PostgreSQL configuration from environment
-            db_host = os.getenv("POSTGRES_HOST", "whisperengine-multi-postgres")
-            db_port = int(os.getenv("POSTGRES_PORT", "5432"))
-            db_name = os.getenv("POSTGRES_DB", "whisperengine")
-            db_user = os.getenv("POSTGRES_USER", "whisperengine")
-            db_password = os.getenv("POSTGRES_PASSWORD", "whisperengine")
+            self.postgres_pool = await get_postgres_pool()
             
-            # Create connection pool
-            self.postgres_pool = await asyncpg.create_pool(
-                host=db_host,
-                port=db_port,
-                database=db_name,
-                user=db_user,
-                password=db_password,
-                min_size=2,
-                max_size=10,
-                command_timeout=60
-            )
-            
-            # Store configuration for reference
-            self.postgres_config = {
-                "host": db_host,
-                "port": db_port,
-                "database": db_name,
-                "user": db_user
-            }
-            
-            self.logger.info(f"✅ PostgreSQL pool initialized: {db_host}:{db_port}/{db_name}")
-            return True
+            if self.postgres_pool:
+                # Store configuration for reference
+                self.postgres_config = {
+                    "host": os.getenv("POSTGRES_HOST", "whisperengine-multi-postgres"),
+                    "port": int(os.getenv("POSTGRES_PORT", "5432")),
+                    "database": os.getenv("POSTGRES_DB", "whisperengine"),
+                    "user": os.getenv("POSTGRES_USER", "whisperengine")
+                }
+                
+                self.logger.info("✅ PostgreSQL pool initialized via centralized manager: %s:%s/%s",
+                               self.postgres_config["host"], self.postgres_config["port"], self.postgres_config["database"])
+                return True
+            else:
+                self.logger.error("❌ Failed to get PostgreSQL pool from centralized manager")
+                return False
             
         except Exception as e:
-            self.logger.error(f"❌ Failed to initialize PostgreSQL pool: {e}")
+            self.logger.error("❌ Failed to initialize PostgreSQL pool: %s", str(e))
             self.logger.warning("⚠️ Bot will continue without semantic knowledge graph features")
             self.postgres_pool = None
             self.postgres_config = None
