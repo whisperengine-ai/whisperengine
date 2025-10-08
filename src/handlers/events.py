@@ -141,6 +141,12 @@ class BotEventHandlers:
             memory_manager=self.memory_manager
         )
 
+        # Per-user message processing locks to prevent race conditions
+        # Ensures messages from the same user are processed sequentially
+        # so message N-1's response is fully stored before message N retrieves conversation history
+        self._user_message_locks = {}
+        self._locks_lock = asyncio.Lock()  # Lock for the locks dictionary itself
+
         # Initialize unified MessageProcessor for consistent processing across platforms
         try:
             self.message_processor = create_message_processor(
@@ -234,6 +240,25 @@ class BotEventHandlers:
             logger.warning("Falling back to direct LLM client calls")
             self.chat_orchestrator = None
             return False
+
+    async def _get_user_message_lock(self, user_id: str) -> asyncio.Lock:
+        """
+        Get or create an asyncio.Lock for a specific user to prevent race conditions.
+        
+        Ensures messages from the same user are processed sequentially, so message N-1's
+        response is fully stored before message N retrieves conversation history.
+        
+        Args:
+            user_id: Discord user ID to get lock for
+            
+        Returns:
+            asyncio.Lock for the specified user
+        """
+        async with self._locks_lock:
+            if user_id not in self._user_message_locks:
+                self._user_message_locks[user_id] = asyncio.Lock()
+                logger.debug(f"🔒 Created message processing lock for user {user_id}")
+            return self._user_message_locks[user_id]
 
     def _register_events(self):
         """Register event handlers with the Discord bot."""
@@ -478,8 +503,16 @@ class BotEventHandlers:
         user_id = str(message.author.id)
         logger.debug(f"Processing DM from {message.author.name}")
 
-        # Security validation
-        validation_result = validate_user_input(message.content, user_id, "dm")
+        # 🔒 RACE CONDITION FIX: Acquire per-user lock to ensure sequential message processing
+        # This prevents message N from retrieving conversation history before message N-1's
+        # response has been fully stored in memory
+        user_lock = await self._get_user_message_lock(user_id)
+        
+        async with user_lock:
+            logger.debug(f"🔒 Acquired message processing lock for user {user_id}")
+            
+            # Security validation
+            validation_result = validate_user_input(message.content, user_id, "dm")
         # Store validation result for emoji intelligence system
         self._last_security_validation = validation_result
         
