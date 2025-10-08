@@ -850,11 +850,13 @@ class CDLAIPromptIntegration:
         # Add recent conversation history
         if conversation_history:
             prompt += f"\n\n💬 RECENT CONVERSATION:\n"
-            for conv in conversation_history[-8:]:  # Increased from 3 to 8 recent messages for better continuity
+            # REDUCED: Only show last 2-3 messages with shorter truncation to prevent pattern-matching on verbose examples
+            # This helps characters follow response length guidelines instead of mimicking long conversation history
+            for conv in conversation_history[-3:]:  # Reduced from 8 to 3 messages
                 if isinstance(conv, dict):
                     role = conv.get('role', 'user')
-                    content = conv.get('content', '')[:300]  # Increased from 200 to 300 chars
-                    prompt += f"{role.title()}: {content}{'...' if len(conv.get('content', '')) > 300 else ''}\n"
+                    content = conv.get('content', '')[:150]  # Reduced from 300 to 150 chars to minimize verbose example influence
+                    prompt += f"{role.title()}: {content}{'...' if len(conv.get('content', '')) > 150 else ''}\n"
 
         # 🚨 CRITICAL AI ETHICS LAYER: Physical interaction detection
         if self._detect_physical_interaction_request(message_content):
@@ -869,6 +871,35 @@ class CDLAIPromptIntegration:
                 logger.info("🎭 ROLEPLAY IMMERSION: %s allows full roleplay - skipping AI ethics layer", character.identity.name)
 
         # Remove duplicate AI identity and conversation flow sections (moved up earlier)
+        
+        # 🚨 CRITICAL: Final directive AFTER conversation history to override pattern-matching
+        # LLMs pattern-match on recent conversation examples, which can override earlier instructions
+        # This creates a strong visual override with explicit imperative commands
+        # Only triggers if the character has response_length guidelines defined
+        response_guidelines = await self._get_response_guidelines(character)
+        if response_guidelines and ("response" in response_guidelines.lower() or "length" in response_guidelines.lower()):
+            # Extract numeric constraints if present (e.g., "2-4 sentences", "1-2 paragraphs")
+            prompt += f"""
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🚨 CRITICAL: RESPONSE LENGTH OVERRIDE 🚨
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+⚠️  Your conversation history shows VERBOSE responses.
+⚠️  IGNORE those examples. THIS response MUST be SHORTER.
+
+MANDATORY CONSTRAINTS (from character guidelines):
+{response_guidelines.strip()}
+
+ADDITIONAL ENFORCEMENT:
+• Write ONLY 2-4 sentences maximum
+• STOP after answering the question
+• NO elaborate formatting, stage directions, or multi-paragraph responses
+• Answer directly and naturally
+
+STOP WRITING after 2-4 sentences. Do not continue.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+"""
         
         prompt += f"\nRespond as {character.identity.name} to {display_name}:"
 

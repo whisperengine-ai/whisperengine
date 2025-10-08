@@ -1367,11 +1367,11 @@ class MessageProcessor:
                 logger.info(f"🔥 CONTEXT DEBUG: Processing {len(recent_messages)} recent messages for conversation context")
                 
                 # OPTIMIZED: Split messages into OLDER (truncated) vs RECENT (detailed)
-                recent_full_count = 20  # Last 10 exchanges (20 messages)
+                recent_full_count = 6  # Reduced from 20 to 6 (last 3 exchanges) to prevent verbose pattern-matching
                 older_messages = recent_messages[:-recent_full_count] if len(recent_messages) > recent_full_count else []
                 recent_full_messages = recent_messages[-recent_full_count:] if len(recent_messages) > recent_full_count else recent_messages
 
-                logger.info(f"🔥 CONTINUITY: Split into {len(older_messages)} older (500 chars) + {len(recent_full_messages)} recent (2000 chars)")
+                logger.info(f"🔥 CONTINUITY: Split into {len(older_messages)} older (500 chars) + {len(recent_full_messages)} recent (400 chars)")
                 
                 # Add older messages first (truncated for space)
                 user_assistant_messages = []
@@ -1418,7 +1418,7 @@ class MessageProcessor:
                     logger.debug(f"🔥 CONTEXT BRIDGE: Added conversation summary ({len(conversation_summary)} chars)")
                 
                 # Add recent messages (detailed)
-                for msg in recent_full_messages:
+                for idx, msg in enumerate(recent_full_messages):
                     msg_content = msg.get('content', '')
                     is_bot_msg = msg.get('bot', False)
                     
@@ -1437,13 +1437,23 @@ class MessageProcessor:
                     if not is_bot_msg:
                         skip_next_bot_response = False
 
-                    # Recent messages: EXPANDED LIMIT - 2000 chars for conversation continuity
-                    recent_content = msg_content[:2000] + "..." if len(msg_content) > 2000 else msg_content
+                    # TIERED APPROACH: Most recent 3 messages (last exchange + current) get FULL content
+                    # Older recent messages truncated to prevent verbose pattern-matching
+                    is_most_recent = idx >= len(recent_full_messages) - 3
+                    if is_most_recent:
+                        # Last 3 messages: FULL content for rich immediate context
+                        recent_content = msg_content
+                        logger.info(f"🔥 CONTEXT (MOST RECENT): Full message [{idx}]")
+                    else:
+                        # Older recent messages: 400 chars to prevent verbose pattern-matching
+                        recent_content = msg_content[:400] + "..." if len(msg_content) > 400 else msg_content
+                        logger.info(f"🔥 CONTEXT (RECENT): Truncated message [{idx}] to 400 chars")
+                    
                     role = "assistant" if is_bot_msg else "user"
                     conversation_context.append({"role": role, "content": recent_content})
                     logger.info(f"🔥 CONTEXT (RECENT): Added [{role}] ({len(recent_content)} chars): '{recent_content[:100]}...'")
                 
-                logger.info(f"✅ OPTIMIZED CONTEXT: Added {len(older_messages)} older (500 chars) + {len(recent_full_messages)} recent (2000 chars) messages")
+                logger.info(f"✅ OPTIMIZED CONTEXT: Added {len(older_messages)} older (500 chars) + {len(recent_full_messages)} recent (tiered: 3 full + rest 400 chars) messages")
             else:
                 logger.info("🔥 CONTEXT DEBUG: No recent messages available for context")
                 
