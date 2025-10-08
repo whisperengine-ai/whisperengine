@@ -38,6 +38,7 @@ class ErrorCategory(Enum):
     RATE_LIMIT = "rate_limit"
     VALIDATION = "validation"
     SYSTEM_RESOURCE = "system_resource"
+    AI_ETHICS = "ai_ethics"
     UNKNOWN = "unknown"
 
 
