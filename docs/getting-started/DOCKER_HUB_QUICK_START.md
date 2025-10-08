@@ -1,50 +1,83 @@
-# ⚡ Lightning Quick Start - Docker Hub
+# ⚡ Docker-First Quick Start
 
-**Get WhisperEngine running in under 2 minutes!** No building, no cloning repos.
+**Get WhisperEngine running in under 5 minutes!** Docker-based development and deployment.
 
-## 🌍 Cross-Platform One-Command Setup
+## 🚀 Recommended: Clone & Multi-Bot Setup
 
-Choose your platform and run the appropriate command:
+The current WhisperEngine uses a **multi-bot Docker architecture**. This is the recommended approach:
+
+```bash
+# 1. Clone WhisperEngine
+git clone https://github.com/whisperengine-ai/whisperengine.git
+cd whisperengine
+
+# 2. Setup your first character (Elena - Marine Biologist)
+cp .env.template .env.elena
+# Edit .env.elena with Discord token and LLM API key
+
+# 3. Generate Docker configuration
+python scripts/generate_multi_bot_config.py
+
+# 4. Start Elena bot with complete infrastructure
+./multi-bot.sh start elena
+
+# 5. Verify everything is running
+./multi-bot.sh status
+```
+
+**What you get:**
+- ✅ Elena Discord bot (marine biologist personality)
+- ✅ PostgreSQL database (port 5433) for semantic knowledge
+- ✅ Qdrant vector database (port 6334) for conversation memory  
+- ✅ HTTP Chat API (port 9091) for 3rd party integration
+- ✅ Complete monitoring and logging
+
+📖 **[Complete Installation Guide](INSTALLATION.md)** | **[Quick Start Guide](QUICK_START.md)**
+
+## 🌍 One-Command Setup (Legacy)
+
+⚠️ **Note**: The one-command scripts are available but **clone & multi-bot setup is recommended** for full functionality.
 
 | Platform | Command |
 |----------|---------|
-| **🐧 Linux** | `curl -sSL https://raw.githubusercontent.com/WhisperEngine-AI/whisperengine/main/scripts/quick-start.sh \| bash` |
-| **🍎 macOS** | `curl -sSL https://raw.githubusercontent.com/WhisperEngine-AI/whisperengine/main/scripts/quick-start.sh \| bash` |
-| **🪟 Windows (PowerShell)** | `iwr https://raw.githubusercontent.com/WhisperEngine-AI/whisperengine/main/scripts/quick-start.ps1 \| iex` |
-| **🪟 Windows (Command Prompt)** | Download and run: [`quick-start.bat`](https://raw.githubusercontent.com/WhisperEngine-AI/whisperengine/main/scripts/quick-start.bat) |
+| **🐧 Linux** | `curl -sSL https://raw.githubusercontent.com/whisperengine-ai/whisperengine/main/scripts/quick-start.sh \| bash` |
+| **🍎 macOS** | `curl -sSL https://raw.githubusercontent.com/whisperengine-ai/whisperengine/main/scripts/quick-start.sh \| bash` |
+| **🪟 Windows (PowerShell)** | `iwr https://raw.githubusercontent.com/whisperengine-ai/whisperengine/main/scripts/quick-start.ps1 \| iex` |
 
-**That's it!** The script will:
-1. Pull the latest WhisperEngine image from Docker Hub
-2. Create a minimal `.env` file for you to edit  
-3. Open your editor to configure Discord token
-4. Start all services
-5. Show you monitoring commands
+**Limitations**: Single-bot setup, limited character options, basic configuration.
 
-📖 **[Detailed Cross-Platform Guide](CROSS_PLATFORM_QUICK_START.md)**
+## 🛠️ Manual Docker Setup
 
-## 🛠️ Manual Setup (3 steps)
-
-### Step 1: Pull the Image
+### Option A: Multi-Bot (Recommended)
 ```bash
+# Clone repository for multi-bot support
+git clone https://github.com/whisperengine-ai/whisperengine.git
+cd whisperengine
+
+# Setup character configuration
+cp .env.template .env.elena
+# Edit .env.elena with your credentials
+
+# Generate and start
+python scripts/generate_multi_bot_config.py
+./multi-bot.sh start elena
+```
+
+### Option B: Single Container (Basic)
+```bash
+# Pull latest image
 docker pull whisperengine/whisperengine:latest
-```
 
-### Step 2: Create Configuration
-```bash
-# Create minimal config directory
-mkdir -p whisperengine-bot && cd whisperengine-bot
+# Create basic setup
+mkdir whisperengine-bot && cd whisperengine-bot
+curl -sSL https://raw.githubusercontent.com/whisperengine-ai/whisperengine/main/.env.template -o .env
+# Edit .env with your Discord token and LLM API key
 
-# Download minimal setup files
-curl -sSL https://raw.githubusercontent.com/WhisperEngine-AI/whisperengine/main/docker/quick-start/docker-compose.yml -o docker-compose.yml
-curl -sSL https://raw.githubusercontent.com/WhisperEngine-AI/whisperengine/main/docker/quick-start/.env.minimal -o .env
-
-# Edit with your Discord token
-nano .env
-```
-
-### Step 3: Launch
-```bash
-docker-compose up -d
+# Run with database dependencies
+docker run -d --name whisperengine-bot \
+  --env-file .env \
+  -p 9091:9091 \
+  whisperengine/whisperengine:latest
 ```
 
 ## 📋 Quick Configuration

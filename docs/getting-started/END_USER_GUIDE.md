@@ -19,8 +19,9 @@ This guide is for users who want to **run the bot** without modifying code. Choo
 ### **Prerequisites**
 - Docker Desktop installed and running
 - Discord Developer Account (free)
+- LLM API key (OpenRouter, Anthropic, or OpenAI)
 
-### **Step 1: Download the Bot**
+### **Step 1: Download WhisperEngine**
 ```bash
 # Download
 git clone https://github.com/whisperengine-ai/whisperengine.git
@@ -30,24 +31,38 @@ cd whisperengine
 ### **Step 2: Get Discord Bot Token**
 1. Go to [Discord Developer Portal](https://discord.com/developers/applications)
 2. Click **"New Application"** 
-3. Give it a name (e.g., "My AI Bot")
+3. Give it a name (e.g., "Elena Marine Bot")
 4. Go to **"Bot"** tab
 5. Click **"Reset Token"** and copy the token
 6. Enable **"Message Content Intent"** under Privileged Gateway Intents
 
-### **Step 3: Configure the Bot**
+### **Step 3: Configure Your Character Bot**
 ```bash
-# Create configuration file
-cp .env.example .env
+# Create configuration for Elena (Marine Biologist)
+cp .env.template .env.elena
 
-# Edit configuration (replace YOUR_TOKEN_HERE with your Discord token)
-nano .env  # macOS/Linux
+# Edit configuration (replace tokens and API keys)
+nano .env.elena  # macOS/Linux
 # OR
-notepad .env  # Windows
+notepad .env.elena  # Windows
 ```
 
-**Minimal .env setup:**
+**Complete .env.elena setup:**
 ```bash
+# Discord Configuration
+DISCORD_BOT_TOKEN=your_discord_bot_token_here
+DISCORD_BOT_NAME=elena
+
+# Character Configuration  
+CHARACTER_FILE=elena
+
+# LLM Configuration (choose one)
+LLM_CLIENT_TYPE=openrouter
+OPENROUTER_API_KEY=your_openrouter_api_key_here
+LLM_CHAT_MODEL=anthropic/claude-3.5-sonnet
+
+# Health Monitoring
+HEALTH_CHECK_PORT=9091
 DISCORD_BOT_TOKEN=your_actual_discord_token_here
 LLM_CHAT_API_URL=http://host.docker.internal:1234/v1
 LLM_MODEL_NAME=local-model
@@ -62,31 +77,47 @@ LLM_MODEL_NAME=local-model
 **Option B: Ollama (Command-line)**
 ```bash
 # Install Ollama
-curl -fsSL https://ollama.ai/install.sh | sh
-
-# Download and run a model
-ollama run phi3:mini
 ```
 
-### **Step 5: Start the Bot**
+### **Step 4: Generate Docker Configuration**
 ```bash
-# Start bot
-./start.sh        # macOS/Linux
-start.bat         # Windows
+# Generate multi-bot Docker configuration
+python scripts/generate_multi_bot_config.py
+```
 
-# View logs (optional)
-./logs.sh         # macOS/Linux  
-logs.bat          # Windows
+### **Step 5: Start Elena Bot**
+```bash
+# Start Elena with complete infrastructure
+./multi-bot.sh start elena
+
+# Check status
+./multi-bot.sh status
+
+# View logs  
+./multi-bot.sh logs elena
 ```
 
 ### **Step 6: Invite Bot to Server**  
 1. In Discord Developer Portal, go to **OAuth2 > URL Generator**
 2. Check **"bot"** scope
-3. Check **"Send Messages"**, **"Read Message History"** permissions
+3. Check **"Send Messages"**, **"Read Message History"**, **"Use Slash Commands"** permissions
 4. Copy generated URL and open in browser
 5. Select your server and authorize
 
-**✅ Done! Your bot is now running locally.**
+**✅ Done! Elena (Marine Biologist) is now running with:**
+- ✅ Discord bot functionality
+- ✅ PostgreSQL database for knowledge storage
+- ✅ Qdrant vector memory for conversations
+- ✅ HTTP Chat API on port 9091
+
+### **Step 7: Test Your Bot**
+```bash
+# Test HTTP API
+curl -X POST http://localhost:9091/api/chat \
+  -H "Content-Type: application/json" \
+  -d '{"user_id": "test_user", "message": "Hello Elena!"}'
+
+# Or test in Discord by sending: "Hello Elena!"
 
 ---
 

@@ -1,6 +1,10 @@
 # 🌍 Cross-Platform Quick Start Guide
 
-This guide covers how to get WhisperEngine running quickly on any platform using our native quick-start scripts.
+This guide covers WhisperEngine quick-start options for any platform.
+
+⚠️ **Recommended Approach**: [Multi-Bot Docker Setup](QUICK_START.md) provides full functionality with multiple character options.
+
+**Quick-start scripts** below provide basic single-bot setup for rapid testing.
 
 ## 📋 **Prerequisites**
 
@@ -8,6 +12,7 @@ All platforms require:
 - **Docker Desktop** (running)
 - **Internet connection** (for downloading images)
 - **Discord bot token** ([Get one here](https://discord.com/developers/applications))
+- **LLM API key** (OpenRouter, Anthropic, or OpenAI)
 
 ### Platform-Specific Requirements
 
@@ -18,7 +23,7 @@ All platforms require:
 | **🪟 Windows (PowerShell)** | PowerShell 5.1+, Docker Desktop |
 | **🪟 Windows (Command Prompt)** | Command Prompt, Docker Desktop |
 
-## 🚀 **Quick Start Commands**
+## 🚀 **Quick Start Commands** (Single-Bot)
 
 ### 🐧 **Linux**
 ```bash

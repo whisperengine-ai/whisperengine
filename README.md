@@ -508,71 +508,86 @@ WhisperEngine features a comprehensive suite of adaptive learning systems that c
 
 ## 🚀 Quick Start
 
-### 🎭 Try Our Demo Characters
+### 🐳 Docker-First Development (Recommended)
 
-**Join our Discord server to experience WhisperEngine's creative AI personalities:**
-- **🧬 Elena Rodriguez** - Marine biologist with warm, empathetic personality (Port 9091)
-- **🤖 Marcus Thompson** - AI researcher with academic, professional communication (Port 9092)
-- **📸 Jake Sterling** - Adventure photographer with rugged, protective nature (Port 9097)
-- **🎮 Ryan Chen** - Independent game developer with perfectionist creativity (Port 9093)
-- **✨ Gabriel** - Rugged British gentleman with dry wit and charming sophistication (Port 9095)
-- **💭 Dream of the Endless** - Mythological entity with profound, otherworldly expression (Port 9094)
-- **💼 Sophia Blake** - Sophisticated marketing executive with luxury lifestyle (Port 9096)
-- **🌟 Aethys** - Omnipotent entity for philosophical exploration (Port 3007)
-
-**🔗 HTTP Chat API Access:**
-Each character also provides rich HTTP Chat API endpoints for 3rd party integration:
-```bash
-# Chat with Elena (Marine Biologist)
-curl -X POST http://localhost:9091/api/chat \
-  -H "Content-Type: application/json" \
-  -d '{"user_id": "your_id", "message": "Tell me about marine conservation"}'
-
-# Rich metadata response includes:
-# - Emotional intelligence analysis
-# - User facts and relationship metrics  
-# - AI component processing data
-# - Character personality context
-```
-
-**📋 Before You Join:**
-- **Read our [Discord Welcome Guide](docs/community/DISCORD_WELCOME_GUIDE.md)** - Learn how to interact with characters respectfully
-- **Review [Community Guidelines](docs/community/DISCORD_WELCOME_GUIDE.md#-community-guidelines)** - Understand our inclusive approach to AI experiences
-- **Check [Responsible AI Statement](docs/community/RESPONSIBLE_AI_STATEMENT.md)** - Our ethical framework and technical transparency
-
-*[Discord invite link coming soon - we're in alpha testing!]*
-
-### Local Development
+WhisperEngine is designed for **Docker-first development** with a complete multi-bot infrastructure:
 
 ```bash
-# Clone and setup
+# 1. Clone the repository
 git clone https://github.com/whisperengine-ai/whisperengine
 cd whisperengine
-source .venv/bin/activate
 
-# Configure your bot
-cp .env.template .env.yourbot
-# Edit .env.yourbot with Discord token and character preferences
+# 2. Setup environment (requires Discord bot token and LLM API key)
+cp .env.template .env.elena
+# Edit .env.elena with your Discord token and OpenRouter/Anthropic API key
 
-# Generate multi-bot configuration
+# 3. Generate multi-bot configuration
 python scripts/generate_multi_bot_config.py
 
-# Start your bot
-./multi-bot.sh start yourbot
+# 4. Start complete infrastructure + Elena bot
+./multi-bot.sh start elena
+
+# 5. Monitor the system
+./multi-bot.sh status
+./multi-bot.sh logs elena
 ```
 
-### Docker Deployment
+**🎯 What You Get Out of the Box:**
+- **Elena Bot** - Marine biologist character running on port 9091
+- **PostgreSQL** - Semantic knowledge graph on port 5433
+- **Qdrant** - Vector memory system on port 6334
+- **HTTP Chat API** - Rich metadata responses for 3rd party integration
+- **Health Monitoring** - Built-in system status and performance monitoring
+
+### 🎭 Available Characters
+
+Each character runs as an independent Discord bot with HTTP Chat API:
+
+| Character | Specialty | Discord Bot | HTTP API Port |
+|-----------|-----------|-------------|---------------|
+| **Elena Rodriguez** | Marine Biologist | ✅ | 9091 |
+| **Marcus Thompson** | AI Researcher | ✅ | 9092 |
+| **Jake Sterling** | Adventure Photographer | ✅ | 9097 |
+| **Ryan Chen** | Game Developer | ✅ | 9093 |
+| **Gabriel** | British Gentleman | ✅ | 9095 |
+| **Sophia Blake** | Marketing Executive | ✅ | 9096 |
+| **Dream** | Mythological Entity | ✅ | 9094 |
+| **Aethys** | Omnipotent Being | ✅ | 3007 |
+
+**🔗 HTTP Chat API Example:**
+```bash
+# Chat with Elena (after starting ./multi-bot.sh start elena)
+curl -X POST http://localhost:9091/api/chat \
+  -H "Content-Type: application/json" \
+  -d '{
+    "user_id": "your_id", 
+    "message": "Tell me about marine conservation",
+    "context": {"platform": "api"}
+  }'
+
+# Response includes emotional intelligence, user facts, and relationship metrics
+```
+
+### 🏃‍♂️ Quick Commands
 
 ```bash
-# Start all infrastructure
+# Start all characters and infrastructure
 ./multi-bot.sh start all
 
-# View logs
-./multi-bot.sh logs yourbot
+# Start specific character
+./multi-bot.sh start elena
 
-# Monitor system health
+# View logs for troubleshooting
+./multi-bot.sh logs elena
+
+# Check system health
 ./multi-bot.sh status
+
+# Stop everything
+./multi-bot.sh stop
 ```
+
+**📖 Need More Setup Options?** See our [Installation Guide](docs/getting-started/INSTALLATION.md) for local development, cloud deployment, and API configuration.
 
 ## 🎭 Character Authoring
 
@@ -658,98 +673,122 @@ WhisperEngine is actively developed with focus on:
 
 **Ready to create your AI Roleplay Character?** Check out our [Quick Start Guide](docs/getting-started/QUICK_START.md) or join our Discord to see WhisperEngine in action!
 
-## 🚀 Choose Your Deployment Mode
+## 🚀 Deployment Modes
 
-### 🏠 **Local Mode (Maximum Privacy)** - Full Installation
-**[📖 Local Setup Guide](docs/deployment/LOCAL_SETUP.md)**  
-Complete local installation with Qdrant vector database, PostgreSQL, and Redis - full customization and privacy.
+### 🐳 **Docker Multi-Bot (Recommended)** - Production-Ready Infrastructure
 
-### ☁️ **Cloud Mode (Production Ready)** - Enterprise Setup  
+**Complete containerized environment with all characters and infrastructure:**
+
 ```bash
+# Start complete multi-bot environment (recommended)
 git clone https://github.com/whisperengine-ai/whisperengine
-cd whisperengine && ./setup.sh
-python run.py  # Discord bot with vector-native memory
-```
+cd whisperengine
 
-**[📖 Full Setup Guide](docs/getting-started/QUICK_START.md)** for detailed instructions
+# Configure environment (copy template and edit with your tokens)
+cp .env.template .env.elena
+cp .env.template .env.marcus  # Add more characters as needed
 
-### 🐳 **Docker Deployment (Recommended)** - Vector-Native Container Setup
-```bash
-# Multi-bot environment with shared Qdrant + PostgreSQL + Redis
+# Generate Docker configuration  
+python scripts/generate_multi_bot_config.py
+
+# Start infrastructure + all configured bots
 ./multi-bot.sh start all
 
-# Development environment  
-docker-compose -f docker-compose.dev.yml up
-
-# Production with monitoring
-docker-compose -f docker-compose.prod.yml up
+# Or start specific characters
+./multi-bot.sh start elena
+./multi-bot.sh start marcus
 ```
 
-**[📖 Docker Deployment Guide](docs/deployment/DOCKER_HUB_SETUP.md)** for enterprise setup
+**What You Get:**
+- **Multiple Character Bots** - Run Elena, Marcus, Jake, Ryan, Gabriel, Sophia, Dream, Aethys simultaneously
+- **Shared Infrastructure** - PostgreSQL (5433), Qdrant (6334), health monitoring
+- **HTTP Chat APIs** - Each character provides rich API endpoints (ports 9091-9097, 3007)
+- **Auto-scaling** - Add new characters by creating `.env.{character}` files
+- **Production Monitoring** - Built-in health checks and performance tracking
 
-### 🏡 **100% On-Premise (Total Independence)** - Self-Hosted Everything
-Run WhisperEngine completely on your personal hardware with **zero external dependencies**:
+### ☁️ **Cloud Development** - Single Bot Setup
 
-**🤖 Host Your Own LLMs**
+**Quick setup for development or single character deployment:**
+
 ```bash
-# Set up local LLM with Ollama (recommended)
-curl -fsSL https://ollama.ai/install.sh | sh
-ollama pull llama3.1:8b  # Or any model you prefer
+# Standard development setup
+git clone https://github.com/whisperengine-ai/whisperengine
+cd whisperengine
 
-# Configure WhisperEngine for local LLM
-cp .env.template .env.local-ai
-# Edit .env.local-ai:
+# Create virtual environment (optional but recommended)
+python -m venv .venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+
+# Install dependencies
+pip install -r requirements-discord.txt
+
+# Configure environment
+cp .env.template .env
+# Edit .env with Discord token and LLM API key
+
+# Start single bot
+python run.py
+```
+
+### 🏠 **Local Infrastructure** - Database Development Mode
+
+**For developers working on memory systems, CDL character development, or database features:**
+
+```bash
+# Start only infrastructure (no bots)
+docker-compose up postgres qdrant
+
+# Run bot in development mode with hot reload
+source .venv/bin/activate
+python run.py --dev
+
+# Connect to local databases:
+# PostgreSQL: localhost:5433
+# Qdrant: localhost:6334
+```
+
+### 🔒 **100% On-Premise** - Complete Privacy Stack
+
+**Run everything locally with no external dependencies:**
+
+```bash
+# 1. Setup local LLM (Ollama recommended)
+curl -fsSL https://ollama.ai/install.sh | sh
+ollama pull llama3.1:8b
+
+# 2. Configure for local LLM
+cp .env.template .env.local
+# Edit .env.local:
 # LLM_CLIENT_TYPE=ollama
 # OLLAMA_BASE_URL=http://localhost:11434
 # OLLAMA_MODEL=llama3.1:8b
+
+# 3. Start complete local stack
+./multi-bot.sh start elena  # Runs with local LLM
+
+# 4. Import your ChatGPT history (optional)
+python scripts/import_chatgpt_history.py ~/Downloads/conversations.json
 ```
 
-**📥 Import Your ChatGPT History**
-Seamlessly transition from ChatGPT to your private AI with full conversation history:
-```bash
-# Download your ChatGPT data export (conversations.json)
-# Import directly into your local WhisperEngine
-./bot.sh import-chatgpt ~/Downloads/conversations.json your_user_id
+**Privacy Features:**
+- **Local LLMs** - Ollama, LM Studio, or custom models
+- **Local Databases** - PostgreSQL, Qdrant, all data on your hardware  
+- **No External Calls** - Complete air-gapped operation
+- **Data Import/Export** - Bring ChatGPT history, export to other platforms
 
-# All memories converted to vector embeddings in your local Qdrant
-# Personality continuity maintained through conversation context
-```
+### � **Deployment Comparison**
 
-**🔒 Complete Privacy Stack**
-- **Local LLMs**: Ollama, LM Studio, or custom models on your hardware
-- **Local Vector Memory**: Qdrant running on your machine
-- **Local Databases**: PostgreSQL and Redis on your infrastructure  
-- **No External API Calls**: Everything runs within your network
-- **Import & Export**: Full data portability from/to other AI platforms
+| Mode | Complexity | Privacy | Performance | Best For |
+|------|------------|---------|-------------|----------|
+| **Docker Multi-Bot** | Low | High | Excellent | Production, multiple characters |
+| **Cloud Development** | Very Low | Medium | Good | Quick testing, single character |
+| **Local Infrastructure** | Medium | High | Excellent | Development, database work |
+| **100% On-Premise** | High | Maximum | Good | Complete privacy, air-gapped |
 
-**💻 Hardware Requirements**
-- **Minimum**: 16GB RAM, modern CPU (for 7B parameter models)
-- **Recommended**: 32GB+ RAM, RTX 4070+ GPU (for larger models with GPU acceleration)
-- **Storage**: 50GB+ for models, databases, and conversation history
-
-**[📖 Complete Local Setup Guide](docs/deployment/LOCAL_SETUP.md)** for full self-hosting instructions
-
-## ⚙️ Configuration Made Simple
-
-WhisperEngine now uses **focused, use-case-specific** configuration files instead of massive 800+ line examples:
-
-| Configuration | Purpose | Lines | Use Case |
-|---------------|---------|-------|----------|
-| **Quick Start** | Get running in 5 minutes | 50 | New users, testing |
-| **Development** | Full dev features | 180+ | Building, debugging |
-| **Production** | Enterprise deployment | 150+ | Production servers |
-| **Local AI** | Privacy-focused | 120+ | Offline, no external APIs |
-| **Enterprise** | Advanced features | 200+ | Multi-entity, compliance |
-
-**Quick Setup:**
-```bash
-# Choose your configuration
-cp .env.elena.example .env.elena
-# Edit Discord token and LLM API key
-./multi-bot.sh start elena
-```
-
-**[📖 Full Configuration Guide](docs/configuration/)** for all setup options
+**📖 Detailed Setup Guides:**
+- **[Docker Multi-Bot Setup](docs/deployment/DOCKER_MULTI_BOT_SETUP.md)** - Complete containerized deployment
+- **[Local Development Guide](docs/getting-started/INSTALLATION.md)** - Development environment setup
+- **[Privacy Stack Guide](docs/deployment/LOCAL_SETUP.md)** - Complete on-premise installation
 
 ---
 
