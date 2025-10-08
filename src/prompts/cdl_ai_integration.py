@@ -70,6 +70,78 @@ class CDLAIPromptIntegration:
         except Exception as e:
             logger.warning("Failed to record fidelity optimization metrics: %s", str(e))
 
+    async def build_confidence_aware_context(
+        self,
+        user_facts: list,
+        confidence_threshold_high: float = 0.9,
+        confidence_threshold_medium: float = 0.6
+    ) -> str:
+        """
+        🎚️ STEP 6: Confidence-Aware Conversations
+        
+        Format user facts with confidence-aware language:
+        - High confidence (0.9+): "The user loves pizza"
+        - Medium confidence (0.6-0.8): "The user mentioned liking pizza"  
+        - Low confidence (<0.6): "The user may like pizza (unconfirmed)"
+        
+        Args:
+            user_facts: List of fact dictionaries with 'entity_name', 'relationship_type', 'confidence'
+            confidence_threshold_high: Threshold for high confidence statements (default 0.9)
+            confidence_threshold_medium: Threshold for medium confidence statements (default 0.6)
+            
+        Returns:
+            Formatted confidence-aware context string
+        """
+        if not user_facts:
+            return ""
+        
+        context_parts = []
+        for fact in user_facts:
+            confidence = fact.get('confidence', 0.0)
+            entity = fact.get('entity_name', '')
+            relationship = fact.get('relationship_type', 'related to')
+            
+            if not entity:
+                continue
+                
+            # Format based on confidence levels for natural conversation
+            if confidence >= confidence_threshold_high:
+                # High confidence: Definitive statements
+                if 'likes' in relationship.lower() or 'loves' in relationship.lower():
+                    context_parts.append(f"The user loves {entity}")
+                elif 'enjoys' in relationship.lower():
+                    context_parts.append(f"The user enjoys {entity}")
+                elif 'interested' in relationship.lower():
+                    context_parts.append(f"The user is interested in {entity}")
+                else:
+                    context_parts.append(f"The user {relationship} {entity}")
+                    
+            elif confidence >= confidence_threshold_medium:
+                # Medium confidence: Tentative but acknowledged
+                if 'likes' in relationship.lower():
+                    context_parts.append(f"The user mentioned liking {entity}")
+                elif 'enjoys' in relationship.lower():
+                    context_parts.append(f"The user mentioned enjoying {entity}")
+                elif 'interested' in relationship.lower():
+                    context_parts.append(f"The user expressed interest in {entity}")
+                else:
+                    context_parts.append(f"The user mentioned {relationship} {entity}")
+                    
+            else:
+                # Low confidence: Uncertain/questioning
+                if 'likes' in relationship.lower():
+                    context_parts.append(f"The user may like {entity} (unconfirmed)")
+                elif 'interested' in relationship.lower():
+                    context_parts.append(f"The user might be interested in {entity} (tentative)")
+                else:
+                    context_parts.append(f"The user possibly {relationship} {entity} (low confidence)")
+        
+        if context_parts:
+            # Return single formatted fact for integration
+            return context_parts[0]  # Return first fact formatted
+        
+        return ""
+
     async def create_unified_character_prompt(
         self,
         user_id: str,
@@ -428,9 +500,18 @@ class CDLAIPromptIntegration:
                                 relationship = fact.get('relationship_type', 'related to')
                                 confidence = fact.get('confidence', 0.0)
                                 
-                                # Include confidence for gradual knowledge building
-                                confidence_marker = "✓" if confidence > 0.8 else "~" if confidence > 0.5 else "?"
-                                prompt += f"  {confidence_marker} {relationship}: {entity_name}\n"
+                                # Include confidence for gradual knowledge building - STEP 6: Confidence-Aware Conversations
+                                confidence_aware_text = await self.build_confidence_aware_context([{
+                                    'entity_name': entity_name,
+                                    'relationship_type': relationship,
+                                    'confidence': confidence
+                                }])
+                                if confidence_aware_text:
+                                    prompt += f"  {confidence_aware_text}\n"
+                                else:
+                                    # Fallback to original format
+                                    confidence_marker = "✓" if confidence > 0.8 else "~" if confidence > 0.5 else "?"
+                                    prompt += f"  {confidence_marker} {relationship}: {entity_name}\n"
                         
                         # Add personality-first synthesis instruction
                         prompt += f"\nInterpret these facts through {character.identity.name}'s personality and communication style."
@@ -1747,23 +1828,40 @@ Stay authentic to {character.identity.name}'s personality while being transparen
                             else:
                                 fact_parts.append(f"{pref_key.replace('_', ' ').title()}: {pref_value}")
             
-            # Format key facts (likes, interests, etc.)
+            # Format key facts (likes, interests, etc.) with STEP 6: Confidence-Aware Conversations
             if facts:
-                likes = []
-                interests = []
+                # Use confidence-aware formatting for all facts
+                confidence_aware_facts = []
                 for fact in facts[:5]:  # Limit to top 5 facts
-                    if 'likes' in fact or 'enjoys' in fact:
-                        # Extract entity name from formatted fact "[pizza (likes)]"
+                    # Try to parse fact structure - handle both dict and string formats
+                    if isinstance(fact, dict):
+                        entity_name = fact.get('entity_name', '')
+                        relationship = fact.get('relationship_type', 'related to')
+                        confidence = fact.get('confidence', 0.0)
+                    else:
+                        # Handle string format like "[pizza (likes)]"
                         entity = fact.replace('[', '').replace(']', '').split(' (')[0]
-                        likes.append(entity)
-                    elif 'interested' in fact or 'hobby' in fact:
-                        entity = fact.replace('[', '').replace(']', '').split(' (')[0]
-                        interests.append(entity)
+                        if 'likes' in fact or 'enjoys' in fact:
+                            relationship = 'likes'
+                        elif 'interested' in fact or 'hobby' in fact:
+                            relationship = 'interested in'
+                        else:
+                            relationship = 'related to'
+                        entity_name = entity
+                        confidence = 0.7  # Default confidence for legacy format
+                    
+                    if entity_name:
+                        # Get confidence-aware formatting
+                        confidence_text = await self.build_confidence_aware_context([{
+                            'entity_name': entity_name,
+                            'relationship_type': relationship,
+                            'confidence': confidence
+                        }])
+                        if confidence_text:
+                            confidence_aware_facts.append(confidence_text)
                 
-                if likes:
-                    fact_parts.append(f"Likes: {', '.join(likes)}")
-                if interests:
-                    fact_parts.append(f"Interests: {', '.join(interests)}")
+                if confidence_aware_facts:
+                    fact_parts.extend(confidence_aware_facts)
             
             if fact_parts:
                 return "📋 Known Facts: " + "; ".join(fact_parts)
