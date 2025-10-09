@@ -1186,7 +1186,7 @@ class SyntheticConversationGenerator:
                 "memory_stored": response.get("memory_stored", False),  # NEW: Memory confirmation
                 "timestamp": datetime.now().isoformat(),
                 "conversation_phase": self._get_conversation_phase(conversation_id),  # NEW: Conversation phase
-                "conversation_state": self.conversation_state.get(conversation_id, {}).copy()  # NEW: Full state snapshot
+                "conversation_state": self._get_serializable_conversation_state(conversation_id)  # NEW: JSON-safe state snapshot
             }
             conversation_log.append(exchange)
             
@@ -1405,6 +1405,33 @@ class SyntheticConversationGenerator:
             "confidence": confidence,
             "intensity": random.uniform(0.3, 0.9)
         }
+    
+    def _get_serializable_conversation_state(self, conversation_id: str) -> Dict[str, Any]:
+        """Get JSON-serializable version of conversation state"""
+        state = self.conversation_state.get(conversation_id, {})
+        if not state:
+            return {}
+        
+        # Create a copy and convert non-serializable objects
+        serializable_state = state.copy()
+        
+        # Convert SyntheticUser object to dictionary
+        if "user" in serializable_state and hasattr(serializable_state["user"], "__dict__"):
+            user = serializable_state["user"]
+            serializable_state["user"] = {
+                "user_id": user.user_id,
+                "name": user.name,
+                "persona": user.persona.value if hasattr(user.persona, 'value') else str(user.persona),
+                "interests": user.interests,
+                "conversation_style": user.conversation_style,
+                "emotional_baseline": user.emotional_baseline
+            }
+        
+        # Convert any enum values to strings
+        if "conversation_type" in serializable_state and hasattr(serializable_state["conversation_type"], 'value'):
+            serializable_state["conversation_type"] = serializable_state["conversation_type"].value
+        
+        return serializable_state
     
     async def _generate_follow_up_message(self, user: SyntheticUser, bot_response: str, 
                                         topics: List[str], emotional_range: List[str],
