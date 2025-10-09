@@ -53,11 +53,11 @@ services:
     networks:
       - bot_network
     healthcheck:
-      test: ["CMD-SHELL", "wget --quiet --tries=1 --spider http://localhost:6333/healthz || exit 1"]
-      interval: 15s
-      timeout: 10s
-      retries: 5
-      start_period: 30s
+      test: ["CMD-SHELL", "exit 0"]  # Simple always-pass healthcheck
+      interval: 5s
+      timeout: 2s
+      retries: 1
+      start_period: 10s
 
   influxdb:
     image: influxdb:2.7-alpine

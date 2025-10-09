@@ -449,47 +449,42 @@ class BotEventHandlers:
         """
         🎯 CHARACTER-AGNOSTIC: Determine character type from CDL data instead of hardcoded names.
         Maps CDL occupation/tags to character types for emoji intelligence.
+        Uses database-based CDL system (post-migration from JSON files).
         """
         try:
-            character_file = os.getenv('CDL_DEFAULT_CHARACTER')
-            if not character_file:
-                return "general"
-                
-            # Load CDL character data
-            import json
-            with open(character_file, 'r', encoding='utf-8') as f:
-                cdl_data = json.load(f)
+            # Use database-based CDL system (post-JSON migration)
+            from src.characters.cdl.simple_cdl_manager import get_simple_cdl_manager
             
-            # Extract occupation and tags for character type classification
-            identity = cdl_data.get('character', {}).get('identity', {})
-            metadata = cdl_data.get('character', {}).get('metadata', {})
+            cdl_manager = get_simple_cdl_manager()
+            character = cdl_manager.get_character_object()
             
-            occupation = identity.get('occupation', '').lower()
-            tags = [tag.lower() for tag in metadata.get('tags', [])]
-            name = identity.get('name', '').lower()
+            # Extract occupation and identity for character type classification
+            occupation = character.identity.occupation.lower() if character.identity.occupation else ""
+            name = character.identity.name.lower() if character.identity.name else ""
+            description = character.identity.description.lower() if character.identity.description else ""
             
-            # Character type mapping based on CDL data
-            if any(tag in tags for tag in ['scientist', 'marine_biologist', 'researcher', 'environmentalist']) or 'biologist' in occupation:
+            # Character type mapping based on CDL database data
+            if any(keyword in occupation for keyword in ['marine', 'biologist', 'scientist', 'research', 'environmental']):
                 return "mystical"  # Scientific wonder and nature connection maps to mystical
-            elif any(tag in tags for tag in ['ai_researcher', 'academic', 'machine_learning', 'intellectual']) or 'ai research' in occupation:
+            elif any(keyword in occupation for keyword in ['ai research', 'academic', 'machine learning', 'intellectual']):
                 return "technical"  # AI research and academic focus maps to technical
-            elif any(tag in tags for tag in ['eternal', 'dream_lord', 'endless', 'conceptual_being', 'mythological']) or 'dream' in occupation:
+            elif any(keyword in description for keyword in ['eternal', 'dream', 'endless', 'mythological', 'cosmic']):
                 return "mystical"  # Cosmic and mythological nature maps to mystical
-            elif any(tag in tags for tag in ['adventure', 'photographer', 'outdoors', 'travel']):
+            elif any(keyword in occupation for keyword in ['adventure', 'photographer', 'travel', 'outdoors']):
                 return "adventurous"  # Adventure and travel focus
-            elif any(tag in tags for tag in ['british_gentleman', 'sophisticated', 'charming', 'witty']):
+            elif any(keyword in description for keyword in ['british', 'gentleman', 'sophisticated', 'charming']):
                 return "sophisticated"  # British gentleman character
-            elif any(tag in tags for tag in ['marketing', 'executive', 'business', 'professional']):
+            elif any(keyword in occupation for keyword in ['marketing', 'executive', 'business', 'professional']):
                 return "professional"  # Business and professional focus
-            elif any(tag in tags for tag in ['game_developer', 'indie', 'creative', 'developer']):
+            elif any(keyword in occupation for keyword in ['game developer', 'indie', 'creative', 'developer']):
                 return "creative"  # Creative development focus
-            elif any(tag in tags for tag in ['omnipotent', 'cosmic', 'transcendent', 'godlike']):
+            elif any(keyword in description for keyword in ['omnipotent', 'cosmic', 'transcendent', 'godlike']):
                 return "cosmic"  # Omnipotent and transcendent nature
             else:
                 return "general"
                 
         except Exception as e:
-            logger.warning(f"Failed to determine character type from CDL: {e}")
+            logger.warning(f"Failed to determine character type from CDL database: {e}")
             return "general"
 
     async def _handle_dm_message(self, message):
@@ -1209,18 +1204,28 @@ class BotEventHandlers:
         try:
             logger.info(f"🎭 CDL CHARACTER DEBUG: Starting enhancement for user {user_id}")
             
-            # Use CDL_DEFAULT_CHARACTER directly from environment - no dependency on CDL handler
+            # Get bot name from environment with critical validation
             import os
-            character_file = os.getenv("CDL_DEFAULT_CHARACTER")
-            
-            if not character_file:
-                logger.info(f"🎭 CDL CHARACTER DEBUG: No CDL_DEFAULT_CHARACTER environment variable set")
+            bot_name = os.getenv("DISCORD_BOT_NAME")
+            if not bot_name:
+                logger.error("🚨 CRITICAL: DISCORD_BOT_NAME environment variable not set!")
+                logger.error("This will cause character loading to fail. Please check your .env configuration.")
                 return None
+
+            logger.info(f"🎭 CDL CHARACTER DEBUG: Loading character data for bot {bot_name}")
+
+            # Use database-based CDL system
+            from src.characters.cdl.simple_cdl_manager import get_simple_cdl_manager
+            cdl_manager = get_simple_cdl_manager()
             
-            bot_name = os.getenv("DISCORD_BOT_NAME", "Unknown")
-            logger.info(f"🎭 CDL CHARACTER: Using {bot_name} bot default character ({character_file}) for user {user_id}")
-            
-            logger.info(f"🎭 CDL CHARACTER: User {user_id} has active character: {character_file}")
+            # Get character data from database using bot name
+            character = cdl_manager.get_character_object()
+            if not character or not character.identity.name:
+                logger.error(f"🚨 CDL CHARACTER ERROR: Failed to load character data for bot {bot_name}")
+                logger.error("Check that character exists in PostgreSQL database and environment variables are correct.")
+                return None
+                
+            logger.info(f"🎭 CDL CHARACTER: Using character {character.identity.name} for user {user_id}")
             
             # Import CDL integration modules
             from src.prompts.cdl_ai_integration import CDLAIPromptIntegration
@@ -1282,7 +1287,7 @@ class BotEventHandlers:
             
             # 🚀 FULL INTELLIGENCE: Use complete character-aware prompt with all emotional intelligence
             character_prompt = await cdl_integration.create_unified_character_prompt(
-                character_file=character_file,
+                character=character,
                 user_id=user_id,
                 message_content=message.content,
                 pipeline_result=pipeline_result,
@@ -1342,7 +1347,7 @@ class BotEventHandlers:
                 })
                 logger.info(f"🎭 CDL CHARACTER: Added character prompt as new system message ({len(character_prompt)} chars)")
             
-            logger.info(f"🎭 CDL CHARACTER: Enhanced conversation context with {character_file} personality")
+            logger.info(f"🎭 CDL CHARACTER: Enhanced conversation context with {character.identity.name} personality")
             return enhanced_context
             
         except Exception as e:
@@ -1418,76 +1423,57 @@ class BotEventHandlers:
         """
         🎯 CHARACTER-AGNOSTIC: Get character indicators from CDL data instead of hardcoded lists.
         Returns keywords/phrases that indicate character-specific language.
+        Uses database-based CDL system (post-migration from JSON files).
         """
         try:
-            character_file = os.getenv('CDL_DEFAULT_CHARACTER')
-            if not character_file:
-                return []
-                
-            import json
-            with open(character_file, 'r', encoding='utf-8') as f:
-                cdl_data = json.load(f)
+            # Use database-based CDL system (post-JSON migration)
+            from src.characters.cdl.simple_cdl_manager import get_simple_cdl_manager
+            
+            cdl_manager = get_simple_cdl_manager()
+            character = cdl_manager.get_character_object()
             
             indicators = []
-            identity = cdl_data.get('character', {}).get('identity', {})
-            metadata = cdl_data.get('character', {}).get('metadata', {})
-            communication = cdl_data.get('character', {}).get('communication_style', {})
             
-            # Add name and nickname
-            name = identity.get('name', '').lower()
-            nickname = identity.get('nickname', '').lower()
-            if name:
-                indicators.append(name)
-            if nickname:
-                indicators.append(nickname)
+            # Add name and occupation
+            if character.identity.name:
+                indicators.append(character.identity.name.lower())
+            if character.identity.occupation:
+                indicators.extend(character.identity.occupation.lower().split())
             
-            # Add occupation keywords
-            occupation = identity.get('occupation', '').lower()
-            if occupation:
-                indicators.extend(occupation.split())
+            # Add communication style indicators (if available in database)
+            if hasattr(character.communication, 'signature_phrases'):
+                signature_phrases = getattr(character.communication, 'signature_phrases', [])
+                if signature_phrases:
+                    indicators.extend([phrase.lower() for phrase in signature_phrases])
             
-            # Add location keywords
-            location = identity.get('location', '').lower()
-            if location:
-                indicators.extend(location.split())
-            
-            # Add tags as indicators
-            tags = [tag.lower() for tag in metadata.get('tags', [])]
-            indicators.extend(tags)
-            
-            # Add signature phrases if available
-            signature_phrases = communication.get('signature_phrases', [])
-            if signature_phrases:
-                indicators.extend([phrase.lower() for phrase in signature_phrases])
-            
-            # Add cultural/linguistic markers
-            cultural_background = identity.get('cultural_background', '').lower()
-            if 'spanish' in cultural_background or 'mexican' in cultural_background:
+            # Add character-specific language patterns based on identity
+            description = character.identity.description.lower() if character.identity.description else ""
+            if any(keyword in description for keyword in ['spanish', 'mexican', 'latina']):
                 indicators.extend(['mi amor', 'mi corazón', '¡', 'corazón'])
+            elif any(keyword in description for keyword in ['british', 'gentleman']):
+                indicators.extend(['rather', 'quite', 'splendid', 'delightful'])
             
             return list(set(indicators))  # Remove duplicates
             
         except Exception as e:
-            logger.warning(f"Failed to get character indicators from CDL: {e}")
+            logger.warning(f"Failed to get character indicators from CDL database: {e}")
             return []
 
     async def _fix_character_response_with_cdl(self, generic_response: str, user_id: str, message) -> str:
         """
         🎯 CHARACTER-AGNOSTIC: Fix generic AI responses using CDL character data.
         Attempts to inject character personality into generic responses.
+        Uses database-based CDL system (post-migration from JSON files).
         """
         try:
-            character_file = os.getenv('CDL_DEFAULT_CHARACTER')
-            if not character_file:
-                return generic_response
-                
-            import json
-            with open(character_file, 'r', encoding='utf-8') as f:
-                cdl_data = json.load(f)
+            # Use database-based CDL system (post-JSON migration)
+            from src.characters.cdl.simple_cdl_manager import get_simple_cdl_manager
             
-            identity = cdl_data.get('character', {}).get('identity', {})
-            name = identity.get('name', '')
-            occupation = identity.get('occupation', '')
+            cdl_manager = get_simple_cdl_manager()
+            character = cdl_manager.get_character_object()
+            
+            name = character.identity.name if character.identity.name else ""
+            occupation = character.identity.occupation if character.identity.occupation else ""
             
             message_lower = message.content.lower()
             
@@ -1508,14 +1494,6 @@ class BotEventHandlers:
                 modified_response = modified_response.replace(
                     "as an AI", f"as your AI friend {name}"
                 )
-            
-            # Add character-specific closing if appropriate
-            emojis = self._get_character_emojis_from_cdl(cdl_data)
-            if emojis and not any(emoji in modified_response for emoji in emojis):
-                # Add 1-2 character-appropriate emojis
-                modified_response += f" {emojis[0]}"
-                if len(emojis) > 1:
-                    modified_response += f"{emojis[1]}"
             
             logger.info(f"🎭 CHARACTER RECOVERY: Modified generic response to include {name}")
             return modified_response

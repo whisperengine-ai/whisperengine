@@ -1,5 +1,16 @@
 # WhisperEngine AI Agent Instructions
 
+## 🚨 CRITICAL LIVE SYSTEM OPERATIONS - ASK BEFORE RESTARTING:**
+- **NEVER restart bots, services, or containers without explicit user permission**
+- **WhisperEngine is a LIVE PRODUCTION SYSTEM** - users may be actively chatting with bots
+- **ALWAYS ASK before running restart commands**: `./multi-bot.sh restart`, `docker restart`, `docker-compose restart`
+- **ALWAYS ASK before running stop commands**: `./multi-bot.sh stop`, `docker stop`, `docker-compose down`
+- **DEBUGGING FIRST**: Use log inspection, health checks, and API testing before considering restarts
+- **Code changes**: Test with direct Python validation scripts before restarting live services
+- **For urgent fixes**: Ask user "Should I restart [specific bot/service] to apply this fix?"
+- **Emergency restart protocol**: Only restart if user explicitly confirms or system is completely broken
+- **Log analysis is NON-DESTRUCTIVE**: Always prefer log checking over service manipulation
+
 ## 🚨 CURRENT ACTIVE ROADMAPS (October 8, 2025) 🚨
 
 **WhisperEngine is currently following TWO parallel development roadmaps:**

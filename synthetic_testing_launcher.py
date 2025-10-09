@@ -112,6 +112,7 @@ class SyntheticTestingOrchestrator:
             cdl_metrics = self.validator.validate_cdl_personality_consistency()
             relationship_metrics = self.validator.validate_relationship_progression()
             cross_pollination_metrics = self.validator.validate_cross_pollination_accuracy()
+            enhanced_api_metrics = self.validator.validate_enhanced_api_metadata()  # NEW: Enhanced API validation
             quality_score = self.validator.calculate_conversation_quality_score()
             
             # Create synthetic test metrics

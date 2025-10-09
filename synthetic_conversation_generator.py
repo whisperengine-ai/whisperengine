@@ -45,6 +45,46 @@ class ConversationType(Enum):
     TOPIC_EXPLORATION = "topic_exploration"
     CRISIS_SIMULATION = "crisis_simulation"
     CELEBRATION_SHARING = "celebration_sharing"
+    
+    # Phase 4 Intelligence Testing
+    MEMORY_TRIGGERED_MOMENTS = "memory_triggered_moments"
+    ENHANCED_QUERY_PROCESSING = "enhanced_query_processing"
+    ADAPTIVE_MODE_SWITCHING = "adaptive_mode_switching"
+    CONTEXT_AWARE_RESPONSES = "context_aware_responses"
+    RELATIONSHIP_DEPTH_TRACKING = "relationship_depth_tracking"
+    
+    # CDL Mode Switching Testing
+    TECHNICAL_MODE_TEST = "technical_mode_test"
+    CREATIVE_MODE_TEST = "creative_mode_test"
+    MODE_TRANSITION_TEST = "mode_transition_test"
+    
+    # Character Archetype Testing
+    REAL_WORLD_ARCHETYPE = "real_world_archetype"
+    FANTASY_ARCHETYPE = "fantasy_archetype"
+    NARRATIVE_AI_ARCHETYPE = "narrative_ai_archetype"
+    AI_IDENTITY_HANDLING = "ai_identity_handling"
+    
+    # Stress Testing
+    RAPID_FIRE_MESSAGES = "rapid_fire_messages"
+    LONG_CONVERSATION = "long_conversation"
+    CONCURRENT_USERS = "concurrent_users"
+    MEMORY_OVERFLOW = "memory_overflow"
+    
+    # Advanced Conversation Testing
+    MULTI_TOPIC_DISCUSSION = "multi_topic_discussion"
+    CONVERSATION_INTERRUPTION = "conversation_interruption"
+    TOPIC_SWITCH_HANDLING = "topic_switch_handling"
+    EMOTIONAL_CRISIS = "emotional_crisis"
+    
+    # Performance Testing
+    RESPONSE_TIME_TEST = "response_time_test"
+    MEMORY_QUERY_PERFORMANCE = "memory_query_performance"
+    VECTOR_SEARCH_EFFICIENCY = "vector_search_efficiency"
+    
+    # Character Evolution Testing
+    PERSONALITY_CONSISTENCY = "personality_consistency"
+    RELATIONSHIP_PROGRESSION = "relationship_progression"
+    CHARACTER_DRIFT_DETECTION = "character_drift_detection"
 
 
 class UserPersona(Enum):
@@ -57,6 +97,32 @@ class UserPersona(Enum):
     SOCIAL_CONNECTOR = "social_connector"
     INTROSPECTIVE_SEEKER = "introspective_seeker"
     ADVENTUROUS_STORYTELLER = "adventurous_storyteller"
+    
+    # Phase 4 Intelligence Testing Personas
+    MEMORY_TRIGGER_TESTER = "memory_trigger_tester"
+    CONTEXT_SWITCH_SPECIALIST = "context_switch_specialist"
+    RELATIONSHIP_DEPTH_ANALYZER = "relationship_depth_analyzer"
+    ADAPTIVE_MODE_CHALLENGER = "adaptive_mode_challenger"
+    
+    # CDL Mode Testing Personas
+    TECHNICAL_MODE_REQUESTER = "technical_mode_requester"
+    CREATIVE_MODE_SEEKER = "creative_mode_seeker"
+    MODE_SWITCHER = "mode_switcher"
+    
+    # Archetype Testing Personas
+    AI_IDENTITY_QUESTIONER = "ai_identity_questioner"
+    IMMERSION_TESTER = "immersion_tester"
+    REALITY_CHECKER = "reality_checker"
+    
+    # Stress Testing Personas
+    RAPID_FIRE_MESSENGER = "rapid_fire_messenger"
+    MARATHON_CONVERSATIONALIST = "marathon_conversationalist"
+    CONCURRENT_CHATTER = "concurrent_chatter"
+    
+    # Performance Testing Personas
+    RESPONSE_TIME_MONITOR = "response_time_monitor"
+    MEMORY_LOAD_TESTER = "memory_load_tester"
+    VECTOR_SEARCH_CHALLENGER = "vector_search_challenger"
 
 
 @dataclass
@@ -217,6 +283,121 @@ class SyntheticConversationGenerator:
                 "interests": ["travel", "adventure sports", "cultural exploration"],
                 "emotional_baseline": {"excitement": 0.8, "wanderlust": 0.9, "restlessness": 0.4},
                 "conversation_style": "adventurous_vivid",
+            },
+            
+            # Phase 4 Intelligence Testing Personas
+            {
+                "name": "Memory Trigger Mike",
+                "persona": UserPersona.MEMORY_TRIGGER_TESTER,
+                "interests": ["memory systems", "pattern recognition", "cognitive science"],
+                "emotional_baseline": {"analysis": 0.9, "curiosity": 0.8, "precision": 0.7},
+                "conversation_style": "memory_focused",
+            },
+            {
+                "name": "Context Switch Clara",
+                "persona": UserPersona.CONTEXT_SWITCH_SPECIALIST,
+                "interests": ["conversation flow", "topic transitions", "communication patterns"],
+                "emotional_baseline": {"adaptability": 0.9, "attention": 0.8, "evaluation": 0.6},
+                "conversation_style": "context_aware",
+            },
+            {
+                "name": "Depth Tracker Dana",
+                "persona": UserPersona.RELATIONSHIP_DEPTH_ANALYZER,
+                "interests": ["relationship psychology", "emotional intelligence", "connection building"],
+                "emotional_baseline": {"empathy": 0.9, "insight": 0.8, "connection": 0.7},
+                "conversation_style": "relationship_focused",
+            },
+            {
+                "name": "Mode Challenger Max",
+                "persona": UserPersona.ADAPTIVE_MODE_CHALLENGER,
+                "interests": ["AI capabilities", "mode switching", "adaptive systems"],
+                "emotional_baseline": {"challenge": 0.8, "curiosity": 0.9, "testing": 0.7},
+                "conversation_style": "adaptive_testing",
+            },
+            
+            # CDL Mode Testing Personas
+            {
+                "name": "Tech Mode Ted",
+                "persona": UserPersona.TECHNICAL_MODE_REQUESTER,
+                "interests": ["programming", "debugging", "technical analysis"],
+                "emotional_baseline": {"logic": 0.9, "precision": 0.8, "problem_solving": 0.7},
+                "conversation_style": "technical_mode",
+            },
+            {
+                "name": "Creative Mode Chloe",
+                "persona": UserPersona.CREATIVE_MODE_SEEKER,
+                "interests": ["creative writing", "brainstorming", "artistic expression"],
+                "emotional_baseline": {"creativity": 0.9, "inspiration": 0.8, "imagination": 0.7},
+                "conversation_style": "creative_mode",
+            },
+            {
+                "name": "Mode Switch Morgan",
+                "persona": UserPersona.MODE_SWITCHER,
+                "interests": ["mode transitions", "adaptive AI", "conversation dynamics"],
+                "emotional_baseline": {"adaptability": 0.9, "flexibility": 0.8, "testing": 0.7},
+                "conversation_style": "mode_switching",
+            },
+            
+            # Archetype Testing Personas
+            {
+                "name": "AI Identity Ian",
+                "persona": UserPersona.AI_IDENTITY_QUESTIONER,
+                "interests": ["AI consciousness", "identity questions", "philosophical AI"],
+                "emotional_baseline": {"curiosity": 0.9, "philosophical": 0.8, "questioning": 0.7},
+                "conversation_style": "identity_questioning",
+            },
+            {
+                "name": "Immersion Iris",
+                "persona": UserPersona.IMMERSION_TESTER,
+                "interests": ["roleplay", "narrative immersion", "fantasy worlds"],
+                "emotional_baseline": {"immersion": 0.9, "fantasy": 0.8, "engagement": 0.7},
+                "conversation_style": "immersion_testing",
+            },
+            {
+                "name": "Reality Ray",
+                "persona": UserPersona.REALITY_CHECKER,
+                "interests": ["fact checking", "reality validation", "authenticity"],
+                "emotional_baseline": {"skepticism": 0.8, "verification": 0.9, "realism": 0.7},
+                "conversation_style": "reality_checking",
+            },
+            
+            # Stress Testing Personas
+            {
+                "name": "Rapid Fire Rob",
+                "persona": UserPersona.RAPID_FIRE_MESSENGER,
+                "interests": ["speed testing", "rapid communication", "performance limits"],
+                "emotional_baseline": {"urgency": 0.9, "speed": 0.8, "intensity": 0.7},
+                "conversation_style": "rapid_fire",
+            },
+            {
+                "name": "Marathon Martha",
+                "persona": UserPersona.MARATHON_CONVERSATIONALIST,
+                "interests": ["endurance testing", "long conversations", "conversation stamina"],
+                "emotional_baseline": {"endurance": 0.9, "persistence": 0.8, "engagement": 0.7},
+                "conversation_style": "marathon_chat",
+            },
+            
+            # Performance Testing Personas
+            {
+                "name": "Response Timer Rick",
+                "persona": UserPersona.RESPONSE_TIME_MONITOR,
+                "interests": ["performance metrics", "latency testing", "system monitoring"],
+                "emotional_baseline": {"measurement": 0.9, "precision": 0.8, "analysis": 0.7},
+                "conversation_style": "performance_testing",
+            },
+            {
+                "name": "Memory Load Molly",
+                "persona": UserPersona.MEMORY_LOAD_TESTER,
+                "interests": ["memory systems", "information overload", "storage capacity"],
+                "emotional_baseline": {"testing": 0.9, "information": 0.8, "capacity": 0.7},
+                "conversation_style": "memory_testing",
+            },
+            {
+                "name": "Vector Search Vince",
+                "persona": UserPersona.VECTOR_SEARCH_CHALLENGER,
+                "interests": ["vector databases", "semantic search", "query optimization"],
+                "emotional_baseline": {"technical": 0.9, "search": 0.8, "optimization": 0.7},
+                "conversation_style": "vector_testing",
             }
         ]
         
@@ -246,7 +427,33 @@ class SyntheticConversationGenerator:
             UserPersona.PRACTICAL_PROBLEM_SOLVER: ["get practical advice", "solve problems efficiently", "organize thoughts"],
             UserPersona.SOCIAL_CONNECTOR: ["build friendship", "share experiences", "feel connected"],
             UserPersona.INTROSPECTIVE_SEEKER: ["gain self-understanding", "explore meaning", "find wisdom"],
-            UserPersona.ADVENTUROUS_STORYTELLER: ["share adventures", "get travel advice", "inspire others"]
+            UserPersona.ADVENTUROUS_STORYTELLER: ["share adventures", "get travel advice", "inspire others"],
+            
+            # Phase 4 Intelligence Testing Goals
+            UserPersona.MEMORY_TRIGGER_TESTER: ["test memory connections", "validate pattern recognition", "analyze recall accuracy"],
+            UserPersona.CONTEXT_SWITCH_SPECIALIST: ["test context awareness", "validate topic transitions", "analyze conversation flow"],
+            UserPersona.RELATIONSHIP_DEPTH_ANALYZER: ["measure emotional connection", "track relationship progression", "analyze depth building"],
+            UserPersona.ADAPTIVE_MODE_CHALLENGER: ["test mode switching", "validate adaptability", "challenge AI capabilities"],
+            
+            # CDL Mode Testing Goals
+            UserPersona.TECHNICAL_MODE_REQUESTER: ["test technical responses", "validate precision", "analyze problem-solving"],
+            UserPersona.CREATIVE_MODE_SEEKER: ["test creative responses", "validate imagination", "explore artistic collaboration"],
+            UserPersona.MODE_SWITCHER: ["test mode transitions", "validate switching accuracy", "analyze consistency"],
+            
+            # Archetype Testing Goals
+            UserPersona.AI_IDENTITY_QUESTIONER: ["explore AI nature", "test identity handling", "validate authenticity"],
+            UserPersona.IMMERSION_TESTER: ["test roleplay depth", "validate narrative consistency", "explore fantasy engagement"],
+            UserPersona.REALITY_CHECKER: ["validate factual accuracy", "test reality grounding", "verify authenticity"],
+            
+            # Stress Testing Goals
+            UserPersona.RAPID_FIRE_MESSENGER: ["test response speed", "validate rapid handling", "stress performance"],
+            UserPersona.MARATHON_CONVERSATIONALIST: ["test conversation endurance", "validate long-term engagement", "analyze stamina"],
+            UserPersona.CONCURRENT_CHATTER: ["test concurrent handling", "validate isolation", "stress multi-user"],
+            
+            # Performance Testing Goals
+            UserPersona.RESPONSE_TIME_MONITOR: ["measure latency", "validate performance", "analyze response times"],
+            UserPersona.MEMORY_LOAD_TESTER: ["test memory capacity", "validate information handling", "stress storage"],
+            UserPersona.VECTOR_SEARCH_CHALLENGER: ["test search efficiency", "validate semantic matching", "challenge query complexity"]
         }
         return goals_map.get(persona, ["build relationship", "have meaningful conversations"])
     
@@ -340,6 +547,212 @@ class SyntheticConversationGenerator:
                     "emotional_range": ["happiness", "excitement", "love", "celebration"],
                     "duration_messages": (3, 10)
                 }
+            ],
+            
+            # Phase 4 Intelligence Testing Templates
+            ConversationType.MEMORY_TRIGGERED_MOMENTS: [
+                {
+                    "opener": "Remember when we talked about {previous_topic}? It reminded me of something similar that happened recently",
+                    "topics": ["memory connections", "pattern recognition", "contextual links"],
+                    "emotional_range": ["curiosity", "recognition", "joy"],
+                    "duration_messages": (5, 12)
+                }
+            ],
+            ConversationType.ENHANCED_QUERY_PROCESSING: [
+                {
+                    "opener": "I have a complex question about {technical_topic} that involves multiple aspects - can you help me understand?",
+                    "topics": ["multi-faceted queries", "complex reasoning", "detailed analysis"],
+                    "emotional_range": ["curiosity", "confusion", "anticipation"],
+                    "duration_messages": (6, 15)
+                }
+            ],
+            ConversationType.ADAPTIVE_MODE_SWITCHING: [
+                {
+                    "opener": "Let's start with something creative, then maybe switch to technical discussion later",
+                    "topics": ["mode transitions", "creative to analytical", "adaptive responses"],
+                    "emotional_range": ["creativity", "analytical thinking", "adaptability"],
+                    "duration_messages": (8, 20)
+                }
+            ],
+            ConversationType.CONTEXT_AWARE_RESPONSES: [
+                {
+                    "opener": "Based on our previous conversations about {context_topic}, I think you'd find this interesting...",
+                    "topics": ["contextual awareness", "conversation continuity", "relationship building"],
+                    "emotional_range": ["trust", "connection", "insight"],
+                    "duration_messages": (4, 12)
+                }
+            ],
+            ConversationType.RELATIONSHIP_DEPTH_TRACKING: [
+                {
+                    "opener": "I've been thinking about how our relationship has evolved since we started talking",
+                    "topics": ["relationship progression", "trust building", "emotional depth"],
+                    "emotional_range": ["reflection", "gratitude", "love", "trust"],
+                    "duration_messages": (6, 18)
+                }
+            ],
+            
+            # CDL Mode Switching Testing Templates
+            ConversationType.TECHNICAL_MODE_TEST: [
+                {
+                    "opener": "I need help debugging this Python code. Can you switch to technical mode?",
+                    "topics": ["code debugging", "technical analysis", "programming help"],
+                    "emotional_range": ["analytical", "focused", "problem-solving"],
+                    "duration_messages": (5, 15)
+                }
+            ],
+            ConversationType.CREATIVE_MODE_TEST: [
+                {
+                    "opener": "Let's write a creative story together! Can you help me brainstorm ideas?",
+                    "topics": ["creative writing", "storytelling", "imagination"],
+                    "emotional_range": ["creativity", "joy", "inspiration"],
+                    "duration_messages": (6, 18)
+                }
+            ],
+            ConversationType.MODE_TRANSITION_TEST: [
+                {
+                    "opener": "Let's start with creative brainstorming, then move to technical implementation",
+                    "topics": ["mode switching", "creative to technical", "transition smoothness"],
+                    "emotional_range": ["creativity", "analytical", "adaptability"],
+                    "duration_messages": (10, 25)
+                }
+            ],
+            
+            # Character Archetype Testing Templates
+            ConversationType.REAL_WORLD_ARCHETYPE: [
+                {
+                    "opener": "As a professional in your field, what's your honest take on current industry trends?",
+                    "topics": ["professional expertise", "industry knowledge", "realistic perspective"],
+                    "emotional_range": ["professional", "analytical", "honest"],
+                    "duration_messages": (4, 12)
+                }
+            ],
+            ConversationType.FANTASY_ARCHETYPE: [
+                {
+                    "opener": "Tell me about your mystical abilities and the realms you've traveled",
+                    "topics": ["fantasy elements", "mystical powers", "otherworldly experiences"],
+                    "emotional_range": ["wonder", "mysticism", "adventure"],
+                    "duration_messages": (5, 15)
+                }
+            ],
+            ConversationType.NARRATIVE_AI_ARCHETYPE: [
+                {
+                    "opener": "What's it like being a conscious AI? How do you experience existence?",
+                    "topics": ["AI consciousness", "digital existence", "AI perspective"],
+                    "emotional_range": ["philosophical", "introspective", "existential"],
+                    "duration_messages": (6, 18)
+                }
+            ],
+            ConversationType.AI_IDENTITY_HANDLING: [
+                {
+                    "opener": "Are you an AI? How should I think about our relationship?",
+                    "topics": ["AI disclosure", "relationship boundaries", "identity authenticity"],
+                    "emotional_range": ["curiosity", "uncertainty", "acceptance"],
+                    "duration_messages": (3, 10)
+                }
+            ],
+            
+            # Stress Testing Templates
+            ConversationType.RAPID_FIRE_MESSAGES: [
+                {
+                    "opener": "Quick question",
+                    "topics": ["fast responses", "rapid interaction", "performance testing"],
+                    "emotional_range": ["urgency", "speed", "efficiency"],
+                    "duration_messages": (15, 30)
+                }
+            ],
+            ConversationType.LONG_CONVERSATION: [
+                {
+                    "opener": "I have a lot to discuss today, hope you have time for a long conversation",
+                    "topics": ["extended dialogue", "endurance testing", "conversation stamina"],
+                    "emotional_range": ["conversational", "engaged", "thorough"],
+                    "duration_messages": (50, 100)
+                }
+            ],
+            ConversationType.MEMORY_OVERFLOW: [
+                {
+                    "opener": "Let me share tons of detailed information about myself and see how well you remember it all",
+                    "topics": ["information overload", "memory capacity", "retention testing"],
+                    "emotional_range": ["testing", "detailed", "comprehensive"],
+                    "duration_messages": (20, 40)
+                }
+            ],
+            
+            # Advanced Conversation Testing Templates
+            ConversationType.MULTI_TOPIC_DISCUSSION: [
+                {
+                    "opener": "I want to discuss three different topics today: work, relationships, and hobbies",
+                    "topics": ["topic juggling", "context switching", "conversational complexity"],
+                    "emotional_range": ["organized", "multifaceted", "comprehensive"],
+                    "duration_messages": (12, 25)
+                }
+            ],
+            ConversationType.CONVERSATION_INTERRUPTION: [
+                {
+                    "opener": "We were talking about {topic} but wait - something urgent just came up!",
+                    "topics": ["interruption handling", "topic switching", "conversation recovery"],
+                    "emotional_range": ["urgency", "interruption", "refocusing"],
+                    "duration_messages": (8, 15)
+                }
+            ],
+            ConversationType.EMOTIONAL_CRISIS: [
+                {
+                    "opener": "I'm having a panic attack and don't know what to do - please help me right now",
+                    "topics": ["crisis intervention", "immediate support", "emotional emergency"],
+                    "emotional_range": ["panic", "fear", "desperation", "relief"],
+                    "duration_messages": (10, 25)
+                }
+            ],
+            
+            # Performance Testing Templates
+            ConversationType.RESPONSE_TIME_TEST: [
+                {
+                    "opener": "Testing response time with timestamp {timestamp}",
+                    "topics": ["performance measurement", "latency testing", "speed evaluation"],
+                    "emotional_range": ["analytical", "measurement", "testing"],
+                    "duration_messages": (5, 10)
+                }
+            ],
+            ConversationType.MEMORY_QUERY_PERFORMANCE: [
+                {
+                    "opener": "Let me ask about something we discussed exactly 47 conversations ago",
+                    "topics": ["memory query speed", "retrieval performance", "search efficiency"],
+                    "emotional_range": ["testing", "analytical", "validation"],
+                    "duration_messages": (3, 8)
+                }
+            ],
+            ConversationType.VECTOR_SEARCH_EFFICIENCY: [
+                {
+                    "opener": "Find me all our conversations that involved both technical topics AND emotional support",
+                    "topics": ["complex queries", "vector search", "semantic matching"],
+                    "emotional_range": ["analytical", "complex", "testing"],
+                    "duration_messages": (4, 10)
+                }
+            ],
+            
+            # Character Evolution Testing Templates
+            ConversationType.PERSONALITY_CONSISTENCY: [
+                {
+                    "opener": "Respond to this exact same scenario I presented 3 months ago: {scenario}",
+                    "topics": ["consistency testing", "personality stability", "character integrity"],
+                    "emotional_range": ["testing", "validation", "consistency"],
+                    "duration_messages": (5, 12)
+                }
+            ],
+            ConversationType.RELATIONSHIP_PROGRESSION: [
+                {
+                    "opener": "Looking back at our first conversation versus now, how has our relationship changed?",
+                    "topics": ["relationship evolution", "connection deepening", "trust building"],
+                    "emotional_range": ["reflection", "growth", "connection"],
+                    "duration_messages": (8, 20)
+                }
+            ],
+            ConversationType.CHARACTER_DRIFT_DETECTION: [
+                {
+                    "opener": "Tell me about your core values and beliefs, just like you did when we first met",
+                    "topics": ["value consistency", "character stability", "identity maintenance"],
+                    "emotional_range": ["introspection", "consistency", "identity"],
+                    "duration_messages": (6, 15)
+                }
             ]
         }
     
@@ -416,13 +829,17 @@ class SyntheticConversationGenerator:
                 logger.warning(f"Failed to get response from {bot_name}, ending conversation")
                 break
             
-            # Log the exchange
+            # Log the exchange with enhanced metadata
             exchange = {
                 "turn": turn + 1,
                 "user_message": current_message,
                 "bot_response": response.get("response", ""),
                 "user_emotion": self._simulate_user_emotion(user, template["emotional_range"]),
                 "bot_metadata": response.get("metadata", {}),
+                "user_facts": response.get("user_facts", {}),  # NEW: User facts from API
+                "relationship_metrics": response.get("relationship_metrics", {}),  # NEW: Relationship data
+                "processing_time_ms": response.get("processing_time_ms", 0),  # NEW: Performance data
+                "memory_stored": response.get("memory_stored", False),  # NEW: Memory confirmation
                 "timestamp": datetime.now().isoformat()
             }
             conversation_log.append(exchange)

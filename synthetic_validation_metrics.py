@@ -41,6 +41,41 @@ class ValidationMetrics:
     unique_users: int
     bots_tested: List[str]
     test_duration_hours: float
+    
+    # Phase 4 Intelligence Metrics
+    memory_triggered_moments_accuracy: float
+    enhanced_query_processing_score: float
+    adaptive_mode_switching_success: float
+    context_awareness_score: float
+    relationship_depth_tracking_accuracy: float
+    
+    # CDL Mode Switching Metrics
+    technical_mode_compliance: float
+    creative_mode_compliance: float
+    mode_transition_smoothness: float
+    anti_pattern_avoidance: float
+    
+    # Character Archetype Metrics
+    real_world_archetype_authenticity: float
+    fantasy_archetype_immersion: float
+    narrative_ai_archetype_consistency: float
+    ai_identity_handling_accuracy: float
+    
+    # Stress Testing Metrics
+    rapid_fire_handling_score: float
+    long_conversation_endurance: float
+    concurrent_user_isolation: float
+    memory_overflow_resilience: float
+    
+    # Performance Metrics
+    average_response_time_ms: float
+    memory_query_performance_ms: float
+    vector_search_efficiency_score: float
+    
+    # Character Evolution Metrics
+    personality_consistency_over_time: float
+    relationship_progression_naturalness: float
+    character_drift_detection_score: float
 
 
 class SyntheticDataValidator:
@@ -304,6 +339,69 @@ class SyntheticDataValidator:
             'cross_bot_consistency': 0.82  # Placeholder
         }
     
+    def validate_enhanced_api_metadata(self) -> Dict[str, Any]:
+        """
+        Validate enhanced API metadata features:
+        - User facts extraction accuracy
+        - Relationship metrics progression  
+        - Processing performance consistency
+        - Memory storage reliability
+        """
+        user_facts_quality = []
+        relationship_progression = []
+        performance_scores = []
+        memory_reliability = []
+        
+        for conv in self.conversations:
+            for exchange in conv['exchanges']:
+                # Validate user facts extraction
+                user_facts = exchange.get('user_facts', {})
+                if user_facts:
+                    # Score based on completeness of extracted facts
+                    facts_score = 0.0
+                    if user_facts.get('name'):
+                        facts_score += 0.4  # Name extraction
+                    if user_facts.get('interaction_count', 0) > 0:
+                        facts_score += 0.3  # Interaction tracking
+                    if user_facts.get('first_interaction'):
+                        facts_score += 0.15  # Timeline tracking
+                    if user_facts.get('last_interaction'):
+                        facts_score += 0.15  # Recent activity
+                    user_facts_quality.append(facts_score)
+                
+                # Validate relationship metrics
+                rel_metrics = exchange.get('relationship_metrics', {})
+                if rel_metrics and all(k in rel_metrics for k in ['affection', 'trust', 'attunement']):
+                    # Score based on metric realism (0-100 scale, reasonable progression)
+                    affection = rel_metrics.get('affection', 50)
+                    trust = rel_metrics.get('trust', 50)  
+                    attunement = rel_metrics.get('attunement', 50)
+                    
+                    # Check if metrics are in reasonable range and show progression
+                    metrics_score = 1.0 if all(0 <= score <= 100 for score in [affection, trust, attunement]) else 0.5
+                    relationship_progression.append(metrics_score)
+                
+                # Validate processing performance
+                proc_time = exchange.get('processing_time_ms', 0)
+                if proc_time > 0:
+                    # Score based on reasonable response times (< 5 seconds = good)
+                    perf_score = 1.0 if proc_time < 5000 else max(0.0, 1.0 - (proc_time - 5000) / 10000)
+                    performance_scores.append(perf_score)
+                
+                # Validate memory storage reliability
+                memory_stored = exchange.get('memory_stored', False)
+                memory_reliability.append(1.0 if memory_stored else 0.0)
+        
+        return {
+            'user_facts_extraction_accuracy': statistics.mean(user_facts_quality) if user_facts_quality else 0.0,
+            'relationship_metrics_quality': statistics.mean(relationship_progression) if relationship_progression else 0.0, 
+            'performance_consistency': statistics.mean(performance_scores) if performance_scores else 0.0,
+            'memory_storage_reliability': statistics.mean(memory_reliability) if memory_reliability else 0.0,
+            'metadata_completeness': len([ex for conv in self.conversations for ex in conv['exchanges'] 
+                                         if ex.get('user_facts') and ex.get('relationship_metrics')]) / 
+                                    max(1, len([ex for conv in self.conversations for ex in conv['exchanges']]))
+        }
+
     def calculate_conversation_quality_score(self) -> float:
         """Calculate overall conversation quality metrics"""
         quality_scores = []
@@ -345,7 +443,30 @@ class SyntheticDataValidator:
         """Generate comprehensive validation report"""
         if not self.conversations:
             logger.warning("No conversations to validate")
-            return ValidationMetrics(0, 0, 0, 0, 0, 0, 0, 0, 0, [], 0)
+            return ValidationMetrics(
+                memory_recall_accuracy=0.0, emotion_detection_precision=0.0, cdl_personality_consistency=0.0,
+                relationship_progression_score=0.0, cross_pollination_accuracy=0.0, conversation_quality_score=0.0,
+                total_conversations=0, total_exchanges=0, unique_users=0, bots_tested=[], test_duration_hours=0.0,
+                # Phase 4 Intelligence Metrics
+                memory_triggered_moments_accuracy=0.0, enhanced_query_processing_score=0.0,
+                adaptive_mode_switching_success=0.0, context_awareness_score=0.0,
+                relationship_depth_tracking_accuracy=0.0,
+                # CDL Mode Switching Metrics
+                technical_mode_compliance=0.0, creative_mode_compliance=0.0,
+                mode_transition_smoothness=0.0, anti_pattern_avoidance=0.0,
+                # Character Archetype Metrics
+                real_world_archetype_authenticity=0.0, fantasy_archetype_immersion=0.0,
+                narrative_ai_archetype_consistency=0.0, ai_identity_handling_accuracy=0.0,
+                # Stress Testing Metrics
+                rapid_fire_handling_score=0.0, long_conversation_endurance=0.0,
+                concurrent_user_isolation=0.0, memory_overflow_resilience=0.0,
+                # Performance Metrics
+                average_response_time_ms=0.0, memory_query_performance_ms=0.0,
+                vector_search_efficiency_score=0.0,
+                # Character Evolution Metrics
+                personality_consistency_over_time=0.0, relationship_progression_naturalness=0.0,
+                character_drift_detection_score=0.0
+            )
         
         logger.info("Generating comprehensive validation report...")
         
@@ -355,6 +476,7 @@ class SyntheticDataValidator:
         cdl_metrics = self.validate_cdl_personality_consistency()
         relationship_metrics = self.validate_relationship_progression()
         cross_pollination_metrics = self.validate_cross_pollination_accuracy()
+        enhanced_api_metrics = self.validate_enhanced_api_metadata()  # NEW: Enhanced API validation
         quality_score = self.calculate_conversation_quality_score()
         
         # Calculate summary statistics
@@ -386,7 +508,26 @@ class SyntheticDataValidator:
             total_exchanges=total_exchanges,
             unique_users=unique_users,
             bots_tested=bots_tested,
-            test_duration_hours=test_duration_hours
+            test_duration_hours=test_duration_hours,
+            # Phase 4 Intelligence Metrics (placeholder values)
+            memory_triggered_moments_accuracy=0.0, enhanced_query_processing_score=0.0,
+            adaptive_mode_switching_success=0.0, context_awareness_score=0.0,
+            relationship_depth_tracking_accuracy=0.0,
+            # CDL Mode Switching Metrics (placeholder values)
+            technical_mode_compliance=0.0, creative_mode_compliance=0.0,
+            mode_transition_smoothness=0.0, anti_pattern_avoidance=0.0,
+            # Character Archetype Metrics (placeholder values)
+            real_world_archetype_authenticity=0.0, fantasy_archetype_immersion=0.0,
+            narrative_ai_archetype_consistency=0.0, ai_identity_handling_accuracy=0.0,
+            # Stress Testing Metrics (placeholder values)
+            rapid_fire_handling_score=0.0, long_conversation_endurance=0.0,
+            concurrent_user_isolation=0.0, memory_overflow_resilience=0.0,
+            # Performance Metrics (placeholder values)
+            average_response_time_ms=0.0, memory_query_performance_ms=0.0,
+            vector_search_efficiency_score=0.0,
+            # Character Evolution Metrics (placeholder values)
+            personality_consistency_over_time=0.0, relationship_progression_naturalness=0.0,
+            character_drift_detection_score=0.0
         )
         
         # Log detailed report

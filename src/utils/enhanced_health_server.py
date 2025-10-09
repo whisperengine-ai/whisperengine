@@ -281,6 +281,10 @@ class EnhancedHealthServer:
             # Process message through the same pipeline as Discord
             processing_result = await self.message_processor.process_message(message_context)
 
+            # Extract user facts and relationship metrics (like external_chat_api.py)
+            user_facts = await self._extract_user_facts(request_data['user_id'])
+            relationship_metrics = await self._extract_relationship_metrics(request_data['user_id'])
+
             # Return response
             response_data = {
                 'success': processing_result.success,
@@ -288,7 +292,9 @@ class EnhancedHealthServer:
                 'processing_time_ms': processing_result.processing_time_ms,
                 'memory_stored': processing_result.memory_stored,
                 'timestamp': datetime.utcnow().isoformat(),
-                'bot_name': self.bot.user.name if self.bot.user else "WhisperEngine Bot"
+                'bot_name': self.bot.user.name if self.bot.user else "WhisperEngine Bot",
+                'user_facts': user_facts,
+                'relationship_metrics': relationship_metrics
             }
 
             if not processing_result.success:
@@ -385,13 +391,19 @@ class EnhancedHealthServer:
                     # Process message
                     processing_result = await self.message_processor.process_message(message_context)
                     
+                    # Extract user facts and relationship metrics for each message
+                    user_facts = await self._extract_user_facts(msg_data['user_id'])
+                    relationship_metrics = await self._extract_relationship_metrics(msg_data['user_id'])
+                    
                     result = {
                         'index': i,
                         'user_id': msg_data['user_id'],
                         'success': processing_result.success,
                         'response': processing_result.response,
                         'processing_time_ms': processing_result.processing_time_ms,
-                        'memory_stored': processing_result.memory_stored
+                        'memory_stored': processing_result.memory_stored,
+                        'user_facts': user_facts,
+                        'relationship_metrics': relationship_metrics
                     }
                     
                     if not processing_result.success:
@@ -581,6 +593,123 @@ class EnhancedHealthServer:
         except (OSError, ValueError) as e:
             logger.error("Failed to start enhanced server: %s", str(e))
             raise
+
+    async def _extract_user_facts(self, user_id: str) -> Dict[str, Any]:
+        """Extract user facts from memory system."""
+        try:
+            # Get user profile from memory system - could be used for future enhancements
+            user_facts = {}
+            
+            # Get conversation history to extract basic facts
+            if self.message_processor and hasattr(self.message_processor, 'memory_manager') and self.message_processor.memory_manager:
+                memory_manager = self.message_processor.memory_manager
+                
+                # Get recent conversation history for user
+                conversation_history = await memory_manager.get_conversation_history(user_id, limit=50)
+                
+                # Extract user name from conversation history (simple approach)
+                name = None
+                for message in conversation_history:
+                    content = message.get('user_message', '').lower()
+                    if 'my name is' in content or 'i am' in content or "i'm" in content:
+                        # Simple name extraction - could be enhanced with NLP
+                        words = content.split()
+                        if 'my name is' in content:
+                            name_idx = words.index('is') + 1 if 'is' in words else -1
+                            if name_idx < len(words):
+                                name = words[name_idx].strip('.,!?').title()
+                        break
+                
+                if name:
+                    user_facts['name'] = name
+                
+                # Get interaction metrics
+                interaction_count = len(conversation_history)
+                if interaction_count > 0:
+                    user_facts['interaction_count'] = interaction_count
+                    user_facts['first_interaction'] = conversation_history[-1].get('timestamp') if conversation_history else None
+                    user_facts['last_interaction'] = conversation_history[0].get('timestamp') if conversation_history else None
+
+            return user_facts
+
+        except Exception as e:
+            logger.warning("Failed to extract user facts for %s: %s", user_id, e)
+            return {}
+
+    async def _extract_relationship_metrics(self, user_id: str) -> Dict[str, Any]:
+        """Extract relationship metrics from emotion manager and memory system."""
+        try:
+            # Initialize default metrics
+            relationship_metrics = {
+                'affection': 50,
+                'trust': 42,
+                'attunement': 78
+            }
+
+            # Get emotion manager if available from bot core
+            bot_core = getattr(self.bot_manager, 'bot_core', None) if self.bot_manager else None
+            emotion_manager = getattr(bot_core, 'emotion_manager', None) if bot_core else None
+            if emotion_manager and hasattr(emotion_manager, 'user_profiles'):
+                user_profiles = emotion_manager.user_profiles
+                if user_id in user_profiles:
+                    profile = user_profiles[user_id]
+                    
+                    # Convert relationship level to affection score
+                    relationship_mapping = {
+                        'stranger': 30,
+                        'acquaintance': 50, 
+                        'friend': 70,
+                        'close_friend': 90
+                    }
+                    
+                    if hasattr(profile, 'relationship_level'):
+                        level_name = profile.relationship_level.value if hasattr(profile.relationship_level, 'value') else str(profile.relationship_level)
+                        relationship_metrics['affection'] = relationship_mapping.get(level_name, 50)
+                    
+                    # Calculate trust based on interaction count and positive interactions
+                    if hasattr(profile, 'interaction_count'):
+                        # Base trust grows with interactions (capped at 80)
+                        base_trust = min(80, 20 + (profile.interaction_count * 2))
+                        
+                        # Reduce trust for escalation count
+                        if hasattr(profile, 'escalation_count'):
+                            trust_penalty = profile.escalation_count * 10
+                            base_trust = max(10, base_trust - trust_penalty)
+                        
+                        relationship_metrics['trust'] = base_trust
+                    
+                    # Calculate attunement based on emotional understanding
+                    if hasattr(profile, 'emotion_history') and profile.emotion_history:
+                        # Higher attunement for users with emotional history (shows understanding)
+                        emotion_diversity = len(set(e.detected_emotion.value if hasattr(e.detected_emotion, 'value') else str(e.detected_emotion) 
+                                                   for e in profile.emotion_history[-10:]))  # Last 10 emotions
+                        attunement_base = min(90, 60 + (emotion_diversity * 5))
+                        relationship_metrics['attunement'] = attunement_base
+
+            # Get memory-based relationship indicators
+            if self.message_processor and hasattr(self.message_processor, 'memory_manager') and self.message_processor.memory_manager:
+                try:
+                    # Get user memories to gauge relationship depth
+                    memories = await self.message_processor.memory_manager.retrieve_relevant_memories(user_id, "relationship friendship", limit=10)
+                    
+                    if memories and len(memories) > 5:
+                        # Boost affection for users with rich memory history
+                        relationship_metrics['affection'] = min(95, relationship_metrics['affection'] + 15)
+                        relationship_metrics['trust'] = min(90, relationship_metrics['trust'] + 10)
+                        relationship_metrics['attunement'] = min(95, relationship_metrics['attunement'] + 10)
+                
+                except Exception as e:
+                    logger.debug("Could not access memory for relationship metrics: %s", e)
+
+            return relationship_metrics
+
+        except Exception as e:
+            logger.warning("Failed to extract relationship metrics for %s: %s", user_id, e)
+            return {
+                'affection': 50,
+                'trust': 42, 
+                'attunement': 78
+            }
 
     async def stop(self):
         """Stop the enhanced server"""
