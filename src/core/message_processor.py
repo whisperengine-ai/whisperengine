@@ -153,6 +153,36 @@ class MessageProcessor:
         except ImportError as e:
             logger.warning("Character Vector Episodic Intelligence not available: %s", e)
         
+        # STAGE 4: Character Temporal Evolution Intelligence (PHASE 2A)
+        self.temporal_evolution_analyzer = None
+        
+        try:
+            from src.characters.learning.character_temporal_evolution_analyzer import create_character_temporal_evolution_analyzer
+            
+            # Initialize temporal evolution analyzer with shared temporal client
+            self.temporal_evolution_analyzer = create_character_temporal_evolution_analyzer(
+                temporal_client=self.temporal_client
+            )
+            logger.info("⏱️ Character Temporal Evolution Intelligence initialized (PHASE 2A)")
+        except ImportError as e:
+            logger.warning("Character Temporal Evolution Intelligence not available: %s", e)
+        
+        # STAGE 5: MemoryBoost Integration System (MEMORY EFFECTIVENESS)
+        self.memory_boost_integrator = None
+        
+        try:
+            from src.intelligence.memory_boost_integrator import create_memory_boost_integrator
+            
+            # Initialize with memory manager and postgres pool (from bot_core if available)
+            postgres_pool = getattr(bot_core, 'postgres_pool', None) if bot_core else None
+            self.memory_boost_integrator = create_memory_boost_integrator(
+                memory_manager=self.memory_manager,
+                postgres_pool=postgres_pool
+            )
+            logger.info("🚀 MemoryBoost Integration System initialized (Memory Effectiveness + Vector Optimization)")
+        except ImportError as e:
+            logger.warning("MemoryBoost Integration System not available: %s", e)
+        
         # TrendWise Adaptive Learning: Initialize trend analysis and confidence adaptation
         self.trend_analyzer = None
         self.confidence_adapter = None
@@ -853,7 +883,50 @@ class MessageProcessor:
             logger.debug("Message context classified: %s", classified_context.context_type.value)
 
             # 🚀 MEMORYBOOST: Try enhanced memory retrieval first if available
-            if hasattr(self.memory_manager, 'retrieve_relevant_memories_with_memoryboost'):
+            if self.memory_boost_integrator:
+                try:
+                    # Build conversation context for MemoryBoost optimization
+                    conversation_history = self._build_conversation_history_for_memoryboost(message_context)
+                    
+                    # Use MemoryBoost enhanced retrieval
+                    memoryboost_result = await self.memory_boost_integrator.enhance_memory_retrieval(
+                        user_id=message_context.user_id,
+                        bot_name=get_normalized_bot_name_from_env(),
+                        query=message_context.content,
+                        conversation_history=conversation_history,
+                        max_memories=20,
+                        quality_threshold=50.0
+                    )
+                    
+                    # Convert MemoryBoost result to legacy format
+                    relevant_memories = self._convert_memoryboost_result_to_memories(memoryboost_result)
+                    
+                    # Calculate actual retrieval timing
+                    memory_end_time = datetime.now()
+                    retrieval_time_ms = int((memory_end_time - memory_start_time).total_seconds() * 1000)
+                    
+                    logger.info("🚀 MEMORYBOOST: Enhanced retrieval returned %d memories in %dms (improvements: %d, boost_time: %.1fms)", 
+                               len(relevant_memories), 
+                               retrieval_time_ms,
+                               memoryboost_result.improvements_applied,
+                               memoryboost_result.processing_time_ms)
+                    
+                    # Record MemoryBoost metrics to InfluxDB
+                    if self.fidelity_metrics and relevant_memories:
+                        self._record_memoryboost_integration_metrics(
+                            message_context=message_context,
+                            memoryboost_result=memoryboost_result,
+                            retrieval_time_ms=retrieval_time_ms
+                        )
+                    
+                    return relevant_memories
+                    
+                except Exception as e:
+                    logger.warning("MemoryBoost integration failed, falling back to optimized retrieval: %s", str(e))
+                    # Continue to optimized retrieval fallback
+
+            # Legacy MemoryBoost hook (deprecated in favor of integrator above)
+            elif hasattr(self.memory_manager, 'retrieve_relevant_memories_with_memoryboost'):
                 try:
                     # Build conversation context for MemoryBoost optimization
                     conversation_context = self._build_conversation_context_for_memoryboost(message_context)
@@ -1630,6 +1703,44 @@ class MessageProcessor:
             except Exception as e:
                 logger.warning("Episodic intelligence enhancement failed: %s", e)
         
+        # Character Temporal Evolution Intelligence (PHASE 2A): Add character growth awareness
+        if self.temporal_evolution_analyzer:
+            try:
+                bot_name = get_normalized_bot_name_from_env()
+                
+                # Get temporal evolution insights for character self-awareness
+                evolution_insights = await self.temporal_evolution_analyzer.get_character_evolution_insights_for_response(
+                    character_name=bot_name,
+                    user_id=message_context.user_id,
+                    current_topic=message_context.content,
+                    days_back=14  # Last 2 weeks for recent evolution patterns
+                )
+                
+                if evolution_insights and evolution_insights.get('has_evolution_insights'):
+                    # Build temporal evolution guidance for character responses
+                    evolution_guidance = self._build_temporal_evolution_guidance(evolution_insights)
+                    
+                    # Add evolution context to system prompt
+                    for i, msg in enumerate(conversation_context):
+                        if msg.get("role") == "system":
+                            conversation_context[i]["content"] += f"\n\n{evolution_guidance}"
+                            break
+                    
+                    # Store temporal evolution context for monitoring
+                    ai_components['temporal_evolution_intelligence'] = {
+                        'evolution_references_count': len(evolution_insights.get('evolution_references', [])),
+                        'growth_awareness_count': len(evolution_insights.get('growth_awareness', [])),
+                        'confidence_evolution': evolution_insights.get('confidence_evolution', []),
+                        'emotional_evolution': evolution_insights.get('emotional_evolution', []),
+                        'evolution_metadata': evolution_insights.get('evolution_metadata', {})
+                    }
+                    
+                    logger.info("⏱️ TEMPORAL EVOLUTION: Applied character growth awareness with %d evolution references for %s",
+                               len(evolution_insights.get('evolution_references', [])), message_context.user_id)
+                
+            except Exception as e:
+                logger.warning("Temporal evolution intelligence enhancement failed: %s", e)
+        
         # Add AI intelligence guidance to system messages
         ai_guidance = self._build_ai_intelligence_guidance(ai_components)
         if ai_guidance:
@@ -2036,6 +2147,86 @@ class MessageProcessor:
         
         if guidance_parts:
             return "\n\n🧠 EPISODIC INTELLIGENCE:\n" + "\n".join(f"• {part}" for part in guidance_parts)
+        
+        return ""
+
+    def _build_temporal_evolution_guidance(self, temporal_context: Dict[str, Any]) -> str:
+        """Build temporal evolution guidance from personality changes and learning moments."""
+        guidance_parts = []
+        
+        # Personality evolution guidance
+        personality_evolution = temporal_context.get('personality_evolution', {})
+        if personality_evolution:
+            confidence_drift = personality_evolution.get('confidence_drift')
+            emotional_drift = personality_evolution.get('emotional_drift')
+            quality_drift = personality_evolution.get('quality_drift')
+            
+            # Build personality evolution insights
+            evolution_insights = []
+            if confidence_drift and abs(confidence_drift) > 0.1:
+                direction = "more confident" if confidence_drift > 0 else "less confident"
+                evolution_insights.append(f"feeling {direction} lately")
+                
+            if emotional_drift and abs(emotional_drift) > 0.1:
+                direction = "more emotionally engaged" if emotional_drift > 0 else "more emotionally reserved"
+                evolution_insights.append(f"becoming {direction}")
+                
+            if quality_drift and abs(quality_drift) > 0.1:
+                direction = "improving communication quality" if quality_drift > 0 else "adjusting communication style"
+                evolution_insights.append(direction)
+            
+            if evolution_insights:
+                guidance_parts.append(f"PERSONALITY EVOLUTION: You've been {' and '.join(evolution_insights[:2])}")
+        
+        # Learning moments guidance
+        learning_moments = temporal_context.get('learning_moments', [])
+        if learning_moments:
+            recent_learning = []
+            for moment in learning_moments[:2]:  # Top 2 most significant
+                learning_type = moment.get('learning_type', 'general')
+                description = moment.get('description', '')
+                confidence_change = moment.get('confidence_change', 0)
+                
+                if learning_type == 'confidence_growth':
+                    recent_learning.append(f"gained confidence in {description}")
+                elif learning_type == 'emotional_development':
+                    recent_learning.append(f"developed emotional understanding in {description}")
+                elif learning_type == 'communication_improvement':
+                    recent_learning.append(f"improved communication about {description}")
+                else:
+                    recent_learning.append(f"learned about {description}")
+            
+            if recent_learning:
+                guidance_parts.append(f"RECENT LEARNING: You've {' and '.join(recent_learning)}")
+        
+        # Temporal patterns guidance
+        patterns = temporal_context.get('patterns', {})
+        if patterns:
+            pattern_insights = []
+            confidence_trend = patterns.get('confidence_trend', 'stable')
+            emotion_trend = patterns.get('emotion_trend', 'stable')
+            
+            if confidence_trend == 'increasing':
+                pattern_insights.append("growing more self-assured over time")
+            elif confidence_trend == 'decreasing':
+                pattern_insights.append("becoming more thoughtful and careful")
+                
+            if emotion_trend == 'increasing':
+                pattern_insights.append("expressing emotions more openly")
+            elif emotion_trend == 'decreasing':
+                pattern_insights.append("developing emotional maturity")
+            
+            if pattern_insights:
+                guidance_parts.append(f"TEMPORAL PATTERNS: You've been {' and '.join(pattern_insights[:2])}")
+        
+        # Evolution awareness for natural self-reference
+        evolution_awareness = temporal_context.get('evolution_awareness', [])
+        if evolution_awareness:
+            awareness_cues = evolution_awareness[:2]  # Top 2 awareness cues
+            guidance_parts.append(f"EVOLUTION AWARENESS: You can naturally mention: {' | '.join(awareness_cues)}")
+        
+        if guidance_parts:
+            return "\n\n⏰ TEMPORAL EVOLUTION:\n" + "\n".join(f"• {part}" for part in guidance_parts)
         
         return ""
 
@@ -4685,6 +4876,62 @@ class MessageProcessor:
                     
         except Exception as e:
             logger.error("Sprint 6 IntelligenceOrchestrator coordination failed: %s", str(e))
+
+    def _build_conversation_history_for_memoryboost(self, message_context: MessageContext) -> List[Dict[str, Any]]:
+        """Build conversation history context for MemoryBoost processing."""
+        # Simple implementation - could be enhanced with more sophisticated context
+        return [
+            {
+                'content': message_context.content,
+                'user_id': message_context.user_id,
+                'timestamp': datetime.now().isoformat(),
+                'platform': message_context.platform
+            }
+        ]
+    
+    def _convert_memoryboost_result_to_memories(self, memoryboost_result) -> List[Dict[str, Any]]:
+        """Convert MemoryBoost result to legacy memory format."""
+        memories = []
+        for vector_memory in memoryboost_result.optimized_memories:
+            memory_dict = {
+                'id': vector_memory.id,
+                'content': vector_memory.content,
+                'user_id': vector_memory.user_id,
+                'timestamp': vector_memory.timestamp.isoformat() if vector_memory.timestamp else None,
+                'bot_name': vector_memory.metadata.get('bot_name', ''),
+                'memory_type': vector_memory.metadata.get('memory_type', 'conversation'),
+                'score': vector_memory.score,
+                'metadata': vector_memory.metadata
+            }
+            memories.append(memory_dict)
+        return memories
+    
+    def _record_memoryboost_integration_metrics(self, message_context: MessageContext, memoryboost_result, retrieval_time_ms: int):
+        """Record MemoryBoost integration metrics to InfluxDB."""
+        try:
+            if not self.temporal_client:
+                return
+                
+            boost_data = memoryboost_result.to_dict()
+            
+            # Record to InfluxDB (async operation, fire and forget)
+            asyncio.create_task(self.temporal_client.record_memory_boost_metrics(
+                user_id=message_context.user_id,
+                bot_name=get_normalized_bot_name_from_env(),
+                memory_count=len(memoryboost_result.optimized_memories),
+                avg_relevance_score=boost_data.get('avg_relevance_score', 0),
+                avg_quality_score=boost_data.get('avg_quality_score', 0),
+                improvements_applied=memoryboost_result.improvements_applied,
+                processing_time_ms=memoryboost_result.processing_time_ms,
+                total_retrieval_time_ms=retrieval_time_ms
+            ))
+            
+            logger.debug("MemoryBoost metrics recorded: %d memories, %.2f relevance, %.2f quality", 
+                        len(memoryboost_result.optimized_memories),
+                        boost_data.get('avg_relevance_score', 0),
+                        boost_data.get('avg_quality_score', 0))
+        except Exception as e:
+            logger.warning("Failed to record MemoryBoost metrics: %s", str(e))
 
 
 def create_message_processor(bot_core, memory_manager, llm_client, **kwargs) -> MessageProcessor:
