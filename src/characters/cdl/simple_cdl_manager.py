@@ -92,17 +92,20 @@ class SimpleCDLManager:
     async def _load_from_database(self, character_name: str) -> Optional[Dict[str, Any]]:
         """Load character data from comprehensive RDBMS schema using enhanced manager"""
         try:
+            logger.info("🔍 SIMPLE CDL: Starting database load for character: %s", character_name)
             pool = await self._get_database_pool()
             
             # Use enhanced CDL manager for comprehensive character data
             from src.characters.cdl.enhanced_cdl_manager import create_enhanced_cdl_manager
             enhanced_manager = create_enhanced_cdl_manager(pool)
             
+            logger.info("🔍 SIMPLE CDL: About to call enhanced_manager.get_character_by_name('%s')", character_name)
             # Get comprehensive character data from enhanced manager
             character_data = await enhanced_manager.get_character_by_name(character_name)
             
             if character_data:
-                logger.info("✅ Enhanced manager loaded character: %s", character_name)
+                actual_name = character_data.get('identity', {}).get('name', 'UNKNOWN_NAME')
+                logger.info("✅ Enhanced manager loaded character: %s (actual name: %s)", character_name, actual_name)
                 logger.debug("Character data keys: %s", list(character_data.keys()))
                 return character_data
             else:
@@ -110,7 +113,9 @@ class SimpleCDLManager:
                 return None
                 
         except Exception as e:
-            logger.error("Enhanced manager failed to load character: %s", e)
+            logger.error("❌ SIMPLE CDL: Enhanced manager failed to load character '%s': %s", character_name, e)
+            import traceback
+            logger.error("❌ SIMPLE CDL: Traceback: %s", traceback.format_exc())
             return None
             
     def _build_cdl_structure(self, char_row, personality_rows, values_rows) -> Dict[str, Any]:

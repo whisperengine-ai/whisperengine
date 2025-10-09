@@ -453,6 +453,7 @@ class CDLAIPromptIntegration:
             # STEP 1: Load CDL character and determine context
             character = await self.load_character(character_file)
             logger.info("🎭 UNIFIED: Loaded CDL character: %s", character.identity.name)
+            print(f"🔍 DEBUG: Character loaded - name: '{character.identity.name}', occupation: '{character.identity.occupation}', description: '{character.identity.description[:100]}...'", flush=True)
 
             # STEP 2: Get user's preferred name with Discord username fallback
             preferred_name = None
@@ -556,7 +557,9 @@ class CDLAIPromptIntegration:
         prompt = ""
         
         # Base character identity - WHO ARE YOU (must come first)
-        prompt += f"You are {character.identity.name}, a {character.identity.occupation}."
+        character_identity_line = f"You are {character.identity.name}, a {character.identity.occupation}."
+        print(f"🔍 DEBUG: Building character identity line: '{character_identity_line}'", flush=True)
+        prompt += character_identity_line
         
         # Add character description
         if hasattr(character.identity, 'description') and character.identity.description:
@@ -1437,27 +1440,85 @@ STOP WRITING after 2-4 sentences. Do not continue.
 
     async def load_character(self, character_file: Optional[str] = None) -> Character:
         """
-        Load a character from database using enhanced CDL manager.
+        Load a character from database using bot name from environment.
         
-        Uses enhanced database CDL Manager for comprehensive character data access.
+        Simple approach: Get bot name from env, query database for basic fields needed for prompt.
         The character_file parameter is kept for compatibility but ignored.
         """
         try:
-            # Use enhanced CDL manager for comprehensive character data
-            from src.characters.cdl.simple_cdl_manager import get_simple_cdl_manager
+            # Get bot name from environment
+            from src.memory.vector_memory_system import get_normalized_bot_name_from_env
+            bot_name = get_normalized_bot_name_from_env()
+            logger.info("🔍 CDL: Loading character for bot: %s", bot_name)
             
-            logger.info("🔍 CDL: Loading character from enhanced RDBMS (comprehensive schema)")
-            cdl_manager = get_simple_cdl_manager()
+            # Get database pool
+            from src.database.postgres_pool_manager import get_postgres_pool
+            pool = await get_postgres_pool()
             
-            # Get Character object from database (bot name from environment)
-            character = cdl_manager.get_character_object()
-            logger.info("✅ CDL: Loaded character from enhanced database: %s", character.identity.name)
-            
-            return character
+            # Simple direct database query for prompt fields
+            async with pool.acquire() as conn:
+                query = """
+                    SELECT name, occupation, description, allow_full_roleplay 
+                    FROM characters 
+                    WHERE LOWER(normalized_name) = LOWER($1)
+                """
+                row = await conn.fetchrow(query, bot_name)
+                
+                if not row:
+                    logger.error("❌ CDL: Character '%s' not found in database", bot_name)
+                    # Return fallback character
+                    class FallbackCharacter:
+                        def __init__(self):
+                            self.identity = self._create_identity()
+                            
+                        def _create_identity(self):
+                            class Identity:
+                                def __init__(self):
+                                    self.name = "Unknown"
+                                    self.occupation = ""
+                                    self.description = ""
+                            return Identity()
+                    
+                    return FallbackCharacter()
+                
+                logger.info("✅ CDL: Found character: %s (%s)", row['name'], row['occupation'])
+                
+                # Create simple character object with just what we need for prompts
+                class SimpleCharacter:
+                    def __init__(self, db_row):
+                        self.identity = self._create_identity(db_row)
+                        self.allow_full_roleplay_immersion = db_row.get('allow_full_roleplay', False)
+                        
+                    def _create_identity(self, db_row):
+                        class Identity:
+                            def __init__(self, row):
+                                self.name = row['name']
+                                self.occupation = row['occupation'] or ""
+                                self.description = row['description'] or ""
+                        return Identity(db_row)
+                
+                character = SimpleCharacter(row)
+                logger.info("✅ CDL: Created character object - name: '%s', occupation: '%s'", 
+                           character.identity.name, character.identity.occupation)
+                
+                return character
             
         except Exception as e:
-            logger.error("❌ ENHANCED CDL: Failed to load character from database: %s", e)
-            raise RuntimeError(f"Enhanced CDL character loading failed: {e}")
+            logger.error("❌ CDL: Failed to load character: %s", e)
+            # Return fallback character
+            class FallbackCharacter:
+                def __init__(self):
+                    self.identity = self._create_identity()
+                    
+                def _create_identity(self):
+                    class Identity:
+                        def __init__(self):
+                            self.name = "Unknown"
+                            self.occupation = ""
+                            self.description = ""
+                    return Identity()
+            
+            return FallbackCharacter()
 
     async def _get_graph_manager(self):
         """Get or initialize CharacterGraphManager (cached)"""

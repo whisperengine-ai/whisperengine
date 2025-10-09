@@ -155,6 +155,7 @@ class EnhancedCDLManager:
     async def get_character_by_name(self, character_name: str) -> Optional[Dict[str, Any]]:
         """Get complete character data (backward compatible with CDL AI Integration)"""
         try:
+            logger.info("🔍 ENHANCED CDL: get_character_by_name called with: '%s'", character_name)
             async with self.pool.acquire() as conn:
                 # Core character data - search by bot name (case insensitive)
                 core_query = """
@@ -164,12 +165,15 @@ class EnhancedCDLManager:
                     FROM characters c 
                     WHERE LOWER(c.name) = LOWER($1)
                 """
+                logger.info("🔍 ENHANCED CDL: Executing query for character: '%s'", character_name)
                 character_row = await conn.fetchrow(core_query, character_name)
+                logger.info("🔍 ENHANCED CDL: Query result: %s", character_row)
                 
                 if not character_row:
-                    logger.warning(f"Character '{character_name}' not found in database")
+                    logger.warning("🔍 ENHANCED CDL: Character '%s' not found in database", character_name)
                     return None
                 
+                logger.info("🔍 ENHANCED CDL: Found character row with name: '%s'", character_row['name'])
                 character_id = character_row['id']
                 
                 # Build backward-compatible CDL structure
