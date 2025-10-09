@@ -1173,20 +1173,20 @@ class SyntheticConversationGenerator:
                 logger.warning(f"Failed to get response from {bot_name}, ending conversation")
                 break
             
-            # Log the exchange with enhanced metadata
+            # Log the exchange with enhanced metadata (ensure all data is JSON serializable)
             exchange = {
                 "turn": turn + 1,
                 "user_message": current_message,
                 "bot_response": response.get("response", ""),
                 "user_emotion": self._simulate_user_emotion(user, template["emotional_range"]),
-                "bot_metadata": response.get("metadata", {}),
-                "user_facts": response.get("user_facts", {}),  # NEW: User facts from API
-                "relationship_metrics": response.get("relationship_metrics", {}),  # NEW: Relationship data
-                "processing_time_ms": response.get("processing_time_ms", 0),  # NEW: Performance data
-                "memory_stored": response.get("memory_stored", False),  # NEW: Memory confirmation
+                "bot_metadata": self._make_json_safe(response.get("metadata", {})),  # Ensure JSON safe
+                "user_facts": self._make_json_safe(response.get("user_facts", {})),  # Ensure JSON safe
+                "relationship_metrics": self._make_json_safe(response.get("relationship_metrics", {})),  # Ensure JSON safe
+                "processing_time_ms": response.get("processing_time_ms", 0),
+                "memory_stored": response.get("memory_stored", False),
                 "timestamp": datetime.now().isoformat(),
-                "conversation_phase": self._get_conversation_phase(conversation_id),  # NEW: Conversation phase
-                "conversation_state": self._get_serializable_conversation_state(conversation_id)  # NEW: JSON-safe state snapshot
+                "conversation_phase": self._get_conversation_phase(conversation_id),
+                "conversation_state": self._get_serializable_conversation_state(conversation_id)
             }
             conversation_log.append(exchange)
             
@@ -1432,6 +1432,26 @@ class SyntheticConversationGenerator:
             serializable_state["conversation_type"] = serializable_state["conversation_type"].value
         
         return serializable_state
+    
+    def _make_json_safe(self, obj: Any) -> Any:
+        """Recursively convert objects to JSON-safe format"""
+        if obj is None:
+            return None
+        elif isinstance(obj, (str, int, float, bool)):
+            return obj
+        elif isinstance(obj, dict):
+            return {str(k): self._make_json_safe(v) for k, v in obj.items()}
+        elif isinstance(obj, list):
+            return [self._make_json_safe(item) for item in obj]
+        elif hasattr(obj, '__dict__'):
+            # Convert object to dictionary
+            return self._make_json_safe(obj.__dict__)
+        elif hasattr(obj, 'value'):
+            # Handle enum values
+            return obj.value
+        else:
+            # Convert to string as fallback
+            return str(obj)
     
     async def _generate_follow_up_message(self, user: SyntheticUser, bot_response: str, 
                                         topics: List[str], emotional_range: List[str],
