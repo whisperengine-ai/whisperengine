@@ -2,6 +2,8 @@
 
 This comprehensive guide covers WhisperEngine installation with **Docker-first development** approach, configuration options, troubleshooting, and all available features.
 
+> **🪟 Windows Users:** For comprehensive Windows-specific setup with PowerShell commands and Docker Desktop guidance, see the **[Windows Setup Guide in our main README](../../README.md#-windows-users-complete-setup-guide)**. This guide contains platform-agnostic instructions that work on all systems.
+
 ## 🐳 Docker-First Installation (Recommended)
 
 ### Prerequisites

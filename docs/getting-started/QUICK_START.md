@@ -2,6 +2,8 @@
 
 Get WhisperEngine running in **5 minutes** with Docker! This guide focuses on the recommended Docker-based development approach.
 
+> **🪟 Windows Users:** For complete Windows setup with PowerShell commands, troubleshooting, and Docker Desktop guidance, see our **[Comprehensive Windows Setup Guide](../../README.md#-windows-users-complete-setup-guide)**. Commands below work on all platforms but Windows users may prefer the detailed PowerShell examples in the main README.
+
 ## 🐳 Docker Multi-Bot Setup (Recommended)
 
 ### Prerequisites

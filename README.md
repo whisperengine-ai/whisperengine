@@ -512,6 +512,8 @@ WhisperEngine features a comprehensive suite of adaptive learning systems that c
 
 WhisperEngine is designed for **Docker-first development** with a complete multi-bot infrastructure:
 
+#### 🐧 Linux/macOS/Unix (Shell Script Method)
+
 ```bash
 # 1. Clone the repository
 git clone https://github.com/whisperengine-ai/whisperengine
@@ -531,6 +533,43 @@ python scripts/generate_multi_bot_config.py
 ./multi-bot.sh status
 ./multi-bot.sh logs elena
 ```
+
+#### 🪟 Windows (Docker Commands Method)
+
+For Windows users without bash/shell script support, use direct Docker commands:
+
+```powershell
+# 1. Clone the repository
+git clone https://github.com/whisperengine-ai/whisperengine
+cd whisperengine
+
+# 2. Setup environment (requires Discord bot token and LLM API key)
+copy .env.template .env.elena
+# Edit .env.elena with your Discord token and OpenRouter/Anthropic API key
+
+# 3. Generate multi-bot configuration (requires Python)
+python scripts/generate_multi_bot_config.py
+
+# 4. Start infrastructure services
+docker-compose -f docker-compose.multi-bot.yml up -d postgres qdrant
+
+# 5. Start Elena bot (after infrastructure is ready, wait ~30 seconds)
+docker-compose -f docker-compose.multi-bot.yml up -d elena-bot
+
+# 6. Check system status
+docker-compose -f docker-compose.multi-bot.yml ps
+
+# 7. View Elena's logs
+docker-compose -f docker-compose.multi-bot.yml logs -f elena-bot
+
+# 8. Stop everything when done
+docker-compose -f docker-compose.multi-bot.yml down
+```
+
+**Windows Alternative Methods:**
+- **Git Bash**: If you have Git for Windows installed, you can use the shell scripts: `./multi-bot.sh start elena`
+- **WSL2**: Install Windows Subsystem for Linux to use the Linux/Unix commands above
+- **PowerShell Core**: Some shell scripts may work in PowerShell Core 7+
 
 **🎯 What You Get Out of the Box:**
 - **Elena Bot** - Marine biologist character running on port 9091
@@ -570,6 +609,7 @@ curl -X POST http://localhost:9091/api/chat \
 
 ### 🏃‍♂️ Quick Commands
 
+#### Linux/macOS/Unix Commands:
 ```bash
 # Start all characters and infrastructure
 ./multi-bot.sh start all
@@ -587,7 +627,249 @@ curl -X POST http://localhost:9091/api/chat \
 ./multi-bot.sh stop
 ```
 
+#### Windows Docker Commands:
+```powershell
+# Start all characters and infrastructure
+docker-compose -f docker-compose.multi-bot.yml up -d
+
+# Start specific character (Elena example)
+docker-compose -f docker-compose.multi-bot.yml up -d postgres qdrant elena-bot
+
+# View logs for troubleshooting
+docker-compose -f docker-compose.multi-bot.yml logs -f elena-bot
+
+# Check system health
+docker-compose -f docker-compose.multi-bot.yml ps
+
+# Stop everything
+docker-compose -f docker-compose.multi-bot.yml down
+
+# Stop specific service
+docker-compose -f docker-compose.multi-bot.yml stop elena-bot
+```
+
+#### Windows PowerShell HTTP API Testing:
+```powershell
+# Test Elena's HTTP Chat API (PowerShell equivalent of curl)
+Invoke-RestMethod -Uri "http://localhost:9091/api/chat" `
+  -Method POST `
+  -Headers @{"Content-Type"="application/json"} `
+  -Body '{
+    "user_id": "your_id", 
+    "message": "Tell me about marine conservation",
+    "context": {"platform": "api"}
+  }'
+```
+
 **📖 Need More Setup Options?** See our [Installation Guide](docs/getting-started/INSTALLATION.md) for local development, cloud deployment, and API configuration.
+
+## 🪟 Windows Users: Complete Setup Guide
+
+### Prerequisites for Windows
+
+**Required Software:**
+- **[Docker Desktop for Windows](https://docs.docker.com/desktop/install/windows-system-requirements/)** - Includes Docker and Docker Compose
+- **[Git for Windows](https://git-scm.com/download/win)** - For cloning repositories (includes Git Bash)
+- **[Python 3.8+](https://www.python.org/downloads/windows/)** - For configuration scripts
+- **Text Editor** - Visual Studio Code, Notepad++, or any editor for .env files
+
+**System Requirements:**
+- Windows 10/11 (64-bit)
+- 8GB+ RAM (12GB+ recommended for multiple characters)
+- 10GB+ free disk space
+- WSL2 enabled (Docker Desktop will help set this up)
+
+### Step-by-Step Windows Installation
+
+#### Step 1: Install Prerequisites
+```powershell
+# Install Chocolatey (Windows package manager) - Optional but helpful
+Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
+
+# Install tools via Chocolatey (alternative to manual downloads)
+choco install docker-desktop git python vscode
+```
+
+#### Step 2: Clone and Setup WhisperEngine
+```powershell
+# Open PowerShell or Command Prompt
+git clone https://github.com/whisperengine-ai/whisperengine.git
+cd whisperengine
+
+# Copy environment template
+copy .env.template .env.elena
+
+# Edit .env.elena in your preferred text editor
+notepad .env.elena
+# OR
+code .env.elena  # If using VS Code
+```
+
+#### Step 3: Configure Environment File
+Edit `.env.elena` with your credentials:
+```env
+# Discord Bot Configuration
+DISCORD_BOT_TOKEN=your_discord_bot_token_here
+DISCORD_BOT_NAME=elena
+CHARACTER_FILE=elena
+
+# LLM API Configuration (choose one)
+LLM_CLIENT_TYPE=openrouter
+OPENROUTER_API_KEY=your_openrouter_api_key_here
+
+# Database Configuration
+QDRANT_COLLECTION_NAME=whisperengine_memory_elena
+HEALTH_CHECK_PORT=9091
+```
+
+#### Step 4: Generate Configuration and Start System
+```powershell
+# Generate Docker configuration
+python scripts/generate_multi_bot_config.py
+
+# Start infrastructure first (wait for healthy status)
+docker-compose -f docker-compose.multi-bot.yml up -d postgres qdrant
+
+# Check infrastructure is ready (should show "healthy" status)
+docker-compose -f docker-compose.multi-bot.yml ps
+
+# Start Elena bot (after infrastructure is running)
+docker-compose -f docker-compose.multi-bot.yml up -d elena-bot
+
+# Verify everything is running
+docker-compose -f docker-compose.multi-bot.yml ps
+```
+
+### Windows Management Commands
+
+**Essential Docker Commands for Windows:**
+```powershell
+# View all running containers
+docker ps
+
+# Check specific service logs
+docker-compose -f docker-compose.multi-bot.yml logs elena-bot
+docker-compose -f docker-compose.multi-bot.yml logs postgres
+docker-compose -f docker-compose.multi-bot.yml logs qdrant
+
+# Follow logs in real-time
+docker-compose -f docker-compose.multi-bot.yml logs -f elena-bot
+
+# Restart a specific service
+docker-compose -f docker-compose.multi-bot.yml restart elena-bot
+
+# Stop all services
+docker-compose -f docker-compose.multi-bot.yml down
+
+# Remove all data (CAUTION: Deletes all conversations/memories)
+docker-compose -f docker-compose.multi-bot.yml down -v
+```
+
+**Starting Multiple Characters:**
+```powershell
+# Start infrastructure first
+docker-compose -f docker-compose.multi-bot.yml up -d postgres qdrant
+
+# Add more characters (create .env files first)
+docker-compose -f docker-compose.multi-bot.yml up -d elena-bot marcus-bot jake-bot
+
+# Check all services
+docker-compose -f docker-compose.multi-bot.yml ps
+```
+
+### Windows Troubleshooting
+
+**Common Windows Issues:**
+
+1. **"docker-compose not found"**
+   ```powershell
+   # Use Docker Compose V2 syntax
+   docker compose -f docker-compose.multi-bot.yml up -d
+   ```
+
+2. **Permission Errors**
+   ```powershell
+   # Run PowerShell as Administrator
+   # Or check Docker Desktop is running and WSL2 is enabled
+   ```
+
+3. **Port Already in Use**
+   ```powershell
+   # Find what's using the port
+   netstat -ano | findstr :9091
+   
+   # Kill the process (replace PID with actual process ID)
+   taskkill /PID 1234 /F
+   ```
+
+4. **Python Not Found**
+   ```powershell
+   # Install Python from Microsoft Store or python.org
+   # Or use py instead of python
+   py scripts/generate_multi_bot_config.py
+   ```
+
+### Windows Alternatives to Shell Scripts
+
+If you prefer shell-like commands, you have options:
+
+**Option 1: Git Bash (Recommended)**
+```bash
+# After installing Git for Windows, use Git Bash terminal
+./multi-bot.sh start elena
+./multi-bot.sh logs elena
+./multi-bot.sh status
+```
+
+**Option 2: WSL2 Ubuntu**
+```bash
+# Install WSL2 Ubuntu from Microsoft Store
+wsl --install Ubuntu
+# Then use Linux commands normally
+./multi-bot.sh start elena
+```
+
+**Option 3: PowerShell Functions**
+Create a PowerShell profile with helper functions:
+```powershell
+# Add to your PowerShell profile
+function Start-WhisperBot($botName) {
+    docker-compose -f docker-compose.multi-bot.yml up -d postgres qdrant "$botName-bot"
+}
+
+function Get-WhisperLogs($botName) {
+    docker-compose -f docker-compose.multi-bot.yml logs -f "$botName-bot"
+}
+
+function Stop-WhisperEngine {
+    docker-compose -f docker-compose.multi-bot.yml down
+}
+
+# Usage:
+Start-WhisperBot elena
+Get-WhisperLogs elena
+Stop-WhisperEngine
+```
+
+### Windows HTTP API Testing
+
+Test your bots using PowerShell:
+```powershell
+# Test Elena's health endpoint
+Invoke-RestMethod -Uri "http://localhost:9091/health"
+
+# Send a chat message
+$body = @{
+    user_id = "your_user_id"
+    message = "Hello Elena!"
+    context = @{
+        platform = "api"
+        channel_type = "dm"
+    }
+} | ConvertTo-Json
+
+Invoke-RestMethod -Uri "http://localhost:9091/api/chat" -Method POST -Body $body -ContentType "application/json"
+```
 
 ## 🎭 Character Authoring
 
@@ -643,6 +925,8 @@ For detailed technical information, setup guides, and development documentation:
 ### Key Documentation Files
 
 - **[Quick Start Guide](docs/getting-started/QUICK_START.md)** - Step-by-step setup
+- **[Installation Guide](docs/getting-started/INSTALLATION.md)** - Comprehensive setup options
+- **🪟 Windows Setup Guide** - Complete Windows installation (see Windows section above)
 - **[Character Creation Guide](docs/characters/cdl-specification.md)** - Build custom personalities
 - **[Multi-Bot Setup](docs/multi-bot/MULTI_BOT_SETUP.md)** - Deploy multiple characters
 - **[Development Guide](docs/development/DEVELOPMENT_GUIDE.md)** - Contribute to WhisperEngine
@@ -1098,3 +1382,5 @@ See our **[Contributing Guide](docs/development/CONTRIBUTING.md)** to get starte
 **Ready to create your first AI Roleplay Character?** 
 
 🚀 **[Get Started Now](docs/getting-started/QUICK_START.md)** and bring your digital personality to life!
+
+🪟 **Windows Users:** Use the comprehensive Windows setup guide above for step-by-step Docker commands!
