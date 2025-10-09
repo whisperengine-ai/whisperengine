@@ -18,7 +18,7 @@ services:
       - LLM_CHAT_MODEL=local-model  # Uses whatever model is loaded in LM Studio
       - LLM_CHAT_API_KEY=
       - SYNTHETIC_USE_LLM=true
-      - LLM_MAX_TOKENS_CHAT=1024
+      - LLM_MAX_TOKENS_CHAT=2048  # Increased for better response generation
       # Bot endpoints (adjust based on your setup)
       - ELENA_ENDPOINT=http://host.docker.internal:9091
       - MARCUS_ENDPOINT=http://host.docker.internal:9092

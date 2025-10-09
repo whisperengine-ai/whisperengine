@@ -1325,7 +1325,7 @@ class SyntheticConversationGenerator:
 
             # Use chat completion API instead of completion API
             try:
-                response = self.llm_client.generate_chat_completion(messages, max_tokens=50, temperature=0.7)
+                response = self.llm_client.generate_chat_completion(messages, max_tokens=100, temperature=0.7)
                 
                 # If it's a coroutine, await it
                 if hasattr(response, '__await__'):
@@ -1350,9 +1350,11 @@ class SyntheticConversationGenerator:
                 
                 # Clean and validate
                 generated_message = generated_message.strip().strip('"\'')
-                if generated_message and len(generated_message) > 10:
+                if generated_message and len(generated_message) > 5:  # Reduced minimum length
                     logger.info(f"✅ LLM opener: {generated_message[:50]}...")
                     return generated_message
+                else:
+                    logger.warning(f"⚠️ LLM generated short/empty opener: '{generated_message}' - using template fallback")
                     
             except Exception as e:
                 logger.warning(f"LLM call failed: {e}")
@@ -1514,7 +1516,7 @@ class SyntheticConversationGenerator:
 
             # Use chat completion API instead of completion API
             try:
-                response = self.llm_client.generate_chat_completion(messages, max_tokens=50, temperature=0.7)
+                response = self.llm_client.generate_chat_completion(messages, max_tokens=100, temperature=0.7)
                 
                 # Handle async if needed
                 if hasattr(response, '__await__'):
