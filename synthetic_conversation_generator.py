@@ -312,6 +312,34 @@ class SyntheticConversationGenerator:
                     "emotional_range": ["curiosity", "excitement", "contemplation"],
                     "duration_messages": (5, 18)
                 }
+            ],
+            ConversationType.CRISIS_SIMULATION: [
+                {
+                    "opener": "I'm going through a really difficult time right now and need someone to talk to",
+                    "topics": ["crisis support", "emergency coping", "immediate help", "emotional stabilization"],
+                    "emotional_range": ["fear", "anxiety", "despair", "hope"],
+                    "duration_messages": (6, 20)
+                },
+                {
+                    "opener": "Something urgent happened and I don't know what to do",
+                    "topics": ["decision making", "crisis management", "urgent support"],
+                    "emotional_range": ["panic", "confusion", "fear", "relief"],
+                    "duration_messages": (5, 15)
+                }
+            ],
+            ConversationType.CELEBRATION_SHARING: [
+                {
+                    "opener": "I have amazing news to share with you! {personal_detail} just happened!",
+                    "topics": ["achievements", "milestones", "good news", "celebrations"],
+                    "emotional_range": ["joy", "excitement", "pride", "gratitude"],
+                    "duration_messages": (4, 12)
+                },
+                {
+                    "opener": "Today is such a special day and I wanted to celebrate with you",
+                    "topics": ["special occasions", "anniversaries", "personal victories"],
+                    "emotional_range": ["happiness", "excitement", "love", "celebration"],
+                    "duration_messages": (3, 10)
+                }
             ]
         }
     
@@ -429,8 +457,18 @@ class SyntheticConversationGenerator:
         if "{personal_detail}" in message:
             # Use backstory details
             hobbies = user.backstory.get('hobbies', user.interests)
+            
+            # Handle family data which can be either dict or set
+            family_data = user.backstory.get('family', {})
+            if isinstance(family_data, dict) and family_data:
+                family_detail = f"my {list(family_data.keys())[0]}"
+            elif isinstance(family_data, (set, list)) and family_data:
+                family_detail = f"my {list(family_data)[0]}"
+            else:
+                family_detail = "my family"
+            
             details = [
-                f"my {list(user.backstory.get('family', {}).keys())[0] if user.backstory.get('family') else 'family'}",
+                family_detail,
                 f"my work as a {user.backstory.get('occupation', 'professional')}",
                 f"my hobby of {random.choice(hobbies)}"
             ]
