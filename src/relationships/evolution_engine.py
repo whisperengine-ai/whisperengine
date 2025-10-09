@@ -1,5 +1,5 @@
 """
-Relationship Evolution Engine - Sprint 3: RelationshipTuner
+Relationship Evolution Engine - Dynamic Relationship Management
 
 Implements dynamic relationship scoring that adapts based on interaction patterns
 and conversation outcomes. Makes relationships ACTUALLY EVOLVE based on user
@@ -9,13 +9,13 @@ Core Features:
 - Dynamic relationship score updates after each conversation
 - Simple progression/regression based on conversation quality
 - RoBERTa emotion variance integration for complexity detection
-- Integration with Sprint 1 TrendWise for conversation outcomes
+- Integration with conversation quality tracking for outcomes
 - PostgreSQL storage for relationship history
 
 MVP Approach:
 - Focus on making relationships update based on conversations
-- Use existing Sprint 1 ConversationOutcome for quality signals
-- Leverage Sprint 2 RoBERTa emotion_variance for nuanced scoring
+- Use existing conversation outcome data for quality signals
+- Leverage RoBERTa emotion_variance for nuanced scoring
 - Simple increment/decrement logic (can enhance later)
 - No complex multi-dimensional modeling yet
 """

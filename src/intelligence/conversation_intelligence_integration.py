@@ -238,13 +238,13 @@ def apply_phase4_integration_patch(
         memory_manager.retrieve_relevant_memories_phase4 = enhanced_retrieve_relevant_memories_async
 
         # Add comprehensive message processing method
-        async def process_with_phase4_intelligence(
+        async def process_with_conversation_intelligence(
             user_id: str,
             message: str,
             conversation_context: list[dict] | None = None,
             discord_context: dict | None = None,
         ) -> Phase4Context:
-            """Process message with full Phase 4 intelligence"""
+            """Process message with full conversation intelligence"""
             return await phase4_integration.process_comprehensive_message(
                 user_id=user_id,
                 message=message,
@@ -252,7 +252,7 @@ def apply_phase4_integration_patch(
                 discord_context=discord_context,
             )
 
-        memory_manager.process_with_phase4_intelligence = process_with_phase4_intelligence
+        memory_manager.process_with_conversation_intelligence = process_with_conversation_intelligence
 
         # Add method to get comprehensive response context
         async def get_phase4_response_context(phase4_context: Phase4Context) -> dict[str, Any]:

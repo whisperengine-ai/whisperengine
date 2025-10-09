@@ -31,6 +31,29 @@ This step has been superseded by the Memory Intelligence Convergence roadmap (`M
 
 ---
 
+## 🗺️ **Roadmap-to-Code Mapping**
+
+**Development Step Tracking** → **Semantic Code Implementation**
+```
+📋 STEP 1: Basic CDL Integration      → SimpleCDLManager (personal knowledge) ✅ COMPLETE
+📋 STEP 2: Cross-Pollination          → CharacterGraphManager ✅ COMPLETE  
+📋 STEP 3: Memory Trigger             → Trigger-based memory activation ✅ COMPLETE
+📋 STEP 4: Emotional Context          → ⚠️ SUPERSEDED by Memory Intelligence Convergence
+📋 STEP 5+: Future Enhancements       → 📋 PLANNED
+```
+
+**Code Locations**:
+- **CharacterGraphManager**: `src/characters/graph/character_graph_manager.py` (712 lines, production-ready)
+- **SimpleCDLManager**: `src/characters/cdl/simple_manager.py` (lazy-loading properties)
+- **Integration**: Via `src/prompts/cdl_ai_integration.py` (CDL pipeline)
+
+**Navigation Notes**:
+- **Roadmap Progress**: Track with STEP numbers for development status  
+- **Code Search**: Use semantic names like `CharacterGraphManager` for precise location
+- **Testing**: All components have validation scripts in `tests/automated/`
+
+---
+
 ## 📋 Implementation Steps
 
 ### ✅ **Foundation Complete** (Pre-Step 1)

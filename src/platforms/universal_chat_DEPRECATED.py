@@ -914,14 +914,14 @@ class UniversalChatOrchestrator:
             # Memory retrieval is handled by the vector memory system
             additional_memories = []
 
-            # Apply Phase 4 Intelligence if available
-            if hasattr(memory_manager, "process_with_phase4_intelligence"):
+            # Apply Conversation Intelligence if available
+            if hasattr(memory_manager, "process_with_conversation_intelligence"):
                 try:
-                    await memory_manager.process_with_phase4_intelligence(
+                    await memory_manager.process_with_conversation_intelligence(
                         message.user_id, message.content, relevant_memories, emotion_context
                     )
                 except Exception as e:
-                    logging.warning(f"Phase 4 intelligence processing failed: {e}")
+                    logging.warning(f"Conversation intelligence processing failed: {e}")
 
             # Apply Phase 4.1: Memory-Triggered Personality Moments if available
             memory_moments_context = None

@@ -111,17 +111,29 @@
 - When user asks to "document", update existing relevant doc, don't create new file
 - Focus on **implementation velocity** over documentation bureaucracy
 
-**🚨 CRITICAL NAMING CONVENTION: NO DEVELOPMENT PHASE NAMES IN PRODUCTION CODE!**
+**🚨 CRITICAL NAMING CONVENTION: SEMANTIC NAMES ONLY - NO DEVELOPMENT PHASE NAMES!**
 - **NEVER use development phase names** in production code: "sprint1", "sprint2", "sprint3", "phase4", etc.
 - **USE SEMANTIC, DOMAIN-DRIVEN NAMES** that describe WHAT code does, not WHEN it was built
-- **Examples of BAD names**: `sprint3_relationship`, `phase4_intelligence`, `sprint1_confidence`, `_update_sprint3_scores()`
-- **Examples of GOOD names**: `relationship_state`, `conversation_intelligence`, `conversation_confidence`, `_update_relationship_scores()`
-- **Examples of GOOD names**: `relationship_state`, `conversation_intelligence`, `conversation_confidence`, `_update_relationship_scores()`
-- **Rationale**: Development phase names create confusion, make code harder to understand, and don't describe functionality
+- **Examples of BAD names**: `sprint3_relationship`, `phase4_intelligence`, `sprint1_confidence`, `process_phase4_intelligence()`
+- **Examples of GOOD names**: `relationship_state`, `conversation_intelligence`, `conversation_confidence`, `process_conversation_intelligence()`
+- **Rationale**: Development phase names pollute search results, make code harder to understand, and don't describe functionality
 - **Domain language**: Use terms from problem domain (relationships, conversations, emotions, trust, affection, confidence)
 - **Intent-revealing**: Names should explain purpose without looking at implementation
 - **Timeless**: Names should remain accurate as codebase evolves
-- **See**: `NAMING_REFACTORING_PLAN.md` for comprehensive naming conversion map and migration strategy
+
+**🚨 DUAL NAMING SYSTEM FOR DEVELOPMENT TRACKING:**
+- **ROADMAPS**: Keep PHASE/STEP numbers for tracking development progress (e.g., "PHASE 1: Vector Intelligence")
+- **CODE**: Use semantic names for searchability and maintenance (e.g., `character_vector_episodic_intelligence.py`)
+- **MAPPING**: Roadmap phases map to semantic code implementations - both are maintained for navigation
+- **SEARCH ADVANTAGE**: `grep "conversation_intelligence"` returns precise results vs `grep "phase4"` returning 10+ unrelated hits
+- **AI NAVIGATION**: Agent tracks progress with roadmap phases, finds code with semantic names
+- **See**: `ROADMAP_CODE_MAPPING_STRATEGY.md` for comprehensive dual naming approach
+
+**🚨 DICTIONARY KEY STANDARDS:**
+- **HIGH IMPACT**: Dictionary keys used throughout application (ai_components, pipeline_result) MUST use semantic names
+- **Examples**: `'conversation_intelligence'` NOT `'phase4_context'`, `'emotion_context'` NOT `'phase2_results'`
+- **INTERNAL KEYS**: Even internal dictionary structure uses semantic names: `'memory_context'`, `'conversation_patterns'`
+- **FILE HEADERS**: Remove "Sprint X" or "Phase Y" descriptions - use semantic system descriptions
 
 **ALPHA/DEV PHASE**: WhisperEngine is in active development. Prioritize working features over production optimization. No production users yet - we can freely iterate and change.
 

@@ -342,7 +342,7 @@ class SimplifiedEmotionManager:
         
         return enhanced_context
 
-    async def process_phase4_intelligence(
+    async def process_conversation_intelligence(
         self, 
         user_id: str,
         message,  # Can be Discord message or string
@@ -351,7 +351,7 @@ class SimplifiedEmotionManager:
         phase2_context = None
     ) -> Optional[Dict[str, Any]]:
         """
-        Process Phase 4 Intelligence Integration.
+        Process Conversation Intelligence Integration.
         
         This method provides the interface expected by MessageProcessor for Phase 4 processing.
         It initializes and runs the Phase4HumanLikeIntegration system.
@@ -428,9 +428,9 @@ class SimplifiedEmotionManager:
                 result = {
                     "conversation_mode": phase4_context.conversation_mode.value if hasattr(phase4_context.conversation_mode, 'value') else str(phase4_context.conversation_mode),
                     "interaction_type": phase4_context.interaction_type.value if hasattr(phase4_context.interaction_type, 'value') else str(phase4_context.interaction_type),
-                    "phase2_results": serialize_datetime_objects(phase4_context.phase2_results),
-                    "phase3_results": serialize_datetime_objects(phase4_context.phase3_results),
-                    "human_like_results": serialize_datetime_objects(phase4_context.human_like_results),
+                    "emotion_context": serialize_datetime_objects(phase4_context.phase2_results),
+                    "memory_context": serialize_datetime_objects(phase4_context.phase3_results),
+                    "conversation_patterns": serialize_datetime_objects(phase4_context.human_like_results),
                     "memory_enhancement_results": serialize_datetime_objects(phase4_context.memory_enhancement_results),
                     "processing_metadata": serialize_datetime_objects(phase4_context.processing_metadata)
                 }

@@ -1,5 +1,5 @@
 """
-Confidence Adapter - Sprint 1: TrendWise
+Confidence Adapter - Conversation Quality Tracking
 
 Adapts bot response style based on confidence trend analysis.
 When confidence is declining or below thresholds, adjusts:

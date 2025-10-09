@@ -620,7 +620,7 @@ class BotEventHandlers:
 
         # Initialize variables early
         enhanced_system_prompt = None
-        phase4_context = None
+        conversation_intelligence_context = None
         comprehensive_context = None
 
         # Use unified MessageProcessor if available (preferred), fallback to complex manual processing
@@ -1111,7 +1111,7 @@ class BotEventHandlers:
         self._last_phase3_context_switches = None
         self._last_phase3_empathy_calibration = None
         self._last_dynamic_personality_context = None
-        self._last_phase4_context = None
+        self._last_conversation_intelligence_context = None
         self._last_comprehensive_context = None
         self._last_enhanced_system_prompt = None
 
@@ -1240,7 +1240,7 @@ class BotEventHandlers:
         current_emotion_data=None,
         external_emotion_data=None,
         phase2_context=None,
-        phase4_context=None,
+        conversation_intelligence_context=None,
         dynamic_personality_context=None
     ):
         """
@@ -1293,8 +1293,8 @@ class BotEventHandlers:
                 mood_assessment=external_emotion_data if isinstance(external_emotion_data, dict) else None,
                 # Map personality data 
                 personality_profile=dynamic_personality_context if isinstance(dynamic_personality_context, dict) else None,
-                # Map phase4 data
-                enhanced_context=phase4_context if isinstance(phase4_context, dict) else None
+                # Map conversation intelligence data
+                enhanced_context=conversation_intelligence_context if isinstance(conversation_intelligence_context, dict) else None
             )
             
             # 🎯 ENHANCE: Add context analysis insights to pipeline result

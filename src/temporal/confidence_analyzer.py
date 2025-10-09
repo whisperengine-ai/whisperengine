@@ -169,9 +169,9 @@ class ConfidenceAnalyzer:
             trust_level = max(0.1, min(0.9, trust_level))  # Clamp to reasonable range
             
             # Affection based on emotional resonance and interaction quality
-            if 'phase4_intelligence' in ai_components:
-                phase4_data = ai_components['phase4_intelligence']
-                interaction_type = phase4_data.get('interaction_type', 'general')
+            if 'conversation_intelligence' in ai_components:
+                conversation_data = ai_components['conversation_intelligence']
+                interaction_type = conversation_data.get('interaction_type', 'general')
                 
                 # Personal interactions indicate higher affection
                 if interaction_type in ['personal', 'emotional_support']:

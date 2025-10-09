@@ -19,7 +19,25 @@
 
 ---
 
-## 📋 **Implementation Phases**
+## �️ **Roadmap-to-Code Mapping**
+
+**Development Phase Tracking** → **Semantic Code Implementation**
+```
+📋 PHASE 0: Foundation Analysis    → MEMORY_INTELLIGENCE_CONVERGENCE.md (analysis docs)
+📋 PHASE 1: Vector Intelligence    → character_vector_episodic_intelligence.py
+📋 PHASE 2: Temporal Evolution     → character_temporal_intelligence.py  
+📋 PHASE 3: Graph Knowledge        → character_graph_intelligence.py
+📋 PHASE 4: Unified Coordination   → unified_character_intelligence_coordinator.py ✅ EXISTS
+```
+
+**Navigation Notes**:
+- **Roadmap Progress**: Track with PHASE numbers for development status
+- **Code Search**: Use semantic names for precise file/function location
+- **Integration**: All implementations integrate via `src/core/message_processor.py`
+
+---
+
+## �📋 **Implementation Phases**
 
 ### ✅ **PHASE 0: Foundation Analysis** (COMPLETE)
 **Duration**: Completed  
