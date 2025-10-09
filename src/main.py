@@ -230,6 +230,20 @@ class ModularBotManager:
             await setup_performance_commands(self.bot)
             logger.info("✅ Performance monitoring commands enabled (InfluxDB metrics only)")
 
+            # Ban system commands
+            from src.handlers.ban_commands import BanCommandHandlers
+            
+            if self.bot:  # Ensure bot is initialized
+                self.command_handlers["ban"] = BanCommandHandlers(
+                    bot=self.bot,
+                    postgres_pool=components.get("postgres_pool")  # Use shared PostgreSQL pool
+                )
+                self.command_handlers["ban"].register_commands(bot_name_filter, is_admin)
+                logger.info("✅ Ban command handlers registered with shared PostgreSQL pool")
+            else:
+                logger.warning("⚠️ Ban command handlers skipped - bot not initialized")
+            logger.info("✅ Performance monitoring commands enabled (InfluxDB metrics only)")
+
             # ℹ️ Multi-entity handlers removed - using vector-native memory approach
 
             logger.info("ℹ️ Deleted obsolete command handlers: CDL Test, Monitoring, LLM Self-Memory")

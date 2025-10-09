@@ -159,6 +159,10 @@ class BotEventHandlers:
             logger.error(f"❌ Failed to initialize MessageProcessor: {e}")
             self.message_processor = None
 
+        # Initialize ban checking system
+        self._ban_checker = None
+        self._init_ban_checker()
+
         # Universal Chat Orchestrator - DEPRECATED (Discord-only processing now)
         self.chat_orchestrator = None
 
@@ -259,6 +263,40 @@ class BotEventHandlers:
                 self._user_message_locks[user_id] = asyncio.Lock()
                 logger.debug(f"🔒 Created message processing lock for user {user_id}")
             return self._user_message_locks[user_id]
+
+    def _init_ban_checker(self):
+        """Initialize ban checking system."""
+        try:
+            from src.handlers.ban_commands import BanCommandHandlers
+            from src.database.database_integration import DatabaseIntegrationManager
+            
+            db_integration = DatabaseIntegrationManager()
+            self._ban_checker = BanCommandHandlers(self.bot, db_integration)
+            logger.info("✅ Ban checking system initialized")
+        except Exception as e:
+            logger.error(f"❌ Failed to initialize ban checking system: {e}")
+            self._ban_checker = None
+
+    async def _is_user_banned(self, discord_user_id: str) -> bool:
+        """
+        Check if a Discord user is currently banned.
+        
+        Args:
+            discord_user_id: Discord user ID to check
+            
+        Returns:
+            True if user is banned, False otherwise
+        """
+        if not self._ban_checker:
+            # If ban checker is not available, assume not banned to avoid false positives
+            return False
+            
+        try:
+            return await self._ban_checker.is_user_banned(discord_user_id)
+        except Exception as e:
+            logger.error(f"Error checking ban status for user {discord_user_id}: {e}")
+            # On error, assume not banned to avoid false positives
+            return False
 
     def _register_events(self):
         """Register event handlers with the Discord bot."""
@@ -497,6 +535,12 @@ class BotEventHandlers:
         reply_channel = message.channel
         user_id = str(message.author.id)
         logger.debug(f"Processing DM from {message.author.name}")
+
+        # 🚫 BAN CHECK: Verify user is not banned before processing
+        if await self._is_user_banned(user_id):
+            logger.info(f"BANNED USER: Ignoring DM from banned user {user_id} ({message.author.name})")
+            # Silently ignore banned users - no response to prevent harassment
+            return
 
         # 🔒 RACE CONDITION FIX: Acquire per-user lock to ensure sequential message processing
         # This prevents message N from retrieving conversation history before message N-1's
@@ -742,6 +786,13 @@ class BotEventHandlers:
     async def _handle_mention_message(self, message):
         """Handle message where bot is mentioned."""
         reply_channel = message.channel
+        user_id = str(message.author.id)
+        
+        # 🚫 BAN CHECK: Verify user is not banned before processing
+        if await self._is_user_banned(user_id):
+            logger.info(f"BANNED USER: Ignoring mention from banned user {user_id} ({message.author.name})")
+            # Silently ignore banned users - no response to prevent harassment
+            return
         user_id = str(message.author.id)
         logger.info(f"[CONV-CTX] Handling mention message_id={message.id} user_id={user_id} channel_id={getattr(message.channel, 'id', None)} guild_id={getattr(message.guild, 'id', None)} content='{message.content[:60]}'")
 

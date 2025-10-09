@@ -180,6 +180,18 @@ class WhisperEngineSchema:
                     tags TEXT DEFAULT '{}'
                 )
             """,
+            "banned_users": """
+                CREATE TABLE IF NOT EXISTS banned_users (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    discord_user_id TEXT NOT NULL UNIQUE,
+                    banned_by TEXT NOT NULL,
+                    ban_reason TEXT,
+                    banned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    expires_at TIMESTAMP,
+                    is_active BOOLEAN DEFAULT TRUE,
+                    notes TEXT
+                )
+            """,
         }
 
     @staticmethod
@@ -208,6 +220,7 @@ class WhisperEngineSchema:
             "emotions",
             "relationships",
             "performance_metrics",
+            "banned_users",
         ]:
             if table_name in schema:
                 schema[table_name] = schema[table_name].replace(
@@ -223,6 +236,8 @@ class WhisperEngineSchema:
             CREATE INDEX IF NOT EXISTS idx_memory_entries_user_id ON memory_entries(user_id);
             CREATE INDEX IF NOT EXISTS idx_facts_user_id ON facts(user_id);
             CREATE INDEX IF NOT EXISTS idx_emotions_user_id ON emotions(user_id);
+            CREATE INDEX IF NOT EXISTS idx_banned_users_discord_id ON banned_users(discord_user_id);
+            CREATE INDEX IF NOT EXISTS idx_banned_users_active ON banned_users(is_active);
         """
 
         return schema
@@ -283,8 +298,8 @@ class DatabaseIntegrationManager:
 
         default_settings = {
             "schema_version": "1.0.0",
-            "deployment_mode": self.config_manager.config.deployment_mode,
-            "scale_tier": str(self.config_manager.config.scale_tier),
+            "deployment_mode": os.environ.get("DEPLOYMENT_MODE", "development"),
+            "scale_tier": "docker",
             "last_startup": "CURRENT_TIMESTAMP",
             "performance_mode": "balanced",
         }
