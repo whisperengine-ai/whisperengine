@@ -469,18 +469,10 @@ class WhisperEngineProductionAdapter:
         self.fallback_mode = False
 
     async def initialize_production_mode(self) -> bool:
-        """Initialize production mode if components are available"""
+        """Initialize production mode (permanently enabled)"""
         try:
-            # Check if production mode is enabled
-            enable_production = (
-                os.getenv("ENABLE_PRODUCTION_OPTIMIZATION", "true").lower() == "true"
-            )
-
-            if not enable_production:
-                logger.info("📋 Production optimization disabled by environment variable")
-                self.fallback_mode = True
-                return False
-
+            # Production optimization is now permanently enabled (no feature flag)
+            
             # Initialize production integrator
             self.production_integrator = ProductionSystemIntegrator(bot_core=self.bot_core)
             success = await self.production_integrator.initialize_production_components()

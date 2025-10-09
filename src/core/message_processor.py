@@ -93,24 +93,23 @@ class MessageProcessor:
         self.conversation_cache = conversation_cache
         
         # Phase 5: Initialize temporal intelligence with PostgreSQL integration
-        self.temporal_intelligence_enabled = os.getenv('ENABLE_TEMPORAL_INTELLIGENCE', 'true').lower() == 'true'
+        # Temporal intelligence is now permanently enabled (no feature flag)
         self.temporal_client = None
         self.confidence_analyzer = None
         
-        if self.temporal_intelligence_enabled:
-            try:
-                from src.temporal.temporal_protocol import create_temporal_intelligence_system
-                
-                # Pass knowledge_router for actual PostgreSQL relationship scores
-                knowledge_router = getattr(bot_core, 'knowledge_router', None) if bot_core else None
-                self.temporal_client, self.confidence_analyzer = create_temporal_intelligence_system(
-                    knowledge_router=knowledge_router
-                )
-                logger.info("Temporal intelligence initialized (enabled: %s, postgres_integration: %s)", 
-                           self.temporal_client.enabled, knowledge_router is not None)
-            except ImportError:
-                logger.warning("Temporal intelligence not available - install influxdb-client")
-                self.temporal_intelligence_enabled = False
+        # Initialize temporal intelligence (always enabled)
+        try:
+            from src.temporal.temporal_protocol import create_temporal_intelligence_system
+            
+            # Pass knowledge_router for actual PostgreSQL relationship scores
+            knowledge_router = getattr(bot_core, 'knowledge_router', None) if bot_core else None
+            self.temporal_client, self.confidence_analyzer = create_temporal_intelligence_system(
+                knowledge_router=knowledge_router
+            )
+            logger.info("Temporal intelligence initialized (postgres_integration: %s)", 
+                       knowledge_router is not None)
+        except ImportError:
+            logger.warning("Temporal intelligence not available - install influxdb-client")
         
         # STAGE 2: Enhanced AI Ethics for Character Learning
         self.enhanced_ai_ethics = None
@@ -130,7 +129,7 @@ class MessageProcessor:
         self.trend_analyzer = None
         self.confidence_adapter = None
         
-        if self.temporal_intelligence_enabled and self.temporal_client:
+        if self.temporal_client:
             try:
                 from src.analytics.trend_analyzer import create_trend_analyzer
                 from src.adaptation.confidence_adapter import create_confidence_adapter
@@ -153,7 +152,7 @@ class MessageProcessor:
         self.predictive_engine = None
         self.learning_pipeline = None
         
-        if self.temporal_intelligence_enabled and self.temporal_client:
+        if self.temporal_client:
             try:
                 from src.orchestration.learning_orchestrator import LearningOrchestrator
                 from src.adaptation.predictive_engine import PredictiveAdaptationEngine
@@ -419,7 +418,7 @@ class MessageProcessor:
         processing_time_ms: float
     ):
         """Record temporal intelligence metrics if enabled (Phase 7.5: includes bot emotion)."""
-        if not self.temporal_intelligence_enabled or not self.temporal_client or not self.confidence_analyzer:
+        if not self.temporal_client or not self.confidence_analyzer:
             return
 
         try:
@@ -2815,11 +2814,8 @@ class MessageProcessor:
             Dict with memory health metrics and aging results
         """
         try:
-            # Check if memory aging is enabled
+            # Memory aging is now permanently enabled (no feature flag)
             import os
-            if os.getenv('MEMORY_AGING_ENABLED', 'false').lower() != 'true':
-                logger.debug("Memory aging intelligence disabled via environment")
-                return None
                 
             # Import memory aging components
             from src.memory.aging.aging_policy import MemoryAgingPolicy
@@ -4371,7 +4367,7 @@ class MessageProcessor:
             }
         
         # 3. Phase 5 Temporal Intelligence (if available)
-        if self.temporal_intelligence_enabled and self.confidence_analyzer:
+        if self.confidence_analyzer:
             try:
                 # Get confidence metrics from analyzer
                 confidence_metrics = self.confidence_analyzer.calculate_confidence_metrics(

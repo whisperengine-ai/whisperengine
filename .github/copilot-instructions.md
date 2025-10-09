@@ -40,6 +40,16 @@
 
 ## 🚨 CRITICAL DEVELOPMENT CONTEXT 🚨
 
+**🚨 CRITICAL LIVE SYSTEM OPERATIONS - ASK BEFORE RESTARTING:**
+- **NEVER restart bots, services, or containers without explicit user permission**
+- **WhisperEngine is a LIVE PRODUCTION SYSTEM** - users may be actively chatting with bots
+- **ALWAYS ASK before running restart commands**: `./multi-bot.sh restart`, `docker restart`, `docker-compose restart`
+- **DEBUGGING FIRST**: Use log inspection, health checks, and API testing before considering restarts
+- **Code changes**: Test with direct Python validation scripts before restarting live services
+- **For urgent fixes**: Ask user "Should I restart [specific bot/service] to apply this fix?"
+- **Emergency restart protocol**: Only restart if user explicitly confirms or system is completely broken
+- **Log analysis is NON-DESTRUCTIVE**: Always prefer log checking over service manipulation
+
 **🚨 CRITICAL DESIGN PHILOSOPHY: PERSONALITY-FIRST ARCHITECTURE:**
 - **WhisperEngine prioritizes AUTHENTIC CHARACTER PERSONALITY over tool-like instruction compliance**
 - **CDL (Character Definition Language) personality adherence is HIGH PRIORITY** - characters maintain their identity even when it conflicts with rigid format constraints

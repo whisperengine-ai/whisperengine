@@ -3961,11 +3961,11 @@ class VectorMemoryManager:
             if any(keyword in query_lower for keyword in emotional_keywords):
                 logger.info(f"🎭 EMOTIONAL QUERY DETECTED: '{query}' - Using emotion vector search")
                 try:
-                    emotion_results = await self.vector_store.search_with_emotional_context(
-                        content_query=query,
-                        emotional_query=query,  # Use same query for emotion matching
+                    emotion_results = await self.vector_store.search_memories_with_qdrant_intelligence(
+                        query=query,
                         user_id=user_id,
-                        top_k=limit
+                        top_k=limit,
+                        emotional_context=query  # Use same query for emotion matching
                     )
                     
                     if emotion_results:

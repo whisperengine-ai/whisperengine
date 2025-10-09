@@ -41,7 +41,7 @@ class BackupManager:
         self.chromadb_path = Path(os.getenv("CHROMADB_DATA_PATH", "./chromadb_data"))
 
         # Load backup configuration from environment
-        self.auto_backup_enabled = os.getenv("AUTO_BACKUP_ENABLED", "true").lower() == "true"
+        # Auto backup is now permanently enabled (no feature flag)
         self.backup_interval_hours = int(os.getenv("AUTO_BACKUP_INTERVAL_HOURS", "24"))
         self.backup_retention_count = int(os.getenv("BACKUP_RETENTION_COUNT", "5"))
 
@@ -51,7 +51,7 @@ class BackupManager:
             f"BackupManager initialized: chromadb_http={self.chromadb_host}:{self.chromadb_port}, backups={relative_backup_path}"
         )
         logger.info(
-            f"Auto backup: enabled={self.auto_backup_enabled}, interval={self.backup_interval_hours}h, retention={self.backup_retention_count}"
+            f"Auto backup: permanently enabled, interval={self.backup_interval_hours}h, retention={self.backup_retention_count}"
         )
 
     async def create_backup(self, include_metadata: bool = True) -> str:

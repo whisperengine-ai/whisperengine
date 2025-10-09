@@ -7,7 +7,6 @@ Provides natural emoji+text responses based on character personalities.
 """
 
 import logging
-import os
 from typing import Dict, Optional, Any, Tuple
 
 from .cdl_emoji_personality import CDLEmojiGenerator, EmojiResponse
@@ -23,13 +22,13 @@ class CDLEmojiIntegration:
     
     def __init__(self, character_files_dir: str = "characters/examples"):
         self.emoji_generator = CDLEmojiGenerator(character_files_dir)
-        self.enabled = os.getenv("EMOJI_ENABLED", "true").lower() == "true"
+        # Emoji integration is now permanently enabled (no feature flag)
         
         # Override thresholds when CDL system is active
         self.cdl_base_threshold = 0.3  # Lower threshold since CDL handles frequency internally
         self.cdl_new_user_threshold = 0.2
         
-        logger.info(f"🎭 CDL Emoji Integration initialized (enabled: {self.enabled})")
+        logger.info("🎭 CDL Emoji Integration initialized (permanently enabled)")
         
     def enhance_bot_response(self,
                            character_file: str,
@@ -50,9 +49,7 @@ class CDLEmojiIntegration:
         Returns:
             (enhanced_response, emoji_metadata)
         """
-        if not self.enabled:
-            return bot_response, {"cdl_emoji_applied": False, "reason": "disabled"}
-            
+        # Emoji integration is now permanently enabled
         try:
             # Determine if we should add emojis based on CDL personality
             should_add, confidence = self.emoji_generator.should_add_emojis(
