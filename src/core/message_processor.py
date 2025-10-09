@@ -2236,7 +2236,7 @@ class MessageProcessor:
                 'external_emotion_data': None,
                 'context_analysis': None,
                 'personality_context': None,
-                'phase4_context': None,
+                'conversation_intelligence': None,
                 'comprehensive_context': None,
                 'enhanced_system_prompt': None
             }
@@ -2291,7 +2291,7 @@ class MessageProcessor:
             phase3_empathy_calibration = await self._calibrate_empathy_response(user_id, content, discord_message)
             
             # Process with conversation intelligence sophistication
-            conversation_context_result = await self.bot_core.phase2_integration.process_phase4_intelligence(
+            conversation_context_result = await self.bot_core.phase2_integration.process_conversation_intelligence(
                 user_id=user_id,
                 message=discord_message,
                 recent_messages=conversation_context,
@@ -3244,7 +3244,7 @@ class MessageProcessor:
             discord_message = create_discord_message_adapter(message_context)
             
             # Use conversation intelligence integration if available
-            conversation_context_result = await self.bot_core.phase2_integration.process_phase4_intelligence(
+            conversation_context_result = await self.bot_core.phase2_integration.process_conversation_intelligence(
                 user_id=user_id,
                 message=discord_message,
                 recent_messages=[],
@@ -3492,8 +3492,8 @@ class MessageProcessor:
                 mood_assessment=ai_components.get('external_emotion_data') if isinstance(ai_components.get('external_emotion_data'), dict) else None,
                 # Map personality data 
                 personality_profile=ai_components.get('personality_context') if isinstance(ai_components.get('personality_context'), dict) else None,
-                # Map phase4 data
-                enhanced_context=ai_components.get('phase4_context') if isinstance(ai_components.get('phase4_context'), dict) else None
+                # Map conversation intelligence data
+                enhanced_context=ai_components.get('conversation_intelligence') if isinstance(ai_components.get('conversation_intelligence'), dict) else None
             )
             
             # 🎭 CRITICAL FIX: Add emotion_analysis mapping for CDL integration  
