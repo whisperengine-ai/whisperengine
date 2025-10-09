@@ -21,9 +21,10 @@ services:
       - bot_network
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U whisperengine -d whisperengine"]
-      interval: 30s
+      interval: 10s
       timeout: 10s
-      retries: 3
+      retries: 5
+      start_period: 40s
 
   # Redis - Commented out since we're using vector-native memory with Qdrant only
   # redis:
@@ -52,12 +53,8 @@ services:
       - qdrant_data:/qdrant/storage
     networks:
       - bot_network
-    healthcheck:
-      test: ["CMD-SHELL", "exit 0"]  # Simple always-pass healthcheck
-      interval: 5s
-      timeout: 2s
-      retries: 1
-      start_period: 10s
+    # Health check disabled - Qdrant containers have minimal tooling
+    # Bots will retry connections if Qdrant isn't ready yet
 
   influxdb:
     image: influxdb:2.7-alpine
@@ -82,6 +79,7 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 60s
 
   # CDL Web UI for character authoring and management
   cdl-web-ui:
@@ -103,7 +101,8 @@ services:
     ports:
       - "3001:3000"
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
     networks:
       - bot_network
     healthcheck:
@@ -167,6 +166,7 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 60s
     volumes:
       - jake_backups:/app/backups
       - jake_privacy:/app/privacy
@@ -188,7 +188,7 @@ services:
       postgres:
         condition: service_healthy
       qdrant:
-        condition: service_healthy
+        condition: service_started
       # - redis  # Commented out - using vector-native memory only
 
   marcus-bot:
@@ -233,6 +233,7 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 60s
     volumes:
       - marcus_backups:/app/backups
       - marcus_privacy:/app/privacy
@@ -254,7 +255,7 @@ services:
       postgres:
         condition: service_healthy
       qdrant:
-        condition: service_healthy
+        condition: service_started
       # - redis  # Commented out - using vector-native memory only
 
   dotty-bot:
@@ -299,6 +300,7 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 60s
     volumes:
       - dotty_backups:/app/backups
       - dotty_privacy:/app/privacy
@@ -320,7 +322,7 @@ services:
       postgres:
         condition: service_healthy
       qdrant:
-        condition: service_healthy
+        condition: service_started
       # - redis  # Commented out - using vector-native memory only
 
   dream-bot:
@@ -365,6 +367,7 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 60s
     volumes:
       - dream_backups:/app/backups
       - dream_privacy:/app/privacy
@@ -386,7 +389,7 @@ services:
       postgres:
         condition: service_healthy
       qdrant:
-        condition: service_healthy
+        condition: service_started
       # - redis  # Commented out - using vector-native memory only
 
   aetheris-bot:
@@ -431,6 +434,7 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 60s
     volumes:
       - aetheris_backups:/app/backups
       - aetheris_privacy:/app/privacy
@@ -452,7 +456,7 @@ services:
       postgres:
         condition: service_healthy
       qdrant:
-        condition: service_healthy
+        condition: service_started
       # - redis  # Commented out - using vector-native memory only
 
   elena-bot:
@@ -497,6 +501,7 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 60s
     volumes:
       - elena_backups:/app/backups
       - elena_privacy:/app/privacy
@@ -518,7 +523,7 @@ services:
       postgres:
         condition: service_healthy
       qdrant:
-        condition: service_healthy
+        condition: service_started
       # - redis  # Commented out - using vector-native memory only
 
   aethys-bot:
@@ -563,6 +568,7 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 60s
     volumes:
       - aethys_backups:/app/backups
       - aethys_privacy:/app/privacy
@@ -584,7 +590,7 @@ services:
       postgres:
         condition: service_healthy
       qdrant:
-        condition: service_healthy
+        condition: service_started
       # - redis  # Commented out - using vector-native memory only
 
   ryan-bot:
@@ -629,6 +635,7 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 60s
     volumes:
       - ryan_backups:/app/backups
       - ryan_privacy:/app/privacy
@@ -650,7 +657,7 @@ services:
       postgres:
         condition: service_healthy
       qdrant:
-        condition: service_healthy
+        condition: service_started
       # - redis  # Commented out - using vector-native memory only
 
   gabriel-bot:
@@ -695,6 +702,7 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 60s
     volumes:
       - gabriel_backups:/app/backups
       - gabriel_privacy:/app/privacy
@@ -716,7 +724,7 @@ services:
       postgres:
         condition: service_healthy
       qdrant:
-        condition: service_healthy
+        condition: service_started
       # - redis  # Commented out - using vector-native memory only
 
   sophia-bot:
@@ -761,6 +769,7 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 60s
     volumes:
       - sophia_backups:/app/backups
       - sophia_privacy:/app/privacy
@@ -782,7 +791,7 @@ services:
       postgres:
         condition: service_healthy
       qdrant:
-        condition: service_healthy
+        condition: service_started
       # - redis  # Commented out - using vector-native memory only
 
 # ===== NETWORKS =====

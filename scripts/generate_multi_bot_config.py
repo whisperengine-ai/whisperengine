@@ -178,6 +178,7 @@ class BotConfigDiscovery:
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 60s
     volumes:
       - {bot_name}_backups:/app/backups
       - {bot_name}_privacy:/app/privacy
@@ -199,7 +200,7 @@ class BotConfigDiscovery:
       postgres:
         condition: service_healthy
       qdrant:
-        condition: service_healthy
+        condition: service_started
       # - redis  # Commented out - using vector-native memory only"""
         
         return service_yaml

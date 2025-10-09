@@ -24,6 +24,7 @@ class CDLAIPromptIntegration:
         self.bot_core = bot_core  # Store bot_core for personality profiler access
         self._graph_manager = None  # Cache for CharacterGraphManager
         self._graph_manager_initialized = False
+        self._context_enhancer = None  # Cache for CharacterContextEnhancer (Phase 2B)
         
         # Initialize the optimized prompt builder for size management
         from src.prompts.optimized_prompt_builder import create_optimized_prompt_builder
@@ -741,7 +742,44 @@ class CDLAIPromptIntegration:
             import traceback
             logger.error(f"❌ TRACEBACK: {traceback.format_exc()}")
 
-        # 🎯 SEMANTIC KNOWLEDGE INTEGRATION: Retrieve structured facts from PostgreSQL
+        # � PHASE 2B: PROACTIVE CONTEXT INJECTION - Automatically inject relevant character knowledge when topics arise
+        try:
+            context_enhancer = await self._get_context_enhancer()
+            if context_enhancer:
+                # Use the existing API from CharacterContextEnhancer
+                injection_result = await context_enhancer.detect_and_inject_context(
+                    user_message=message_content,
+                    character_name=character.identity.name,
+                    base_system_prompt=prompt,
+                    relevance_threshold=0.3  # Lower threshold for more context injection
+                )
+                
+                if injection_result.injection_score > 0:
+                    prompt = injection_result.enhanced_prompt
+                    context_count = (len(injection_result.relevant_background) + 
+                                   len(injection_result.relevant_abilities) + 
+                                   len(injection_result.relevant_memories))
+                    
+                    logger.info(f"🎭 PROACTIVE CONTEXT: Injected {context_count} context items (score: {injection_result.injection_score:.2f})")
+                    logger.info(f"🎭 DETECTED TOPICS: {injection_result.detected_topics}")
+                    
+                    # Log what was injected for debugging
+                    if injection_result.relevant_background:
+                        logger.debug(f"🎭 Background contexts: {len(injection_result.relevant_background)}")
+                    if injection_result.relevant_abilities:
+                        logger.debug(f"🎭 Ability contexts: {len(injection_result.relevant_abilities)}")
+                    if injection_result.relevant_memories:
+                        logger.debug(f"🎭 Memory contexts: {len(injection_result.relevant_memories)}")
+                else:
+                    logger.debug("🎭 PROACTIVE CONTEXT: No relevant context found for user message")
+            else:
+                logger.debug("🎭 PROACTIVE CONTEXT: CharacterContextEnhancer not available")
+        except Exception as e:
+            logger.error(f"❌ PROACTIVE CONTEXT ERROR: Context injection failed: {e}")
+            import traceback
+            logger.error(f"❌ TRACEBACK: {traceback.format_exc()}")
+
+        # �🎯 SEMANTIC KNOWLEDGE INTEGRATION: Retrieve structured facts from PostgreSQL
         if self.knowledge_router:
             try:
                 # Analyze query intent to determine what facts to retrieve
@@ -1249,6 +1287,46 @@ class CDLAIPromptIntegration:
                     
                 prompt += f"{i}. {content}{'...' if len(str(memory)) > 300 else ''}\n"
 
+        # 🌟 EPISODIC INTELLIGENCE: Character reflective thoughts based on memorable moments
+        try:
+            graph_manager = await self._get_graph_manager()
+            if graph_manager and hasattr(graph_manager, 'extract_episodic_memories'):
+                # Extract memorable moments for character reflection
+                episodic_memories = await graph_manager.extract_episodic_memories(
+                    character_name=character.identity.name,
+                    limit=2,  # Just a few memorable moments
+                    min_confidence=0.7,  # High confidence memories
+                    min_intensity=0.6   # Emotionally significant moments
+                )
+                
+                if episodic_memories:
+                    prompt += f"\n\n✨ CHARACTER EPISODIC MEMORIES (for natural reflection):\n"
+                    prompt += f"You remember these emotionally significant moments from past conversations:\n"
+                    
+                    for i, memory in enumerate(episodic_memories, 1):
+                        emotion_context = memory.get('primary_emotion', 'neutral')
+                        confidence = memory.get('roberta_confidence', 0.0)
+                        intensity = memory.get('emotional_intensity', 0.0)
+                        content = memory.get('content', '')[:200]
+                        
+                        # Add emotional context for character awareness
+                        if memory.get('is_multi_emotion', False):
+                            mixed_emotions = memory.get('mixed_emotions', [])
+                            if mixed_emotions:
+                                emotion_context += f" (with {mixed_emotions[0][0]})"
+                        
+                        prompt += f"{i}. {emotion_context.title()} moment: \"{content}{'...' if len(memory.get('content', '')) > 200 else ''}\"\n"
+                        prompt += f"   (Emotional significance: {intensity:.1f}/1.0, Confidence: {confidence:.1f}/1.0)\n"
+                    
+                    prompt += f"\nYou may naturally reference these memories if relevant to the current conversation.\n"
+                    logger.info("✨ EPISODIC INTELLIGENCE: Added %d memorable moments to character prompt", len(episodic_memories))
+                else:
+                    logger.debug("✨ EPISODIC INTELLIGENCE: No memorable moments found for %s", character.identity.name)
+            else:
+                logger.debug("✨ EPISODIC INTELLIGENCE: Graph manager not available or missing episodic methods")
+        except Exception as e:
+            logger.debug("✨ EPISODIC INTELLIGENCE: Failed to extract episodic memories: %s", str(e))
+
         # Add long-term conversation summary for continuity beyond recent history
         if conversation_summary:
             prompt += f"\n\n📚 CONVERSATION BACKGROUND:\n{conversation_summary}\n"
@@ -1586,6 +1664,36 @@ STOP WRITING after 2-4 sentences. Do not continue.
         
         return self._graph_manager
 
+    async def _get_context_enhancer(self):
+        """Get or initialize CharacterContextEnhancer (cached) - Phase 2B"""
+        if not self._context_enhancer:
+            try:
+                logger.info("🎭 CONTEXT ENHANCER INIT: Starting CharacterContextEnhancer initialization...")
+                
+                # First get the graph manager (required for context enhancer)
+                graph_manager = await self._get_graph_manager()
+                
+                if graph_manager:
+                    from src.characters.cdl.character_context_enhancer import create_character_context_enhancer
+                    
+                    # Initialize context enhancer with graph manager
+                    self._context_enhancer = create_character_context_enhancer(
+                        character_graph_manager=graph_manager
+                    )
+                    
+                    logger.info("✅ CONTEXT ENHANCER INIT: CharacterContextEnhancer initialized successfully!")
+                else:
+                    logger.warning("❌ CONTEXT ENHANCER INIT: No graph manager available - proactive context disabled")
+                    self._context_enhancer = None
+                    
+            except Exception as e:
+                logger.error(f"❌ CONTEXT ENHANCER INIT FAILED: Could not initialize CharacterContextEnhancer: {e}")
+                import traceback
+                logger.error(f"❌ TRACEBACK: {traceback.format_exc()}")
+                self._context_enhancer = None
+        
+        return self._context_enhancer
+
     async def _extract_cdl_personal_knowledge_sections(self, character, message_content: str, user_id: Optional[str] = None) -> str:
         """
         Extract relevant personal knowledge sections using CharacterGraphManager.
@@ -1662,6 +1770,35 @@ STOP WRITING after 2-4 sentences. Do not continue.
                         if any(family_term in rel['related_entity'].lower() for family_term in ['mother', 'father', 'sister', 'brother', 'parent']):
                             personal_sections.append(f"Family: {rel['related_entity']} - {rel.get('description', '')}")
             
+            # 🤝 PHASE 2A ENHANCEMENT: Extract relationships if message mentions relationships/connections
+            if any(keyword in message_lower for keyword in ['relationship', 'relationships', 'friend', 'friends', 'colleague', 'colleagues', 'partner', 'spouse', 'mentor', 'connection', 'connected', 'know', 'knows']):
+                logger.info("📊 GRAPH: Relationship keywords detected, querying character knowledge...")
+                result = await graph_manager.query_character_knowledge(
+                    character_name=character.identity.name,
+                    query_text=message_content,
+                    intent=CharacterKnowledgeIntent.RELATIONSHIPS,
+                    limit=5,
+                    user_id=user_id
+                )
+                
+                logger.info(f"📊 GRAPH: Relationships query returned - Relationships: {len(result.relationships)}, Background: {len(result.background)}")
+                
+                if not result.is_empty():
+                    # Format relationships with strength weighting
+                    for rel in result.relationships:
+                        strength = rel.get('relationship_strength', 5)
+                        rel_type = rel.get('relationship_type', 'connection')
+                        stars = '⭐' * min(strength, 5)
+                        relationship_entry = f"{stars} {rel_type.title()}: {rel['related_entity']} - {rel.get('description', '')}"
+                        personal_sections.append(relationship_entry)
+                        logger.info(f"📊 GRAPH: Added relationship: {rel['related_entity']} ({rel_type})")
+                    
+                    # Add relationship-relevant background entries
+                    for bg in result.background:
+                        if any(rel_keyword in bg['description'].lower() for rel_keyword in ['relationship', 'friend', 'colleague', 'partner', 'mentor']):
+                            importance = bg.get('importance_level', 5)
+                            personal_sections.append(f"Relationship Context ({importance}/10): {bg['description']}")
+            
             # Extract career/work info if message mentions work/career
             if any(keyword in message_lower for keyword in ['work', 'job', 'career', 'education', 'study', 'university', 'college', 'professional']):
                 logger.info("📊 GRAPH: Career keywords detected, querying character knowledge...")
@@ -1709,6 +1846,147 @@ STOP WRITING after 2-4 sentences. Do not continue.
                     for ability in result.abilities:
                         if ability.get('category') in ['hobby', 'personal', 'recreation']:
                             personal_sections.append(f"Hobby Skill: {ability['ability_name']}")
+            
+            # 🎓 PHASE 2A ENHANCEMENT: Extract education info if message mentions school/learning
+            if any(keyword in message_lower for keyword in ['education', 'school', 'college', 'university', 'degree', 'study', 'studied', 'learning', 'training', 'certification']):
+                logger.info("📊 GRAPH: Education keywords detected, querying character knowledge...")
+                result = await graph_manager.query_character_knowledge(
+                    character_name=character.identity.name,
+                    query_text=message_content,
+                    intent=CharacterKnowledgeIntent.EDUCATION,
+                    limit=3,
+                    user_id=user_id
+                )
+                
+                logger.info(f"📊 GRAPH: Education query returned - Background: {len(result.background)}, Abilities: {len(result.abilities)}")
+                
+                if not result.is_empty():
+                    for bg in result.background:
+                        importance = bg.get('importance_level', 5)
+                        education_entry = f"Education ({importance}/10 importance): {bg['description']}"
+                        personal_sections.append(education_entry)
+                        logger.info(f"📊 GRAPH: Added education background: {education_entry[:80]}...")
+            
+            # 💪 PHASE 2A ENHANCEMENT: Extract skills/abilities if message mentions expertise/talent
+            if any(keyword in message_lower for keyword in ['skill', 'skills', 'good at', 'expertise', 'expert', 'ability', 'abilities', 'talented', 'proficient', 'capable', 'competent']):
+                logger.info("📊 GRAPH: Skills keywords detected, querying character knowledge...")
+                result = await graph_manager.query_character_knowledge(
+                    character_name=character.identity.name,
+                    query_text=message_content,
+                    intent=CharacterKnowledgeIntent.SKILLS,
+                    limit=5,
+                    user_id=user_id
+                )
+                
+                logger.info(f"📊 GRAPH: Skills query returned - Abilities: {len(result.abilities)}, Background: {len(result.background)}")
+                
+                if not result.is_empty():
+                    for ability in result.abilities:
+                        proficiency = ability.get('proficiency_level', 5)
+                        skill_entry = f"Skill: {ability['ability_name']} (proficiency: {proficiency}/10)"
+                        personal_sections.append(skill_entry)
+                        logger.info(f"📊 GRAPH: Added skill: {skill_entry}")
+                    
+                    for bg in result.background:
+                        if 'skill' in bg['description'].lower() or 'ability' in bg['description'].lower():
+                            personal_sections.append(f"Skill Background: {bg['description']}")
+            
+            # 🧠 PHASE 2A ENHANCEMENT: Extract memories if message asks about experiences/past
+            if any(keyword in message_lower for keyword in ['remember', 'memory', 'memories', 'experience', 'experiences', 'happened', 'past', 'story', 'stories', 'recall', 'event']):
+                logger.info("📊 GRAPH: Memory keywords detected, querying character knowledge...")
+                result = await graph_manager.query_character_knowledge(
+                    character_name=character.identity.name,
+                    query_text=message_content,
+                    intent=CharacterKnowledgeIntent.MEMORIES,
+                    limit=3,
+                    user_id=user_id
+                )
+                
+                logger.info(f"📊 GRAPH: Memory query returned - Memories: {len(result.memories)}, Background: {len(result.background)}")
+                
+                if not result.is_empty():
+                    for memory in result.memories:
+                        importance = memory.get('importance_level', 5)
+                        emotional_impact = memory.get('emotional_impact', 5)
+                        memory_title = memory.get('title', 'Memory')
+                        memory_desc = memory.get('description', '')
+                        memory_entry = f"Memory ({importance}/10 importance, {emotional_impact}/10 emotional): {memory_title} - {memory_desc}"
+                        personal_sections.append(memory_entry)
+                        logger.info(f"📊 GRAPH: Added memory: {memory_title[:50]}...")
+            
+            # 📖 PHASE 2A ENHANCEMENT: Extract general background if message asks about character generally
+            if any(keyword in message_lower for keyword in ['about you', 'who are you', 'tell me about yourself', 'your background', 'your story', 'yourself', 'introduce yourself']):
+                logger.info("📊 GRAPH: Background keywords detected, querying character knowledge...")
+                result = await graph_manager.query_character_knowledge(
+                    character_name=character.identity.name,
+                    query_text=message_content,
+                    intent=CharacterKnowledgeIntent.BACKGROUND,
+                    limit=5,
+                    user_id=user_id
+                )
+                
+                logger.info(f"📊 GRAPH: Background query returned - Background: {len(result.background)}, Memories: {len(result.memories)}, Relationships: {len(result.relationships)}")
+                
+                if not result.is_empty():
+                    # Add high-importance background entries
+                    for bg in result.background[:5]:
+                        importance = bg.get('importance_level', 5)
+                        stars = '⭐' * min(importance, 5)
+                        background_entry = f"{stars} {bg['description']}"
+                        personal_sections.append(background_entry)
+                        logger.info(f"📊 GRAPH: Added background: {bg['description'][:80]}...")
+            
+            # 🌐 PHASE 2A ENHANCEMENT: Extract comprehensive character information for general inquiries
+            if any(keyword in message_lower for keyword in ['everything', 'anything', 'general', 'overview', 'summary', 'all about', 'comprehensive', 'complete', 'full picture', 'everything about']):
+                logger.info("📊 GRAPH: General keywords detected, querying comprehensive character knowledge...")
+                result = await graph_manager.query_character_knowledge(
+                    character_name=character.identity.name,
+                    query_text=message_content,
+                    intent=CharacterKnowledgeIntent.GENERAL,
+                    limit=10,  # More comprehensive results
+                    user_id=user_id
+                )
+                
+                logger.info(f"📊 GRAPH: General query returned - Background: {len(result.background)}, Abilities: {len(result.abilities)}, Relationships: {len(result.relationships)}, Memories: {len(result.memories)}")
+                
+                if not result.is_empty():
+                    # Add comprehensive background (top importance)
+                    background_added = 0
+                    for bg in sorted(result.background, key=lambda x: x.get('importance_level', 0), reverse=True)[:6]:
+                        importance = bg.get('importance_level', 5)
+                        if importance >= 7:  # Only high-importance for general overview
+                            stars = '⭐' * min(importance, 5)
+                            personal_sections.append(f"{stars} Overview: {bg['description']}")
+                            background_added += 1
+                    
+                    # Add key abilities/skills
+                    abilities_added = 0
+                    for ability in sorted(result.abilities, key=lambda x: x.get('proficiency_level', 0), reverse=True)[:4]:
+                        proficiency = ability.get('proficiency_level', 5)
+                        if proficiency >= 7:  # Only high-proficiency skills
+                            skill_entry = f"⚡ Key Skill: {ability['ability_name']} (expert level: {proficiency}/10)"
+                            personal_sections.append(skill_entry)
+                            abilities_added += 1
+                    
+                    # Add important relationships (top 3)
+                    relationships_added = 0
+                    for rel in sorted(result.relationships, key=lambda x: x.get('relationship_strength', 0), reverse=True)[:3]:
+                        strength = rel.get('relationship_strength', 5)
+                        if strength >= 6:  # Only meaningful relationships
+                            rel_type = rel.get('relationship_type', 'connection')
+                            personal_sections.append(f"🤝 {rel_type.title()}: {rel['related_entity']} (significant)")
+                            relationships_added += 1
+                    
+                    # Add formative memories (top 2)
+                    memories_added = 0
+                    for memory in sorted(result.memories, key=lambda x: x.get('importance_level', 0), reverse=True)[:2]:
+                        importance = memory.get('importance_level', 5)
+                        if importance >= 8:  # Only very important memories
+                            memory_title = memory.get('title', 'Significant Experience')
+                            personal_sections.append(f"🧠 Formative: {memory_title}")
+                            memories_added += 1
+                    
+                    logger.info(f"📊 GRAPH: General overview added - Background: {background_added}, Abilities: {abilities_added}, Relationships: {relationships_added}, Memories: {memories_added}")
             
             # � STEP 2: CROSS-POLLINATION - Connect character knowledge with user facts
             has_postgres = hasattr(graph_manager, 'postgres') if graph_manager else False

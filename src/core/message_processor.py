@@ -116,9 +116,22 @@ class MessageProcessor:
         
         try:
             from src.ethics.enhanced_ai_ethics_integrator import create_enhanced_ai_ethics_integrator
-            # Initialize with temporal client for attachment monitoring
+            from src.ethics.attachment_monitoring import create_attachment_monitoring_system
+            
+            # Create attachment monitor with temporal client for interaction frequency analysis
+            attachment_monitor = None
+            if self.temporal_client:
+                attachment_monitor = create_attachment_monitoring_system(
+                    temporal_client=self.temporal_client
+                )
+                logger.info("🛡️ Attachment monitoring created with temporal intelligence integration")
+            else:
+                logger.warning("⚠️ Attachment monitoring created without temporal client - frequency analysis limited")
+                attachment_monitor = create_attachment_monitoring_system()
+            
+            # Initialize enhanced AI ethics with properly configured attachment monitor
             self.enhanced_ai_ethics = create_enhanced_ai_ethics_integrator(
-                attachment_monitor=None,  # Will use default with temporal_client
+                attachment_monitor=attachment_monitor,
                 ethics_integration=None   # Will use default
             )
             logger.info("🛡️ Enhanced AI Ethics initialized with attachment monitoring and learning ethics")

@@ -102,6 +102,7 @@ logs/
 backups/
 models/
 checkpoints/
+synthetic_conversations/
 
 # Exception: Allow Python model classes in src/characters/models/
 !src/characters/models/

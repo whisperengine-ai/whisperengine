@@ -234,12 +234,37 @@ class CharacterGraphManager:
         return result
     
     async def _get_character_id(self, character_name: str) -> Optional[int]:
-        """Get character ID from name"""
+        """
+        Get character ID from name with flexible matching.
+        
+        Supports both simple names ('Elena') and full names ('Elena Rodriguez').
+        Tries exact match first, then partial matching.
+        """
         async with self.postgres.acquire() as conn:
+            # Try exact match first (case-insensitive)
             row = await conn.fetchrow(
-                "SELECT id FROM characters WHERE name = $1",
-                character_name.lower()
+                "SELECT id FROM characters WHERE LOWER(name) = LOWER($1)",
+                character_name
             )
+            
+            if row:
+                return row['id']
+            
+            # Try partial match - find name that starts with the query
+            row = await conn.fetchrow(
+                "SELECT id FROM characters WHERE LOWER(name) LIKE LOWER($1) || '%'",
+                character_name
+            )
+            
+            if row:
+                return row['id']
+                
+            # Try partial match - find name that contains the query as a word
+            row = await conn.fetchrow(
+                "SELECT id FROM characters WHERE LOWER(name) LIKE '%' || LOWER($1) || '%'",
+                character_name
+            )
+            
             return row['id'] if row else None
     
     async def _query_background(
@@ -1300,6 +1325,125 @@ class CharacterGraphManager:
         )
         
         return scored_memories
+
+    async def extract_episodic_memories(self, character_name: str, limit: int = 5, min_confidence: float = 0.8, min_intensity: float = 0.7) -> List[Dict]:
+        """
+        Extract high-confidence episodic memories from RoBERTa emotional intelligence data.
+        Enables character 'I've been thinking about...' responses using stored emotional context.
+        
+        Args:
+            character_name: Character name to extract memories for
+            limit: Maximum number of memories to return
+            min_confidence: Minimum RoBERTa confidence threshold (0-1)
+            min_intensity: Minimum emotional intensity threshold (0-1)
+            
+        Returns:
+            List of memorable moments with emotional context
+        """
+        if not self.memory_manager:
+            logger.warning("⚠️ EPISODIC EXTRACTION: No memory manager available - cannot extract vector memories")
+            return []
+            
+        try:
+            # Get character ID for bot filtering
+            character_id = await self._get_character_id(character_name)
+            if not character_id:
+                logger.warning("⚠️ EPISODIC EXTRACTION: Character '%s' not found", character_name)
+                return []
+                
+            # Query vector system for high-confidence emotional memories
+            # Use empty query to get all memories, then filter by emotional criteria
+            memories = await self.memory_manager.retrieve_relevant_memories(
+                user_id="episodic_extraction",  # Special user_id for episodic queries
+                query="",  # Empty query to get unfiltered results
+                limit=limit * 3,  # Get more to filter down
+                memory_type=f"bot_{character_name.lower()}"  # Bot-specific memories
+            )
+            
+            logger.info("🧠 EPISODIC EXTRACTION: Retrieved %d raw memories for %s", len(memories), character_name)
+            
+            # Filter by RoBERTa emotional intelligence criteria
+            episodic_memories = []
+            for memory in memories:
+                # Extract RoBERTa metadata from memory payload
+                roberta_confidence = memory.get('roberta_confidence', 0.0)
+                emotional_intensity = memory.get('emotional_intensity', 0.0)
+                emotion_variance = memory.get('emotion_variance', 0.0)
+                is_multi_emotion = memory.get('is_multi_emotion', False)
+                
+                # High-confidence, high-intensity memories are more memorable
+                if roberta_confidence >= min_confidence and emotional_intensity >= min_intensity:
+                    episodic_score = (roberta_confidence * 0.6) + (emotional_intensity * 0.4)
+                    if emotion_variance > 0.3:  # Complex emotions are more memorable
+                        episodic_score += 0.1
+                    if is_multi_emotion:  # Multi-emotion events are more memorable
+                        episodic_score += 0.1
+                        
+                    episodic_memories.append({
+                        'content': memory.get('content', ''),
+                        'bot_response': memory.get('bot_response', ''),
+                        'timestamp': memory.get('timestamp', ''),
+                        'primary_emotion': memory.get('primary_emotion', 'neutral'),
+                        'roberta_confidence': roberta_confidence,
+                        'emotional_intensity': emotional_intensity,
+                        'emotion_variance': emotion_variance,
+                        'is_multi_emotion': is_multi_emotion,
+                        'mixed_emotions': memory.get('mixed_emotions', []),
+                        'episodic_score': episodic_score,
+                        'memory_type': 'episodic_intelligence'
+                    })
+            
+            # Sort by episodic score (most memorable first)
+            episodic_memories.sort(key=lambda m: m['episodic_score'], reverse=True)
+            
+            logger.info("✨ EPISODIC EXTRACTION: Found %d memorable moments for %s", len(episodic_memories), character_name)
+            return episodic_memories[:limit]
+            
+        except (AttributeError, KeyError, TypeError) as e:
+            logger.error("❌ EPISODIC EXTRACTION ERROR: %s", str(e))
+            return []
+
+    async def get_character_reflection_prompt(self, character_name: str, context: str = "") -> str:
+        """
+        Generate character reflection prompt using episodic memories.
+        Enables natural 'I've been thinking about...' character responses.
+        
+        Args:
+            character_name: Character name
+            context: Optional conversation context
+            
+        Returns:
+            Character reflection prompt with episodic memories
+        """
+        try:
+            # Extract memorable moments
+            episodic_memories = await self.extract_episodic_memories(character_name, limit=3)
+            
+            if not episodic_memories:
+                return f"As {character_name}, I've been reflecting on recent conversations..."
+                
+            # Build reflection prompt with memorable moments
+            reflection_parts = [f"As {character_name}, I've been thinking about some recent interactions:"]
+            
+            for i, memory in enumerate(episodic_memories, 1):
+                emotion_context = f"{memory['primary_emotion']}"
+                if memory['is_multi_emotion'] and memory['mixed_emotions']:
+                    emotion_context += f" (with {', '.join([e[0] for e in memory['mixed_emotions'][:2]])})"
+                    
+                reflection_parts.append(
+                    f"{i}. A {emotion_context} conversation: \"{memory['content'][:100]}...\""
+                )
+                
+            if context:
+                reflection_parts.append(f"Given the current context: {context}")
+                
+            reflection_parts.append("This makes me want to share...")
+            
+            return "\n".join(reflection_parts)
+            
+        except (AttributeError, KeyError, TypeError) as e:
+            logger.error("❌ REFLECTION PROMPT ERROR: %s", str(e))
+            return f"As {character_name}, I've been reflecting on our conversations..."
 
 
 def create_character_graph_manager(postgres_pool, semantic_router=None, memory_manager=None) -> CharacterGraphManager:

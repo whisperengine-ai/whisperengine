@@ -21,9 +21,10 @@ services:
       - bot_network
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U whisperengine -d whisperengine"]
-      interval: 30s
+      interval: 10s
       timeout: 10s
-      retries: 3
+      retries: 5
+      start_period: 40s
 
   # Redis - Commented out since we're using vector-native memory with Qdrant only
   # redis:
@@ -52,12 +53,8 @@ services:
       - qdrant_data:/qdrant/storage
     networks:
       - bot_network
-    healthcheck:
-      test: ["CMD-SHELL", "wget --quiet --tries=1 --spider http://localhost:6333/healthz || exit 1"]
-      interval: 15s
-      timeout: 10s
-      retries: 5
-      start_period: 30s
+    # Health check disabled - Qdrant containers have minimal tooling
+    # Bots will retry connections if Qdrant isn't ready yet
 
   influxdb:
     image: influxdb:2.7-alpine
@@ -82,6 +79,7 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 60s
 
   # CDL Web UI for character authoring and management
   cdl-web-ui:
@@ -103,7 +101,8 @@ services:
     ports:
       - "3001:3000"
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
     networks:
       - bot_network
     healthcheck:
