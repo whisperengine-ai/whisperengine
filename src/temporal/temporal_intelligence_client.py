@@ -372,6 +372,413 @@ class TemporalIntelligenceClient:
             logger.error("Failed to record user emotion: %s", e)
             return False
 
+    async def record_memory_aging_metrics(
+        self,
+        bot_name: str,
+        user_id: str,
+        health_status: str,
+        total_memories: int,
+        memories_flagged: int,
+        flagged_ratio: float,
+        processing_time: float,
+        session_id: Optional[str] = None,
+        timestamp: Optional[datetime] = None
+    ) -> bool:
+        """
+        Record memory aging intelligence metrics to InfluxDB
+        
+        Args:
+            bot_name: Name of the bot
+            user_id: User identifier
+            health_status: Memory health status
+            total_memories: Total number of memories analyzed
+            memories_flagged: Number of memories flagged for aging
+            flagged_ratio: Ratio of flagged memories (0.0-1.0)
+            processing_time: Processing time in seconds
+            session_id: Optional session identifier
+            timestamp: Optional timestamp
+            
+        Returns:
+            bool: Success status
+        """
+        if not self.enabled:
+            return False
+
+        try:
+            point = Point("memory_aging_metrics") \
+                .tag("bot", bot_name) \
+                .tag("user_id", user_id) \
+                .tag("health_status", health_status)
+            
+            if session_id:
+                point = point.tag("session_id", session_id)
+                
+            point = point \
+                .field("total_memories", total_memories) \
+                .field("memories_flagged", memories_flagged) \
+                .field("flagged_ratio", flagged_ratio) \
+                .field("processing_time_ms", processing_time * 1000)
+            
+            if timestamp:
+                point = point.time(timestamp)
+                
+            self.write_api.write(bucket=os.getenv('INFLUXDB_BUCKET'), record=point)
+            logger.debug("Recorded memory aging metrics for %s/%s: %d/%d flagged (%.2f%%)", 
+                        bot_name, user_id, memories_flagged, total_memories, flagged_ratio * 100)
+            return True
+            
+        except (ValueError, ConnectionError, KeyError) as e:
+            logger.error("Failed to record memory aging metrics: %s", e)
+            return False
+
+    async def record_character_graph_performance(
+        self,
+        bot_name: str,
+        user_id: str,
+        operation: str,
+        query_time_ms: float,
+        knowledge_matches: int,
+        cache_hit: bool,
+        character_name: Optional[str] = None,
+        session_id: Optional[str] = None,
+        timestamp: Optional[datetime] = None
+    ) -> bool:
+        """
+        Record CharacterGraphManager performance metrics to InfluxDB
+        
+        Args:
+            bot_name: Name of the bot
+            user_id: User identifier
+            operation: Type of graph operation (knowledge_query, skill_lookup, etc.)
+            query_time_ms: Database query time in milliseconds
+            knowledge_matches: Number of knowledge items found
+            cache_hit: Whether query hit cache
+            character_name: Character being queried
+            session_id: Optional session identifier
+            timestamp: Optional timestamp
+            
+        Returns:
+            bool: Success status
+        """
+        if not self.enabled:
+            return False
+
+        try:
+            point = Point("character_graph_performance") \
+                .tag("bot", bot_name) \
+                .tag("user_id", user_id) \
+                .tag("operation", operation) \
+                .tag("cache_hit", str(cache_hit).lower())
+            
+            if character_name:
+                point = point.tag("character_name", character_name)
+            if session_id:
+                point = point.tag("session_id", session_id)
+                
+            point = point \
+                .field("query_time_ms", query_time_ms) \
+                .field("knowledge_matches", knowledge_matches) \
+                .field("cache_hit_value", 1 if cache_hit else 0)
+            
+            if timestamp:
+                point = point.time(timestamp)
+                
+            self.write_api.write(bucket=os.getenv('INFLUXDB_BUCKET'), record=point)
+            logger.debug("Recorded character graph performance for %s/%s: %s in %.1fms (%d matches)", 
+                        bot_name, user_id, operation, query_time_ms, knowledge_matches)
+            return True
+            
+        except (ValueError, ConnectionError, KeyError) as e:
+            logger.error("Failed to record character graph performance: %s", e)
+            return False
+
+    async def record_intelligence_coordination_metrics(
+        self,
+        bot_name: str,
+        user_id: str,
+        systems_used: List[str],
+        coordination_time_ms: float,
+        authenticity_score: float,
+        confidence_score: float,
+        context_type: str,
+        coordination_strategy: str,
+        character_name: Optional[str] = None,
+        session_id: Optional[str] = None,
+        timestamp: Optional[datetime] = None
+    ) -> bool:
+        """
+        Record UnifiedCharacterIntelligenceCoordinator performance metrics to InfluxDB
+        
+        Args:
+            bot_name: Name of the bot
+            user_id: User identifier
+            systems_used: List of intelligence systems used
+            coordination_time_ms: Total coordination time in milliseconds
+            authenticity_score: Character authenticity score (0.0-1.0)
+            confidence_score: Coordination confidence score (0.0-1.0)
+            context_type: Type of context detected
+            coordination_strategy: Strategy used for coordination
+            character_name: Character being coordinated
+            session_id: Optional session identifier
+            timestamp: Optional timestamp
+            
+        Returns:
+            bool: Success status
+        """
+        if not self.enabled:
+            return False
+
+        try:
+            point = Point("intelligence_coordination_metrics") \
+                .tag("bot", bot_name) \
+                .tag("user_id", user_id) \
+                .tag("context_type", context_type) \
+                .tag("coordination_strategy", coordination_strategy)
+            
+            if character_name:
+                point = point.tag("character_name", character_name)
+            if session_id:
+                point = point.tag("session_id", session_id)
+                
+            point = point \
+                .field("coordination_time_ms", coordination_time_ms) \
+                .field("authenticity_score", authenticity_score) \
+                .field("confidence_score", confidence_score) \
+                .field("systems_count", len(systems_used)) \
+                .field("systems_used", ",".join(systems_used))
+            
+            if timestamp:
+                point = point.time(timestamp)
+                
+            self.write_api.write(bucket=os.getenv('INFLUXDB_BUCKET'), record=point)
+            logger.debug("Recorded intelligence coordination for %s/%s: %.1fms, %d systems, authenticity=%.2f", 
+                        bot_name, user_id, coordination_time_ms, len(systems_used), authenticity_score)
+            return True
+            
+        except (ValueError, ConnectionError, KeyError) as e:
+            logger.error("Failed to record intelligence coordination metrics: %s", e)
+            return False
+
+    async def record_emotion_analysis_performance(
+        self,
+        bot_name: str,
+        user_id: str,
+        analysis_time_ms: float,
+        confidence_score: float,
+        emotion_count: int,
+        primary_emotion: str,
+        vector_dimension: int = 24,
+        roberta_inference_time_ms: Optional[float] = None,
+        session_id: Optional[str] = None,
+        timestamp: Optional[datetime] = None
+    ) -> bool:
+        """
+        Record Enhanced Vector Emotion Analyzer performance metrics to InfluxDB
+        
+        Args:
+            bot_name: Name of the bot
+            user_id: User identifier
+            analysis_time_ms: Total emotion analysis time in milliseconds
+            confidence_score: RoBERTa confidence score (0.0-1.0)
+            emotion_count: Number of emotions detected
+            primary_emotion: Primary emotion detected
+            vector_dimension: Emotion vector dimension
+            roberta_inference_time_ms: RoBERTa transformer inference time
+            session_id: Optional session identifier
+            timestamp: Optional timestamp
+            
+        Returns:
+            bool: Success status
+        """
+        if not self.enabled:
+            return False
+
+        try:
+            point = Point("emotion_analysis_performance") \
+                .tag("bot", bot_name) \
+                .tag("user_id", user_id) \
+                .tag("primary_emotion", primary_emotion)
+            
+            if session_id:
+                point = point.tag("session_id", session_id)
+                
+            point = point \
+                .field("analysis_time_ms", analysis_time_ms) \
+                .field("confidence_score", confidence_score) \
+                .field("emotion_count", emotion_count) \
+                .field("vector_dimension", vector_dimension)
+            
+            if roberta_inference_time_ms is not None:
+                point = point.field("roberta_inference_time_ms", roberta_inference_time_ms)
+            
+            if timestamp:
+                point = point.time(timestamp)
+                
+            self.write_api.write(bucket=os.getenv('INFLUXDB_BUCKET'), record=point)
+            logger.debug("Recorded emotion analysis performance for %s/%s: %.1fms, %s (%.2f confidence)", 
+                        bot_name, user_id, analysis_time_ms, primary_emotion, confidence_score)
+            return True
+            
+        except (ValueError, ConnectionError, KeyError) as e:
+            logger.error("Failed to record emotion analysis performance: %s", e)
+            return False
+
+    async def record_vector_memory_performance(
+        self,
+        bot_name: str,
+        user_id: str,
+        operation: str,
+        search_time_ms: float,
+        memories_found: int,
+        avg_relevance_score: float,
+        collection_name: str,
+        vector_type: str = "content",
+        session_id: Optional[str] = None,
+        timestamp: Optional[datetime] = None
+    ) -> bool:
+        """
+        Record Vector Memory System performance metrics to InfluxDB
+        
+        Args:
+            bot_name: Name of the bot
+            user_id: User identifier
+            operation: Memory operation (search, store, retrieve)
+            search_time_ms: Qdrant search time in milliseconds
+            memories_found: Number of memories found
+            avg_relevance_score: Average relevance score (0.0-1.0)
+            collection_name: Qdrant collection name
+            vector_type: Type of vector search (content, emotion, semantic)
+            session_id: Optional session identifier
+            timestamp: Optional timestamp
+            
+        Returns:
+            bool: Success status
+        """
+        if not self.enabled:
+            return False
+
+        try:
+            point = Point("vector_memory_performance") \
+                .tag("bot", bot_name) \
+                .tag("user_id", user_id) \
+                .tag("operation", operation) \
+                .tag("collection_name", collection_name) \
+                .tag("vector_type", vector_type)
+            
+            if session_id:
+                point = point.tag("session_id", session_id)
+                
+            point = point \
+                .field("search_time_ms", search_time_ms) \
+                .field("memories_found", memories_found) \
+                .field("avg_relevance_score", avg_relevance_score)
+            
+            if timestamp:
+                point = point.time(timestamp)
+                
+            self.write_api.write(bucket=os.getenv('INFLUXDB_BUCKET'), record=point)
+            logger.debug("Recorded vector memory performance for %s/%s: %s in %.1fms (%d memories, %.2f relevance)", 
+                        bot_name, user_id, operation, search_time_ms, memories_found, avg_relevance_score)
+            return True
+            
+        except (ValueError, ConnectionError, KeyError) as e:
+            logger.error("Failed to record vector memory performance: %s", e)
+            return False
+
+    async def record_cdl_integration_performance(
+        self,
+        bot_name: str,
+        user_id: str,
+        operation: str,
+        generation_time_ms: float,
+        character_consistency_score: float,
+        prompt_length: int,
+        character_name: Optional[str] = None,
+        mode_type: Optional[str] = None,
+        session_id: Optional[str] = None,
+        timestamp: Optional[datetime] = None
+    ) -> bool:
+        """
+        Record CDL AI Integration performance metrics to InfluxDB
+        
+        Args:
+            bot_name: Name of the bot
+            user_id: User identifier
+            operation: CDL operation (prompt_generation, mode_switching, knowledge_extraction)
+            generation_time_ms: Prompt generation time in milliseconds
+            character_consistency_score: Character consistency score (0.0-1.0)
+            prompt_length: Length of generated prompt
+            character_name: Character being integrated
+            mode_type: Mode type (technical, creative, etc.)
+            session_id: Optional session identifier
+            timestamp: Optional timestamp
+            
+        Returns:
+            bool: Success status
+        """
+        if not self.enabled:
+            return False
+
+        try:
+            point = Point("cdl_integration_performance") \
+                .tag("bot", bot_name) \
+                .tag("user_id", user_id) \
+                .tag("operation", operation)
+            
+            if character_name:
+                point = point.tag("character_name", character_name)
+            if mode_type:
+                point = point.tag("mode_type", mode_type)
+            if session_id:
+                point = point.tag("session_id", session_id)
+                
+            point = point \
+                .field("generation_time_ms", generation_time_ms) \
+                .field("character_consistency_score", character_consistency_score) \
+                .field("prompt_length", prompt_length)
+            
+            if timestamp:
+                point = point.time(timestamp)
+                
+            self.write_api.write(bucket=os.getenv('INFLUXDB_BUCKET'), record=point)
+            logger.debug("Recorded CDL integration performance for %s/%s: %s in %.1fms (consistency=%.2f)", 
+                        bot_name, user_id, operation, generation_time_ms, character_consistency_score)
+            return True
+            
+        except (ValueError, ConnectionError, KeyError) as e:
+            logger.error("Failed to record CDL integration performance: %s", e)
+            return False
+
+    async def record_point(
+        self,
+        point: Any,
+        session_id: Optional[str] = None
+    ) -> bool:
+        """
+        Record a custom InfluxDB point (for advanced use cases)
+        
+        Args:
+            point: InfluxDB Point object
+            session_id: Optional session identifier
+            
+        Returns:
+            bool: Success status
+        """
+        if not self.enabled:
+            return False
+
+        try:
+            if session_id and hasattr(point, 'tag'):
+                point = point.tag("session_id", session_id)
+                
+            self.write_api.write(bucket=os.getenv('INFLUXDB_BUCKET'), record=point)
+            logger.debug("Recorded custom point to InfluxDB")
+            return True
+            
+        except (ValueError, ConnectionError, KeyError) as e:
+            logger.error("Failed to record custom point: %s", e)
+            return False
+
     async def get_confidence_trend(
         self,
         bot_name: str,

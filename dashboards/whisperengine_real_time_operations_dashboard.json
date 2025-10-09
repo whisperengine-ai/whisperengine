@@ -1,0 +1,205 @@
+{
+  "id": null,
+  "title": "WhisperEngine Real-Time Operations",
+  "tags": [
+    "whisperengine",
+    "operations",
+    "realtime"
+  ],
+  "timezone": "browser",
+  "schemaVersion": 36,
+  "version": 1,
+  "refresh": "2s",
+  "time": {
+    "from": "now-30m",
+    "to": "now"
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Active Sessions",
+      "type": "stat",
+      "targets": [
+        {
+          "refId": "A",
+          "query": "from(bucket: \"performance_metrics\")\n  |> range(start: -30m)\n  |> filter(fn: (r) => r._measurement == \"performance_metrics\")\n  |> filter(fn: (r) => r._field == \"active_sessions\")\n  |> last()",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "influxdb-whisperengine"
+          }
+        }
+      ],
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 0,
+        "y": 0
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 50
+              },
+              {
+                "color": "red",
+                "value": 100
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": 2,
+      "title": "Concurrent Users",
+      "type": "stat",
+      "targets": [
+        {
+          "refId": "A",
+          "query": "from(bucket: \"performance_metrics\")\n  |> range(start: -30m)\n  |> filter(fn: (r) => r._measurement == \"performance_metrics\")\n  |> filter(fn: (r) => r._field == \"concurrent_users\")\n  |> last()",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "influxdb-whisperengine"
+          }
+        }
+      ],
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 4,
+        "y": 0
+      }
+    },
+    {
+      "id": 3,
+      "title": "Queue Length",
+      "type": "stat",
+      "targets": [
+        {
+          "refId": "A",
+          "query": "from(bucket: \"performance_metrics\")\n  |> range(start: -30m)\n  |> filter(fn: (r) => r._measurement == \"performance_metrics\")\n  |> filter(fn: (r) => r._field == \"queue_length\")\n  |> last()",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "influxdb-whisperengine"
+          }
+        }
+      ],
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 8,
+        "y": 0
+      }
+    },
+    {
+      "id": 4,
+      "title": "System Utilization",
+      "type": "stat",
+      "targets": [
+        {
+          "refId": "A",
+          "query": "from(bucket: \"performance_metrics\")\n  |> range(start: -30m)\n  |> filter(fn: (r) => r._measurement == \"performance_metrics\")\n  |> filter(fn: (r) => r._field == \"session_utilization\")\n  |> last()",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "influxdb-whisperengine"
+          }
+        }
+      ],
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 12,
+        "y": 0
+      }
+    },
+    {
+      "id": 5,
+      "title": "Conversations Per Hour by Bot",
+      "type": "timeseries",
+      "targets": [
+        {
+          "refId": "A",
+          "query": "from(bucket: \"performance_metrics\")\n  |> range(start: -30m)\n  |> filter(fn: (r) => r._measurement == \"performance_metrics\")\n  |> filter(fn: (r) => r._field == \"conversations_elena\")\n  |> aggregateWindow(every: 1m, fn: sum, createEmpty: false)",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "influxdb-whisperengine"
+          }
+        },
+        {
+          "refId": "B",
+          "query": "from(bucket: \"performance_metrics\")\n  |> range(start: -30m)\n  |> filter(fn: (r) => r._measurement == \"performance_metrics\")\n  |> filter(fn: (r) => r._field == \"conversations_gabriel\")\n  |> aggregateWindow(every: 1m, fn: sum, createEmpty: false)",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "influxdb-whisperengine"
+          }
+        },
+        {
+          "refId": "C",
+          "query": "from(bucket: \"performance_metrics\")\n  |> range(start: -30m)\n  |> filter(fn: (r) => r._measurement == \"performance_metrics\")\n  |> filter(fn: (r) => r._field == \"conversations_sophia\")\n  |> aggregateWindow(every: 1m, fn: sum, createEmpty: false)",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "influxdb-whisperengine"
+          }
+        }
+      ],
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 4
+      }
+    },
+    {
+      "id": 6,
+      "title": "Intelligence Coordination Performance",
+      "type": "timeseries",
+      "targets": [
+        {
+          "refId": "A",
+          "query": "from(bucket: \"performance_metrics\")\n  |> range(start: -30m)\n  |> filter(fn: (r) => r._measurement == \"intelligence_coordination\")\n  |> filter(fn: (r) => r._field == \"coordination_time_ms\")\n  |> aggregateWindow(every: 1m, fn: mean, createEmpty: false)",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "influxdb-whisperengine"
+          }
+        }
+      ],
+      "gridPos": {
+        "h": 6,
+        "w": 12,
+        "x": 0,
+        "y": 12
+      }
+    },
+    {
+      "id": 7,
+      "title": "Memory Cache Performance",
+      "type": "timeseries",
+      "targets": [
+        {
+          "refId": "A",
+          "query": "from(bucket: \"performance_metrics\")\n  |> range(start: -30m)\n  |> filter(fn: (r) => r._measurement == \"memory_quality_v2\")\n  |> filter(fn: (r) => r._field == \"cache_hit_value\")\n  |> aggregateWindow(every: 1m, fn: mean, createEmpty: false)",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "influxdb-whisperengine"
+          }
+        }
+      ],
+      "gridPos": {
+        "h": 6,
+        "w": 12,
+        "x": 12,
+        "y": 12
+      }
+    }
+  ]
+}

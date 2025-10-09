@@ -24,6 +24,13 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from enum import Enum
 
+# InfluxDB metrics integration
+try:
+    from src.temporal.temporal_intelligence_client import create_temporal_intelligence_client
+    TEMPORAL_METRICS_AVAILABLE = True
+except ImportError:
+    TEMPORAL_METRICS_AVAILABLE = False
+
 logger = logging.getLogger(__name__)
 
 class IntelligenceSystemType(Enum):
@@ -130,6 +137,12 @@ class UnifiedCharacterIntelligenceCoordinator:
         self.character_episodic_intelligence = character_episodic_intelligence
         self.character_temporal_evolution_analyzer = character_temporal_evolution_analyzer
         self.postgres_pool = postgres_pool  # PHASE 3: PostgreSQL pool for graph knowledge
+        
+        # InfluxDB metrics integration
+        if TEMPORAL_METRICS_AVAILABLE:
+            self.temporal_client = create_temporal_intelligence_client()
+        else:
+            self.temporal_client = None
         
         # Coordination state
         self.system_availability = {}
@@ -290,6 +303,17 @@ class UnifiedCharacterIntelligenceCoordinator:
                 confidence_score=await self._calculate_confidence_score(system_contributions),
                 processing_time_ms=processing_time
             )
+            
+            # Record coordination metrics to InfluxDB
+            if self.temporal_client:
+                await self._record_coordination_metrics(
+                    request=request,
+                    systems_used=[system.value for system in selected_systems],
+                    coordination_time_ms=processing_time,
+                    authenticity_score=response.character_authenticity_score,
+                    confidence_score=response.confidence_score,
+                    context_type=context_type
+                )
             
             logger.info("✅ Unified intelligence coordination complete: %.1fms", processing_time)
             return response
@@ -826,6 +850,40 @@ class UnifiedCharacterIntelligenceCoordinator:
             'average_processing_time': 0,
             'average_systems_per_request': 0
         })
+
+    async def _record_coordination_metrics(
+        self,
+        request: IntelligenceRequest,
+        systems_used: List[str],
+        coordination_time_ms: float,
+        authenticity_score: float,
+        confidence_score: float,
+        context_type: str
+    ):
+        """Record UnifiedCharacterIntelligenceCoordinator performance metrics to InfluxDB"""
+        if not self.temporal_client:
+            return
+            
+        try:
+            # Get bot name from environment for InfluxDB tagging
+            import os
+            bot_name = os.getenv('DISCORD_BOT_NAME', 'unknown')
+            
+            await self.temporal_client.record_intelligence_coordination_metrics(
+                bot_name=bot_name,
+                user_id=request.user_id,
+                systems_used=systems_used,
+                coordination_time_ms=coordination_time_ms,
+                authenticity_score=authenticity_score,
+                confidence_score=confidence_score,
+                context_type=context_type,
+                coordination_strategy=request.coordination_strategy.value,
+                character_name=request.character_name
+            )
+        except Exception as e:
+            # Metrics recording should not break functionality
+            logger.debug("Failed to record coordination metrics: %s", str(e))
+
 
 def create_unified_character_intelligence_coordinator(
     memory_manager=None,

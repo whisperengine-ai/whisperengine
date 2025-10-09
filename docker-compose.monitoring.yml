@@ -1,0 +1,200 @@
+# WhisperEngine with InfluxDB + Grafana Monitoring Stack
+# Enhanced multi-bot configuration with comprehensive character intelligence monitoring
+
+version: '3.8'
+
+services:
+  # Infrastructure Services
+  postgres:
+    image: postgres:16.4-alpine
+    container_name: whisperengine-postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-whisperengine}
+      POSTGRES_USER: ${POSTGRES_USER:-whisperengine_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-your_secure_password}
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./db/init:/docker-entrypoint-initdb.d
+    networks:
+      - whisperengine-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-whisperengine_user}"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  qdrant:
+    image: qdrant/qdrant:v1.15.4
+    container_name: whisperengine-qdrant
+    ports:
+      - "6334:6333"
+    volumes:
+      - qdrant_data:/qdrant/storage
+    networks:
+      - whisperengine-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:6333/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  influxdb:
+    image: influxdb:2.7-alpine
+    container_name: whisperengine-influxdb
+    environment:
+      DOCKER_INFLUXDB_INIT_MODE: setup
+      DOCKER_INFLUXDB_INIT_USERNAME: ${INFLUXDB_USER:-admin}
+      DOCKER_INFLUXDB_INIT_PASSWORD: ${INFLUXDB_PASSWORD:-whisperengine_metrics}
+      DOCKER_INFLUXDB_INIT_ORG: ${INFLUXDB_ORG:-whisperengine}
+      DOCKER_INFLUXDB_INIT_BUCKET: ${INFLUXDB_BUCKET:-temporal_intelligence}
+      DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: ${INFLUXDB_TOKEN:-whisperengine_admin_token}
+    ports:
+      - "8086:8086"
+    volumes:
+      - influxdb_data:/var/lib/influxdb2
+      - influxdb_config:/etc/influxdb2
+    networks:
+      - whisperengine-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8086/ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  grafana:
+    image: grafana/grafana:11.3.0
+    container_name: whisperengine-grafana
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-whisperengine_grafana}
+      GF_INSTALL_PLUGINS: grafana-influxdb-datasource
+      GF_FEATURE_TOGGLES_ENABLE: publicDashboards
+      INFLUXDB_USER: ${INFLUXDB_USER:-admin}
+      INFLUXDB_PASSWORD: ${INFLUXDB_PASSWORD:-whisperengine_metrics}
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana-config/datasource.yml:/etc/grafana/provisioning/datasources/datasource.yml
+      - ./grafana-config/dashboard.yml:/etc/grafana/provisioning/dashboards/dashboard.yml
+      - ./dashboards:/var/lib/grafana/dashboards:ro
+    networks:
+      - whisperengine-network
+    depends_on:
+      - influxdb
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Character Bots (Template-Based)
+  elena-bot:
+    build: .
+    container_name: whisperengine-elena-bot
+    env_file:
+      - .env.elena
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-whisperengine_user}:${POSTGRES_PASSWORD:-your_secure_password}@postgres:5432/${POSTGRES_DB:-whisperengine}
+      QDRANT_HOST: qdrant
+      QDRANT_PORT: 6333
+      INFLUXDB_URL: http://influxdb:8086
+      INFLUXDB_TOKEN: ${INFLUXDB_TOKEN:-whisperengine_admin_token}
+      INFLUXDB_ORG: ${INFLUXDB_ORG:-whisperengine}
+      INFLUXDB_BUCKET: ${INFLUXDB_BUCKET:-temporal_intelligence}
+    ports:
+      - "9091:8000"
+    volumes:
+      - ./logs:/app/logs
+      - model_cache:/app/model_cache
+    networks:
+      - whisperengine-network
+    depends_on:
+      - postgres
+      - qdrant
+      - influxdb
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  gabriel-bot:
+    build: .
+    container_name: whisperengine-gabriel-bot
+    env_file:
+      - .env.gabriel
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-whisperengine_user}:${POSTGRES_PASSWORD:-your_secure_password}@postgres:5432/${POSTGRES_DB:-whisperengine}
+      QDRANT_HOST: qdrant
+      QDRANT_PORT: 6333
+      INFLUXDB_URL: http://influxdb:8086
+      INFLUXDB_TOKEN: ${INFLUXDB_TOKEN:-whisperengine_admin_token}
+      INFLUXDB_ORG: ${INFLUXDB_ORG:-whisperengine}
+      INFLUXDB_BUCKET: ${INFLUXDB_BUCKET:-temporal_intelligence}
+    ports:
+      - "9095:8000"
+    volumes:
+      - ./logs:/app/logs
+      - model_cache:/app/model_cache
+    networks:
+      - whisperengine-network
+    depends_on:
+      - postgres
+      - qdrant
+      - influxdb
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  sophia-bot:
+    build: .
+    container_name: whisperengine-sophia-bot
+    env_file:
+      - .env.sophia
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-whisperengine_user}:${POSTGRES_PASSWORD:-your_secure_password}@postgres:5432/${POSTGRES_DB:-whisperengine}
+      QDRANT_HOST: qdrant
+      QDRANT_PORT: 6333
+      INFLUXDB_URL: http://influxdb:8086
+      INFLUXDB_TOKEN: ${INFLUXDB_TOKEN:-whisperengine_admin_token}
+      INFLUXDB_ORG: ${INFLUXDB_ORG:-whisperengine}
+      INFLUXDB_BUCKET: ${INFLUXDB_BUCKET:-temporal_intelligence}
+    ports:
+      - "9096:8000"
+    volumes:
+      - ./logs:/app/logs
+      - model_cache:/app/model_cache
+    networks:
+      - whisperengine-network
+    depends_on:
+      - postgres
+      - qdrant
+      - influxdb
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+volumes:
+  postgres_data:
+  qdrant_data:
+  influxdb_data:
+  influxdb_config:
+  grafana_data:
+  model_cache:
+
+networks:
+  whisperengine-network:
+    driver: bridge

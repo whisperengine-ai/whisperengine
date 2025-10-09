@@ -1,0 +1,168 @@
+{
+  "id": null,
+  "title": "WhisperEngine LIVE Operations (Confirmed Data)",
+  "tags": [
+    "whisperengine",
+    "live",
+    "confirmed"
+  ],
+  "timezone": "browser",
+  "schemaVersion": 36,
+  "version": 1,
+  "refresh": "2s",
+  "time": {
+    "from": "now-30m",
+    "to": "now"
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Active Sessions (LIVE)",
+      "type": "stat",
+      "targets": [
+        {
+          "refId": "A",
+          "query": "from(bucket: \"performance_metrics\")\n  |> range(start: -30m)\n  |> filter(fn: (r) => r._measurement == \"response_time_v2\")\n  |> filter(fn: (r) => r._field == \"active_sessions\")\n  |> last()",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "influxdb-whisperengine"
+          }
+        }
+      ],
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 0,
+        "y": 0
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 100
+              },
+              {
+                "color": "red",
+                "value": 200
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": 2,
+      "title": "Concurrent Users (LIVE)",
+      "type": "stat",
+      "targets": [
+        {
+          "refId": "A",
+          "query": "from(bucket: \"performance_metrics\")\n  |> range(start: -30m)\n  |> filter(fn: (r) => r._measurement == \"response_time_v2\")\n  |> filter(fn: (r) => r._field == \"concurrent_users\")\n  |> last()",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "influxdb-whisperengine"
+          }
+        }
+      ],
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 4,
+        "y": 0
+      }
+    },
+    {
+      "id": 3,
+      "title": "Queue Length (LIVE)",
+      "type": "stat",
+      "targets": [
+        {
+          "refId": "A",
+          "query": "from(bucket: \"performance_metrics\")\n  |> range(start: -30m)\n  |> filter(fn: (r) => r._measurement == \"response_time_v2\")\n  |> filter(fn: (r) => r._field == \"queue_length\")\n  |> last()",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "influxdb-whisperengine"
+          }
+        }
+      ],
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 8,
+        "y": 0
+      }
+    },
+    {
+      "id": 4,
+      "title": "Messages Per Second",
+      "type": "timeseries",
+      "targets": [
+        {
+          "refId": "A",
+          "query": "from(bucket: \"performance_metrics\")\n  |> range(start: -30m)\n  |> filter(fn: (r) => r._measurement == \"response_time_v2\")\n  |> filter(fn: (r) => r._field == \"messages_per_second\")\n  |> aggregateWindow(every: 30s, fn: mean, createEmpty: false)",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "influxdb-whisperengine"
+          }
+        }
+      ],
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 0
+      }
+    },
+    {
+      "id": 5,
+      "title": "Response Length Distribution",
+      "type": "timeseries",
+      "targets": [
+        {
+          "refId": "A",
+          "query": "from(bucket: \"performance_metrics\")\n  |> range(start: -30m)\n  |> filter(fn: (r) => r._measurement == \"response_time_v2\")\n  |> filter(fn: (r) => r._field == \"response_length\")\n  |> aggregateWindow(every: 1m, fn: mean, createEmpty: false)",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "influxdb-whisperengine"
+          }
+        }
+      ],
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 4
+      }
+    },
+    {
+      "id": 6,
+      "title": "System Utilization Live",
+      "type": "timeseries",
+      "targets": [
+        {
+          "refId": "A",
+          "query": "from(bucket: \"performance_metrics\")\n  |> range(start: -30m)\n  |> filter(fn: (r) => r._measurement == \"response_time_v2\")\n  |> filter(fn: (r) => r._field == \"session_utilization\")\n  |> aggregateWindow(every: 30s, fn: mean, createEmpty: false)",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "influxdb-whisperengine"
+          }
+        }
+      ],
+      "gridPos": {
+        "h": 6,
+        "w": 24,
+        "x": 0,
+        "y": 12
+      }
+    }
+  ]
+}

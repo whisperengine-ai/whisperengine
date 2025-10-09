@@ -179,6 +179,14 @@ class EnhancedVectorEmotionAnalyzer:
         """Initialize the enhanced emotion analyzer"""
         self.vector_memory_manager = vector_memory_manager
         
+        # Initialize temporal intelligence client for metrics recording
+        self.temporal_client = None
+        try:
+            from src.temporal.temporal_intelligence_client import TemporalIntelligenceClient
+            self.temporal_client = TemporalIntelligenceClient()
+        except ImportError:
+            logger.warning("TemporalIntelligenceClient not available - metrics recording disabled")
+        
         # Load configuration from environment variables - always enabled in development!
         self.enabled = True  # Always enabled in development
         self.keyword_weight = float(os.getenv("ENHANCED_EMOTION_KEYWORD_WEIGHT", "0.3"))
@@ -416,6 +424,22 @@ class EnhancedVectorEmotionAnalyzer:
                 mixed_desc = ", ".join([f"{emotion} ({score:.2f})" for emotion, score in result.mixed_emotions])
                 logger.info(f"  - Mixed emotions detected: {mixed_desc}")
                 logger.info(f"  - Complex emotion description: '{result.emotion_description}'")
+            
+            # 📊 TEMPORAL METRICS: Record emotion analysis performance
+            try:
+                from src.memory.vector_memory_system import get_normalized_bot_name_from_env
+                bot_name = get_normalized_bot_name_from_env()
+                emotion_count = len([score for score in final_emotions.values() if score > 0.1])
+                await self._record_emotion_analysis_metrics(
+                    bot_name=bot_name,
+                    user_id=user_id,
+                    analysis_time_ms=analysis_time_ms,
+                    confidence=confidence,
+                    emotion_count=emotion_count,
+                    primary_emotion=standardized_primary
+                )
+            except Exception as e:
+                logger.debug(f"Could not record emotion analysis metrics: {e}")
             
             logger.info(
                 "🎭 ENHANCED EMOTION ANALYSIS COMPLETE for user %s: "
@@ -1554,6 +1578,32 @@ class EnhancedVectorEmotionAnalyzer:
             logger.warning(f"⚠️ UNKNOWN EMOTION: {raw_label} → {mapped_emotion} (passthrough)")
             
         return mapped_emotion
+
+    async def _record_emotion_analysis_metrics(self, 
+                                             bot_name: str,
+                                             user_id: str, 
+                                             analysis_time_ms: int,
+                                             confidence: float,
+                                             emotion_count: int,
+                                             primary_emotion: str,
+                                             roberta_time_ms: int = 0):
+        """Record emotion analysis performance metrics to InfluxDB"""
+        if not self.temporal_client:
+            return
+            
+        try:
+            await self.temporal_client.record_emotion_analysis_performance(
+                bot_name=bot_name,
+                user_id=user_id,
+                analysis_time_ms=analysis_time_ms,
+                confidence_score=confidence,
+                emotion_count=emotion_count,
+                primary_emotion=primary_emotion,
+                roberta_inference_time_ms=roberta_time_ms
+            )
+            logger.debug(f"📊 TEMPORAL: Recorded emotion analysis metrics for {bot_name}/{user_id}")
+        except Exception as e:
+            logger.error(f"Failed to record emotion analysis metrics: {e}")
 
     async def _count_total_assessments(self) -> int:
         """Count total assessments in system"""

@@ -601,6 +601,92 @@ class MessageProcessor:
                     # record_memory_aging_metrics method doesn't exist yet - skip for now
                     logger.debug("Memory aging metrics recording not yet implemented in TemporalIntelligenceClient")
             
+            # 📊 ENHANCED CHARACTER INTELLIGENCE METRICS: Record performance from all operational systems
+            
+            # CharacterGraphManager metrics (if available)
+            character_performance = ai_components.get('character_performance_intelligence')
+            if character_performance:
+                try:
+                    character_graph_task = self.temporal_client.record_character_graph_performance(
+                        bot_name=bot_name,
+                        user_id=message_context.user_id,
+                        operation="knowledge_query",
+                        query_time_ms=character_performance.get('query_time_ms', 0),
+                        knowledge_matches=character_performance.get('knowledge_matches', 0),
+                        cache_hit=character_performance.get('cache_hit', False),
+                        character_name=bot_name
+                    )
+                    temporal_tasks.append(character_graph_task)
+                    logger.debug("📊 TEMPORAL: Added character graph performance metrics to batch recording")
+                except AttributeError:
+                    logger.debug("Character graph performance recording not yet implemented in TemporalIntelligenceClient")
+            
+            # UnifiedCharacterIntelligenceCoordinator metrics (if available)
+            unified_intelligence = ai_components.get('unified_character_intelligence')
+            if unified_intelligence:
+                try:
+                    systems_used = ["conversation_intelligence", "memory_boost"]  # Default systems
+                    coordination_metadata = unified_intelligence.get('coordination_metadata', {})
+                    coordination_task = self.temporal_client.record_intelligence_coordination_metrics(
+                        bot_name=bot_name,
+                        user_id=message_context.user_id,
+                        systems_used=systems_used,
+                        coordination_time_ms=unified_intelligence.get('performance_metrics', {}).get('processing_time_ms', 0),
+                        authenticity_score=unified_intelligence.get('character_authenticity_score', 0.0),
+                        confidence_score=unified_intelligence.get('confidence_score', 0.0),
+                        context_type=coordination_metadata.get('context_type', 'standard'),
+                        coordination_strategy=coordination_metadata.get('coordination_strategy', 'adaptive'),
+                        character_name=bot_name
+                    )
+                    temporal_tasks.append(coordination_task)
+                    logger.debug("📊 TEMPORAL: Added intelligence coordination metrics to batch recording")
+                except AttributeError:
+                    logger.debug("Intelligence coordination metrics recording not yet implemented in TemporalIntelligenceClient")
+            
+            # Enhanced Vector Emotion Analyzer metrics (already handled individually but can aggregate)
+            emotion_analysis = ai_components.get('emotion_analysis')
+            if emotion_analysis:
+                try:
+                    # Note: Individual emotion analysis metrics are recorded by the analyzer itself
+                    # This aggregates them for overall message processing metrics
+                    emotion_count = len([score for score in emotion_analysis.get('all_emotions', {}).values() if score > 0.1])
+                    emotion_task = self.temporal_client.record_emotion_analysis_performance(
+                        bot_name=bot_name,
+                        user_id=message_context.user_id,
+                        analysis_time_ms=emotion_analysis.get('analysis_time_ms', 0),
+                        confidence_score=emotion_analysis.get('confidence', 0.0),
+                        emotion_count=emotion_count,
+                        primary_emotion=emotion_analysis.get('primary_emotion', 'neutral')
+                    )
+                    temporal_tasks.append(emotion_task)
+                    logger.debug("📊 TEMPORAL: Added emotion analysis performance metrics to batch recording")
+                except AttributeError:
+                    logger.debug("Emotion analysis performance recording not yet implemented in TemporalIntelligenceClient")
+            
+            # Vector Memory System metrics (memory retrieval performance)
+            if relevant_memories:
+                try:
+                    # Calculate average relevance score from retrieved memories
+                    avg_relevance = sum(mem.get('score', 0.0) for mem in relevant_memories) / len(relevant_memories)
+                    
+                    # Get collection name from environment
+                    collection_name = os.getenv('QDRANT_COLLECTION_NAME', f'whisperengine_memory_{bot_name.lower()}')
+                    
+                    vector_memory_task = self.temporal_client.record_vector_memory_performance(
+                        bot_name=bot_name,
+                        user_id=message_context.user_id,
+                        operation="message_processing_retrieval",
+                        search_time_ms=processing_time_ms * 0.2,  # Estimate ~20% of processing time for memory
+                        memories_found=len(relevant_memories),
+                        avg_relevance_score=avg_relevance,
+                        collection_name=collection_name,
+                        vector_type="content"
+                    )
+                    temporal_tasks.append(vector_memory_task)
+                    logger.debug("📊 TEMPORAL: Added vector memory performance metrics to batch recording")
+                except AttributeError:
+                    logger.debug("Vector memory performance recording not yet implemented in TemporalIntelligenceClient")
+            
             await asyncio.gather(
                 *temporal_tasks,
                 return_exceptions=True  # Don't fail message processing if temporal recording fails
