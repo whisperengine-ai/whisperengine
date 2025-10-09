@@ -138,6 +138,21 @@ class MessageProcessor:
         except ImportError as e:
             logger.warning("Enhanced AI Ethics not available: %s", e)
         
+        # STAGE 3: Character Vector Episodic Intelligence (PHASE 1A)
+        self.episodic_intelligence = None
+        
+        try:
+            from src.characters.learning import create_character_vector_episodic_intelligence
+            
+            # Initialize episodic intelligence with shared Qdrant client from memory manager
+            qdrant_client = getattr(self.memory_manager, 'client', None)
+            self.episodic_intelligence = create_character_vector_episodic_intelligence(
+                qdrant_client=qdrant_client
+            )
+            logger.info("🧠 Character Vector Episodic Intelligence initialized (PHASE 1A)")
+        except ImportError as e:
+            logger.warning("Character Vector Episodic Intelligence not available: %s", e)
+        
         # TrendWise Adaptive Learning: Initialize trend analysis and confidence adaptation
         self.trend_analyzer = None
         self.confidence_adapter = None
@@ -1576,6 +1591,45 @@ class MessageProcessor:
             except Exception as e:
                 logger.warning("TrendWise adaptation failed: %s", e)
         
+        # Character Vector Episodic Intelligence (PHASE 1A): Add memorable moments and character insights
+        if self.episodic_intelligence:
+            try:
+                bot_name = get_normalized_bot_name_from_env()
+                collection_name = os.getenv('QDRANT_COLLECTION_NAME', f'whisperengine_memory_{bot_name}')
+                
+                # Get episodic memories and character insights for response enhancement
+                episodic_context = await self.episodic_intelligence.get_episodic_memory_for_response_enhancement(
+                    collection_name=collection_name,
+                    current_message=message_context.content,
+                    user_id=message_context.user_id,
+                    limit=3  # Top 3 most relevant memorable moments
+                )
+                
+                if episodic_context and (episodic_context['memories'] or episodic_context['insights']):
+                    # Build episodic guidance for character responses
+                    episodic_guidance = self._build_episodic_guidance(episodic_context)
+                    
+                    # Add episodic context to system prompt
+                    for i, msg in enumerate(conversation_context):
+                        if msg.get("role") == "system":
+                            conversation_context[i]["content"] += f"\n\n{episodic_guidance}"
+                            break
+                    
+                    # Store episodic intelligence context for monitoring
+                    ai_components['episodic_intelligence'] = {
+                        'memorable_moments_count': len(episodic_context['memories']),
+                        'character_insights_count': len(episodic_context['insights']),
+                        'total_memorable_moments': episodic_context['total_memorable_moments'],
+                        'memory_confidence': episodic_context['memory_confidence'],
+                        'context_suggestions': episodic_context['context_suggestions']
+                    }
+                    
+                    logger.info("🧠 EPISODIC INTELLIGENCE: Applied %d memorable moments and %d character insights for %s",
+                               len(episodic_context['memories']), len(episodic_context['insights']), message_context.user_id)
+                
+            except Exception as e:
+                logger.warning("Episodic intelligence enhancement failed: %s", e)
+        
         # Add AI intelligence guidance to system messages
         ai_guidance = self._build_ai_intelligence_guidance(ai_components)
         if ai_guidance:
@@ -1920,6 +1974,68 @@ class MessageProcessor:
         
         if guidance_parts:
             return "\n\n🤖 AI INTELLIGENCE GUIDANCE:\n" + "\n".join(f"• {part}" for part in guidance_parts)
+        
+        return ""
+
+    def _build_episodic_guidance(self, episodic_context: Dict[str, Any]) -> str:
+        """Build episodic intelligence guidance from memorable moments and character insights."""
+        guidance_parts = []
+        
+        # Memorable moments guidance
+        memories = episodic_context.get('memories', [])
+        if memories:
+            memorable_moments = []
+            for memory in memories[:2]:  # Top 2 most relevant
+                context_type = memory.get('context_type', 'general')
+                content_preview = memory.get('content_preview', '')
+                memorable_score = memory.get('memorable_score', 0)
+                
+                if context_type == 'personal_sharing':
+                    memorable_moments.append(f"Personal moment: {content_preview[:60]}...")
+                elif context_type == 'creative_moment':
+                    memorable_moments.append(f"Creative discussion: {content_preview[:60]}...")
+                elif context_type == 'expertise':
+                    memorable_moments.append(f"Professional insight: {content_preview[:60]}...")
+                else:
+                    memorable_moments.append(f"Memorable conversation: {content_preview[:60]}...")
+            
+            if memorable_moments:
+                guidance_parts.append(f"MEMORABLE MOMENTS: You can naturally reference these past experiences: {' | '.join(memorable_moments)}")
+        
+        # Character insights guidance
+        insights = episodic_context.get('insights', [])
+        if insights:
+            character_insights = []
+            for insight in insights[:2]:  # Top 2 insights
+                insight_type = insight.get('type', '')
+                description = insight.get('description', '')
+                confidence = insight.get('confidence', 0)
+                
+                if insight_type == 'emotional_pattern':
+                    character_insights.append(f"Emotional pattern: {description}")
+                elif insight_type == 'topic_enthusiasm':
+                    character_insights.append(f"Topic enthusiasm: {description}")
+                elif insight_type == 'personality_trait':
+                    character_insights.append(f"Personality trait: {description}")
+            
+            if character_insights:
+                guidance_parts.append(f"CHARACTER INSIGHTS: {' | '.join(character_insights)}")
+        
+        # Context suggestions guidance
+        context_suggestions = episodic_context.get('context_suggestions', [])
+        if context_suggestions:
+            suggestions = context_suggestions[:2]  # Top 2 suggestions
+            guidance_parts.append(f"EPISODIC CONTEXT: {' | '.join(suggestions)}")
+        
+        # Memory statistics for response tuning
+        total_memorable = episodic_context.get('total_memorable_moments', 0)
+        memory_confidence = episodic_context.get('memory_confidence', 0)
+        
+        if total_memorable > 0:
+            guidance_parts.append(f"MEMORY DEPTH: {total_memorable} total memorable moments (confidence: {memory_confidence:.2f})")
+        
+        if guidance_parts:
+            return "\n\n🧠 EPISODIC INTELLIGENCE:\n" + "\n".join(f"• {part}" for part in guidance_parts)
         
         return ""
 
