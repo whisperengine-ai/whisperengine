@@ -71,10 +71,10 @@ def main():
         {
             "name": "Memory Commands",
             "file": "src/handlers/memory.py", 
-            "status": "Disabled in src/main.py",
-            "reason": "obsolete API - calls non-existent methods",
-            "value": "Low - needs significant refactoring",
-            "effort": "High - API needs updating"
+            "status": "DELETED - obsolete API removed",
+            "reason": "obsolete API - called non-existent methods",
+            "value": "N/A - removed from codebase",
+            "effort": "N/A - component deleted"
         }
     ]
     

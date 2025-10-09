@@ -22,10 +22,9 @@ import sys
 # Core modular imports
 from src.core.bot import DiscordBotCore
 from src.core.bot_launcher import start_bot
-# from src.handlers.admin import AdminCommandHandlers  # Disabled - over-engineered
+# from src.handlers.admin import AdminCommandHandlers  # Deleted - over-engineered
 from src.handlers.events import BotEventHandlers
 from src.handlers.help import HelpCommandHandlers
-# from src.handlers.memory import MemoryCommandHandlers  # Disabled - obsolete API
 # Multi-entity handlers removed - using vector-native memory
 from src.handlers.status import StatusCommandHandlers
 from src.handlers.voice import VoiceCommandHandlers
@@ -206,18 +205,7 @@ class ModularBotManager:
             self.command_handlers["help"].register_commands(bot_name_filter, is_admin)
             logger.info("✅ Help command handlers registered")
 
-            # Memory commands - DISABLED (obsolete API, calling non-existent methods)
-            # self.command_handlers["memory"] = MemoryCommandHandlers(
-            #     bot=self.bot,
-            #     memory_manager=components["memory_manager"],
-            #     safe_memory_manager=getattr(self.bot_core, "safe_memory_manager", None),
-            #     context_memory_manager=getattr(self.bot_core, "context_memory_manager", None),
-            #     graph_personality_manager=components.get("graph_personality_manager"),
-            #     personality_profiler=None,  # Legacy personality profiler removed
-            #     dynamic_personality_profiler=components.get("dynamic_personality_profiler"),
-            # )
-            # self.command_handlers["memory"].register_commands(is_admin, bot_name_filter)
-            logger.info("ℹ️ Memory command handlers disabled (obsolete API - calls non-existent methods)")
+            logger.info("ℹ️ Memory command handlers deleted (obsolete API - called non-existent methods)")
 
             logger.info("ℹ️ Admin command handlers deleted (obsolete PostgreSQL-based features)")
 
