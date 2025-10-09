@@ -12,12 +12,12 @@ services:
     environment:
       - PYTHONUNBUFFERED=1
       - LOG_LEVEL=INFO
-      # LM Studio Configuration for Enhanced Synthetic Generation
+      # LM Studio Configuration (DISABLED - using reliable templates instead)
       - LLM_CHAT_API_URL=http://host.docker.internal:1234/v1
       - LLM_CLIENT_TYPE=lmstudio
       - LLM_CHAT_MODEL=local-model  # Uses whatever model is loaded in LM Studio
       - LLM_CHAT_API_KEY=
-      - SYNTHETIC_USE_LLM=true
+      - SYNTHETIC_USE_LLM=false  # Disabled for consistent, deterministic results
       - LLM_MAX_TOKENS_CHAT=2048  # Increased for better response generation
       # Bot endpoints (adjust based on your setup)
       - ELENA_ENDPOINT=http://host.docker.internal:9091

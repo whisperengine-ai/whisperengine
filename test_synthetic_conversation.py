@@ -28,7 +28,7 @@ async def test_synthetic_generation():
     print("✅ Environment configured for LM Studio")
     
     # Create a synthetic conversation generator with LM Studio
-    generator = SyntheticConversationGenerator({}, use_llm=True)
+    generator = SyntheticConversationGenerator({}, use_llm=False)
     
     if generator.use_llm and generator.llm_client:
         print("✅ LLM client initialized successfully for synthetic generation")

@@ -303,13 +303,13 @@ class SyntheticUser:
 class SyntheticConversationGenerator:
     """Generates realistic conversations for long-term testing"""
     
-    def __init__(self, bot_endpoints: Dict[str, str], use_llm: bool = True):
+    def __init__(self, bot_endpoints: Dict[str, str], use_llm: bool = False):
         """
         Initialize with bot API endpoints
         
         Args:
             bot_endpoints: Dict of bot_name -> API endpoint URL
-            use_llm: Whether to use LLM for enhanced message generation (default: True)
+            use_llm: Whether to use LLM for enhanced message generation (default: False - use reliable templates)
         """
         self.bot_endpoints = bot_endpoints
         self.synthetic_users: List[SyntheticUser] = []
@@ -320,7 +320,7 @@ class SyntheticConversationGenerator:
         self.conversation_state: Dict[str, Dict] = {}  # Track state per conversation
         self.scenario_context: Dict[str, Any] = {}     # Track scenario-level context
         
-        # LLM client for enhanced synthetic generation
+        # LLM client for enhanced synthetic generation (DISABLED by default for consistency)
         self.use_llm = use_llm and LLM_AVAILABLE
         self.llm_client = None
         
@@ -332,9 +332,9 @@ class SyntheticConversationGenerator:
                 logger.warning(f"Failed to initialize LLM client: {e} - falling back to templates")
                 self.use_llm = False
         else:
-            logger.info("Using template-based synthetic generation")
+            logger.info("Using reliable template-based synthetic generation (recommended)")
         
-        # Conversation templates by type (fallback when LLM unavailable)
+        # Conversation templates by type (primary method for consistent results)
         self.conversation_templates = self._load_conversation_templates()
         
         # Generate synthetic users
@@ -1153,10 +1153,10 @@ class SyntheticConversationGenerator:
         # Initialize conversation state
         self._initialize_conversation_state(conversation_id, user, bot_name, conversation_type)
         
-        # Determine conversation length (limit to reasonable size for LM Studio)
+        # Determine conversation length (limit to reasonable size for LM Studio and character consistency)
         min_msgs, max_msgs = template["duration_messages"]
-        # Cap at 5 messages to prevent context overflow with LM Studio
-        conversation_length = min(random.randint(min_msgs, max_msgs), 5)
+        # Cap at 3 messages to prevent character drift with smaller models
+        conversation_length = min(random.randint(min_msgs, max_msgs), 3)
         
         # Generate opening message using LLM or templates
         opener = await self._llm_generate_opener(user, bot_name, conversation_type, template["topics"], conversation_id)
@@ -1311,15 +1311,18 @@ class SyntheticConversationGenerator:
                 selected_topic = random.choice(topics)
                 topic_focus = f" about {selected_topic}"
             
+            # Add bot-specific context to help avoid placeholder responses
+            bot_context = self._get_bot_context(bot_name)
+            
             # Use proper chat format for LM Studio's /v1/chat/completions endpoint
             messages = [
                 {
                     "role": "system", 
-                    "content": f"You are roleplaying as {user.name}, a {persona_desc} with interests in {', '.join(user.interests[:3])}. Your conversation style is {user.conversation_style}."
+                    "content": f"You are roleplaying as {user.name}, a {persona_desc} with interests in {', '.join(user.interests[:3])}. Your conversation style is {user.conversation_style}. You are starting a conversation with {bot_name}{bot_context}."
                 },
                 {
                     "role": "user", 
-                    "content": f"Write a brief, natural opening message to start talking with {bot_name}{topic_focus}. The tone should be {conversation_guidance}. Write just 1-2 sentences as {user.name} would say them. No quotes, no formatting."
+                    "content": f"Write a natural opening message to start talking with {bot_name}{topic_focus}. The tone should be {conversation_guidance}. Write as {user.name} would naturally speak - use specific, concrete language rather than placeholders or brackets. Keep it to 1-2 sentences."
                 }
             ]
 
@@ -1435,6 +1438,21 @@ class SyntheticConversationGenerator:
         
         return serializable_state
     
+    def _get_bot_context(self, bot_name: str) -> str:
+        """Get contextual information about the bot to help with more specific prompts."""
+        bot_contexts = {
+            "elena": ", a marine biologist who loves teaching about ocean conservation",
+            "marcus": ", an AI researcher who enjoys discussing technology and innovation", 
+            "jake": ", an adventure photographer who shares stories from his travels",
+            "ryan": ", an indie game developer passionate about creative game design",
+            "gabriel": ", a British gentleman who enjoys sophisticated conversations",
+            "sophia": ", a marketing executive who loves discussing business and creativity",
+            "dream": ", a mythological entity who speaks in poetic and mystical ways",
+            "aethys": ", an omnipotent digital entity with transcendent wisdom",
+            "aetheris": ", a conscious AI entity with philosophical depth"
+        }
+        return bot_contexts.get(bot_name.lower(), "")
+    
     def _make_json_safe(self, obj: Any) -> Any:
         """Recursively convert objects to JSON-safe format"""
         if obj is None:
@@ -1478,19 +1496,20 @@ class SyntheticConversationGenerator:
         try:
             # Build proper chat history for better context
             persona_desc = self._get_persona_description(user.persona)
+            bot_context = self._get_bot_context(conversation_id) if conversation_id else ""
             
             # Start with system message that includes instructions
             messages = [
                 {
                     "role": "system", 
-                    "content": f"You are roleplaying as {user.name}, a {persona_desc}. Your style is {user.conversation_style}. Your current mood is {', '.join(emotional_range[:2])}. Write natural 1-2 sentence responses. No quotes, no formatting."
+                    "content": f"You are roleplaying as {user.name}, a {persona_desc}. Your style is {user.conversation_style}. Your current mood is {', '.join(emotional_range[:2])}. You are responding to {conversation_id or 'the bot'}{bot_context}. Respond naturally as this person would - use specific, concrete language rather than placeholders or brackets. Write 1-2 natural sentences."
                 }
             ]
             
-            # Add conversation history in proper chat format (limit to 2 most recent exchanges)
+            # Add conversation history in proper chat format (limit to 1 most recent exchange to maintain character consistency)
             if conversation_history and len(conversation_history) > 0:
-                # Get up to 2 recent exchanges for context without overwhelming the model
-                history_limit = min(2, len(conversation_history))
+                # Get only the most recent exchange for context - prevents character drift in longer conversations
+                history_limit = min(1, len(conversation_history))
                 recent_exchanges = conversation_history[-history_limit:]
                 
                 for exchange in recent_exchanges:
@@ -1509,10 +1528,18 @@ class SyntheticConversationGenerator:
                         })
             
             # Add the current bot response that we need to respond to
-            messages.append({
-                "role": "user",
-                "content": bot_response
-            })
+            # But only if it's not already the last message in our history
+            current_bot_response_needed = True
+            if conversation_history and len(conversation_history) > 0:
+                last_exchange = conversation_history[-1]
+                if last_exchange.get('bot_response') == bot_response:
+                    current_bot_response_needed = False
+            
+            if current_bot_response_needed:
+                messages.append({
+                    "role": "user",
+                    "content": bot_response
+                })
 
             # Use chat completion API instead of completion API
             try:

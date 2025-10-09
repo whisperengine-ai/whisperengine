@@ -50,7 +50,7 @@ async def test_lm_studio_connection():
     
     try:
         # Create generator with LM Studio configuration
-        generator = SyntheticConversationGenerator({}, use_llm=True)
+        generator = SyntheticConversationGenerator({}, use_llm=False)
         
         if generator.use_llm and generator.llm_client:
             print("✅ LM Studio client initialized successfully")
@@ -124,7 +124,7 @@ async def run_lm_studio_synthetic_test():
     }
     
     # Create generator
-    generator = SyntheticConversationGenerator(bot_endpoints, use_llm=True)
+    generator = SyntheticConversationGenerator(bot_endpoints, use_llm=False)
     
     if not generator.use_llm:
         print("❌ LLM not available for synthetic generation")

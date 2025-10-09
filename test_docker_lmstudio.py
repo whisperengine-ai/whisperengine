@@ -35,18 +35,22 @@ def test_docker_lmstudio_connection():
         test_prompt = "Hello! How are you today?"
         print(f"\n🧪 Testing generation with prompt: '{test_prompt}'")
         
-        # Use sync call (as implemented in synthetic generator)
-        import asyncio
+        # Use chat completion format like the synthetic generator
+        messages = [
+            {"role": "system", "content": "You are a helpful assistant."},
+            {"role": "user", "content": test_prompt}
+        ]
         
-        async def test_async():
-            response = await llm_client.generate_response(test_prompt)
-            return response
+        # Use the correct method from LLMClient
+        response = llm_client.generate_chat_completion(messages, max_tokens=50, temperature=0.7)
         
-        # Run async test
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        response = loop.run_until_complete(test_async())
-        loop.close()
+        # Handle async if needed
+        if hasattr(response, '__await__'):
+            import asyncio
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            response = loop.run_until_complete(response)
+            loop.close()
         
         print(f"✅ LM Studio response: {response[:100]}...")
         print("🎉 Docker LM Studio integration working!")

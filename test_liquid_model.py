@@ -31,7 +31,7 @@ async def test_liquid_model():
     print()
     
     # Create generator
-    generator = SyntheticConversationGenerator({}, use_llm=True)
+    generator = SyntheticConversationGenerator({}, use_llm=False)
     
     if not generator.use_llm:
         print("❌ LLM not available - check LM Studio is running")
