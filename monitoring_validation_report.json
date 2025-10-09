@@ -1,0 +1,77 @@
+{
+  "monitoring_validation_summary": {
+    "total_tests": 9,
+    "passed": 7,
+    "failed": 2,
+    "warnings": 0,
+    "success_rate": "77.8%",
+    "validation_timestamp": "2025-10-09T15:21:06.542477"
+  },
+  "test_results": [
+    {
+      "test": "InfluxDB Health Check",
+      "status": "PASS",
+      "details": "InfluxDB is responsive",
+      "timestamp": "2025-10-09T15:20:42.169142"
+    },
+    {
+      "test": "Grafana Health Check",
+      "status": "PASS",
+      "details": "Version: 11.3.0",
+      "timestamp": "2025-10-09T15:20:42.171561"
+    },
+    {
+      "test": "Elena Bot Health",
+      "status": "PASS",
+      "details": "Status: healthy",
+      "timestamp": "2025-10-09T15:20:42.174678"
+    },
+    {
+      "test": "Gabriel Bot Health",
+      "status": "PASS",
+      "details": "Status: healthy",
+      "timestamp": "2025-10-09T15:20:42.176156"
+    },
+    {
+      "test": "Sophia Bot Health",
+      "status": "PASS",
+      "details": "Status: healthy",
+      "timestamp": "2025-10-09T15:20:42.177543"
+    },
+    {
+      "test": "Metrics Collection Test",
+      "status": "PASS",
+      "details": "Processing time recorded: 7843ms",
+      "timestamp": "2025-10-09T15:20:50.032667"
+    },
+    {
+      "test": "InfluxDB Data Query",
+      "status": "FAIL",
+      "details": "HTTP 401",
+      "timestamp": "2025-10-09T15:20:50.042700"
+    },
+    {
+      "test": "Grafana Dashboards",
+      "status": "FAIL",
+      "details": "HTTP 401",
+      "timestamp": "2025-10-09T15:20:50.049611"
+    },
+    {
+      "test": "End-to-End Monitoring",
+      "status": "PASS",
+      "details": "Successfully triggered metrics for 3/3 test messages",
+      "timestamp": "2025-10-09T15:21:06.542372"
+    }
+  ],
+  "monitoring_stack_status": {
+    "influxdb_healthy": true,
+    "grafana_healthy": true,
+    "character_bots_healthy": true,
+    "metrics_collection_working": true
+  },
+  "recommendations": [
+    "\u26a0\ufe0f  InfluxDB issues detected - check docker logs for whisperengine-influxdb",
+    "\u26a0\ufe0f  Grafana issues detected - verify Grafana container and port 3000 availability",
+    "\u26a0\ufe0f  Monitoring stack partially functional - some features may be limited"
+  ]
+}
