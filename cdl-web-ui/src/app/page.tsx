@@ -74,12 +74,42 @@ export default function Home() {
               </p>
             </div>
           </Link>
+
+          <Link href="/config" className="block">
+            <div className="bg-white rounded-lg shadow-lg hover:shadow-xl transition-shadow p-8">
+              <div className="text-3xl mb-4">⚙️</div>
+              <h3 className="text-xl font-semibold mb-2">System Configuration</h3>
+              <p className="text-gray-800">
+                Configure LLM providers, Discord integration, and deployment settings.
+              </p>
+            </div>
+          </Link>
+
+          <Link href="/chat" className="block">
+            <div className="bg-white rounded-lg shadow-lg hover:shadow-xl transition-shadow p-8">
+              <div className="text-3xl mb-4">💬</div>
+              <h3 className="text-xl font-semibold mb-2">Test Chat</h3>
+              <p className="text-gray-800">
+                Chat with your AI characters in real-time to test personality and responses.
+              </p>
+            </div>
+          </Link>
+
+          <Link href="/deployments" className="block">
+            <div className="bg-white rounded-lg shadow-lg hover:shadow-xl transition-shadow p-8">
+              <div className="text-3xl mb-4">🚀</div>
+              <h3 className="text-xl font-semibold mb-2">Deployments</h3>
+              <p className="text-gray-800">
+                View and manage deployed character bots, test endpoints, and monitor status.
+              </p>
+            </div>
+          </Link>
         </div>
 
         <div className="text-center mt-16">
           <div className="bg-white rounded-lg p-4 shadow max-w-md mx-auto">
             <h3 className="text-lg font-medium mb-2">🚀 Character Authoring Platform</h3>
-            <p className="text-gray-900">Ready for character creation and template management</p>
+            <p className="text-gray-900">Ready for character creation and configuration management</p>
           </div>
         </div>
       </div>
