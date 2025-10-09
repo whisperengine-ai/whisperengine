@@ -84,8 +84,8 @@ This document catalogs all environment variables used in the WhisperEngine Pytho
 | Variable | Default | Description | Location |
 |----------|---------|-------------|----------|
 | `QDRANT_HOST` | `"localhost"` | Qdrant vector database host | `src/memory/memory_protocol.py` |
-| `QDRANT_PORT` | `6333` | Qdrant vector database port | `src/memory/memory_protocol.py` |
-| `QDRANT_COLLECTION_NAME` | `"chat_memories"` | Qdrant collection name for memories | `src/memory/memory_protocol.py` |
+| `QDRANT_PORT` | `6334` | Qdrant vector database port | `src/memory/memory_protocol.py` |
+| `QDRANT_COLLECTION_NAME` | `"whisperengine_memory"` | Qdrant collection name for memories | `src/memory/memory_protocol.py` |
 
 ### Embedding Configuration
 | Variable | Default | Description | Location |
@@ -116,7 +116,7 @@ This document catalogs all environment variables used in the WhisperEngine Pytho
 |----------|---------|-------------|----------|
 | `USE_POSTGRESQL` | `false` | Enable PostgreSQL database | `src/database/database_integration.py`, `src/utils/emotion_manager.py` |
 | `POSTGRES_HOST` | `"localhost"` | PostgreSQL server host | Multiple locations |
-| `POSTGRES_PORT` | `5432` | PostgreSQL server port | Multiple locations |
+| `POSTGRES_PORT` | `5433` | PostgreSQL server port | Multiple locations |
 | `POSTGRES_DB` | `"whisperengine"` | PostgreSQL database name | Multiple locations |
 | `POSTGRES_USER` | `"whisperengine"` | PostgreSQL username | Multiple locations |
 | `POSTGRES_PASSWORD` | `""` | PostgreSQL password | Multiple locations |
@@ -135,7 +135,6 @@ This document catalogs all environment variables used in the WhisperEngine Pytho
 | `BACKUP_MAX_FILES` | `5` | Maximum backup files to retain | `src/database/database_integration.py` |
 | `BACKUP_COMPRESSION` | `true` | Enable backup compression | `src/database/database_integration.py` |
 | `BACKUP_PATH` | `"./backups"` | Backup path for memory system | `src/memory/backup_manager.py` |
-| `AUTO_BACKUP_ENABLED` | `true` | Enable automatic memory backups | `src/memory/backup_manager.py` |
 | `AUTO_BACKUP_INTERVAL_HOURS` | `24` | Backup interval in hours | `src/memory/backup_manager.py` |
 | `BACKUP_RETENTION_COUNT` | `5` | Number of backups to retain | `src/memory/backup_manager.py` |
 
@@ -163,6 +162,7 @@ This document catalogs all environment variables used in the WhisperEngine Pytho
 | `ENHANCED_EMOTION_SEMANTIC_WEIGHT` | `0.4` | Weight for semantic emotion analysis | `src/intelligence/enhanced_vector_emotion_analyzer.py` |
 | `ENHANCED_EMOTION_CONTEXT_WEIGHT` | `0.3` | Weight for context-based emotion analysis | `src/intelligence/enhanced_vector_emotion_analyzer.py` |
 | `ENHANCED_EMOTION_CONFIDENCE_THRESHOLD` | `0.3` | Confidence threshold for emotion detection | `src/intelligence/enhanced_vector_emotion_analyzer.py` |
+| `ROBERTA_EMOTION_MODEL_NAME` | `"cardiffnlp/twitter-roberta-base-emotion-multilabel-latest"` | RoBERTa emotion model name | `src/intelligence/enhanced_vector_emotion_analyzer.py` |
 
 ---
 
@@ -172,7 +172,7 @@ This document catalogs all environment variables used in the WhisperEngine Pytho
 | Variable | Default | Description | Location |
 |----------|---------|-------------|----------|
 | `ELEVENLABS_API_KEY` | *None* | ElevenLabs API key | `src/llm/elevenlabs_client.py`, `src/web/voice_api.py` |
-| `ELEVENLABS_DEFAULT_VOICE_ID` | *None* | Default voice ID for TTS | `src/llm/elevenlabs_client.py` |
+| `ELEVENLABS_DEFAULT_VOICE_ID` | `"ked1vRAQW5Sk9vhZC3vI"` | Default voice ID for TTS | `src/llm/elevenlabs_client.py` |
 | `ELEVENLABS_VOICE_STABILITY` | `0.5` | Voice stability setting | `src/llm/elevenlabs_client.py` |
 | `ELEVENLABS_VOICE_SIMILARITY_BOOST` | `0.8` | Voice similarity boost | `src/llm/elevenlabs_client.py` |
 | `ELEVENLABS_VOICE_STYLE` | `0.0` | Voice style setting (0.0 = most natural) | `src/llm/elevenlabs_client.py` |
@@ -181,7 +181,7 @@ This document catalogs all environment variables used in the WhisperEngine Pytho
 | `ELEVENLABS_STT_MODEL` | `"eleven_speech_to_text_v1"` | STT model to use | `src/llm/elevenlabs_client.py` |
 | `ELEVENLABS_REQUEST_TIMEOUT` | `30` | Request timeout in seconds | `src/llm/elevenlabs_client.py` |
 | `ELEVENLABS_CONNECTION_TIMEOUT` | `10` | Connection timeout in seconds | `src/llm/elevenlabs_client.py` |
-| `ELEVENLABS_OUTPUT_FORMAT` | *Default* | Audio output format | `src/llm/elevenlabs_client.py` |
+| `ELEVENLABS_OUTPUT_FORMAT` | `"mp3_44100_128"` | Audio output format | `src/llm/elevenlabs_client.py` |
 | `ELEVENLABS_OPTIMIZE_STREAMING` | `2` | Streaming optimization level | `src/llm/elevenlabs_client.py` |
 | `ELEVENLABS_USE_STREAMING` | `true` | Enable streaming audio | `src/llm/elevenlabs_client.py` |
 
@@ -335,9 +335,9 @@ This document catalogs all environment variables used in the WhisperEngine Pytho
 | Variable | Default | Description | Location |
 |----------|---------|-------------|----------|
 | `ENGAGEMENT_ENGINE_TYPE` | `"full"` | Engagement engine implementation | `src/core/bot.py`, `src/conversation/engagement_protocol.py` |
-| `PHASE4_ENGAGEMENT_STAGNATION_THRESHOLD_MINUTES` | `5` | Stagnation threshold in minutes | `src/conversation/proactive_engagement_engine.py` |
-| `PHASE4_ENGAGEMENT_CHECK_INTERVAL_MINUTES` | `3` | Check interval in minutes | `src/conversation/proactive_engagement_engine.py` |
-| `PHASE4_ENGAGEMENT_MAX_SUGGESTIONS_PER_HOUR` | `8` | Maximum suggestions per hour | `src/conversation/proactive_engagement_engine.py` |
+| `ENGAGEMENT_STAGNATION_THRESHOLD_MINUTES` | `5` | Stagnation threshold in minutes | `src/conversation/proactive_engagement_engine.py` |
+| `ENGAGEMENT_CHECK_INTERVAL_MINUTES` | `3` | Check interval in minutes | `src/conversation/proactive_engagement_engine.py` |
+| `ENGAGEMENT_MAX_SUGGESTIONS_PER_HOUR` | `8` | Maximum suggestions per hour | `src/conversation/proactive_engagement_engine.py` |
 
 ---
 
@@ -346,20 +346,20 @@ This document catalogs all environment variables used in the WhisperEngine Pytho
 ### Phase 3 Intelligence
 | Variable | Default | Description | Location |
 |----------|---------|-------------|----------|
-| `PHASE3_TOPIC_SHIFT_THRESHOLD` | `0.4` | Topic shift detection threshold | `src/intelligence/context_switch_detector.py` |
-| `PHASE3_EMOTIONAL_SHIFT_THRESHOLD` | `0.3` | Emotional shift detection threshold | `src/intelligence/context_switch_detector.py` |
-| `PHASE3_CONVERSATION_MODE_THRESHOLD` | `0.5` | Conversation mode threshold | `src/intelligence/context_switch_detector.py` |
-| `PHASE3_URGENCY_CHANGE_THRESHOLD` | `0.4` | Urgency change detection threshold | `src/intelligence/context_switch_detector.py` |
-| `PHASE3_MAX_MEMORIES` | `50` | Maximum memories for analysis | `src/memory/phase3_integration.py`, `src/intelligence/context_switch_detector.py` |
-| `PHASE3_ANALYSIS_TIMEOUT` | `60` | Analysis timeout in seconds | `src/memory/phase3_integration.py`, `src/intelligence/context_switch_detector.py` |
+| `CONTEXT_SWITCH_TOPIC_SHIFT_THRESHOLD` | `0.4` | Topic shift detection threshold | `src/intelligence/context_switch_detector.py` |
+| `CONTEXT_SWITCH_EMOTIONAL_SHIFT_THRESHOLD` | `0.3` | Emotional shift detection threshold | `src/intelligence/context_switch_detector.py` |
+| `CONTEXT_SWITCH_CONVERSATION_MODE_THRESHOLD` | `0.5` | Conversation mode threshold | `src/intelligence/context_switch_detector.py` |
+| `CONTEXT_SWITCH_URGENCY_CHANGE_THRESHOLD` | `0.4` | Urgency change detection threshold | `src/intelligence/context_switch_detector.py` |
+| `CONTEXT_SWITCH_MAX_MEMORIES` | `50` | Maximum memories for analysis | `src/intelligence/context_switch_detector.py` |
+| `CONTEXT_SWITCH_ANALYSIS_TIMEOUT` | `60` | Analysis timeout in seconds | `src/intelligence/context_switch_detector.py` |
 
 ### Empathy Calibration
 | Variable | Default | Description | Location |
 |----------|---------|-------------|----------|
-| `PHASE3_EMPATHY_MIN_INTERACTIONS` | `3` | Minimum interactions for empathy confidence | `src/intelligence/empathy_calibrator.py` |
-| `PHASE3_EMPATHY_EFFECTIVENESS_THRESHOLD` | `0.6` | Empathy effectiveness threshold | `src/intelligence/empathy_calibrator.py` |
-| `PHASE3_EMPATHY_LEARNING_RATE` | `0.1` | Empathy learning rate | `src/intelligence/empathy_calibrator.py` |
-| `PHASE3_EMPATHY_CONFIDENCE_THRESHOLD` | `0.7` | Empathy confidence threshold | `src/intelligence/empathy_calibrator.py` |
+| `EMPATHY_MIN_INTERACTIONS_FOR_CONFIDENCE` | `3` | Minimum interactions for empathy confidence | `src/intelligence/empathy_calibrator.py` |
+| `EMPATHY_EFFECTIVENESS_THRESHOLD` | `0.6` | Empathy effectiveness threshold | `src/intelligence/empathy_calibrator.py` |
+| `EMPATHY_LEARNING_RATE` | `0.1` | Empathy learning rate | `src/intelligence/empathy_calibrator.py` |
+| `EMPATHY_CONFIDENCE_THRESHOLD` | `0.7` | Empathy confidence threshold | `src/intelligence/empathy_calibrator.py` |
 
 ### Feature Toggles
 | Variable | Default | Description | Location |
@@ -391,6 +391,7 @@ This document catalogs all environment variables used in the WhisperEngine Pytho
 |----------|---------|-------------|----------|
 | `OPENAI_API_KEY` | *None* | OpenAI API key | `src/llm/smart_backend_selector.py` |
 | `ANTHROPIC_API_KEY` | *None* | Anthropic API key | `src/llm/smart_backend_selector.py` |
+| `ALLOWED_ORIGINS` | `'http://localhost:3000,http://localhost:8080'` | CORS allowed origins for API | `src/api/external_chat_api.py` |
 
 ### NLP & Processing
 | Variable | Default | Description | Location |
@@ -415,6 +416,39 @@ This document catalogs all environment variables used in the WhisperEngine Pytho
 | Variable | Default | Description | Location |
 |----------|---------|-------------|----------|
 | `ENABLE_PRODUCTION_OPTIMIZATION` | `true` | Enable production optimizations | `src/integration/production_system_integration.py` |
+
+---
+
+## 🏗️ Temporal Intelligence (InfluxDB)
+
+### InfluxDB Configuration
+| Variable | Default | Description | Location |
+|----------|---------|-------------|----------|
+| `INFLUXDB_URL` | `"http://localhost:8086"` | InfluxDB server URL | `src/temporal/temporal_intelligence_client.py`, `src/monitoring/fidelity_metrics_collector.py` |
+| `INFLUXDB_TOKEN` | *None* | InfluxDB authentication token | `src/temporal/temporal_intelligence_client.py`, `src/monitoring/fidelity_metrics_collector.py` |
+| `INFLUXDB_ORG` | *None* | InfluxDB organization | `src/temporal/temporal_intelligence_client.py`, `src/monitoring/fidelity_metrics_collector.py` |
+| `INFLUXDB_BUCKET` | *None* | InfluxDB bucket name | `src/temporal/temporal_intelligence_client.py`, `src/monitoring/fidelity_metrics_collector.py` |
+
+---
+
+## 💾 Memory Cache Configuration
+
+### Conversation Cache
+| Variable | Default | Description | Location |
+|----------|---------|-------------|----------|
+| `CONVERSATION_CACHE_TIMEOUT_MINUTES` | *varies* | Cache timeout in minutes | `src/memory/local_memory_cache.py` |
+| `CONVERSATION_CACHE_BOOTSTRAP_LIMIT` | *varies* | Bootstrap limit for cache | `src/memory/local_memory_cache.py` |
+| `CONVERSATION_CACHE_MAX_LOCAL` | *varies* | Maximum local cache entries | `src/memory/local_memory_cache.py` |
+
+### Memory Management
+| Variable | Default | Description | Location |
+|----------|---------|-------------|----------|
+| `MEMORY_DECAY_LAMBDA` | `0.01` | Memory decay rate for aging | `src/core/message_processor.py` |
+| `MEMORY_PRUNE_THRESHOLD` | `0.2` | Threshold for memory pruning | `src/core/message_processor.py` |
+
+---
+
+## 🔧 Miscellaneous
 
 ---
 
@@ -445,5 +479,6 @@ Many settings auto-detect appropriate defaults based on:
 
 ---
 
-*Generated on: 2025-09-30*
-*Total Variables Documented: 200+*
+*Generated on: 2025-10-08*
+*Total Variables Documented: 225+*
+*Last Updated: Added missing environment variables (MEMORY_DECAY_LAMBDA, MEMORY_PRUNE_THRESHOLD, corrected ELEVENLABS defaults)*

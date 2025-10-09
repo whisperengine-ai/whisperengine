@@ -320,7 +320,10 @@ async def main():
     success = await collector.record_synthetic_conversation_rate(
         conversations_per_hour=6.2,
         active_synthetic_users=8,
-        bot_distribution={"elena": 25, "marcus": 18, "ryan": 12, "gabriel": 15}
+        bot_distribution={
+            "elena": 15, "marcus": 12, "ryan": 8, "dream": 10, "gabriel": 11, 
+            "sophia": 9, "jake": 7, "dotty": 6, "aetheris": 8, "aethys": 14
+        }
     )
     if success:
         logger.info("✅ Conversation rate metrics recorded successfully")

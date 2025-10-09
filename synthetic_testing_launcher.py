@@ -6,7 +6,7 @@ Simple launcher script for running synthetic conversations and feeding metrics t
 Integrates with WhisperEngine's existing InfluxDB temporal intelligence infrastructure.
 
 Usage:
-    python synthetic_testing_launcher.py --bots elena,marcus,ryan --duration 24
+    python synthetic_testing_launcher.py --bots elena,marcus,ryan,dream,gabriel,sophia,jake,dotty,aetheris,aethys --duration 24
 
 Author: WhisperEngine AI Team  
 Created: October 8, 2025
@@ -165,7 +165,7 @@ class SyntheticTestingOrchestrator:
 async def main():
     """Main function with command line argument parsing"""
     parser = argparse.ArgumentParser(description="WhisperEngine Synthetic Testing")
-    parser.add_argument("--bots", default="elena,marcus,ryan", 
+    parser.add_argument("--bots", default="elena,marcus,ryan,dream,gabriel,sophia,jake,dotty,aetheris,aethys", 
                        help="Comma-separated list of bots to test")
     parser.add_argument("--duration", type=float, default=24.0,
                        help="Test duration in hours")
@@ -182,9 +182,13 @@ async def main():
         "elena": os.getenv("ELENA_ENDPOINT", "http://localhost:9091"),
         "marcus": os.getenv("MARCUS_ENDPOINT", "http://localhost:9092"), 
         "ryan": os.getenv("RYAN_ENDPOINT", "http://localhost:9093"),
+        "dream": os.getenv("DREAM_ENDPOINT", "http://localhost:9094"),
         "gabriel": os.getenv("GABRIEL_ENDPOINT", "http://localhost:9095"),
-        "sofia": os.getenv("SOFIA_ENDPOINT", "http://localhost:9096"),
-        "jake": os.getenv("JAKE_ENDPOINT", "http://localhost:9097")
+        "sophia": os.getenv("SOPHIA_ENDPOINT", "http://localhost:9096"),
+        "jake": os.getenv("JAKE_ENDPOINT", "http://localhost:9097"),
+        "dotty": os.getenv("DOTTY_ENDPOINT", "http://localhost:9098"),
+        "aetheris": os.getenv("AETHERIS_ENDPOINT", "http://localhost:9099"),
+        "aethys": os.getenv("AETHYS_ENDPOINT", "http://localhost:3007")
     }
     
     # Build endpoint dict for requested bots

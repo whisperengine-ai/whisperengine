@@ -16,9 +16,13 @@ services:
       - ELENA_ENDPOINT=http://host.docker.internal:9091
       - MARCUS_ENDPOINT=http://host.docker.internal:9092
       - RYAN_ENDPOINT=http://host.docker.internal:9093
+      - DREAM_ENDPOINT=http://host.docker.internal:9094
       - GABRIEL_ENDPOINT=http://host.docker.internal:9095
-      - SOFIA_ENDPOINT=http://host.docker.internal:9096
+      - SOPHIA_ENDPOINT=http://host.docker.internal:9096
       - JAKE_ENDPOINT=http://host.docker.internal:9097
+      - DOTTY_ENDPOINT=http://host.docker.internal:9098
+      - AETHERIS_ENDPOINT=http://host.docker.internal:9099
+      - AETHYS_ENDPOINT=http://host.docker.internal:3007
       # InfluxDB integration (use existing WhisperEngine InfluxDB)
       - INFLUXDB_URL=http://host.docker.internal:8086
       - INFLUXDB_TOKEN=whisperengine-fidelity-first-metrics-token

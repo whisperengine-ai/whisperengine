@@ -564,9 +564,13 @@ async def main():
         "elena": os.getenv("ELENA_ENDPOINT", "http://localhost:9091"),
         "marcus": os.getenv("MARCUS_ENDPOINT", "http://localhost:9092"), 
         "ryan": os.getenv("RYAN_ENDPOINT", "http://localhost:9093"),
+        "dream": os.getenv("DREAM_ENDPOINT", "http://localhost:9094"),
         "gabriel": os.getenv("GABRIEL_ENDPOINT", "http://localhost:9095"),
-        "sofia": os.getenv("SOFIA_ENDPOINT", "http://localhost:9096"),
-        "jake": os.getenv("JAKE_ENDPOINT", "http://localhost:9097")
+        "sophia": os.getenv("SOPHIA_ENDPOINT", "http://localhost:9096"),
+        "jake": os.getenv("JAKE_ENDPOINT", "http://localhost:9097"),
+        "dotty": os.getenv("DOTTY_ENDPOINT", "http://localhost:9098"),
+        "aetheris": os.getenv("AETHERIS_ENDPOINT", "http://localhost:9099"),
+        "aethys": os.getenv("AETHYS_ENDPOINT", "http://localhost:3007")
     }
     
     logger.info("🤖 Bot endpoints configured:")
