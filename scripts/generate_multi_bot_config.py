@@ -58,7 +58,8 @@ class BotConfigDiscovery:
                     "health_port": health_port,
                     "service_name": f"{bot_name}-bot",
                     "container_name": f"whisperengine-{bot_name}-bot",
-                    "display_name": self._get_display_name(bot_name)
+                    "display_name": self._get_display_name(bot_name),
+                    "character_file": None  # Database-based CDL - no character files needed
                 }
                 
         return bot_configs
@@ -139,12 +140,8 @@ class BotConfigDiscovery:
             f"HEALTH_CHECK_PORT={config['health_port']}",
             "HEALTH_CHECK_HOST=0.0.0.0"
             # Note: QDRANT_COLLECTION_NAME is loaded from .env.{bot_name} via env_file
-            # and should not be explicitly set here to avoid conflicts
+            # Note: Character data is loaded from PostgreSQL database via DISCORD_BOT_NAME
         ]
-        
-        # Add character file if available
-        if config['character_file']:
-            environment_vars.append(f"CDL_DEFAULT_CHARACTER={config['character_file']}")
         
         service_yaml = f"""  {config['service_name']}:
     image: whisperengine-bot:${{VERSION:-latest}}
@@ -462,8 +459,8 @@ def main():
     # Display discovered configurations
     print(f"✅ Found {len(bot_configs)} bot configurations:")
     for bot_name, config in bot_configs.items():
-        character_status = f"character={config['character_file']}" if config['character_file'] else "no character file"
-        print(f"  ✓ {bot_name}: env={config['env_file']}, {character_status}, port={config['health_port']}")
+        # WhisperEngine now uses database-based CDL - no character files needed
+        print(f"  ✓ {bot_name}: env={config['env_file']}, database CDL, port={config['health_port']}")
     
     try:
         # Generate Docker Compose from template

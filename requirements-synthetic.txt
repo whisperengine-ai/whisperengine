@@ -1,0 +1,4 @@
+aiohttp==3.9.0
+requests==2.31.0
+asyncio-mqtt==0.16.1
+influxdb-client==1.40.0
