@@ -203,6 +203,19 @@ class MessageProcessor:
             logger.warning("Fidelity metrics collector not available")
             self.fidelity_metrics = None
         
+        # Unified Character Intelligence Coordinator: PHASE 4A Integration
+        self.character_intelligence_coordinator = None
+        
+        try:
+            from src.characters.learning.unified_character_intelligence_coordinator import UnifiedCharacterIntelligenceCoordinator
+            
+            self.character_intelligence_coordinator = UnifiedCharacterIntelligenceCoordinator(
+                memory_manager=self.memory_manager
+            )
+            logger.info("🧠 Unified Character Intelligence Coordinator initialized")
+        except ImportError as e:
+            logger.warning("Character intelligence coordinator not available: %s", e)
+        
         # Track processing state for debugging
         self._last_security_validation = None
         self._last_emotional_context = None
@@ -2018,7 +2031,22 @@ class MessageProcessor:
                 )
                 
                 tasks.append(conversation_intelligence_task)
-                task_names.append("conversation_intelligence")            # Task 5: Thread management analysis (Phase 4.2)
+                task_names.append("conversation_intelligence")
+            
+            # Task 5: Unified Character Intelligence Coordination (PHASE 4A)
+            if self.character_intelligence_coordinator:
+                logger.debug("🧠 TASK DEBUG: Creating unified character intelligence task")
+                character_intelligence_task = self._process_unified_character_intelligence(
+                    message_context.user_id,
+                    message_context.content,
+                    message_context,
+                    conversation_context
+                )
+                
+                tasks.append(character_intelligence_task)
+                task_names.append("unified_character_intelligence")
+                
+            # Task 6: Thread management analysis (Phase 4.2)
             if self.bot_core and hasattr(self.bot_core, 'phase4_thread_manager'):
                 thread_task = self._process_thread_management(
                     message_context.user_id,
@@ -2309,6 +2337,57 @@ class MessageProcessor:
             
         except Exception as e:
             logger.debug(f"Sophisticated Phase 4 intelligence processing failed: {e}")
+            return None
+
+    async def _process_unified_character_intelligence(self, user_id: str, content: str, 
+                                                    message_context: MessageContext,
+                                                    conversation_context: List[Dict[str, str]]) -> Optional[Dict[str, Any]]:
+        """Process Unified Character Intelligence Coordination (PHASE 4A)."""
+        logger.debug(f"🧠 STARTING UNIFIED CHARACTER INTELLIGENCE for user {user_id}")
+        try:
+            if not self.character_intelligence_coordinator:
+                logger.debug("🧠 Character intelligence coordinator not available")
+                return None
+            
+            # Get character name from environment (bot-specific)
+            character_name = get_normalized_bot_name_from_env()
+            if not character_name:
+                logger.warning("🧠 Character name not available from environment")
+                return None
+            
+            # Create intelligence request
+            from src.characters.learning.unified_character_intelligence_coordinator import IntelligenceRequest, CoordinationStrategy
+            
+            request = IntelligenceRequest(
+                user_id=user_id,
+                message_content=content,
+                character_name=character_name,
+                conversation_context=conversation_context,
+                coordination_strategy=CoordinationStrategy.ADAPTIVE
+            )
+            
+            # Coordinate unified intelligence
+            intelligence_response = await self.character_intelligence_coordinator.coordinate_intelligence(request)
+            
+            # Convert response to dictionary for ai_components integration
+            result = {
+                'enhanced_response': intelligence_response.enhanced_response,
+                'system_contributions': {
+                    system.value: contribution 
+                    for system, contribution in intelligence_response.system_contributions.items()
+                },
+                'coordination_metadata': intelligence_response.coordination_metadata,
+                'performance_metrics': intelligence_response.performance_metrics,
+                'character_authenticity_score': intelligence_response.character_authenticity_score,
+                'confidence_score': intelligence_response.confidence_score,
+                'processing_time_ms': intelligence_response.processing_time_ms
+            }
+            
+            logger.info(f"🧠 Unified character intelligence successful for {character_name} (user {user_id})")
+            return result
+            
+        except Exception as e:
+            logger.error(f"🧠 Unified character intelligence failed: {e}")
             return None
 
     async def _process_thread_management(self, user_id: str, content: str, 
