@@ -68,7 +68,8 @@ class Phase3IntelligenceTestSuite:
                 json={
                     "user_id": self.test_user_id,
                     "message": message,
-                    "username": "TestUser"
+                    "username": "TestUser",
+                    "metadata_level": "extended"  # Request extended metadata for comprehensive testing
                 },
                 timeout=30
             ) as response:

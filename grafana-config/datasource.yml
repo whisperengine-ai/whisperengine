@@ -1,0 +1,22 @@
+# Grafana InfluxDB Datasource Configuration
+apiVersion: 1
+
+datasources:
+  - name: InfluxDB-WhisperEngine
+    type: influxdb
+    access: proxy
+    url: http://whisperengine-multi-influxdb:8086
+    database: performance_metrics
+    user: whisperengine
+    password: whisperengine_metrics
+    uid: influxdb-whisperengine
+    isDefault: true
+    jsonData:
+      version: Flux
+      organization: whisperengine
+      defaultBucket: performance_metrics
+      tlsSkipVerify: true
+    secureJsonData:
+      token: whisperengine-fidelity-first-metrics-token
+    version: 1
+    editable: true

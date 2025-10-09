@@ -115,7 +115,12 @@ class SyntheticTestingOrchestrator:
             enhanced_api_metrics = self.validator.validate_enhanced_api_metadata()  # NEW: Enhanced API validation
             quality_score = self.validator.calculate_conversation_quality_score()
             
-            # Create synthetic test metrics
+            # Memory Intelligence Convergence validation (NEW)
+            memory_intelligence_metrics = self.validator.validate_memory_intelligence_convergence()
+            coordinator_metrics = self.validator.validate_unified_character_intelligence_coordinator()
+            semantic_naming_metrics = self.validator.validate_semantic_naming_compliance()
+            
+            # Create synthetic test metrics (enhanced with Memory Intelligence Convergence)
             elapsed_hours = (datetime.now() - self.start_time).total_seconds() / 3600
             test_metrics = SyntheticTestMetrics(
                 memory_recall_accuracy=memory_metrics['overall_accuracy'],
@@ -127,7 +132,13 @@ class SyntheticTestingOrchestrator:
                 conversations_analyzed=len(self.validator.conversations),
                 unique_synthetic_users=len(set(conv['user']['user_id'] for conv in self.validator.conversations)),
                 test_duration_hours=elapsed_hours,
-                expanded_taxonomy_usage=emotion_metrics['expanded_taxonomy_usage']
+                expanded_taxonomy_usage=emotion_metrics['expanded_taxonomy_usage'],
+                # Memory Intelligence Convergence metrics (PHASE 1-4)
+                character_vector_episodic_intelligence_score=memory_intelligence_metrics['character_vector_episodic_intelligence_score'],
+                temporal_evolution_intelligence_score=memory_intelligence_metrics['temporal_evolution_intelligence_score'],
+                unified_coordinator_response_quality=coordinator_metrics['unified_coordinator_response_quality'],
+                intelligence_system_coordination_score=coordinator_metrics['intelligence_system_coordination_score'],
+                semantic_naming_compliance=semantic_naming_metrics['semantic_naming_compliance']
             )
             
             # Record to InfluxDB

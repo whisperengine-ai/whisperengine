@@ -13,6 +13,7 @@ but applied to character personal knowledge.
 
 import logging
 import asyncio
+import time
 from typing import Dict, List, Optional, Any
 from enum import Enum
 from dataclasses import dataclass
@@ -22,6 +23,13 @@ try:
     ASYNCPG_AVAILABLE = True
 except ImportError:
     ASYNCPG_AVAILABLE = False
+
+# InfluxDB metrics integration
+try:
+    from src.temporal.temporal_intelligence_client import create_temporal_intelligence_client
+    TEMPORAL_METRICS_AVAILABLE = True
+except ImportError:
+    TEMPORAL_METRICS_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
 
@@ -86,6 +94,12 @@ class CharacterGraphManager:
         self.postgres = postgres_pool
         self.semantic_router = semantic_router
         self.memory_manager = memory_manager
+        
+        # InfluxDB metrics integration
+        if TEMPORAL_METRICS_AVAILABLE:
+            self.temporal_client = create_temporal_intelligence_client()
+        else:
+            self.temporal_client = None
         
         # Intent patterns for query routing
         self._intent_patterns = self._build_intent_patterns()
@@ -165,6 +179,9 @@ class CharacterGraphManager:
         Returns:
             CharacterKnowledgeResult with weighted, prioritized data
         """
+        # Start timing for metrics
+        start_time = time.time()
+        
         # Detect intent if not provided
         if intent is None:
             intent = self.detect_intent(query_text)
@@ -175,6 +192,18 @@ class CharacterGraphManager:
         character_id = await self._get_character_id(character_name)
         if character_id is None:
             logger.warning("⚠️ Character not found: %s", character_name)
+            
+            # Record metrics for failed query
+            if self.temporal_client and user_id:
+                await self._record_character_graph_metrics(
+                    user_id=user_id,
+                    operation="knowledge_query",
+                    query_time_ms=(time.time() - start_time) * 1000,
+                    knowledge_matches=0,
+                    cache_hit=False,
+                    character_name=character_name
+                )
+            
             return CharacterKnowledgeResult(
                 background=[], memories=[], relationships=[], abilities=[],
                 total_results=0, intent=intent
@@ -221,6 +250,18 @@ class CharacterGraphManager:
         
         total = len(background) + len(memories) + len(relationships) + len(abilities)
         
+        # Record performance metrics
+        query_time_ms = (time.time() - start_time) * 1000
+        if self.temporal_client and user_id:
+            await self._record_character_graph_metrics(
+                user_id=user_id,
+                operation="knowledge_query",
+                query_time_ms=query_time_ms,
+                knowledge_matches=total,
+                cache_hit=False,  # TODO: Implement caching
+                character_name=character_name
+            )
+        
         result = CharacterKnowledgeResult(
             background=background,
             memories=memories,
@@ -240,6 +281,8 @@ class CharacterGraphManager:
         Supports both simple names ('Elena') and full names ('Elena Rodriguez').
         Tries exact match first, then partial matching.
         """
+        start_time = time.time()
+        
         async with self.postgres.acquire() as conn:
             # Try exact match first (case-insensitive)
             row = await conn.fetchrow(
@@ -247,6 +290,7 @@ class CharacterGraphManager:
                 character_name
             )
             
+            query_time_ms = (time.time() - start_time) * 1000
             if row:
                 return row['id']
             
@@ -1444,6 +1488,37 @@ class CharacterGraphManager:
         except (AttributeError, KeyError, TypeError) as e:
             logger.error("❌ REFLECTION PROMPT ERROR: %s", str(e))
             return f"As {character_name}, I've been reflecting on our conversations..."
+
+    async def _record_character_graph_metrics(
+        self,
+        user_id: str,
+        operation: str,
+        query_time_ms: float,
+        knowledge_matches: int,
+        cache_hit: bool,
+        character_name: Optional[str] = None
+    ):
+        """Record CharacterGraphManager performance metrics to InfluxDB"""
+        if not self.temporal_client:
+            return
+            
+        try:
+            # Get bot name from environment for InfluxDB tagging
+            import os
+            bot_name = os.getenv('DISCORD_BOT_NAME', 'unknown')
+            
+            await self.temporal_client.record_character_graph_performance(
+                bot_name=bot_name,
+                user_id=user_id,
+                operation=operation,
+                query_time_ms=query_time_ms,
+                knowledge_matches=knowledge_matches,
+                cache_hit=cache_hit,
+                character_name=character_name
+            )
+        except Exception as e:
+            # Metrics recording should not break functionality
+            logger.debug("Failed to record character graph metrics: %s", str(e))
 
 
 def create_character_graph_manager(postgres_pool, semantic_router=None, memory_manager=None) -> CharacterGraphManager:

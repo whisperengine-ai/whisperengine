@@ -203,6 +203,68 @@ class MessageProcessor:
             logger.warning("Fidelity metrics collector not available")
             self.fidelity_metrics = None
         
+        # Unified Character Intelligence Coordinator: PHASE 4A Integration
+        self.character_intelligence_coordinator = None
+        
+        try:
+            from src.characters.learning.unified_character_intelligence_coordinator import UnifiedCharacterIntelligenceCoordinator
+            
+            # Try to initialize Character Vector Episodic Intelligence
+            character_name = get_normalized_bot_name_from_env()
+            character_episodic_intelligence = None
+            
+            try:
+                from src.characters.learning.character_vector_episodic_intelligence import create_character_vector_episodic_intelligence
+                
+                if character_name and self.memory_manager:
+                    # Create episodic intelligence using existing Qdrant client from memory manager
+                    qdrant_client = getattr(self.memory_manager, 'vector_store', None)
+                    if qdrant_client and hasattr(qdrant_client, 'client'):
+                        qdrant_client = qdrant_client.client
+                    else:
+                        qdrant_client = None
+                    
+                    character_episodic_intelligence = create_character_vector_episodic_intelligence(
+                        qdrant_client=qdrant_client
+                    )
+                    logger.info("🧠 Character Vector Episodic Intelligence initialized for %s", character_name)
+            
+            except ImportError as e:
+                logger.warning("🧠 Character Vector Episodic Intelligence not available: %s", e)
+                character_episodic_intelligence = None
+            
+            # Try to initialize Character Temporal Evolution Analyzer (PHASE 2)
+            character_temporal_evolution_analyzer = None
+            
+            try:
+                # Import the module first to check availability
+                import src.characters.learning.character_temporal_evolution_analyzer as temporal_module
+                from src.temporal.temporal_intelligence_client import get_temporal_client
+                
+                # Get the class from the module
+                if hasattr(temporal_module, 'CharacterTemporalEvolutionAnalyzer'):
+                    TemporalAnalyzer = temporal_module.CharacterTemporalEvolutionAnalyzer
+                    
+                    # Initialize temporal client for analyzer
+                    temporal_client = get_temporal_client()
+                    character_temporal_evolution_analyzer = TemporalAnalyzer(temporal_client=temporal_client)
+                    logger.info("🧠 Character Temporal Evolution Analyzer initialized for %s", character_name)
+                else:
+                    logger.warning("🧠 CharacterTemporalEvolutionAnalyzer class not found in module")
+            
+            except ImportError as e:
+                logger.warning("🧠 Character Temporal Evolution Analyzer not available: %s", e)
+                character_temporal_evolution_analyzer = None
+            
+            self.character_intelligence_coordinator = UnifiedCharacterIntelligenceCoordinator(
+                memory_manager=self.memory_manager,
+                character_episodic_intelligence=character_episodic_intelligence,
+                character_temporal_evolution_analyzer=character_temporal_evolution_analyzer
+            )
+            logger.info("🧠 Unified Character Intelligence Coordinator initialized")
+        except ImportError as e:
+            logger.warning("Character intelligence coordinator not available: %s", e)
+        
         # Track processing state for debugging
         self._last_security_validation = None
         self._last_emotional_context = None
@@ -538,6 +600,92 @@ class MessageProcessor:
                 except AttributeError:
                     # record_memory_aging_metrics method doesn't exist yet - skip for now
                     logger.debug("Memory aging metrics recording not yet implemented in TemporalIntelligenceClient")
+            
+            # 📊 ENHANCED CHARACTER INTELLIGENCE METRICS: Record performance from all operational systems
+            
+            # CharacterGraphManager metrics (if available)
+            character_performance = ai_components.get('character_performance_intelligence')
+            if character_performance:
+                try:
+                    character_graph_task = self.temporal_client.record_character_graph_performance(
+                        bot_name=bot_name,
+                        user_id=message_context.user_id,
+                        operation="knowledge_query",
+                        query_time_ms=character_performance.get('query_time_ms', 0),
+                        knowledge_matches=character_performance.get('knowledge_matches', 0),
+                        cache_hit=character_performance.get('cache_hit', False),
+                        character_name=bot_name
+                    )
+                    temporal_tasks.append(character_graph_task)
+                    logger.debug("📊 TEMPORAL: Added character graph performance metrics to batch recording")
+                except AttributeError:
+                    logger.debug("Character graph performance recording not yet implemented in TemporalIntelligenceClient")
+            
+            # UnifiedCharacterIntelligenceCoordinator metrics (if available)
+            unified_intelligence = ai_components.get('unified_character_intelligence')
+            if unified_intelligence:
+                try:
+                    systems_used = ["conversation_intelligence", "memory_boost"]  # Default systems
+                    coordination_metadata = unified_intelligence.get('coordination_metadata', {})
+                    coordination_task = self.temporal_client.record_intelligence_coordination_metrics(
+                        bot_name=bot_name,
+                        user_id=message_context.user_id,
+                        systems_used=systems_used,
+                        coordination_time_ms=unified_intelligence.get('performance_metrics', {}).get('processing_time_ms', 0),
+                        authenticity_score=unified_intelligence.get('character_authenticity_score', 0.0),
+                        confidence_score=unified_intelligence.get('confidence_score', 0.0),
+                        context_type=coordination_metadata.get('context_type', 'standard'),
+                        coordination_strategy=coordination_metadata.get('coordination_strategy', 'adaptive'),
+                        character_name=bot_name
+                    )
+                    temporal_tasks.append(coordination_task)
+                    logger.debug("📊 TEMPORAL: Added intelligence coordination metrics to batch recording")
+                except AttributeError:
+                    logger.debug("Intelligence coordination metrics recording not yet implemented in TemporalIntelligenceClient")
+            
+            # Enhanced Vector Emotion Analyzer metrics (already handled individually but can aggregate)
+            emotion_analysis = ai_components.get('emotion_analysis')
+            if emotion_analysis:
+                try:
+                    # Note: Individual emotion analysis metrics are recorded by the analyzer itself
+                    # This aggregates them for overall message processing metrics
+                    emotion_count = len([score for score in emotion_analysis.get('all_emotions', {}).values() if score > 0.1])
+                    emotion_task = self.temporal_client.record_emotion_analysis_performance(
+                        bot_name=bot_name,
+                        user_id=message_context.user_id,
+                        analysis_time_ms=emotion_analysis.get('analysis_time_ms', 0),
+                        confidence_score=emotion_analysis.get('confidence', 0.0),
+                        emotion_count=emotion_count,
+                        primary_emotion=emotion_analysis.get('primary_emotion', 'neutral')
+                    )
+                    temporal_tasks.append(emotion_task)
+                    logger.debug("📊 TEMPORAL: Added emotion analysis performance metrics to batch recording")
+                except AttributeError:
+                    logger.debug("Emotion analysis performance recording not yet implemented in TemporalIntelligenceClient")
+            
+            # Vector Memory System metrics (memory retrieval performance)
+            if relevant_memories:
+                try:
+                    # Calculate average relevance score from retrieved memories
+                    avg_relevance = sum(mem.get('score', 0.0) for mem in relevant_memories) / len(relevant_memories)
+                    
+                    # Get collection name from environment
+                    collection_name = os.getenv('QDRANT_COLLECTION_NAME', f'whisperengine_memory_{bot_name.lower()}')
+                    
+                    vector_memory_task = self.temporal_client.record_vector_memory_performance(
+                        bot_name=bot_name,
+                        user_id=message_context.user_id,
+                        operation="message_processing_retrieval",
+                        search_time_ms=processing_time_ms * 0.2,  # Estimate ~20% of processing time for memory
+                        memories_found=len(relevant_memories),
+                        avg_relevance_score=avg_relevance,
+                        collection_name=collection_name,
+                        vector_type="content"
+                    )
+                    temporal_tasks.append(vector_memory_task)
+                    logger.debug("📊 TEMPORAL: Added vector memory performance metrics to batch recording")
+                except AttributeError:
+                    logger.debug("Vector memory performance recording not yet implemented in TemporalIntelligenceClient")
             
             await asyncio.gather(
                 *temporal_tasks,
@@ -2018,7 +2166,22 @@ class MessageProcessor:
                 )
                 
                 tasks.append(conversation_intelligence_task)
-                task_names.append("conversation_intelligence")            # Task 5: Thread management analysis (Phase 4.2)
+                task_names.append("conversation_intelligence")
+            
+            # Task 5: Unified Character Intelligence Coordination (PHASE 4A)
+            if self.character_intelligence_coordinator:
+                logger.debug("🧠 TASK DEBUG: Creating unified character intelligence task")
+                character_intelligence_task = self._process_unified_character_intelligence(
+                    message_context.user_id,
+                    message_context.content,
+                    message_context,
+                    conversation_context
+                )
+                
+                tasks.append(character_intelligence_task)
+                task_names.append("unified_character_intelligence")
+                
+            # Task 6: Thread management analysis (Phase 4.2)
             if self.bot_core and hasattr(self.bot_core, 'phase4_thread_manager'):
                 thread_task = self._process_thread_management(
                     message_context.user_id,
@@ -2309,6 +2472,57 @@ class MessageProcessor:
             
         except Exception as e:
             logger.debug(f"Sophisticated Phase 4 intelligence processing failed: {e}")
+            return None
+
+    async def _process_unified_character_intelligence(self, user_id: str, content: str, 
+                                                    message_context: MessageContext,
+                                                    conversation_context: List[Dict[str, str]]) -> Optional[Dict[str, Any]]:
+        """Process Unified Character Intelligence Coordination (PHASE 4A)."""
+        logger.debug(f"🧠 STARTING UNIFIED CHARACTER INTELLIGENCE for user {user_id}")
+        try:
+            if not self.character_intelligence_coordinator:
+                logger.debug("🧠 Character intelligence coordinator not available")
+                return None
+            
+            # Get character name from environment (bot-specific)
+            character_name = get_normalized_bot_name_from_env()
+            if not character_name:
+                logger.warning("🧠 Character name not available from environment")
+                return None
+            
+            # Create intelligence request
+            from src.characters.learning.unified_character_intelligence_coordinator import IntelligenceRequest, CoordinationStrategy
+            
+            request = IntelligenceRequest(
+                user_id=user_id,
+                message_content=content,
+                character_name=character_name,
+                conversation_context=conversation_context,
+                coordination_strategy=CoordinationStrategy.ADAPTIVE
+            )
+            
+            # Coordinate unified intelligence
+            intelligence_response = await self.character_intelligence_coordinator.coordinate_intelligence(request)
+            
+            # Convert response to dictionary for ai_components integration
+            result = {
+                'enhanced_response': intelligence_response.enhanced_response,
+                'system_contributions': {
+                    system.value: contribution 
+                    for system, contribution in intelligence_response.system_contributions.items()
+                },
+                'coordination_metadata': intelligence_response.coordination_metadata,
+                'performance_metrics': intelligence_response.performance_metrics,
+                'character_authenticity_score': intelligence_response.character_authenticity_score,
+                'confidence_score': intelligence_response.confidence_score,
+                'processing_time_ms': intelligence_response.processing_time_ms
+            }
+            
+            logger.info(f"🧠 Unified character intelligence successful for {character_name} (user {user_id})")
+            return result
+            
+        except Exception as e:
+            logger.error(f"🧠 Unified character intelligence failed: {e}")
             return None
 
     async def _process_thread_management(self, user_id: str, content: str, 

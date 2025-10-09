@@ -139,7 +139,8 @@ class WhisperEngineAPIClient:
             
         payload: Dict[str, Any] = {
             "user_id": user_id,
-            "message": message
+            "message": message,
+            "metadata_level": "extended"  # Request extended metadata for comprehensive testing
         }
         
         if context:
@@ -159,7 +160,10 @@ class WhisperEngineAPIClient:
         if self.session is None:
             raise RuntimeError("Session not initialized")
             
-        payload = {"messages": messages}
+        payload = {
+            "metadata_level": "extended",  # Request extended metadata for comprehensive testing
+            "messages": messages
+        }
 
         async with self.session.post(
             f"{self.base_url}/api/chat/batch",

@@ -201,7 +201,8 @@ class BotAPITester:
         test_message = f"Hello {bot.display_name}! Can you tell me about your work as a {bot.profession.lower()}?"
         payload = {
             "message": test_message,
-            "user_id": f"test_user_{int(time.time())}"
+            "user_id": f"test_user_{int(time.time())}",
+            "metadata_level": "extended"  # Request extended metadata for comprehensive testing
         }
         
         try:
@@ -349,7 +350,8 @@ class BotAPITester:
         url = f"http://localhost:{bot.port}/api/chat"
         payload = {
             "message": message,
-            "user_id": user_id
+            "user_id": user_id,
+            "metadata_level": "extended"  # Request extended metadata for comprehensive testing
         }
         
         start_time = time.time()

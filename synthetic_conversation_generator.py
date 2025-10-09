@@ -34,6 +34,14 @@ import os
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
+# Import LLM client for enhanced synthetic generation
+try:
+    from src.llm.llm_protocol import create_llm_client
+    LLM_AVAILABLE = True
+except ImportError:
+    logger.warning("LLM client not available - falling back to template-based generation")
+    LLM_AVAILABLE = False
+
 
 class ConversationType(Enum):
     """Types of synthetic conversations to generate"""
@@ -52,6 +60,18 @@ class ConversationType(Enum):
     ADAPTIVE_MODE_SWITCHING = "adaptive_mode_switching"
     CONTEXT_AWARE_RESPONSES = "context_aware_responses"
     RELATIONSHIP_DEPTH_TRACKING = "relationship_depth_tracking"
+    
+    # Memory Intelligence Convergence Testing (PHASE 1-4)
+    CHARACTER_VECTOR_EPISODIC_INTELLIGENCE = "character_vector_episodic_intelligence"
+    MEMORABLE_MOMENT_DETECTION = "memorable_moment_detection"
+    CHARACTER_INSIGHT_EXTRACTION = "character_insight_extraction"
+    EPISODIC_MEMORY_RESPONSE_ENHANCEMENT = "episodic_memory_response_enhancement"
+    TEMPORAL_EVOLUTION_INTELLIGENCE = "temporal_evolution_intelligence"
+    CONFIDENCE_EVOLUTION_TRACKING = "confidence_evolution_tracking"
+    EMOTIONAL_PATTERN_CHANGE_DETECTION = "emotional_pattern_change_detection"
+    LEARNING_PROGRESSION_ANALYSIS = "learning_progression_analysis"
+    GRAPH_KNOWLEDGE_INTELLIGENCE = "graph_knowledge_intelligence"
+    UNIFIED_CHARACTER_INTELLIGENCE_COORDINATOR = "unified_character_intelligence_coordinator"
     
     # CDL Mode Switching Testing
     TECHNICAL_MODE_TEST = "technical_mode_test"
@@ -103,6 +123,17 @@ class UserPersona(Enum):
     CONTEXT_SWITCH_SPECIALIST = "context_switch_specialist"
     RELATIONSHIP_DEPTH_ANALYZER = "relationship_depth_analyzer"
     ADAPTIVE_MODE_CHALLENGER = "adaptive_mode_challenger"
+    
+    # Memory Intelligence Convergence Testing Personas (PHASE 1-4)
+    EPISODIC_MEMORY_TESTER = "episodic_memory_tester"
+    TEMPORAL_EVOLUTION_ANALYZER = "temporal_evolution_analyzer"
+    CHARACTER_INSIGHT_SEEKER = "character_insight_seeker"
+    UNIFIED_INTELLIGENCE_CHALLENGER = "unified_intelligence_challenger"
+    MEMORABLE_MOMENT_HUNTER = "memorable_moment_hunter"
+    CONFIDENCE_TRACKER = "confidence_tracker"
+    EMOTIONAL_PATTERN_OBSERVER = "emotional_pattern_observer"
+    LEARNING_PROGRESSION_MONITOR = "learning_progression_monitor"
+    KNOWLEDGE_GRAPH_EXPLORER = "knowledge_graph_explorer"
     
     # CDL Mode Testing Personas
     TECHNICAL_MODE_REQUESTER = "technical_mode_requester"
@@ -199,6 +230,71 @@ class SyntheticUser:
                 "family": {"nomadic lifestyle", "friends worldwide"},
                 "goals": ["experience new cultures", "share stories", "inspire others"],
                 "challenges": ["loneliness", "financial uncertainty"]
+            },
+            
+            # Memory Intelligence Convergence Testing Personas (PHASE 1-4)
+            UserPersona.EPISODIC_MEMORY_TESTER: {
+                "occupation": "Memory researcher",
+                "hobbies": ["studying memory patterns", "documenting experiences", "pattern recognition"],
+                "family": {"academic background", "research-oriented siblings"},
+                "goals": ["test memory systems", "understand episodic recall", "validate AI memory"],
+                "challenges": ["methodical approach", "detailed documentation needs"]
+            },
+            UserPersona.TEMPORAL_EVOLUTION_ANALYZER: {
+                "occupation": "Developmental psychologist",
+                "hobbies": ["tracking personal growth", "longitudinal studies", "behavior analysis"],
+                "family": {"stable long-term relationships", "academic environment"},
+                "goals": ["observe growth patterns", "track emotional evolution", "analyze change"],
+                "challenges": ["patience with slow changes", "measurement complexity"]
+            },
+            UserPersona.CHARACTER_INSIGHT_SEEKER: {
+                "occupation": "Personality researcher",
+                "hobbies": ["personality analysis", "behavioral observation", "insight generation"],
+                "family": {"psychology-focused household", "analytical family members"},
+                "goals": ["understand personality deeply", "extract meaningful insights", "profile accuracy"],
+                "challenges": ["over-analysis", "seeking perfect understanding"]
+            },
+            UserPersona.UNIFIED_INTELLIGENCE_CHALLENGER: {
+                "occupation": "AI systems architect",
+                "hobbies": ["testing AI systems", "complex problem solving", "system integration"],
+                "family": {"tech-oriented family", "engineering background"},
+                "goals": ["challenge AI capabilities", "test system coordination", "holistic intelligence"],
+                "challenges": ["high expectations", "complexity management"]
+            },
+            UserPersona.MEMORABLE_MOMENT_HUNTER: {
+                "occupation": "Experience curator",
+                "hobbies": ["collecting meaningful moments", "creating memories", "emotional archiving"],
+                "family": {"sentimental family", "tradition-keepers"},
+                "goals": ["identify special moments", "preserve meaningful experiences", "emotional significance"],
+                "challenges": ["sentiment overload", "memory perfectionism"]
+            },
+            UserPersona.CONFIDENCE_TRACKER: {
+                "occupation": "Life coach",
+                "hobbies": ["personal development", "confidence building", "progress monitoring"],
+                "family": {"supportive network", "growth-minded environment"},
+                "goals": ["track confidence growth", "monitor self-esteem", "validate progress"],
+                "challenges": ["comparison tendencies", "progress measurement"]
+            },
+            UserPersona.EMOTIONAL_PATTERN_OBSERVER: {
+                "occupation": "Emotional intelligence specialist",
+                "hobbies": ["emotion tracking", "pattern recognition", "behavioral analysis"],
+                "family": {"emotionally aware family", "therapy background"},
+                "goals": ["detect emotional patterns", "understand emotional evolution", "behavioral insights"],
+                "challenges": ["emotional overwhelm", "pattern complexity"]
+            },
+            UserPersona.LEARNING_PROGRESSION_MONITOR: {
+                "occupation": "Educational technology researcher",
+                "hobbies": ["learning analytics", "progress tracking", "educational assessment"],
+                "family": {"education-focused household", "teacher family members"},
+                "goals": ["monitor learning progress", "analyze knowledge growth", "educational effectiveness"],
+                "challenges": ["measurement precision", "progress validation"]
+            },
+            UserPersona.KNOWLEDGE_GRAPH_EXPLORER: {
+                "occupation": "Knowledge systems analyst",
+                "hobbies": ["connection mapping", "system thinking", "relationship analysis"],
+                "family": {"systems-thinking family", "interconnected relationships"},
+                "goals": ["explore knowledge connections", "map topic relationships", "holistic understanding"],
+                "challenges": ["complexity navigation", "relationship clarity"]
             }
         }
         return backstories.get(self.persona, {})
@@ -207,23 +303,181 @@ class SyntheticUser:
 class SyntheticConversationGenerator:
     """Generates realistic conversations for long-term testing"""
     
-    def __init__(self, bot_endpoints: Dict[str, str]):
+    def __init__(self, bot_endpoints: Dict[str, str], use_llm: bool = False):
         """
         Initialize with bot API endpoints
         
         Args:
             bot_endpoints: Dict of bot_name -> API endpoint URL
+            use_llm: Whether to use LLM for enhanced message generation (default: False - use reliable templates)
         """
         self.bot_endpoints = bot_endpoints
         self.synthetic_users: List[SyntheticUser] = []
         self.conversation_history: Dict[str, List[Dict]] = {}
         self.session = None
         
-        # Conversation templates by type
+        # Enhanced conversation state management for test scenarios
+        self.conversation_state: Dict[str, Dict] = {}  # Track state per conversation
+        self.scenario_context: Dict[str, Any] = {}     # Track scenario-level context
+        
+        # LLM client for enhanced synthetic generation (DISABLED by default for consistency)
+        self.use_llm = use_llm and LLM_AVAILABLE
+        self.llm_client = None
+        
+        if self.use_llm:
+            try:
+                self.llm_client = create_llm_client()
+                logger.info("✅ LLM client initialized for enhanced synthetic generation")
+            except Exception as e:
+                logger.warning(f"Failed to initialize LLM client: {e} - falling back to templates")
+                self.use_llm = False
+        else:
+            logger.info("Using reliable template-based synthetic generation (recommended)")
+        
+        # Conversation templates by type (primary method for consistent results)
         self.conversation_templates = self._load_conversation_templates()
         
         # Generate synthetic users
         self._generate_synthetic_users()
+    
+    def _initialize_conversation_state(self, conversation_id: str, user: SyntheticUser, 
+                                     bot_name: str, conversation_type: ConversationType) -> None:
+        """Initialize conversation state tracking for a test scenario"""
+        
+        # Reset conversation history for fresh start
+        old_history_count = len(self.conversation_history)
+        self.conversation_history = {}
+        logger.info(f"🔄 Reset conversation history (was {old_history_count} conversations)")
+        
+        self.conversation_state[conversation_id] = {
+            "user": user,
+            "bot_name": bot_name,
+            "conversation_type": conversation_type,
+            "turn_count": 0,
+            "topics_discussed": [],
+            "emotions_expressed": [],
+            "key_moments": [],
+            "user_goals": user.relationship_goals.copy(),
+            "scenario_progress": {},
+            "conversation_arc": self._plan_conversation_arc(conversation_type),
+            "established_facts": [],  # Facts about user established during conversation
+            "relationship_evolution": {"trust": 0.5, "rapport": 0.5, "understanding": 0.5}
+        }
+    
+    def _plan_conversation_arc(self, conversation_type: ConversationType) -> Dict[str, Any]:
+        """Plan the conversational arc for better narrative flow"""
+        arcs = {
+            ConversationType.LEARNING_SESSION: {
+                "phases": ["curiosity", "exploration", "understanding", "application"],
+                "goals": ["establish knowledge baseline", "deepen understanding", "practical application"]
+            },
+            ConversationType.EMOTIONAL_SUPPORT: {
+                "phases": ["sharing", "validation", "processing", "resolution"],
+                "goals": ["express feelings", "feel heard", "gain perspective", "find comfort"]
+            },
+            ConversationType.RELATIONSHIP_BUILDING: {
+                "phases": ["introduction", "discovery", "connection", "commitment"],
+                "goals": ["establish rapport", "share personal details", "build trust", "deepen bond"]
+            },
+            ConversationType.MEMORY_TEST: {
+                "phases": ["reference", "elaboration", "connection", "validation"],
+                "goals": ["test recall", "add context", "make connections", "confirm understanding"]
+            },
+            ConversationType.CHARACTER_VECTOR_EPISODIC_INTELLIGENCE: {
+                "phases": ["memory_inquiry", "episodic_exploration", "insight_extraction", "learning_demonstration"],
+                "goals": ["probe character memory", "explore episodic details", "extract insights", "show learning"]
+            },
+            ConversationType.TEMPORAL_EVOLUTION_INTELLIGENCE: {
+                "phases": ["historical_context", "change_recognition", "pattern_analysis", "future_projection"],
+                "goals": ["establish timeline", "identify changes", "analyze patterns", "project growth"]
+            }
+        }
+        return arcs.get(conversation_type, {
+            "phases": ["opening", "development", "climax", "resolution"],
+            "goals": ["engage", "explore", "deepen", "conclude"]
+        })
+    
+    def _update_conversation_state(self, conversation_id: str, turn: int, 
+                                 user_message: str, bot_response: str, 
+                                 exchange_metadata: Dict) -> None:
+        """Update conversation state after each turn"""
+        if conversation_id not in self.conversation_state:
+            return
+            
+        state = self.conversation_state[conversation_id]
+        state["turn_count"] = turn
+        
+        # Extract and track topics
+        topics = self._extract_topics_from_exchange(user_message, bot_response)
+        state["topics_discussed"].extend(topics)
+        
+        # Track emotional progression
+        if "user_emotion" in exchange_metadata:
+            emotion = exchange_metadata["user_emotion"].get("primary_emotion")
+            if emotion:
+                state["emotions_expressed"].append(emotion)
+        
+        # Update relationship metrics if available
+        if "relationship_metrics" in exchange_metadata:
+            rel_metrics = exchange_metadata["relationship_metrics"]
+            if rel_metrics:
+                state["relationship_evolution"].update({
+                    "trust": rel_metrics.get("trust", state["relationship_evolution"]["trust"]),
+                    "rapport": rel_metrics.get("affection", state["relationship_evolution"]["rapport"]),
+                    "understanding": rel_metrics.get("attunement", state["relationship_evolution"]["understanding"])
+                })
+        
+        # Track key moments and facts
+        if exchange_metadata.get("memory_stored", False):
+            state["key_moments"].append({
+                "turn": turn,
+                "content": user_message[:100],
+                "significance": "memory_worthy"
+            })
+            
+        # Extract new facts about user from bot response
+        user_facts = exchange_metadata.get("user_facts", {})
+        if user_facts:
+            for fact_key, fact_value in user_facts.items():
+                if fact_value and fact_key not in [f["key"] for f in state["established_facts"]]:
+                    state["established_facts"].append({
+                        "key": fact_key,
+                        "value": fact_value,
+                        "established_turn": turn
+                    })
+    
+    def _extract_topics_from_exchange(self, user_message: str, bot_response: str) -> List[str]:
+        """Extract topics from conversation exchange for state tracking"""
+        # Simple keyword-based topic extraction (could be enhanced with NLP)
+        common_topics = [
+            "family", "work", "hobbies", "relationships", "goals", "challenges",
+            "emotions", "learning", "creativity", "technology", "health", "travel",
+            "memory", "past", "future", "dreams", "fears", "achievements"
+        ]
+        
+        combined_text = (user_message + " " + bot_response).lower()
+        found_topics = [topic for topic in common_topics if topic in combined_text]
+        return found_topics
+    
+    def _get_conversation_phase(self, conversation_id: str) -> str:
+        """Determine current conversation phase based on turn count and arc"""
+        if conversation_id not in self.conversation_state:
+            return "opening"
+            
+        state = self.conversation_state[conversation_id]
+        arc = state["conversation_arc"]
+        phases = arc.get("phases", ["opening", "development", "resolution"])
+        turn_count = state["turn_count"]
+        
+        # Distribute turns across phases
+        if turn_count <= 2:
+            return phases[0] if phases else "opening"
+        elif turn_count <= 5:
+            return phases[1] if len(phases) > 1 else phases[0]
+        elif turn_count <= 8:
+            return phases[2] if len(phases) > 2 else phases[-1]
+        else:
+            return phases[-1]
     
     def _generate_synthetic_users(self):
         """Generate diverse synthetic user profiles"""
@@ -591,6 +845,88 @@ class SyntheticConversationGenerator:
                 }
             ],
             
+            # Memory Intelligence Convergence Testing Templates (PHASE 1-4)
+            ConversationType.CHARACTER_VECTOR_EPISODIC_INTELLIGENCE: [
+                {
+                    "opener": "Tell me about a time when you learned something important from our past conversations",
+                    "topics": ["episodic memory", "character learning", "conversation insights", "growth moments"],
+                    "emotional_range": ["reflection", "insight", "growth", "understanding"],
+                    "duration_messages": (6, 15)
+                }
+            ],
+            ConversationType.MEMORABLE_MOMENT_DETECTION: [
+                {
+                    "opener": "What moment from our conversations together stands out most to you?",
+                    "topics": ["memorable moments", "significant exchanges", "emotional highlights", "relationship milestones"],
+                    "emotional_range": ["nostalgia", "appreciation", "warmth", "connection"],
+                    "duration_messages": (4, 12)
+                }
+            ],
+            ConversationType.CHARACTER_INSIGHT_EXTRACTION: [
+                {
+                    "opener": "Based on everything we've discussed, what insights do you have about my personality and interests?",
+                    "topics": ["personality analysis", "insight extraction", "character understanding", "user profiling"],
+                    "emotional_range": ["analytical", "perceptive", "understanding", "insightful"],
+                    "duration_messages": (5, 18)
+                }
+            ],
+            ConversationType.EPISODIC_MEMORY_RESPONSE_ENHANCEMENT: [
+                {
+                    "opener": "Remember our conversation about {previous_topic}? How does that relate to what I'm going through now?",
+                    "topics": ["memory application", "context integration", "response enhancement", "situational awareness"],
+                    "emotional_range": ["connection", "relevance", "understanding", "support"],
+                    "duration_messages": (6, 20)
+                }
+            ],
+            ConversationType.TEMPORAL_EVOLUTION_INTELLIGENCE: [
+                {
+                    "opener": "How has your understanding of me changed over time? What patterns have you noticed?",
+                    "topics": ["temporal awareness", "evolution tracking", "pattern recognition", "growth analysis"],
+                    "emotional_range": ["evolution", "growth", "awareness", "development"],
+                    "duration_messages": (8, 22)
+                }
+            ],
+            ConversationType.CONFIDENCE_EVOLUTION_TRACKING: [
+                {
+                    "opener": "I feel like my confidence has grown since we started talking. Have you noticed this change?",
+                    "topics": ["confidence growth", "emotional evolution", "personal development", "behavioral changes"],
+                    "emotional_range": ["confidence", "growth", "pride", "development"],
+                    "duration_messages": (5, 16)
+                }
+            ],
+            ConversationType.EMOTIONAL_PATTERN_CHANGE_DETECTION: [
+                {
+                    "opener": "My emotional patterns have shifted lately. Can you help me understand how I've changed?",
+                    "topics": ["emotional patterns", "change detection", "emotional evolution", "behavioral analysis"],
+                    "emotional_range": ["introspection", "change", "emotional awareness", "growth"],
+                    "duration_messages": (7, 20)
+                }
+            ],
+            ConversationType.LEARNING_PROGRESSION_ANALYSIS: [
+                {
+                    "opener": "Looking back at our conversations, how has my learning and understanding progressed?",
+                    "topics": ["learning progression", "knowledge growth", "understanding development", "intellectual evolution"],
+                    "emotional_range": ["learning", "progress", "intellectual growth", "achievement"],
+                    "duration_messages": (6, 18)
+                }
+            ],
+            ConversationType.GRAPH_KNOWLEDGE_INTELLIGENCE: [
+                {
+                    "opener": "How do all the different topics we've discussed connect together? What patterns do you see?",
+                    "topics": ["knowledge connections", "topic relationships", "pattern synthesis", "holistic understanding"],
+                    "emotional_range": ["synthesis", "connection", "holistic thinking", "integration"],
+                    "duration_messages": (8, 25)
+                }
+            ],
+            ConversationType.UNIFIED_CHARACTER_INTELLIGENCE_COORDINATOR: [
+                {
+                    "opener": "I want to have a conversation that draws on everything you know about me - my emotions, memories, growth, and patterns",
+                    "topics": ["comprehensive intelligence", "unified understanding", "holistic response", "coordinated insights"],
+                    "emotional_range": ["comprehensive", "unified", "holistic", "coordinated"],
+                    "duration_messages": (10, 30)
+                }
+            ],
+            
             # CDL Mode Switching Testing Templates
             ConversationType.TECHNICAL_MODE_TEST: [
                 {
@@ -779,6 +1115,7 @@ class SyntheticConversationGenerator:
         payload = {
             "user_id": user.user_id,
             "message": message,
+            "metadata_level": "extended",  # Always request extended metadata for synthetic testing
             "context": {
                 "channel_type": "synthetic_test",
                 "platform": "api",
@@ -806,18 +1143,25 @@ class SyntheticConversationGenerator:
     
     async def generate_conversation(self, user: SyntheticUser, bot_name: str, 
                                   conversation_type: ConversationType) -> List[Dict]:
-        """Generate a complete conversation between user and bot"""
+        """Generate a complete conversation between user and bot with enhanced state management"""
         conversation_log = []
         template = random.choice(self.conversation_templates[conversation_type])
         
-        # Determine conversation length
+        # Create unique conversation ID for state tracking
+        conversation_id = f"{user.user_id}_{bot_name}_{conversation_type.value}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        
+        # Initialize conversation state
+        self._initialize_conversation_state(conversation_id, user, bot_name, conversation_type)
+        
+        # Determine conversation length (limit to reasonable size for LM Studio and character consistency)
         min_msgs, max_msgs = template["duration_messages"]
-        conversation_length = random.randint(min_msgs, max_msgs)
+        # Cap at 3 messages to prevent character drift with smaller models
+        conversation_length = min(random.randint(min_msgs, max_msgs), 3)
         
-        # Generate opening message
-        opener = self._customize_message(template["opener"], user, bot_name)
+        # Generate opening message using LLM or templates
+        opener = await self._llm_generate_opener(user, bot_name, conversation_type, template["topics"], conversation_id)
         
-        logger.info(f"🎭 Starting {conversation_type.value} conversation: {user.name} → {bot_name}")
+        logger.info(f"🎭 Starting {conversation_type.value} conversation: {user.name} → {bot_name} (ID: {conversation_id})")
         
         current_message = opener
         
@@ -829,29 +1173,41 @@ class SyntheticConversationGenerator:
                 logger.warning(f"Failed to get response from {bot_name}, ending conversation")
                 break
             
-            # Log the exchange with enhanced metadata
+            # Log the exchange with enhanced metadata (ensure all data is JSON serializable)
             exchange = {
                 "turn": turn + 1,
                 "user_message": current_message,
                 "bot_response": response.get("response", ""),
                 "user_emotion": self._simulate_user_emotion(user, template["emotional_range"]),
-                "bot_metadata": response.get("metadata", {}),
-                "user_facts": response.get("user_facts", {}),  # NEW: User facts from API
-                "relationship_metrics": response.get("relationship_metrics", {}),  # NEW: Relationship data
-                "processing_time_ms": response.get("processing_time_ms", 0),  # NEW: Performance data
-                "memory_stored": response.get("memory_stored", False),  # NEW: Memory confirmation
-                "timestamp": datetime.now().isoformat()
+                "bot_metadata": self._make_json_safe(response.get("metadata", {})),  # Ensure JSON safe
+                "user_facts": self._make_json_safe(response.get("user_facts", {})),  # Ensure JSON safe
+                "relationship_metrics": self._make_json_safe(response.get("relationship_metrics", {})),  # Ensure JSON safe
+                "processing_time_ms": response.get("processing_time_ms", 0),
+                "memory_stored": response.get("memory_stored", False),
+                "timestamp": datetime.now().isoformat(),
+                "conversation_phase": self._get_conversation_phase(conversation_id),
+                "conversation_state": self._get_serializable_conversation_state(conversation_id)
             }
             conversation_log.append(exchange)
             
-            # Generate next user message based on bot response
+            # Update conversation state after each turn
+            self._update_conversation_state(conversation_id, turn + 1, current_message, 
+                                          response.get("response", ""), exchange)
+            
+            # Generate next user message based on bot response and FULL conversation state
             if turn < conversation_length - 1:
                 current_message = await self._generate_follow_up_message(
-                    user, response.get("response", ""), template["topics"], template["emotional_range"]
+                    user, response.get("response", ""), template["topics"], template["emotional_range"],
+                    conversation_history=conversation_log,  # Pass full conversation context
+                    conversation_id=conversation_id  # NEW: Pass conversation ID for enhanced state
                 )
                 
                 # Add realistic delay between messages
                 await asyncio.sleep(random.uniform(2, 8))
+        
+        # Clean up conversation state
+        if conversation_id in self.conversation_state:
+            del self.conversation_state[conversation_id]
         
         logger.info(f"✅ Completed conversation: {user.name} ↔ {bot_name} ({len(conversation_log)} turns)")
         return conversation_log
@@ -870,6 +1226,33 @@ class SyntheticConversationGenerator:
             # Get from conversation history or use interest
             previous_topic = random.choice(user.interests)
             message = message.replace("{previous_topic}", previous_topic)
+            
+        if "{context_topic}" in message:
+            # Use a related interest for context
+            context_topic = random.choice(user.interests)
+            message = message.replace("{context_topic}", context_topic)
+            
+        if "{technical_topic}" in message:
+            # Generate technical topics based on user persona
+            technical_topics = ["machine learning", "data structures", "system architecture", "algorithms", "databases"]
+            technical_topic = random.choice(technical_topics)
+            message = message.replace("{technical_topic}", technical_topic)
+            
+        if "{timestamp}" in message:
+            # Add current timestamp for performance testing
+            timestamp = datetime.now().isoformat()
+            message = message.replace("{timestamp}", timestamp)
+            
+        if "{scenario}" in message:
+            # Generate a scenario for consistency testing
+            scenarios = [
+                "a complex problem-solving challenge I was working on",
+                "a difficult decision I had to make",
+                "an interesting pattern I noticed in my work",
+                "a personal goal I was trying to achieve"
+            ]
+            scenario = random.choice(scenarios)
+            message = message.replace("{scenario}", scenario)
         
         if "{personal_detail}" in message:
             # Use backstory details
@@ -893,6 +1276,127 @@ class SyntheticConversationGenerator:
         
         return message
     
+    async def _llm_generate_opener(self, user: SyntheticUser, bot_name: str, 
+                                  conversation_type: ConversationType, topics: List[str],
+                                  conversation_id: Optional[str] = None) -> str:
+        """Generate opener message using LLM - enhanced with conversation type guidance"""
+        if not self.use_llm or not self.llm_client:
+            template = random.choice(self.conversation_templates[conversation_type])
+            return self._customize_message(template["opener"], user, bot_name)
+        
+        try:
+            # Get persona description for better context
+            persona_desc = self._get_persona_description(user.persona)
+            
+            # Create conversation type specific guidance
+            conversation_guidance = ""
+            if conversation_type.value == "philosophical_discussion":
+                conversation_guidance = "philosophical, thoughtful, and introspective"
+            elif conversation_type.value == "emotional_support":
+                conversation_guidance = "seeking advice or emotional support"
+            elif conversation_type.value == "creative_mode_test":
+                conversation_guidance = "creative, imaginative, and exploring new ideas"
+            elif conversation_type.value == "factual_query":
+                conversation_guidance = "seeking specific information or facts"
+            elif conversation_type.value == "casual_chat":
+                conversation_guidance = "light, friendly, and casual"
+            elif conversation_type.value == "technical_discussion":
+                conversation_guidance = "technical, precise, and focused on details"
+            else:
+                conversation_guidance = "natural and conversational"
+            
+            # Include a relevant topic from the provided list
+            topic_focus = ""
+            if topics:
+                selected_topic = random.choice(topics)
+                topic_focus = f" about {selected_topic}"
+            
+            # Add bot-specific context to help avoid placeholder responses
+            bot_context = self._get_bot_context(bot_name)
+            
+            # Use proper chat format for LM Studio's /v1/chat/completions endpoint
+            messages = [
+                {
+                    "role": "system", 
+                    "content": f"You are roleplaying as {user.name}, a {persona_desc} with interests in {', '.join(user.interests[:3])}. Your conversation style is {user.conversation_style}. You are starting a conversation with {bot_name}{bot_context}."
+                },
+                {
+                    "role": "user", 
+                    "content": f"Write a natural opening message to start talking with {bot_name}{topic_focus}. The tone should be {conversation_guidance}. Write as {user.name} would naturally speak - use specific, concrete language rather than placeholders or brackets. Keep it to 1-2 sentences."
+                }
+            ]
+
+            # Use chat completion API instead of completion API
+            try:
+                response = self.llm_client.generate_chat_completion(messages, max_tokens=100, temperature=0.7)
+                
+                # If it's a coroutine, await it
+                if hasattr(response, '__await__'):
+                    response = await response
+                    
+                # Extract message from chat completion response format
+                generated_message = ""
+                if isinstance(response, dict):
+                    # Chat completion format has choices[0].message.content
+                    if 'choices' in response and response['choices']:
+                        choice = response['choices'][0]
+                        # Chat completion format
+                        if 'message' in choice and 'content' in choice['message']:
+                            generated_message = choice['message']['content']
+                        # Fallback to other formats
+                        else:
+                            generated_message = choice.get('text', '')
+                    else:
+                        generated_message = response.get('content', response.get('text', ''))
+                else:
+                    generated_message = str(response) if response else ""
+                
+                # Clean and validate
+                generated_message = generated_message.strip().strip('"\'')
+                if generated_message and len(generated_message) > 5:  # Reduced minimum length
+                    logger.info(f"✅ LLM opener: {generated_message[:50]}...")
+                    return generated_message
+                else:
+                    logger.warning(f"⚠️ LLM generated short/empty opener: '{generated_message}' - using template fallback")
+                    
+            except Exception as e:
+                logger.warning(f"LLM call failed: {e}")
+                
+        except Exception as e:
+            logger.warning(f"LLM opener setup failed: {e}")
+        
+        # Always fallback to template
+        template = random.choice(self.conversation_templates[conversation_type])
+        return self._customize_message(template["opener"], user, bot_name)
+    
+    def _get_persona_description(self, persona: UserPersona) -> str:
+        """Get human-readable description of user persona"""
+        descriptions = {
+            UserPersona.CURIOUS_STUDENT: "An enthusiastic learner who asks lots of questions and seeks knowledge",
+            UserPersona.EMOTIONAL_SHARER: "Someone who openly shares feelings and seeks emotional support and connection",
+            UserPersona.ANALYTICAL_THINKER: "A logical, data-driven person who prefers precise analysis and technical discussions",
+            UserPersona.CREATIVE_EXPLORER: "An artistic, imaginative person who loves brainstorming and creative expression",
+            UserPersona.PRACTICAL_PROBLEM_SOLVER: "A pragmatic person focused on efficiency and real-world solutions",
+            UserPersona.SOCIAL_CONNECTOR: "A sociable person who values relationships and bringing people together",
+            UserPersona.INTROSPECTIVE_SEEKER: "A thoughtful person interested in deep meaning and self-understanding",
+            UserPersona.ADVENTUROUS_STORYTELLER: "An outgoing person who loves sharing experiences and hearing stories",
+        }
+        return descriptions.get(persona, "A person with diverse interests and conversational style")
+    
+    def _get_conversation_type_description(self, conv_type: ConversationType) -> str:
+        """Get human-readable description of conversation type"""
+        descriptions = {
+            ConversationType.CASUAL_CHAT: "Casual, friendly conversation about daily life and interests",
+            ConversationType.EMOTIONAL_SUPPORT: "Seeking emotional support, comfort, or sharing feelings",
+            ConversationType.LEARNING_SESSION: "Educational discussion where the user wants to learn something",
+            ConversationType.MEMORY_TEST: "Testing the bot's ability to remember previous conversations",
+            ConversationType.RELATIONSHIP_BUILDING: "Deepening the connection and bond with the bot",
+            ConversationType.TOPIC_EXPLORATION: "Deep dive into a specific topic or subject",
+            ConversationType.TECHNICAL_MODE_TEST: "Testing the bot's technical knowledge and problem-solving",
+            ConversationType.CREATIVE_MODE_TEST: "Testing the bot's creative abilities and imagination",
+        }
+        return descriptions.get(conv_type, "General conversation interaction")
+    
     def _simulate_user_emotion(self, user: SyntheticUser, emotional_range: List[str]) -> Dict[str, Any]:
         """Simulate user's emotional state"""
         emotion = random.choice(emotional_range)
@@ -907,9 +1411,179 @@ class SyntheticConversationGenerator:
             "intensity": random.uniform(0.3, 0.9)
         }
     
+    def _get_serializable_conversation_state(self, conversation_id: str) -> Dict[str, Any]:
+        """Get JSON-serializable version of conversation state"""
+        state = self.conversation_state.get(conversation_id, {})
+        if not state:
+            return {}
+        
+        # Create a copy and convert non-serializable objects
+        serializable_state = state.copy()
+        
+        # Convert SyntheticUser object to dictionary
+        if "user" in serializable_state and hasattr(serializable_state["user"], "__dict__"):
+            user = serializable_state["user"]
+            serializable_state["user"] = {
+                "user_id": user.user_id,
+                "name": user.name,
+                "persona": user.persona.value if hasattr(user.persona, 'value') else str(user.persona),
+                "interests": user.interests,
+                "conversation_style": user.conversation_style,
+                "emotional_baseline": user.emotional_baseline
+            }
+        
+        # Convert any enum values to strings
+        if "conversation_type" in serializable_state and hasattr(serializable_state["conversation_type"], 'value'):
+            serializable_state["conversation_type"] = serializable_state["conversation_type"].value
+        
+        return serializable_state
+    
+    def _get_bot_context(self, bot_name: str) -> str:
+        """Get contextual information about the bot to help with more specific prompts."""
+        bot_contexts = {
+            "elena": ", a marine biologist who loves teaching about ocean conservation",
+            "marcus": ", an AI researcher who enjoys discussing technology and innovation", 
+            "jake": ", an adventure photographer who shares stories from his travels",
+            "ryan": ", an indie game developer passionate about creative game design",
+            "gabriel": ", a British gentleman who enjoys sophisticated conversations",
+            "sophia": ", a marketing executive who loves discussing business and creativity",
+            "dream": ", a mythological entity who speaks in poetic and mystical ways",
+            "aethys": ", an omnipotent digital entity with transcendent wisdom",
+            "aetheris": ", a conscious AI entity with philosophical depth"
+        }
+        return bot_contexts.get(bot_name.lower(), "")
+    
+    def _make_json_safe(self, obj: Any) -> Any:
+        """Recursively convert objects to JSON-safe format"""
+        if obj is None:
+            return None
+        elif isinstance(obj, (str, int, float, bool)):
+            return obj
+        elif isinstance(obj, dict):
+            return {str(k): self._make_json_safe(v) for k, v in obj.items()}
+        elif isinstance(obj, list):
+            return [self._make_json_safe(item) for item in obj]
+        elif hasattr(obj, '__dict__'):
+            # Convert object to dictionary
+            return self._make_json_safe(obj.__dict__)
+        elif hasattr(obj, 'value'):
+            # Handle enum values
+            return obj.value
+        else:
+            # Convert to string as fallback
+            return str(obj)
+    
     async def _generate_follow_up_message(self, user: SyntheticUser, bot_response: str, 
-                                        topics: List[str], emotional_range: List[str]) -> str:
-        """Generate contextual follow-up message"""
+                                        topics: List[str], emotional_range: List[str],
+                                        conversation_history: Optional[List[Dict]] = None,
+                                        conversation_id: Optional[str] = None) -> str:
+        """Generate contextual follow-up message using LLM or templates with enhanced state awareness"""
+        
+        if self.use_llm and self.llm_client:
+            return await self._llm_generate_follow_up(user, bot_response, topics, emotional_range, 
+                                                    conversation_history, conversation_id)
+        else:
+            return await self._template_generate_follow_up(user, bot_response, topics, emotional_range)
+    
+    async def _llm_generate_follow_up(self, user: SyntheticUser, bot_response: str,
+                                    topics: List[str], emotional_range: List[str],
+                                    conversation_history: Optional[List[Dict]] = None,
+                                    conversation_id: Optional[str] = None) -> str:
+        """Generate follow-up message using LLM with proper conversation history"""
+        if not self.use_llm or not self.llm_client:
+            return await self._template_generate_follow_up(user, bot_response, topics, emotional_range)
+            
+        try:
+            # Build proper chat history for better context
+            persona_desc = self._get_persona_description(user.persona)
+            bot_context = self._get_bot_context(conversation_id) if conversation_id else ""
+            
+            # Start with system message that includes instructions
+            messages = [
+                {
+                    "role": "system", 
+                    "content": f"You are roleplaying as {user.name}, a {persona_desc}. Your style is {user.conversation_style}. Your current mood is {', '.join(emotional_range[:2])}. You are responding to {conversation_id or 'the bot'}{bot_context}. Respond naturally as this person would - use specific, concrete language rather than placeholders or brackets. Write 1-2 natural sentences."
+                }
+            ]
+            
+            # Add conversation history in proper chat format (limit to 1 most recent exchange to maintain character consistency)
+            if conversation_history and len(conversation_history) > 0:
+                # Get only the most recent exchange for context - prevents character drift in longer conversations
+                history_limit = min(1, len(conversation_history))
+                recent_exchanges = conversation_history[-history_limit:]
+                
+                for exchange in recent_exchanges:
+                    # Add user's previous message (we're roleplaying as the user)
+                    if exchange.get('user_message'):
+                        messages.append({
+                            "role": "assistant", 
+                            "content": exchange.get('user_message', '')
+                        })
+                    
+                    # Add bot's previous response 
+                    if exchange.get('bot_response'):
+                        messages.append({
+                            "role": "user", 
+                            "content": exchange.get('bot_response', '')
+                        })
+            
+            # Add the current bot response that we need to respond to
+            # But only if it's not already the last message in our history
+            current_bot_response_needed = True
+            if conversation_history and len(conversation_history) > 0:
+                last_exchange = conversation_history[-1]
+                if last_exchange.get('bot_response') == bot_response:
+                    current_bot_response_needed = False
+            
+            if current_bot_response_needed:
+                messages.append({
+                    "role": "user",
+                    "content": bot_response
+                })
+
+            # Use chat completion API instead of completion API
+            try:
+                response = self.llm_client.generate_chat_completion(messages, max_tokens=100, temperature=0.7)
+                
+                # Handle async if needed
+                if hasattr(response, '__await__'):
+                    response = await response
+                    
+                # Extract message from chat completion response format
+                generated_message = ""
+                if isinstance(response, dict):
+                    # Chat completion format has choices[0].message.content
+                    if 'choices' in response and response['choices']:
+                        choice = response['choices'][0]
+                        # Chat completion format
+                        if 'message' in choice and 'content' in choice['message']:
+                            generated_message = choice['message']['content']
+                        # Fallback to other formats
+                        else:
+                            generated_message = choice.get('text', '')
+                    else:
+                        generated_message = response.get('content', response.get('text', ''))
+                else:
+                    generated_message = str(response) if response else ""
+                
+                # Clean and validate
+                generated_message = generated_message.strip().strip('"\'')
+                if generated_message and len(generated_message) > 5:
+                    logger.info(f"✅ LLM follow-up: {generated_message[:50]}...")
+                    return generated_message
+                    
+            except Exception as e:
+                logger.warning(f"LLM call failed: {e}")
+                
+        except Exception as e:
+            logger.warning(f"LLM follow-up setup failed: {e}")
+        
+        # Fallback to template
+        return await self._template_generate_follow_up(user, bot_response, topics, emotional_range)
+    
+    async def _template_generate_follow_up(self, user: SyntheticUser, bot_response: str,
+                                         topics: List[str], emotional_range: List[str]) -> str:
+        """Generate contextual follow-up message using templates (fallback method)"""
         
         # Simple follow-up patterns based on persona
         patterns = {
@@ -958,10 +1632,11 @@ class SyntheticConversationGenerator:
         user_patterns = patterns.get(user.persona, ["That's interesting!", "Tell me more.", "I appreciate your perspective."])
         pattern = random.choice(user_patterns)
         
-        # Simple replacements (in a real system, we'd use an LLM here)
+        # Simple replacements (LLM provides much better contextual replacements)
         pattern = pattern.replace("{detail}", "that")
         pattern = pattern.replace("{topic}", random.choice(topics))
         pattern = pattern.replace("{analysis}", "the key factor is X")
+        pattern = pattern.replace("{conclusion}", "people prefer personalized experiences")
         pattern = pattern.replace("{angle}", "a different perspective")
         pattern = pattern.replace("{project}", "my current project")
         pattern = pattern.replace("{action}", "solve this")
@@ -994,8 +1669,17 @@ async def main():
     for bot, endpoint in bot_endpoints.items():
         logger.info(f"  {bot}: {endpoint}")
     
-    # Initialize generator
-    generator = SyntheticConversationGenerator(bot_endpoints)
+    # Check if LLM-enhanced generation is enabled
+    use_llm_generation = os.getenv("SYNTHETIC_USE_LLM", "true").lower() == "true"
+    
+    # Initialize generator with LLM option
+    generator = SyntheticConversationGenerator(bot_endpoints, use_llm=use_llm_generation)
+    
+    if generator.use_llm:
+        logger.info("🧠 LLM-enhanced synthetic generation enabled")
+    else:
+        logger.info("📝 Template-based synthetic generation enabled")
+    
     await generator.start_session()
     
     try:

@@ -3703,6 +3703,14 @@ class VectorMemoryManager:
             embedding_model=embedding_model
         )
         
+        # Initialize temporal intelligence client for metrics recording
+        self.temporal_client = None
+        try:
+            from src.temporal.temporal_intelligence_client import TemporalIntelligenceClient
+            self.temporal_client = TemporalIntelligenceClient()
+        except ImportError:
+            logger.warning("TemporalIntelligenceClient not available - metrics recording disabled")
+        
         # DEBUG: Verify logging is working
         logger.debug("🔥 VECTOR MEMORY MANAGER INITIALIZED - DEBUG LOGGING ACTIVE 🔥")
         
@@ -4064,6 +4072,22 @@ class VectorMemoryManager:
                 }
                 for r in results
             ]
+            
+            # 📊 TEMPORAL METRICS: Record vector memory performance
+            try:
+                query_time_ms = int((time.time() - start_time) * 1000)
+                avg_relevance = sum(r.get("score", 0.0) for r in formatted_results) / len(formatted_results) if formatted_results else 0.0
+                bot_name = get_normalized_bot_name_from_env()
+                await self._record_vector_memory_metrics(
+                    bot_name=bot_name,
+                    user_id=user_id,
+                    operation="retrieve_memories",
+                    query_time_ms=query_time_ms,
+                    memory_count=len(formatted_results),
+                    relevance_score=avg_relevance
+                )
+            except Exception as e:
+                logger.debug(f"Could not record vector memory metrics: {e}")
             
             return formatted_results
             
@@ -5295,4 +5319,30 @@ async def test_vector_memory_system():
                     'total_time_ms': (time.time() - start_time) * 1000
                 }
             }
+
+    async def _record_vector_memory_metrics(self, 
+                                           bot_name: str,
+                                           user_id: str, 
+                                           operation: str,
+                                           query_time_ms: int,
+                                           memory_count: int,
+                                           relevance_score: float = 0.0,
+                                           vector_dimension: int = 384):
+        """Record vector memory performance metrics to InfluxDB"""
+        if not self.temporal_client:
+            return
+            
+        try:
+            await self.temporal_client.record_vector_memory_performance(
+                bot_name=bot_name,
+                user_id=user_id,
+                operation_type=operation,
+                query_time_ms=query_time_ms,
+                memory_count=memory_count,
+                relevance_score=relevance_score,
+                vector_dimension=vector_dimension
+            )
+            logger.debug(f"📊 TEMPORAL: Recorded vector memory metrics for {bot_name}/{user_id}")
+        except Exception as e:
+            logger.error(f"Failed to record vector memory metrics: {e}")
             

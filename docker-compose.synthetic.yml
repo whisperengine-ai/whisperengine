@@ -9,10 +9,18 @@ services:
     volumes:
       - ./synthetic_conversations:/app/synthetic_conversations
       - ./synthetic_validation_report.json:/app/synthetic_validation_report.json
+      - ./character_intelligence_validation_results.json:/app/character_intelligence_validation_results.json
     environment:
       - PYTHONUNBUFFERED=1
       - LOG_LEVEL=INFO
-      # Bot endpoints (adjust based on your setup)
+      # LM Studio Configuration (DISABLED - using reliable templates instead)
+      - LLM_CHAT_API_URL=http://host.docker.internal:1234/v1
+      - LLM_CLIENT_TYPE=lmstudio
+      - LLM_CHAT_MODEL=local-model  # Uses whatever model is loaded in LM Studio
+      - LLM_CHAT_API_KEY=
+      - SYNTHETIC_USE_LLM=false  # Disabled for consistent, deterministic results
+      - LLM_MAX_TOKENS_CHAT=2048  # Increased for better response generation
+      # Bot endpoints (updated for all validated operational bots)
       - ELENA_ENDPOINT=http://host.docker.internal:9091
       - MARCUS_ENDPOINT=http://host.docker.internal:9092
       - RYAN_ENDPOINT=http://host.docker.internal:9093
@@ -20,9 +28,17 @@ services:
       - GABRIEL_ENDPOINT=http://host.docker.internal:9095
       - SOPHIA_ENDPOINT=http://host.docker.internal:9096
       - JAKE_ENDPOINT=http://host.docker.internal:9097
-      - DOTTY_ENDPOINT=http://host.docker.internal:9098
-      - AETHERIS_ENDPOINT=http://host.docker.internal:9099
       - AETHYS_ENDPOINT=http://host.docker.internal:3007
+      - AETHERIS_ENDPOINT=http://host.docker.internal:3008
+      # Database connectivity for character intelligence testing
+      - POSTGRES_HOST=host.docker.internal
+      - POSTGRES_PORT=5433
+      - POSTGRES_USER=whisperengine
+      - POSTGRES_PASSWORD=whisperengine_password
+      - POSTGRES_DB=whisperengine
+      # Qdrant for vector memory testing
+      - QDRANT_HOST=host.docker.internal
+      - QDRANT_PORT=6334
       # InfluxDB integration (use existing WhisperEngine InfluxDB)
       - INFLUXDB_URL=http://host.docker.internal:8086
       - INFLUXDB_TOKEN=whisperengine-fidelity-first-metrics-token
@@ -37,22 +53,66 @@ services:
       timeout: 10s
       retries: 3
 
-  # Validation metrics collector (runs every 4 hours to update InfluxDB)
+  # Validation metrics collector (enhanced for character intelligence)
   synthetic-validator:
     build:
       context: .
       dockerfile: Dockerfile.synthetic
-    command: ["sh", "-c", "while true; do python synthetic_validation_metrics.py; sleep 14400; done"]
+    command: ["sh", "-c", "while true; do python synthetic_validation_metrics.py && python character_intelligence_synthetic_validator.py; sleep 14400; done"]
     volumes:
       - ./synthetic_conversations:/app/synthetic_conversations
+      - ./character_intelligence_validation_results.json:/app/character_intelligence_validation_results.json
     environment:
       - PYTHONUNBUFFERED=1
       - LOG_LEVEL=INFO
+      # LM Studio Configuration for Enhanced Synthetic Generation
+      - LLM_CHAT_API_URL=http://host.docker.internal:1234/v1
+      - LLM_CLIENT_TYPE=lmstudio
+      - LLM_CHAT_MODEL=local-model
+      - LLM_CHAT_API_KEY=
+      - SYNTHETIC_USE_LLM=true
+      - LLM_MAX_TOKENS_CHAT=1024
+      # Database connectivity for character intelligence validation
+      - POSTGRES_HOST=host.docker.internal
+      - POSTGRES_PORT=5433
+      - POSTGRES_USER=whisperengine
+      - POSTGRES_PASSWORD=whisperengine_password
+      - POSTGRES_DB=whisperengine
+      # Qdrant for vector memory validation
+      - QDRANT_HOST=host.docker.internal
+      - QDRANT_PORT=6334
       # InfluxDB integration (same as WhisperEngine)
       - INFLUXDB_URL=http://host.docker.internal:8086
       - INFLUXDB_TOKEN=whisperengine-fidelity-first-metrics-token
       - INFLUXDB_ORG=whisperengine
       - INFLUXDB_BUCKET=performance_metrics
+    restart: unless-stopped
+    networks:
+      - synthetic-network
+
+  # Character Intelligence Direct Tester (NEW - tests validated systems directly)
+  character-intelligence-tester:
+    build:
+      context: .
+      dockerfile: Dockerfile.synthetic
+    command: ["sh", "-c", "while true; do python direct_character_intelligence_tester.py; sleep 7200; done"]
+    volumes:
+      - ./character_intelligence_direct_test_results.json:/app/character_intelligence_direct_test_results.json
+    environment:
+      - PYTHONUNBUFFERED=1
+      - LOG_LEVEL=INFO
+      # Database connectivity for direct testing
+      - POSTGRES_HOST=host.docker.internal
+      - POSTGRES_PORT=5433
+      - POSTGRES_USER=whisperengine
+      - POSTGRES_PASSWORD=whisperengine_password
+      - POSTGRES_DB=whisperengine
+      # Qdrant for vector memory direct testing
+      - QDRANT_HOST=host.docker.internal
+      - QDRANT_PORT=6334
+      # Character intelligence testing configuration
+      - CHARACTER_INTELLIGENCE_TEST_MODE=direct
+      - TEST_CHARACTER_NAMES=Elena Rodriguez,Marcus Thompson,Gabriel,Sophia Blake,Jake Sterling
     restart: unless-stopped
     networks:
       - synthetic-network

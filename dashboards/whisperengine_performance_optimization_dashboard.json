@@ -1,0 +1,165 @@
+{
+  "id": null,
+  "title": "WhisperEngine Performance Optimization",
+  "tags": [
+    "whisperengine",
+    "performance",
+    "optimization"
+  ],
+  "timezone": "browser",
+  "schemaVersion": 36,
+  "version": 1,
+  "refresh": "5s",
+  "time": {
+    "from": "now-3h",
+    "to": "now"
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Response Time Distribution",
+      "type": "histogram",
+      "targets": [
+        {
+          "refId": "A",
+          "query": "from(bucket: \"performance_metrics\")\n  |> range(start: -3h)\n  |> filter(fn: (r) => r._measurement == \"response_time_v2\")\n  |> filter(fn: (r) => r._field == \"processing_time_ms\")\n  |> aggregateWindow(every: 1m, fn: mean, createEmpty: false)",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "influxdb-whisperengine"
+          }
+        }
+      ],
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 0
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "custom": {
+            "bucketSize": 500
+          }
+        }
+      }
+    },
+    {
+      "id": 2,
+      "title": "Memory Performance",
+      "type": "timeseries",
+      "targets": [
+        {
+          "refId": "A",
+          "query": "from(bucket: \"performance_metrics\")\n  |> range(start: -3h)\n  |> filter(fn: (r) => r._measurement == \"vector_memory_performance\")\n  |> filter(fn: (r) => r._field == \"search_time_ms\")\n  |> aggregateWindow(every: 2m, fn: mean, createEmpty: false)",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "influxdb-whisperengine"
+          }
+        }
+      ],
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 0
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2
+          }
+        }
+      }
+    },
+    {
+      "id": 3,
+      "title": "RoBERTa Inference Time",
+      "type": "stat",
+      "targets": [
+        {
+          "refId": "A",
+          "query": "from(bucket: \"performance_metrics\")\n  |> range(start: -1h)\n  |> filter(fn: (r) => r._measurement == \"emotion_analysis_performance\")\n  |> filter(fn: (r) => r._field == \"roberta_inference_time_ms\")\n  |> mean()",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "influxdb-whisperengine"
+          }
+        }
+      ],
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 0,
+        "y": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 100
+              },
+              {
+                "color": "red",
+                "value": 200
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": 4,
+      "title": "Optimization Ratio",
+      "type": "stat",
+      "targets": [
+        {
+          "refId": "A",
+          "query": "from(bucket: \"performance_metrics\")\n  |> range(start: -1h)\n  |> filter(fn: (r) => r._measurement == \"optimization_ratio_v2\")\n  |> filter(fn: (r) => r._field == \"value\")\n  |> mean()",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "influxdb-whisperengine"
+          }
+        }
+      ],
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 6,
+        "y": 8
+      }
+    },
+    {
+      "id": 5,
+      "title": "Messages Per Second",
+      "type": "timeseries",
+      "targets": [
+        {
+          "refId": "A",
+          "query": "from(bucket: \"performance_metrics\")\n  |> range(start: -3h)\n  |> filter(fn: (r) => r._measurement == \"performance_metrics\")\n  |> filter(fn: (r) => r._field == \"messages_per_second\")\n  |> aggregateWindow(every: 1m, fn: sum, createEmpty: false)",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "influxdb-whisperengine"
+          }
+        }
+      ],
+      "gridPos": {
+        "h": 4,
+        "w": 12,
+        "x": 12,
+        "y": 8
+      }
+    }
+  ]
+}

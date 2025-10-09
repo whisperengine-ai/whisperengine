@@ -1,0 +1,134 @@
+{
+  "id": null,
+  "title": "WhisperEngine Performance Metrics (Confirmed Data)",
+  "tags": [
+    "whisperengine",
+    "performance",
+    "confirmed"
+  ],
+  "timezone": "browser",
+  "schemaVersion": 36,
+  "version": 1,
+  "refresh": "5s",
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Response Time Values",
+      "type": "timeseries",
+      "targets": [
+        {
+          "refId": "A",
+          "query": "from(bucket: \"performance_metrics\")\n  |> range(start: -1h)\n  |> filter(fn: (r) => r._measurement == \"response_time_v2\")\n  |> filter(fn: (r) => r._field == \"value\")\n  |> aggregateWindow(every: 2m, fn: mean, createEmpty: false)",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "influxdb-whisperengine"
+          }
+        }
+      ],
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 0
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms"
+        }
+      }
+    },
+    {
+      "id": 2,
+      "title": "Optimization Ratio",
+      "type": "timeseries",
+      "targets": [
+        {
+          "refId": "A",
+          "query": "from(bucket: \"performance_metrics\")\n  |> range(start: -1h)\n  |> filter(fn: (r) => r._measurement == \"optimization_ratio_v2\")\n  |> filter(fn: (r) => r._field == \"value\")\n  |> aggregateWindow(every: 2m, fn: mean, createEmpty: false)",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "influxdb-whisperengine"
+          }
+        }
+      ],
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 0
+      }
+    },
+    {
+      "id": 3,
+      "title": "Emotion Analysis Performance",
+      "type": "timeseries",
+      "targets": [
+        {
+          "refId": "A",
+          "query": "from(bucket: \"performance_metrics\")\n  |> range(start: -1h)\n  |> filter(fn: (r) => r._measurement == \"emotion_analysis_performance\")\n  |> filter(fn: (r) => r._field == \"analysis_time_ms\")\n  |> aggregateWindow(every: 2m, fn: mean, createEmpty: false)",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "influxdb-whisperengine"
+          }
+        }
+      ],
+      "gridPos": {
+        "h": 6,
+        "w": 8,
+        "x": 0,
+        "y": 8
+      }
+    },
+    {
+      "id": 4,
+      "title": "Bot Emotion Distribution",
+      "type": "piechart",
+      "targets": [
+        {
+          "refId": "A",
+          "query": "from(bucket: \"performance_metrics\")\n  |> range(start: -1h)\n  |> filter(fn: (r) => r._measurement == \"bot_emotion\")\n  |> filter(fn: (r) => r._field == \"confidence\")\n  |> group(columns: [\"bot\"])\n  |> count()",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "influxdb-whisperengine"
+          }
+        }
+      ],
+      "gridPos": {
+        "h": 6,
+        "w": 8,
+        "x": 8,
+        "y": 8
+      }
+    },
+    {
+      "id": 5,
+      "title": "Intelligence Coordination",
+      "type": "stat",
+      "targets": [
+        {
+          "refId": "A",
+          "query": "from(bucket: \"performance_metrics\")\n  |> range(start: -1h)\n  |> filter(fn: (r) => r._measurement == \"intelligence_coordination_metrics\")\n  |> filter(fn: (r) => r._field == \"coordination_time_ms\")\n  |> mean()",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "influxdb-whisperengine"
+          }
+        }
+      ],
+      "gridPos": {
+        "h": 6,
+        "w": 8,
+        "x": 16,
+        "y": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms"
+        }
+      }
+    }
+  ]
+}

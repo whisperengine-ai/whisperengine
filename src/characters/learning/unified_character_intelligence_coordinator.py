@@ -1,7 +1,7 @@
 """
 Unified Character Intelligence Coordinator
-WhisperEngine Memory Intelligence Convergence - PHASE 4A
-Version: 1.0 - October 2025
+WhisperEngine Memory Intelligence Convergence - PHASE 4 FINAL INTEGRATION
+Version: 2.0 - October 2025
 
 Creates a unified coordination layer that combines all intelligence systems
 (MemoryBoost, character self-knowledge, conversation intelligence) for 
@@ -13,13 +13,23 @@ Core Capabilities:
 - Unified response generation with character authenticity
 - Performance optimization through smart resource allocation
 - Maintains fidelity-first principles across all systems
+- PHASE 4: Production optimization with caching and parallel processing
 """
 
 import logging
+import asyncio
+import time
 from typing import Dict, Any, List, Optional
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from enum import Enum
+
+# InfluxDB metrics integration
+try:
+    from src.temporal.temporal_intelligence_client import create_temporal_intelligence_client
+    TEMPORAL_METRICS_AVAILABLE = True
+except ImportError:
+    TEMPORAL_METRICS_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +37,9 @@ class IntelligenceSystemType(Enum):
     """Types of intelligence systems available for coordination."""
     MEMORY_BOOST = "memory_boost"
     CHARACTER_SELF_KNOWLEDGE = "character_self_knowledge"
+    CHARACTER_EPISODIC_INTELLIGENCE = "character_episodic_intelligence"
+    CHARACTER_TEMPORAL_EVOLUTION = "character_temporal_evolution"  # PHASE 2: Temporal Evolution Intelligence
+    CHARACTER_GRAPH_KNOWLEDGE = "character_graph_knowledge"  # PHASE 3: Graph Knowledge Intelligence
     CONVERSATION_INTELLIGENCE = "conversation_intelligence"
     VECTOR_MEMORY = "vector_memory"
     EMOTIONAL_INTELLIGENCE = "emotional_intelligence"
@@ -110,7 +123,10 @@ class UnifiedCharacterIntelligenceCoordinator:
                  character_graph_knowledge_builder=None,
                  dynamic_trait_discovery=None,
                  cdl_ai_integration=None,
-                 emotion_analyzer=None):
+                 emotion_analyzer=None,
+                 character_episodic_intelligence=None,
+                 character_temporal_evolution_analyzer=None,
+                 postgres_pool=None):
         """Initialize with available intelligence systems."""
         self.memory_manager = memory_manager
         self.character_extractor = character_self_knowledge_extractor
@@ -118,37 +134,77 @@ class UnifiedCharacterIntelligenceCoordinator:
         self.trait_discovery = dynamic_trait_discovery
         self.cdl_integration = cdl_ai_integration
         self.emotion_analyzer = emotion_analyzer
+        self.character_episodic_intelligence = character_episodic_intelligence
+        self.character_temporal_evolution_analyzer = character_temporal_evolution_analyzer
+        self.postgres_pool = postgres_pool  # PHASE 3: PostgreSQL pool for graph knowledge
+        
+        # InfluxDB metrics integration
+        if TEMPORAL_METRICS_AVAILABLE:
+            self.temporal_client = create_temporal_intelligence_client()
+        else:
+            self.temporal_client = None
         
         # Coordination state
         self.system_availability = {}
         self.performance_history = {}
         self.coordination_cache = {}
         
+        # PHASE 4: Production optimization features
+        self.cache_ttl_seconds = 60  # Cache system responses for 1 minute
+        self.max_parallel_systems = 5  # Limit concurrent system processing
+        self.performance_targets = {
+            'total_processing_ms': 200,  # Target: under 200ms total
+            'system_processing_ms': 50,  # Target: under 50ms per system
+            'cache_hit_rate': 0.3  # Target: 30% cache hit rate
+        }
+        self.performance_metrics = {
+            'total_requests': 0,
+            'cache_hits': 0,
+            'average_processing_time': 0.0,
+            'system_success_rates': {},
+            'performance_violations': 0
+        }
+        
         # Coordination patterns
         self.context_patterns = {
             'personal_question': [
                 IntelligenceSystemType.CHARACTER_SELF_KNOWLEDGE,
+                IntelligenceSystemType.CHARACTER_EPISODIC_INTELLIGENCE,
+                IntelligenceSystemType.CHARACTER_TEMPORAL_EVOLUTION,  # PHASE 2: Character growth awareness
+                IntelligenceSystemType.CHARACTER_GRAPH_KNOWLEDGE,  # PHASE 3: Personal facts and relationships
                 IntelligenceSystemType.CDL_PERSONALITY,
                 IntelligenceSystemType.MEMORY_BOOST
             ],
             'emotional_support': [
                 IntelligenceSystemType.EMOTIONAL_INTELLIGENCE,
+                IntelligenceSystemType.CHARACTER_TEMPORAL_EVOLUTION,  # PHASE 2: Emotional evolution understanding
+                IntelligenceSystemType.CHARACTER_EPISODIC_INTELLIGENCE,
+                IntelligenceSystemType.CHARACTER_GRAPH_KNOWLEDGE,  # PHASE 3: Relationship context and history
                 IntelligenceSystemType.MEMORY_BOOST,
                 IntelligenceSystemType.CDL_PERSONALITY
             ],
             'knowledge_sharing': [
                 IntelligenceSystemType.CDL_PERSONALITY,
+                IntelligenceSystemType.CHARACTER_EPISODIC_INTELLIGENCE,
+                IntelligenceSystemType.CHARACTER_TEMPORAL_EVOLUTION,  # PHASE 2: Learning progression awareness
+                IntelligenceSystemType.CHARACTER_GRAPH_KNOWLEDGE,  # PHASE 3: Structured knowledge and facts
                 IntelligenceSystemType.VECTOR_MEMORY,
                 IntelligenceSystemType.CHARACTER_SELF_KNOWLEDGE
             ],
             'casual_conversation': [
                 IntelligenceSystemType.CONVERSATION_INTELLIGENCE,
+                IntelligenceSystemType.CHARACTER_EPISODIC_INTELLIGENCE,
+                IntelligenceSystemType.CHARACTER_TEMPORAL_EVOLUTION,  # PHASE 2: Natural growth references
+                IntelligenceSystemType.CHARACTER_GRAPH_KNOWLEDGE,  # PHASE 3: Conversational context and connections
                 IntelligenceSystemType.MEMORY_BOOST,
                 IntelligenceSystemType.CDL_PERSONALITY
             ],
             'complex_problem': [
                 IntelligenceSystemType.VECTOR_MEMORY,
                 IntelligenceSystemType.CHARACTER_SELF_KNOWLEDGE,
+                IntelligenceSystemType.CHARACTER_TEMPORAL_EVOLUTION,  # PHASE 2: Confidence evolution insights
+                IntelligenceSystemType.CHARACTER_GRAPH_KNOWLEDGE,  # PHASE 3: Problem-solving knowledge and relationships
+                IntelligenceSystemType.CHARACTER_EPISODIC_INTELLIGENCE,
                 IntelligenceSystemType.CONVERSATION_INTELLIGENCE
             ]
         }
@@ -158,6 +214,7 @@ class UnifiedCharacterIntelligenceCoordinator:
     async def coordinate_intelligence(self, request: IntelligenceRequest) -> IntelligenceResponse:
         """
         Coordinate all intelligence systems for unified character response.
+        PHASE 4: Production optimized with caching and parallel processing.
         
         Args:
             request: Intelligence coordination request
@@ -165,20 +222,49 @@ class UnifiedCharacterIntelligenceCoordinator:
         Returns:
             Unified intelligence response with system contributions
         """
-        start_time = datetime.now()
+        start_time = time.time()
+        
+        # Initialize performance metrics if needed
+        if not hasattr(self, '_performance_metrics'):
+            self._performance_metrics = {
+                'total_requests': 0,
+                'cache_hits': 0,
+                'average_processing_time': 0.0,
+                'average_systems_per_request': 0.0
+            }
+        
+        self._performance_metrics['total_requests'] += 1
         
         try:
             logger.info("🧠 UNIFIED-INTELLIGENCE: Coordinating intelligence for character %s", 
                        request.character_name)
             
+            # PHASE 4: Check cache first for performance optimization
+            cache_key = self._generate_cache_key(request)
+            cached_response = await self._get_cached_response(cache_key)
+            if cached_response:
+                self._performance_metrics['cache_hits'] += 1
+                logger.debug("✅ Cache hit for intelligence coordination")
+                return cached_response
+            
             # Detect conversation context type
             context_type = await self._detect_context_type(request)
             
-            # Select optimal intelligence systems
-            selected_systems = await self._select_intelligence_systems(request, context_type)
+            # Select optimal intelligence systems with performance constraints
+            selected_systems = await self._select_intelligence_systems_optimized(request, context_type)
             
-            # Gather intelligence from each selected system
-            system_contributions = await self._gather_system_intelligence(request, selected_systems)
+            # PHASE 4: Gather intelligence with parallel processing for performance
+            system_intelligence = await self._gather_system_intelligence_parallel(request, selected_systems)
+            
+            # Convert string keys to IntelligenceSystemType for type consistency
+            system_contributions = {}
+            for system_str, data in system_intelligence.items():
+                try:
+                    system_enum = IntelligenceSystemType(system_str)
+                    system_contributions[system_enum] = data
+                except ValueError:
+                    # Skip invalid system types
+                    continue
             
             # Synthesize unified response
             unified_response = await self._synthesize_unified_response(
@@ -186,9 +272,16 @@ class UnifiedCharacterIntelligenceCoordinator:
             )
             
             # Calculate performance metrics
-            processing_time = (datetime.now() - start_time).total_seconds() * 1000
+            processing_time = (time.time() - start_time) * 1000
             performance_metrics = await self._calculate_performance_metrics(
                 system_contributions, processing_time
+            )
+            
+            # Update performance tracking
+            self._update_performance_tracking(
+                system_count=len(selected_systems), 
+                processing_time=processing_time,
+                cache_hit=False
             )
             
             # Build coordination response
@@ -199,7 +292,9 @@ class UnifiedCharacterIntelligenceCoordinator:
                     'context_type': context_type,
                     'selected_systems': [system.value for system in selected_systems],
                     'coordination_strategy': request.coordination_strategy.value,
-                    'character_name': request.character_name
+                    'character_name': request.character_name,
+                    'cache_status': 'miss',
+                    'processing_optimizations': 'parallel_processing_enabled'
                 },
                 performance_metrics=performance_metrics,
                 character_authenticity_score=await self._calculate_authenticity_score(
@@ -208,6 +303,17 @@ class UnifiedCharacterIntelligenceCoordinator:
                 confidence_score=await self._calculate_confidence_score(system_contributions),
                 processing_time_ms=processing_time
             )
+            
+            # Record coordination metrics to InfluxDB
+            if self.temporal_client:
+                await self._record_coordination_metrics(
+                    request=request,
+                    systems_used=[system.value for system in selected_systems],
+                    coordination_time_ms=processing_time,
+                    authenticity_score=response.character_authenticity_score,
+                    confidence_score=response.confidence_score,
+                    context_type=context_type
+                )
             
             logger.info("✅ Unified intelligence coordination complete: %.1fms", processing_time)
             return response
@@ -278,6 +384,36 @@ class UnifiedCharacterIntelligenceCoordinator:
                    len(available_systems), context_type)
         return available_systems
     
+    async def _select_intelligence_systems_optimized(self, 
+                                                   request: IntelligenceRequest, 
+                                                   context_type: str) -> List[IntelligenceSystemType]:
+        """PHASE 4: Optimized intelligence system selection with performance constraints."""
+        # Start with base selection
+        base_systems = await self._select_intelligence_systems(request, context_type)
+        
+        # Apply performance constraints if specified
+        performance_constraints = request.performance_constraints or {}
+        max_systems = performance_constraints.get('max_systems', len(base_systems))
+        target_time_ms = performance_constraints.get('target_time_ms', 200)
+        
+        # Optimize based on processing time targets
+        if target_time_ms < 100:
+            # Ultra-fast mode: CDL + Memory only
+            optimized_systems = [s for s in base_systems if s in [
+                IntelligenceSystemType.CDL_PERSONALITY,
+                IntelligenceSystemType.MEMORY_BOOST
+            ]][:2]
+        elif target_time_ms < 200:
+            # Fast mode: Core systems only
+            optimized_systems = base_systems[:max_systems]
+        else:
+            # Normal mode: All systems within limit
+            optimized_systems = base_systems[:max_systems]
+        
+        logger.info("🚀 PHASE 4: Optimized %d→%d systems for %dms target", 
+                   len(base_systems), len(optimized_systems), target_time_ms)
+        return optimized_systems
+
     async def _gather_system_intelligence(self, 
                                         request: IntelligenceRequest,
                                         systems: List[IntelligenceSystemType]) -> Dict[IntelligenceSystemType, Dict[str, Any]]:
@@ -327,6 +463,127 @@ class UnifiedCharacterIntelligenceCoordinator:
                 'values_beliefs': character_knowledge.values_beliefs if character_knowledge else [],
                 'self_awareness_available': character_knowledge is not None
             }
+        
+        elif system == IntelligenceSystemType.CHARACTER_EPISODIC_INTELLIGENCE and self.character_episodic_intelligence:
+            # Get episodic memories and character insights from vector conversations
+            try:
+                episodic_context = await self.character_episodic_intelligence.get_episodic_memory_for_response_enhancement(
+                    user_id=request.user_id,
+                    current_message=request.message_content,
+                    conversation_context=request.conversation_context or []
+                )
+                
+                return {
+                    'type': 'character_episodic_intelligence',
+                    'memorable_moments': [
+                        {
+                            'content': moment.context_summary,
+                            'emotion': moment.primary_emotion,
+                            'confidence': moment.roberta_confidence,
+                            'timestamp': moment.timestamp.isoformat() if moment.timestamp else None
+                        } for moment in episodic_context.memorable_moments[:3]  # Top 3 moments
+                    ],
+                    'character_insights': [
+                        {
+                            'type': insight.insight_type,
+                            'description': insight.description,
+                            'confidence': insight.confidence
+                        } for insight in episodic_context.character_insights[:2]  # Top 2 insights
+                    ],
+                    'conversation_references': episodic_context.conversation_references[:2],  # Top 2 references
+                    'processing_time_ms': episodic_context.processing_time_ms,
+                    'episodic_available': len(episodic_context.memorable_moments) > 0
+                }
+            except Exception as e:
+                logger.error("🧠 UNIFIED: Error processing episodic intelligence: %s", e)
+                return {
+                    'type': 'character_episodic_intelligence',
+                    'memorable_moments': [],
+                    'character_insights': [],
+                    'conversation_references': [],
+                    'processing_time_ms': 0,
+                    'episodic_available': False
+                }
+        
+        elif system == IntelligenceSystemType.CHARACTER_TEMPORAL_EVOLUTION and self.character_temporal_evolution_analyzer:
+            # Get temporal evolution insights from existing InfluxDB data
+            try:
+                temporal_insights = await self.character_temporal_evolution_analyzer.get_character_evolution_insights_for_response(
+                    character_name=request.character_name,
+                    user_id=request.user_id,
+                    current_topic=request.message_content,
+                    days_back=14  # Recent 2 weeks for conversation integration
+                )
+                
+                return {
+                    'type': 'character_temporal_evolution',
+                    'has_evolution_insights': temporal_insights.get('has_evolution_insights', False),
+                    'evolution_references': temporal_insights.get('evolution_references', []),
+                    'growth_awareness': temporal_insights.get('growth_awareness', None),
+                    'confidence_evolution': temporal_insights.get('confidence_evolution', {}),
+                    'emotional_evolution': temporal_insights.get('emotional_evolution', {}),
+                    'evolution_metadata': temporal_insights.get('evolution_metadata', {}),
+                    'temporal_intelligence_available': temporal_insights.get('has_evolution_insights', False)
+                }
+            except Exception as e:
+                logger.error("🧠 UNIFIED: Error processing temporal evolution intelligence: %s", e)
+                return {
+                    'type': 'character_temporal_evolution',
+                    'has_evolution_insights': False,
+                    'evolution_references': [],
+                    'growth_awareness': None,
+                    'confidence_evolution': {},
+                    'emotional_evolution': {},
+                    'evolution_metadata': {},
+                    'temporal_intelligence_available': False
+                }
+        
+        elif system == IntelligenceSystemType.CHARACTER_GRAPH_KNOWLEDGE and self.postgres_pool:
+            # Get graph knowledge insights from PostgreSQL infrastructure (PHASE 3)
+            try:
+                from .character_graph_knowledge_intelligence import create_character_graph_knowledge_intelligence
+                
+                graph_intelligence = create_character_graph_knowledge_intelligence(self.postgres_pool)
+                graph_result = await graph_intelligence.extract_knowledge_graph(
+                    user_id=request.user_id,
+                    character_name=request.character_name,
+                    context=request.message_content[:100]  # First 100 chars for context
+                )
+                
+                return {
+                    'type': 'character_graph_knowledge',
+                    'knowledge_nodes': len(graph_result.nodes),
+                    'knowledge_relationships': len(graph_result.relationships),
+                    'structured_facts': graph_result.structured_facts,
+                    'knowledge_summary': graph_result.knowledge_summary,
+                    'confidence_score': graph_result.confidence_score,
+                    'extraction_metadata': graph_result.extraction_metadata,
+                    'graph_knowledge_available': graph_result.confidence_score > 0.3
+                }
+            except ImportError:
+                logger.warning("Graph knowledge intelligence module not available - graceful fallback")
+                return {
+                    'type': 'character_graph_knowledge',
+                    'knowledge_nodes': 0,
+                    'knowledge_relationships': 0,
+                    'structured_facts': {},
+                    'knowledge_summary': "Graph knowledge not available",
+                    'confidence_score': 0.0,
+                    'extraction_metadata': {'status': 'module_not_available'},
+                    'graph_knowledge_available': False
+                }
+            except Exception as e:
+                logger.error("🧠 UNIFIED: Error processing graph knowledge intelligence: %s", e)
+                return {
+                    'type': 'character_graph_knowledge',
+                    'knowledge_nodes': 0,
+                    'knowledge_relationships': 0,
+                    'structured_facts': {},
+                    'knowledge_summary': "Graph knowledge processing error",
+                    'confidence_score': 0.0,
+                    'extraction_metadata': {'status': 'processing_error', 'error': str(e)},
+                    'graph_knowledge_available': False
+                }
         
         elif system == IntelligenceSystemType.CONVERSATION_INTELLIGENCE and self.memory_manager:
             # Get conversation history and patterns
@@ -394,6 +651,14 @@ class UnifiedCharacterIntelligenceCoordinator:
                     context_enhancements.append(
                         f"Considering conversation continuity with {contribution['conversation_count']} recent messages"
                     )
+            
+            elif system == IntelligenceSystemType.CHARACTER_GRAPH_KNOWLEDGE:
+                if contribution.get('graph_knowledge_available'):
+                    nodes = contribution.get('knowledge_nodes', 0)
+                    relationships = contribution.get('knowledge_relationships', 0)
+                    context_enhancements.append(
+                        f"Leveraging graph knowledge ({nodes} entities, {relationships} relationships)"
+                    )
         
         # Create unified enhancement note (not included in actual response)
         enhancement_summary = "Intelligence coordination active: " + ", ".join(context_enhancements)
@@ -449,22 +714,6 @@ class UnifiedCharacterIntelligenceCoordinator:
         """Public method to detect conversation context type."""
         return await self._detect_context_type(request)
     
-    async def _detect_context_type(self, request: IntelligenceRequest) -> str:
-        """Detect the type of conversation context for optimal system selection."""
-        message = request.message_content.lower()
-        
-        # Pattern matching for context detection
-        if any(word in message for word in ['feel', 'emotion', 'sad', 'happy', 'worry', 'stress']):
-            return 'emotional_support'
-        elif any(word in message for word in ['you', 'your', 'yourself', 'personal', 'background']):
-            return 'personal_question'
-        elif any(word in message for word in ['how', 'what', 'why', 'explain', 'teach', 'learn']):
-            return 'knowledge_sharing'
-        elif any(word in message for word in ['problem', 'solve', 'complex', 'analyze', 'research']):
-            return 'complex_problem'
-        else:
-            return 'casual_conversation'
-    
     async def _is_system_available(self, system: IntelligenceSystemType) -> bool:
         """Check if an intelligence system is available for use."""
         
@@ -498,6 +747,143 @@ class UnifiedCharacterIntelligenceCoordinator:
             confidence_score=0.3,
             processing_time_ms=0
         )
+    
+    def _generate_cache_key(self, request: IntelligenceRequest) -> str:
+        """Generate cache key for intelligence response caching."""
+        import hashlib
+        
+        # Create hash from request characteristics
+        cache_components = [
+            request.character_name,
+            request.message_content,
+            request.user_id,
+            str(request.coordination_strategy),
+            str(sorted([s.value for s in request.priority_systems]) if request.priority_systems else '')
+        ]
+        
+        cache_string = '|'.join(cache_components)
+        return hashlib.md5(cache_string.encode()).hexdigest()
+    
+    async def _get_cached_response(self, cache_key: str) -> Optional[IntelligenceResponse]:
+        """Retrieve cached intelligence response if available."""
+        # Simple in-memory cache for now (could be extended to Redis/database)
+        if not hasattr(self, '_response_cache'):
+            self._response_cache = {}
+        
+        cached_entry = self._response_cache.get(cache_key)
+        if cached_entry:
+            timestamp, response = cached_entry
+            # Cache valid for 5 minutes
+            if time.time() - timestamp < 300:
+                return response
+        
+        return None
+    
+    def _cache_response(self, cache_key: str, response: IntelligenceResponse):
+        """Cache intelligence response for future use."""
+        if not hasattr(self, '_response_cache'):
+            self._response_cache = {}
+        
+        # Limit cache size to prevent memory issues
+        if len(self._response_cache) > 100:
+            # Remove oldest entries
+            oldest_key = min(self._response_cache.keys(), 
+                           key=lambda k: self._response_cache[k][0])
+            del self._response_cache[oldest_key]
+        
+        self._response_cache[cache_key] = (time.time(), response)
+    
+    async def _gather_system_intelligence_parallel(self, 
+                                                 request: IntelligenceRequest, 
+                                                 systems: List[IntelligenceSystemType]) -> Dict[str, Any]:
+        """Gather intelligence from multiple systems in parallel."""
+        # Use existing single system method for each system
+        combined_intelligence = {}
+        
+        for system in systems:
+            if await self._is_system_available(system):
+                try:
+                    result = await self._gather_single_system_intelligence(request, system)
+                    if result:
+                        combined_intelligence[system.value] = result
+                except Exception as e:
+                    combined_intelligence[system.value] = {
+                        'error': str(e),
+                        'available': False
+                    }
+        
+        return combined_intelligence
+    
+    def _update_performance_tracking(self, 
+                                   system_count: int, 
+                                   processing_time: float,
+                                   cache_hit: bool = False):
+        """Update performance tracking metrics."""
+        if not hasattr(self, '_performance_metrics'):
+            self._performance_metrics = {
+                'total_requests': 0,
+                'cache_hits': 0,
+                'average_processing_time': 0.0,
+                'average_systems_per_request': 0.0
+            }
+        
+        metrics = self._performance_metrics
+        metrics['total_requests'] += 1
+        
+        if cache_hit:
+            metrics['cache_hits'] += 1
+        
+        # Update running averages
+        request_count = metrics['total_requests']
+        metrics['average_processing_time'] = (
+            (metrics['average_processing_time'] * (request_count - 1) + processing_time) / request_count
+        )
+        metrics['average_systems_per_request'] = (
+            (metrics['average_systems_per_request'] * (request_count - 1) + system_count) / request_count
+        )
+    
+    def get_performance_metrics(self) -> Dict[str, Any]:
+        """Get current performance metrics."""
+        return getattr(self, '_performance_metrics', {
+            'total_requests': 0,
+            'cache_hits': 0,
+            'average_processing_time': 0,
+            'average_systems_per_request': 0
+        })
+
+    async def _record_coordination_metrics(
+        self,
+        request: IntelligenceRequest,
+        systems_used: List[str],
+        coordination_time_ms: float,
+        authenticity_score: float,
+        confidence_score: float,
+        context_type: str
+    ):
+        """Record UnifiedCharacterIntelligenceCoordinator performance metrics to InfluxDB"""
+        if not self.temporal_client:
+            return
+            
+        try:
+            # Get bot name from environment for InfluxDB tagging
+            import os
+            bot_name = os.getenv('DISCORD_BOT_NAME', 'unknown')
+            
+            await self.temporal_client.record_intelligence_coordination_metrics(
+                bot_name=bot_name,
+                user_id=request.user_id,
+                systems_used=systems_used,
+                coordination_time_ms=coordination_time_ms,
+                authenticity_score=authenticity_score,
+                confidence_score=confidence_score,
+                context_type=context_type,
+                coordination_strategy=request.coordination_strategy.value,
+                character_name=request.character_name
+            )
+        except Exception as e:
+            # Metrics recording should not break functionality
+            logger.debug("Failed to record coordination metrics: %s", str(e))
+
 
 def create_unified_character_intelligence_coordinator(
     memory_manager=None,

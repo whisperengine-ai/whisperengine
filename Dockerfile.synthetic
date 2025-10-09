@@ -14,9 +14,27 @@ COPY requirements-synthetic.txt requirements.txt
 # Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Copy LLM client source code for LM Studio integration
+COPY src/llm/ src/llm/
+COPY src/utils/exceptions.py src/utils/exceptions.py
+COPY src/utils/performance_monitor.py src/utils/performance_monitor.py
+COPY src/utils/__init__.py src/utils/__init__.py
+COPY src/security/__init__.py src/security/__init__.py
+COPY src/security/api_key_security.py src/security/api_key_security.py
+COPY src/__init__.py src/__init__.py
+
+# Copy character intelligence system source code for direct testing
+COPY src/characters/ src/characters/
+COPY src/prompts/ src/prompts/
+COPY src/memory/ src/memory/
+COPY src/intelligence/ src/intelligence/
+COPY src/core/ src/core/
+
 # Copy application files
 COPY synthetic_conversation_generator.py .
 COPY synthetic_validation_metrics.py .
+COPY character_intelligence_synthetic_validator.py .
+COPY direct_character_intelligence_tester.py .
 
 # Create directory for conversation logs
 RUN mkdir -p synthetic_conversations
@@ -24,10 +42,28 @@ RUN mkdir -p synthetic_conversations
 # Set environment variables
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONPATH=/app
+# LM Studio integration defaults (can be overridden by docker-compose)
+ENV LLM_CLIENT_TYPE=lmstudio
+ENV LLM_CHAT_API_URL=http://host.docker.internal:1234/v1
+ENV LLM_CHAT_MODEL=local-model
 
-# Health check
+# Database connectivity for character intelligence testing
+ENV POSTGRES_HOST=host.docker.internal
+ENV POSTGRES_PORT=5433
+ENV POSTGRES_USER=whisperengine
+ENV POSTGRES_PASSWORD=whisperengine_password
+ENV POSTGRES_DB=whisperengine
+
+# Qdrant connectivity for vector memory testing
+ENV QDRANT_HOST=host.docker.internal
+ENV QDRANT_PORT=6334
+
+# Health check (updated for synthetic service)
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-  CMD python -c "import requests; requests.get('http://localhost:9091/health')" || exit 1
+  CMD python test_docker_lmstudio.py || exit 1
+
+# Copy test script
+COPY test_docker_lmstudio.py .
 
 # Default command
 CMD ["python", "synthetic_conversation_generator.py"]
