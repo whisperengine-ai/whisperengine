@@ -51,23 +51,42 @@ logger = logging.getLogger(__name__)
 
 
 class EmotionDimension(Enum):
-    """Multi-dimensional emotion classification"""
+    """
+    Multi-dimensional emotion classification
+    
+    Expanded taxonomy to preserve Cardiff NLP fidelity:
+    Core emotions (6): anger, disgust, fear, joy, sadness, surprise
+    Cardiff emotions (5): love, trust, optimism, pessimism, anticipation
+    Extended emotions (7): excitement, contentment, frustration, anxiety, curiosity, gratitude, hope, disappointment
+    Total: 18 emotions for comprehensive emotional intelligence
+    """
+    # Core 6 emotions (preserved from Cardiff NLP)
     JOY = "joy"
-    SADNESS = "sadness"
+    SADNESS = "sadness" 
     ANGER = "anger"
     FEAR = "fear"
     SURPRISE = "surprise"
     DISGUST = "disgust"
-    NEUTRAL = "neutral"
+    
+    # Cardiff NLP emotions (now preserved as first-class)
+    LOVE = "love"
+    TRUST = "trust" 
+    OPTIMISM = "optimism"
+    PESSIMISM = "pessimism"
+    ANTICIPATION = "anticipation"
+    
+    # Extended emotional intelligence
     EXCITEMENT = "excitement"
     CONTENTMENT = "contentment"
     FRUSTRATION = "frustration"
     ANXIETY = "anxiety"
     CURIOSITY = "curiosity"
     GRATITUDE = "gratitude"
-    LOVE = "love"
     HOPE = "hope"
     DISAPPOINTMENT = "disappointment"
+    
+    # System emotions
+    NEUTRAL = "neutral"
 
 
 @dataclass
@@ -1498,30 +1517,29 @@ class EnhancedVectorEmotionAnalyzer:
 
     def _map_roberta_emotion_label(self, raw_label: str) -> str:
         """
-        Map RoBERTa emotion labels to standardized emotion names.
+        Map RoBERTa emotion labels to WhisperEngine taxonomy.
         
         Cardiff NLP twitter-roberta-base-emotion-multilabel-latest (11 emotions):
         anger, anticipation, disgust, fear, joy, love, optimism, pessimism, sadness, surprise, trust
         
-        Maps 11 emotions to our 7 core emotion taxonomy for system compatibility.
+        🔥 FIDELITY PRESERVATION: All 11 Cardiff emotions are now preserved as first-class emotions
+        in the expanded WhisperEngine taxonomy instead of being crushed into 7 buckets.
         """
         label_mapping = {
-            # Core 7 emotions (direct mappings)
+            # Core emotions (direct mappings - 100% fidelity preserved)
             "anger": "anger",
+            "anticipation": "anticipation",  # ✅ PRESERVED: No longer mapped to surprise
             "disgust": "disgust", 
             "fear": "fear",
             "joy": "joy",
+            "love": "love",                  # ✅ PRESERVED: No longer mapped to joy
+            "optimism": "optimism",          # ✅ PRESERVED: No longer mapped to joy
+            "pessimism": "pessimism",        # ✅ PRESERVED: No longer mapped to sadness
             "sadness": "sadness",
             "surprise": "surprise",
+            "trust": "trust",                # ✅ PRESERVED: No longer mapped to joy
             
-            # Cardiff NLP 11-emotion mappings to core 7
-            "optimism": "joy",           # ✅ "feeling more hopeful" → joy
-            "pessimism": "sadness",      # Negative outlook → sadness
-            "love": "joy",               # Positive emotion → joy
-            "trust": "joy",              # Positive emotion → joy
-            "anticipation": "surprise",  # Future-focused → surprise
-            
-            # Neutral handling (if present)
+            # System emotions
             "neutral": "neutral"
         }
         
@@ -1529,9 +1547,11 @@ class EnhancedVectorEmotionAnalyzer:
         normalized_label = raw_label.lower().strip()
         mapped_emotion = label_mapping.get(normalized_label, normalized_label)
         
-        # Log mapping for debugging (show 11→7 conversions)
-        if normalized_label != mapped_emotion:
-            logger.info(f"🎭 EMOTION MAPPING (11→7): {raw_label} → {mapped_emotion}")
+        # Log successful fidelity preservation (no more 11→7 crushing)
+        if normalized_label in label_mapping:
+            logger.debug(f"✅ EMOTION FIDELITY PRESERVED: {raw_label} → {mapped_emotion}")
+        else:
+            logger.warning(f"⚠️ UNKNOWN EMOTION: {raw_label} → {mapped_emotion} (passthrough)")
             
         return mapped_emotion
 
