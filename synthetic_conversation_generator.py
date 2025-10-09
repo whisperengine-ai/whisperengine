@@ -343,6 +343,12 @@ class SyntheticConversationGenerator:
     def _initialize_conversation_state(self, conversation_id: str, user: SyntheticUser, 
                                      bot_name: str, conversation_type: ConversationType) -> None:
         """Initialize conversation state tracking for a test scenario"""
+        
+        # Reset conversation history for fresh start
+        old_history_count = len(self.conversation_history)
+        self.conversation_history = {}
+        logger.info(f"🔄 Reset conversation history (was {old_history_count} conversations)")
+        
         self.conversation_state[conversation_id] = {
             "user": user,
             "bot_name": bot_name,
@@ -1147,9 +1153,10 @@ class SyntheticConversationGenerator:
         # Initialize conversation state
         self._initialize_conversation_state(conversation_id, user, bot_name, conversation_type)
         
-        # Determine conversation length
+        # Determine conversation length (limit to reasonable size for LM Studio)
         min_msgs, max_msgs = template["duration_messages"]
-        conversation_length = random.randint(min_msgs, max_msgs)
+        # Cap at 5 messages to prevent context overflow with LM Studio
+        conversation_length = min(random.randint(min_msgs, max_msgs), 5)
         
         # Generate opening message using LLM or templates
         opener = await self._llm_generate_opener(user, bot_name, conversation_type, template["topics"], conversation_id)
@@ -1423,45 +1430,39 @@ class SyntheticConversationGenerator:
             # Build proper chat history for better context
             persona_desc = self._get_persona_description(user.persona)
             
-            # Start with system message
+            # Start with system message that includes instructions
             messages = [
                 {
                     "role": "system", 
-                    "content": f"You are roleplaying as {user.name}, a {persona_desc}. Your style is {user.conversation_style}. Your current mood is {', '.join(emotional_range[:2])}."
+                    "content": f"You are roleplaying as {user.name}, a {persona_desc}. Your style is {user.conversation_style}. Your current mood is {', '.join(emotional_range[:2])}. Write natural 1-2 sentence responses. No quotes, no formatting."
                 }
             ]
             
-            # Add conversation history in chat format (up to 3 previous exchanges)
+            # Add conversation history in proper chat format (limit to 2 most recent exchanges)
             if conversation_history and len(conversation_history) > 0:
-                # Get up to 3 recent exchanges (skip the most recent as we'll add it separately)
-                history_limit = min(3, len(conversation_history))
+                # Get up to 2 recent exchanges for context without overwhelming the model
+                history_limit = min(2, len(conversation_history))
                 recent_exchanges = conversation_history[-history_limit:]
                 
                 for exchange in recent_exchanges:
-                    # Add user's previous message
+                    # Add user's previous message (we're roleplaying as the user)
                     if exchange.get('user_message'):
                         messages.append({
-                            "role": "assistant", # User is assistant because we're roleplaying as the user
+                            "role": "assistant", 
                             "content": exchange.get('user_message', '')
                         })
                     
-                    # Add bot's previous response
+                    # Add bot's previous response 
                     if exchange.get('bot_response'):
                         messages.append({
-                            "role": "user", # Bot is user in this exchange context
+                            "role": "user", 
                             "content": exchange.get('bot_response', '')
                         })
             
-            # Add the current bot response as the latest message
+            # Add the current bot response that we need to respond to
             messages.append({
                 "role": "user",
                 "content": bot_response
-            })
-            
-            # Add a final instruction to guide the response
-            messages.append({
-                "role": "system",
-                "content": f"Write a natural 1-2 sentence response as {user.name}. No quotes, no formatting."
             })
 
             # Use chat completion API instead of completion API

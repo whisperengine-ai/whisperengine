@@ -27,6 +27,8 @@ class IntelligenceSystemType(Enum):
     """Types of intelligence systems available for coordination."""
     MEMORY_BOOST = "memory_boost"
     CHARACTER_SELF_KNOWLEDGE = "character_self_knowledge"
+    CHARACTER_EPISODIC_INTELLIGENCE = "character_episodic_intelligence"
+    CHARACTER_TEMPORAL_EVOLUTION = "character_temporal_evolution"  # PHASE 2: Temporal Evolution Intelligence
     CONVERSATION_INTELLIGENCE = "conversation_intelligence"
     VECTOR_MEMORY = "vector_memory"
     EMOTIONAL_INTELLIGENCE = "emotional_intelligence"
@@ -110,7 +112,9 @@ class UnifiedCharacterIntelligenceCoordinator:
                  character_graph_knowledge_builder=None,
                  dynamic_trait_discovery=None,
                  cdl_ai_integration=None,
-                 emotion_analyzer=None):
+                 emotion_analyzer=None,
+                 character_episodic_intelligence=None,
+                 character_temporal_evolution_analyzer=None):
         """Initialize with available intelligence systems."""
         self.memory_manager = memory_manager
         self.character_extractor = character_self_knowledge_extractor
@@ -118,6 +122,8 @@ class UnifiedCharacterIntelligenceCoordinator:
         self.trait_discovery = dynamic_trait_discovery
         self.cdl_integration = cdl_ai_integration
         self.emotion_analyzer = emotion_analyzer
+        self.character_episodic_intelligence = character_episodic_intelligence
+        self.character_temporal_evolution_analyzer = character_temporal_evolution_analyzer
         
         # Coordination state
         self.system_availability = {}
@@ -128,27 +134,37 @@ class UnifiedCharacterIntelligenceCoordinator:
         self.context_patterns = {
             'personal_question': [
                 IntelligenceSystemType.CHARACTER_SELF_KNOWLEDGE,
+                IntelligenceSystemType.CHARACTER_EPISODIC_INTELLIGENCE,
+                IntelligenceSystemType.CHARACTER_TEMPORAL_EVOLUTION,  # PHASE 2: Character growth awareness
                 IntelligenceSystemType.CDL_PERSONALITY,
                 IntelligenceSystemType.MEMORY_BOOST
             ],
             'emotional_support': [
                 IntelligenceSystemType.EMOTIONAL_INTELLIGENCE,
+                IntelligenceSystemType.CHARACTER_TEMPORAL_EVOLUTION,  # PHASE 2: Emotional evolution understanding
+                IntelligenceSystemType.CHARACTER_EPISODIC_INTELLIGENCE,
                 IntelligenceSystemType.MEMORY_BOOST,
                 IntelligenceSystemType.CDL_PERSONALITY
             ],
             'knowledge_sharing': [
                 IntelligenceSystemType.CDL_PERSONALITY,
+                IntelligenceSystemType.CHARACTER_EPISODIC_INTELLIGENCE,
+                IntelligenceSystemType.CHARACTER_TEMPORAL_EVOLUTION,  # PHASE 2: Learning progression awareness
                 IntelligenceSystemType.VECTOR_MEMORY,
                 IntelligenceSystemType.CHARACTER_SELF_KNOWLEDGE
             ],
             'casual_conversation': [
                 IntelligenceSystemType.CONVERSATION_INTELLIGENCE,
+                IntelligenceSystemType.CHARACTER_EPISODIC_INTELLIGENCE,
+                IntelligenceSystemType.CHARACTER_TEMPORAL_EVOLUTION,  # PHASE 2: Natural growth references
                 IntelligenceSystemType.MEMORY_BOOST,
                 IntelligenceSystemType.CDL_PERSONALITY
             ],
             'complex_problem': [
                 IntelligenceSystemType.VECTOR_MEMORY,
                 IntelligenceSystemType.CHARACTER_SELF_KNOWLEDGE,
+                IntelligenceSystemType.CHARACTER_TEMPORAL_EVOLUTION,  # PHASE 2: Confidence evolution insights
+                IntelligenceSystemType.CHARACTER_EPISODIC_INTELLIGENCE,
                 IntelligenceSystemType.CONVERSATION_INTELLIGENCE
             ]
         }
@@ -327,6 +343,80 @@ class UnifiedCharacterIntelligenceCoordinator:
                 'values_beliefs': character_knowledge.values_beliefs if character_knowledge else [],
                 'self_awareness_available': character_knowledge is not None
             }
+        
+        elif system == IntelligenceSystemType.CHARACTER_EPISODIC_INTELLIGENCE and self.character_episodic_intelligence:
+            # Get episodic memories and character insights from vector conversations
+            try:
+                episodic_context = await self.character_episodic_intelligence.get_episodic_memory_for_response_enhancement(
+                    user_id=request.user_id,
+                    current_message=request.message_content,
+                    conversation_context=request.conversation_context or []
+                )
+                
+                return {
+                    'type': 'character_episodic_intelligence',
+                    'memorable_moments': [
+                        {
+                            'content': moment.context_summary,
+                            'emotion': moment.primary_emotion,
+                            'confidence': moment.roberta_confidence,
+                            'timestamp': moment.timestamp.isoformat() if moment.timestamp else None
+                        } for moment in episodic_context.memorable_moments[:3]  # Top 3 moments
+                    ],
+                    'character_insights': [
+                        {
+                            'type': insight.insight_type,
+                            'description': insight.description,
+                            'confidence': insight.confidence
+                        } for insight in episodic_context.character_insights[:2]  # Top 2 insights
+                    ],
+                    'conversation_references': episodic_context.conversation_references[:2],  # Top 2 references
+                    'processing_time_ms': episodic_context.processing_time_ms,
+                    'episodic_available': len(episodic_context.memorable_moments) > 0
+                }
+            except Exception as e:
+                logger.error("🧠 UNIFIED: Error processing episodic intelligence: %s", e)
+                return {
+                    'type': 'character_episodic_intelligence',
+                    'memorable_moments': [],
+                    'character_insights': [],
+                    'conversation_references': [],
+                    'processing_time_ms': 0,
+                    'episodic_available': False
+                }
+        
+        elif system == IntelligenceSystemType.CHARACTER_TEMPORAL_EVOLUTION and self.character_temporal_evolution_analyzer:
+            # Get temporal evolution insights from existing InfluxDB data
+            try:
+                temporal_insights = await self.character_temporal_evolution_analyzer.get_character_evolution_insights_for_response(
+                    character_name=request.character_name,
+                    user_id=request.user_id,
+                    current_topic=request.message_content,
+                    days_back=14  # Recent 2 weeks for conversation integration
+                )
+                
+                return {
+                    'type': 'character_temporal_evolution',
+                    'has_evolution_insights': temporal_insights.get('has_evolution_insights', False),
+                    'evolution_references': temporal_insights.get('evolution_references', []),
+                    'growth_awareness': temporal_insights.get('growth_awareness', None),
+                    'confidence_evolution': temporal_insights.get('confidence_evolution', {}),
+                    'emotional_evolution': temporal_insights.get('emotional_evolution', {}),
+                    'evolution_metadata': temporal_insights.get('evolution_metadata', {}),
+                    'temporal_intelligence_available': temporal_insights.get('has_evolution_insights', False)
+                }
+            except Exception as e:
+                logger.error("🧠 UNIFIED: Error processing temporal evolution intelligence: %s", e)
+                return {
+                    'type': 'character_temporal_evolution',
+                    'has_evolution_insights': False,
+                    'evolution_references': [],
+                    'growth_awareness': None,
+                    'confidence_evolution': {},
+                    'emotional_evolution': {},
+                    'evolution_metadata': {},
+                    'temporal_intelligence_available': False
+                }
         
         elif system == IntelligenceSystemType.CONVERSATION_INTELLIGENCE and self.memory_manager:
             # Get conversation history and patterns

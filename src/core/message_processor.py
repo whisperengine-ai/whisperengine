@@ -209,8 +209,57 @@ class MessageProcessor:
         try:
             from src.characters.learning.unified_character_intelligence_coordinator import UnifiedCharacterIntelligenceCoordinator
             
+            # Try to initialize Character Vector Episodic Intelligence
+            character_name = get_normalized_bot_name_from_env()
+            character_episodic_intelligence = None
+            
+            try:
+                from src.characters.learning.character_vector_episodic_intelligence import create_character_vector_episodic_intelligence
+                
+                if character_name and self.memory_manager:
+                    # Create episodic intelligence using existing Qdrant client from memory manager
+                    qdrant_client = getattr(self.memory_manager, 'vector_store', None)
+                    if qdrant_client and hasattr(qdrant_client, 'client'):
+                        qdrant_client = qdrant_client.client
+                    else:
+                        qdrant_client = None
+                    
+                    character_episodic_intelligence = create_character_vector_episodic_intelligence(
+                        qdrant_client=qdrant_client
+                    )
+                    logger.info("🧠 Character Vector Episodic Intelligence initialized for %s", character_name)
+            
+            except ImportError as e:
+                logger.warning("🧠 Character Vector Episodic Intelligence not available: %s", e)
+                character_episodic_intelligence = None
+            
+            # Try to initialize Character Temporal Evolution Analyzer (PHASE 2)
+            character_temporal_evolution_analyzer = None
+            
+            try:
+                # Import the module first to check availability
+                import src.characters.learning.character_temporal_evolution_analyzer as temporal_module
+                from src.temporal.temporal_intelligence_client import get_temporal_client
+                
+                # Get the class from the module
+                if hasattr(temporal_module, 'CharacterTemporalEvolutionAnalyzer'):
+                    TemporalAnalyzer = temporal_module.CharacterTemporalEvolutionAnalyzer
+                    
+                    # Initialize temporal client for analyzer
+                    temporal_client = get_temporal_client()
+                    character_temporal_evolution_analyzer = TemporalAnalyzer(temporal_client=temporal_client)
+                    logger.info("🧠 Character Temporal Evolution Analyzer initialized for %s", character_name)
+                else:
+                    logger.warning("🧠 CharacterTemporalEvolutionAnalyzer class not found in module")
+            
+            except ImportError as e:
+                logger.warning("🧠 Character Temporal Evolution Analyzer not available: %s", e)
+                character_temporal_evolution_analyzer = None
+            
             self.character_intelligence_coordinator = UnifiedCharacterIntelligenceCoordinator(
-                memory_manager=self.memory_manager
+                memory_manager=self.memory_manager,
+                character_episodic_intelligence=character_episodic_intelligence,
+                character_temporal_evolution_analyzer=character_temporal_evolution_analyzer
             )
             logger.info("🧠 Unified Character Intelligence Coordinator initialized")
         except ImportError as e:

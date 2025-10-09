@@ -281,27 +281,51 @@ class EnhancedHealthServer:
             # Process message through the same pipeline as Discord
             processing_result = await self.message_processor.process_message(message_context)
 
-            # Extract user facts and relationship metrics (like external_chat_api.py)
-            user_facts = await self._extract_user_facts(request_data['user_id'])
-            relationship_metrics = await self._extract_relationship_metrics(request_data['user_id'])
-
-            # Return response
+            # Build response based on metadata level
             response_data = {
                 'success': processing_result.success,
                 'response': processing_result.response,
-                'processing_time_ms': processing_result.processing_time_ms,
-                'memory_stored': processing_result.memory_stored,
                 'timestamp': datetime.utcnow().isoformat(),
-                'bot_name': self.bot.user.name if self.bot.user else "WhisperEngine Bot",
-                'user_facts': user_facts,
-                'relationship_metrics': relationship_metrics
+                'bot_name': self.bot.user.name if self.bot.user else "WhisperEngine Bot"
             }
+
+            # Basic level: minimal essential data
+            if metadata_level in ['basic', 'standard', 'extended']:
+                response_data.update({
+                    'processing_time_ms': processing_result.processing_time_ms,
+                    'memory_stored': processing_result.memory_stored
+                })
+
+            # Standard level: add core AI components and security validation
+            if metadata_level in ['standard', 'extended']:
+                if processing_result.metadata:
+                    # Include core AI components but filter out detailed analytics
+                    filtered_metadata = {}
+                    core_components = ['ai_components', 'security_validation', 'context_detection']
+                    for key in core_components:
+                        if key in processing_result.metadata:
+                            filtered_metadata[key] = processing_result.metadata[key]
+                    
+                    if filtered_metadata:
+                        response_data['metadata'] = self._make_json_serializable(filtered_metadata)
+
+            # Extended level: include all analytics and detailed metrics
+            if metadata_level == 'extended':
+                # Extract user facts and relationship metrics for extended level only
+                user_facts = await self._extract_user_facts(request_data['user_id'])
+                relationship_metrics = await self._extract_relationship_metrics(request_data['user_id'])
+                
+                response_data.update({
+                    'user_facts': user_facts,
+                    'relationship_metrics': relationship_metrics
+                })
+                
+                # Include full metadata for extended level
+                if processing_result.metadata:
+                    response_data['metadata'] = self._make_json_serializable(processing_result.metadata)
 
             if not processing_result.success:
                 response_data['error'] = processing_result.error_message
-
-            if processing_result.metadata:
-                response_data['metadata'] = self._make_json_serializable(processing_result.metadata)
 
             status_code = 200 if processing_result.success else 500
             return web.json_response(response_data, status=status_code)
@@ -329,6 +353,7 @@ class EnhancedHealthServer:
         
         POST /api/chat/batch
         {
+            "metadata_level": "basic|standard|extended",  // Optional, defaults to "standard"
             "messages": [
                 {
                     "user_id": "string",
@@ -352,6 +377,15 @@ class EnhancedHealthServer:
                     )
 
             request_data = await request.json()
+            
+            # Get metadata level (basic, standard, extended) - applies to all messages in batch
+            metadata_level = request_data.get('metadata_level', 'standard').lower()
+            if metadata_level not in ['basic', 'standard', 'extended']:
+                return web.json_response(
+                    {'error': 'metadata_level must be "basic", "standard", or "extended"'}, 
+                    status=400
+                )
+            
             messages = request_data.get('messages', [])
             
             if not messages:
@@ -385,26 +419,55 @@ class EnhancedHealthServer:
                         content=msg_data['message'],
                         platform='api',
                         channel_type=context_data.get('channel_type', 'dm'),
-                        metadata=context_data.get('metadata', {})
+                        metadata=context_data.get('metadata', {}),
+                        metadata_level=metadata_level  # Pass metadata level control
                     )
 
                     # Process message
                     processing_result = await self.message_processor.process_message(message_context)
                     
-                    # Extract user facts and relationship metrics for each message
-                    user_facts = await self._extract_user_facts(msg_data['user_id'])
-                    relationship_metrics = await self._extract_relationship_metrics(msg_data['user_id'])
-                    
+                    # Build result based on metadata level
                     result = {
                         'index': i,
                         'user_id': msg_data['user_id'],
                         'success': processing_result.success,
-                        'response': processing_result.response,
-                        'processing_time_ms': processing_result.processing_time_ms,
-                        'memory_stored': processing_result.memory_stored,
-                        'user_facts': user_facts,
-                        'relationship_metrics': relationship_metrics
+                        'response': processing_result.response
                     }
+
+                    # Basic level: minimal essential data
+                    if metadata_level in ['basic', 'standard', 'extended']:
+                        result.update({
+                            'processing_time_ms': processing_result.processing_time_ms,
+                            'memory_stored': processing_result.memory_stored
+                        })
+
+                    # Standard level: add core AI components
+                    if metadata_level in ['standard', 'extended']:
+                        if processing_result.metadata:
+                            # Include core AI components but filter out detailed analytics
+                            filtered_metadata = {}
+                            core_components = ['ai_components', 'security_validation', 'context_detection']
+                            for key in core_components:
+                                if key in processing_result.metadata:
+                                    filtered_metadata[key] = processing_result.metadata[key]
+                            
+                            if filtered_metadata:
+                                result['metadata'] = self._make_json_serializable(filtered_metadata)
+
+                    # Extended level: include all analytics and detailed metrics
+                    if metadata_level == 'extended':
+                        # Extract user facts and relationship metrics for extended level only
+                        user_facts = await self._extract_user_facts(msg_data['user_id'])
+                        relationship_metrics = await self._extract_relationship_metrics(msg_data['user_id'])
+                        
+                        result.update({
+                            'user_facts': user_facts,
+                            'relationship_metrics': relationship_metrics
+                        })
+                        
+                        # Include full metadata for extended level
+                        if processing_result.metadata:
+                            result['metadata'] = self._make_json_serializable(processing_result.metadata)
                     
                     if not processing_result.success:
                         result['error'] = processing_result.error_message

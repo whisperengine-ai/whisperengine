@@ -117,6 +117,7 @@ class JakeE2EValidator:
             payload = {
                 "user_id": self.test_user_id,
                 "message": message,
+                "metadata_level": "extended",  # Request extended metadata for comprehensive testing
                 "context": {
                     "channel_type": "dm",
                     "platform": "e2e_test",

@@ -47,6 +47,13 @@ class SyntheticTestMetrics:
     unique_synthetic_users: int
     test_duration_hours: float
     expanded_taxonomy_usage: float  # Percentage of new emotions used
+    
+    # Memory Intelligence Convergence metrics (PHASE 1-4)
+    character_vector_episodic_intelligence_score: float = 0.0
+    temporal_evolution_intelligence_score: float = 0.0
+    unified_coordinator_response_quality: float = 0.0
+    intelligence_system_coordination_score: float = 0.0
+    semantic_naming_compliance: float = 0.0
 
 
 class SyntheticMetricsCollector:
@@ -120,7 +127,12 @@ class SyntheticMetricsCollector:
                 .field("conversations_analyzed", metrics.conversations_analyzed) \
                 .field("unique_synthetic_users", metrics.unique_synthetic_users) \
                 .field("test_duration_hours", metrics.test_duration_hours) \
-                .field("expanded_taxonomy_usage", metrics.expanded_taxonomy_usage)
+                .field("expanded_taxonomy_usage", metrics.expanded_taxonomy_usage) \
+                .field("character_vector_episodic_intelligence_score", metrics.character_vector_episodic_intelligence_score) \
+                .field("temporal_evolution_intelligence_score", metrics.temporal_evolution_intelligence_score) \
+                .field("unified_coordinator_response_quality", metrics.unified_coordinator_response_quality) \
+                .field("intelligence_system_coordination_score", metrics.intelligence_system_coordination_score) \
+                .field("semantic_naming_compliance", metrics.semantic_naming_compliance)
             
             if timestamp:
                 point = point.time(timestamp)

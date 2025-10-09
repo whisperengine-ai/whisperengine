@@ -50,7 +50,8 @@ class Phase4IntelligenceTestSuite:
                 payload = {
                     "user_id": self.test_user_id,
                     "message": message,
-                    "username": "TestUser"
+                    "username": "TestUser",
+                    "metadata_level": "extended"  # Request extended metadata for comprehensive testing
                 }
                 
                 async with session.post(
