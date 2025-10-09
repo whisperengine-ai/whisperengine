@@ -21,7 +21,7 @@ async def test_lm_studio_chat_completion():
     # Set environment variables for the test
     os.environ["LLM_CHAT_API_URL"] = "http://127.0.0.1:1234"  # Base URL without /v1
     os.environ["LLM_CLIENT_TYPE"] = "lmstudio"
-    os.environ["LLM_CHAT_MODEL"] = "mistralai/mistral-nemo-instruct-2407"
+    os.environ["LLM_CHAT_MODEL"] = "local-model"  # Standard LM Studio model name
     os.environ["LLM_CHAT_API_KEY"] = ""  # Local LM Studio doesn't require API key
     
     # Create LLM client using factory

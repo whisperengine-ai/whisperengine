@@ -12,6 +12,13 @@ services:
     environment:
       - PYTHONUNBUFFERED=1
       - LOG_LEVEL=INFO
+      # LM Studio Configuration for Enhanced Synthetic Generation
+      - LLM_CHAT_API_URL=http://host.docker.internal:1234/v1
+      - LLM_CLIENT_TYPE=lmstudio
+      - LLM_CHAT_MODEL=local-model  # Uses whatever model is loaded in LM Studio
+      - LLM_CHAT_API_KEY=
+      - SYNTHETIC_USE_LLM=true
+      - LLM_MAX_TOKENS_CHAT=1024
       # Bot endpoints (adjust based on your setup)
       - ELENA_ENDPOINT=http://host.docker.internal:9091
       - MARCUS_ENDPOINT=http://host.docker.internal:9092
@@ -48,6 +55,13 @@ services:
     environment:
       - PYTHONUNBUFFERED=1
       - LOG_LEVEL=INFO
+      # LM Studio Configuration for Enhanced Synthetic Generation
+      - LLM_CHAT_API_URL=http://host.docker.internal:1234/v1
+      - LLM_CLIENT_TYPE=lmstudio
+      - LLM_CHAT_MODEL=local-model
+      - LLM_CHAT_API_KEY=
+      - SYNTHETIC_USE_LLM=true
+      - LLM_MAX_TOKENS_CHAT=1024
       # InfluxDB integration (same as WhisperEngine)
       - INFLUXDB_URL=http://host.docker.internal:8086
       - INFLUXDB_TOKEN=whisperengine-fidelity-first-metrics-token

@@ -7,7 +7,7 @@ for enhanced synthetic conversation generation.
 
 Local LM Studio Configuration:
 - URL: http://127.0.0.1:1234
-- Model: liquid/lfm2-1.2b (1.2B parameters - fast & efficient)
+- Model: local-model (uses whatever model is loaded in LM Studio)
 """
 
 import os
@@ -25,7 +25,7 @@ def setup_lm_studio_environment():
     # Set LM Studio endpoint - ensure we're using the correct endpoint
     os.environ["LLM_CHAT_API_URL"] = "http://127.0.0.1:1234"  # Base URL without /v1
     os.environ["LLM_CLIENT_TYPE"] = "lmstudio"
-    os.environ["LLM_CHAT_MODEL"] = "mistralai/mistral-nemo-instruct-2407"
+    os.environ["LLM_CHAT_MODEL"] = "local-model"  # Standard LM Studio model name
     
     # LM Studio typically doesn't require an API key for local use
     # But some configurations might need it - leave empty for local
@@ -39,7 +39,7 @@ def setup_lm_studio_environment():
     
     print("✅ Environment configured for LM Studio:")
     print(f"   URL: {os.environ['LLM_CHAT_API_URL']}")
-    print(f"   Model: {os.environ['LLM_CHAT_MODEL']}")
+    print(f"   Model: {os.environ['LLM_CHAT_MODEL']} (uses loaded model in LM Studio)")
     print(f"   Client Type: {os.environ['LLM_CLIENT_TYPE']}")
     print(f"   Synthetic LLM: {os.environ['SYNTHETIC_USE_LLM']}")
 
@@ -93,9 +93,9 @@ async def test_lm_studio_connection():
             print(f"✅ Generated follow-up: {follow_up}")
             
             print(f"\n🎯 LM Studio Integration Successful!")
-            print(f"   Model: liquid/lfm2-1.2b (1.2B parameters)")
+            print(f"   Model: {os.environ.get('LLM_CHAT_MODEL', 'local-model')} (active model)")
             print(f"   Endpoint: http://127.0.0.1:1234")
-            print(f"   Synthetic generation: Enhanced with tiny local LLM")
+            print(f"   Synthetic generation: Enhanced with local LLM")
             
             return True
             
@@ -107,7 +107,7 @@ async def test_lm_studio_connection():
         print(f"❌ LM Studio connection failed: {e}")
         print("\n🔧 Troubleshooting:")
         print("   1. Make sure LM Studio is running on http://127.0.0.1:1234")
-        print("   2. Verify the model 'liquid/lfm2-1.2b' is loaded")
+        print("   2. Verify that a model is loaded and active in LM Studio")
         print("   3. Check that the API server is enabled in LM Studio")
         print("   4. Ensure no firewall is blocking localhost:1234")
         return False
