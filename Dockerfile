@@ -124,6 +124,10 @@ COPY src/ ./src/
 COPY pyproject.toml validate_config.py env_manager.py run.py ./
 COPY config/ ./config/
 COPY sql/ ./sql/
+COPY scripts/ ./scripts/
+
+# Make scripts executable
+RUN chmod +x ./scripts/*.sh
 
 # Create necessary directories
 RUN mkdir -p \

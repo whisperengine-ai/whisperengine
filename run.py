@@ -42,7 +42,7 @@ async def launcher_main():
     try:
         from src.utils.auto_migrate import DatabaseMigrator
         
-        logger.info("🔧 Checking database initialization...")
+        logger.info("🔧 Checking database connection...")
         migrator = DatabaseMigrator()
         
         # Wait for PostgreSQL to be available
@@ -50,23 +50,12 @@ async def launcher_main():
             logger.error("❌ Failed to connect to PostgreSQL. Exiting.")
             return 1
         
-        # Check if database needs initialization
-        if not await migrator.database_exists():
-            logger.info("🔧 Database not initialized. Running migrations...")
-            success = await migrator.run_migrations()
-            if success:
-                logger.info("✅ Database initialization complete!")
-            else:
-                logger.error("❌ Database initialization failed. Exiting.")
-                return 1
-        else:
-            logger.info("✅ Database already initialized. Checking for pending migrations...")
-            # Run migrations in case there are new ones
-            await migrator.run_migrations()
+        logger.info("✅ Database connection successful!")
+        logger.info("ℹ️  Database migrations are handled by init container in Docker deployments")
         
     except Exception as e:
-        logger.error(f"❌ Database initialization error: {e}")
-        logger.info("⚠️ Continuing bot startup despite database initialization error...")
+        logger.error(f"❌ Database connection error: {e}")
+        logger.info("⚠️ Continuing bot startup despite database connection error...")
     
     # Delegate to the bot's async main
     return await bot_async_main()

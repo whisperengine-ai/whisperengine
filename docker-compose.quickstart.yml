@@ -1,8 +1,26 @@
 # WhisperEngine Quick Start
 # Single-command deployment for non-technical users
-# Uses :latest tags for easy updates - WhisperEngine container includes SQL initialization
+# Uses :latest tags for easy updates
 
 services:
+  # Database migration init container (runs once before bot starts)
+  db-migrate:
+    image: whisperengine/whisperengine:latest
+    container_name: whisperengine-db-migrate
+    command: ["/app/scripts/run_migrations.sh"]
+    environment:
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=whisperengine
+      - POSTGRES_PASSWORD=whisperengine_password
+      - POSTGRES_DB=whisperengine
+    networks:
+      - whisperengine-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"  # Only run once
+
   # Main WhisperEngine bot (HTTP API only by default)
   whisperengine-assistant:
     image: whisperengine/whisperengine:latest
@@ -65,6 +83,8 @@ services:
         condition: service_healthy
       qdrant:
         condition: service_started
+      db-migrate:
+        condition: service_completed_successfully
       influxdb:
         condition: service_healthy
     restart: unless-stopped
