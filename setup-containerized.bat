@@ -75,8 +75,9 @@ if not exist .env (
     copy .env.template .env >nul
     echo [SUCCESS] Created .env file from template
     echo.
-    echo [WARNING] IMPORTANT: You need to edit the .env file with your settings!
-    echo    Required: Set your LLM_CHAT_API_KEY
+    echo [WARNING] IMPORTANT: You need to edit the .env file with your LLM settings!
+    echo    Default: Uses local LM Studio (install from https://lmstudio.ai)
+    echo    Alternative: Set LLM_CHAT_API_KEY for cloud providers
     echo    Optional: Set DISCORD_BOT_TOKEN for Discord integration
     echo.
     
@@ -85,26 +86,44 @@ if not exist .env (
     notepad .env
     
     echo.
-    echo 📖 After editing .env, run this script again to start WhisperEngine
+    echo 📖 After reviewing .env settings, run this script again to start WhisperEngine
+    echo    💡 Tip: Default configuration uses LM Studio (no API key needed)
     pause
     exit /b 0
 )
 
 echo [SUCCESS] Configuration file found
 
-REM Check if API key is set
+REM Check if API key is needed (only for cloud providers)
+findstr /c:"LLM_CLIENT_TYPE=lmstudio" .env >nul
+if not errorlevel 1 (
+    echo [SUCCESS] Using local LM Studio (no API key required)
+    goto :continue_setup
+)
+
+findstr /c:"LLM_CLIENT_TYPE=ollama" .env >nul
+if not errorlevel 1 (
+    echo [SUCCESS] Using local Ollama (no API key required)
+    goto :continue_setup
+)
+
 findstr /c:"your_api_key_here" .env >nul
 if not errorlevel 1 (
-    echo [WARNING] Please set your LLM_CHAT_API_KEY in the .env file
+    echo [WARNING] Please set your LLM_CHAT_API_KEY in the .env file for cloud providers
     echo    Edit .env and replace 'your_api_key_here' with your actual API key
     echo.
     echo    Get API keys from:
     echo    • OpenRouter: https://openrouter.ai (recommended for beginners)
     echo    • OpenAI: https://platform.openai.com
     echo.
+    echo    💡 Tip: Use LM Studio instead (no API key needed):
+    echo      Set LLM_CLIENT_TYPE=lmstudio in .env
+    echo.
     pause
     exit /b 1
 )
+
+:continue_setup
 
 echo [SUCCESS] API key configured
 

@@ -89,8 +89,9 @@ if [ ! -f .env ]; then
     cp .env.template .env
     print_success "Created .env file from template"
     echo ""
-    print_warning "IMPORTANT: You need to edit the .env file with your settings!"
-    echo "   Required: Set your LLM_CHAT_API_KEY"
+    print_warning "IMPORTANT: You need to edit the .env file with your LLM settings!"
+    echo "   Default: Uses local LM Studio (install from https://lmstudio.ai)"
+    echo "   Alternative: Set LLM_CHAT_API_KEY for cloud providers"
     echo "   Optional: Set DISCORD_BOT_TOKEN for Discord integration"
     echo ""
     
@@ -112,20 +113,26 @@ if [ ! -f .env ]; then
     fi
     
     echo ""
-    echo "📖 After editing .env, run this script again to start WhisperEngine"
+    echo "📖 After reviewing .env settings, run this script again to start WhisperEngine"
+    echo "   💡 Tip: Default configuration uses LM Studio (no API key needed)"
     exit 0
 fi
 
 print_success "Configuration file found"
 
-# Check if API key is set
-if grep -q "your_api_key_here" .env; then
-    print_warning "Please set your LLM_CHAT_API_KEY in the .env file"
+# Check if API key is needed (only for cloud providers)
+if grep -q "LLM_CLIENT_TYPE=lmstudio" .env || grep -q "LLM_CLIENT_TYPE=ollama" .env; then
+    print_success "Using local LLM (no API key required)"
+elif grep -q "your_api_key_here" .env; then
+    print_warning "Please set your LLM_CHAT_API_KEY in the .env file for cloud providers"
     echo "   Edit .env and replace 'your_api_key_here' with your actual API key"
     echo ""
     echo "   Get API keys from:"
     echo "   • OpenRouter: https://openrouter.ai (recommended for beginners)"
     echo "   • OpenAI: https://platform.openai.com"
+    echo ""
+    echo "   💡 Tip: Use LM Studio instead (no API key needed):"
+    echo "     Set LLM_CLIENT_TYPE=lmstudio in .env"
     echo ""
     exit 1
 fi

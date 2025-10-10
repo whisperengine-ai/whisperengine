@@ -253,16 +253,16 @@ docker-compose -f docker-compose.containerized.yml up -d
 
 ## 📚 Next StepserEngine
 
-### **Required API Access**
-You'll need an API key from one of these LLM providers:
+### **LLM Configuration Options**
+You can choose from these LLM providers:
 
 | Provider | Cost | Setup Time | Best For |
 |----------|------|------------|----------|
-| **[OpenRouter](https://openrouter.ai)** ⭐ | Pay-per-use | 2 minutes | Beginners, trying different models |
+| **Local Models (LM Studio)** ⭐ | Free | 10 minutes | Privacy, no API costs, offline use |
+| **[OpenRouter](https://openrouter.ai)** | Pay-per-use | 2 minutes | Trying different models, flexibility |
 | **[OpenAI](https://platform.openai.com)** | Monthly credits | 5 minutes | Production use, reliability |
-| **Local Models** | Free | 30+ minutes | Privacy, offline use |
 
-> 💡 **Recommendation**: Start with OpenRouter - it's fastest to set up and gives access to multiple AI models including Claude, GPT-4, and open-source alternatives.
+> 💡 **Recommendation**: Start with LM Studio - it's completely free, works offline, and requires no API keys. Perfect for getting started!
 
 ## ⚡ Installation Methods
 
@@ -340,19 +340,31 @@ LLM_CHAT_API_KEY=your_api_key_here
 LLM_CHAT_MODEL=anthropic/claude-3-haiku
 ```
 
-### **Getting Your API Key**
+### **LLM Setup Instructions**
 
-#### **OpenRouter** (Recommended for beginners)
+#### **Local LM Studio** ⭐ (Recommended - Free & Private)
+1. Download LM Studio from [lmstudio.ai](https://lmstudio.ai)
+2. Install and launch LM Studio
+3. Download a model (try "Llama 3.1 8B" or similar)
+4. Start the local server in LM Studio
+5. WhisperEngine is already configured to use LM Studio by default!
+
+#### **OpenRouter** (Cloud option)
 1. Go to [openrouter.ai](https://openrouter.ai)
 2. Sign up with Google/GitHub
 3. Click "Keys" in sidebar → "Create Key"
-4. Copy the key and paste it in your `.env` file
+4. Copy the key and update your `.env` file:
+   ```bash
+   LLM_CLIENT_TYPE=openrouter
+   LLM_CHAT_API_KEY=your_key_here
+   LLM_CHAT_MODEL=anthropic/claude-3-haiku
+   ```
 
-#### **OpenAI**
+#### **OpenAI** (Cloud option)
 1. Go to [platform.openai.com](https://platform.openai.com)
 2. Create account and add billing info
 3. Go to "API Keys" → "Create new secret key"
-4. Copy the key and set:
+4. Copy the key and update your `.env` file:
    ```bash
    LLM_CLIENT_TYPE=openai
    LLM_CHAT_API_KEY=sk-your_openai_key
@@ -369,9 +381,9 @@ ENABLE_DISCORD=true
 # Character Settings
 CHARACTER_NAME=assistant  # Default character name
 
-# Advanced LLM Settings
-LLM_CLIENT_TYPE=openrouter  # or: openai, local
-LLM_CHAT_API_URL=https://openrouter.ai/api/v1
+# Advanced LLM Settings (default is LM Studio)
+LLM_CLIENT_TYPE=lmstudio  # Default: lmstudio, or: openrouter, openai
+LLM_CHAT_API_URL=http://host.docker.internal:1234/v1
 ```
 
 ## 🌐 Accessing WhisperEngine
