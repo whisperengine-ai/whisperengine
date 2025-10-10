@@ -4765,7 +4765,9 @@ class MessageProcessor:
         }
         
         # 5. Relationship Metrics (if available from Phase 4)
-        conversation_intelligence_data = ai_components.get('conversation_intelligence', {})
+        conversation_intelligence_data = ai_components.get('conversation_intelligence')
+        if conversation_intelligence_data is None:
+            conversation_intelligence_data = {}
         relationship_level = conversation_intelligence_data.get('relationship_level', 'acquaintance')
         
         # Map relationship level to approximate scores (0-100 scale)
@@ -4789,7 +4791,7 @@ class MessageProcessor:
         }
         
         # 6. Processing Pipeline Breakdown
-        conversation_intelligence_metadata = conversation_intelligence_data.get('processing_metadata', {})
+        conversation_intelligence_metadata = conversation_intelligence_data.get('processing_metadata', {}) if conversation_intelligence_data else {}
         performance_metrics = conversation_intelligence_metadata.get('performance_metrics', {})
         
         metadata["processing_pipeline"] = {

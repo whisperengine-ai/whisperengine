@@ -28,8 +28,9 @@ services:
       - GABRIEL_ENDPOINT=http://whisperengine-gabriel-bot:9095
       - SOPHIA_ENDPOINT=http://whisperengine-sophia-bot:9096
       - JAKE_ENDPOINT=http://whisperengine-jake-bot:9097
+      - DOTTY_ENDPOINT=http://whisperengine-dotty-bot:9098
+      - AETHERIS_ENDPOINT=http://whisperengine-aetheris-bot:9099
       - AETHYS_ENDPOINT=http://whisperengine-aethys-bot:3007
-      - AETHERIS_ENDPOINT=http://whisperengine-aetheris-bot:3008
       # Database connectivity for character intelligence testing
       - POSTGRES_HOST=whisperengine-multi-postgres
       - POSTGRES_PORT=5432
