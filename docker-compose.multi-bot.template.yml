@@ -1,12 +1,17 @@
 # Multi-Bot Docker Compose Template
 # This file is a template that gets populated by scripts/generate_multi_bot_config.py
 # DO NOT EDIT: Generated sections will be overwritten
+#
+# Port Strategy:
+# - Development Environment (multi-bot.sh): 5000-5999 + 9000-9999 range
+# - End-User Environment (quickstart): 8000-8999 range
+# - Docker Networks: whisperengine-multi_bot_network (dev) vs whisperengine-quickstart-network (end-user)
 
 services:
   # ===== INFRASTRUCTURE SERVICES =====
   postgres:
     image: postgres:16.4-alpine
-    container_name: whisperengine-multi-postgres
+    container_name: postgres
     restart: unless-stopped
     environment:
       POSTGRES_DB: whisperengine
@@ -14,7 +19,7 @@ services:
       POSTGRES_PASSWORD: whisperengine_password
       POSTGRES_HOST_AUTH_METHOD: trust
     ports:
-      - "5433:5432"
+      - "5433:5432"  # PostgreSQL (Dev: 5433, Quickstart: 8432)
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
@@ -25,6 +30,24 @@ services:
       timeout: 10s
       retries: 5
       start_period: 40s
+
+  # Database migration init container (runs once before bots start)
+  db-migrate:
+    image: whisperengine-bot:${VERSION:-latest}
+    container_name: db-migrate
+    command: ["python", "/app/src/utils/auto_migrate.py"]
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: whisperengine
+      POSTGRES_PASSWORD: whisperengine_password
+      POSTGRES_DB: whisperengine
+    networks:
+      - bot_network
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"  # Only run once
 
   # Redis - Commented out since we're using vector-native memory with Qdrant only
   # redis:
@@ -45,10 +68,10 @@ services:
 
   qdrant:
     image: qdrant/qdrant:v1.15.4
-    container_name: whisperengine-multi-qdrant
+    container_name: qdrant
     restart: unless-stopped
     ports:
-      - "6334:6333"
+      - "6334:6333"  # Qdrant (Dev: 6334, Quickstart: 8333)
     volumes:
       - qdrant_data:/qdrant/storage
     networks:
@@ -58,7 +81,7 @@ services:
 
   influxdb:
     image: influxdb:2.7-alpine
-    container_name: whisperengine-multi-influxdb
+    container_name: influxdb
     restart: unless-stopped
     environment:
       DOCKER_INFLUXDB_INIT_MODE: setup
@@ -68,7 +91,7 @@ services:
       DOCKER_INFLUXDB_INIT_BUCKET: performance_metrics
       DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: whisperengine-fidelity-first-metrics-token
     ports:
-      - "8086:8086"
+      - "8086:8086"  # InfluxDB (Dev: 8086, Quickstart: 8087)
     volumes:
       - influxdb_data:/var/lib/influxdb2
       - influxdb_config:/etc/influxdb2
@@ -81,12 +104,141 @@ services:
       retries: 3
       start_period: 60s
 
+  # Grafana monitoring dashboard for development environment
+  grafana:
+    image: grafana/grafana:11.3.0
+    container_name: grafana
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-whisperengine_grafana}
+      GF_FEATURE_TOGGLES_ENABLE: publicDashboards
+      INFLUXDB_USER: whisperengine
+      INFLUXDB_PASSWORD: whisperengine_metrics
+    ports:
+      - "3000:3000"  # Grafana (Dev: 3000, Quickstart: not included)
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana-config/datasource.yml:/etc/grafana/provisioning/datasources/datasource.yml:ro
+      - ./grafana-config/dashboard.yml:/etc/grafana/provisioning/dashboards/dashboard.yml:ro
+      - ./dashboards:/var/lib/grafana/dashboards:ro
+    networks:
+      - bot_network
+    depends_on:
+      influxdb:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Synthetic conversation generator for development testing
+  synthetic-generator:
+    build:
+      context: .
+      dockerfile: Dockerfile.synthetic
+    container_name: synthetic-generator
+    restart: unless-stopped
+    volumes:
+      - ./synthetic_conversations:/app/synthetic_conversations
+      - ./synthetic_validation_report.json:/app/synthetic_validation_report.json
+      - ./character_intelligence_validation_results.json:/app/character_intelligence_validation_results.json
+    environment:
+      - PYTHONUNBUFFERED=1
+      - LOG_LEVEL=INFO
+      - LLM_CHAT_API_URL=http://host.docker.internal:1234/v1
+      - LLM_CLIENT_TYPE=lmstudio
+      - LLM_CHAT_MODEL=local-model
+      - LLM_CHAT_API_KEY=
+      - SYNTHETIC_USE_LLM=false
+      - LLM_MAX_TOKENS_CHAT=2048
+      # Development bot endpoints (template will populate these)
+      - ELENA_ENDPOINT=http://elena-bot:9091
+      - MARCUS_ENDPOINT=http://marcus-bot:9092
+      - RYAN_ENDPOINT=http://ryan-bot:9093
+      - DREAM_ENDPOINT=http://dream-bot:9094
+      - GABRIEL_ENDPOINT=http://gabriel-bot:9095
+      - SOPHIA_ENDPOINT=http://sophia-bot:9096
+      - JAKE_ENDPOINT=http://jake-bot:9097
+      - DOTTY_ENDPOINT=http://dotty-bot:9098
+      - AETHERIS_ENDPOINT=http://aetheris-bot:9099
+      - AETHYS_ENDPOINT=http://aethys-bot:3007
+      # Multi-bot infrastructure
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=whisperengine
+      - POSTGRES_PASSWORD=whisperengine_password
+      - POSTGRES_DB=whisperengine
+      - QDRANT_HOST=qdrant
+      - QDRANT_PORT=6333
+      - INFLUXDB_URL=http://influxdb:8086
+      - INFLUXDB_TOKEN=whisperengine-fidelity-first-metrics-token
+      - INFLUXDB_ORG=whisperengine
+      - INFLUXDB_BUCKET=performance_metrics
+    networks:
+      - bot_network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      qdrant:
+        condition: service_started
+      influxdb:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "print('Generator healthy')"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+
+  # Synthetic validation metrics collector for development testing
+  synthetic-validator:
+    build:
+      context: .
+      dockerfile: Dockerfile.synthetic
+    container_name: synthetic-validator
+    restart: unless-stopped
+    command: ["sh", "-c", "while true; do python synthetic_validation_metrics.py && python character_intelligence_synthetic_validator.py; sleep 14400; done"]
+    volumes:
+      - ./synthetic_conversations:/app/synthetic_conversations
+      - ./character_intelligence_validation_results.json:/app/character_intelligence_validation_results.json
+    environment:
+      - PYTHONUNBUFFERED=1
+      - LOG_LEVEL=INFO
+      - LLM_CHAT_API_URL=http://host.docker.internal:1234/v1
+      - LLM_CLIENT_TYPE=lmstudio
+      - LLM_CHAT_MODEL=local-model
+      - LLM_CHAT_API_KEY=
+      - SYNTHETIC_USE_LLM=true
+      - LLM_MAX_TOKENS_CHAT=1024
+      # Multi-bot infrastructure
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=whisperengine
+      - POSTGRES_PASSWORD=whisperengine_password
+      - POSTGRES_DB=whisperengine
+      - QDRANT_HOST=qdrant
+      - QDRANT_PORT=6333
+      - INFLUXDB_URL=http://influxdb:8086
+      - INFLUXDB_TOKEN=whisperengine-fidelity-first-metrics-token
+      - INFLUXDB_ORG=whisperengine
+      - INFLUXDB_BUCKET=performance_metrics
+    networks:
+      - bot_network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      qdrant:
+        condition: service_started
+      influxdb:
+        condition: service_healthy
+
   # CDL Web UI for character authoring and management
   cdl-web-ui:
     build:
       context: ./cdl-web-ui
       dockerfile: Dockerfile
-    container_name: whisperengine-cdl-web-ui
+    container_name: cdl-web-ui
     restart: unless-stopped
     environment:
       # PostgreSQL connection (same as WhisperEngine bots)
@@ -99,7 +251,7 @@ services:
       NODE_ENV: production
       NEXT_TELEMETRY_DISABLED: 1
     ports:
-      - "3001:3000"
+      - "3001:3000"  # CDL Web UI (Dev: 3001, Quickstart: 8080)
     depends_on:
       postgres:
         condition: service_healthy
@@ -144,6 +296,8 @@ volumes:
     name: whisperengine-multi_influxdb_data
   influxdb_config:
     name: whisperengine-multi_influxdb_config
+  grafana_data:
+    name: whisperengine-multi_grafana_data
   
   # Bot-specific volumes (populated dynamically)
   # BOT_VOLUMES_PLACEHOLDER

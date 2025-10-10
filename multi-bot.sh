@@ -125,7 +125,7 @@ show_status() {
 check_health() {
     echo -e "${BLUE}[MULTI-BOT]${NC} Health check results:"
     for bot in "${AVAILABLE_BOTS[@]}"; do
-        container_name="whisperengine-${bot}-bot"
+        container_name="${bot}-bot"
         if docker ps --format "table {{.Names}}" | grep -q "$container_name"; then
             health=$(docker inspect --format='{{.State.Health.Status}}' "$container_name" 2>/dev/null || echo "no-healthcheck")
             if [[ "$health" == "healthy" ]]; then

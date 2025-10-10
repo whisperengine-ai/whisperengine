@@ -19,25 +19,11 @@ is_container() {
     [ -f /.dockerenv ] || [ -n "${CONTAINER_MODE:-}" ]
 }
 
-# Only run migrations if we're in a container and have database configuration
+# Note: Database migrations are now handled by dedicated init container
 if is_container && [ -n "${POSTGRES_HOST:-}" ]; then
-    log "🔧 Running automatic database migrations..."
-    
-    # Run the migration system
-    python /app/src/utils/auto_migrate.py
-    
-    migration_exit_code=$?
-    if [ $migration_exit_code -eq 0 ]; then
-        log "✅ Database migrations completed successfully"
-    else
-        log "❌ Database migrations failed with exit code $migration_exit_code"
-        log "💥 Cannot start bot without valid database schema"
-        exit 1
-    fi
-    
-    echo ""
+    log "ℹ️  Database migrations handled by db-migrate init container"
 else
-    log "⏭️ Skipping migrations (not in container or no database config)"
+    log "⏭️ Skipping migration check (not in container or no database config)"
 fi
 
 log "🎯 Starting WhisperEngine bot..."

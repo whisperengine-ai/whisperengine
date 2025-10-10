@@ -57,7 +57,7 @@ class BotConfigDiscovery:
                     "env_file": str(env_file),
                     "health_port": health_port,
                     "service_name": f"{bot_name}-bot",
-                    "container_name": f"whisperengine-{bot_name}-bot",
+                    "container_name": f"{bot_name}-bot",
                     "display_name": self._get_display_name(bot_name),
                     "character_file": None  # Database-based CDL - no character files needed
                 }
@@ -197,10 +197,14 @@ class BotConfigDiscovery:
     networks:
       - bot_network
     depends_on:
+      db-migrate:
+        condition: service_completed_successfully
       postgres:
         condition: service_healthy
       qdrant:
         condition: service_started
+      influxdb:
+        condition: service_healthy
       # - redis  # Commented out - using vector-native memory only"""
         
         return service_yaml
@@ -385,7 +389,7 @@ show_status() {{
 check_health() {{
     echo -e "${{BLUE}}[MULTI-BOT]${{NC}} Health check results:"
     for bot in "${{AVAILABLE_BOTS[@]}}"; do
-        container_name="whisperengine-${{bot}}-bot"
+        container_name="${{bot}}-bot"
         if docker ps --format "table {{{{.Names}}}}" | grep -q "$container_name"; then
             health=$(docker inspect --format='{{{{.State.Health.Status}}}}' "$container_name" 2>/dev/null || echo "no-healthcheck")
             if [[ "$health" == "healthy" ]]; then
