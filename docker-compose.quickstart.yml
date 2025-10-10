@@ -7,7 +7,7 @@ services:
   db-migrate:
     image: whisperengine/whisperengine:latest
     container_name: whisperengine-db-migrate
-    command: ["/app/scripts/run_migrations.sh"]
+    command: ["python", "/app/scripts/run_migrations.py"]
     environment:
       - POSTGRES_HOST=postgres
       - POSTGRES_PORT=5432
