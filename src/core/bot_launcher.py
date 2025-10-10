@@ -92,6 +92,23 @@ def create_discord_bot() -> commands.Bot:
 
 async def start_bot(bot: commands.Bot) -> None:
     """Start the Discord bot with the token from environment."""
+    # Check if Discord is enabled
+    enable_discord = os.getenv("ENABLE_DISCORD", "false").lower() == "true"
+    
+    if not enable_discord:
+        logger.info("🚫 Discord integration disabled (ENABLE_DISCORD=false)")
+        logger.info("✅ Bot running in HTTP API-only mode")
+        logger.info("🌐 Chat API available at: http://localhost:%s/api/chat", 
+                   os.getenv("HEALTH_CHECK_PORT", "9090"))
+        # Keep the bot alive without connecting to Discord
+        import asyncio
+        try:
+            while True:
+                await asyncio.sleep(1)
+        except KeyboardInterrupt:
+            logger.info("🛑 Shutdown requested - stopping HTTP API-only bot")
+        return
+    
     discord_token = os.getenv("DISCORD_BOT_TOKEN")
     if not discord_token:
         raise ConfigurationError("DISCORD_BOT_TOKEN not found in environment")

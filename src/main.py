@@ -111,7 +111,12 @@ class ModularBotManager:
 
     async def _validate_essential_config(self) -> bool:
         """Validate essential configuration before initialization"""
-        essential_vars = ['DISCORD_BOT_TOKEN', 'LLM_CHAT_API_URL']
+        essential_vars = ['LLM_CHAT_API_URL']
+        
+        # Only require Discord token if Discord is enabled
+        enable_discord = os.getenv("ENABLE_DISCORD", "false").lower() == "true"
+        if enable_discord:
+            essential_vars.append('DISCORD_BOT_TOKEN')
         
         missing_vars = []
         for var in essential_vars:
@@ -120,6 +125,8 @@ class ModularBotManager:
         
         if missing_vars:
             logger.error("❌ Missing essential configuration variables: %s", ', '.join(missing_vars))
+            if enable_discord:
+                logger.error("💡 Discord is enabled - DISCORD_BOT_TOKEN is required")
             logger.error("💡 Please check your .env file and ensure these variables are set")
             return False
         
