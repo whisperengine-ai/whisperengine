@@ -90,8 +90,8 @@ curl -sSL https://raw.githubusercontent.com/whisperengine-ai/whisperengine/main/
 - **`.env.containerized.template`**: Configuration template with model paths
 
 ### **Documentation**
-- **`QUICKSTART_NEW.md`**: Updated quickstart with model information
-- **`INSTALLATION_NEW.md`**: Complete installation guide with containerization
+- **`QUICKSTART.md`**: Updated quickstart with model information
+- **`INSTALLATION.md`**: Complete installation guide with containerization
 - **`README.md`**: Updated main documentation
 
 ## 🔧 Model Download Infrastructure

@@ -32,19 +32,17 @@
 - **Version**: Docker Desktop 4.0+ (includes Docker Compose V2)
 - **Setup**: Install and start Docker Desktop before proceeding
 
-#### **Git** (For downloading WhisperEngine)
-- **Download**: [git-scm.com/downloads](https://git-scm.com/downloads)
-- **Alternative**: Download WhisperEngine as ZIP from GitHub
-
 #### **Text Editor** (For configuration)
 - **Options**: VS Code, Sublime Text, Notepad++, nano, vim
 - **Purpose**: Editing `.env` configuration files
 
+**Note**: Git and Python are NOT required for containerized installation - only for developers who want to modify the source code.
+
 ## 🚀 Installation Methods
 
-### **Method 1: Instant Containerized Setup** ⭐ (Recommended)
+### **Method 1: Instant Containerized Setup** ⭐ (Recommended for End Users)
 
-**No source code required - uses pre-built Docker Hub containers!**
+**No source code, Git, or Python required - uses pre-built Docker Hub containers!**
 
 This method downloads only the necessary configuration files (under 5KB) and uses pre-built containers from Docker Hub.
 
@@ -497,9 +495,489 @@ docker-compose -f docker-compose.production.yml up -d
     └────────────────┘              └───────────────┘
 ```
 
-## 🔧 Troubleshooting
+## � Container Management & Updates
+
+### **Updating Containerized Installation**
+
+When new versions of WhisperEngine are released, update your containers:
+
+#### **Standard Update Process**
+```bash
+# Stop current containers
+docker-compose -f docker-compose.containerized.yml down
+
+# Pull latest container versions
+docker-compose -f docker-compose.containerized.yml pull
+
+# Start with updated containers
+docker-compose -f docker-compose.containerized.yml up -d
+
+# Verify versions
+docker ps --format "table {{.Names}}\t{{.Image}}\t{{.Status}}"
+```
+
+#### **Version Checking**
+```bash
+# Check current container versions
+docker images | grep whisperengine
+
+# Check API version
+curl http://localhost:9090/health
+
+# Check web UI version
+curl http://localhost:3001/api/health
+```
+
+#### **Rolling Back to Previous Version**
+```bash
+# Stop current containers
+docker-compose -f docker-compose.containerized.yml down
+
+# Pull specific version (replace v1.0.0 with desired version)
+docker pull whisperengine/whisperengine:v1.0.0
+docker pull whisperengine/whisperengine-ui:v1.0.0
+
+# Update docker-compose.containerized.yml to use specific version
+# Change 'latest' to 'v1.0.0' in image tags
+
+# Start with specific version
+docker-compose -f docker-compose.containerized.yml up -d
+```
+
+### **Monitoring Container Health**
+
+#### **Basic Health Checks**
+```bash
+# Check all containers are running
+docker ps
+
+# Check container resource usage
+docker stats
+
+# Check container logs
+docker-compose -f docker-compose.containerized.yml logs -f whisperengine-app
+docker-compose -f docker-compose.containerized.yml logs -f whisperengine-ui
+```
+
+#### **Detailed Health Monitoring**
+```bash
+# Check specific container health
+docker inspect --format='{{.State.Health.Status}}' whisperengine-app
+docker inspect --format='{{.State.Health.Status}}' whisperengine-ui
+
+# View health check logs
+docker inspect --format='{{range .State.Health.Log}}{{.Output}}{{end}}' whisperengine-app
+
+# Test API endpoints
+curl http://localhost:9090/health
+curl http://localhost:3001
+```
+
+## 💾 Data Backup & Recovery
+
+### **Understanding WhisperEngine Data**
+
+WhisperEngine stores data in Docker volumes:
+- **`whisperengine_postgres_data`**: Character definitions, user accounts, conversation metadata
+- **`whisperengine_qdrant_data`**: Vector memories, semantic search data
+- **`whisperengine_app_logs`**: Application logs and debug information
+
+### **Creating Backups**
+
+#### **Quick Backup Script**
+Create `backup-whisperengine.sh`:
+```bash
+#!/bin/bash
+set -e
+
+# Create backup directory with timestamp
+BACKUP_DIR="whisperengine-backups/$(date +%Y%m%d_%H%M%S)"
+mkdir -p "$BACKUP_DIR"
+
+echo "🔄 Creating WhisperEngine backup in $BACKUP_DIR..."
+
+# Backup PostgreSQL data (characters, users, metadata)
+echo "📊 Backing up PostgreSQL data..."
+docker run --rm \
+  -v whisperengine_postgres_data:/source:ro \
+  -v "$(pwd)/$BACKUP_DIR":/backup \
+  alpine tar czf /backup/postgres_data.tar.gz -C /source .
+
+# Backup Qdrant data (vector memories)
+echo "🧠 Backing up vector memories..."
+docker run --rm \
+  -v whisperengine_qdrant_data:/source:ro \
+  -v "$(pwd)/$BACKUP_DIR":/backup \
+  alpine tar czf /backup/qdrant_data.tar.gz -C /source .
+
+# Backup application logs
+echo "📝 Backing up logs..."
+docker run --rm \
+  -v whisperengine_app_logs:/source:ro \
+  -v "$(pwd)/$BACKUP_DIR":/backup \
+  alpine tar czf /backup/app_logs.tar.gz -C /source .
+
+# Backup configuration
+echo "⚙️ Backing up configuration..."
+cp docker-compose.containerized.yml "$BACKUP_DIR/"
+cp .env "$BACKUP_DIR/" 2>/dev/null || echo "No .env file found"
+
+echo "✅ Backup completed: $BACKUP_DIR"
+echo "📁 Files created:"
+ls -lh "$BACKUP_DIR/"
+```
+
+**Windows Backup Script (backup-whisperengine.bat):**
+```batch
+@echo off
+setlocal enabledelayedexpansion
+
+for /f "tokens=1-6 delims=/: " %%i in ("%date% %time%") do (
+    set BACKUP_DIR=whisperengine-backups\%%k%%j%%i_%%l%%m
+)
+
+mkdir "%BACKUP_DIR%" 2>nul
+
+echo Creating WhisperEngine backup in %BACKUP_DIR%...
+
+REM Backup PostgreSQL data
+echo Backing up PostgreSQL data...
+docker run --rm -v whisperengine_postgres_data:/source:ro -v "%cd%\%BACKUP_DIR%":/backup alpine tar czf /backup/postgres_data.tar.gz -C /source .
+
+REM Backup Qdrant data  
+echo Backing up vector memories...
+docker run --rm -v whisperengine_qdrant_data:/source:ro -v "%cd%\%BACKUP_DIR%":/backup alpine tar czf /backup/qdrant_data.tar.gz -C /source .
+
+REM Backup logs
+echo Backing up logs...
+docker run --rm -v whisperengine_app_logs:/source:ro -v "%cd%\%BACKUP_DIR%":/backup alpine tar czf /backup/app_logs.tar.gz -C /source .
+
+REM Backup configuration
+echo Backing up configuration...
+copy docker-compose.containerized.yml "%BACKUP_DIR%\" >nul
+copy .env "%BACKUP_DIR%\" 2>nul || echo No .env file found
+
+echo Backup completed: %BACKUP_DIR%
+dir "%BACKUP_DIR%"
+```
+
+#### **Manual Backup Commands**
+```bash
+# Create backup directory
+BACKUP_DIR="whisperengine-backups/manual_$(date +%Y%m%d_%H%M%S)"
+mkdir -p "$BACKUP_DIR"
+
+# Backup each volume individually
+docker run --rm \
+  -v whisperengine_postgres_data:/source:ro \
+  -v "$(pwd)/$BACKUP_DIR":/backup \
+  alpine tar czf /backup/postgres_data.tar.gz -C /source .
+
+docker run --rm \
+  -v whisperengine_qdrant_data:/source:ro \
+  -v "$(pwd)/$BACKUP_DIR":/backup \
+  alpine tar czf /backup/qdrant_data.tar.gz -C /source .
+
+docker run --rm \
+  -v whisperengine_app_logs:/source:ro \
+  -v "$(pwd)/$BACKUP_DIR":/backup \
+  alpine tar czf /backup/app_logs.tar.gz -C /source .
+```
+
+### **Restoring from Backup**
+
+#### **Complete System Restore**
+```bash
+# ⚠️ WARNING: This will replace ALL current data!
+
+# Stop WhisperEngine
+docker-compose -f docker-compose.containerized.yml down
+
+# Remove existing volumes (THIS DELETES CURRENT DATA!)
+docker volume rm whisperengine_postgres_data
+docker volume rm whisperengine_qdrant_data
+docker volume rm whisperengine_app_logs
+
+# Replace BACKUP_DATE with your backup folder name
+BACKUP_DATE="20241010_143000"
+
+# Restore PostgreSQL data
+docker run --rm \
+  -v whisperengine_postgres_data:/target \
+  -v "$(pwd)/whisperengine-backups/$BACKUP_DATE":/backup:ro \
+  alpine tar xzf /backup/postgres_data.tar.gz -C /target
+
+# Restore Qdrant data
+docker run --rm \
+  -v whisperengine_qdrant_data:/target \
+  -v "$(pwd)/whisperengine-backups/$BACKUP_DATE":/backup:ro \
+  alpine tar xzf /backup/qdrant_data.tar.gz -C /target
+
+# Restore logs (optional)
+docker run --rm \
+  -v whisperengine_app_logs:/target \
+  -v "$(pwd)/whisperengine-backups/$BACKUP_DATE":/backup:ro \
+  alpine tar xzf /backup/app_logs.tar.gz -C /target
+
+# Start WhisperEngine with restored data
+docker-compose -f docker-compose.containerized.yml up -d
+```
+
+#### **Selective Data Restore**
+```bash
+# Restore only character data (PostgreSQL)
+docker-compose -f docker-compose.containerized.yml stop whisperengine-app
+docker volume rm whisperengine_postgres_data
+docker run --rm \
+  -v whisperengine_postgres_data:/target \
+  -v "$(pwd)/whisperengine-backups/BACKUP_DATE":/backup:ro \
+  alpine tar xzf /backup/postgres_data.tar.gz -C /target
+docker-compose -f docker-compose.containerized.yml start whisperengine-app
+
+# Restore only vector memories (Qdrant)
+docker-compose -f docker-compose.containerized.yml stop whisperengine-app
+docker volume rm whisperengine_qdrant_data
+docker run --rm \
+  -v whisperengine_qdrant_data:/target \
+  -v "$(pwd)/whisperengine-backups/BACKUP_DATE":/backup:ro \
+  alpine tar xzf /backup/qdrant_data.tar.gz -C /target
+docker-compose -f docker-compose.containerized.yml start whisperengine-app
+```
+
+### **Backup Best Practices**
+
+#### **Recommended Backup Schedule**
+- **Before Updates**: Always backup before updating containers
+- **Daily**: For production systems with active users
+- **Weekly**: For development or light usage
+- **Before Configuration Changes**: Backup before modifying settings
+
+#### **Automated Backup Setup**
+```bash
+# Add to crontab for daily backups at 2 AM
+crontab -e
+
+# Add this line for daily backups:
+0 2 * * * /path/to/whisperengine/backup-whisperengine.sh > /dev/null 2>&1
+
+# For weekly backups on Sundays:
+0 2 * * 0 /path/to/whisperengine/backup-whisperengine.sh > /dev/null 2>&1
+```
+
+#### **Backup Verification**
+```bash
+# Verify backup integrity
+BACKUP_DIR="whisperengine-backups/20241010_143000"
+
+# Check file sizes (should not be 0 bytes)
+ls -lh "$BACKUP_DIR/"
+
+# Test tar files can be extracted
+tar -tzf "$BACKUP_DIR/postgres_data.tar.gz" > /dev/null && echo "PostgreSQL backup OK"
+tar -tzf "$BACKUP_DIR/qdrant_data.tar.gz" > /dev/null && echo "Qdrant backup OK"
+tar -tzf "$BACKUP_DIR/app_logs.tar.gz" > /dev/null && echo "Logs backup OK"
+```
+
+## 🧹 Cleanup & Reset
+
+### **Cleanup Options**
+
+#### **Soft Reset (Keep Data)**
+```bash
+# Stop containers only
+docker-compose -f docker-compose.containerized.yml down
+
+# Remove container images (will re-download on next start)
+docker rmi whisperengine/whisperengine:latest
+docker rmi whisperengine/whisperengine-ui:latest
+
+# Clean up unused Docker resources
+docker system prune
+
+# Restart fresh (keeps your data)
+./setup-containerized.sh  # Linux/macOS
+# OR
+setup-containerized.bat   # Windows
+```
+
+#### **Complete Reset (Removes ALL Data)**
+```bash
+# ⚠️ WARNING: This deletes ALL characters, conversations, and memories!
+echo "This will delete ALL your WhisperEngine data. Type 'DELETE_EVERYTHING' to confirm:"
+read confirmation
+if [ "$confirmation" = "DELETE_EVERYTHING" ]; then
+    # Stop and remove containers + volumes
+    docker-compose -f docker-compose.containerized.yml down -v
+    
+    # Remove all WhisperEngine data volumes
+    docker volume rm whisperengine_postgres_data 2>/dev/null || true
+    docker volume rm whisperengine_qdrant_data 2>/dev/null || true
+    docker volume rm whisperengine_app_logs 2>/dev/null || true
+    
+    # Remove container images
+    docker rmi whisperengine/whisperengine:latest 2>/dev/null || true
+    docker rmi whisperengine/whisperengine-ui:latest 2>/dev/null || true
+    
+    # Clean up Docker system
+    docker system prune -f
+    
+    echo "✅ Complete reset finished. Run setup-containerized.sh to start fresh."
+else
+    echo "❌ Reset cancelled."
+fi
+```
+
+#### **Selective Cleanup**
+```bash
+# Remove only application logs (keeps characters and memories)
+docker volume rm whisperengine_app_logs
+
+# Remove only vector memories (keeps characters, resets conversations)
+docker-compose -f docker-compose.containerized.yml stop whisperengine-app
+docker volume rm whisperengine_qdrant_data
+docker-compose -f docker-compose.containerized.yml up -d
+
+# Remove only unused Docker images (saves disk space)
+docker image prune
+```
+
+### **Disk Space Management**
+
+#### **Check Docker Disk Usage**
+```bash
+# See what's using disk space
+docker system df
+
+# See detailed breakdown
+docker system df -v
+
+# Check specific volumes
+docker volume ls
+docker inspect whisperengine_postgres_data | grep Mountpoint
+```
+
+#### **Free Up Disk Space**
+```bash
+# Clean up unused containers, networks, images
+docker system prune
+
+# More aggressive cleanup (removes all unused items)
+docker system prune -a
+
+# Clean up only specific items
+docker container prune  # Remove stopped containers
+docker image prune     # Remove unused images
+docker volume prune    # Remove unused volumes (⚠️ MAY DELETE DATA!)
+```
+
+## �🔧 Troubleshooting
+
+### **Container-Specific Issues**
+
+#### **Setup Script Problems**
+**Problem**: Setup script fails or hangs
+```bash
+# Check Docker is running
+docker --version
+docker info
+
+# Check internet connectivity
+curl -I https://hub.docker.com
+
+# Manual setup steps
+docker-compose -f docker-compose.containerized.yml pull
+docker-compose -f docker-compose.containerized.yml up -d
+```
+
+**Problem**: "Permission denied" on Linux
+```bash
+# Add user to docker group
+sudo usermod -aG docker $USER
+newgrp docker
+
+# Or run with sudo
+sudo ./setup-containerized.sh
+```
+
+#### **Container Startup Issues**
+**Problem**: Containers won't start
+```bash
+# Check container status
+docker ps -a
+
+# Check specific container logs
+docker logs whisperengine-app
+docker logs whisperengine-ui
+docker logs whisperengine-postgres
+docker logs whisperengine-qdrant
+
+# Check system resources
+docker stats
+df -h  # Disk space
+free -h  # Memory usage (Linux)
+```
+
+**Problem**: Containers start then stop immediately
+```bash
+# Check exit codes
+docker ps -a
+
+# Look for error messages in logs
+docker-compose -f docker-compose.containerized.yml logs
+
+# Try starting services individually
+docker-compose -f docker-compose.containerized.yml up postgres qdrant
+docker-compose -f docker-compose.containerized.yml up whisperengine-app
+docker-compose -f docker-compose.containerized.yml up whisperengine-ui
+```
+
+#### **Network & Port Issues**
+**Problem**: "Port already in use" errors
+```bash
+# Find what's using the ports
+lsof -i :3001    # Web UI port
+lsof -i :9090    # API port
+lsof -i :5432    # PostgreSQL port
+lsof -i :6333    # Qdrant port
+
+# Kill conflicting processes (replace PID)
+kill -9 <PID>
+
+# Or change ports in docker-compose.containerized.yml
+```
+
+**Problem**: Cannot access web interface
+```bash
+# Check if UI container is running
+docker ps | grep whisperengine-ui
+
+# Check UI logs
+docker logs whisperengine-ui
+
+# Test UI health
+curl http://localhost:3001
+
+# Try different browser or incognito mode
+```
+
+**Problem**: API connection refused
+```bash
+# Check if app container is running
+docker ps | grep whisperengine-app
+
+# Check app logs
+docker logs whisperengine-app
+
+# Test API health
+curl http://localhost:9090/health
+
+# Check if app is binding to correct interface
+docker exec whisperengine-app netstat -tlnp
+```
 
 ### **Common Installation Issues**
+
+#### **Docker Issues**
 
 #### **Docker Issues**
 

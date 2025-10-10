@@ -148,6 +148,8 @@ CHARACTER_NAME=assistant    # Default character name
 ## 📚 Documentation
 
 - **[Quick Start Guide](QUICKSTART.md)** - Detailed setup instructions
+- **[Installation Guide](INSTALLATION.md)** - Complete installation options
+- **[Container Operations Guide](CONTAINERIZED_OPERATIONS_GUIDE.md)** - Updates, backups, troubleshooting
 - **[Character Creation Guide](docs/characters/CHARACTER_AUTHORING_GUIDE.md)** - Advanced character building
 - **[API Documentation](docs/api/README.md)** - Integration guide
 - **[Discord Setup](docs/discord/DISCORD_SETUP.md)** - Discord bot configuration
@@ -206,5 +208,9 @@ Unlike simple chatbots, WhisperEngine creates **persistent AI characters** with:
 **Start building your AI characters today!** 🚀
 
 ```bash
+# For end users (recommended):
+curl -sSL https://raw.githubusercontent.com/whisperengine-ai/whisperengine/main/setup-containerized.sh | bash
+
+# For developers:
 git clone https://github.com/whisperengine-ai/whisperengine.git && cd whisperengine && ./setup.sh
 ```
