@@ -57,7 +57,7 @@ services:
       - EMBEDDING_MODEL=sentence-transformers/all-MiniLM-L6-v2
       
     volumes:
-      - ./logs:/app/logs
+      - whisperengine_logs:/app/logs
     networks:
       - whisperengine-network
     depends_on:
@@ -108,7 +108,7 @@ services:
       - POSTGRES_INITDB_ARGS=--auth-host=scram-sha-256
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./sql:/docker-entrypoint-initdb.d
+      # SQL init scripts are included in the assistant image and run via application
     networks:
       - whisperengine-network
     restart: unless-stopped
@@ -163,6 +163,7 @@ volumes:
   qdrant_data:
   influxdb_data:
   influxdb_config:
+  whisperengine_logs:
 
 networks:
   whisperengine-network:
