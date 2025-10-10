@@ -4,13 +4,14 @@ import { getCharacterById } from '@/lib/db'
 import CharacterEditForm from '@/components/CharacterEditForm'
 
 interface PageProps {
-  params: {
+  params: Promise<{
     id: string
-  }
+  }>
 }
 
 export default async function CharacterEditPage({ params }: PageProps) {
-  const characterId = parseInt(params.id)
+  const resolvedParams = await params
+  const characterId = parseInt(resolvedParams.id)
   
   if (isNaN(characterId)) {
     notFound()

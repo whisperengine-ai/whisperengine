@@ -1,19 +1,78 @@
+'use client'
+
 import Link from 'next/link'
-import { getCharacters } from '@/lib/db'
+import { useState, useEffect } from 'react'
 import { Character } from '@/types/cdl'
 
-// Make this page dynamic to prevent static generation during build
-export const dynamic = 'force-dynamic'
+export default function CharactersPage() {
+  const [characters, setCharacters] = useState<Character[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [cloning, setCloning] = useState<number | null>(null)
 
-export default async function CharactersPage() {
-  let characters: Character[] = []
-  let error: string | null = null
+  useEffect(() => {
+    loadCharacters()
+  }, [])
 
-  try {
-    characters = await getCharacters()
-  } catch (e) {
-    console.error('Error loading characters:', e)
-    error = e instanceof Error ? e.message : 'Failed to load characters'
+  const loadCharacters = async () => {
+    try {
+      const response = await fetch('/api/characters')
+      if (response.ok) {
+        const data = await response.json()
+        // Extract the characters array from the response
+        const charactersArray = data.characters || data || []
+        setCharacters(charactersArray)
+      } else {
+        setError('Failed to load characters')
+      }
+    } catch (e) {
+      console.error('Error loading characters:', e)
+      setError(e instanceof Error ? e.message : 'Failed to load characters')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleCloneCharacter = async (character: Character) => {
+    const newName = prompt(`Clone "${character.name}" as:`, `${character.name} (Copy)`)
+    if (!newName || newName.trim() === '') return
+    
+    setCloning(character.id!)
+    try {
+      const response = await fetch('/api/characters/clone', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sourceCharacterId: character.id,
+          newName: newName.trim()
+        })
+      })
+      
+      if (response.ok) {
+        await response.json() // Read the response but don't need to store it
+        alert(`✅ Character cloned successfully! New character "${newName}" has been created.`)
+        loadCharacters() // Refresh the list
+      } else {
+        const errorData = await response.json()
+        alert(`❌ Failed to clone character: ${errorData.message || 'Unknown error'}`)
+      }
+    } catch (error) {
+      console.error('Error cloning character:', error)
+      alert(`❌ Failed to clone character: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    } finally {
+      setCloning(null)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading characters...</p>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -88,44 +147,62 @@ export default async function CharactersPage() {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {characters.map((character) => (
-                    <tr key={character.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div>
-                          <div className="text-sm font-medium text-gray-900">{character.name}</div>
-                          <div className="text-sm text-gray-500">{character.location || 'No location'}</div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {character.occupation || 'Not specified'}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                          character.character_archetype === 'real-world' 
-                            ? 'bg-green-100 text-green-800'
-                            : character.character_archetype === 'fantasy'
-                            ? 'bg-purple-100 text-purple-800'
-                            : 'bg-blue-100 text-blue-800'
-                        }`}>
-                          {character.character_archetype}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {character.bot_name || 'No bot assigned'}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {new Date(character.updated_at).toLocaleDateString()}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <Link href={`/characters/${character.id}`} className="text-blue-600 hover:text-blue-900 mr-4">
-                          Edit
-                        </Link>
-                        <Link href={`/characters/${character.id}/view`} className="text-gray-600 hover:text-gray-900">
-                          View
-                        </Link>
+                  {Array.isArray(characters) && characters.length > 0 ? (
+                    characters.map((character) => (
+                      <tr key={character.id} className="hover:bg-gray-50">
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div>
+                            <div className="text-sm font-medium text-gray-900">{character.name}</div>
+                            <div className="text-sm text-gray-500">{character.location || 'No location'}</div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {character.occupation || 'Not specified'}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                            character.character_archetype === 'real-world' 
+                              ? 'bg-green-100 text-green-800'
+                              : character.character_archetype === 'fantasy'
+                              ? 'bg-purple-100 text-purple-800'
+                              : 'bg-blue-100 text-blue-800'
+                          }`}>
+                            {character.character_archetype}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {character.bot_name || 'No bot assigned'}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {new Date(character.updated_at).toLocaleDateString()}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                          <div className="flex space-x-2 justify-end">
+                            <Link href={`/characters/${character.id}`} className="text-blue-600 hover:text-blue-900">
+                              Edit
+                            </Link>
+                            <Link href={`/characters/${character.id}/view`} className="text-gray-600 hover:text-gray-900">
+                              View
+                            </Link>
+                            <button
+                              onClick={() => handleCloneCharacter(character)}
+                              disabled={cloning === character.id}
+                              className="text-green-600 hover:text-green-900 disabled:text-gray-400 disabled:cursor-not-allowed"
+                              title="Clone this character as a template"
+                            >
+                              {cloning === character.id ? 'Cloning...' : 'Clone'}
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={6} className="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-500">
+                        {error ? `Error: ${error}` : 'No characters available or invalid data format'}
                       </td>
                     </tr>
-                  ))}
+                  )}
                 </tbody>
               </table>
             </div>

@@ -63,6 +63,26 @@ interface CDLData {
       }
     }
   }
+  values_and_beliefs?: {
+    core_values?: Array<{
+      value_key: string
+      value_description: string
+      importance_level: 'low' | 'medium' | 'high' | 'critical'
+      category: 'core_value'
+    }>
+    fears?: Array<{
+      value_key: string
+      value_description: string
+      importance_level: 'low' | 'medium' | 'high' | 'critical'
+      category: 'fear'
+    }>
+    beliefs?: Array<{
+      value_key: string
+      value_description: string
+      importance_level: 'low' | 'medium' | 'high' | 'critical'
+      category: 'belief'
+    }>
+  }
   personal_knowledge?: {
     relationships?: Array<{
       name: string
@@ -85,6 +105,11 @@ interface FormData {
   bot_name: string
   character_archetype: 'real-world' | 'fantasy' | 'narrative-ai'
   allow_full_roleplay_immersion: boolean
+  discord_config?: {
+    bot_token?: string
+    bot_status?: string
+    admin_user_ids?: string
+  }
   cdl_data: CDLData
 }
 
@@ -94,9 +119,10 @@ interface CharacterCreateFormProps {
 
 export default function CharacterCreateForm({ initialTemplate }: CharacterCreateFormProps) {
   const router = useRouter()
-  const [activeTab, setActiveTab] = useState<'identity' | 'personality' | 'communication' | 'knowledge'>('identity')
+  const [activeTab, setActiveTab] = useState<'identity' | 'personality' | 'communication' | 'values' | 'knowledge'>('identity')
   const [isLoading, setIsLoading] = useState(false)
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
+  const [deployAfterCreate, setDeployAfterCreate] = useState(false)
 
   const [formData, setFormData] = useState<FormData>({
     name: '',
@@ -104,6 +130,11 @@ export default function CharacterCreateForm({ initialTemplate }: CharacterCreate
     bot_name: '',
     character_archetype: 'real-world',
     allow_full_roleplay_immersion: false,
+    discord_config: {
+      bot_token: '',
+      bot_status: '',
+      admin_user_ids: ''
+    },
     cdl_data: {
       identity: {
         name: '',
@@ -160,6 +191,11 @@ export default function CharacterCreateForm({ initialTemplate }: CharacterCreate
             }
           }
         }
+      },
+      values_and_beliefs: {
+        core_values: [],
+        fears: [],
+        beliefs: []
       },
       personal_knowledge: {
         relationships: [],
@@ -223,6 +259,7 @@ export default function CharacterCreateForm({ initialTemplate }: CharacterCreate
     setSaveStatus('saving')
     
     try {
+      // Create character
       const response = await fetch('/api/characters', {
         method: 'POST',
         headers: {
@@ -234,17 +271,52 @@ export default function CharacterCreateForm({ initialTemplate }: CharacterCreate
       if (response.ok) {
         const result = await response.json()
         setSaveStatus('saved')
-        setTimeout(() => {
-          router.push(`/characters/${result.character.id}`)
-        }, 1000)
+        
+        // Deploy character if requested
+        if (deployAfterCreate) {
+          try {
+            const deployResponse = await fetch('/api/characters/deploy', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                characterId: result.character.id,
+                deploymentConfig: {
+                  enableDiscord: false,
+                  healthCheckPort: 9090 + result.character.id
+                }
+              })
+            })
+            
+            if (deployResponse.ok) {
+              const deployResult = await deployResponse.json()
+              alert(`✅ Character "${formData.name}" created and deployed successfully!\n\nAPI Endpoint: ${deployResult.deployment.apiEndpoint}`)
+              router.push('/deployments')
+            } else {
+              alert(`✅ Character "${formData.name}" created successfully!\n❌ Deployment failed - you can deploy manually from the Characters page.`)
+              router.push(`/characters/${result.character.id}`)
+            }
+          } catch (deployError) {
+            console.error('Deployment error:', deployError)
+            alert(`✅ Character "${formData.name}" created successfully!\n❌ Deployment failed - you can deploy manually from the Characters page.`)
+            router.push(`/characters/${result.character.id}`)
+          }
+        } else {
+          setTimeout(() => {
+            router.push(`/characters/${result.character.id}`)
+          }, 1000)
+        }
       } else {
         const error = await response.json()
         console.error('Save error:', error)
         setSaveStatus('error')
+        alert(`Error creating character: ${error.error || 'Unknown error'}`)
       }
     } catch (error) {
       console.error('Save error:', error)
       setSaveStatus('error')
+      alert('Failed to create character. Please try again.')
     } finally {
       setIsLoading(false)
     }
@@ -297,6 +369,7 @@ export default function CharacterCreateForm({ initialTemplate }: CharacterCreate
             { id: 'identity', label: 'Identity', icon: '👤' },
             { id: 'personality', label: 'Personality', icon: '🧠' },
             { id: 'communication', label: 'Communication', icon: '💬' },
+            { id: 'values', label: 'Values & Beliefs', icon: '⭐' },
             { id: 'knowledge', label: 'Knowledge', icon: '📚' }
           ].map((tab) => (
             <button
@@ -305,7 +378,7 @@ export default function CharacterCreateForm({ initialTemplate }: CharacterCreate
               className={`flex items-center space-x-2 px-3 py-2 rounded-lg font-medium ${
                 activeTab === tab.id
                   ? 'bg-blue-100 text-blue-700'
-                  : 'text-gray-600 hover:text-gray-900'
+                  : 'text-gray-800 hover:text-gray-900'
               }`}
             >
               <span>{tab.icon}</span>
@@ -324,20 +397,20 @@ export default function CharacterCreateForm({ initialTemplate }: CharacterCreate
             {/* Basic Information */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-gray-900 mb-2">
                   Character Name *
                 </label>
                 <input
                   type="text"
                   value={formData.name}
                   onChange={(e) => handleNameChange(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="Enter character name"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-gray-900 mb-2">
                   Occupation *
                 </label>
                 <input
@@ -353,13 +426,13 @@ export default function CharacterCreateForm({ initialTemplate }: CharacterCreate
                       }
                     }
                   }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="e.g., Marine Biologist, AI Researcher"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-gray-900 mb-2">
                   Location
                 </label>
                 <input
@@ -375,13 +448,13 @@ export default function CharacterCreateForm({ initialTemplate }: CharacterCreate
                       }
                     }
                   }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="e.g., San Francisco, Remote"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-gray-900 mb-2">
                   Age
                 </label>
                 <input
@@ -397,7 +470,7 @@ export default function CharacterCreateForm({ initialTemplate }: CharacterCreate
                       }
                     }
                   }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="Age"
                 />
               </div>
@@ -405,7 +478,7 @@ export default function CharacterCreateForm({ initialTemplate }: CharacterCreate
 
             {/* Description */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-gray-900 mb-2">
                 Character Description
               </label>
               <textarea
@@ -421,14 +494,14 @@ export default function CharacterCreateForm({ initialTemplate }: CharacterCreate
                   }
                 }))}
                 rows={4}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="Describe the character's background, role, and key characteristics..."
               />
             </div>
 
             {/* Character Archetype */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-gray-900 mb-2">
                 Character Archetype
               </label>
               <select
@@ -437,7 +510,7 @@ export default function CharacterCreateForm({ initialTemplate }: CharacterCreate
                   ...prev,
                   character_archetype: e.target.value as any
                 }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="real-world">Real-world (Human-like professional)</option>
                 <option value="fantasy">Fantasy/Mythical (Fictional entity)</option>
@@ -450,7 +523,7 @@ export default function CharacterCreateForm({ initialTemplate }: CharacterCreate
               <h4 className="text-md font-medium text-gray-800 mb-3">Voice Characteristics</h4>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Pace</label>
+                  <label className="block text-sm font-medium text-gray-900 mb-1">Pace</label>
                   <select
                     value={formData.cdl_data.identity.voice?.pace || 'moderate'}
                     onChange={(e) => setFormData(prev => ({
@@ -466,7 +539,7 @@ export default function CharacterCreateForm({ initialTemplate }: CharacterCreate
                         }
                       }
                     }))}
-                    className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                    className="w-full px-2 py-1 border border-gray-300 rounded text-sm text-gray-900"
                   >
                     <option value="slow">Slow</option>
                     <option value="moderate">Moderate</option>
@@ -476,7 +549,7 @@ export default function CharacterCreateForm({ initialTemplate }: CharacterCreate
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Tone</label>
+                  <label className="block text-sm font-medium text-gray-900 mb-1">Tone</label>
                   <select
                     value={formData.cdl_data.identity.voice?.tone || 'warm'}
                     onChange={(e) => setFormData(prev => ({
@@ -492,7 +565,7 @@ export default function CharacterCreateForm({ initialTemplate }: CharacterCreate
                         }
                       }
                     }))}
-                    className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                    className="w-full px-2 py-1 border border-gray-300 rounded text-sm text-gray-900"
                   >
                     <option value="warm">Warm</option>
                     <option value="professional">Professional</option>
@@ -503,7 +576,7 @@ export default function CharacterCreateForm({ initialTemplate }: CharacterCreate
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Accent</label>
+                  <label className="block text-sm font-medium text-gray-900 mb-1">Accent</label>
                   <input
                     type="text"
                     value={formData.cdl_data.identity.voice?.accent || ''}
@@ -520,13 +593,13 @@ export default function CharacterCreateForm({ initialTemplate }: CharacterCreate
                         }
                       }
                     }))}
-                    className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                    className="w-full px-2 py-1 border border-gray-300 rounded text-sm text-gray-900"
                     placeholder="e.g., British, Southern"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Volume</label>
+                  <label className="block text-sm font-medium text-gray-900 mb-1">Volume</label>
                   <select
                     value={formData.cdl_data.identity.voice?.volume || 'normal'}
                     onChange={(e) => setFormData(prev => ({
@@ -542,13 +615,86 @@ export default function CharacterCreateForm({ initialTemplate }: CharacterCreate
                         }
                       }
                     }))}
-                    className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                    className="w-full px-2 py-1 border border-gray-300 rounded text-sm text-gray-900"
                   >
                     <option value="quiet">Quiet</option>
                     <option value="normal">Normal</option>
                     <option value="loud">Loud</option>
                     <option value="varies">Varies</option>
                   </select>
+                </div>
+              </div>
+            </div>
+
+            {/* Discord Bot Configuration */}
+            <div>
+              <h4 className="text-md font-medium text-gray-800 mb-3">🤖 Discord Bot Configuration</h4>
+              <p className="text-sm text-gray-800 mb-4">
+                Configure Discord bot settings for this character. Each character can have its own Discord bot token.
+              </p>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-900 mb-2">
+                    Discord Bot Token
+                  </label>
+                  <input
+                    type="password"
+                    value={formData.discord_config?.bot_token || ''}
+                    onChange={(e) => setFormData(prev => ({
+                      ...prev,
+                      discord_config: {
+                        ...prev.discord_config,
+                        bot_token: e.target.value
+                      }
+                    }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Enter Discord bot token (optional)"
+                  />
+                  <p className="text-xs text-gray-700 mt-1">
+                    Create a bot at <a href="https://discord.com/developers/applications" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">Discord Developer Portal</a>
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-900 mb-2">
+                    Bot Status Message
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.discord_config?.bot_status || ''}
+                    onChange={(e) => setFormData(prev => ({
+                      ...prev,
+                      discord_config: {
+                        ...prev.discord_config,
+                        bot_status: e.target.value
+                      }
+                    }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="e.g., 🔬 Marine Research Demo"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-900 mb-2">
+                    Admin User IDs
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.discord_config?.admin_user_ids || ''}
+                    onChange={(e) => setFormData(prev => ({
+                      ...prev,
+                      discord_config: {
+                        ...prev.discord_config,
+                        admin_user_ids: e.target.value
+                      }
+                    }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Comma-separated Discord user IDs (optional)"
+                  />
+                  <p className="text-xs text-gray-700 mt-1">
+                    Discord user IDs for admin commands (right-click user → Copy User ID)
+                  </p>
                 </div>
               </div>
             </div>
@@ -565,7 +711,7 @@ export default function CharacterCreateForm({ initialTemplate }: CharacterCreate
               <div className="space-y-4">
                 {Object.entries(formData.cdl_data.personality.big_five).map(([trait, value]) => (
                   <div key={trait}>
-                    <label className="block text-sm font-medium text-gray-700 mb-2 capitalize">
+                    <label className="block text-sm font-medium text-gray-900 mb-2 capitalize">
                       {trait} ({Math.round(value * 100)}%)
                     </label>
                     <input
@@ -589,7 +735,7 @@ export default function CharacterCreateForm({ initialTemplate }: CharacterCreate
                       }))}
                       className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
                     />
-                    <div className="flex justify-between text-xs text-gray-500 mt-1">
+                    <div className="flex justify-between text-xs text-gray-700 mt-1">
                       <span>Low</span>
                       <span>High</span>
                     </div>
@@ -623,7 +769,7 @@ export default function CharacterCreateForm({ initialTemplate }: CharacterCreate
                         (e.target as HTMLInputElement).value = ''
                       }
                     }}
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded"
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded text-gray-900"
                   />
                 </div>
               </div>
@@ -634,7 +780,7 @@ export default function CharacterCreateForm({ initialTemplate }: CharacterCreate
               <h4 className="text-md font-medium text-gray-800 mb-3">Communication Style</h4>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Tone</label>
+                  <label className="block text-sm font-medium text-gray-900 mb-1">Tone</label>
                   <select
                     value={formData.cdl_data.personality.communication_style.tone}
                     onChange={(e) => setFormData(prev => ({
@@ -650,7 +796,7 @@ export default function CharacterCreateForm({ initialTemplate }: CharacterCreate
                         }
                       }
                     }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded"
+                    className="w-full px-3 py-2 border border-gray-300 rounded text-gray-900"
                   >
                     <option value="friendly">Friendly</option>
                     <option value="professional">Professional</option>
@@ -661,7 +807,7 @@ export default function CharacterCreateForm({ initialTemplate }: CharacterCreate
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Formality</label>
+                  <label className="block text-sm font-medium text-gray-900 mb-1">Formality</label>
                   <select
                     value={formData.cdl_data.personality.communication_style.formality}
                     onChange={(e) => setFormData(prev => ({
@@ -677,7 +823,7 @@ export default function CharacterCreateForm({ initialTemplate }: CharacterCreate
                         }
                       }
                     }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded"
+                    className="w-full px-3 py-2 border border-gray-300 rounded text-gray-900"
                   >
                     <option value="casual">Casual</option>
                     <option value="semi-formal">Semi-formal</option>
@@ -687,7 +833,7 @@ export default function CharacterCreateForm({ initialTemplate }: CharacterCreate
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Directness</label>
+                  <label className="block text-sm font-medium text-gray-900 mb-1">Directness</label>
                   <select
                     value={formData.cdl_data.personality.communication_style.directness}
                     onChange={(e) => setFormData(prev => ({
@@ -703,7 +849,7 @@ export default function CharacterCreateForm({ initialTemplate }: CharacterCreate
                         }
                       }
                     }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded"
+                    className="w-full px-3 py-2 border border-gray-300 rounded text-gray-900"
                   >
                     <option value="indirect">Indirect</option>
                     <option value="moderate">Moderate</option>
@@ -713,7 +859,7 @@ export default function CharacterCreateForm({ initialTemplate }: CharacterCreate
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Empathy Level</label>
+                  <label className="block text-sm font-medium text-gray-900 mb-1">Empathy Level</label>
                   <select
                     value={formData.cdl_data.personality.communication_style.empathy_level}
                     onChange={(e) => setFormData(prev => ({
@@ -729,7 +875,7 @@ export default function CharacterCreateForm({ initialTemplate }: CharacterCreate
                         }
                       }
                     }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded"
+                    className="w-full px-3 py-2 border border-gray-300 rounded text-gray-900"
                   >
                     <option value="low">Low</option>
                     <option value="moderate">Moderate</option>
@@ -748,7 +894,7 @@ export default function CharacterCreateForm({ initialTemplate }: CharacterCreate
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-gray-900 mb-2">
                   Response Length
                 </label>
                 <select
@@ -763,7 +909,7 @@ export default function CharacterCreateForm({ initialTemplate }: CharacterCreate
                       }
                     }
                   }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded"
+                  className="w-full px-3 py-2 border border-gray-300 rounded text-gray-900"
                 >
                   <option value="brief">Brief (1-2 sentences)</option>
                   <option value="moderate">Moderate (2-4 sentences)</option>
@@ -773,7 +919,7 @@ export default function CharacterCreateForm({ initialTemplate }: CharacterCreate
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-gray-900 mb-2">
                   AI Identity Approach
                 </label>
                 <select
@@ -791,7 +937,7 @@ export default function CharacterCreateForm({ initialTemplate }: CharacterCreate
                       }
                     }
                   }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded"
+                  className="w-full px-3 py-2 border border-gray-300 rounded text-gray-900"
                 >
                   <option value="3-tier">3-Tier (Enthusiasm → Clarification → Alternatives)</option>
                   <option value="direct_honest">Direct Honest</option>
@@ -802,7 +948,7 @@ export default function CharacterCreateForm({ initialTemplate }: CharacterCreate
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-gray-900 mb-2">
                 AI Identity Philosophy
               </label>
               <textarea
@@ -821,7 +967,7 @@ export default function CharacterCreateForm({ initialTemplate }: CharacterCreate
                   }
                 }))}
                 rows={3}
-                className="w-full px-3 py-2 border border-gray-300 rounded"
+                className="w-full px-3 py-2 border border-gray-300 rounded text-gray-900"
                 placeholder="Describe how this character should handle questions about AI identity..."
               />
             </div>
@@ -850,9 +996,306 @@ export default function CharacterCreateForm({ initialTemplate }: CharacterCreate
                 }}
                 className="h-4 w-4 text-blue-600"
               />
-              <label htmlFor="roleplay_immersion" className="text-sm font-medium text-gray-700">
+              <label htmlFor="roleplay_immersion" className="text-sm font-medium text-gray-900">
                 Allow Full Roleplay Immersion (character never breaks character)
               </label>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'values' && (
+          <div className="space-y-6">
+            <h3 className="text-lg font-semibold text-gray-900">Values & Beliefs</h3>
+            
+            {/* Core Values */}
+            <div>
+              <h4 className="text-md font-medium text-gray-800 mb-3">Core Values</h4>
+              <p className="text-sm text-gray-800 mb-3">
+                Define the fundamental principles and values that guide this character&apos;s decisions and worldview.
+              </p>
+              <div className="space-y-3">
+                {formData.cdl_data.values_and_beliefs?.core_values?.map((value, index) => (
+                  <div key={index} className="flex items-center space-x-3 p-3 bg-blue-50 rounded-lg">
+                    <div className="flex-1">
+                      <div className="font-medium text-sm">{value.value_key}</div>
+                      <div className="text-sm text-gray-800">{value.value_description}</div>
+                      <div className="text-xs text-blue-600 capitalize">Importance: {value.importance_level}</div>
+                    </div>
+                    <button
+                      onClick={() => {
+                        setFormData(prev => ({
+                          ...prev,
+                          cdl_data: {
+                            ...prev.cdl_data,
+                            values_and_beliefs: {
+                              ...prev.cdl_data.values_and_beliefs,
+                              core_values: prev.cdl_data.values_and_beliefs?.core_values?.filter((_, i) => i !== index) || []
+                            }
+                          }
+                        }))
+                      }}
+                      className="text-red-600 hover:text-red-800"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                )) || []}
+                
+                <div className="p-3 border border-gray-300 rounded-lg">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <input
+                      type="text"
+                      placeholder="Value name (e.g., 'Environmental stewardship')"
+                      className="px-3 py-2 border border-gray-300 rounded text-sm text-gray-900"
+                      id="new-core-value-key"
+                    />
+                    <input
+                      type="text"
+                      placeholder="Description"
+                      className="px-3 py-2 border border-gray-300 rounded text-sm text-gray-900"
+                      id="new-core-value-desc"
+                    />
+                    <select
+                      className="px-3 py-2 border border-gray-300 rounded text-sm text-gray-900"
+                      id="new-core-value-importance"
+                      defaultValue="medium"
+                    >
+                      <option value="low">Low Importance</option>
+                      <option value="medium">Medium Importance</option>
+                      <option value="high">High Importance</option>
+                      <option value="critical">Critical Importance</option>
+                    </select>
+                  </div>
+                  <button
+                    onClick={() => {
+                      const keyInput = document.getElementById('new-core-value-key') as HTMLInputElement
+                      const descInput = document.getElementById('new-core-value-desc') as HTMLInputElement
+                      const importanceSelect = document.getElementById('new-core-value-importance') as HTMLSelectElement
+                      
+                      if (keyInput.value.trim() && descInput.value.trim()) {
+                        setFormData(prev => ({
+                          ...prev,
+                          cdl_data: {
+                            ...prev.cdl_data,
+                            values_and_beliefs: {
+                              ...prev.cdl_data.values_and_beliefs,
+                              core_values: [
+                                ...(prev.cdl_data.values_and_beliefs?.core_values || []),
+                                {
+                                  value_key: keyInput.value.trim(),
+                                  value_description: descInput.value.trim(),
+                                  importance_level: importanceSelect.value as 'low' | 'medium' | 'high' | 'critical',
+                                  category: 'core_value'
+                                }
+                              ]
+                            }
+                          }
+                        }))
+                        keyInput.value = ''
+                        descInput.value = ''
+                        importanceSelect.value = 'medium'
+                      }
+                    }}
+                    className="mt-2 bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700"
+                  >
+                    Add Core Value
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Fears */}
+            <div>
+              <h4 className="text-md font-medium text-gray-800 mb-3">Fears & Concerns</h4>
+              <p className="text-sm text-gray-800 mb-3">
+                What does this character fear or worry about? These drive cautious behaviors and emotional responses.
+              </p>
+              <div className="space-y-3">
+                {formData.cdl_data.values_and_beliefs?.fears?.map((fear, index) => (
+                  <div key={index} className="flex items-center space-x-3 p-3 bg-red-50 rounded-lg">
+                    <div className="flex-1">
+                      <div className="font-medium text-sm">{fear.value_key}</div>
+                      <div className="text-sm text-gray-800">{fear.value_description}</div>
+                      <div className="text-xs text-red-600 capitalize">Intensity: {fear.importance_level}</div>
+                    </div>
+                    <button
+                      onClick={() => {
+                        setFormData(prev => ({
+                          ...prev,
+                          cdl_data: {
+                            ...prev.cdl_data,
+                            values_and_beliefs: {
+                              ...prev.cdl_data.values_and_beliefs,
+                              fears: prev.cdl_data.values_and_beliefs?.fears?.filter((_, i) => i !== index) || []
+                            }
+                          }
+                        }))
+                      }}
+                      className="text-red-600 hover:text-red-800"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                )) || []}
+                
+                <div className="p-3 border border-gray-300 rounded-lg">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <input
+                      type="text"
+                      placeholder="Fear name (e.g., 'Climate change')"
+                      className="px-3 py-2 border border-gray-300 rounded text-sm text-gray-900"
+                      id="new-fear-key"
+                    />
+                    <input
+                      type="text"
+                      placeholder="Description"
+                      className="px-3 py-2 border border-gray-300 rounded text-sm text-gray-900"
+                      id="new-fear-desc"
+                    />
+                    <select
+                      className="px-3 py-2 border border-gray-300 rounded text-sm text-gray-900"
+                      id="new-fear-importance"
+                      defaultValue="medium"
+                    >
+                      <option value="low">Low Intensity</option>
+                      <option value="medium">Medium Intensity</option>
+                      <option value="high">High Intensity</option>
+                      <option value="critical">Critical Fear</option>
+                    </select>
+                  </div>
+                  <button
+                    onClick={() => {
+                      const keyInput = document.getElementById('new-fear-key') as HTMLInputElement
+                      const descInput = document.getElementById('new-fear-desc') as HTMLInputElement
+                      const importanceSelect = document.getElementById('new-fear-importance') as HTMLSelectElement
+                      
+                      if (keyInput.value.trim() && descInput.value.trim()) {
+                        setFormData(prev => ({
+                          ...prev,
+                          cdl_data: {
+                            ...prev.cdl_data,
+                            values_and_beliefs: {
+                              ...prev.cdl_data.values_and_beliefs,
+                              fears: [
+                                ...(prev.cdl_data.values_and_beliefs?.fears || []),
+                                {
+                                  value_key: keyInput.value.trim(),
+                                  value_description: descInput.value.trim(),
+                                  importance_level: importanceSelect.value as 'low' | 'medium' | 'high' | 'critical',
+                                  category: 'fear'
+                                }
+                              ]
+                            }
+                          }
+                        }))
+                        keyInput.value = ''
+                        descInput.value = ''
+                        importanceSelect.value = 'medium'
+                      }
+                    }}
+                    className="mt-2 bg-red-600 text-white px-3 py-1 rounded text-sm hover:bg-red-700"
+                  >
+                    Add Fear
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Beliefs */}
+            <div>
+              <h4 className="text-md font-medium text-gray-800 mb-3">Beliefs & Philosophy</h4>
+              <p className="text-sm text-gray-800 mb-3">
+                What does this character believe about the world, society, or human nature? These shape their perspective.
+              </p>
+              <div className="space-y-3">
+                {formData.cdl_data.values_and_beliefs?.beliefs?.map((belief, index) => (
+                  <div key={index} className="flex items-center space-x-3 p-3 bg-green-50 rounded-lg">
+                    <div className="flex-1">
+                      <div className="font-medium text-sm">{belief.value_key}</div>
+                      <div className="text-sm text-gray-800">{belief.value_description}</div>
+                      <div className="text-xs text-green-600 capitalize">Conviction: {belief.importance_level}</div>
+                    </div>
+                    <button
+                      onClick={() => {
+                        setFormData(prev => ({
+                          ...prev,
+                          cdl_data: {
+                            ...prev.cdl_data,
+                            values_and_beliefs: {
+                              ...prev.cdl_data.values_and_beliefs,
+                              beliefs: prev.cdl_data.values_and_beliefs?.beliefs?.filter((_, i) => i !== index) || []
+                            }
+                          }
+                        }))
+                      }}
+                      className="text-red-600 hover:text-red-800"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                )) || []}
+                
+                <div className="p-3 border border-gray-300 rounded-lg">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <input
+                      type="text"
+                      placeholder="Belief name (e.g., 'Science can solve problems')"
+                      className="px-3 py-2 border border-gray-300 rounded text-sm text-gray-900"
+                      id="new-belief-key"
+                    />
+                    <input
+                      type="text"
+                      placeholder="Description"
+                      className="px-3 py-2 border border-gray-300 rounded text-sm text-gray-900"
+                      id="new-belief-desc"
+                    />
+                    <select
+                      className="px-3 py-2 border border-gray-300 rounded text-sm text-gray-900"
+                      id="new-belief-importance"
+                      defaultValue="medium"
+                    >
+                      <option value="low">Low Conviction</option>
+                      <option value="medium">Medium Conviction</option>
+                      <option value="high">High Conviction</option>
+                      <option value="critical">Core Belief</option>
+                    </select>
+                  </div>
+                  <button
+                    onClick={() => {
+                      const keyInput = document.getElementById('new-belief-key') as HTMLInputElement
+                      const descInput = document.getElementById('new-belief-desc') as HTMLInputElement
+                      const importanceSelect = document.getElementById('new-belief-importance') as HTMLSelectElement
+                      
+                      if (keyInput.value.trim() && descInput.value.trim()) {
+                        setFormData(prev => ({
+                          ...prev,
+                          cdl_data: {
+                            ...prev.cdl_data,
+                            values_and_beliefs: {
+                              ...prev.cdl_data.values_and_beliefs,
+                              beliefs: [
+                                ...(prev.cdl_data.values_and_beliefs?.beliefs || []),
+                                {
+                                  value_key: keyInput.value.trim(),
+                                  value_description: descInput.value.trim(),
+                                  importance_level: importanceSelect.value as 'low' | 'medium' | 'high' | 'critical',
+                                  category: 'belief'
+                                }
+                              ]
+                            }
+                          }
+                        }))
+                        keyInput.value = ''
+                        descInput.value = ''
+                        importanceSelect.value = 'medium'
+                      }
+                    }}
+                    className="mt-2 bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700"
+                  >
+                    Add Belief
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         )}
@@ -886,7 +1329,7 @@ export default function CharacterCreateForm({ initialTemplate }: CharacterCreate
                         (e.target as HTMLInputElement).value = ''
                       }
                     }}
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded"
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded text-gray-900"
                   />
                 </div>
               </div>
@@ -917,7 +1360,7 @@ export default function CharacterCreateForm({ initialTemplate }: CharacterCreate
                         (e.target as HTMLInputElement).value = ''
                       }
                     }}
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded"
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded text-gray-900"
                   />
                 </div>
               </div>
@@ -928,7 +1371,7 @@ export default function CharacterCreateForm({ initialTemplate }: CharacterCreate
               <h4 className="text-md font-medium text-gray-800 mb-3">Background Information</h4>
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Education</label>
+                  <label className="block text-sm font-medium text-gray-900 mb-2">Education</label>
                   <textarea
                     value={formData.cdl_data.personal_knowledge?.background?.education || ''}
                     onChange={(e) => setFormData(prev => ({
@@ -945,13 +1388,13 @@ export default function CharacterCreateForm({ initialTemplate }: CharacterCreate
                       }
                     }))}
                     rows={2}
-                    className="w-full px-3 py-2 border border-gray-300 rounded"
+                    className="w-full px-3 py-2 border border-gray-300 rounded text-gray-900"
                     placeholder="Educational background, degrees, certifications..."
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Career History</label>
+                  <label className="block text-sm font-medium text-gray-900 mb-2">Career History</label>
                   <textarea
                     value={formData.cdl_data.personal_knowledge?.background?.career_history || ''}
                     onChange={(e) => setFormData(prev => ({
@@ -968,7 +1411,7 @@ export default function CharacterCreateForm({ initialTemplate }: CharacterCreate
                       }
                     }))}
                     rows={3}
-                    className="w-full px-3 py-2 border border-gray-300 rounded"
+                    className="w-full px-3 py-2 border border-gray-300 rounded text-gray-900"
                     placeholder="Work experience, career progression, notable achievements..."
                   />
                 </div>
@@ -981,16 +1424,32 @@ export default function CharacterCreateForm({ initialTemplate }: CharacterCreate
       {/* Action Buttons */}
       <div className="border-t border-gray-200 px-6 py-4">
         <div className="flex justify-between items-center">
-          <div className="text-sm text-gray-500">
-            {saveStatus === 'saving' && 'Saving character...'}
-            {saveStatus === 'saved' && '✅ Character saved successfully!'}
-            {saveStatus === 'error' && '❌ Error saving character'}
+          <div className="flex items-center space-x-4">
+            <div className="text-sm text-gray-700">
+              {saveStatus === 'saving' && 'Saving character...'}
+              {saveStatus === 'saved' && '✅ Character saved successfully!'}
+              {saveStatus === 'error' && '❌ Error saving character'}
+            </div>
+            
+            <div className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                id="deploy-after-create"
+                checked={deployAfterCreate}
+                onChange={(e) => setDeployAfterCreate(e.target.checked)}
+                className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                disabled={isLoading}
+              />
+              <label htmlFor="deploy-after-create" className="text-sm text-gray-900">
+                🚀 Deploy immediately after creation
+              </label>
+            </div>
           </div>
           
           <div className="flex space-x-3">
             <button
               onClick={() => router.push('/characters')}
-              className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+              className="px-4 py-2 border border-gray-300 rounded-md text-gray-900 hover:bg-gray-50"
               disabled={isLoading}
             >
               Cancel
@@ -1000,7 +1459,8 @@ export default function CharacterCreateForm({ initialTemplate }: CharacterCreate
               disabled={isLoading || !formData.name || !formData.cdl_data.identity.occupation}
               className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-400"
             >
-              {isLoading ? 'Creating...' : 'Create Character'}
+              {isLoading ? (deployAfterCreate ? 'Creating & Deploying...' : 'Creating...') : 
+                         (deployAfterCreate ? 'Create & Deploy' : 'Create Character')}
             </button>
           </div>
         </div>

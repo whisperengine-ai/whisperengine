@@ -178,19 +178,15 @@ class DirectCharacterIntelligenceTester:
             
             cdl_integration = CDLAIPromptIntegration()
             
-            # Get character data from database
-            async with self.postgres_pool.acquire() as conn:
-                character_data = await conn.fetchrow(
-                    'SELECT * FROM characters WHERE name = $1', 
-                    'Elena Rodriguez'
-                )
+            # Load character properly using CDL integration method
+            character = await cdl_integration.load_character('Elena Rodriguez')
             
-            if not character_data:
-                raise Exception("Character data not found in database")
+            if not character or not hasattr(character, 'identity'):
+                raise Exception("Character could not be loaded properly")
             
             # Test personal knowledge extraction
             personal_knowledge = await cdl_integration._extract_cdl_personal_knowledge_sections(
-                character=character_data,
+                character=character,
                 message_content='Tell me about your marine biology research background',
                 user_id='direct_test_user'
             )
@@ -226,8 +222,9 @@ class DirectCharacterIntelligenceTester:
             
             for character_name in self.test_characters:
                 async with self.postgres_pool.acquire() as conn:
+                    # Updated query to work with current database schema
                     character_data = await conn.fetchrow(
-                        'SELECT name, identity, personality FROM characters WHERE name = $1', 
+                        'SELECT name, occupation, description FROM characters WHERE name = $1', 
                         character_name
                     )
                     

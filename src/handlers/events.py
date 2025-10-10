@@ -271,7 +271,7 @@ class BotEventHandlers:
             from src.database.database_integration import DatabaseIntegrationManager
             
             db_integration = DatabaseIntegrationManager()
-            self._ban_checker = BanCommandHandlers(self.bot, db_integration)
+            self._ban_checker = BanCommandHandlers(self.bot, postgres_pool=None, db_integration=db_integration)
             logger.info("✅ Ban checking system initialized")
         except Exception as e:
             logger.error(f"❌ Failed to initialize ban checking system: {e}")
