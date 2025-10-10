@@ -264,3 +264,165 @@ SELECT
     NULL::jsonb AS cdl_data  -- Placeholder for future JSONB aggregation
 FROM cdl_characters;
 
+-- Backward compatibility VIEW for CDL graph code (maps cdl_characters to old characters table)
+CREATE OR REPLACE VIEW characters AS
+SELECT 
+    id,
+    name,
+    normalized_name,
+    bot_name,
+    occupation,
+    location,
+    age_range,
+    background,
+    description,
+    character_archetype,
+    allow_full_roleplay_immersion,
+    is_active,
+    version,
+    created_at,
+    updated_at
+FROM cdl_characters;
+
+COMMENT ON VIEW characters IS 'Backward compatibility view mapping cdl_characters to old characters table schema';
+
+-- ============================================================================
+-- UNIVERSAL IDENTITY SYSTEM (Cross-Platform User Management)
+-- ============================================================================
+-- Creates tables for cross-platform user identity management
+-- Users can interact via Discord, Web UI, or future platforms with consistent identity
+
+-- Universal Users Table
+CREATE TABLE IF NOT EXISTS universal_users (
+    universal_id VARCHAR(255) PRIMARY KEY,
+    primary_username VARCHAR(255) NOT NULL,
+    display_name VARCHAR(255),
+    email VARCHAR(255),
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    last_active TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    preferences TEXT DEFAULT '{}',
+    privacy_settings TEXT DEFAULT '{}'
+);
+
+-- Platform Identities Table
+CREATE TABLE IF NOT EXISTS platform_identities (
+    id SERIAL PRIMARY KEY,
+    universal_id VARCHAR(255) NOT NULL REFERENCES universal_users(universal_id) ON DELETE CASCADE,
+    platform VARCHAR(50) NOT NULL,
+    platform_user_id VARCHAR(255) NOT NULL,
+    username VARCHAR(255) NOT NULL,
+    display_name VARCHAR(255),
+    email VARCHAR(255),
+    verified_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(platform, platform_user_id)
+);
+
+-- Indexes for performance
+CREATE INDEX IF NOT EXISTS idx_platform_identities_universal_id ON platform_identities(universal_id);
+CREATE INDEX IF NOT EXISTS idx_platform_identities_platform_user ON platform_identities(platform, platform_user_id);
+CREATE INDEX IF NOT EXISTS idx_universal_users_username ON universal_users(primary_username);
+CREATE INDEX IF NOT EXISTS idx_universal_users_email ON universal_users(email);
+
+-- Comments for documentation
+COMMENT ON TABLE universal_users IS 'Universal user identities across all platforms';
+COMMENT ON TABLE platform_identities IS 'Platform-specific identity mappings to universal users';
+COMMENT ON COLUMN universal_users.universal_id IS 'Universal unique identifier (weu_* format)';
+COMMENT ON COLUMN platform_identities.platform IS 'Platform name (discord, web_ui, etc.)';
+COMMENT ON COLUMN platform_identities.platform_user_id IS 'Platform-specific user ID';
+
+-- ============================================================================
+-- RELATIONSHIP EVOLUTION SYSTEM (Dynamic Relationship Scoring)
+-- ============================================================================
+-- Tracks dynamic trust/affection/attunement scores for user-bot relationships
+-- Part of Sprint 3 RelationshipTuner system
+
+-- Relationship Scores Table (Current state)
+CREATE TABLE IF NOT EXISTS relationship_scores (
+    user_id VARCHAR(255) NOT NULL,
+    bot_name VARCHAR(100) NOT NULL,
+    trust DECIMAL(5,4) NOT NULL DEFAULT 0.5000,
+    affection DECIMAL(5,4) NOT NULL DEFAULT 0.4000,
+    attunement DECIMAL(5,4) NOT NULL DEFAULT 0.3000,
+    interaction_count INTEGER NOT NULL DEFAULT 0,
+    last_updated TIMESTAMP NOT NULL DEFAULT NOW(),
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    
+    PRIMARY KEY (user_id, bot_name),
+    
+    -- Constraints for 0-1 range
+    CHECK (trust >= 0.0 AND trust <= 1.0),
+    CHECK (affection >= 0.0 AND affection <= 1.0),
+    CHECK (attunement >= 0.0 AND attunement <= 1.0),
+    CHECK (interaction_count >= 0)
+);
+
+-- Relationship Events Table (History)
+CREATE TABLE IF NOT EXISTS relationship_events (
+    id SERIAL PRIMARY KEY,
+    user_id VARCHAR(255) NOT NULL,
+    bot_name VARCHAR(100) NOT NULL,
+    event_type VARCHAR(50) NOT NULL,
+    trust_delta DECIMAL(5,4),
+    affection_delta DECIMAL(5,4),
+    attunement_delta DECIMAL(5,4),
+    trust_value DECIMAL(5,4),
+    affection_value DECIMAL(5,4),
+    attunement_value DECIMAL(5,4),
+    conversation_quality VARCHAR(20),
+    emotion_variance DECIMAL(5,4),
+    update_reason TEXT,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    
+    -- Foreign key to relationship_scores
+    FOREIGN KEY (user_id, bot_name) 
+        REFERENCES relationship_scores(user_id, bot_name)
+        ON DELETE CASCADE
+);
+
+-- Trust Recovery State Table
+CREATE TABLE IF NOT EXISTS trust_recovery_state (
+    user_id VARCHAR(255) NOT NULL,
+    bot_name VARCHAR(100) NOT NULL,
+    recovery_stage VARCHAR(20) NOT NULL,
+    initial_trust DECIMAL(5,4) NOT NULL,
+    current_trust DECIMAL(5,4) NOT NULL,
+    target_trust DECIMAL(5,4) NOT NULL,
+    progress_percentage DECIMAL(5,2) NOT NULL DEFAULT 0.00,
+    recovery_actions_taken TEXT[],
+    started_at TIMESTAMP NOT NULL,
+    last_updated TIMESTAMP NOT NULL DEFAULT NOW(),
+    estimated_completion TIMESTAMP,
+    
+    PRIMARY KEY (user_id, bot_name, started_at),
+    
+    -- Foreign key to relationship_scores
+    FOREIGN KEY (user_id, bot_name) 
+        REFERENCES relationship_scores(user_id, bot_name)
+        ON DELETE CASCADE,
+    
+    -- Constraints
+    CHECK (initial_trust >= 0.0 AND initial_trust <= 1.0),
+    CHECK (current_trust >= 0.0 AND current_trust <= 1.0),
+    CHECK (target_trust >= 0.0 AND target_trust <= 1.0),
+    CHECK (progress_percentage >= 0.0 AND progress_percentage <= 100.0)
+);
+
+-- Indexes for relationship_scores
+CREATE INDEX IF NOT EXISTS idx_relationship_scores_user ON relationship_scores(user_id);
+CREATE INDEX IF NOT EXISTS idx_relationship_scores_bot ON relationship_scores(bot_name);
+CREATE INDEX IF NOT EXISTS idx_relationship_scores_trust ON relationship_scores(trust) WHERE trust < 0.4;
+
+-- Indexes for relationship_events
+CREATE INDEX IF NOT EXISTS idx_relationship_events_user_bot ON relationship_events(user_id, bot_name);
+CREATE INDEX IF NOT EXISTS idx_relationship_events_type ON relationship_events(event_type);
+CREATE INDEX IF NOT EXISTS idx_relationship_events_timestamp ON relationship_events(created_at DESC);
+
+-- Indexes for trust_recovery_state
+CREATE INDEX IF NOT EXISTS idx_trust_recovery_user_bot ON trust_recovery_state(user_id, bot_name);
+CREATE INDEX IF NOT EXISTS idx_trust_recovery_stage ON trust_recovery_state(recovery_stage) WHERE recovery_stage IN ('active', 'recovering');
+
+-- Comments for documentation
+COMMENT ON TABLE relationship_scores IS 'Current relationship scores for each user-bot pair (trust, affection, attunement)';
+COMMENT ON TABLE relationship_events IS 'Historical record of relationship score changes and updates';
+COMMENT ON TABLE trust_recovery_state IS 'Active trust recovery tracking for damaged relationships';
+
