@@ -39,6 +39,12 @@ services:
       - ENABLE_CHARACTER_INTELLIGENCE=true
       - ENABLE_EMOTIONAL_INTELLIGENCE=true
       
+      # InfluxDB (Temporal Intelligence & Machine Learning)
+      - INFLUXDB_URL=${INFLUXDB_URL:-http://influxdb:8086}
+      - INFLUXDB_TOKEN=${INFLUXDB_TOKEN:-whisperengine-fidelity-first-metrics-token}
+      - INFLUXDB_ORG=${INFLUXDB_ORG:-whisperengine}
+      - INFLUXDB_BUCKET=${INFLUXDB_BUCKET:-performance_metrics}
+      
       # Pre-downloaded model cache paths
       - FASTEMBED_CACHE_PATH=/app/cache/fastembed
       - HF_HOME=/app/cache/huggingface
@@ -47,7 +53,7 @@ services:
       
       # Model configuration (models are pre-downloaded in container)
       - ROBERTA_EMOTION_MODEL_NAME=cardiffnlp/twitter-roberta-base-emotion-multilabel-latest
-      - EMBEDDING_MODEL_NAME=sentence-transformers/all-MiniLM-L6-v2
+      - EMBEDDING_MODEL=sentence-transformers/all-MiniLM-L6-v2
       
     volumes:
       - whisperengine_logs:/app/logs
@@ -57,6 +63,8 @@ services:
       postgres:
         condition: service_healthy
       qdrant:
+        condition: service_healthy
+      influxdb:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
@@ -127,9 +135,36 @@ services:
       timeout: 10s
       retries: 3
 
+  # InfluxDB Time-Series Database (Temporal Intelligence & Machine Learning)
+  influxdb:
+    image: influxdb:2.7-alpine
+    container_name: whisperengine-influxdb
+    ports:
+      - "8086:8086"  # InfluxDB UI access
+    environment:
+      - DOCKER_INFLUXDB_INIT_MODE=setup
+      - DOCKER_INFLUXDB_INIT_USERNAME=${INFLUXDB_USER:-admin}
+      - DOCKER_INFLUXDB_INIT_PASSWORD=${INFLUXDB_PASSWORD:-whisperengine_metrics}
+      - DOCKER_INFLUXDB_INIT_ORG=${INFLUXDB_ORG:-whisperengine}
+      - DOCKER_INFLUXDB_INIT_BUCKET=${INFLUXDB_BUCKET:-performance_metrics}
+      - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=${INFLUXDB_TOKEN:-whisperengine-fidelity-first-metrics-token}
+    volumes:
+      - influxdb_data:/var/lib/influxdb2
+      - influxdb_config:/etc/influxdb2
+    networks:
+      - whisperengine-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8086/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
 volumes:
   postgres_data:
   qdrant_data:
+  influxdb_data:
+  influxdb_config:
   whisperengine_logs:
 
 networks:

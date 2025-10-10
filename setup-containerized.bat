@@ -28,68 +28,71 @@ if errorlevel 1 (
 )
 echo [SUCCESS] Docker is running
 
-REM Create WhisperEngine directory
-set INSTALL_DIR=whisperengine
-if exist "%INSTALL_DIR%" (
-    echo [WARNING] Directory '%INSTALL_DIR%' already exists
-    set /p "REPLY=Remove existing directory and continue? (y/N): "
-    if /i "!REPLY!" equ "y" (
-        rmdir /s /q "%INSTALL_DIR%"
-        echo [SETUP] Removed existing directory
-    ) else (
-        echo [ERROR] Setup cancelled
+REM Detect if we're running inside the WhisperEngine repository
+if exist "docker-compose.containerized.yml" if exist ".env.containerized.template" (
+    echo [SETUP] Running from WhisperEngine repository directory
+    set INSTALL_DIR=.
+    set COMPOSE_FILE=docker-compose.containerized.yml
+    set ENV_TEMPLATE=.env.containerized.template
+) else (
+    REM Create WhisperEngine directory for fresh installation
+    set INSTALL_DIR=whisperengine
+    set COMPOSE_FILE=docker-compose.yml
+    set ENV_TEMPLATE=.env.template
+    
+    if exist "%INSTALL_DIR%" (
+        echo [WARNING] Directory '%INSTALL_DIR%' already exists
+        set /p "REPLY=Remove existing directory and continue? (y/N): "
+        if /i "!REPLY!" equ "y" (
+            rmdir /s /q "%INSTALL_DIR%"
+            echo [SETUP] Removed existing directory
+        ) else (
+            echo [ERROR] Setup cancelled
+            pause
+            exit /b 1
+        )
+    )
+    
+    mkdir "%INSTALL_DIR%"
+)
+
+cd "%INSTALL_DIR%"
+echo [SUCCESS] Using directory: %CD%
+
+if not "%INSTALL_DIR%" == "." (
+    REM Download Docker Compose file
+    echo [SETUP] Downloading Docker Compose configuration...
+    set COMPOSE_URL=https://raw.githubusercontent.com/whisperengine-ai/whisperengine/main/docker-compose.containerized.yml
+    curl -sSL "%COMPOSE_URL%" -o docker-compose.yml
+    if errorlevel 1 (
+        echo [ERROR] Failed to download Docker Compose file
         pause
         exit /b 1
     )
-)
+    echo [SUCCESS] Downloaded docker-compose.yml
 
-mkdir "%INSTALL_DIR%"
-cd "%INSTALL_DIR%"
-echo [SUCCESS] Created directory: %INSTALL_DIR%
-
-REM Download Docker Compose file
-echo [SETUP] Downloading Docker Compose configuration...
-set COMPOSE_URL=https://raw.githubusercontent.com/whisperengine-ai/whisperengine/main/docker-compose.containerized.yml
-curl -sSL "%COMPOSE_URL%" -o docker-compose.yml
-if errorlevel 1 (
-    echo [ERROR] Failed to download Docker Compose file
-    pause
-    exit /b 1
+    REM Download environment template
+    echo [SETUP] Downloading configuration template...
+    set ENV_URL=https://raw.githubusercontent.com/whisperengine-ai/whisperengine/main/.env.containerized.template
+    curl -sSL "%ENV_URL%" -o .env.template
+    if errorlevel 1 (
+        echo [ERROR] Failed to download environment template
+        pause
+        exit /b 1
+    )
+    echo [SUCCESS] Downloaded .env.template
+) else (
+    echo [SUCCESS] Using existing repository files
 )
-echo [SUCCESS] Downloaded docker-compose.yml
-
-REM Download environment template
-echo [SETUP] Downloading configuration template...
-set ENV_URL=https://raw.githubusercontent.com/whisperengine-ai/whisperengine/main/.env.containerized.template
-curl -sSL "%ENV_URL%" -o .env.template
-if errorlevel 1 (
-    echo [ERROR] Failed to download environment template
-    pause
-    exit /b 1
-)
-echo [SUCCESS] Downloaded .env.template
 
 REM Create .env file if it doesn't exist
 if not exist .env (
     echo [SETUP] Creating configuration file...
-    copy .env.template .env >nul
-    echo [SUCCESS] Created .env file from template
+    copy "%ENV_TEMPLATE%" .env >nul
+    echo [SUCCESS] Created .env file with default settings (LM Studio)
+    echo [SETUP] 💡 Using LM Studio as default LLM (free, local)
+    echo [SETUP] 🔧 You can edit .env later to customize settings
     echo.
-    echo [WARNING] IMPORTANT: You need to edit the .env file with your LLM settings!
-    echo    Default: Uses local LM Studio (install from https://lmstudio.ai)
-    echo    Alternative: Set LLM_CHAT_API_KEY for cloud providers
-    echo    Optional: Set DISCORD_BOT_TOKEN for Discord integration
-    echo.
-    
-    REM Open .env file for editing
-    echo [SETUP] Opening .env file for editing...
-    notepad .env
-    
-    echo.
-    echo 📖 After reviewing .env settings, run this script again to start WhisperEngine
-    echo    💡 Tip: Default configuration uses LM Studio (no API key needed)
-    pause
-    exit /b 0
 )
 
 echo [SUCCESS] Configuration file found
@@ -138,11 +141,11 @@ echo.
 
 REM Pull latest images first
 echo [SETUP] Pulling latest container images...
-docker-compose pull
+docker-compose -f "%COMPOSE_FILE%" pull
 
 REM Start WhisperEngine
 echo [SETUP] Starting services...
-docker-compose up -d
+docker-compose -f "%COMPOSE_FILE%" up -d
 
 echo.
 echo [SETUP] ⏳ Waiting for services to start...
@@ -165,7 +168,7 @@ goto wait_loop
 
 :timeout
 echo [ERROR] Services didn't start properly. Check logs:
-echo    docker-compose logs
+echo    docker-compose -f "%COMPOSE_FILE%" logs
 pause
 exit /b 1
 
@@ -177,23 +180,26 @@ echo.
 echo 🌐 Web UI:     http://localhost:3001
 echo 🤖 Chat API:   http://localhost:9090/api/chat
 echo 📊 Health:     http://localhost:9090/health
+echo 📈 InfluxDB:   http://localhost:8086 (Metrics & Machine Learning)
 echo.
 echo ✨ Features:
 echo • Create AI characters via web interface
 echo • Persistent memory and conversation history
+echo • Machine learning & temporal intelligence (InfluxDB)
 echo • RESTful Chat APIs for integration
 echo • Optional Discord bot functionality
 echo.
 echo 📖 Next steps:
 echo 1. Visit http://localhost:3001 to create your first character
 echo 2. Test the chat API with curl or your application
-echo 3. Enable Discord integration if desired
+echo 3. Edit .env file to customize LLM settings if needed
+echo 4. Enable Discord integration if desired
 echo.
 echo 🔧 Management commands:
-echo    docker-compose stop     # Stop WhisperEngine
-echo    docker-compose start    # Restart WhisperEngine
-echo    docker-compose logs -f  # View live logs
-echo    docker-compose down     # Stop and remove containers
+echo    docker-compose -f %COMPOSE_FILE% stop     # Stop WhisperEngine
+echo    docker-compose -f %COMPOSE_FILE% start    # Restart WhisperEngine
+echo    docker-compose -f %COMPOSE_FILE% logs -f  # View live logs
+echo    docker-compose -f %COMPOSE_FILE% down     # Stop and remove containers
 echo.
 
 REM Auto-open browser

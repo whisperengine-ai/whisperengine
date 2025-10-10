@@ -44,78 +44,69 @@ if ! docker info > /dev/null 2>&1; then
 fi
 print_success "Docker is running"
 
-# Create WhisperEngine directory
-INSTALL_DIR="whisperengine"
-if [ -d "$INSTALL_DIR" ]; then
-    print_warning "Directory '$INSTALL_DIR' already exists"
-    read -p "Remove existing directory and continue? (y/N): " -n 1 -r
-    echo ""
-    if [[ $REPLY =~ ^[Yy]$ ]]; then
-        rm -rf "$INSTALL_DIR"
-        print_status "Removed existing directory"
+# Detect if we're running inside the WhisperEngine repository
+if [ -f "docker-compose.containerized.yml" ] && [ -f ".env.containerized.template" ]; then
+    print_status "Running from WhisperEngine repository directory"
+    INSTALL_DIR="."
+    COMPOSE_FILE="docker-compose.containerized.yml"
+    ENV_TEMPLATE=".env.containerized.template"
+else
+    # Create WhisperEngine directory for fresh installation
+    INSTALL_DIR="whisperengine"
+    COMPOSE_FILE="docker-compose.yml"
+    ENV_TEMPLATE=".env.template"
+    
+    if [ -d "$INSTALL_DIR" ]; then
+        print_warning "Directory '$INSTALL_DIR' already exists"
+        read -p "Remove existing directory and continue? (y/N): " -n 1 -r
+        echo ""
+        if [[ $REPLY =~ ^[Yy]$ ]]; then
+            rm -rf "$INSTALL_DIR"
+            print_status "Removed existing directory"
+        else
+            print_error "Setup cancelled"
+            exit 1
+        fi
+    fi
+    
+    mkdir -p "$INSTALL_DIR"
+fi
+
+cd "$INSTALL_DIR"
+print_success "Using directory: $(pwd)"
+
+if [ "$INSTALL_DIR" != "." ]; then
+    # Download Docker Compose file
+    print_status "Downloading Docker Compose configuration..."
+    COMPOSE_URL="https://raw.githubusercontent.com/whisperengine-ai/whisperengine/main/docker-compose.containerized.yml"
+    if curl -sSL "$COMPOSE_URL" -o docker-compose.yml; then
+        print_success "Downloaded docker-compose.yml"
     else
-        print_error "Setup cancelled"
+        print_error "Failed to download Docker Compose file"
         exit 1
     fi
-fi
 
-mkdir -p "$INSTALL_DIR"
-cd "$INSTALL_DIR"
-print_success "Created directory: $INSTALL_DIR"
-
-# Download Docker Compose file
-print_status "Downloading Docker Compose configuration..."
-COMPOSE_URL="https://raw.githubusercontent.com/whisperengine-ai/whisperengine/main/docker-compose.containerized.yml"
-if curl -sSL "$COMPOSE_URL" -o docker-compose.yml; then
-    print_success "Downloaded docker-compose.yml"
+    # Download environment template
+    print_status "Downloading configuration template..."
+    ENV_URL="https://raw.githubusercontent.com/whisperengine-ai/whisperengine/main/.env.containerized.template"
+    if curl -sSL "$ENV_URL" -o .env.template; then
+        print_success "Downloaded .env.template"
+    else
+        print_error "Failed to download environment template"
+        exit 1
+    fi
 else
-    print_error "Failed to download Docker Compose file"
-    exit 1
-fi
-
-# Download environment template
-print_status "Downloading configuration template..."
-ENV_URL="https://raw.githubusercontent.com/whisperengine-ai/whisperengine/main/.env.containerized.template"
-if curl -sSL "$ENV_URL" -o .env.template; then
-    print_success "Downloaded .env.template"
-else
-    print_error "Failed to download environment template"
-    exit 1
+    print_success "Using existing repository files"
 fi
 
 # Create .env file if it doesn't exist
 if [ ! -f .env ]; then
     print_status "Creating configuration file..."
-    cp .env.template .env
-    print_success "Created .env file from template"
+    cp "$ENV_TEMPLATE" .env
+    print_success "Created .env file with default settings (LM Studio)"
+    print_status "💡 Using LM Studio as default LLM (free, local)"
+    print_status "🔧 You can edit .env later to customize settings"
     echo ""
-    print_warning "IMPORTANT: You need to edit the .env file with your LLM settings!"
-    echo "   Default: Uses local LM Studio (install from https://lmstudio.ai)"
-    echo "   Alternative: Set LLM_CHAT_API_KEY for cloud providers"
-    echo "   Optional: Set DISCORD_BOT_TOKEN for Discord integration"
-    echo ""
-    
-    # Detect OS and open .env file
-    if [[ "$OSTYPE" == "darwin"* ]]; then
-        # macOS
-        print_status "Opening .env file for editing..."
-        open -e .env
-    elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
-        # Linux
-        print_status "Edit the .env file with your preferred text editor:"
-        echo "   nano .env"
-        echo "   OR"
-        echo "   gedit .env"
-    elif [[ "$OSTYPE" == "msys" ]] || [[ "$OSTYPE" == "cygwin" ]]; then
-        # Windows
-        print_status "Opening .env file for editing..."
-        notepad .env
-    fi
-    
-    echo ""
-    echo "📖 After reviewing .env settings, run this script again to start WhisperEngine"
-    echo "   💡 Tip: Default configuration uses LM Studio (no API key needed)"
-    exit 0
 fi
 
 print_success "Configuration file found"
@@ -154,11 +145,11 @@ echo ""
 
 # Pull latest images first
 print_status "Pulling latest container images..."
-docker-compose pull
+docker-compose -f "$COMPOSE_FILE" pull
 
 # Start WhisperEngine
 print_status "Starting services..."
-docker-compose up -d
+docker-compose -f "$COMPOSE_FILE" up -d
 
 echo ""
 print_status "⏳ Waiting for services to start..."
@@ -178,7 +169,7 @@ done
 
 if [ $attempt -eq $max_attempts ]; then
     print_error "Services didn't start properly. Check logs:"
-    echo "   docker-compose logs"
+    echo "   docker-compose -f $COMPOSE_FILE logs"
     exit 1
 fi
 
@@ -189,23 +180,26 @@ echo ""
 echo "🌐 Web UI:     http://localhost:3001"
 echo "🤖 Chat API:   http://localhost:9090/api/chat"
 echo "📊 Health:     http://localhost:9090/health"
+echo "📈 InfluxDB:   http://localhost:8086 (Metrics & Machine Learning)"
 echo ""
 echo "✨ Features:"
 echo "• Create AI characters via web interface"
 echo "• Persistent memory and conversation history"
+echo "• Machine learning & temporal intelligence (InfluxDB)"
 echo "• RESTful Chat APIs for integration"
 echo "• Optional Discord bot functionality"
 echo ""
 echo "📖 Next steps:"
 echo "1. Visit http://localhost:3001 to create your first character"
 echo "2. Test the chat API with curl or your application"
-echo "3. Enable Discord integration if desired"
+echo "3. Edit .env file to customize LLM settings if needed"
+echo "4. Enable Discord integration if desired"
 echo ""
 echo "🔧 Management commands:"
-echo "   docker-compose stop     # Stop WhisperEngine"
-echo "   docker-compose start    # Restart WhisperEngine"
-echo "   docker-compose logs -f  # View live logs"
-echo "   docker-compose down     # Stop and remove containers"
+echo "   docker-compose -f $COMPOSE_FILE stop     # Stop WhisperEngine"
+echo "   docker-compose -f $COMPOSE_FILE start    # Restart WhisperEngine"
+echo "   docker-compose -f $COMPOSE_FILE logs -f  # View live logs"
+echo "   docker-compose -f $COMPOSE_FILE down     # Stop and remove containers"
 echo ""
 
 # Auto-open browser on macOS
