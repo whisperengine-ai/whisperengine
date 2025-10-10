@@ -1,17 +1,11 @@
-# WhisperEngine - Containerized Deployment
+# WhisperEngine - Containerized Deployment (Development)
 # No source code required - uses pre-built Docker Hub images
-#
-# Version Strategy:
-# - Use specific tags (v1.0.1) for production stability
-# - Use 'latest' for development/testing of newest features
-#
-# Production: whisperengine/whisperengine:v1.0.1
-# Development: whisperengine/whisperengine:latest
+# Uses 'latest' tags for automatic updates (development/testing only)
 
 services:
   # Main WhisperEngine Assistant (AI Chat API)
   whisperengine-assistant:
-    image: whisperengine/whisperengine:v1.0.1
+    image: whisperengine/whisperengine:latest
     container_name: whisperengine-assistant
     ports:
       - "9090:9090"  # Chat API endpoint
@@ -82,7 +76,7 @@ services:
 
   # CDL Web UI for character creation and management
   cdl-web-ui:
-    image: whisperengine/whisperengine-ui:v1.0.1
+    image: whisperengine/whisperengine-ui:latest
     container_name: whisperengine-web-ui
     ports:
       - "3001:3000"  # Web interface

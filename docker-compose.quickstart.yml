@@ -1,10 +1,11 @@
 # WhisperEngine Quick Start
 # Single-command deployment for non-technical users
+# Uses pinned versions for maximum reliability and reproducibility
 
 services:
   # Main WhisperEngine bot (HTTP API only by default)
   whisperengine-assistant:
-    build: .
+    image: whisperengine/whisperengine:v1.0.1
     container_name: whisperengine-assistant
     ports:
       - "9090:9090"  # Chat API endpoint
@@ -45,6 +46,16 @@ services:
       - INFLUXDB_ORG=${INFLUXDB_ORG:-whisperengine}
       - INFLUXDB_BUCKET=${INFLUXDB_BUCKET:-performance_metrics}
       
+      # Pre-downloaded model cache paths (models are bundled in container)
+      - FASTEMBED_CACHE_PATH=/app/cache/fastembed
+      - HF_HOME=/app/cache/huggingface
+      - TRANSFORMERS_CACHE=/app/cache/huggingface
+      - MODEL_CACHE_DIR=/app/models
+      
+      # Model configuration (models are pre-downloaded in container)
+      - ROBERTA_EMOTION_MODEL_NAME=cardiffnlp/twitter-roberta-base-emotion-multilabel-latest
+      - EMBEDDING_MODEL=sentence-transformers/all-MiniLM-L6-v2
+      
     volumes:
       - ./logs:/app/logs
     networks:
@@ -65,9 +76,7 @@ services:
 
   # CDL Web UI for character creation and management
   cdl-web-ui:
-    build:
-      context: ./cdl-web-ui
-      dockerfile: Dockerfile
+    image: whisperengine/whisperengine-ui:v1.0.1
     container_name: whisperengine-web-ui
     ports:
       - "3001:3000"  # Web interface
