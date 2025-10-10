@@ -102,7 +102,7 @@ class BotEventHandlers:
         self.personality_profiler = None
         self.dynamic_personality_profiler = getattr(bot_core, "dynamic_personality_profiler", None)
         self.graph_personality_manager = getattr(bot_core, "graph_personality_manager", None)
-        self.phase2_integration = getattr(bot_core, "phase2_integration", None)
+        self.emotion_manager = getattr(bot_core, "phase2_integration", None)
         # Character system reference for CDL integration
         self.character_system = getattr(bot_core, "character_system", None)
         # Legacy emotion engine removed - vector-native system handles this
@@ -133,7 +133,7 @@ class BotEventHandlers:
         from src.intelligence.emoji_reaction_intelligence import EmojiReactionIntelligence
         self.emoji_reaction_intelligence = EmojiReactionIntelligence(
             memory_manager=self.memory_manager,
-            emotion_manager=self.phase2_integration
+            emotion_manager=self.emotion_manager
         )
         
         # Initialize Vector-Based Emoji Response Intelligence 
@@ -1106,10 +1106,10 @@ class BotEventHandlers:
     def _set_minimal_ai_results(self):
         """Set minimal AI analysis results for maximum performance mode."""
         self._last_external_emotion_data = None
-        self._last_phase2_context = None
+        self._last_emotion_context = None
         self._last_current_emotion_data = None
-        self._last_phase3_context_switches = None
-        self._last_phase3_empathy_calibration = None
+        self._last_conversation_flow_patterns = None
+        self._last_empathy_response_calibration = None
         self._last_dynamic_personality_context = None
         self._last_conversation_intelligence_context = None
         self._last_comprehensive_context = None
@@ -1239,7 +1239,7 @@ class BotEventHandlers:
         context_analysis=None,
         current_emotion_data=None,
         external_emotion_data=None,
-        phase2_context=None,
+        emotion_context=None,
         conversation_intelligence_context=None,
         dynamic_personality_context=None
     ):

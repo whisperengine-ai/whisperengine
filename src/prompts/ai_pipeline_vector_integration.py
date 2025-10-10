@@ -138,8 +138,8 @@ class VectorAIPipelineIntegration:
             # 🚀 PARALLEL PROCESSING: Run existing AI pipeline phases
             import asyncio
             
-            phase1_task = self._run_phase1_personality_analysis(user_id, message_content)
-            phase2_task = self._run_phase2_emotional_intelligence(user_id, message_content, discord_message)
+            phase1_task = self._run_personality_analysis(user_id, message_content)
+            phase2_task = self._run_emotional_intelligence(user_id, message_content, discord_message)
             phase3_task = self._run_phase3_memory_networks(user_id, message_content, recent_messages)
             
             # Execute phases in parallel (keeping existing pipeline efficiency)
@@ -183,9 +183,9 @@ class VectorAIPipelineIntegration:
             logger.error("❌ AI pipeline + vector integration failed: %s", e)
             raise e
     
-    async def _run_phase1_personality_analysis(self, user_id: str, message_content: str) -> Dict[str, Any]:
+    async def _run_personality_analysis(self, user_id: str, message_content: str) -> Dict[str, Any]:
         """
-        Run Phase 1: Personality Analysis using hybrid approach.
+        Run Personality Analysis using hybrid approach.
         
         Combines traditional personality profiling with vector-native analysis
         for comprehensive personality insights.
@@ -276,11 +276,11 @@ class VectorAIPipelineIntegration:
         
         return result
     
-    async def _run_phase2_emotional_intelligence(
+    async def _run_emotional_intelligence(
         self, user_id: str, message_content: str, discord_message
     ) -> Dict[str, Any]:
         """
-        Run existing Phase 2 emotional intelligence system.
+        Run emotional intelligence analysis system.
         
         This keeps the sophisticated emotion analysis intact.
         """

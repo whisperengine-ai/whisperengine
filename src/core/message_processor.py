@@ -2196,8 +2196,8 @@ class MessageProcessor:
                 tasks.append(character_intelligence_task)
                 task_names.append("unified_character_intelligence")
                 
-            # Task 6: Thread management analysis (Phase 4.2)
-            if self.bot_core and hasattr(self.bot_core, 'phase4_thread_manager'):
+            # Task 6: Thread management analysis (Advanced Thread Management)
+            if self.bot_core and hasattr(self.bot_core, 'conversation_thread_manager'):
                 thread_task = self._process_thread_management(
                     message_context.user_id,
                     message_context.content,
@@ -2358,10 +2358,10 @@ class MessageProcessor:
                         'conversation_mode': getattr(conversation_context, 'conversation_mode', None),
                     })
             
-            # Add thread management results (Phase 4.2)
+            # Add thread management results (Advanced Thread Analysis)
             if ai_components.get('thread_management'):
-                comprehensive_context['phase4_2_thread_analysis'] = ai_components['thread_management']
-                logger.info("🧠 Added Phase 4.2 Advanced Thread Management results to context")
+                comprehensive_context['conversation_thread_analysis'] = ai_components['thread_management']
+                logger.info("🧠 Added Advanced Thread Management results to context")
             
             # Add proactive engagement results (Phase 4.3)
             if ai_components.get('proactive_engagement'):
@@ -2489,7 +2489,7 @@ class MessageProcessor:
             
             # Process Phase 3 components separately (like the old working system)
             conversation_context_switches = await self._analyze_context_switches(user_id, content, discord_message)
-            phase3_empathy_calibration = await self._calibrate_empathy_response(user_id, content, discord_message)
+            empathy_response_calibration = await self._calibrate_empathy_response(user_id, content, discord_message)
             
             # Process with conversation intelligence sophistication
             conversation_context_result = await self.bot_core.phase2_integration.process_conversation_intelligence(
@@ -2497,13 +2497,13 @@ class MessageProcessor:
                 message=discord_message,
                 recent_messages=conversation_context,
                 external_emotion_data=None,
-                phase2_context=None
+                emotion_context=None
             )
             
             # Add Phase 3 results to the conversation intelligence context
             if isinstance(conversation_context_result, dict):
                 conversation_context_result['conversation_context_switches'] = conversation_context_switches
-                conversation_context_result['phase3_empathy_calibration'] = phase3_empathy_calibration
+                conversation_context_result['empathy_response_calibration'] = empathy_response_calibration
             
             logger.debug(f"Sophisticated conversation intelligence processing successful for user {user_id}")
             return conversation_context_result
@@ -2581,7 +2581,7 @@ class MessageProcessor:
                 return None
             
             # Extract data from ai_components for learning moment context
-            emotional_context = ai_components.get('phase2_emotional_intelligence', {})
+            emotional_context = ai_components.get('emotional_intelligence', {})
             temporal_data = ai_components.get('character_intelligence', {}).get('coordination_metadata', {})
             episodic_memories = ai_components.get('character_intelligence', {}).get('system_contributions', {}).get('character_episodic_intelligence')
             
@@ -2666,14 +2666,14 @@ class MessageProcessor:
                                        message_context: MessageContext) -> Optional[Dict[str, Any]]:
         """Process Phase 4.2 Advanced Thread Management."""
         try:
-            if not self.bot_core or not hasattr(self.bot_core, 'phase4_thread_manager'):
+            if not self.bot_core or not hasattr(self.bot_core, 'conversation_thread_manager'):
                 return None
             
             # Create adapter for Discord-specific component
             discord_message = create_discord_message_adapter(message_context)
             
             # Process thread management
-            thread_result = await self.bot_core.phase4_thread_manager.analyze_thread_context(
+            thread_result = await self.bot_core.conversation_thread_manager.analyze_thread_context(
                 user_id=user_id,
                 message=discord_message,
                 conversation_history=[]
@@ -3600,7 +3600,7 @@ class MessageProcessor:
                 message=discord_message,
                 recent_messages=[],
                 external_emotion_data=emotion_data,
-                phase2_context=emotion_data
+                emotion_context=emotion_data
             )
             
             logger.debug("Conversation intelligence processing successful for user %s", user_id)
@@ -4747,7 +4747,7 @@ class MessageProcessor:
                     "context_confidence": round(confidence_metrics.context_confidence, 3),
                     "emotional_confidence": round(confidence_metrics.emotional_confidence, 3),
                     "interaction_pattern": "stable",  # TODO: Calculate from temporal data
-                    "data_source": "phase5_temporal_intelligence"
+                    "data_source": "temporal_relationship_intelligence"
                 }
             except Exception as e:
                 logger.debug(f"Could not calculate temporal intelligence: {e}")
@@ -4793,7 +4793,7 @@ class MessageProcessor:
         performance_metrics = conversation_intelligence_metadata.get('performance_metrics', {})
         
         metadata["processing_pipeline"] = {
-            "phase2_emotion_analysis_ms": round(performance_metrics.get('phase2_duration', 0) * 1000, 2),
+            "emotion_analysis_duration_ms": round(performance_metrics.get('phase2_duration', 0) * 1000, 2),
             "conversation_intelligence_ms": round(conversation_intelligence_metadata.get('total_duration', 0) * 1000, 2),
             "total_processing_ms": processing_time_ms,
             "phases_executed": conversation_intelligence_metadata.get('phases_executed', []),

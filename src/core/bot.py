@@ -361,12 +361,12 @@ class DiscordBotCore:
             
     # REMOVED: Legacy memory optimizer - replaced by vector-native memory system
 
-    async def initialize_phase4_components(self):
-        """Initialize Phase 4.2 and 4.3 components asynchronously."""
+    async def initialize_conversation_intelligence(self):
+        """Initialize Advanced Thread Management and Conversation Intelligence components asynchronously."""
         try:
-            # Phase 4.2: Advanced Thread Manager removed as phantom feature
+            # Advanced Thread Manager removed as phantom feature
             self.thread_manager = None
-            self.logger.info("✅ Phase 4.2: Advanced Thread Manager removed (phantom feature)")
+            self.logger.info("✅ Advanced Thread Manager removed (phantom feature)")
 
             # Initialize Phase 4.3: Proactive Engagement Engine
             if not hasattr(self, 'engagement_engine') or self.engagement_engine is None:
@@ -896,7 +896,7 @@ class DiscordBotCore:
         asyncio.create_task(self.initialize_postgres_pool())
         
         # Schedule async initialization of Phase 4 components
-        asyncio.create_task(self.initialize_phase4_components())
+        asyncio.create_task(self.initialize_conversation_intelligence())
         
         # Schedule async initialization of knowledge router (requires postgres pool)
         # Note: This will wait for postgres_pool to be available
