@@ -83,11 +83,11 @@ services:
     environment:
       - NODE_ENV=production
       - NEXT_TELEMETRY_DISABLED=1
-      - PGHOST=postgres
-      - PGPORT=5432
-      - PGDATABASE=whisperengine
-      - PGUSER=whisperengine
-      - PGPASSWORD=whisperengine_password
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=whisperengine
+      - POSTGRES_USER=whisperengine
+      - POSTGRES_PASSWORD=whisperengine_password
       # API endpoint for bot management
       - WHISPERENGINE_API_URL=http://whisperengine-assistant:9090
     networks:
