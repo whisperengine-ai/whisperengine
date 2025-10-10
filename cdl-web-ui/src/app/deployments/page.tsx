@@ -124,7 +124,8 @@ export default function DeploymentsPage() {
               <div className="text-6xl mb-4">🤖</div>
               <h3 className="text-xl font-semibold text-gray-900 mb-2">No Deployed Characters</h3>
               <p className="text-gray-600 mb-6">
-                Deploy characters from the Characters page to see them here.
+                Create characters and deploy them to WhisperEngine to see their status here.
+                Run <code className="bg-gray-100 px-2 py-1 rounded">./multi-bot.sh start all</code> to deploy all characters.
               </p>
               <Link 
                 href="/characters" 
@@ -181,14 +182,15 @@ export default function DeploymentsPage() {
                           onClick={() => testEndpoint(deployment)}
                           className="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700"
                         >
-                          Test Chat
+                          Test Connection
                         </button>
 
                         <Link
                           href={`/chat?endpoint=${encodeURIComponent(deployment.apiEndpoint)}&character=${encodeURIComponent(deployment.characterName)}`}
                           className="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700"
+                          title="Start a chat session with this character (requires running WhisperEngine)"
                         >
-                          Open Chat
+                          Chat Interface
                         </Link>
                       </div>
                     </div>

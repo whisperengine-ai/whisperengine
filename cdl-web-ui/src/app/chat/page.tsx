@@ -8,7 +8,7 @@ interface Message {
   content: string
   sender: 'user' | 'assistant'
   timestamp: Date
-  metadata?: any
+  metadata?: Record<string, unknown>
 }
 
 interface ChatConfig {
@@ -46,9 +46,13 @@ export default function ChatPage() {
       }))
     }
     
-    checkConnection()
-    scrollToBottom()
-  }, [])
+    const initializeConnection = async () => {
+      await checkConnection()
+      scrollToBottom()
+    }
+    
+    initializeConnection()
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     scrollToBottom()
@@ -67,9 +71,15 @@ export default function ChatPage() {
         setConnectionStatus('connected')
         // Add welcome message
         if (messages.length === 0) {
+          const currentTime = new Date().getHours()
+          let greeting = 'Hello'
+          if (currentTime < 12) greeting = 'Good morning'
+          else if (currentTime < 18) greeting = 'Good afternoon'
+          else greeting = 'Good evening'
+          
           setMessages([{
             id: 'welcome',
-            content: `Hello! I'm ${config.characterName}. How can I help you today?`,
+            content: `${greeting}! I'm ${config.characterName}. I'm connected and ready to chat. What would you like to talk about?`,
             sender: 'assistant',
             timestamp: new Date()
           }])
@@ -77,7 +87,7 @@ export default function ChatPage() {
       } else {
         setConnectionStatus('disconnected')
       }
-    } catch (error) {
+    } catch {
       setConnectionStatus('disconnected')
     }
   }
@@ -199,10 +209,29 @@ export default function ChatPage() {
             <div className="flex items-center space-x-4">
               <div className="flex items-center text-sm text-gray-600">
                 {getStatusIndicator()}
-                {connectionStatus === 'connected' && 'Connected'}
+                {connectionStatus === 'connected' && `Connected to ${config.characterName}`}
                 {connectionStatus === 'disconnected' && 'Disconnected'}
-                {connectionStatus === 'checking' && 'Checking...'}
+                {connectionStatus === 'checking' && 'Checking connection...'}
               </div>
+              
+              {connectionStatus === 'disconnected' && (
+                <button
+                  onClick={checkConnection}
+                  className="text-xs bg-blue-600 text-white px-2 py-1 rounded hover:bg-blue-700"
+                >
+                  Retry
+                </button>
+              )}
+              
+              {connectionStatus === 'connected' && (
+                <button
+                  onClick={checkConnection}
+                  className="text-xs bg-green-600 text-white px-2 py-1 rounded hover:bg-green-700"
+                  title="Test connection"
+                >
+                  ✓
+                </button>
+              )}
               
               <button
                 onClick={() => setShowConfig(!showConfig)}
@@ -278,12 +307,27 @@ export default function ChatPage() {
         <div className="bg-white rounded-lg shadow-lg h-[600px] flex flex-col">
           {/* Chat Header */}
           <div className="border-b border-gray-200 p-4">
-            <h1 className="text-xl font-semibold text-gray-900">
-              Chat with {config.characterName}
-            </h1>
-            <p className="text-sm text-gray-600">
-              Test your AI character in real-time
-            </p>
+            <div className="flex items-center justify-between">
+              <div>
+                <h1 className="text-xl font-semibold text-gray-900">
+                  Chat with {config.characterName}
+                </h1>
+                <p className="text-sm text-gray-600">
+                  Test your AI character in real-time
+                </p>
+              </div>
+              <div className="flex items-center text-sm">
+                {getStatusIndicator()}
+                <span className={`${
+                  connectionStatus === 'connected' ? 'text-green-600' : 
+                  connectionStatus === 'disconnected' ? 'text-red-600' : 'text-yellow-600'
+                }`}>
+                  {connectionStatus === 'connected' && 'Ready to Chat'}
+                  {connectionStatus === 'disconnected' && 'Not Connected'}
+                  {connectionStatus === 'checking' && 'Connecting...'}
+                </span>
+              </div>
+            </div>
           </div>
 
           {/* Messages */}
@@ -346,9 +390,24 @@ export default function ChatPage() {
               </button>
             </div>
             
+            {connectionStatus === 'connected' && messages.length <= 1 && (
+              <div className="mt-2 p-3 bg-green-50 border border-green-200 rounded text-sm text-green-800">
+                <div className="font-medium mb-1">✅ Connected to {config.characterName}</div>
+                <div className="text-green-700">
+                  Your character is ready to chat! Type a message above to start the conversation.
+                </div>
+              </div>
+            )}
+            
             {connectionStatus === 'disconnected' && (
-              <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded text-sm text-red-800">
-                Cannot connect to WhisperEngine. Make sure it's running with: <code>./setup.sh</code>
+              <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded text-sm text-blue-800">
+                <div className="font-medium mb-1">💡 Character Testing Requires WhisperEngine</div>
+                <div className="text-blue-700">
+                  To chat with deployed characters, start WhisperEngine with: <code className="bg-blue-100 px-1 rounded">./multi-bot.sh start all</code>
+                </div>
+                <div className="text-blue-600 text-xs mt-1">
+                  Note: This is optional for character creation and management.
+                </div>
               </div>
             )}
           </div>

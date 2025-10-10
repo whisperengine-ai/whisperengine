@@ -29,7 +29,7 @@ export async function GET() {
     let envContent = ''
     try {
       envContent = await fs.readFile(ENV_FILE_PATH, 'utf-8')
-    } catch (error) {
+    } catch {
       // File doesn't exist, return defaults
       console.log('.env file not found, returning defaults')
     }
@@ -124,7 +124,7 @@ export async function POST(request: NextRequest) {
     let existingEnv = ''
     try {
       existingEnv = await fs.readFile(ENV_FILE_PATH, 'utf-8')
-    } catch (error) {
+    } catch {
       console.log('Creating new .env file')
     }
 

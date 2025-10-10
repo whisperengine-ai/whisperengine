@@ -397,7 +397,7 @@ class EnhancedVectorEmotionAnalyzer:
             standardized_primary = standardize_emotion(primary_emotion)
             
             # Calculate performance metrics
-            analysis_time_ms = int((time.perf_counter() - start_time) * 1000)
+            analysis_time_ms = float((time.perf_counter() - start_time) * 1000)
             
             logger.info(f"🎭 FINAL RESULT: Creating EmotionAnalysisResult with:")
             logger.info(f"  - Primary emotion: {standardized_primary} (standardized from {primary_emotion})")
@@ -461,7 +461,7 @@ class EnhancedVectorEmotionAnalyzer:
                 all_emotions={"neutral": 0.7, "unknown": 0.3},
                 emotional_trajectory=["stable"],
                 context_emotions={},
-                analysis_time_ms=int((time.perf_counter() - start_time) * 1000),
+                analysis_time_ms=float((time.perf_counter() - start_time) * 1000),
                 vector_similarity=0.0,
                 embedding_confidence=0.0,
                 pattern_match_score=0.0
@@ -1582,11 +1582,11 @@ class EnhancedVectorEmotionAnalyzer:
     async def _record_emotion_analysis_metrics(self, 
                                              bot_name: str,
                                              user_id: str, 
-                                             analysis_time_ms: int,
+                                             analysis_time_ms: float,
                                              confidence: float,
                                              emotion_count: int,
                                              primary_emotion: str,
-                                             roberta_time_ms: int = 0):
+                                             roberta_time_ms: float = 0.0):
         """Record emotion analysis performance metrics to InfluxDB"""
         if not self.temporal_client:
             return

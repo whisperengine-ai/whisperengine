@@ -14,11 +14,6 @@ interface SystemConfig {
   discord_bot_token: string
   enable_discord: boolean
   
-  // Memory Configuration
-  memory_system_type: string
-  enable_character_intelligence: boolean
-  enable_emotional_intelligence: boolean
-  
   // Database Configuration
   postgres_host: string
   postgres_port: string
@@ -38,9 +33,6 @@ const defaultConfig: SystemConfig = {
   llm_chat_api_key: '',
   discord_bot_token: '',
   enable_discord: false,
-  memory_system_type: 'vector',
-  enable_character_intelligence: true,
-  enable_emotional_intelligence: true,
   postgres_host: 'postgres',
   postgres_port: '5432',
   postgres_user: 'whisperengine',
@@ -117,10 +109,10 @@ export default function ConfigPage() {
         setMessage({type: 'success', text: 'Configuration saved successfully!'})
         setTimeout(() => setMessage(null), 3000)
       } else {
-        const error = await response.json()
-        setMessage({type: 'error', text: error.message || 'Failed to save configuration'})
+        const errorData = await response.json()
+        setMessage({type: 'error', text: errorData.message || 'Failed to save configuration'})
       }
-    } catch (error) {
+    } catch {
       setMessage({type: 'error', text: 'Failed to save configuration'})
     } finally {
       setSaving(false)
@@ -312,51 +304,13 @@ export default function ConfigPage() {
 
             {showAdvanced && (
               <div className="space-y-4 border-t pt-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Memory System Type
-                    </label>
-                    <select
-                      value={config.memory_system_type}
-                      onChange={(e) => setConfig({...config, memory_system_type: e.target.value})}
-                      className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    >
-                      <option value="vector">Vector (Recommended)</option>
-                      <option value="hierarchical">Hierarchical</option>
-                      <option value="test_mock">Test Mock</option>
-                    </select>
-                  </div>
-
-                  <div className="space-y-3">
-                    <div className="flex items-center space-x-3">
-                      <input
-                        type="checkbox"
-                        id="enable_character_intelligence"
-                        checked={config.enable_character_intelligence}
-                        onChange={(e) => setConfig({...config, enable_character_intelligence: e.target.checked})}
-                        className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                      />
-                      <label htmlFor="enable_character_intelligence" className="text-sm font-medium text-gray-700">
-                        Character Intelligence
-                      </label>
-                    </div>
-
-                    <div className="flex items-center space-x-3">
-                      <input
-                        type="checkbox"
-                        id="enable_emotional_intelligence"
-                        checked={config.enable_emotional_intelligence}
-                        onChange={(e) => setConfig({...config, enable_emotional_intelligence: e.target.checked})}
-                        className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                      />
-                      <label htmlFor="enable_emotional_intelligence" className="text-sm font-medium text-gray-700">
-                        Emotional Intelligence
-                      </label>
-                    </div>
+                <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded text-sm text-blue-800">
+                  <div className="font-medium mb-1">💡 Automatic Configuration</div>
+                  <div className="text-blue-700">
+                    WhisperEngine automatically configures memory system (vector-based), character intelligence (CDL), and emotional intelligence (RoBERTa). No manual setup required.
                   </div>
                 </div>
-
+                
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">

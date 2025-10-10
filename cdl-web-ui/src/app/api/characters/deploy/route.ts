@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
 
     // Load current system config
     const mainEnvPath = path.join(process.cwd(), '../.env')
-    let systemConfig: Record<string, string> = {}
+    const systemConfig: Record<string, string> = {}
     
     try {
       const envContent = await fs.readFile(mainEnvPath, 'utf-8')
