@@ -38,6 +38,9 @@ show_usage() {
     echo "  $0 start all"
     echo "  $0 logs marcus"
     echo "  $0 stop"
+    echo ""
+    echo "Note: For manual docker-compose commands, use: -p whisperengine-multi"
+    echo "      docker-compose -f docker-compose.multi-bot.yml -p whisperengine-multi [command]"
 }
 
 validate_bot_name() {
