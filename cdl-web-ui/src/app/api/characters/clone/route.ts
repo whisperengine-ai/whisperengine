@@ -14,7 +14,7 @@ export async function POST(request: NextRequest) {
 
     const pool = new Pool({
       host: process.env.PGHOST || 'host.docker.internal',
-      port: parseInt(process.env.PGPORT || '5433'),
+      port: parseInt(process.env.PGPORT || '5432'),
       database: process.env.PGDATABASE || 'whisperengine',
       user: process.env.PGUSER || 'whisperengine',
       password: process.env.PGPASSWORD || 'whisperengine_password',

@@ -30,12 +30,45 @@ setup_logging(debug=debug_mode, environment=environment, log_dir=log_dir, app_na
 
 # Import and run the main function (logging is now configured)
 import asyncio
+import logging
 from src.main import main as bot_async_main  # Import the real async entry point
+
+logger = logging.getLogger(__name__)
 
 
 async def launcher_main():
-    """Launcher entry point that delegates to the core async bot."""
-    # Delegate directly to the bot's async main (avoid nested asyncio.run())
+    """Launcher entry point with automatic database initialization."""
+    # Auto-migrate database before starting bot
+    try:
+        from src.utils.auto_migrate import DatabaseMigrator
+        
+        logger.info("🔧 Checking database initialization...")
+        migrator = DatabaseMigrator()
+        
+        # Wait for PostgreSQL to be available
+        if not await migrator.wait_for_database():
+            logger.error("❌ Failed to connect to PostgreSQL. Exiting.")
+            return 1
+        
+        # Check if database needs initialization
+        if not await migrator.database_exists():
+            logger.info("🔧 Database not initialized. Running migrations...")
+            success = await migrator.run_migrations()
+            if success:
+                logger.info("✅ Database initialization complete!")
+            else:
+                logger.error("❌ Database initialization failed. Exiting.")
+                return 1
+        else:
+            logger.info("✅ Database already initialized. Checking for pending migrations...")
+            # Run migrations in case there are new ones
+            await migrator.run_migrations()
+        
+    except Exception as e:
+        logger.error(f"❌ Database initialization error: {e}")
+        logger.info("⚠️ Continuing bot startup despite database initialization error...")
+    
+    # Delegate to the bot's async main
     return await bot_async_main()
 
 

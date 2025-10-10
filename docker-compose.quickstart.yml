@@ -1,11 +1,11 @@
 # WhisperEngine Quick Start
 # Single-command deployment for non-technical users
-# Uses pinned versions for maximum reliability and reproducibility
+# Uses :latest tags for easy updates - WhisperEngine container includes SQL initialization
 
 services:
   # Main WhisperEngine bot (HTTP API only by default)
   whisperengine-assistant:
-    image: whisperengine/whisperengine:v1.0.1
+    image: whisperengine/whisperengine:latest
     container_name: whisperengine-assistant
     ports:
       - "9090:9090"  # Chat API endpoint
@@ -76,7 +76,7 @@ services:
 
   # CDL Web UI for character creation and management
   cdl-web-ui:
-    image: whisperengine/whisperengine-ui:v1.0.1
+    image: whisperengine/whisperengine-ui:latest
     container_name: whisperengine-web-ui
     ports:
       - "3001:3000"  # Web interface

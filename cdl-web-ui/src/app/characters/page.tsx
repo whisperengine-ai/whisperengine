@@ -113,7 +113,10 @@ export default function CharactersPage() {
               <h3 className="text-lg font-medium mb-2">Database Connection Error</h3>
               <p className="mb-2">Unable to connect to the database.</p>
               <p className="text-sm text-gray-600">Error: {error}</p>
-              <p className="text-sm text-gray-600 mt-2">Please ensure PostgreSQL is running on port 5433.</p>
+              <p className="text-sm text-gray-600 mt-2">
+                Please ensure PostgreSQL is running and configured correctly.
+                Check your PGHOST and PGPORT environment variables.
+              </p>
             </div>
           ) : characters.length === 0 ? (
             <div className="text-center py-12 text-gray-500">
