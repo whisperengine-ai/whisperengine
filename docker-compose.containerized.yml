@@ -63,7 +63,7 @@ services:
       postgres:
         condition: service_healthy
       qdrant:
-        condition: service_healthy
+        condition: service_started
       influxdb:
         condition: service_healthy
     restart: unless-stopped
@@ -129,11 +129,8 @@ services:
     networks:
       - whisperengine-network
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:6333/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+    # Health check disabled - Qdrant containers have minimal tooling
+    # Application will retry connections if Qdrant isn't ready yet
 
   # InfluxDB Time-Series Database (Temporal Intelligence & Machine Learning)
   influxdb:
