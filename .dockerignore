@@ -96,6 +96,9 @@ backups/
 temp_images/
 privacy_data/
 
+# Legacy character JSON files (characters now stored in PostgreSQL)
+characters/
+
 # Development and testing artifacts
 test_results/
 coverage/
