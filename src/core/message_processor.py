@@ -262,8 +262,23 @@ class MessageProcessor:
                 character_temporal_evolution_analyzer=character_temporal_evolution_analyzer
             )
             logger.info("🧠 Unified Character Intelligence Coordinator initialized")
+            
+            # Initialize Character Learning Moment Detector for user experience enhancement
+            try:
+                from src.characters.learning.character_learning_moment_detector import create_character_learning_moment_detector
+                self.learning_moment_detector = create_character_learning_moment_detector(
+                    character_intelligence_coordinator=self.character_intelligence_coordinator,
+                    emotion_analyzer=self._shared_emotion_analyzer,
+                    memory_manager=self.memory_manager
+                )
+                logger.info("🌟 Character Learning Moment Detector initialized")
+            except ImportError as e:
+                logger.warning("Learning moment detector not available: %s", e)
+                self.learning_moment_detector = None
+                
         except ImportError as e:
             logger.warning("Character intelligence coordinator not available: %s", e)
+            self.learning_moment_detector = None
         
         # Track processing state for debugging
         self._last_security_validation = None
@@ -2391,6 +2406,29 @@ class MessageProcessor:
             logger.info(f"🧠 Final comprehensive context size: {len(str(comprehensive_context))} chars")
             logger.info(f"🧠 Final comprehensive context keys: {list(comprehensive_context.keys())}")
             
+            # 🌟 CHARACTER LEARNING MOMENT DETECTION: Add learning visibility to user experience
+            try:
+                logger.debug("🌟 PROCESSING: Character learning moment detection")
+                learning_moments_result = await self._process_character_learning_moments(
+                    message_context.user_id,
+                    message_context.content,
+                    message_context,
+                    conversation_context,
+                    ai_components
+                )
+                
+                if learning_moments_result:
+                    ai_components['character_learning_moments'] = learning_moments_result
+                    logger.info("🌟 Added character learning moments to AI components (detected %d moments)", 
+                               learning_moments_result.get('learning_moments_detected', 0))
+                else:
+                    ai_components['character_learning_moments'] = None
+                    logger.debug("🌟 No learning moments detected or detector unavailable")
+                    
+            except Exception as e:
+                logger.warning("🌟 Character learning moment detection failed: %s", str(e))
+                ai_components['character_learning_moments'] = None
+            
         except (AttributeError, ValueError, TypeError) as e:
             logger.error("Sophisticated AI component processing failed: %s", str(e))
             # Fallback to basic components
@@ -2523,6 +2561,105 @@ class MessageProcessor:
             
         except Exception as e:
             logger.error(f"🧠 Unified character intelligence failed: {e}")
+            return None
+
+    async def _process_character_learning_moments(self, user_id: str, content: str,
+                                                message_context: MessageContext,
+                                                conversation_context: List[Dict[str, str]],
+                                                ai_components: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Process Character Learning Moment Detection for enhanced user experience."""
+        logger.debug("🌟 STARTING CHARACTER LEARNING MOMENT DETECTION for user %s", user_id)
+        try:
+            if not self.learning_moment_detector:
+                logger.debug("🌟 Learning moment detector not available")
+                return None
+            
+            # Get character name from environment
+            character_name = get_normalized_bot_name_from_env()
+            if not character_name:
+                logger.warning("🌟 Character name not available from environment")
+                return None
+            
+            # Extract data from ai_components for learning moment context
+            emotional_context = ai_components.get('phase2_emotional_intelligence', {})
+            temporal_data = ai_components.get('character_intelligence', {}).get('coordination_metadata', {})
+            episodic_memories = ai_components.get('character_intelligence', {}).get('system_contributions', {}).get('character_episodic_intelligence')
+            
+            # Create learning moment context
+            from src.characters.learning.character_learning_moment_detector import LearningMomentContext
+            
+            context = LearningMomentContext(
+                user_id=user_id,
+                character_name=character_name,
+                current_message=content,
+                conversation_history=conversation_context,
+                emotional_context=emotional_context,
+                temporal_data=temporal_data,
+                episodic_memories=episodic_memories
+            )
+            
+            # Detect learning moments
+            learning_moments = await self.learning_moment_detector.detect_learning_moments(context)
+            
+            # Process detected moments for conversation integration
+            result = {
+                'learning_moments_detected': len(learning_moments),
+                'moments': [],
+                'surface_moment': False,
+                'suggested_integration': None
+            }
+            
+            if learning_moments:
+                # Select the best moment to potentially surface
+                best_moment = learning_moments[0]  # Already sorted by confidence
+                
+                # Check if this moment should be surfaced
+                conversation_state = {
+                    'conversation_history': conversation_context,
+                    'current_emotion': emotional_context.get('primary_emotion'),
+                    'recent_learning_moments': (message_context.metadata or {}).get('recent_learning_moments', 0),
+                    'total_recent_messages': len(conversation_context)
+                }
+                
+                should_surface = await self.learning_moment_detector.should_surface_learning_moment(
+                    best_moment, conversation_state
+                )
+                
+                if should_surface:
+                    result.update({
+                        'surface_moment': True,
+                        'suggested_integration': {
+                            'type': best_moment.moment_type.value,
+                            'suggested_response': best_moment.suggested_response,
+                            'confidence': best_moment.confidence,
+                            'integration_point': best_moment.natural_integration_point,
+                            'character_voice': best_moment.character_voice_adaptation
+                        }
+                    })
+                    
+                    # Add to metadata for tracking
+                    if message_context.metadata is None:
+                        message_context.metadata = {}
+                    if 'recent_learning_moments' not in message_context.metadata:
+                        message_context.metadata['recent_learning_moments'] = 0
+                    message_context.metadata['recent_learning_moments'] += 1
+                
+                # Store all detected moments for potential API metadata
+                result['moments'] = [
+                    {
+                        'type': moment.moment_type.value,
+                        'confidence': moment.confidence,
+                        'suggested_response': moment.suggested_response
+                    }
+                    for moment in learning_moments
+                ]
+            
+            logger.info("🌟 Learning moment detection successful for %s (detected %d moments)", 
+                       character_name, len(learning_moments))
+            return result
+            
+        except Exception as e:
+            logger.error("🌟 Learning moment detection failed: %s", str(e))
             return None
 
     async def _process_thread_management(self, user_id: str, content: str, 

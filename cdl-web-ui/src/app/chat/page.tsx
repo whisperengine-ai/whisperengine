@@ -17,6 +17,277 @@ interface ChatConfig {
   userId: string
 }
 
+// Learning moment type definitions
+interface LearningMoment {
+  type: 'growth_insight' | 'user_observation' | 'memory_surprise' | 'knowledge_evolution' | 'emotional_growth' | 'relationship_awareness'
+  confidence: number
+  suggested_response: string
+}
+
+interface LearningMomentData {
+  learning_moments_detected: number
+  surface_moment: boolean
+  suggested_integration?: {
+    type: string
+    suggested_response: string
+    confidence: number
+    integration_point: string
+    character_voice: string
+  }
+  moments: LearningMoment[]
+}
+
+// Helper function to render learning moment indicators
+const renderLearningMomentIndicators = (metadata: Record<string, unknown>) => {
+  // Character learning moments are now nested under ai_components
+  const aiComponents = metadata.ai_components as Record<string, unknown> | undefined
+  const learningData = aiComponents?.character_learning_moments as LearningMomentData | undefined
+  
+  if (!learningData || learningData.learning_moments_detected === 0) {
+    return null
+  }
+
+  const getLearningMomentIcon = (type: string) => {
+    switch (type) {
+      case 'growth_insight':
+        return '🌱'
+      case 'user_observation':
+        return '👁️'
+      case 'memory_surprise':
+        return '💡'
+      case 'knowledge_evolution':
+        return '📚'
+      case 'emotional_growth':
+        return '💖'
+      case 'relationship_awareness':
+        return '🤝'
+      default:
+        return '✨'
+    }
+  }
+
+  const getLearningMomentLabel = (type: string) => {
+    switch (type) {
+      case 'growth_insight':
+        return 'Character Growth'
+      case 'user_observation':
+        return 'User Insight'
+      case 'memory_surprise':
+        return 'Memory Connection'
+      case 'knowledge_evolution':
+        return 'Learning Moment'
+      case 'emotional_growth':
+        return 'Emotional Growth'
+      case 'relationship_awareness':
+        return 'Relationship Insight'
+      default:
+        return 'AI Learning'
+    }
+  }
+
+  return (
+    <div className="mt-2 space-y-1">
+      {/* Surfaced Learning Moment */}
+      {learningData.surface_moment && learningData.suggested_integration && (
+        <div className="bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-200 rounded-lg p-2">
+          <div className="flex items-center space-x-2">
+            <span className="text-lg">{getLearningMomentIcon(learningData.suggested_integration.type)}</span>
+            <div className="flex-1">
+              <div className="text-xs font-medium text-purple-700">
+                {getLearningMomentLabel(learningData.suggested_integration.type)}
+              </div>
+              <div className="text-xs text-purple-600 mt-1">
+                This response includes character learning insights
+              </div>
+            </div>
+            <div className="text-xs text-purple-500">
+              {Math.round(learningData.suggested_integration.confidence * 100)}%
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* Learning Moments Detected Indicator */}
+      {learningData.learning_moments_detected > 0 && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-2">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <span className="text-sm">🧠</span>
+              <span className="text-xs text-blue-700 font-medium">
+                {learningData.learning_moments_detected} learning moment{learningData.learning_moments_detected > 1 ? 's' : ''} detected
+              </span>
+            </div>
+            <div className="flex space-x-1">
+              {learningData.moments.slice(0, 3).map((moment, index) => (
+                <span 
+                  key={index}
+                  className="text-xs"
+                  title={`${getLearningMomentLabel(moment.type)}: ${Math.round(moment.confidence * 100)}% confidence`}
+                >
+                  {getLearningMomentIcon(moment.type)}
+                </span>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// Helper function to render character learning summary
+const renderCharacterLearningSummary = (messages: Message[]) => {
+  // Count learning moments from recent messages
+  const recentMessages = messages.filter(m => m.sender === 'assistant').slice(-5)
+  const learningMoments = recentMessages
+    .map(m => {
+      const aiComponents = m.metadata?.ai_components as Record<string, unknown> | undefined
+      return aiComponents?.character_learning_moments as LearningMomentData | undefined
+    })
+    .filter(Boolean)
+  
+  const totalLearningMomentsDetected = learningMoments.reduce((sum, data) => sum + (data?.learning_moments_detected || 0), 0)
+  const surfacedMoments = learningMoments.filter(data => data?.surface_moment).length
+  
+  if (totalLearningMomentsDetected === 0 && messages.length < 3) {
+    return null // Don't show until there's some conversation
+  }
+
+  const learningTypes = new Set<string>()
+  learningMoments.forEach(data => {
+    data?.moments.forEach(moment => learningTypes.add(moment.type))
+  })
+
+  return (
+    <div className="border-b border-gray-200 bg-gradient-to-r from-purple-50 to-blue-50 p-3">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-2">
+            <span className="text-lg">🧠</span>
+            <div>
+              <div className="text-sm font-medium text-gray-900">Character Learning Active</div>
+              <div className="text-xs text-gray-600">
+                {totalLearningMomentsDetected > 0 ? (
+                  <>
+                    {totalLearningMomentsDetected} learning moment{totalLearningMomentsDetected > 1 ? 's' : ''} detected
+                    {surfacedMoments > 0 && `, ${surfacedMoments} shared naturally`}
+                  </>
+                ) : (
+                  'Building understanding through conversation...'
+                )}
+              </div>
+            </div>
+          </div>
+          
+          {learningTypes.size > 0 && (
+            <div className="flex space-x-1">
+              {Array.from(learningTypes).slice(0, 4).map(type => (
+                <span 
+                  key={type}
+                  className="px-2 py-1 text-xs bg-purple-100 text-purple-700 rounded-full"
+                  title={type.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                >
+                  {type === 'growth_insight' && '🌱'}
+                  {type === 'user_observation' && '👁️'} 
+                  {type === 'memory_surprise' && '💡'}
+                  {type === 'knowledge_evolution' && '📚'}
+                  {type === 'emotional_growth' && '💖'}
+                  {type === 'relationship_awareness' && '🤝'}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+        
+        <div className="flex items-center justify-between">
+          <div className="text-xs text-gray-500">
+            {totalLearningMomentsDetected > 0 ? 'Learning from our conversation' : 'Ready to learn and grow'}
+          </div>
+          
+          {totalLearningMomentsDetected > 0 && (
+            <Link 
+              href="/evolution" 
+              className="text-xs bg-indigo-100 text-indigo-700 px-2 py-1 rounded-full hover:bg-indigo-200 transition-colors"
+            >
+              📈 View Timeline
+            </Link>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Enhanced function to extract comprehensive learning insights from metadata
+const extractLearningInsights = (metadata: Record<string, unknown>) => {
+  const aiComponents = metadata.ai_components as Record<string, unknown> | undefined
+  const learningData = aiComponents?.character_learning_moments as LearningMomentData | undefined
+  
+  if (!learningData || learningData.learning_moments_detected === 0) {
+    return null
+  }
+
+  return {
+    totalMoments: learningData.learning_moments_detected,
+    moments: learningData.moments,
+    surfacedMoment: learningData.surface_moment,
+    suggestedIntegration: learningData.suggested_integration,
+    // Extract other AI components data for context
+    emotionalContext: aiComponents?.phase2_emotional_intelligence as Record<string, unknown> | undefined,
+    characterIntelligence: aiComponents?.character_intelligence as Record<string, unknown> | undefined,
+    // Add temporal and confidence data if available
+    temporalIntelligence: aiComponents?.temporal_intelligence as Record<string, unknown> | undefined,
+    contextAnalysis: aiComponents?.context_analysis as Record<string, unknown> | undefined
+  }
+}
+
+// Enhanced learning moment display with richer context
+const renderEnhancedLearningDisplay = (metadata: Record<string, unknown>) => {
+  const insights = extractLearningInsights(metadata)
+  if (!insights) return null
+
+  return (
+    <div className="mt-3 p-3 bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-200 rounded-lg">
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center space-x-2">
+          <span className="text-lg">🎯</span>
+          <span className="text-sm font-semibold text-indigo-800">Character Learning Active</span>
+        </div>
+        <span className="text-xs text-indigo-600 bg-indigo-100 px-2 py-1 rounded-full">
+          {insights.totalMoments} insights
+        </span>
+      </div>
+      
+      {insights.surfacedMoment && insights.suggestedIntegration && (
+        <div className="mb-2 p-2 bg-white border border-indigo-200 rounded">
+          <div className="text-xs font-medium text-indigo-700 mb-1">Featured Learning Moment</div>
+          <div className="text-xs text-gray-700">
+            {insights.suggestedIntegration.type.replace('_', ' ')} • {Math.round(insights.suggestedIntegration.confidence * 100)}% confidence
+          </div>
+        </div>
+      )}
+      
+      <div className="flex flex-wrap gap-1">
+        {insights.moments.slice(0, 4).map((moment, index) => (
+          <span
+            key={index}
+            className="inline-flex items-center px-2 py-1 text-xs bg-white text-indigo-700 border border-indigo-200 rounded-full"
+            title={`${moment.type}: ${moment.suggested_response}`}
+          >
+            {moment.type === 'growth_insight' && '🌱'}
+            {moment.type === 'user_observation' && '👁️'}
+            {moment.type === 'memory_surprise' && '💡'}
+            {moment.type === 'knowledge_evolution' && '📚'}
+            {moment.type === 'emotional_growth' && '💖'}
+            {moment.type === 'relationship_awareness' && '🤝'}
+            {moment.type}
+          </span>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 export default function ChatPage() {
   const [messages, setMessages] = useState<Message[]>([])
   const [inputValue, setInputValue] = useState('')
@@ -197,6 +468,9 @@ export default function ChatPage() {
                 <Link href="/characters" className="text-gray-600 hover:text-blue-600">
                   Characters
                 </Link>
+                <Link href="/evolution" className="text-gray-600 hover:text-blue-600">
+                  Evolution
+                </Link>
                 <Link href="/config" className="text-gray-600 hover:text-blue-600">
                   Configuration
                 </Link>
@@ -330,6 +604,9 @@ export default function ChatPage() {
             </div>
           </div>
 
+          {/* Character Learning Summary */}
+          {renderCharacterLearningSummary(messages)}
+
           {/* Messages */}
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
             {messages.map((message) => (
@@ -337,19 +614,29 @@ export default function ChatPage() {
                 key={message.id}
                 className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}
               >
-                <div
-                  className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
-                    message.sender === 'user'
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-gray-100 text-gray-900'
-                  }`}
-                >
-                  <p className="text-sm">{message.content}</p>
-                  <p className={`text-xs mt-1 ${
-                    message.sender === 'user' ? 'text-blue-100' : 'text-gray-500'
-                  }`}>
-                    {message.timestamp.toLocaleTimeString()}
-                  </p>
+                <div className="flex flex-col max-w-xs lg:max-w-md">
+                  <div
+                    className={`px-4 py-2 rounded-lg ${
+                      message.sender === 'user'
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-gray-100 text-gray-900'
+                    }`}
+                  >
+                    <p className="text-sm">{message.content}</p>
+                    <p className={`text-xs mt-1 ${
+                      message.sender === 'user' ? 'text-blue-100' : 'text-gray-500'
+                    }`}>
+                      {message.timestamp.toLocaleTimeString()}
+                    </p>
+                  </div>
+                  
+                  {/* Character Learning Moment Indicators */}
+                  {message.sender === 'assistant' && message.metadata && renderLearningMomentIndicators(message.metadata)}
+                  
+                  {/* Enhanced Learning Display for significant moments */}
+                  {message.sender === 'assistant' && message.metadata && extractLearningInsights(message.metadata) && (
+                    renderEnhancedLearningDisplay(message.metadata)
+                  )}
                 </div>
               </div>
             ))}

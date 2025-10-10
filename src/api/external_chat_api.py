@@ -126,7 +126,8 @@ class ExternalChatAPI:
                 content=request_data['message'],
                 platform='api',
                 channel_type=context_data.get('channel_type', 'dm'),
-                metadata=context_data.get('metadata', {})
+                metadata=context_data.get('metadata', {}),
+                metadata_level='standard'  # Include AI components and character learning moments
             )
 
             logger.info("API CHAT: Processing message for user %s", message_context.user_id)
@@ -455,7 +456,8 @@ class ExternalChatAPI:
                         content=msg_data['message'],
                         platform='api',
                         channel_type=context_data.get('channel_type', 'dm'),
-                        metadata=context_data.get('metadata', {})
+                        metadata=context_data.get('metadata', {}),
+                        metadata_level='standard'  # Include AI components and character learning moments
                     )
 
                     # Process message
