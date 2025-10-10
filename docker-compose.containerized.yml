@@ -1,0 +1,137 @@
+# WhisperEngine - Containerized Deployment
+# No source code required - uses pre-built Docker Hub images
+
+services:
+  # Main WhisperEngine Assistant (AI Chat API)
+  whisperengine-assistant:
+    image: whisperengine/whisperengine:latest
+    container_name: whisperengine-assistant
+    ports:
+      - "9090:9090"  # Chat API endpoint
+    environment:
+      # Core infrastructure
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=whisperengine
+      - POSTGRES_PASSWORD=whisperengine_password
+      - POSTGRES_DB=whisperengine
+      - QDRANT_HOST=qdrant
+      - QDRANT_PORT=6333
+      - QDRANT_COLLECTION_NAME=whisperengine_memory_assistant
+      
+      # Bot configuration
+      - DISCORD_BOT_NAME=assistant
+      - CHARACTER_NAME=assistant
+      - HEALTH_CHECK_PORT=9090
+      
+      # LLM Configuration (set in .env file)
+      - LLM_CLIENT_TYPE=${LLM_CLIENT_TYPE:-openrouter}
+      - LLM_CHAT_API_URL=${LLM_CHAT_API_URL:-https://openrouter.ai/api/v1}
+      - LLM_CHAT_MODEL=${LLM_CHAT_MODEL:-anthropic/claude-3-haiku}
+      - LLM_CHAT_API_KEY=${LLM_CHAT_API_KEY:-}
+      
+      # Discord (optional - only if token provided)
+      - DISCORD_BOT_TOKEN=${DISCORD_BOT_TOKEN:-}
+      - ENABLE_DISCORD=${ENABLE_DISCORD:-false}
+      
+      # Memory and intelligence
+      - MEMORY_SYSTEM_TYPE=vector
+      - ENABLE_CHARACTER_INTELLIGENCE=true
+      - ENABLE_EMOTIONAL_INTELLIGENCE=true
+      
+      # Pre-downloaded model cache paths
+      - FASTEMBED_CACHE_PATH=/app/cache/fastembed
+      - HF_HOME=/app/cache/huggingface
+      - TRANSFORMERS_CACHE=/app/cache/huggingface
+      - MODEL_CACHE_DIR=/app/models
+      
+      # Model configuration (models are pre-downloaded in container)
+      - ROBERTA_EMOTION_MODEL_NAME=cardiffnlp/twitter-roberta-base-emotion-multilabel-latest
+      - EMBEDDING_MODEL_NAME=sentence-transformers/all-MiniLM-L6-v2
+      
+    volumes:
+      - whisperengine_logs:/app/logs
+    networks:
+      - whisperengine-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9090/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # CDL Web UI for character creation and management
+  cdl-web-ui:
+    image: whisperengine/whisperengine-ui:latest
+    container_name: whisperengine-web-ui
+    ports:
+      - "3001:3000"  # Web interface
+    environment:
+      - NODE_ENV=production
+      - NEXT_TELEMETRY_DISABLED=1
+      - PGHOST=postgres
+      - PGPORT=5432
+      - PGDATABASE=whisperengine
+      - PGUSER=whisperengine
+      - PGPASSWORD=whisperengine_password
+      # API endpoint for bot management
+      - WHISPERENGINE_API_URL=http://whisperengine-assistant:9090
+    networks:
+      - whisperengine-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # PostgreSQL Database
+  postgres:
+    image: postgres:16.4-alpine
+    container_name: whisperengine-postgres
+    environment:
+      - POSTGRES_DB=whisperengine
+      - POSTGRES_USER=whisperengine
+      - POSTGRES_PASSWORD=whisperengine_password
+      - POSTGRES_INITDB_ARGS=--auth-host=scram-sha-256
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      # SQL init scripts will be included in the assistant image and run via application
+    networks:
+      - whisperengine-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U whisperengine -d whisperengine"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Qdrant Vector Database
+  qdrant:
+    image: qdrant/qdrant:v1.15.4
+    container_name: whisperengine-qdrant
+    volumes:
+      - qdrant_data:/qdrant/storage
+    environment:
+      - QDRANT__SERVICE__HTTP_PORT=6333
+      - QDRANT__SERVICE__GRPC_PORT=6334
+    networks:
+      - whisperengine-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:6333/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  postgres_data:
+  qdrant_data:
+  whisperengine_logs:
+
+networks:
+  whisperengine-network:
+    driver: bridge

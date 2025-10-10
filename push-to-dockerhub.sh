@@ -48,6 +48,7 @@ fi
 print_status "Starting WhisperEngine Docker Hub push..."
 print_status "DockerHub Username: $DOCKERHUB_USERNAME"
 print_status "Version Tag: $VERSION"
+echo ""
 
 # Check if user is logged in to Docker Hub
 if ! docker info | grep -q "Username"; then
@@ -56,81 +57,119 @@ if ! docker info | grep -q "Username"; then
     docker login
 fi
 
-# Define local images and their DockerHub counterparts
-declare -A IMAGES=(
-    ["whisperengine-bot"]="whisperengine-bot"
-    ["whisperengine-whisperengine-web"]="whisperengine-web"
-)
+# Define images to build and push
+IMAGES="whisperengine whisperengine-ui"
 
-print_status "Building images if needed..."
+print_status "Building WhisperEngine containers..."
+echo ""
 
-# Check if main bot image exists, build if not
-if ! docker image inspect whisperengine-bot:latest >/dev/null 2>&1; then
-    print_warning "Main bot image not found, building..."
-    docker-compose -f docker-compose.multi-bot.yml --profile build-only build whisperengine-bot-builder
+# Build main WhisperEngine assistant container
+print_status "Building WhisperEngine Assistant container with pre-downloaded models..."
+print_status "This will download and bundle:"
+print_status "  • FastEmbed: sentence-transformers/all-MiniLM-L6-v2 (~67MB)"
+print_status "  • RoBERTa: cardiffnlp/twitter-roberta-base-emotion-multilabel-latest (~300MB)"
+print_status "  • Total model cache: ~400MB (embedded in container)"
+echo ""
+
+if docker build -t whisperengine:${VERSION} -t whisperengine:latest -f Dockerfile .; then
+    print_success "WhisperEngine Assistant container built successfully with pre-downloaded models"
+    
+    # Verify models are in container
+    print_status "Verifying models are bundled in container..."
+    docker run --rm whisperengine:latest python -c "
+import os, json
+config_path = '/app/models/model_config.json'
+if os.path.exists(config_path):
+    config = json.load(open(config_path))
+    print('✅ Models verified in container:')
+    print(f'  📊 Embedding: {config.get(\"embedding_models\", {}).get(\"primary\", \"Unknown\")}')
+    print(f'  🎭 Emotion: {config.get(\"emotion_models\", {}).get(\"primary\", \"Unknown\")}')
+else:
+    print('❌ Model configuration not found in container')
+    exit(1)
+"
+    if [ $? -eq 0 ]; then
+        print_success "✅ Models successfully bundled in container"
+    else
+        print_error "❌ Model verification failed"
+        exit 1
+    fi
+else
+    print_error "Failed to build WhisperEngine Assistant container"
+    exit 1
 fi
 
-# Check if web image exists, build if not  
-if ! docker image inspect whisperengine-whisperengine-web:latest >/dev/null 2>&1; then
-    print_warning "Web image not found, building..."
-    docker-compose -f docker-compose.multi-bot.yml build whisperengine-web
+# Build CDL Web UI container
+print_status "Building CDL Web UI container..."
+if docker build -t whisperengine-ui:${VERSION} -t whisperengine-ui:latest -f cdl-web-ui/Dockerfile ./cdl-web-ui; then
+    print_success "CDL Web UI container built successfully"
+else
+    print_error "Failed to build CDL Web UI container"
+    exit 1
 fi
+
+echo ""
+print_status "Tagging and pushing containers to Docker Hub..."
+echo ""
 
 # Tag and push images
-for LOCAL_IMAGE in "${!IMAGES[@]}"; do
-    DOCKERHUB_IMAGE="${IMAGES[$LOCAL_IMAGE]}"
+for LOCAL_IMAGE in $IMAGES; do
+    DOCKERHUB_IMAGE="$LOCAL_IMAGE"
     FULL_DOCKERHUB_TAG="${DOCKERHUB_USERNAME}/${DOCKERHUB_IMAGE}"
     
     print_status "Processing $LOCAL_IMAGE -> $FULL_DOCKERHUB_TAG"
     
     # Check if local image exists
-    if docker image inspect "${LOCAL_IMAGE}:latest" >/dev/null 2>&1; then
+    if docker image inspect "${LOCAL_IMAGE}:${VERSION}" >/dev/null 2>&1; then
         # Tag for DockerHub
-        print_status "Tagging ${LOCAL_IMAGE}:latest as ${FULL_DOCKERHUB_TAG}:${VERSION}"
-        docker tag "${LOCAL_IMAGE}:latest" "${FULL_DOCKERHUB_TAG}:${VERSION}"
+        print_status "Tagging ${LOCAL_IMAGE}:${VERSION} as ${FULL_DOCKERHUB_TAG}:${VERSION}"
+        docker tag "${LOCAL_IMAGE}:${VERSION}" "${FULL_DOCKERHUB_TAG}:${VERSION}"
         
-        # Also tag as latest if version is not latest
-        if [[ "$VERSION" != "latest" ]]; then
-            docker tag "${LOCAL_IMAGE}:latest" "${FULL_DOCKERHUB_TAG}:latest"
-        fi
+        # Also tag as latest
+        print_status "Tagging ${LOCAL_IMAGE}:latest as ${FULL_DOCKERHUB_TAG}:latest"
+        docker tag "${LOCAL_IMAGE}:latest" "${FULL_DOCKERHUB_TAG}:latest"
         
         # Push to DockerHub
         print_status "Pushing ${FULL_DOCKERHUB_TAG}:${VERSION}"
         docker push "${FULL_DOCKERHUB_TAG}:${VERSION}"
         
-        if [[ "$VERSION" != "latest" ]]; then
-            print_status "Pushing ${FULL_DOCKERHUB_TAG}:latest"
-            docker push "${FULL_DOCKERHUB_TAG}:latest"
-        fi
+        print_status "Pushing ${FULL_DOCKERHUB_TAG}:latest"
+        docker push "${FULL_DOCKERHUB_TAG}:latest"
         
         print_success "Successfully pushed ${FULL_DOCKERHUB_TAG}"
     else
-        print_error "Local image ${LOCAL_IMAGE}:latest not found"
+        print_error "Local image ${LOCAL_IMAGE}:${VERSION} not found"
         print_warning "Skipping ${LOCAL_IMAGE}"
     fi
     
     echo ""
 done
 
-print_success "Docker Hub push complete!"
+echo ""
+print_success "🎉 Docker Hub push complete!"
 print_status "Your images are now available at:"
 echo ""
-for LOCAL_IMAGE in "${!IMAGES[@]}"; do
-    DOCKERHUB_IMAGE="${IMAGES[$LOCAL_IMAGE]}"
-    echo "  📦 https://hub.docker.com/r/${DOCKERHUB_USERNAME}/${DOCKERHUB_IMAGE}"
+for LOCAL_IMAGE in $IMAGES; do
+    echo "  📦 https://hub.docker.com/r/${DOCKERHUB_USERNAME}/${LOCAL_IMAGE}"
 done
 echo ""
 
-print_status "To pull these images on other systems:"
+print_status "To use these images in production:"
 echo ""
-for LOCAL_IMAGE in "${!IMAGES[@]}"; do
-    DOCKERHUB_IMAGE="${IMAGES[$LOCAL_IMAGE]}"
-    echo "  docker pull ${DOCKERHUB_USERNAME}/${DOCKERHUB_IMAGE}:${VERSION}"
+echo "  # Pull images:"
+for LOCAL_IMAGE in $IMAGES; do
+    echo "  docker pull ${DOCKERHUB_USERNAME}/${LOCAL_IMAGE}:${VERSION}"
 done
 echo ""
-
-print_status "To update docker-compose.yml for production deployment:"
+echo "  # Use in docker-compose.yml:"
+echo "  services:"
+echo "    whisperengine-assistant:"
+echo "      image: ${DOCKERHUB_USERNAME}/whisperengine:${VERSION}"
+echo "    cdl-web-ui:"
+echo "      image: ${DOCKERHUB_USERNAME}/whisperengine-ui:${VERSION}"
 echo ""
-echo "Replace image references:"
-echo "  whisperengine-bot:latest -> ${DOCKERHUB_USERNAME}/whisperengine-bot:${VERSION}"
-echo "  whisperengine-whisperengine-web:latest -> ${DOCKERHUB_USERNAME}/whisperengine-web:${VERSION}"
+
+print_status "Next steps:"
+echo "  1. Create production docker-compose.yml with these images"
+echo "  2. Update documentation to use containerized setup"
+echo "  3. Test deployment without source code"

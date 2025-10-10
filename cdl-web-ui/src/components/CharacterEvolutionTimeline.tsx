@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 
 // Types for timeline data
 interface LearningMilestone {
@@ -91,7 +91,7 @@ const CharacterEvolutionTimeline: React.FC<CharacterEvolutionTimelineProps> = ({
   }
 
   // Load evolution data from API or generate mock data
-  const loadEvolutionData = async () => {
+  const loadEvolutionData = useCallback(async () => {
     setLoading(true)
     setError(null)
 
@@ -174,7 +174,7 @@ const CharacterEvolutionTimeline: React.FC<CharacterEvolutionTimelineProps> = ({
     } finally {
       setLoading(false)
     }
-  }
+  }, [apiEndpoint, characterName, maxMilestones, showPhases])
 
   // Generate realistic mock milestones
   const generateMockMilestones = (count: number): LearningMilestone[] => {
@@ -296,7 +296,7 @@ const CharacterEvolutionTimeline: React.FC<CharacterEvolutionTimelineProps> = ({
 
   useEffect(() => {
     loadEvolutionData()
-  }, [characterName, apiEndpoint])
+  }, [loadEvolutionData])
 
   if (loading) {
     return (

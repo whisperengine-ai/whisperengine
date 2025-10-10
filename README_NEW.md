@@ -44,34 +44,32 @@ Get WhisperEngine running with a **single command**:
 
 ### **Prerequisites**
 - [Docker Desktop](https://www.docker.com/products/docker-desktop/) installed and running
+- [Git](https://git-scm.com/downloads) installed
 - An LLM API key (OpenRouter recommended for beginners)
-- **No Git or source code required!**
 
 ### **1-Command Setup**
 
 **macOS/Linux:**
 ```bash
-curl -sSL https://raw.githubusercontent.com/whisperengine-ai/whisperengine/main/setup-containerized.sh | bash
+git clone https://github.com/whisperengine-ai/whisperengine.git && cd whisperengine && ./setup.sh
 ```
 
 **Windows (Command Prompt):**
 ```cmd
-curl -sSL https://raw.githubusercontent.com/whisperengine-ai/whisperengine/main/setup-containerized.bat -o setup.bat && setup.bat
+git clone https://github.com/whisperengine-ai/whisperengine.git && cd whisperengine && setup.bat
 ```
 
-**Windows (PowerShell):**
-```powershell
-Invoke-WebRequest -Uri "https://raw.githubusercontent.com/whisperengine-ai/whisperengine/main/setup-containerized.bat" -OutFile "setup.bat"; .\setup.bat
+**Windows (Git Bash):**
+```bash
+git clone https://github.com/whisperengine-ai/whisperengine.git && cd whisperengine && ./setup.sh
 ```
 
 The setup script will:
 1. ✅ Check Docker is running
-2. 📦 Download only configuration files (~5KB)
-3. 🐳 Pull pre-built containers from Docker Hub
-4. 📝 Create your configuration file 
-5. 🔧 Open the config file for you to add your API key
-6. 🚀 Start all services automatically
-7. 🌐 Open the web interface in your browser
+2. 📝 Create your configuration file 
+3. 🔧 Open the config file for you to add your API key
+4. 🚀 Start all services automatically
+5. 🌐 Open the web interface in your browser
 
 ### **What You Get**
 
