@@ -7,7 +7,7 @@ echo    ✨ Containers include pre-downloaded AI models (~400MB):
 echo      • FastEmbed: sentence-transformers/all-MiniLM-L6-v2 (embeddings)
 echo      • RoBERTa: cardiffnlp emotion analysis (11 emotions)
 echo    🚀 No model downloads needed - instant startup!
-echo.ce code required!
+echo.
 
 setlocal enabledelayedexpansion
 
@@ -63,7 +63,7 @@ if not "%INSTALL_DIR%" == "." (
     REM Download Docker Compose file
     echo [SETUP] Downloading Docker Compose configuration...
     set COMPOSE_URL=https://raw.githubusercontent.com/whisperengine-ai/whisperengine/main/docker-compose.containerized.yml
-    curl -sSL "%COMPOSE_URL%" -o docker-compose.yml
+    powershell -Command "try { Invoke-WebRequest -Uri '%COMPOSE_URL%' -OutFile 'docker-compose.yml' -UseBasicParsing } catch { exit 1 }"
     if errorlevel 1 (
         echo [ERROR] Failed to download Docker Compose file
         pause
@@ -74,7 +74,7 @@ if not "%INSTALL_DIR%" == "." (
     REM Download environment template
     echo [SETUP] Downloading configuration template...
     set ENV_URL=https://raw.githubusercontent.com/whisperengine-ai/whisperengine/main/.env.containerized.template
-    curl -sSL "%ENV_URL%" -o .env.template
+    powershell -Command "try { Invoke-WebRequest -Uri '%ENV_URL%' -OutFile '.env.template' -UseBasicParsing } catch { exit 1 }"
     if errorlevel 1 (
         echo [ERROR] Failed to download environment template
         pause
@@ -158,7 +158,7 @@ set attempt=0
 if !attempt! geq !max_attempts! goto timeout
 
 REM Check if services are ready
-curl -s http://localhost:3001 >nul 2>&1 && curl -s http://localhost:9090/health >nul 2>&1
+powershell -Command "try { Invoke-WebRequest -Uri 'http://localhost:3001' -UseBasicParsing | Out-Null; Invoke-WebRequest -Uri 'http://localhost:9090/health' -UseBasicParsing | Out-Null; exit 0 } catch { exit 1 }" >nul 2>&1
 if not errorlevel 1 goto services_ready
 
 set /a attempt+=1
