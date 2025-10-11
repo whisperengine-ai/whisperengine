@@ -4276,35 +4276,19 @@ class MessageProcessor:
                 character_prompt += f"\n\n🎯 ACTIVE TRANSACTION CONTEXT:\n{workflow_prompt_injection}"
                 logger.info("🎯 WORKFLOW: Injected transaction context into character prompt (%d chars)", len(workflow_prompt_injection))
             
-            # 🚀 VECTOR-NATIVE ENHANCEMENT: Enhance character prompt with dynamic vector context
-            try:
-                from src.prompts.vector_native_prompt_manager import create_vector_native_prompt_manager
-                
-                # Create vector-native prompt manager
-                vector_prompt_manager = create_vector_native_prompt_manager(
-                    vector_memory_system=self.memory_manager,
-                    personality_engine=None  # Reserved for future use
-                )
-                
-                # Extract emotional context from pipeline for vector enhancement
-                emotional_context = None
-                if pipeline_result and hasattr(pipeline_result, 'emotional_state'):
-                    emotional_context = pipeline_result.emotional_state
-                
-                # Enhance character prompt with vector-native context
-                vector_enhanced_prompt = await vector_prompt_manager.create_contextualized_prompt(
-                    base_prompt=character_prompt,
-                    user_id=user_id,
-                    current_message=message_context.content,
-                    emotional_context=emotional_context
-                )
-                
-                logger.info("🎯 VECTOR-NATIVE: Enhanced character prompt with dynamic context (%d chars)", len(vector_enhanced_prompt))
-                character_prompt = vector_enhanced_prompt
-                
-            except ImportError as e:
-                logger.debug("Vector-native prompt enhancement unavailable, using CDL-only: %s", e)
-                # Continue with CDL-only character prompt
+            # � DISABLED: VECTOR-NATIVE ENHANCEMENT (replaced by structured prompt assembly)
+            # The vector_native_prompt_manager had hardcoded stub implementations that added
+            # generic topics like "dreams, creativity, existence" to ALL characters.
+            # Structured prompt assembly (Phase 4) already handles context properly.
+            # 
+            # LEGACY CODE (removed):
+            # - Used vector_native_prompt_manager.create_contextualized_prompt()
+            # - Added hardcoded topics, patterns, emotional states
+            # - Caused all characters to mention "dreams, creativity, existence"
+            #
+            # NEW APPROACH: Character prompt from CDL is already complete and accurate
+            # No additional "enhancement" needed - structured prompts handle everything
+            logger.debug("🎯 VECTOR-NATIVE: Skipped legacy enhancement (using structured prompts from Phase 4)")
             
             # Clone the conversation context and replace/enhance system message
             enhanced_context = conversation_context.copy()
