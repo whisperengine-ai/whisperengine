@@ -22,9 +22,11 @@ Integration Points:
 """
 
 import logging
+import os
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass
 from enum import Enum
+from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
@@ -81,9 +83,14 @@ class MultiVectorIntelligence:
     multi-vector searches for maximum intelligence from all 3 named vectors.
     """
     
-    def __init__(self):
-        """Initialize multi-vector intelligence system"""
+    def __init__(self, temporal_client=None):
+        """Initialize multi-vector intelligence system
+        
+        Args:
+            temporal_client: Optional InfluxDB temporal client for classification accuracy logging
+        """
         self.logger = logger
+        self.temporal_client = temporal_client
         
         # Emotional indicators for emotion vector selection
         self.emotional_keywords = {
@@ -336,6 +343,91 @@ class MultiVectorIntelligence:
             'hybrid_percentage': (self.classification_stats['hybrid_queries'] / total) * 100,
             'temporal_percentage': (self.classification_stats['temporal_queries'] / total) * 100
         }
+    
+    async def log_classification_to_influxdb(
+        self,
+        bot_name: str,
+        user_id: str,
+        query: str,
+        classification: QueryClassification,
+        actual_results_quality: Optional[float] = None,
+        session_id: Optional[str] = None
+    ) -> bool:
+        """
+        Log classification decision and accuracy to InfluxDB for monitoring and optimization.
+        
+        This enables us to:
+        - Track keyword-based classification accuracy over time
+        - Identify queries where classification fails (low result quality)
+        - Detect patterns that need new keywords or better strategies
+        - Monitor emotional/semantic/content query distributions
+        - Validate that our classification approach is sufficient
+        
+        Args:
+            bot_name: Name of the bot
+            user_id: User identifier
+            query: Original search query
+            classification: Classification result from classify_query()
+            actual_results_quality: Optional quality score (0-1) based on result relevance
+                                   Can be computed from result scores or user feedback
+            session_id: Optional session identifier
+            
+        Returns:
+            bool: Success status
+        """
+        if not self.temporal_client or not self.temporal_client.enabled:
+            return False
+        
+        try:
+            from influxdb_client.client.write.point import Point
+            
+            # Create InfluxDB point for vector classification
+            point = Point("vector_classification") \
+                .tag("bot", bot_name) \
+                .tag("user_id", user_id) \
+                .tag("query_type", classification.query_type.value) \
+                .tag("primary_vector", classification.primary_vector) \
+                .tag("strategy", classification.strategy.value)
+            
+            if session_id:
+                point = point.tag("session_id", session_id)
+            
+            # Store classification metrics
+            point = point \
+                .field("confidence", classification.confidence) \
+                .field("content_weight", classification.vector_weights.get('content', 0.0)) \
+                .field("emotion_weight", classification.vector_weights.get('emotion', 0.0)) \
+                .field("semantic_weight", classification.vector_weights.get('semantic', 0.0)) \
+                .field("emotional_indicators_count", len(classification.emotional_indicators)) \
+                .field("semantic_indicators_count", len(classification.semantic_indicators)) \
+                .field("content_indicators_count", len(classification.content_indicators)) \
+                .field("query_length", len(query))
+            
+            # Store actual results quality if available (for accuracy tracking)
+            if actual_results_quality is not None:
+                point = point.field("results_quality", actual_results_quality)
+                # Compute accuracy: high confidence + high quality = accurate classification
+                accuracy = 1.0 if (classification.confidence > 0.6 and actual_results_quality > 0.6) else 0.0
+                point = point.field("classification_accurate", accuracy)
+            
+            # Write to InfluxDB
+            self.temporal_client.write_api.write(
+                bucket=os.getenv('INFLUXDB_BUCKET', 'whisperengine'),
+                record=point
+            )
+            
+            self.logger.debug(
+                "📊 CLASSIFICATION LOGGED: %s vector for '%s' (%.2f confidence, quality: %s)",
+                classification.primary_vector,
+                query[:30] + "..." if len(query) > 30 else query,
+                classification.confidence,
+                f"{actual_results_quality:.2f}" if actual_results_quality is not None else "N/A"
+            )
+            return True
+            
+        except (ImportError, AttributeError, ConnectionError, KeyError) as e:
+            self.logger.error("Failed to log classification to InfluxDB: %s", e)
+            return False
 
 
 class MultiVectorSearchCoordinator:
@@ -467,6 +559,38 @@ class MultiVectorSearchCoordinator:
                 performance_metrics=performance_metrics,
                 classification=classification
             )
+            
+            # 🆕 LOG CLASSIFICATION TO INFLUXDB (for monitoring/analytics)
+            if self.intelligence.temporal_client:
+                try:
+                    # Compute results quality from search scores
+                    results_quality = None
+                    if result.memories:
+                        # Average score of top results (0-1 scale)
+                        avg_score = sum(m.get('score', 0.0) for m in result.memories) / len(result.memories)
+                        results_quality = min(avg_score, 1.0)  # Normalize to 0-1
+                    
+                    # Get bot name for logging
+                    from src.memory.vector_memory_system import get_normalized_bot_name_from_env
+                    bot_name = get_normalized_bot_name_from_env()
+                    
+                    # Log classification decision to InfluxDB
+                    await self.intelligence.log_classification_to_influxdb(
+                        bot_name=bot_name,
+                        user_id=user_id,
+                        query=query,
+                        classification=classification,
+                        actual_results_quality=results_quality,
+                        session_id=None  # Could extract from conversation_context if needed
+                    )
+                    
+                    self.logger.debug("📊 Classification logged to InfluxDB: %s vector (quality: %.2f)",
+                                    classification.primary_vector,
+                                    results_quality if results_quality else 0.0)
+                    
+                except Exception as e:
+                    # Don't fail the search if logging fails
+                    self.logger.warning("Failed to log classification to InfluxDB: %s", e)
             
             self.logger.info("🎯 MULTI-VECTOR COMPLETE: %d memories via %s in %.1fms", 
                            len(memories), fusion_strategy, processing_time)
@@ -668,9 +792,16 @@ class MultiVectorSearchCoordinator:
 
 
 # Factory functions for dependency injection
-def create_multi_vector_intelligence() -> MultiVectorIntelligence:
-    """Create MultiVectorIntelligence instance"""
-    return MultiVectorIntelligence()
+def create_multi_vector_intelligence(temporal_client=None) -> MultiVectorIntelligence:
+    """Create MultiVectorIntelligence instance with optional InfluxDB logging
+    
+    Args:
+        temporal_client: Optional TemporalIntelligenceClient for classification accuracy logging
+        
+    Returns:
+        MultiVectorIntelligence instance
+    """
+    return MultiVectorIntelligence(temporal_client=temporal_client)
 
 
 def create_multi_vector_search_coordinator(vector_memory_system, intelligence=None) -> MultiVectorSearchCoordinator:

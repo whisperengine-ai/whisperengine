@@ -1,0 +1,337 @@
+{
+  "dashboard": {
+    "title": "Vector Classification Intelligence",
+    "tags": ["whisperengine", "classification", "vector", "intelligence"],
+    "timezone": "browser",
+    "refresh": "1m",
+    "time": {
+      "from": "now-24h",
+      "to": "now"
+    },
+    "schemaVersion": 38,
+    "version": 1,
+    "panels": [
+      {
+        "id": 1,
+        "title": "Vector Usage Distribution (7 days)",
+        "type": "piechart",
+        "gridPos": {
+          "h": 8,
+          "w": 8,
+          "x": 0,
+          "y": 0
+        },
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": {
+              "type": "influxdb",
+              "uid": "influxdb"
+            },
+            "query": "from(bucket: \"whisperengine\")\n  |> range(start: -7d)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"vector_classification\")\n  |> filter(fn: (r) => r[\"_field\"] == \"confidence\")\n  |> group(columns: [\"primary_vector\"])\n  |> count()\n  |> group()\n  |> rename(columns: {_value: \"count\", primary_vector: \"vector_type\"})"
+          }
+        ],
+        "options": {
+          "pieType": "pie",
+          "legend": {
+            "displayMode": "table",
+            "placement": "right",
+            "values": ["value", "percent"]
+          }
+        },
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short"
+          }
+        }
+      },
+      {
+        "id": 2,
+        "title": "Classification Confidence Trends",
+        "type": "timeseries",
+        "gridPos": {
+          "h": 8,
+          "w": 16,
+          "x": 8,
+          "y": 0
+        },
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": {
+              "type": "influxdb",
+              "uid": "influxdb"
+            },
+            "query": "from(bucket: \"whisperengine\")\n  |> range(start: -24h)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"vector_classification\")\n  |> filter(fn: (r) => r[\"_field\"] == \"confidence\")\n  |> aggregateWindow(every: 1h, fn: mean, createEmpty: false)\n  |> group(columns: [\"primary_vector\"])"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percentunit",
+            "min": 0,
+            "max": 1,
+            "color": {
+              "mode": "palette-classic"
+            },
+            "custom": {
+              "axisLabel": "Confidence Score",
+              "drawStyle": "line",
+              "lineInterpolation": "smooth",
+              "fillOpacity": 10
+            }
+          }
+        },
+        "options": {
+          "legend": {
+            "displayMode": "list",
+            "placement": "bottom",
+            "showLegend": true
+          }
+        }
+      },
+      {
+        "id": 3,
+        "title": "Overall Accuracy (7d)",
+        "type": "stat",
+        "gridPos": {
+          "h": 6,
+          "w": 6,
+          "x": 0,
+          "y": 8
+        },
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": {
+              "type": "influxdb",
+              "uid": "influxdb"
+            },
+            "query": "from(bucket: \"whisperengine\")\n  |> range(start: -7d)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"vector_classification\")\n  |> filter(fn: (r) => r[\"_field\"] == \"confidence\")\n  |> filter(fn: (r) => r._value >= 0.60)\n  |> count()\n  |> yield(name: \"accurate\")\n\ntotal = from(bucket: \"whisperengine\")\n  |> range(start: -7d)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"vector_classification\")\n  |> filter(fn: (r) => r[\"_field\"] == \"confidence\")\n  |> count()\n  |> yield(name: \"total\")"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "red",
+                  "value": 0
+                },
+                {
+                  "color": "yellow",
+                  "value": 60
+                },
+                {
+                  "color": "green",
+                  "value": 75
+                }
+              ]
+            }
+          }
+        },
+        "options": {
+          "graphMode": "area",
+          "colorMode": "background",
+          "textMode": "value_and_name"
+        }
+      },
+      {
+        "id": 4,
+        "title": "Low Confidence Queries (24h)",
+        "type": "bargauge",
+        "gridPos": {
+          "h": 6,
+          "w": 6,
+          "x": 6,
+          "y": 8
+        },
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": {
+              "type": "influxdb",
+              "uid": "influxdb"
+            },
+            "query": "from(bucket: \"whisperengine\")\n  |> range(start: -24h)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"vector_classification\")\n  |> filter(fn: (r) => r[\"_field\"] == \"confidence\")\n  |> filter(fn: (r) => r._value < 0.5)\n  |> group(columns: [\"query_type\"])\n  |> count()"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": 0
+                },
+                {
+                  "color": "yellow",
+                  "value": 5
+                },
+                {
+                  "color": "red",
+                  "value": 10
+                }
+              ]
+            }
+          }
+        },
+        "options": {
+          "orientation": "horizontal",
+          "displayMode": "gradient"
+        }
+      },
+      {
+        "id": 5,
+        "title": "Emotional Keywords Detected",
+        "type": "timeseries",
+        "gridPos": {
+          "h": 6,
+          "w": 12,
+          "x": 12,
+          "y": 8
+        },
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": {
+              "type": "influxdb",
+              "uid": "influxdb"
+            },
+            "query": "from(bucket: \"whisperengine\")\n  |> range(start: -7d)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"vector_classification\")\n  |> filter(fn: (r) => r[\"_field\"] == \"emotional_indicators_count\")\n  |> aggregateWindow(every: 1d, fn: mean, createEmpty: false)"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "custom": {
+              "axisLabel": "Avg Emotional Keywords",
+              "drawStyle": "line",
+              "lineInterpolation": "smooth",
+              "fillOpacity": 20
+            }
+          }
+        }
+      },
+      {
+        "id": 6,
+        "title": "Average Results Quality by Vector Type",
+        "type": "barchart",
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 14
+        },
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": {
+              "type": "influxdb",
+              "uid": "influxdb"
+            },
+            "query": "from(bucket: \"whisperengine\")\n  |> range(start: -7d)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"vector_classification\")\n  |> filter(fn: (r) => r[\"_field\"] == \"results_quality\")\n  |> group(columns: [\"primary_vector\"])\n  |> mean()\n  |> group()"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percentunit",
+            "min": 0,
+            "max": 1,
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "red",
+                  "value": 0
+                },
+                {
+                  "color": "yellow",
+                  "value": 0.5
+                },
+                {
+                  "color": "green",
+                  "value": 0.6
+                }
+              ]
+            }
+          }
+        },
+        "options": {
+          "orientation": "horizontal"
+        }
+      },
+      {
+        "id": 7,
+        "title": "Classification Volume by Bot",
+        "type": "timeseries",
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 14
+        },
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": {
+              "type": "influxdb",
+              "uid": "influxdb"
+            },
+            "query": "from(bucket: \"whisperengine\")\n  |> range(start: -24h)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"vector_classification\")\n  |> filter(fn: (r) => r[\"_field\"] == \"confidence\")\n  |> group(columns: [\"bot\"])\n  |> aggregateWindow(every: 1h, fn: count, createEmpty: false)"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "custom": {
+              "axisLabel": "Classifications per Hour",
+              "drawStyle": "line",
+              "lineInterpolation": "smooth",
+              "fillOpacity": 10,
+              "stacking": {
+                "mode": "normal"
+              }
+            }
+          }
+        }
+      },
+      {
+        "id": 8,
+        "title": "Query Type Distribution (24h)",
+        "type": "stat",
+        "gridPos": {
+          "h": 6,
+          "w": 24,
+          "x": 0,
+          "y": 22
+        },
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": {
+              "type": "influxdb",
+              "uid": "influxdb"
+            },
+            "query": "from(bucket: \"whisperengine\")\n  |> range(start: -24h)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"vector_classification\")\n  |> filter(fn: (r) => r[\"_field\"] == \"confidence\")\n  |> group(columns: [\"query_type\"])\n  |> count()"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short"
+          }
+        },
+        "options": {
+          "graphMode": "none",
+          "colorMode": "value",
+          "textMode": "value_and_name",
+          "orientation": "horizontal"
+        }
+      }
+    ]
+  },
+  "overwrite": true
+}

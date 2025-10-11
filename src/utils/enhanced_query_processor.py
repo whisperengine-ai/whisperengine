@@ -291,15 +291,24 @@ class EnhancedQueryProcessor:
 
         # Remove extra whitespace
         cleaned = re.sub(r"\s+", " ", cleaned)
+        
+        # Remove stop words (grammar words that are never meaningful entities)
+        # This handles "this", "that", "a", "an", "the", etc. - eliminates need for complex filtering
+        words = cleaned.split()
+        words = [w for w in words if w not in self.stop_words]
+        cleaned = " ".join(words)
 
         return cleaned
 
     def _extract_entities(self, message: str) -> list[str]:
         """Extract key entities and important terms"""
+        # Message is already cleaned - stop words removed in _clean_message
         words = message.split()
 
-        # Remove stop words
-        filtered_words = [word for word in words if word not in self.stop_words and len(word) > 2]
+        # Simple filtering: Just check length since stop words are already gone
+        # Keep words >= 3 characters (allows "Max", "cat", "dog", "car", "job")
+        # Rejects empty strings and very short words
+        filtered_words = [word for word in words if len(word) >= 3]
 
         # Group consecutive important words (simple noun phrase detection)
         entities = []
@@ -318,9 +327,8 @@ class EnhancedQueryProcessor:
                         entities.append(" ".join(current_phrase))
                     current_phrase = []
 
-                # Add single significant word
-                if word not in self.stop_words:
-                    entities.append(word)
+                # Add single word
+                entities.append(word)
 
         # Don't forget the last phrase
         if current_phrase:
@@ -340,10 +348,15 @@ class EnhancedQueryProcessor:
         return unique_entities[:8]  # Limit to top 8 entities
 
     def _is_significant_word(self, word: str) -> bool:
-        """Check if a word is significant for entity extraction"""
-        # Nouns are generally more significant
-        # This is a simple heuristic - in practice, you'd use POS tagging
-        return len(word) > 3 and word not in self.stop_words and word not in self.question_words
+        """
+        Check if a word is significant for entity extraction.
+        
+        Since stop words are already removed in _clean_message, we only need
+        to check basic significance (length and question words).
+        """
+        # Already filtered: stop words removed in preprocessing
+        # Just check: not a question word and reasonable length
+        return len(word) >= 3 and word not in self.question_words
 
     def _classify_intent(self, message: str) -> str:
         """Classify the intent of the message"""

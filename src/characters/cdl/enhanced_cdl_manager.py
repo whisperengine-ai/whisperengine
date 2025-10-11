@@ -179,14 +179,18 @@ class EnhancedCDLManager:
                 # Build backward-compatible CDL structure
                 cdl_data = await self._build_cdl_structure(conn, character_row, character_id)
                 
-                # Add rich character data (new functionality)
-                rich_data = await self._get_rich_character_data(conn, character_id)
-                cdl_data.update(rich_data)
+                # Add rich character data (new functionality) with error handling
+                try:
+                    rich_data = await self._get_rich_character_data(conn, character_id)
+                    cdl_data.update(rich_data)
+                except Exception as rich_error:
+                    logger.warning(f"Failed to load rich character data for {character_name}, using basic data only: {rich_error}")
                 
                 return cdl_data
                 
         except Exception as e:
-            logger.error(f"Error adding abilities for {character_name}: {e}")
+            logger.error(f"Error loading character data for {character_name}: {e}")
+            return None
 
     async def get_response_guidelines(self, character_name: str) -> List[ResponseGuideline]:
         """Get response guidelines including length constraints and formatting rules"""

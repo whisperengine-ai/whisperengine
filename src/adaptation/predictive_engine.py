@@ -25,6 +25,9 @@ from typing import Dict, List, Any, Optional
 from dataclasses import dataclass
 from enum import Enum
 
+# Import TrendDirection from trend_analyzer for proper ConfidenceTrend handling
+from src.analytics.trend_analyzer import TrendDirection
+
 logger = logging.getLogger(__name__)
 
 
@@ -278,9 +281,10 @@ class PredictiveAdaptationEngine:
         confidence_trend = trend_data['confidence_trend']
         
         # Pattern: Declining confidence trend
-        if confidence_trend.get('direction') == 'declining':
-            severity = confidence_trend.get('severity', 0.0)
-            current_confidence = confidence_trend.get('current_value', 0.5)
+        # confidence_trend is a ConfidenceTrend dataclass with trend_analysis: TrendAnalysis attribute
+        if hasattr(confidence_trend, 'trend_analysis') and confidence_trend.trend_analysis.direction == TrendDirection.DECLINING:
+            severity = confidence_trend.trend_analysis.severity
+            current_confidence = confidence_trend.recent_confidence
             
             # Predict confidence will drop below threshold
             if current_confidence > 0.6 and severity > 0.3:
@@ -295,7 +299,7 @@ class PredictiveAdaptationEngine:
                     indicators=[
                         f"Current confidence: {current_confidence:.2f}",
                         f"Decline severity: {severity:.2f}",
-                        f"Trend direction: {confidence_trend.get('direction')}"
+                        f"Trend direction: {confidence_trend.trend_analysis.direction.value}"
                     ],
                     recommended_adaptations=[
                         AdaptationStrategy.INCREASE_DETAIL,

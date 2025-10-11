@@ -105,6 +105,15 @@ class ConversationType(Enum):
     PERSONALITY_CONSISTENCY = "personality_consistency"
     RELATIONSHIP_PROGRESSION = "relationship_progression"
     CHARACTER_DRIFT_DETECTION = "character_drift_detection"
+    
+    # Vector Classification Testing (Multi-Vector Intelligence)
+    EMOTIONAL_QUERY_TEST = "emotional_query_test"
+    SEMANTIC_QUERY_TEST = "semantic_query_test"
+    CONTENT_QUERY_TEST = "content_query_test"
+    TEMPORAL_QUERY_TEST = "temporal_query_test"
+    HYBRID_QUERY_TEST = "hybrid_query_test"
+    MULTI_VECTOR_FUSION_TEST = "multi_vector_fusion_test"
+    CLASSIFICATION_ACCURACY_TEST = "classification_accuracy_test"
 
 
 class UserPersona(Enum):
@@ -1088,6 +1097,208 @@ class SyntheticConversationGenerator:
                     "topics": ["value consistency", "character stability", "identity maintenance"],
                     "emotional_range": ["introspection", "consistency", "identity"],
                     "duration_messages": (6, 15)
+                }
+            ],
+            
+            # Vector Classification Testing Templates (Multi-Vector Intelligence)
+            ConversationType.EMOTIONAL_QUERY_TEST: [
+                {
+                    "opener": "How am I feeling today?",
+                    "topics": ["emotional state", "feelings", "mood", "emotional awareness"],
+                    "emotional_range": ["curiosity", "introspection", "emotional"],
+                    "duration_messages": (3, 8),
+                    "expected_vector": "emotion"
+                },
+                {
+                    "opener": "I'm feeling really happy about our progress!",
+                    "topics": ["happiness", "joy", "excitement", "positive emotions"],
+                    "emotional_range": ["joy", "happiness", "excitement"],
+                    "duration_messages": (2, 6),
+                    "expected_vector": "emotion"
+                },
+                {
+                    "opener": "Why am I so worried about this project?",
+                    "topics": ["anxiety", "worry", "stress", "emotional concerns"],
+                    "emotional_range": ["anxiety", "worry", "concern"],
+                    "duration_messages": (3, 10),
+                    "expected_vector": "emotion"
+                },
+                {
+                    "opener": "I'm excited to learn more about this!",
+                    "topics": ["excitement", "enthusiasm", "anticipation"],
+                    "emotional_range": ["excitement", "joy", "anticipation"],
+                    "duration_messages": (2, 7),
+                    "expected_vector": "emotion"
+                },
+                {
+                    "opener": "This makes me feel frustrated and confused.",
+                    "topics": ["frustration", "confusion", "negative emotions"],
+                    "emotional_range": ["frustration", "confusion", "irritation"],
+                    "duration_messages": (3, 9),
+                    "expected_vector": "emotion"
+                }
+            ],
+            ConversationType.SEMANTIC_QUERY_TEST: [
+                {
+                    "opener": "What patterns do you see in my behavior?",
+                    "topics": ["behavioral patterns", "analysis", "trends", "observations"],
+                    "emotional_range": ["analytical", "curious", "introspective"],
+                    "duration_messages": (4, 12),
+                    "expected_vector": "semantic"
+                },
+                {
+                    "opener": "How do our conversations usually go?",
+                    "topics": ["conversation patterns", "communication style", "relationship dynamics"],
+                    "emotional_range": ["analytical", "reflective", "curious"],
+                    "duration_messages": (3, 10),
+                    "expected_vector": "semantic"
+                },
+                {
+                    "opener": "What's the relationship between these concepts?",
+                    "topics": ["conceptual connections", "relationships", "understanding"],
+                    "emotional_range": ["analytical", "intellectual", "curious"],
+                    "duration_messages": (4, 14),
+                    "expected_vector": "semantic"
+                },
+                {
+                    "opener": "Can you see any trends in my learning style?",
+                    "topics": ["learning patterns", "educational trends", "personal development"],
+                    "emotional_range": ["analytical", "growth-oriented", "curious"],
+                    "duration_messages": (5, 15),
+                    "expected_vector": "semantic"
+                },
+                {
+                    "opener": "How would you describe the evolution of our relationship?",
+                    "topics": ["relationship evolution", "connection patterns", "growth trajectory"],
+                    "emotional_range": ["reflective", "analytical", "relational"],
+                    "duration_messages": (6, 18),
+                    "expected_vector": "semantic"
+                }
+            ],
+            ConversationType.CONTENT_QUERY_TEST: [
+                {
+                    "opener": "What did we discuss about Python yesterday?",
+                    "topics": ["factual recall", "specific information", "past discussions"],
+                    "emotional_range": ["neutral", "factual", "inquiring"],
+                    "duration_messages": (2, 6),
+                    "expected_vector": "content"
+                },
+                {
+                    "opener": "Tell me about marine biology research.",
+                    "topics": ["scientific information", "knowledge sharing", "educational content"],
+                    "emotional_range": ["curious", "educational", "factual"],
+                    "duration_messages": (3, 10),
+                    "expected_vector": "content"
+                },
+                {
+                    "opener": "What are the technical specifications?",
+                    "topics": ["technical details", "specifications", "precise information"],
+                    "emotional_range": ["analytical", "precise", "technical"],
+                    "duration_messages": (2, 8),
+                    "expected_vector": "content"
+                },
+                {
+                    "opener": "How does the algorithm work exactly?",
+                    "topics": ["technical explanation", "process details", "algorithmic understanding"],
+                    "emotional_range": ["analytical", "technical", "precise"],
+                    "duration_messages": (4, 12),
+                    "expected_vector": "content"
+                },
+                {
+                    "opener": "Explain the process step by step.",
+                    "topics": ["procedural knowledge", "step-by-step explanation", "instructional"],
+                    "emotional_range": ["instructional", "methodical", "clear"],
+                    "duration_messages": (5, 15),
+                    "expected_vector": "content"
+                }
+            ],
+            ConversationType.TEMPORAL_QUERY_TEST: [
+                {
+                    "opener": "What was the first thing we talked about today?",
+                    "topics": ["recent memory", "chronological recall", "temporal awareness"],
+                    "emotional_range": ["curious", "temporal", "recent"],
+                    "duration_messages": (2, 6),
+                    "expected_vector": "temporal"
+                },
+                {
+                    "opener": "What did I just say a moment ago?",
+                    "topics": ["immediate recall", "very recent memory", "conversation flow"],
+                    "emotional_range": ["testing", "immediate", "verification"],
+                    "duration_messages": (1, 3),
+                    "expected_vector": "temporal"
+                },
+                {
+                    "opener": "When did we last discuss this topic?",
+                    "topics": ["temporal recall", "time-based memory", "historical reference"],
+                    "emotional_range": ["temporal", "historical", "curious"],
+                    "duration_messages": (2, 7),
+                    "expected_vector": "temporal"
+                },
+                {
+                    "opener": "Remind me what we were talking about earlier in this conversation",
+                    "topics": ["conversation continuity", "short-term recall", "context maintenance"],
+                    "emotional_range": ["continuity", "contextual", "engaged"],
+                    "duration_messages": (2, 5),
+                    "expected_vector": "temporal"
+                }
+            ],
+            ConversationType.HYBRID_QUERY_TEST: [
+                {
+                    "opener": "How do I usually feel when we discuss technical topics?",
+                    "topics": ["emotional patterns", "topical analysis", "behavioral correlation"],
+                    "emotional_range": ["analytical", "emotional", "reflective"],
+                    "duration_messages": (4, 12),
+                    "expected_vector": "hybrid"
+                },
+                {
+                    "opener": "What emotional patterns emerge in our relationship over time?",
+                    "topics": ["emotional evolution", "relationship analysis", "temporal patterns"],
+                    "emotional_range": ["analytical", "emotional", "temporal"],
+                    "duration_messages": (5, 15),
+                    "expected_vector": "hybrid"
+                },
+                {
+                    "opener": "Analyze my learning style considering both my emotions and progress",
+                    "topics": ["multi-dimensional analysis", "emotional learning", "comprehensive view"],
+                    "emotional_range": ["analytical", "comprehensive", "integrative"],
+                    "duration_messages": (6, 18),
+                    "expected_vector": "hybrid"
+                }
+            ],
+            ConversationType.MULTI_VECTOR_FUSION_TEST: [
+                {
+                    "opener": "Looking at our entire history - my feelings, the facts we've discussed, patterns in our conversations, and recent context - what insights do you have?",
+                    "topics": ["comprehensive analysis", "multi-vector fusion", "holistic understanding"],
+                    "emotional_range": ["comprehensive", "integrative", "analytical"],
+                    "duration_messages": (8, 25),
+                    "expected_vector": "fusion"
+                },
+                {
+                    "opener": "Combine what you know about my emotional state, recent conversations, behavioral patterns, and factual knowledge to help me understand myself better",
+                    "topics": ["self-understanding", "integrated intelligence", "complete picture"],
+                    "emotional_range": ["introspective", "comprehensive", "growth"],
+                    "duration_messages": (10, 30),
+                    "expected_vector": "fusion"
+                }
+            ],
+            ConversationType.CLASSIFICATION_ACCURACY_TEST: [
+                {
+                    "opener": "Let's test your classification system with diverse queries",
+                    "topics": ["classification testing", "accuracy validation", "system performance"],
+                    "emotional_range": ["analytical", "testing", "validation"],
+                    "duration_messages": (15, 40),
+                    "test_sequence": [
+                        {"query": "How am I feeling?", "expected": "emotion"},
+                        {"query": "What patterns do you notice?", "expected": "semantic"},
+                        {"query": "What did we discuss yesterday?", "expected": "content"},
+                        {"query": "What did I just say?", "expected": "temporal"},
+                        {"query": "How do I feel about technical topics?", "expected": "hybrid"},
+                        {"query": "I'm so excited about this project!", "expected": "emotion"},
+                        {"query": "Explain the algorithm step by step", "expected": "content"},
+                        {"query": "What's our relationship like?", "expected": "semantic"},
+                        {"query": "When was our last conversation?", "expected": "temporal"},
+                        {"query": "Analyze my emotional growth over time", "expected": "hybrid"}
+                    ]
                 }
             ]
         }

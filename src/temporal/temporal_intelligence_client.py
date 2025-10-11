@@ -814,13 +814,14 @@ class TemporalIntelligenceClient:
             trends = []
             for table in result:
                 for record in table.records:
+                    # Use record.values dictionary for pivoted data
                     trends.append({
                         'timestamp': record.get_time(),
-                        'user_fact_confidence': record.get_value('user_fact_confidence'),
-                        'relationship_confidence': record.get_value('relationship_confidence'),
-                        'context_confidence': record.get_value('context_confidence'),
-                        'emotional_confidence': record.get_value('emotional_confidence'),
-                        'overall_confidence': record.get_value('overall_confidence')
+                        'user_fact_confidence': record.values.get('user_fact_confidence', 0.0),
+                        'relationship_confidence': record.values.get('relationship_confidence', 0.0),
+                        'context_confidence': record.values.get('context_confidence', 0.0),
+                        'emotional_confidence': record.values.get('emotional_confidence', 0.0),
+                        'overall_confidence': record.values.get('overall_confidence', 0.0)
                     })
             
             return sorted(trends, key=lambda x: x['timestamp'])
@@ -864,13 +865,14 @@ class TemporalIntelligenceClient:
             evolution = []
             for table in result:
                 for record in table.records:
+                    # Use record.values dictionary for pivoted data
                     evolution.append({
                         'timestamp': record.get_time(),
-                        'trust_level': record.get_value('trust_level'),
-                        'affection_level': record.get_value('affection_level'),
-                        'attunement_level': record.get_value('attunement_level'),
-                        'interaction_quality': record.get_value('interaction_quality'),
-                        'communication_comfort': record.get_value('communication_comfort')
+                        'trust_level': record.values.get('trust_level', 0.0),
+                        'affection_level': record.values.get('affection_level', 0.0),
+                        'attunement_level': record.values.get('attunement_level', 0.0),
+                        'interaction_quality': record.values.get('interaction_quality', 0.0),
+                        'communication_comfort': record.values.get('communication_comfort', 0.0)
                     })
             
             return sorted(evolution, key=lambda x: x['timestamp'])

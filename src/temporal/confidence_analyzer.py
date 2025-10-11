@@ -49,14 +49,14 @@ class ConfidenceAnalyzer:
         
         # Extract emotion analysis confidence
         emotion_confidence = 0.5  # Default
-        if 'emotion_analysis' in ai_components:
-            emotion_data = ai_components['emotion_analysis']
+        emotion_data = ai_components.get('emotion_analysis')
+        if emotion_data and isinstance(emotion_data, dict):
             emotion_confidence = emotion_data.get('confidence', 0.5)
             
         # Extract context analysis confidence
         context_confidence = 0.5  # Default
-        if 'context_analysis' in ai_components:
-            context_data = ai_components['context_analysis']
+        context_data = ai_components.get('context_analysis')
+        if context_data and isinstance(context_data, dict):
             confidence_scores = context_data.get('confidence_scores', {})
             if confidence_scores:
                 # Average of all context confidence scores
@@ -67,8 +67,8 @@ class ConfidenceAnalyzer:
         
         # Calculate relationship confidence from Phase 4 data
         relationship_confidence = 0.5  # Default
-        if 'conversation_intelligence' in ai_components:
-            conversation_intelligence_data = ai_components['conversation_intelligence']
+        conversation_intelligence_data = ai_components.get('conversation_intelligence')
+        if conversation_intelligence_data and isinstance(conversation_intelligence_data, dict):
             # Use relationship level as confidence indicator
             relationship_level = conversation_intelligence_data.get('relationship_level', 'acquaintance')
             relationship_mapping = {
@@ -153,8 +153,8 @@ class ConfidenceAnalyzer:
         # If PostgreSQL scores not available, fall back to estimates
         if trust_level == 0.5 and affection_level == 0.4:  # Still using defaults
             # Base trust on emotion analysis and conversation length
-            if 'emotion_analysis' in ai_components:
-                emotion_data = ai_components['emotion_analysis']
+            emotion_data = ai_components.get('emotion_analysis')
+            if emotion_data and isinstance(emotion_data, dict):
                 primary_emotion = emotion_data.get('primary_emotion', 'neutral')
                 intensity = emotion_data.get('intensity', 0.5)
                 
@@ -169,8 +169,8 @@ class ConfidenceAnalyzer:
             trust_level = max(0.1, min(0.9, trust_level))  # Clamp to reasonable range
             
             # Affection based on emotional resonance and interaction quality
-            if 'conversation_intelligence' in ai_components:
-                conversation_data = ai_components['conversation_intelligence']
+            conversation_data = ai_components.get('conversation_intelligence')
+            if conversation_data and isinstance(conversation_data, dict):
                 interaction_type = conversation_data.get('interaction_type', 'general')
                 
                 # Personal interactions indicate higher affection
@@ -180,8 +180,8 @@ class ConfidenceAnalyzer:
                     affection_level += 0.1
                     
             # Attunement based on context understanding and response appropriateness
-            if 'context_analysis' in ai_components:
-                context_data = ai_components['context_analysis']
+            context_data = ai_components.get('context_analysis')
+            if context_data and isinstance(context_data, dict):
                 confidence_scores = context_data.get('confidence_scores', {})
                 if confidence_scores:
                     attunement_level = sum(confidence_scores.values()) / len(confidence_scores)
@@ -222,9 +222,9 @@ class ConfidenceAnalyzer:
         
         # Engagement score based on emotion and interaction type
         engagement_score = 0.5  # Default
-        if 'emotion_analysis' in ai_components:
-            emotion_data = ai_components['emotion_analysis']
-            intensity = emotion_data.get('intensity', 0.5)
+        emotion_data_engagement = ai_components.get('emotion_analysis')
+        if emotion_data_engagement and isinstance(emotion_data_engagement, dict):
+            intensity = emotion_data_engagement.get('intensity', 0.5)
             engagement_score = max(0.3, min(0.9, intensity))
             
         # Satisfaction based on response appropriateness and length
@@ -247,15 +247,15 @@ class ConfidenceAnalyzer:
             
         # Emotional resonance from emotion analysis confidence
         emotional_resonance = 0.6  # Default
-        if 'emotion_analysis' in ai_components:
-            emotion_data = ai_components['emotion_analysis']
-            emotional_resonance = emotion_data.get('confidence', 0.6)
+        emotion_data_resonance = ai_components.get('emotion_analysis')
+        if emotion_data_resonance and isinstance(emotion_data_resonance, dict):
+            emotional_resonance = emotion_data_resonance.get('confidence', 0.6)
             
         # Topic relevance based on context analysis
         topic_relevance = 0.7  # Default
-        if 'context_analysis' in ai_components:
-            context_data = ai_components['context_analysis']
-            confidence_scores = context_data.get('confidence_scores', {})
+        context_data_relevance = ai_components.get('context_analysis')
+        if context_data_relevance and isinstance(context_data_relevance, dict):
+            confidence_scores = context_data_relevance.get('confidence_scores', {})
             if confidence_scores:
                 topic_relevance = sum(confidence_scores.values()) / len(confidence_scores)
                 

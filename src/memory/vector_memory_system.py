@@ -49,6 +49,7 @@ from src.intelligence.enhanced_7d_vector_analyzer import Enhanced7DVectorAnalyze
 # Import multi-vector intelligence system for Sprint 2 enhancement
 from src.memory.multi_vector_intelligence import (
     create_multi_vector_search_coordinator,
+    create_multi_vector_intelligence,
     MultiVectorSearchCoordinator,
     QueryType,
     VectorStrategy
@@ -3731,11 +3732,16 @@ class VectorMemoryManager:
             logger.warning("🚀 MEMORYBOOST: Component initialization failed, continuing without MemoryBoost: %s", str(e))
         
         # 🎯 SPRINT 2 ENHANCEMENT: Initialize multi-vector intelligence coordinator
+        # Pass temporal_client for classification accuracy logging to InfluxDB
         try:
-            self._multi_vector_coordinator = create_multi_vector_search_coordinator(
-                vector_memory_system=self.vector_store
+            multi_vector_intelligence = create_multi_vector_intelligence(
+                temporal_client=self.temporal_client
             )
-            logger.info("🎯 Multi-vector intelligence coordinator initialized for enhanced search")
+            self._multi_vector_coordinator = create_multi_vector_search_coordinator(
+                vector_memory_system=self.vector_store,
+                intelligence=multi_vector_intelligence
+            )
+            logger.info("🎯 Multi-vector intelligence coordinator initialized with InfluxDB logging")
         except Exception as e:
             logger.warning(f"🎯 Multi-vector coordinator initialization failed: {e}")
             self._multi_vector_coordinator = None

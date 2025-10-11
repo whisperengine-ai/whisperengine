@@ -180,7 +180,13 @@ class MessageProcessor:
                     postgres_pool=getattr(bot_core, 'postgres_pool', None) if bot_core else None
                 )
                 
-                self.predictive_engine = PredictiveAdaptationEngine()
+                # Pass dependencies to Predictive Engine
+                self.predictive_engine = PredictiveAdaptationEngine(
+                    trend_analyzer=self.trend_analyzer,
+                    confidence_adapter=self.confidence_adapter,
+                    temporal_client=self.temporal_client,
+                    memory_manager=self.memory_manager
+                )
                 self.learning_pipeline = LearningPipelineManager()
                 
                 logger.info("Learning Intelligence Orchestrator: Learning coordination components initialized")
@@ -538,7 +544,7 @@ class MessageProcessor:
             
             # Phase 7.5: Record bot emotion separately in InfluxDB
             bot_emotion = ai_components.get('bot_emotion')
-            if bot_emotion:
+            if bot_emotion and isinstance(bot_emotion, dict):
                 try:
                     # Record bot emotion as separate metric for temporal tracking
                     await self.temporal_client.record_bot_emotion(
@@ -559,7 +565,7 @@ class MessageProcessor:
             
             # Phase 7.5: Record user emotion to InfluxDB (CRITICAL FIX)
             user_emotion = ai_components.get('emotion_data')
-            if user_emotion:
+            if user_emotion and isinstance(user_emotion, dict):
                 try:
                     # Record user emotion for temporal tracking and character tuning
                     await self.temporal_client.record_user_emotion(
@@ -599,7 +605,7 @@ class MessageProcessor:
             
             # Add memory aging metrics if available
             memory_aging = ai_components.get('memory_aging_intelligence')
-            if memory_aging:
+            if memory_aging and isinstance(memory_aging, dict):
                 try:
                     memory_aging_task = self.temporal_client.record_memory_aging_metrics(
                         bot_name=bot_name,
@@ -620,7 +626,7 @@ class MessageProcessor:
             
             # CharacterGraphManager metrics (if available)
             character_performance = ai_components.get('character_performance_intelligence')
-            if character_performance:
+            if character_performance and isinstance(character_performance, dict):
                 try:
                     character_graph_task = self.temporal_client.record_character_graph_performance(
                         bot_name=bot_name,
@@ -638,15 +644,22 @@ class MessageProcessor:
             
             # UnifiedCharacterIntelligenceCoordinator metrics (if available)
             unified_intelligence = ai_components.get('unified_character_intelligence')
-            if unified_intelligence:
+            if unified_intelligence and isinstance(unified_intelligence, dict):
                 try:
                     systems_used = ["conversation_intelligence", "memory_boost"]  # Default systems
                     coordination_metadata = unified_intelligence.get('coordination_metadata', {})
+                    if not isinstance(coordination_metadata, dict):
+                        coordination_metadata = {}
+                    
+                    performance_metrics = unified_intelligence.get('performance_metrics', {})
+                    if not isinstance(performance_metrics, dict):
+                        performance_metrics = {}
+                    
                     coordination_task = self.temporal_client.record_intelligence_coordination_metrics(
                         bot_name=bot_name,
                         user_id=message_context.user_id,
                         systems_used=systems_used,
-                        coordination_time_ms=unified_intelligence.get('performance_metrics', {}).get('processing_time_ms', 0),
+                        coordination_time_ms=performance_metrics.get('processing_time_ms', 0),
                         authenticity_score=unified_intelligence.get('character_authenticity_score', 0.0),
                         confidence_score=unified_intelligence.get('confidence_score', 0.0),
                         context_type=coordination_metadata.get('context_type', 'standard'),
@@ -660,11 +673,16 @@ class MessageProcessor:
             
             # Enhanced Vector Emotion Analyzer metrics (already handled individually but can aggregate)
             emotion_analysis = ai_components.get('emotion_analysis')
-            if emotion_analysis:
+            if emotion_analysis and isinstance(emotion_analysis, dict):
                 try:
                     # Note: Individual emotion analysis metrics are recorded by the analyzer itself
                     # This aggregates them for overall message processing metrics
-                    emotion_count = len([score for score in emotion_analysis.get('all_emotions', {}).values() if score > 0.1])
+                    all_emotions = emotion_analysis.get('all_emotions', {})
+                    if isinstance(all_emotions, dict):
+                        emotion_count = len([score for score in all_emotions.values() if score > 0.1])
+                    else:
+                        emotion_count = 0
+                    
                     emotion_task = self.temporal_client.record_emotion_analysis_performance(
                         bot_name=bot_name,
                         user_id=message_context.user_id,
@@ -681,24 +699,26 @@ class MessageProcessor:
             # Vector Memory System metrics (memory retrieval performance)
             if relevant_memories:
                 try:
-                    # Calculate average relevance score from retrieved memories
-                    avg_relevance = sum(mem.get('score', 0.0) for mem in relevant_memories) / len(relevant_memories)
-                    
-                    # Get collection name from environment
-                    collection_name = os.getenv('QDRANT_COLLECTION_NAME', f'whisperengine_memory_{bot_name.lower()}')
-                    
-                    vector_memory_task = self.temporal_client.record_vector_memory_performance(
-                        bot_name=bot_name,
-                        user_id=message_context.user_id,
-                        operation="message_processing_retrieval",
-                        search_time_ms=processing_time_ms * 0.2,  # Estimate ~20% of processing time for memory
-                        memories_found=len(relevant_memories),
-                        avg_relevance_score=avg_relevance,
-                        collection_name=collection_name,
-                        vector_type="content"
-                    )
-                    temporal_tasks.append(vector_memory_task)
-                    logger.debug("📊 TEMPORAL: Added vector memory performance metrics to batch recording")
+                    # Filter out None values and calculate average relevance score
+                    valid_memories = [mem for mem in relevant_memories if mem and isinstance(mem, dict)]
+                    if valid_memories:
+                        avg_relevance = sum(mem.get('score', 0.0) for mem in valid_memories) / len(valid_memories)
+                        
+                        # Get collection name from environment
+                        collection_name = os.getenv('QDRANT_COLLECTION_NAME', f'whisperengine_memory_{bot_name.lower()}')
+                        
+                        vector_memory_task = self.temporal_client.record_vector_memory_performance(
+                            bot_name=bot_name,
+                            user_id=message_context.user_id,
+                            operation="message_processing_retrieval",
+                            search_time_ms=processing_time_ms * 0.2,  # Estimate ~20% of processing time for memory
+                            memories_found=len(valid_memories),
+                            avg_relevance_score=avg_relevance,
+                            collection_name=collection_name,
+                            vector_type="content"
+                        )
+                        temporal_tasks.append(vector_memory_task)
+                        logger.debug("📊 TEMPORAL: Added vector memory performance metrics to batch recording")
                 except AttributeError:
                     logger.debug("Vector memory performance recording not yet implemented in TemporalIntelligenceClient")
             
@@ -749,22 +769,26 @@ class MessageProcessor:
                         emotion_data=emotion_data
                     )
                     
-                    if update:
+                    if update and update.new_scores:
+                        # Safely extract changes (may be None or empty dict)
+                        changes = update.changes if update.changes else {}
                         logger.info(
                             "🔄 RELATIONSHIP: Trust/affection/attunement updated for %s/%s - "
                             "trust: %.3f (%+.3f), affection: %.3f (%+.3f), attunement: %.3f (%+.3f)",
                             bot_name, message_context.user_id,
-                            update.new_scores.trust, update.changes.get('trust', 0.0),
-                            update.new_scores.affection, update.changes.get('affection', 0.0),
-                            update.new_scores.attunement, update.changes.get('attunement', 0.0)
+                            update.new_scores.trust, changes.get('trust', 0.0),
+                            update.new_scores.affection, changes.get('affection', 0.0),
+                            update.new_scores.attunement, changes.get('attunement', 0.0)
                         )
                     
                 except Exception as e:
                     logger.warning("Relationship evolution update failed: %s", str(e))
             
         except Exception as e:
-            # Log but don't fail message processing
+            # Log but don't fail message processing - include traceback for debugging
+            import traceback
             logger.warning("Failed to record temporal metrics: %s", str(e))
+            logger.debug("Temporal metrics error traceback: %s", traceback.format_exc())
     
     async def _ensure_relationship_initialized(self):
         """Lazy initialization of Relationship Intelligence components (postgres_pool may not be ready at __init__ time)."""
@@ -2582,8 +2606,19 @@ class MessageProcessor:
             
             # Extract data from ai_components for learning moment context
             emotional_context = ai_components.get('emotional_intelligence', {})
-            temporal_data = ai_components.get('character_intelligence', {}).get('coordination_metadata', {})
-            episodic_memories = ai_components.get('character_intelligence', {}).get('system_contributions', {}).get('character_episodic_intelligence')
+            
+            # Safe extraction with None handling for chained .get() calls
+            character_intelligence = ai_components.get('character_intelligence')
+            if character_intelligence and isinstance(character_intelligence, dict):
+                temporal_data = character_intelligence.get('coordination_metadata', {})
+                system_contributions = character_intelligence.get('system_contributions', {})
+                if isinstance(system_contributions, dict):
+                    episodic_memories = system_contributions.get('character_episodic_intelligence')
+                else:
+                    episodic_memories = None
+            else:
+                temporal_data = {}
+                episodic_memories = None
             
             # Create learning moment context
             from src.characters.learning.character_learning_moment_detector import LearningMomentContext
@@ -3291,8 +3326,13 @@ class MessageProcessor:
             # Get bot name for character-specific analysis
             bot_name = os.getenv('DISCORD_BOT_NAME', 'unknown')
             
-            # Initialize performance analyzer
+            # Initialize performance analyzer with all available adaptive learning components
             performance_analyzer = CharacterPerformanceAnalyzer(
+                trend_analyzer=self.trend_analyzer,
+                memory_effectiveness_analyzer=getattr(self, 'memory_effectiveness_analyzer', None),
+                relationship_evolution_engine=getattr(self, 'relationship_engine', None),
+                cdl_parser=None,  # Not needed for runtime analysis
+                cdl_database_manager=getattr(self, 'cdl_database_manager', None),
                 postgres_pool=getattr(self.bot_core, 'postgres_pool', None) if self.bot_core else None
             )
             
@@ -3671,7 +3711,7 @@ class MessageProcessor:
                     return {
                         'empathy_style': empathy_calibration.recommended_style.value,
                         'confidence': empathy_calibration.confidence_score,
-                        'guidance': empathy_calibration.guidance_text,
+                        'guidance': empathy_calibration.reasoning,  # Fixed: was guidance_text, should be reasoning
                         'personalization_factors': empathy_calibration.personalization_factors
                     }
                 return None
@@ -4577,6 +4617,26 @@ class MessageProcessor:
             import json
             from datetime import datetime
             import os
+            from enum import Enum
+            from dataclasses import is_dataclass, asdict
+            
+            # Custom JSON encoder to handle non-serializable objects
+            class CustomJSONEncoder(json.JSONEncoder):
+                def default(self, obj):
+                    # Handle Enum types
+                    if isinstance(obj, Enum):
+                        return obj.value
+                    # Handle dataclass types
+                    if is_dataclass(obj):
+                        return asdict(obj)
+                    # Handle datetime types
+                    if isinstance(obj, datetime):
+                        return obj.isoformat()
+                    # For other types, try str() representation
+                    try:
+                        return str(obj)
+                    except:
+                        return f"<non-serializable: {type(obj).__name__}>"
             
             bot_name = os.getenv('DISCORD_BOT_NAME', 'unknown')
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -4605,7 +4665,7 @@ class MessageProcessor:
             # Write to file
             os.makedirs("/app/logs/prompts", exist_ok=True)
             with open(filename, 'w', encoding='utf-8') as f:
-                json.dump(log_data, f, indent=2, ensure_ascii=False)
+                json.dump(log_data, f, indent=2, ensure_ascii=False, cls=CustomJSONEncoder)
             
             # Also log summary to console
             logger.info(f"📝 PROMPT LOGGED: {filename} ({len(conversation_context)} messages, {log_data['total_chars']} chars)")
@@ -4650,9 +4710,28 @@ class MessageProcessor:
                 "response_timestamp": datetime.now().isoformat()
             }
             
-            # Write back to file
+            # Write back to file (using the same CustomJSONEncoder from _log_full_prompt_to_file)
             with open(latest_file, 'w', encoding='utf-8') as f:
-                json.dump(log_data, f, indent=2, ensure_ascii=False)
+                # Use safe encoding - if CustomJSONEncoder isn't available here, use ensure_ascii=False only
+                try:
+                    from enum import Enum
+                    from dataclasses import is_dataclass, asdict
+                    class CustomJSONEncoder(json.JSONEncoder):
+                        def default(self, obj):
+                            if isinstance(obj, Enum):
+                                return obj.value
+                            if is_dataclass(obj):
+                                return asdict(obj)
+                            if isinstance(obj, datetime):
+                                return obj.isoformat()
+                            try:
+                                return str(obj)
+                            except:
+                                return f"<non-serializable: {type(obj).__name__}>"
+                    json.dump(log_data, f, indent=2, ensure_ascii=False, cls=CustomJSONEncoder)
+                except:
+                    # Fallback without custom encoder
+                    json.dump(log_data, f, indent=2, ensure_ascii=False, default=str)
             
             # Log summary to console
             logger.info(f"📝 RESPONSE LOGGED: {latest_file} ({len(response)} chars)")
@@ -4916,18 +4995,33 @@ class MessageProcessor:
                     try:
                         from influxdb_client.client.write.point import Point
                         
+                        # Safe extraction to avoid chained .get() on None values
+                        learning_predictions = ai_components.get('learning_predictions')
+                        if learning_predictions and isinstance(learning_predictions, dict):
+                            predictions_count = len(learning_predictions.get('prediction_types', []))
+                        else:
+                            predictions_count = 0
+                        
+                        learning_health = ai_components.get('learning_health')
+                        if learning_health and isinstance(learning_health, dict):
+                            system_performance = learning_health.get('system_performance', 0.0)
+                            healthy_components = learning_health.get('healthy_components', 0)
+                        else:
+                            system_performance = 0.0
+                            healthy_components = 0
+                        
                         # Create proper InfluxDB Point object instead of named parameters
                         point = Point("learning_intelligence_orchestrator") \
                             .tag("bot_name", bot_name) \
                             .tag("user_id", message_context.user_id) \
                             .tag("platform", message_context.platform) \
-                            .field("predictions_generated", len(ai_components.get('learning_predictions', {}).get('prediction_types', []))) \
+                            .field("predictions_generated", predictions_count) \
                             .field("health_monitoring_triggered", bool(ai_components.get('learning_health'))) \
                             .field("learning_orchestrator_available", bool(self.learning_orchestrator)) \
                             .field("predictive_engine_available", bool(self.predictive_engine)) \
                             .field("learning_pipeline_available", bool(self.learning_pipeline)) \
-                            .field("system_performance", ai_components.get('learning_health', {}).get('system_performance', 0.0)) \
-                            .field("healthy_components", ai_components.get('learning_health', {}).get('healthy_components', 0)) \
+                            .field("system_performance", system_performance) \
+                            .field("healthy_components", healthy_components) \
                             .time(datetime.utcnow())
                         
                         await self.temporal_client.record_point(point)

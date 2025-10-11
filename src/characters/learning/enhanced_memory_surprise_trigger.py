@@ -132,8 +132,7 @@ class EnhancedMemorySurpriseTrigger:
             similar_memories = await self.memory_manager.retrieve_relevant_memories(
                 user_id=user_id,
                 query=current_message,
-                limit=15,  # Get more candidates for analysis
-                memory_type="conversation"
+                limit=15  # Get more candidates for analysis
             )
             
             # Filter to exclude very recent memories (avoid redundancy)

@@ -121,11 +121,12 @@ class InfluxDBTrendAnalyzer:
             return None
             
         try:
-            # Get confidence data from InfluxDB
-            confidence_data = await self.temporal_client.get_confidence_trends(
+            # Get confidence data from InfluxDB (convert days_back to hours_back)
+            hours_back = days_back * 24
+            confidence_data = await self.temporal_client.get_confidence_trend(
                 bot_name=bot_name,
                 user_id=user_id, 
-                days_back=days_back
+                hours_back=hours_back
             )
             
             if not confidence_data or len(confidence_data) < self.min_data_points:
@@ -133,7 +134,8 @@ class InfluxDBTrendAnalyzer:
                 return None
                 
             # Extract confidence values and timestamps
-            values = [point.get('confidence', 0.0) for point in confidence_data]
+            # The temporal client returns overall_confidence as the main metric
+            values = [point.get('overall_confidence', 0.0) for point in confidence_data]
             timestamps = [point.get('timestamp') for point in confidence_data]
             
             # Perform trend analysis

@@ -1400,8 +1400,7 @@ class CharacterGraphManager:
             memories = await self.memory_manager.retrieve_relevant_memories(
                 user_id="episodic_extraction",  # Special user_id for episodic queries
                 query="",  # Empty query to get unfiltered results
-                limit=limit * 3,  # Get more to filter down
-                memory_type=f"bot_{character_name.lower()}"  # Bot-specific memories
+                limit=limit * 3  # Get more to filter down
             )
             
             logger.info("🧠 EPISODIC EXTRACTION: Retrieved %d raw memories for %s", len(memories), character_name)
