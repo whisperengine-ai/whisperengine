@@ -192,6 +192,8 @@ class BotConfigDiscovery:
       - {bot_name}_temp:/app/temp
       - ./logs:/app/logs  # External mount for prompt/response logs
       - ./sql:/app/sql:ro
+      # Shared Hugging Face cache (all bots share models)
+      - huggingface_cache:/app/.cache/huggingface
       # Live code mounting for development (no rebuild needed)
       - ./src:/app/src
       - ./scripts:/app/scripts

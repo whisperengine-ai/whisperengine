@@ -103,6 +103,7 @@ class EnhancedHealthServer:
         from enum import Enum
         from datetime import datetime, date
         from decimal import Decimal
+        from dataclasses import is_dataclass, asdict
         
         if isinstance(obj, ContextSwitch):
             return obj.to_dict()
@@ -115,13 +116,24 @@ class EnhancedHealthServer:
         elif isinstance(obj, Decimal):
             # Handle Decimal objects
             return float(obj)
-        elif isinstance(obj, dict):
+        elif is_dataclass(obj) and not isinstance(obj, type):
+            # Handle dataclasses (like AdaptationParameters) - but not class types
+            try:
+                return self._make_json_serializable(asdict(obj))
+            except Exception:
+                # If asdict fails, try to_dict method or return as-is
+                pass
+        
+        if isinstance(obj, dict):
             return {k: self._make_json_serializable(v) for k, v in obj.items()}
         elif isinstance(obj, list):
             return [self._make_json_serializable(item) for item in obj]
         elif hasattr(obj, 'to_dict') and callable(getattr(obj, 'to_dict')):
             # Handle objects with to_dict method
-            return obj.to_dict()
+            try:
+                return obj.to_dict()
+            except Exception:
+                return str(obj)
         else:
             return obj
 

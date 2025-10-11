@@ -281,5 +281,9 @@ volumes:
   grafana_data:
     name: whisperengine-multi_grafana_data
   
+  # Shared Hugging Face cache (all bots share to avoid duplicate downloads)
+  huggingface_cache:
+    name: whisperengine-multi_huggingface_cache
+  
   # Bot-specific volumes (populated dynamically)
   # BOT_VOLUMES_PLACEHOLDER

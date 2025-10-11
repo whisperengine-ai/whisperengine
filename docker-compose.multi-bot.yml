@@ -312,6 +312,8 @@ services:
       - jake_temp:/app/temp
       - ./logs:/app/logs  # External mount for prompt/response logs
       - ./sql:/app/sql:ro
+      # Shared Hugging Face cache (all bots share models)
+      - huggingface_cache:/app/.cache/huggingface
       # Live code mounting for development (no rebuild needed)
       - ./src:/app/src
       - ./scripts:/app/scripts
@@ -386,6 +388,8 @@ services:
       - marcus_temp:/app/temp
       - ./logs:/app/logs  # External mount for prompt/response logs
       - ./sql:/app/sql:ro
+      # Shared Hugging Face cache (all bots share models)
+      - huggingface_cache:/app/.cache/huggingface
       # Live code mounting for development (no rebuild needed)
       - ./src:/app/src
       - ./scripts:/app/scripts
@@ -460,6 +464,8 @@ services:
       - dotty_temp:/app/temp
       - ./logs:/app/logs  # External mount for prompt/response logs
       - ./sql:/app/sql:ro
+      # Shared Hugging Face cache (all bots share models)
+      - huggingface_cache:/app/.cache/huggingface
       # Live code mounting for development (no rebuild needed)
       - ./src:/app/src
       - ./scripts:/app/scripts
@@ -534,6 +540,8 @@ services:
       - dream_temp:/app/temp
       - ./logs:/app/logs  # External mount for prompt/response logs
       - ./sql:/app/sql:ro
+      # Shared Hugging Face cache (all bots share models)
+      - huggingface_cache:/app/.cache/huggingface
       # Live code mounting for development (no rebuild needed)
       - ./src:/app/src
       - ./scripts:/app/scripts
@@ -608,6 +616,8 @@ services:
       - aetheris_temp:/app/temp
       - ./logs:/app/logs  # External mount for prompt/response logs
       - ./sql:/app/sql:ro
+      # Shared Hugging Face cache (all bots share models)
+      - huggingface_cache:/app/.cache/huggingface
       # Live code mounting for development (no rebuild needed)
       - ./src:/app/src
       - ./scripts:/app/scripts
@@ -682,6 +692,8 @@ services:
       - elena_temp:/app/temp
       - ./logs:/app/logs  # External mount for prompt/response logs
       - ./sql:/app/sql:ro
+      # Shared Hugging Face cache (all bots share models)
+      - huggingface_cache:/app/.cache/huggingface
       # Live code mounting for development (no rebuild needed)
       - ./src:/app/src
       - ./scripts:/app/scripts
@@ -756,6 +768,8 @@ services:
       - aethys_temp:/app/temp
       - ./logs:/app/logs  # External mount for prompt/response logs
       - ./sql:/app/sql:ro
+      # Shared Hugging Face cache (all bots share models)
+      - huggingface_cache:/app/.cache/huggingface
       # Live code mounting for development (no rebuild needed)
       - ./src:/app/src
       - ./scripts:/app/scripts
@@ -830,6 +844,8 @@ services:
       - ryan_temp:/app/temp
       - ./logs:/app/logs  # External mount for prompt/response logs
       - ./sql:/app/sql:ro
+      # Shared Hugging Face cache (all bots share models)
+      - huggingface_cache:/app/.cache/huggingface
       # Live code mounting for development (no rebuild needed)
       - ./src:/app/src
       - ./scripts:/app/scripts
@@ -904,6 +920,8 @@ services:
       - gabriel_temp:/app/temp
       - ./logs:/app/logs  # External mount for prompt/response logs
       - ./sql:/app/sql:ro
+      # Shared Hugging Face cache (all bots share models)
+      - huggingface_cache:/app/.cache/huggingface
       # Live code mounting for development (no rebuild needed)
       - ./src:/app/src
       - ./scripts:/app/scripts
@@ -978,6 +996,8 @@ services:
       - sophia_temp:/app/temp
       - ./logs:/app/logs  # External mount for prompt/response logs
       - ./sql:/app/sql:ro
+      # Shared Hugging Face cache (all bots share models)
+      - huggingface_cache:/app/.cache/huggingface
       # Live code mounting for development (no rebuild needed)
       - ./src:/app/src
       - ./scripts:/app/scripts
@@ -1018,6 +1038,10 @@ volumes:
     name: whisperengine-multi_influxdb_config
   grafana_data:
     name: whisperengine-multi_grafana_data
+  
+  # Shared Hugging Face cache (all bots share to avoid duplicate downloads)
+  huggingface_cache:
+    name: whisperengine-multi_huggingface_cache
   
   # Bot-specific volumes (populated dynamically)
   jake_backups:
