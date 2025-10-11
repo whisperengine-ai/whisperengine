@@ -129,25 +129,49 @@ class SyntheticDataValidator:
                 filepath = os.path.join(self.conversations_dir, filename)
                 try:
                     with open(filepath, 'r', encoding='utf-8') as f:
-                        conversation = json.load(f)
-                        self.conversations.append(conversation)
+                        data = json.load(f)
+                        
+                        # Handle batch_test_results.json which has a nested "conversations" array
+                        if isinstance(data, dict) and 'conversations' in data:
+                            # This is a batch file with multiple conversations
+                            for conv in data['conversations']:
+                                if 'user' in conv:  # Validate structure
+                                    self.conversations.append(conv)
+                        elif isinstance(data, dict) and 'user' in data:
+                            # This is a single conversation file
+                            self.conversations.append(data)
+                        else:
+                            logger.warning("Skipping file with unexpected structure: %s", filename)
                 except Exception as e:
                     logger.error("Failed to load conversation %s: %s", filename, e)
         
         logger.info("Loaded %d synthetic conversations", len(self.conversations))
     
-    def validate_memory_effectiveness(self) -> Dict[str, float]:
+    def validate_memory_effectiveness(self) -> Dict[str, Any]:
         """
         Validate memory system effectiveness by checking:
-        - Personal detail recall across conversations
-        - Context continuity within conversations
+        - Memory retrieval rates across conversations
+        - Relevance quality of retrieved memories
+        - Memory growth and accumulation
         - Cross-conversation memory persistence
         """
-        memory_scores = []
+        user_detailed_scores = []
+        overall_retrieval_rates = []
+        overall_relevance_scores = []
+        overall_growth_rates = []
+        overall_cross_conv_rates = []
         
         # Group conversations by user
         user_conversations = defaultdict(list)
         for conv in self.conversations:
+            # Skip conversations without proper user structure
+            if not isinstance(conv, dict) or 'user' not in conv:
+                logger.warning("Skipping conversation without 'user' field")
+                continue
+            if not isinstance(conv['user'], dict) or 'user_id' not in conv['user']:
+                logger.warning("Skipping conversation with invalid 'user' structure")
+                continue
+                
             user_id = conv['user']['user_id']
             user_conversations[user_id].append(conv)
         
@@ -158,46 +182,91 @@ class SyntheticDataValidator:
             # Sort by timestamp
             conversations.sort(key=lambda x: x['start_time'])
             
-            user_score = self._calculate_user_memory_score(conversations)
-            memory_scores.append(user_score)
+            detailed_score = self._calculate_user_memory_score(conversations)
+            user_detailed_scores.append(detailed_score['overall_score'])
+            overall_retrieval_rates.append(detailed_score['retrieval_rate'])
+            overall_relevance_scores.append(detailed_score['average_relevance'])
+            overall_growth_rates.append(detailed_score['memory_growth_rate'])
+            overall_cross_conv_rates.append(detailed_score['cross_conversation_rate'])
         
         return {
-            'overall_accuracy': statistics.mean(memory_scores) if memory_scores else 0.0,
-            'user_scores': memory_scores,
-            'users_tested': len(memory_scores)
+            'overall_accuracy': statistics.mean(user_detailed_scores) if user_detailed_scores else 0.0,
+            'retrieval_rate': statistics.mean(overall_retrieval_rates) if overall_retrieval_rates else 0.0,
+            'average_relevance': statistics.mean(overall_relevance_scores) if overall_relevance_scores else 0.0,
+            'memory_growth_rate': statistics.mean(overall_growth_rates) if overall_growth_rates else 0.0,
+            'cross_conversation_rate': statistics.mean(overall_cross_conv_rates) if overall_cross_conv_rates else 0.0,
+            'users_tested': len(user_detailed_scores)
         }
     
-    def _calculate_user_memory_score(self, user_conversations: List[Dict]) -> float:
-        """Calculate memory effectiveness score for a specific user"""
-        total_score = 0.0
-        scored_exchanges = 0
+    def _calculate_user_memory_score(self, user_conversations: List[Dict]) -> Dict[str, float]:
+        """Calculate comprehensive memory effectiveness metrics based on actual metadata"""
         
-        # Extract personal details mentioned in early conversations
-        personal_details = set()
-        for conv in user_conversations[:2]:  # First 2 conversations
-            for exchange in conv['exchanges']:
-                user_msg = exchange['user_message'].lower()
-                # Simple keyword extraction (in real system, use NLP)
-                if any(keyword in user_msg for keyword in ['my', 'i have', 'i am', 'i work', 'i live']):
-                    # Extract potential personal details
-                    words = user_msg.split()
-                    for i, word in enumerate(words):
-                        if word in ['my', 'i'] and i + 1 < len(words):
-                            detail = ' '.join(words[i:i+3])
-                            personal_details.add(detail)
+        # Track memory retrieval across all conversations
+        total_exchanges = 0
+        exchanges_with_memory = 0
+        relevance_scores = []
+        memory_growth_checks = []
+        cross_conversation_memory = 0
         
-        # Check if later conversations reference these details
-        for conv in user_conversations[2:]:  # Later conversations
-            for exchange in conv['exchanges']:
-                bot_response = exchange['bot_response'].lower()
-                # Check if bot references personal details
-                for detail in personal_details:
-                    if any(word in bot_response for word in detail.split()[1:]):  # Skip 'my'/'i'
-                        total_score += 1.0
-                        scored_exchanges += 1
-                        break
+        for conv in user_conversations:
+            previous_memory_count = 0
+            
+            for exchange in conv.get('exchanges', []):
+                total_exchanges += 1
+                
+                # Check vector memory retrieval metadata
+                bot_metadata = exchange.get('bot_metadata', {})
+                vector_memory = bot_metadata.get('vector_memory', {})
+                
+                memories_retrieved = vector_memory.get('memories_retrieved', 0)
+                if memories_retrieved > 0:
+                    exchanges_with_memory += 1
+                    
+                    # Track relevance quality
+                    relevance = vector_memory.get('average_relevance_score', 0)
+                    if relevance > 0:
+                        relevance_scores.append(relevance)
+                
+                # Check memory growth (knowledge accumulation)
+                current_memory_count = bot_metadata.get('memory_count', 0)
+                if current_memory_count > previous_memory_count:
+                    memory_growth_checks.append(1.0)
+                previous_memory_count = current_memory_count
         
-        return total_score / max(1, scored_exchanges)
+        # Check cross-conversation memory (2nd+ conversations should have memories from 1st)
+        if len(user_conversations) > 1:
+            for conv in user_conversations[1:]:
+                exchanges = conv.get('exchanges', [])
+                if exchanges:
+                    # Check if first exchange of subsequent conversation retrieved memories
+                    first_exchange = exchanges[0]
+                    vector_memory = first_exchange.get('bot_metadata', {}).get('vector_memory', {})
+                    if vector_memory.get('memories_retrieved', 0) > 0:
+                        cross_conversation_memory += 1
+        
+        # Calculate comprehensive scores
+        retrieval_rate = exchanges_with_memory / max(1, total_exchanges)
+        avg_relevance = statistics.mean(relevance_scores) if relevance_scores else 0.0
+        growth_rate = statistics.mean(memory_growth_checks) if memory_growth_checks else 0.0
+        cross_conv_rate = cross_conversation_memory / max(1, len(user_conversations) - 1) if len(user_conversations) > 1 else 0.0
+        
+        # Weighted overall score
+        overall_score = (
+            retrieval_rate * 0.35 +        # 35% weight on retrieval rate
+            avg_relevance * 0.25 +          # 25% weight on relevance quality
+            growth_rate * 0.20 +            # 20% weight on memory growth
+            cross_conv_rate * 0.20          # 20% weight on cross-conversation
+        )
+        
+        return {
+            'overall_score': overall_score,
+            'retrieval_rate': retrieval_rate,
+            'average_relevance': avg_relevance,
+            'memory_growth_rate': growth_rate,
+            'cross_conversation_rate': cross_conv_rate,
+            'total_exchanges': total_exchanges,
+            'exchanges_with_memory': exchanges_with_memory
+        }
     
     def validate_emotion_detection(self) -> Dict[str, Any]:
         """
@@ -205,18 +274,22 @@ class SyntheticDataValidator:
         - Consistency of emotion detection
         - Appropriate emotion responses from bots
         - Expanded taxonomy utilization (love, trust, optimism, etc.)
+        - RoBERTa metadata presence and quality
         """
         emotion_stats = {
             'emotions_detected': Counter(),
             'bot_emotional_responses': Counter(),
             'emotion_consistency_score': 0.0,
-            'expanded_taxonomy_usage': 0.0
+            'expanded_taxonomy_usage': 0.0,
+            'roberta_metadata_present': 0,
+            'roberta_confidence_avg': 0.0
         }
         
         expanded_emotions = {'love', 'trust', 'optimism', 'pessimism', 'anticipation'}
         total_emotions = 0
         expanded_emotion_count = 0
         consistency_scores = []
+        roberta_confidences = []
         
         for conv in self.conversations:
             for exchange in conv['exchanges']:
@@ -230,16 +303,27 @@ class SyntheticDataValidator:
                     if emotion in expanded_emotions:
                         expanded_emotion_count += 1
                 
-                # Check bot emotional intelligence in response
+                # Check bot RoBERTa emotional intelligence in response metadata
                 bot_metadata = exchange.get('bot_metadata', {})
-                if 'emotional_intelligence' in bot_metadata:
-                    # Bot recognized and responded to emotion appropriately
-                    consistency_scores.append(1.0)
+                ai_components = bot_metadata.get('ai_components', {})
+                emotion_analysis = ai_components.get('emotion_analysis', {})
+                
+                # Check for RoBERTa metadata presence
+                if emotion_analysis:
+                    emotion_stats['roberta_metadata_present'] += 1
+                    
+                    # Track RoBERTa confidence scores
+                    if 'confidence' in emotion_analysis:
+                        roberta_confidences.append(emotion_analysis['confidence'])
+                        consistency_scores.append(emotion_analysis['confidence'])
+                    else:
+                        consistency_scores.append(0.5)  # Partial credit if metadata exists
                 else:
-                    consistency_scores.append(0.5)  # Partial credit
+                    consistency_scores.append(0.0)  # No metadata
         
         emotion_stats['emotion_consistency_score'] = statistics.mean(consistency_scores) if consistency_scores else 0.0
         emotion_stats['expanded_taxonomy_usage'] = expanded_emotion_count / max(1, total_emotions)
+        emotion_stats['roberta_confidence_avg'] = statistics.mean(roberta_confidences) if roberta_confidences else 0.0
         
         return emotion_stats
     
@@ -316,7 +400,7 @@ class SyntheticDataValidator:
             key = f"{conv['user']['user_id']}_{conv['bot_name']}"
             user_bot_pairs[key].append(conv)
         
-        for pair_key, conversations in user_bot_pairs.items():
+        for conversations in user_bot_pairs.values():
             if len(conversations) < 3:
                 continue  # Need multiple conversations to see progression
             
@@ -337,7 +421,7 @@ class SyntheticDataValidator:
         # Simple progression indicators
         scores = []
         
-        for i, conv in enumerate(conversations):
+        for conv in conversations:
             # Calculate conversation quality indicators
             avg_exchange_length = statistics.mean([len(ex['user_message']) + len(ex['bot_response']) 
                                                  for ex in conv['exchanges']])
@@ -736,7 +820,7 @@ class SyntheticDataValidator:
         cdl_metrics = self.validate_cdl_personality_consistency()
         relationship_metrics = self.validate_relationship_progression()
         cross_pollination_metrics = self.validate_cross_pollination_accuracy()
-        enhanced_api_metrics = self.validate_enhanced_api_metadata()  # NEW: Enhanced API validation
+        _ = self.validate_enhanced_api_metadata()  # NEW: Enhanced API validation
         quality_score = self.calculate_conversation_quality_score()
         
         # Memory Intelligence Convergence validation (NEW)

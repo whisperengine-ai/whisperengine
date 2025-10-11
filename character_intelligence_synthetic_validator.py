@@ -190,13 +190,13 @@ class CharacterIntelligenceValidator:
                 user_msg = exchange['user_message']
                 bot_response = exchange['bot_response']
                 
-                # Test RoBERTa emotion detection accuracy
-                if user_msg in self.character_intelligence_patterns["emotional_intelligence_tests"]:
-                    score = self._score_roberta_emotion_detection(user_msg, bot_response)
+                # Test ALL exchanges for RoBERTa emotion detection (not just test patterns)
+                score = self._score_roberta_emotion_detection(user_msg, bot_response, exchange)
+                if score > 0:  # Only count exchanges with metadata
                     emotion_detection_scores.append(score)
                     
                     # Test multi-emotion analysis
-                    multi_score = self._score_multi_emotion_analysis(user_msg, bot_response)
+                    multi_score = self._score_multi_emotion_analysis(user_msg, bot_response, exchange)
                     multi_emotion_scores.append(multi_score)
                     
                     # Test emotional metadata richness (12+ fields)
@@ -366,38 +366,86 @@ class CharacterIntelligenceValidator:
         else:
             return 0.3
     
-    def _score_roberta_emotion_detection(self, user_msg: str, bot_response: str) -> float:
-        """Score RoBERTa emotion detection accuracy"""
-        # Simplified scoring - in real implementation, would check RoBERTa metadata
-        emotion_response_quality = ["understand how you feel", "sense your", "feeling", "emotion", "mood"]
+    def _score_roberta_emotion_detection(self, user_msg: str, bot_response: str, exchange: Optional[Dict] = None) -> float:
+        """Score RoBERTa emotion detection accuracy by checking actual metadata"""
+        if not exchange:
+            return 0.0
         
-        matches = sum(1 for phrase in emotion_response_quality if phrase in bot_response.lower())
-        return min(matches / 2, 1.0)  # Max score with 2+ matches
-    
-    def _score_multi_emotion_analysis(self, user_msg: str, bot_response: str) -> float:
-        """Score multi-emotion analysis quality"""
-        multi_emotion_indicators = ["mix of", "combination of", "both", "also sense", "along with"]
+        bot_metadata = exchange.get('bot_metadata', {})
+        ai_components = bot_metadata.get('ai_components', {})
+        emotion_analysis = ai_components.get('emotion_analysis', {})
         
         score = 0.0
-        if any(indicator in bot_response.lower() for indicator in multi_emotion_indicators):
-            score = 1.0
-        elif len([word for word in ["joy", "sadness", "anger", "fear", "surprise", "disgust"] if word in bot_response.lower()]) > 1:
-            score = 0.8
-        else:
-            score = 0.3
-            
-        return score
+        
+        # Check for RoBERTa confidence score
+        if 'confidence' in emotion_analysis and emotion_analysis['confidence'] > 0.5:
+            score += 0.3
+        
+        # Check for text indicators with roberta: prefix
+        text_indicators = emotion_analysis.get('text_indicators', [])
+        if any('roberta:' in str(indicator) for indicator in text_indicators):
+            score += 0.4
+        
+        # Check for advanced analysis
+        if 'advanced_analysis' in emotion_analysis:
+            score += 0.3
+        
+        return min(score, 1.0)
+    
+    def _score_multi_emotion_analysis(self, user_msg: str, bot_response: str, exchange: Optional[Dict] = None) -> float:
+        """Score multi-emotion analysis quality by checking actual metadata"""
+        if not exchange:
+            return 0.0
+        
+        bot_metadata = exchange.get('bot_metadata', {})
+        ai_components = bot_metadata.get('ai_components', {})
+        emotion_analysis = ai_components.get('emotion_analysis', {})
+        
+        score = 0.0
+        
+        # Check for multi_modal flag
+        if emotion_analysis.get('multi_modal'):
+            score += 0.4
+        
+        # Check for secondary emotions
+        secondary_emotions = emotion_analysis.get('secondary_emotions', [])
+        if len(secondary_emotions) > 0:
+            score += 0.3
+        
+        # Check advanced analysis for multi-emotion detection
+        advanced_analysis = emotion_analysis.get('advanced_analysis', {})
+        if advanced_analysis.get('secondary_emotions') or advanced_analysis.get('mixed_emotions'):
+            score += 0.3
+        
+        return min(score, 1.0)
     
     def _score_emotional_metadata_richness(self, exchange: Dict) -> float:
-        """Score emotional metadata richness (12+ fields)"""
-        # In real implementation, would check actual RoBERTa metadata
-        # For synthetic testing, estimate based on response sophistication
-        bot_response = exchange['bot_response']
+        """Score emotional metadata richness (12+ fields from RoBERTa)"""
+        bot_metadata = exchange.get('bot_metadata', {})
+        ai_components = bot_metadata.get('ai_components', {})
+        emotion_analysis = ai_components.get('emotion_analysis', {})
         
-        sophistication_indicators = ["confidence", "intensity", "variance", "dominance", "secondary", "mixed"]
-        matches = sum(1 for indicator in sophistication_indicators if indicator in bot_response.lower())
+        # Count actual metadata fields present
+        field_count = 0
+        expected_fields = [
+            'primary_emotion', 'intensity', 'confidence', 'analysis_method',
+            'multi_modal', 'secondary_emotions', 'text_indicators',
+            'emotional_trajectory', 'cultural_context'
+        ]
         
-        return min(matches / 3, 1.0)  # Max score with 3+ sophistication indicators
+        for field in expected_fields:
+            if field in emotion_analysis:
+                field_count += 1
+        
+        # Check advanced analysis fields
+        if 'advanced_analysis' in emotion_analysis:
+            field_count += 3  # Bonus for having advanced analysis
+            advanced = emotion_analysis['advanced_analysis']
+            if 'secondary_emotions' in advanced or 'mixed_emotions' in advanced:
+                field_count += 2
+        
+        # Score based on field richness
+        return min(field_count / 12, 1.0)  # Normalized to 12+ fields
     
     def _score_emotion_context_preservation(self, user_msg: str, bot_response: str) -> float:
         """Score emotion context preservation across conversation"""
