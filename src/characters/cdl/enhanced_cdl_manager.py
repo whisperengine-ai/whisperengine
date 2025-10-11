@@ -157,13 +157,13 @@ class EnhancedCDLManager:
         try:
             logger.info("🔍 ENHANCED CDL: get_character_by_name called with: '%s'", character_name)
             async with self.pool.acquire() as conn:
-                # Core character data - search by bot name (case insensitive)
+                # Core character data - search by normalized name (bot_name) or full name (case insensitive)
                 core_query = """
                     SELECT c.*, 
                            COALESCE(c.created_date, CURRENT_TIMESTAMP) as created_date,
                            COALESCE(c.updated_date, CURRENT_TIMESTAMP) as updated_date
                     FROM characters c 
-                    WHERE LOWER(c.name) = LOWER($1)
+                    WHERE LOWER(c.normalized_name) = LOWER($1) OR LOWER(c.name) = LOWER($1)
                 """
                 logger.info("🔍 ENHANCED CDL: Executing query for character: '%s'", character_name)
                 character_row = await conn.fetchrow(core_query, character_name)
@@ -655,7 +655,12 @@ class EnhancedCDLManager:
             return False
     
     async def _get_character_id(self, conn: asyncpg.Connection, character_name: str) -> Optional[int]:
-        """Helper to get character ID by name"""
+        """Helper to get character ID by name or normalized name (bot_name)"""
+        # Try normalized_name first (for bot_name lookups like "elena")
+        row = await conn.fetchrow("SELECT id FROM characters WHERE LOWER(normalized_name) = LOWER($1)", character_name)
+        if row:
+            return row['id']
+        # Fallback to full name match for backward compatibility
         row = await conn.fetchrow("SELECT id FROM characters WHERE LOWER(name) = LOWER($1)", character_name)
         return row['id'] if row else None
     
