@@ -204,8 +204,6 @@ class BotConfigDiscovery:
     networks:
       - bot_network
     depends_on:
-      db-migrate:
-        condition: service_completed_successfully
       postgres:
         condition: service_healthy
       qdrant:

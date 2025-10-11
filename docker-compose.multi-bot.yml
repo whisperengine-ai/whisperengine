@@ -31,24 +31,6 @@ services:
       retries: 5
       start_period: 40s
 
-  # Database migration init container (runs once before bots start)
-  db-migrate:
-    image: whisperengine-bot:${VERSION:-latest}
-    container_name: db-migrate
-    command: ["python", "/app/src/utils/auto_migrate.py"]
-    environment:
-      POSTGRES_HOST: postgres
-      POSTGRES_PORT: 5432
-      POSTGRES_USER: whisperengine
-      POSTGRES_PASSWORD: whisperengine_password
-      POSTGRES_DB: whisperengine
-    networks:
-      - bot_network
-    depends_on:
-      postgres:
-        condition: service_healthy
-    restart: "no"  # Only run once
-
   # Redis - Commented out since we're using vector-native memory with Qdrant only
   # redis:
   #   image: redis:7.4-alpine
@@ -342,8 +324,6 @@ services:
     networks:
       - bot_network
     depends_on:
-      db-migrate:
-        condition: service_completed_successfully
       postgres:
         condition: service_healthy
       qdrant:
@@ -418,8 +398,6 @@ services:
     networks:
       - bot_network
     depends_on:
-      db-migrate:
-        condition: service_completed_successfully
       postgres:
         condition: service_healthy
       qdrant:
@@ -494,8 +472,6 @@ services:
     networks:
       - bot_network
     depends_on:
-      db-migrate:
-        condition: service_completed_successfully
       postgres:
         condition: service_healthy
       qdrant:
@@ -570,8 +546,6 @@ services:
     networks:
       - bot_network
     depends_on:
-      db-migrate:
-        condition: service_completed_successfully
       postgres:
         condition: service_healthy
       qdrant:
@@ -646,8 +620,6 @@ services:
     networks:
       - bot_network
     depends_on:
-      db-migrate:
-        condition: service_completed_successfully
       postgres:
         condition: service_healthy
       qdrant:
@@ -722,8 +694,6 @@ services:
     networks:
       - bot_network
     depends_on:
-      db-migrate:
-        condition: service_completed_successfully
       postgres:
         condition: service_healthy
       qdrant:
@@ -798,8 +768,6 @@ services:
     networks:
       - bot_network
     depends_on:
-      db-migrate:
-        condition: service_completed_successfully
       postgres:
         condition: service_healthy
       qdrant:
@@ -874,8 +842,6 @@ services:
     networks:
       - bot_network
     depends_on:
-      db-migrate:
-        condition: service_completed_successfully
       postgres:
         condition: service_healthy
       qdrant:
@@ -950,8 +916,6 @@ services:
     networks:
       - bot_network
     depends_on:
-      db-migrate:
-        condition: service_completed_successfully
       postgres:
         condition: service_healthy
       qdrant:
@@ -1026,8 +990,6 @@ services:
     networks:
       - bot_network
     depends_on:
-      db-migrate:
-        condition: service_completed_successfully
       postgres:
         condition: service_healthy
       qdrant:

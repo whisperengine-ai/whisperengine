@@ -19,9 +19,16 @@ is_container() {
     [ -f /.dockerenv ] || [ -n "${CONTAINER_MODE:-}" ]
 }
 
-# Note: Database migrations are now handled by dedicated init container
+# Note: Run database migrations if in container and database config available
 if is_container && [ -n "${POSTGRES_HOST:-}" ]; then
-    log "ℹ️  Database migrations handled by db-migrate init container"
+    log "🗄️  Running database migrations..."
+    python /app/src/utils/auto_migrate.py
+    if [ $? -eq 0 ]; then
+        log "✅ Database migrations completed successfully"
+    else
+        log "❌ Database migrations failed"
+        exit 1
+    fi
 else
     log "⏭️ Skipping migration check (not in container or no database config)"
 fi
