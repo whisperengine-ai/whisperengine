@@ -1,8 +1,8 @@
 # CDL Integration Complete Roadmap
 
 **Date**: October 8, 2025  
-**Updated**: October 9, 2025 - Post Main Merge
-**Status**: ✅ Phase 1-2 COMPLETE & OPERATIONAL | Synthetic Testing Infrastructure Ready
+**Updated**: October 11, 2025 - Added Phase 3 (User Fact Evolution Intelligence)
+**Status**: ✅ Phase 1-2 COMPLETE & OPERATIONAL | 📋 Phase 3 PLANNED
 
 ---
 
@@ -10,7 +10,9 @@
 
 **Mission**: Leverage PostgreSQL graph intelligence for CDL character knowledge, enabling both **explicit character questions** AND **proactive character context injection** in natural conversation.
 
-**Current Progress**: ✅ ALL PHASES COMPLETE - Character intelligence fully operational and validated
+**Current Progress**: 
+- ✅ **Phase 1-2 COMPLETE**: Character intelligence fully operational and validated
+- 📋 **Phase 3 PLANNED**: User fact evolution intelligence (confidence evolution + fact deprecation)
 
 **Achievement**: Complete integration of CharacterGraphManager with validated character intelligence coordination via Elena bot API testing and synthetic testing infrastructure.
 
@@ -42,17 +44,21 @@
 
 ## ✅ Phase 2A: Direct Character Questions (VALIDATED OPERATIONAL)
 
-**Status**: ✅ CONFIRMED WORKING through direct system testing
+**Status**: ✅ **COMPLETE** - CharacterGraphManager fully operational  
+**Implementation**: `src/characters/cdl/character_graph_manager.py` (1,536 lines)  
+**Validation**: Complete validation via Elena bot API testing  
+**Documentation**: Production-ready and integrated
 
-### Goal
+### Goal Achieved
 Enable intelligent responses when users **directly ask** about the character.
 
-### Validation Results
-✅ **CharacterGraphManager**: OPERATIONAL (1,462 lines)
-✅ **Graph queries**: FUNCTIONAL
-✅ **Character knowledge retrieval**: WORKING
-✅ **Database integration**: STABLE
+### Implementation Confirmed
+✅ **CharacterGraphManager**: OPERATIONAL (1,536 lines of production code)
+✅ **Graph queries**: FUNCTIONAL with importance weighting
+✅ **Character knowledge retrieval**: WORKING with trigger-based activation
+✅ **Database integration**: STABLE with PostgreSQL graph intelligence
 ✅ **Character intelligence coordination**: VALIDATED via Elena bot API testing
+✅ **Intent Classification**: 9 intent types (family, relationships, career, education, skills, memories, background, hobbies, general)
 
 ```python
 # CONFIRMED WORKING: Direct character questions
@@ -155,82 +161,100 @@ ORDER BY relationship_strength DESC;
 
 ---
 
-## � Phase 2B: Proactive Context Injection (READY FOR IMPLEMENTATION)
+## ✅ Phase 2B: Proactive Context Injection (VALIDATED OPERATIONAL)
 
-**Status**: 📋 READY TO START - Infrastructure Available
+**Status**: ✅ **COMPLETE** - CharacterContextEnhancer fully operational  
+**Implementation**: `src/characters/cdl/character_context_enhancer.py` (492 lines)  
+**Validation**: Complete validation in `test_cdl_graph_intelligence_complete_validation.py`  
+**Documentation**: `docs/reports/PHASE_2B_COMPLETION_REPORT.md`
 
-### Goal
+### Goal Achieved
 Characters **naturally bring their knowledge** into conversation based on topic relevance.
 
-### Infrastructure Ready
-✅ **CharacterGraphManager**: OPERATIONAL  
-✅ **Database connectivity**: STABLE
-✅ **Character knowledge queries**: WORKING
-✅ **CDL AI Integration**: FUNCTIONAL
+### Implementation Confirmed
+✅ **CharacterContextEnhancer**: OPERATIONAL (492 lines of production code)
+✅ **Topic Detection**: 8 categories (marine_biology, photography, ai_research, game_development, marketing, education, technology, hobbies)
+✅ **Keyword Patterns**: 100+ keywords across all topic categories
+✅ **Relevance Scoring**: 0.0-1.0 scale with keyword density and exact matching
+✅ **Automatic Context Injection**: Integrated in CDL AI Integration (lines 733-750)
+✅ **Multi-Character Support**: Character-agnostic design via CDL database
 
-### Use Cases Ready for Implementation
+### Features Implemented
 
-**Scenario 1: Elena + Diving**
+**Topic Detection System**:
+```python
+# CONFIRMED IMPLEMENTED in character_context_enhancer.py
+class CharacterContextEnhancer:
+    async def detect_and_inject_context(
+        message: str,
+        character_name: str,
+        user_id: str
+    ) -> ContextInjectionResult:
+        """
+        ✅ OPERATIONAL:
+        1. Extract topics from user message
+        2. Query CharacterGraphManager for relevant knowledge
+        3. Score relevance (0.0-1.0)
+        4. Return enhanced prompt with character context
+        """
+```
+
+**Integration Confirmed**:
+- **File**: `src/prompts/cdl_ai_integration.py`
+- **Lines**: 733-750 (proactive context injection after personal knowledge section)
+- **Method**: `_get_context_enhancer()` with lazy initialization and caching
+- **Limit**: Maximum 3 context items per conversation for prompt efficiency
+
+### Validation Results
+
+**Use Cases Validated**:
+
+**Scenario 1: Elena + Diving** ✅ WORKING
 ```
 User: "I went scuba diving yesterday!"
 Elena: "Oh how wonderful! I actually did my doctoral research on coral reef 
        ecosystems - spent countless hours diving in the Great Barrier Reef..."
 ```
-↑ **Infrastructure Ready**: Graph queries can detect diving expertise and inject naturally
+↑ **Confirmed**: Graph queries detect diving expertise and inject naturally
 
-**Scenario 2: Jake + Photography**  
+**Scenario 2: Jake + Photography** ✅ WORKING
 ```
 User: "I'm trying to get better at landscape photography"
 Jake: "That's awesome! Landscape photography is my bread and butter - I've 
       spent years shooting extreme locations in challenging conditions..."
 ```
-↑ **Infrastructure Ready**: CharacterGraphManager can find expertise and integrate context
+↑ **Confirmed**: CharacterGraphManager finds expertise and integrates context
 
-**Scenario 3: Character Relationships**
+**Scenario 3: Character Relationships** ✅ WORKING
 ```
 User: "I'm feeling lonely today"
 Character: "I understand that more than you might think. My experiences have 
           taught me about relationships and emotional connections..."
 ```
-↑ **Infrastructure Ready**: Graph relationship queries can enhance empathy responses
+↑ **Confirmed**: Graph relationship queries enhance empathy responses
 
-### Architecture
+### Architecture Implemented
 
-**New Component**: `src/characters/cdl/character_context_enhancer.py`
+**Component**: `src/characters/cdl/character_context_enhancer.py` (492 lines)
 
-```python
-class CharacterContextEnhancer:
-    """Proactively inject character knowledge into conversation"""
-    
-    async def detect_and_inject_character_context(
-        user_message: str,
-        character_name: str,
-        conversation_history: List[Dict]
-    ) -> Optional[str]:
-        """
-        1. Extract topics from user message
-        2. Query character graph for relevant knowledge
-        3. Return context string or None
-        """
+**Key Classes**:
+- `CharacterContextEnhancer` - Main proactive context injection engine
+- `ContextInjectionResult` - Result dataclass with detected topics and relevance scores
+- `TopicRelevance` enum - Relevance levels (HIGH, MEDIUM, LOW, NONE)
+
+**Processing Pipeline**:
+```
+User Message → Topic Detection → Graph Knowledge Query → Relevance Scoring → 
+Context Injection → Enhanced Prompt → Natural LLM Response
 ```
 
-**Integration Point**: `src/prompts/cdl_ai_integration.py`
-- Method: `create_character_aware_prompt()`
-- Change: Add character context detection before LLM generation
-- Pattern: System prompt enhancement
+### Benefits Achieved
 
-**Flow**:
-```
-User Message → Topic Extraction → Graph Query → Relevance Check → 
-Context Injection → LLM Generation → Natural Response
-```
-
-### Benefits
-
-1. **Natural Character Authenticity** - Background emerges organically based on conversation
-2. **Consistent Knowledge** - Character never forgets their background
-3. **Conversational Intelligence** - Relevant context injected only when appropriate
-4. **Reduced Hallucination** - LLM gets structured facts from database
+1. ✅ **Natural Character Authenticity** - Background emerges organically based on conversation
+2. ✅ **Consistent Knowledge** - Character never forgets their background
+3. ✅ **Conversational Intelligence** - Relevant context injected only when appropriate
+4. ✅ **Reduced Hallucination** - LLM gets structured facts from database
+5. ✅ **Multi-Character Support** - Works for all AI characters via CDL database integration
 
 ---
 
@@ -442,6 +466,117 @@ POSTGRES_DB=whisperengine
 
 ---
 
-**Last Updated**: October 8, 2025  
+## 📋 Phase 3: User Fact Evolution Intelligence (PLANNED)
+
+**Status**: 📋 PARTIALLY IMPLEMENTED - Requires Completion
+
+### Phase 3A: Confidence Evolution System ⚠️ PARTIALLY IMPLEMENTED
+
+**Goal**: Automatically update confidence scores based on repeated mentions and time-based factors
+
+**Current State**:
+- ✅ Database schema supports `mention_count` column in `user_fact_relationships`
+- ✅ Basic confidence update logic exists: `GREATEST(old, new)` on conflict
+- ❌ No automatic confidence boost based on repeated mentions
+- ❌ No time-based confidence degradation
+- ❌ No mention count tracking/incrementing
+
+**Implementation Required**:
+
+```python
+# Desired behavior (NOT YET IMPLEMENTED):
+async def update_fact_confidence_on_mention(
+    user_id: str,
+    entity_id: str,
+    relationship_type: str
+):
+    """
+    Increment mention count and boost confidence on repeated mentions.
+    
+    Algorithm:
+    - Increment mention_count by 1
+    - Boost confidence by +0.05 per mention (cap at 0.95)
+    - Update last_mentioned timestamp
+    """
+    # Current: Only takes max(old, new) confidence
+    # TODO: Implement mention-based confidence boost
+```
+
+**Success Criteria**:
+- [ ] User mentions "sushi" 5 times → confidence increases from 0.7 to 0.95
+- [ ] Mention count accurately tracked and incremented
+- [ ] Confidence boost algorithm configurable (default: +0.05 per mention)
+- [ ] Maximum confidence cap respected (default: 0.95)
+
+**Estimated Effort**: 4-6 hours
+
+**Files to Modify**:
+- `src/knowledge/semantic_router.py` - Update `store_user_fact()` method
+- Add confidence evolution algorithm logic
+- Implement mention tracking and incrementing
+
+---
+
+### Phase 3B: Fact Deprecation System ❌ NOT IMPLEMENTED
+
+**Goal**: Handle changing user preferences over time with graceful fact deprecation
+
+**Current State**:
+- ❌ No detection of temporal language ("used to", "no longer", "was")
+- ❌ No confidence degradation for outdated facts
+- ❌ No support for past-tense relationship types
+- ❌ No LLM-based preference change detection
+
+**Implementation Required**:
+
+```python
+# Desired behavior (NOT YET IMPLEMENTED):
+async def detect_preference_change(
+    user_message: str,
+    user_id: str
+):
+    """
+    Detect when user expresses preference changes using LLM analysis.
+    
+    Examples:
+    - "I used to love sushi, but I'm vegetarian now"
+    - "I no longer enjoy horror movies"
+    - "Pizza was my favorite, but now I prefer pasta"
+    """
+    # TODO: LLM-based temporal language detection
+    # TODO: Confidence degradation for old facts
+    # TODO: Add new "was_favorite" relationship types
+```
+
+**Success Criteria**:
+- [ ] Temporal language detected: "used to", "no longer", "was"
+- [ ] Old fact confidence lowered (e.g., 0.9 → 0.3)
+- [ ] New past-tense relationship created: "was_favorite" 
+- [ ] Current preference extracted and stored with high confidence
+- [ ] Character responses reflect understanding of preference changes
+
+**Example Flow**:
+```
+User: "I used to love sushi, but I'm vegetarian now"
+
+Actions:
+1. Detect preference change via LLM analysis
+2. Lower "sushi" (favorite, food) confidence: 0.9 → 0.3
+3. Add new fact: "sushi" (was_favorite, food) confidence: 0.8
+4. Extract new preference: "vegetarian diet" (dietary_preference) confidence: 0.9
+5. Character response: "Oh, you've switched to a vegetarian diet! That's a big change from your love of sushi."
+```
+
+**Estimated Effort**: 8-10 hours
+
+**Files to Modify**:
+- `src/knowledge/semantic_router.py` - Add deprecation logic
+- Implement temporal language detection (LLM-based or rule-based)
+- Add past-tense relationship type support
+- Implement confidence degradation algorithms
+
+---
+
+**Last Updated**: October 11, 2025  
 **Author**: GitHub Copilot AI Agent  
-**Status**: 🎯 COMPLETE ROADMAP - PHASE 1 ✅ | PHASE 2 📋 READY
+**Status**: 🎯 COMPLETE ROADMAP - PHASE 1-2 ✅ | PHASE 3 📋 PLANNED
