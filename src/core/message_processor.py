@@ -1575,10 +1575,11 @@ class MessageProcessor:
                 # 🚨 CRITICAL FIX: Ensure conversation context includes bot responses for continuity
                 # If the most recent messages are all user messages, this breaks LLM context
                 if recent_messages:
-                    # Count recent user vs bot messages  
+                    # Count recent user vs bot messages
+                    # 🚨 FIX: Check 'role' field, not 'bot' field
                     recent_5 = recent_messages[-5:] if len(recent_messages) >= 5 else recent_messages
-                    user_count = sum(1 for msg in recent_5 if not msg.get('bot', False))
-                    bot_count = sum(1 for msg in recent_5 if msg.get('bot', False))
+                    user_count = sum(1 for msg in recent_5 if msg.get('role', 'user') not in ['bot', 'assistant'])
+                    bot_count = sum(1 for msg in recent_5 if msg.get('role', 'user') in ['bot', 'assistant'])
                     
                     logger.info(f"🔥 CONTINUITY CHECK: Recent 5 messages - User: {user_count}, Bot: {bot_count}")
                     
@@ -1587,7 +1588,7 @@ class MessageProcessor:
                         logger.warning(f"🔥 CONTINUITY FIX: No bot responses in recent 5 messages - expanding search")
                         # Look further back to find at least one bot response
                         for i in range(5, min(15, len(recent_messages))):
-                            if recent_messages[-(i+1)].get('bot', False):
+                            if recent_messages[-(i+1)].get('role', 'user') in ['bot', 'assistant']:
                                 # Include this bot message for context
                                 bot_msg = recent_messages[-(i+1)]
                                 recent_messages = recent_messages[-5:] + [bot_msg]
@@ -1680,7 +1681,9 @@ class MessageProcessor:
                 
                 for msg in older_messages:
                     msg_content = msg.get('content', '')
-                    is_bot_msg = msg.get('bot', False)
+                    # 🚨 FIX: Check 'role' field, not 'bot' field - memory returns role='bot' or role='user'
+                    role_value = msg.get('role', 'user')
+                    is_bot_msg = role_value in ['bot', 'assistant']
                     
                     if msg_content.startswith("!"):
                         skip_next_bot_response = True
@@ -1709,7 +1712,9 @@ class MessageProcessor:
                 # Add recent messages (detailed)
                 for idx, msg in enumerate(recent_full_messages):
                     msg_content = msg.get('content', '')
-                    is_bot_msg = msg.get('bot', False)
+                    # 🚨 FIX: Check 'role' field, not 'bot' field - memory returns role='bot' or role='user'
+                    role_value = msg.get('role', 'user')
+                    is_bot_msg = role_value in ['bot', 'assistant']
                     
                     logger.info(f"🔥 CONTEXT DEBUG: Processing RECENT message - is_bot: {is_bot_msg}, content: '{msg_content[:100]}...'")
                     
@@ -1947,7 +1952,9 @@ class MessageProcessor:
             # Process older messages (truncated to 500 chars)
             for msg in older_messages:
                 content = msg.get('content', '')
-                is_bot = msg.get('bot', False)
+                # 🚨 FIX: Check 'role' field, not 'bot' field - memory returns role='bot' or role='user'
+                role_value = msg.get('role', 'user')
+                is_bot = role_value in ['bot', 'assistant']
                 
                 if content.startswith("!"):
                     skip_next_bot_response = True
@@ -1967,7 +1974,9 @@ class MessageProcessor:
             # Process recent messages (tiered: last 3 full, others 400 chars)
             for idx, msg in enumerate(recent_full_messages):
                 content = msg.get('content', '')
-                is_bot = msg.get('bot', False)
+                # 🚨 FIX: Check 'role' field, not 'bot' field - memory returns role='bot' or role='user'
+                role_value = msg.get('role', 'user')
+                is_bot = role_value in ['bot', 'assistant']
                 
                 if content.startswith("!"):
                     skip_next_bot_response = True
