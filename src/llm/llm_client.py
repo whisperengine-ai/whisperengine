@@ -1623,132 +1623,45 @@ class LLMClient:
 
     def _fix_message_alternation(self, messages: list) -> list:
         """
-        Ensure proper user/assistant alternation by filtering, not merging.
-        This prevents content concatenation bugs while satisfying API requirements.
-        SECURITY ENHANCEMENT: Completely eliminates content merging to prevent conversation history leakage.
-
+        Minimal message validation and cleanup.
+        
+        🚨 ARCHITECTURAL NOTE: Primary alternation handling is now done in message_processor.py
+        where system messages are properly consolidated at the beginning. This function
+        now only performs basic validation and cleanup.
+        
         Args:
             messages: List of message dictionaries with 'role' and 'content'
 
         Returns:
-            Filtered list with proper role alternation (NO CONTENT MERGING)
+            Validated and cleaned message list
         """
         if not messages:
             return messages
 
-        # SECURITY MODULE DISABLED: Let character prompts through unchanged
-
-        result = []
-        system_messages = []
-
-        # Extract system messages first
+        # Basic validation: remove empty messages
+        cleaned_messages = []
         for msg in messages:
-            if msg.get("role") == "system":
-                system_messages.append(msg)
-            else:
-                result.append(msg)
-
-        # SECURITY ENHANCEMENT: Limit combined system message size to prevent large exposure surface
-        if system_messages:
-            combined_system_content = "\n\n".join(
-                msg.get("content", "") for msg in system_messages if msg.get("content")
-            )
-
-            # Calculate dynamic character limit based on token configuration
-            # Reserve 50% of max tokens for system message, convert tokens to characters with 4:1 ratio
-            import os
-
-            # Increased allocation for advanced conversation features (CDL, context switching, empathy)
-            # Advanced AI features require more detailed system prompts
-            max_tokens_for_system = int(self.default_max_tokens_chat * 0.7)  # 70% allocation for rich AI features
-            calculated_char_limit = (
-                max_tokens_for_system * 4
-            )  # 4 characters per token approximation
-
-            # Allow environment override but use calculated limit as minimum
-            env_limit = int(os.getenv("MAX_SYSTEM_MESSAGE_LENGTH", str(calculated_char_limit)))
-            MAX_SYSTEM_MESSAGE_LENGTH = max(calculated_char_limit, env_limit)
-
-            if len(combined_system_content) > MAX_SYSTEM_MESSAGE_LENGTH:
-                combined_system_content = (
-                    combined_system_content[:MAX_SYSTEM_MESSAGE_LENGTH]
-                    + "\n[SYSTEM_CONTEXT_TRUNCATED]"
-                )
-                self.logger.warning(
-                    f"System message truncated to {MAX_SYSTEM_MESSAGE_LENGTH} characters (calculated from {self.default_max_tokens_chat} max tokens)"
-                )
-
-            system_msg = {"role": "system", "content": combined_system_content}
-            final_result = [system_msg]
-        else:
-            final_result = []
-
-        # SECURITY FIX: Filter for proper alternation by SELECTION, not merging
-        if not result:
-            return final_result
-
-        filtered_messages = []
-        expected_role = "user"
-
-        for msg in result:
             role = msg.get("role")
             content = msg.get("content", "")
-
+            
             # Handle both string and list content (for vision messages)
             if isinstance(content, list):
                 # For multimodal content, check if there's any text content
                 has_content = any(
-                    (
-                        isinstance(part, dict)
-                        and part.get("type") == "text"
-                        and part.get("text", "").strip()
-                    )
+                    (isinstance(part, dict) and part.get("type") == "text" and part.get("text", "").strip())
                     or (isinstance(part, str) and part.strip())
                     for part in content
                 )
-                if not has_content:  # Skip messages with no text content
-                    self.logger.debug("Skipping multimodal message with no text content")
-                    continue
-            elif isinstance(content, str):
-                if not content.strip():  # Skip empty messages
-                    self.logger.debug(f"Skipping empty string message with role {role}")
-                    continue
-            else:
-                # Convert other types to string for checking
-                if not str(content).strip():
-                    self.logger.debug(f"Skipping empty message with role {role}")
-                    continue
-
-            if role == expected_role:
-                # Expected role - add message and flip expectation
-                filtered_messages.append(msg)
-                expected_role = "assistant" if role == "user" else "user"
-                self.logger.debug(f"Added {role} message, expecting {expected_role} next")
-            else:
-                # Role doesn't match expectation - check for consecutive same-role messages first
-                if filtered_messages and filtered_messages[-1]["role"] == role:
-                    # Consecutive same-role messages - replace with most recent
-                    self.logger.debug(f"Replacing previous {role} message with more recent one")
-                    filtered_messages[-1] = msg  # Replace with newer message
-                    # Keep same expected_role since we just replaced, don't flip
-                elif role == "assistant" and expected_role == "user":
-                    # Assistant message when expecting user - add minimal placeholder
-                    placeholder = {"role": "user", "content": "[Continuing conversation]"}
-                    filtered_messages.append(placeholder)
-                    filtered_messages.append(msg)
-                    expected_role = "user"
-                    self.logger.debug("Added placeholder user message before assistant message")
-                else:
-                    # Other cases - just add the message
-                    filtered_messages.append(msg)
-                    expected_role = "assistant" if role == "user" else "user"
-
-        final_result.extend(filtered_messages)
-
-        # Log the filtering for debugging
-        self.logger.debug(
-            f"Message alternation filter: {len(messages)} -> {len(final_result)} messages (NO MERGING)"
-        )
+                if has_content:
+                    cleaned_messages.append(msg)
+            elif isinstance(content, str) and content.strip():
+                cleaned_messages.append(msg)
+        
+        # Log basic stats
+        if len(cleaned_messages) != len(messages):
+            self.logger.debug(f"Removed {len(messages) - len(cleaned_messages)} empty messages")
+        
+        return cleaned_messages
 
         return final_result
 

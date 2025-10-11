@@ -1,4 +1,61 @@
-# Next Steps: Build and Test Quickstart Images
+# Next Steps: Validate Alternation Fixes → Structured Prompt Assembly
+
+## 🔥 IMMEDIATE: Test Alternation Fixes (October 11, 2025)
+
+**Status**: ✅ Fixes applied, awaiting validation  
+**Priority**: CRITICAL - Blocks next major architecture improvement
+
+### Testing Steps:
+
+```bash
+# 1. Test with Jake and Elena bots in Discord
+# Send 3-5 messages to each bot, check responses
+
+# 2. Inspect prompt logs for proper alternation
+ls -lht logs/prompts/Jake_*672814231002939413.json | head -1
+cat logs/prompts/Jake_*.json | jq '.messages[] | {role: .role, content_preview: .content[:100]}'
+
+# 3. Validate: System message at beginning only, no mid-conversation system messages
+
+# 4. Check memory context length (should be 500-5000 chars, NOT 136!)
+cat logs/prompts/Jake_*.json | jq '.messages[0].content | length'
+```
+
+**See**: `ALTERNATION_FIX_TESTING_GUIDE.md` for comprehensive testing checklist
+
+**Success Criteria**:
+- ✅ No system messages mid-conversation
+- ✅ Proper user→assistant→user alternation
+- ✅ Memory context present in initial system message
+- ✅ No hallucinations or API errors
+
+---
+
+## 🚀 NEXT: Structured Prompt Assembly Architecture (HIGH PRIORITY)
+
+**Status**: 📋 READY TO START (after alternation validation)  
+**Priority**: HIGH 🔥  
+**Estimated**: 2-3 weeks (4 sprints)
+
+### Why This Matters:
+Recent alternation bugs exposed fragility of string concatenation approach. Structured assembly:
+- ✅ Prevents alternation issues by design
+- ✅ Enables token budget management
+- ✅ Supports model-specific formatting (Claude XML, OpenAI sections, Mistral)
+- ✅ Better debugging via component inspection
+- ✅ Dynamic reordering without code changes
+
+**See**: `docs/architecture/STRUCTURED_PROMPT_ASSEMBLY_ENHANCEMENT.md` for complete implementation plan
+
+### Implementation Phases:
+1. **Phase 1**: Core Infrastructure (PromptComponent, PromptAssembler classes)
+2. **Phase 2**: Message Processor Integration (migrate from string concat)
+3. **Phase 3**: Model-Specific Formatting (Anthropic, OpenAI, Mistral)
+4. **Phase 4**: Production Rollout (feature flag, gradual migration)
+
+---
+
+## 📋 BACKLOG: Build and Test Quickstart Images
 
 ## 🚀 Quick Commands
 

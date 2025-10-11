@@ -1389,9 +1389,9 @@ class MessageProcessor:
                     if content and content.strip():
                         # Try to parse if it contains conversation structure
                         if "User:" in content and "Bot:" in content:
-                            memory_text = f"[Previous conversation: {content[:120]}]"
+                            memory_text = f"[Previous conversation: {content[:500]}]"  # Increased from 120 to 500 chars
                         else:
-                            memory_text = f"[Memory: {content[:120]}]"
+                            memory_text = f"[Memory: {content[:500]}]"  # Increased from 120 to 500 chars
                         
                         # Prioritize recent conversation
                         if is_recent:
@@ -1404,8 +1404,8 @@ class MessageProcessor:
                         # Only try metadata if content is empty/missing
                         md = memory.get("metadata", {})
                         if md.get("user_message") and md.get("bot_response"):
-                            user_msg = md.get("user_message")[:100]
-                            bot_msg = md.get("bot_response")[:100]
+                            user_msg = md.get("user_message")[:300]  # Increased from 100 to 300 chars
+                            bot_msg = md.get("bot_response")[:300]  # Increased from 100 to 300 chars
                             memory_text = f"[User said: \"{user_msg}\", You responded: \"{bot_msg}\"]"
                             
                             if is_recent:
@@ -1415,7 +1415,7 @@ class MessageProcessor:
                                 conversation_memory_parts.append(memory_text)
                                 logger.info(f"🔍 MEMORY DEBUG: ✅ Added older from metadata conversation")
                         elif md.get("user_message"):
-                            user_msg = md.get("user_message")[:120]
+                            user_msg = md.get("user_message")[:300]  # Increased from 120 to 300 chars
                             memory_text = f"[User said: \"{user_msg}\"]"
                             
                             if is_recent:
@@ -1425,7 +1425,7 @@ class MessageProcessor:
                                 conversation_memory_parts.append(memory_text)
                                 logger.info(f"🔍 MEMORY DEBUG: ✅ Added older from metadata user message")
                         elif md.get("type") == "user_fact":
-                            memory_text = f"[Fact: {md.get('fact', '')[:120]}]"
+                            memory_text = f"[Fact: {md.get('fact', '')[:300]}]"  # Increased from 120 to 300 chars
                             conversation_memory_parts.append(memory_text)  # Facts are not time-sensitive
                             logger.info(f"🔍 MEMORY DEBUG: ✅ Added from metadata fact")
                         else:
@@ -1476,9 +1476,23 @@ class MessageProcessor:
                             if summary:
                                 older_conversation_summaries.append(summary)
                 
+                # Process RECENT conversation parts - add directly without summarization
+                recent_conversation_summaries = []
+                if recent_conversation_parts:
+                    for part in recent_conversation_parts:
+                        if "[Fact:" not in part:  # Don't duplicate facts
+                            # Extract content without [Memory:] wrapper for cleaner context
+                            clean_part = part.replace('[Memory:', '').replace('[Previous conversation:', '').replace(']', '').strip()
+                            if len(clean_part) > 15:  # Skip very short content
+                                recent_conversation_summaries.append(clean_part[:1500])  # Keep substantial context (Discord messages can be up to 2000 chars)
+                
                 # Build organized memory narrative
                 if user_facts:
                     memory_parts.append("USER FACTS: " + "; ".join(user_facts))
+                if recent_conversation_summaries:
+                    # Recent conversations get priority - add them directly
+                    unique_recent = list(dict.fromkeys(recent_conversation_summaries))[:10]  # Max 10 recent exchanges
+                    memory_parts.append("RECENT CONVERSATIONS: " + "; ".join(unique_recent))
                 if older_conversation_summaries:
                     # Deduplicate and limit summaries
                     unique_summaries = list(dict.fromkeys(older_conversation_summaries))[:5]  # Max 5 summaries
@@ -1486,7 +1500,7 @@ class MessageProcessor:
                 
                 if memory_parts:
                     memory_fragments.append(" ".join(memory_parts))
-                    logger.info(f"🤖 LLM CONTEXT DEBUG: Added {len(user_facts)} facts + {len(older_conversation_summaries)} summaries")
+                    logger.info(f"🤖 LLM CONTEXT DEBUG: Added {len(user_facts)} facts + {len(recent_conversation_summaries)} recent + {len(older_conversation_summaries)} older summaries")
                 else:
                     logger.error(f"🤖 LLM CONTEXT DEBUG: FAILED - No valid memory content found from {len(user_memories)} memories")
             else:
@@ -1611,10 +1625,32 @@ class MessageProcessor:
             f"or section headings. Stay in character and speak like a real person would."
         )
         
-        # Consolidate core system context (lean)
-        core_system = system_prompt_content + attachment_guard + guidance_clause
+        # 🚨 FIX: Consolidate ALL system content at the beginning to maintain user/assistant alternation
+        # Memory narrative and conversation summary will be added to initial system message
+        # to prevent breaking alternation rules required by many LLM APIs
         
-        conversation_context.append({"role": "system", "content": core_system})
+        core_system_parts = [system_prompt_content + attachment_guard + guidance_clause]
+        
+        # Add memory narrative to initial system message (not as separate message)
+        if memory_narrative:
+            core_system_parts.append(f"\n\nRELEVANT MEMORIES: {memory_narrative}")
+            logger.debug(f"🔥 SYSTEM CONSOLIDATION: Added memory narrative ({len(memory_narrative)} chars) to initial system message")
+        else:
+            # Add no-memory warning to initial system message
+            core_system_parts.append(
+                "\n\n⚠️ MEMORY STATUS: No previous conversation history found. If asked about past conversations, "
+                "politely say you don't have specific memories of those discussions yet. DO NOT invent or hallucinate conversation details."
+            )
+            logger.debug(f"🔥 SYSTEM CONSOLIDATION: Added NO MEMORY warning to initial system message")
+        
+        # Add conversation summary to initial system message (not as separate message)
+        if conversation_summary:
+            core_system_parts.append(f"\n\nCONVERSATION FLOW: {conversation_summary}")
+            logger.debug(f"🔥 SYSTEM CONSOLIDATION: Added conversation summary ({len(conversation_summary)} chars) to initial system message")
+        
+        # Create consolidated system message
+        consolidated_system = "".join(core_system_parts)
+        conversation_context.append({"role": "system", "content": consolidated_system})
         
         # 🚀 SOPHISTICATED RECENT MESSAGE PROCESSING with OPTIMIZED ASSEMBLY ORDER
         try:
@@ -1656,21 +1692,9 @@ class MessageProcessor:
                 # Add older messages to context
                 conversation_context.extend(user_assistant_messages)
                 
-                # OPTIMIZED: Add memory narrative as context bridge
-                if memory_narrative:
-                    conversation_context.append({
-                        "role": "system", 
-                        "content": f"RELEVANT MEMORIES: {memory_narrative}"
-                    })
-                    logger.debug(f"🔥 CONTEXT BRIDGE: Added memory narrative ({len(memory_narrative)} chars)")
-
-                # OPTIMIZED: Add conversation summary as "where we left off" bridge
-                if conversation_summary:
-                    conversation_context.append({
-                        "role": "system",
-                        "content": f"CONVERSATION FLOW: {conversation_summary}"
-                    })
-                    logger.debug(f"🔥 CONTEXT BRIDGE: Added conversation summary ({len(conversation_summary)} chars)")
+                # 🚨 FIX: Memory narrative and conversation summary are now in initial system message
+                # Do NOT add them here as that breaks user/assistant alternation
+                # (Previously these were added as separate system messages mid-conversation)
                 
                 # Add recent messages (detailed)
                 for idx, msg in enumerate(recent_full_messages):
@@ -1793,7 +1817,7 @@ class MessageProcessor:
         for memory in memories[:5]:  # Top 5 most relevant
             content = memory.get('content', '')
             if content and len(content.strip()) > 0:
-                relevant_snippets.append(content[:200])  # Truncate to 200 chars
+                relevant_snippets.append(content[:400])  # Increased from 200 to 400 chars for better memory context
         
         return " ... ".join(relevant_snippets) if relevant_snippets else "No relevant context found."
 
@@ -1859,6 +1883,9 @@ class MessageProcessor:
         This is for conversations that are OLDER than the recent message context.
         We want summaries like: 'Discussed marine biology career paths and shared favorite documentaries'
         NOT just topic labels like: 'Science topics'
+        
+        🚨 FIX: Memories are stored as individual messages, not structured "User: X Bot: Y" format.
+        We now work with the actual stored content format.
         """
         # Clean up memory formatting
         clean_content = memory_part.replace('[Memory:', '').replace('[Previous conversation:', '').replace(']', '').strip()
@@ -1867,34 +1894,34 @@ class MessageProcessor:
         if len(clean_content) < 15 or clean_content.lower() in ['hi', 'hello', 'hey', 'good afternoon', 'good morning']:
             return ""
         
-        # Extract user and bot parts if present
-        if "User:" in clean_content and ("Bot:" in clean_content or "You responded:" in clean_content):
-            # Parse conversation structure
-            parts = clean_content.split("User:")
-            if len(parts) > 1:
-                user_part = parts[1].split("Bot:")[0].split("You responded:")[0].strip()[:60]
-                
-                # Create contextual summary based on content
-                lower_content = clean_content.lower()
-                
-                if any(word in lower_content for word in ['coffee', 'meet', 'dinner', 'lunch']):
-                    return f"Discussed meeting plans: {user_part}"
-                elif any(word in lower_content for word in ['food', 'pizza', 'burger', 'sandwich', 'taco']):
-                    return f"Talked about food preferences: {user_part}"
-                elif any(word in lower_content for word in ['beach', 'ocean', 'swim', 'dive']):
-                    return f"Discussed beach/ocean activities: {user_part}"
-                elif any(word in lower_content for word in ['dream', 'creative', 'art', 'music', 'imagine']):
-                    return f"Had creative conversation: {user_part}"
-                elif any(word in lower_content for word in ['research', 'science', 'marine', 'biology']):
-                    return f"Discussed science/research: {user_part}"
-                elif any(word in lower_content for word in ['work', 'job', 'career', 'project']):
-                    return f"Talked about work/career: {user_part}"
-                else:
-                    return f"Conversed about: {user_part}"
+        # Create contextual summary based on content keywords
+        lower_content = clean_content.lower()
         
-        # Fallback: create generic summary
-        content_preview = clean_content[:50]
-        return f"Previous exchange: {content_preview}..."
+        # Extract meaningful content (up to 400 chars for context)
+        content_preview = clean_content[:400]
+        
+        # Try to create semantic summaries based on content
+        if any(word in lower_content for word in ['coffee', 'meet', 'dinner', 'lunch', 'hang out', 'get together']):
+            return f"Discussed meeting/social plans: {content_preview}"
+        elif any(word in lower_content for word in ['food', 'pizza', 'burger', 'sandwich', 'taco', 'meal', 'eat', 'cook']):
+            return f"Talked about food/meals: {content_preview}"
+        elif any(word in lower_content for word in ['beach', 'ocean', 'swim', 'dive', 'surf', 'water', 'sea']):
+            return f"Discussed beach/ocean activities: {content_preview}"
+        elif any(word in lower_content for word in ['dream', 'creative', 'art', 'music', 'imagine', 'poetry', 'write']):
+            return f"Creative/artistic conversation: {content_preview}"
+        elif any(word in lower_content for word in ['research', 'science', 'marine', 'biology', 'experiment', 'study']):
+            return f"Science/research discussion: {content_preview}"
+        elif any(word in lower_content for word in ['work', 'job', 'career', 'project', 'profession', 'business']):
+            return f"Work/career conversation: {content_preview}"
+        elif any(word in lower_content for word in ['family', 'parent', 'mother', 'father', 'sibling', 'relative', 'background']):
+            return f"Family/background discussion: {content_preview}"
+        elif any(word in lower_content for word in ['adventure', 'travel', 'explore', 'journey', 'trek', 'expedition']):
+            return f"Adventure/travel conversation: {content_preview}"
+        elif any(word in lower_content for word in ['photography', 'photo', 'camera', 'picture', 'shoot', 'lens']):
+            return f"Photography discussion: {content_preview}"
+        else:
+            # Generic but informative summary with full context
+            return f"Previous exchange: {content_preview}"
 
     def _extract_user_facts_from_memories(self, memories: List[Dict[str, Any]]) -> List[str]:
         """Extract important user facts from raw memories with enhanced Discord name handling."""
