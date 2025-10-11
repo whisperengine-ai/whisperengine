@@ -3743,7 +3743,7 @@ class MessageProcessor:
             final_context = enhanced_context if enhanced_context else conversation_context
             
             # 📝 COMPREHENSIVE PROMPT LOGGING: Log full prompts to file for review
-            await self._log_full_prompt_to_file(final_context, message_context.user_id)
+            await self._log_full_prompt_to_file(final_context, message_context.user_id, ai_components)
             
             # Generate response using LLM
             logger.info("🎯 GENERATING: Sending %d messages to LLM", len(final_context))
@@ -4571,7 +4571,7 @@ class MessageProcessor:
                 security_level=ContextSecurity.PRIVATE_DM,
             )
 
-    async def _log_full_prompt_to_file(self, conversation_context: List[Dict[str, Any]], user_id: str):
+    async def _log_full_prompt_to_file(self, conversation_context: List[Dict[str, Any]], user_id: str, ai_components: Optional[Dict[str, Any]] = None):
         """Log the complete prompt sent to LLM for debugging and review."""
         try:
             import json
@@ -4591,8 +4591,16 @@ class MessageProcessor:
                 "user_id": user_id,
                 "message_count": len(conversation_context),
                 "total_chars": sum(len(msg.get('content', '')) for msg in conversation_context),
-                "messages": conversation_context
+                "messages": conversation_context,
+                "ai_components": ai_components or {}  # NEW: Include emotional analysis data
             }
+            
+            # 🔍 DEBUG: Log ai_components status
+            if ai_components:
+                logger.info(f"📊 AI_COMPONENTS DEBUG: Logging {len(ai_components)} component keys: {list(ai_components.keys())}")
+            else:
+                logger.warning(f"📊 AI_COMPONENTS DEBUG: ai_components is None or empty!")
+            
             
             # Write to file
             os.makedirs("/app/logs/prompts", exist_ok=True)
@@ -4899,24 +4907,34 @@ class MessageProcessor:
             # 4. Record Sprint 6 metrics to InfluxDB (if available)
             if self.temporal_client and hasattr(self.temporal_client, 'record_point'):
                 try:
-                    await self.temporal_client.record_point(
-                        measurement="learning_intelligence_orchestrator",
-                        tags={
-                            "bot_name": bot_name,
-                            "user_id": message_context.user_id,
-                            "platform": message_context.platform
-                        },
-                        fields={
-                            "predictions_generated": len(ai_components.get('learning_predictions', {}).get('prediction_types', [])),
-                            "health_monitoring_triggered": bool(ai_components.get('learning_health')),
-                            "learning_orchestrator_available": bool(self.learning_orchestrator),
-                            "predictive_engine_available": bool(self.predictive_engine),
-                            "learning_pipeline_available": bool(self.learning_pipeline),
-                            "system_performance": ai_components.get('learning_health', {}).get('system_performance', 0.0),
-                            "healthy_components": ai_components.get('learning_health', {}).get('healthy_components', 0)
-                        },
-                        timestamp=datetime.utcnow()
-                    )
+                    # Ensure ai_components is not None to prevent NoneType errors
+                    if ai_components is None:
+                        logger.warning("ai_components is None - skipping Sprint 6 InfluxDB metrics")
+                        return
+                    
+                    # Import Point class for proper InfluxDB point creation
+                    try:
+                        from influxdb_client.client.write.point import Point
+                        
+                        # Create proper InfluxDB Point object instead of named parameters
+                        point = Point("learning_intelligence_orchestrator") \
+                            .tag("bot_name", bot_name) \
+                            .tag("user_id", message_context.user_id) \
+                            .tag("platform", message_context.platform) \
+                            .field("predictions_generated", len(ai_components.get('learning_predictions', {}).get('prediction_types', []))) \
+                            .field("health_monitoring_triggered", bool(ai_components.get('learning_health'))) \
+                            .field("learning_orchestrator_available", bool(self.learning_orchestrator)) \
+                            .field("predictive_engine_available", bool(self.predictive_engine)) \
+                            .field("learning_pipeline_available", bool(self.learning_pipeline)) \
+                            .field("system_performance", ai_components.get('learning_health', {}).get('system_performance', 0.0)) \
+                            .field("healthy_components", ai_components.get('learning_health', {}).get('healthy_components', 0)) \
+                            .time(datetime.utcnow())
+                        
+                        await self.temporal_client.record_point(point)
+                        
+                    except ImportError:
+                        logger.debug("InfluxDB client not available - skipping Sprint 6 metrics")
+                        
                 except Exception as e:
                     logger.warning("Sprint 6 InfluxDB metrics recording failed: %s", str(e))
                     
