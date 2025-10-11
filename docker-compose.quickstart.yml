@@ -20,8 +20,6 @@ services:
       postgres:
         condition: service_healthy
     restart: "no"  # Only run once
-    profiles:
-      - migration  # Optional profile - use 'docker-compose --profile migration up' to include
 
   # Main WhisperEngine bot (HTTP API only by default)
   whisperengine-assistant:

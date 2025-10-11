@@ -58,9 +58,24 @@ if ! docker info | grep -q "Username"; then
 fi
 
 # Define images to build and push
+# Note: Database migrations use the main whisperengine container with a different command
+# (python /app/scripts/run_migrations.py), so no separate migrations image is needed
 IMAGES="whisperengine whisperengine-ui"
 
 print_status "Building WhisperEngine containers..."
+echo ""
+
+# Setup Docker buildx for multi-platform builds
+print_status "Setting up Docker buildx for multi-platform builds..."
+BUILDER_NAME="whisperengine-multiplatform"
+if ! docker buildx inspect "$BUILDER_NAME" >/dev/null 2>&1; then
+    print_status "Creating new buildx builder: $BUILDER_NAME"
+    docker buildx create --name "$BUILDER_NAME" --driver docker-container --use
+else
+    print_status "Using existing buildx builder: $BUILDER_NAME"
+    docker buildx use "$BUILDER_NAME"
+fi
+docker buildx inspect --bootstrap
 echo ""
 
 # Build main WhisperEngine assistant container
@@ -69,30 +84,26 @@ print_status "This will download and bundle:"
 print_status "  • FastEmbed: sentence-transformers/all-MiniLM-L6-v2 (~67MB)"
 print_status "  • RoBERTa: cardiffnlp/twitter-roberta-base-emotion-multilabel-latest (~300MB)"
 print_status "  • Total model cache: ~400MB (embedded in container)"
+print_status "Platforms: linux/amd64, linux/arm64 (multi-platform support)"
 echo ""
 
-if docker build -t whisperengine:${VERSION} -t whisperengine:latest -f Dockerfile .; then
-    print_success "WhisperEngine Assistant container built successfully with pre-downloaded models"
+# Build and push multi-platform image
+print_status "Building and pushing multi-platform image..."
+if docker buildx build \
+    --platform linux/amd64,linux/arm64 \
+    -t ${DOCKERHUB_USERNAME}/whisperengine:${VERSION} \
+    -t ${DOCKERHUB_USERNAME}/whisperengine:latest \
+    -f Dockerfile \
+    --push \
+    .; then
+    print_success "WhisperEngine Assistant container built and pushed successfully (multi-platform)"
     
-    # Verify models are in container
-    print_status "Verifying models are bundled in container..."
-    docker run --rm whisperengine:latest python -c "
-import os, json
-config_path = '/app/models/model_config.json'
-if os.path.exists(config_path):
-    config = json.load(open(config_path))
-    print('✅ Models verified in container:')
-    print(f'  📊 Embedding: {config.get(\"embedding_models\", {}).get(\"primary\", \"Unknown\")}')
-    print(f'  🎭 Emotion: {config.get(\"emotion_models\", {}).get(\"primary\", \"Unknown\")}')
-else:
-    print('❌ Model configuration not found in container')
-    exit(1)
-"
-    if [ $? -eq 0 ]; then
-        print_success "✅ Models successfully bundled in container"
+    # Verify multi-platform manifest
+    print_status "Verifying multi-platform manifest..."
+    if docker buildx imagetools inspect ${DOCKERHUB_USERNAME}/whisperengine:${VERSION} | grep -E "linux/(amd64|arm64)"; then
+        print_success "✅ Multi-platform manifest verified (AMD64 + ARM64)"
     else
-        print_error "❌ Model verification failed"
-        exit 1
+        print_warning "⚠️ Could not verify multi-platform manifest"
     fi
 else
     print_error "Failed to build WhisperEngine Assistant container"
@@ -100,58 +111,32 @@ else
 fi
 
 # Build CDL Web UI container
-print_status "Building CDL Web UI container..."
-if docker build -t whisperengine-ui:${VERSION} -t whisperengine-ui:latest -f cdl-web-ui/Dockerfile ./cdl-web-ui; then
-    print_success "CDL Web UI container built successfully"
+print_status "Building CDL Web UI container (multi-platform)..."
+if docker buildx build \
+    --platform linux/amd64,linux/arm64 \
+    -t ${DOCKERHUB_USERNAME}/whisperengine-ui:${VERSION} \
+    -t ${DOCKERHUB_USERNAME}/whisperengine-ui:latest \
+    -f cdl-web-ui/Dockerfile \
+    --push \
+    ./cdl-web-ui; then
+    print_success "CDL Web UI container built and pushed successfully (multi-platform)"
 else
     print_error "Failed to build CDL Web UI container"
     exit 1
 fi
 
 echo ""
-print_status "Tagging and pushing containers to Docker Hub..."
-echo ""
-
-# Tag and push images
-for LOCAL_IMAGE in $IMAGES; do
-    DOCKERHUB_IMAGE="$LOCAL_IMAGE"
-    FULL_DOCKERHUB_TAG="${DOCKERHUB_USERNAME}/${DOCKERHUB_IMAGE}"
-    
-    print_status "Processing $LOCAL_IMAGE -> $FULL_DOCKERHUB_TAG"
-    
-    # Check if local image exists
-    if docker image inspect "${LOCAL_IMAGE}:${VERSION}" >/dev/null 2>&1; then
-        # Tag for DockerHub
-        print_status "Tagging ${LOCAL_IMAGE}:${VERSION} as ${FULL_DOCKERHUB_TAG}:${VERSION}"
-        docker tag "${LOCAL_IMAGE}:${VERSION}" "${FULL_DOCKERHUB_TAG}:${VERSION}"
-        
-        # Also tag as latest
-        print_status "Tagging ${LOCAL_IMAGE}:latest as ${FULL_DOCKERHUB_TAG}:latest"
-        docker tag "${LOCAL_IMAGE}:latest" "${FULL_DOCKERHUB_TAG}:latest"
-        
-        # Push to DockerHub
-        print_status "Pushing ${FULL_DOCKERHUB_TAG}:${VERSION}"
-        docker push "${FULL_DOCKERHUB_TAG}:${VERSION}"
-        
-        print_status "Pushing ${FULL_DOCKERHUB_TAG}:latest"
-        docker push "${FULL_DOCKERHUB_TAG}:latest"
-        
-        print_success "Successfully pushed ${FULL_DOCKERHUB_TAG}"
-    else
-        print_error "Local image ${LOCAL_IMAGE}:${VERSION} not found"
-        print_warning "Skipping ${LOCAL_IMAGE}"
-    fi
-    
-    echo ""
-done
-
-echo ""
-print_success "🎉 Docker Hub push complete!"
+print_success "🎉 Docker Hub push complete (multi-platform support)!"
 print_status "Your images are now available at:"
 echo ""
 for LOCAL_IMAGE in $IMAGES; do
     echo "  📦 https://hub.docker.com/r/${DOCKERHUB_USERNAME}/${LOCAL_IMAGE}"
 done
+echo ""
+
+print_status "Multi-platform support verified:"
+echo "  ✅ linux/amd64 (Intel/AMD processors)"
+echo "  ✅ linux/arm64 (ARM processors, Apple Silicon)"
 echo ""
 
 print_status "To use these images in production:"

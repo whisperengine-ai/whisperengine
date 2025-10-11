@@ -1,17 +1,29 @@
 # WhisperEngine - Containerized Deployment
 # No source code required - uses pre-built Docker Hub images
-#
-# Version Strategy:
-# - Use specific tags (v1.0.1) for production stability
-# - Use 'latest' for development/testing of newest features
-#
-# Production: whisperengine/whisperengine:v1.0.1
-# Development: whisperengine/whisperengine:latest
+# Uses :latest tags for automatic updates
 
 services:
+  # Database migration init container (runs once before bot starts)
+  db-migrate:
+    image: whisperengine/whisperengine:latest
+    container_name: whisperengine-db-migrate
+    command: ["python", "/app/scripts/run_migrations.py"]
+    environment:
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=whisperengine
+      - POSTGRES_PASSWORD=whisperengine_password
+      - POSTGRES_DB=whisperengine
+    networks:
+      - whisperengine-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"  # Only run once
+
   # Main WhisperEngine Assistant (AI Chat API)
   whisperengine-assistant:
-    image: whisperengine/whisperengine:v1.0.1
+    image: whisperengine/whisperengine:latest
     container_name: whisperengine-assistant
     ports:
       - "9090:9090"  # Chat API endpoint
@@ -71,6 +83,8 @@ services:
         condition: service_healthy
       qdrant:
         condition: service_started
+      db-migrate:
+        condition: service_completed_successfully
       influxdb:
         condition: service_healthy
     restart: unless-stopped
@@ -82,7 +96,7 @@ services:
 
   # CDL Web UI for character creation and management
   cdl-web-ui:
-    image: whisperengine/whisperengine-ui:v1.0.1
+    image: whisperengine/whisperengine-ui:latest
     container_name: whisperengine-web-ui
     ports:
       - "3001:3000"  # Web interface
