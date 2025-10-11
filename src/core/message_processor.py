@@ -1999,9 +1999,17 @@ class MessageProcessor:
     async def _build_conversation_context_with_ai_intelligence(
         self, message_context: MessageContext, relevant_memories: List[Dict[str, Any]], ai_components: Dict[str, Any]
     ) -> List[Dict[str, str]]:
-        """Build conversation context with AI intelligence guidance integrated."""
-        # Start with basic conversation context
-        conversation_context = await self._build_conversation_context(message_context, relevant_memories)
+        """
+        Enhance conversation context with AI intelligence guidance.
+        
+        🚨 CRITICAL: This method ENHANCES the structured context from Phase 4,
+        it does NOT rebuild from scratch. We accept the pre-built structured context
+        and just add TrendWise adaptation and AI intelligence guidance to it.
+        """
+        # 🚨 CRITICAL FIX: Use structured context from Phase 4, don't rebuild!
+        # The conversation_context is ALREADY built by _build_conversation_context_structured()
+        # We just need to enhance it with AI intelligence additions
+        conversation_context = await self._build_conversation_context_structured(message_context, relevant_memories)
         
         # TrendWise Adaptive Learning: Add confidence adaptation guidance
         if self.confidence_adapter:
