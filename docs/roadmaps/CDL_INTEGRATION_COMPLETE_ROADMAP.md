@@ -837,24 +837,44 @@ async def query_character_knowledge_graph(
 
 ### Rationale for Phase 4 Timing
 
+**Decision (October 11, 2025): DEFER TO FUTURE**
+
 **Why NOT Implement Now**:
-1. ✅ Current weighted queries work for basic character knowledge
-2. 🎯 Phase 3 (Confidence Evolution) has more immediate user impact
-3. ⏱️ 20-24 hours is significant investment vs Phase 3's 12-16 hours
-4. 📊 Requires data population effort (connections between knowledge entries)
-5. 🎨 This is "polish" enhancement, not "core" functionality
+1. ✅ **LLM inference is masking the gaps effectively** - Claude/GPT-4 create plausible connections even without explicit graph traversal
+2. ✅ **Current users don't notice inconsistencies** - No complaints about character depth or backstory coherence
+3. ✅ **Most conversations are simple 1-hop queries** - Graph traversal solves problems users rarely encounter
+4. 🎯 **Phase 3 (Confidence Evolution) has more immediate user impact** - User fact intelligence directly affects conversation quality
+5. ⏱️ **20-24 hours is significant investment** - Better spent on user-facing features (Phase 3, web UI, user acquisition)
+6. 📊 **Requires data population effort** - Need to define connections between knowledge entries (manual or LLM-generated)
+7. 🎨 **This is "polish" enhancement, not "core" functionality** - Improves depth for power users but doesn't materially impact casual users
 
-**Why Implement Later**:
-1. ⭐ Significantly enhances character depth and authenticity
-2. 🏆 Creates competitive moat (hard to replicate)
-3. 🔧 Already have proven graph infrastructure (SemanticKnowledgeRouter)
-4. 💡 Users will notice "Elena understands her own story" vs just knowing facts
-5. ♻️ Can be added incrementally without breaking existing system
+**Why Implement Later (When Appropriate)**:
+1. ⭐ **Significantly enhances character depth** - Transforms experience for engaged/power users (+50-150% value)
+2. 🏆 **Creates competitive moat** - Hard to replicate, "best-in-class" positioning
+3. 🔧 **Already have proven graph infrastructure** - SemanticKnowledgeRouter demonstrates pattern works
+4. 💡 **Prevents long-term inconsistencies** - Explicit connections reduce hallucination risk and backstory drift
+5. ♻️ **Can be added incrementally** - No breaking changes to existing system
 
-**Recommended Sequence**:
-1. Phase 3A: Confidence Evolution (12-16 hours) ← **NEXT PRIORITY**
-2. Phase 3B: Fact Deprecation (8-10 hours)
-3. Phase 4: Character Knowledge Graph (20-24 hours) ← **AFTER PHASE 3**
+**Implementation Triggers** (Revisit Phase 4 when ANY of these occur):
+- [ ] Users start complaining about character inconsistencies over time
+- [ ] Beta testers notice generic "why" question responses
+- [ ] Power users explicitly request deeper character backstory connections
+- [ ] Competitive positioning requires "best-in-class character depth"
+- [ ] Phase 3 is complete and dev resources are available
+- [ ] User acquisition is stable and focus shifts to retention/engagement
+
+**Recommended Priority Sequence**:
+1. **Phase 3A: Confidence Evolution (12-16 hours)** ← NEXT PRIORITY - User facts get smarter
+2. **Phase 3B: Fact Deprecation (8-10 hours)** ← AFTER 3A - Handle changing preferences
+3. **User Acquisition & Product-Market Fit Validation** ← FOCUS HERE
+4. **Phase 4: Character Knowledge Graph (20-24 hours)** ← ONLY AFTER user demand signals
+
+**Value Assessment by User Type**:
+- 👤 **Casual Users (80%?)**: +20% improvement - Nice polish, LLM inference sufficient
+- 👤 **Engaged Users (15%?)**: +50% improvement - Noticeable consistency gains
+- 👤 **Power Users (5%?)**: +150% improvement - Transforms authenticity experience
+
+**Bottom Line**: Current system works well enough. LLM masking is effective. Invest in Phase 4 only when users demonstrate they need it through explicit feedback or behavior patterns.
 
 ### Naming Clarification Note
 
