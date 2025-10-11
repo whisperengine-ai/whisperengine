@@ -27,6 +27,15 @@ from src.adapters.platform_adapters import (
     create_discord_message_adapter,
     create_discord_attachment_adapters
 )
+from src.prompts.prompt_assembler import create_prompt_assembler
+from src.prompts.prompt_components import (
+    create_core_system_component,
+    create_memory_component,
+    create_anti_hallucination_component,
+    create_guidance_component,
+    PromptComponent,
+    PromptComponentType
+)
 
 # Relationship Intelligence components
 from src.relationships.evolution_engine import create_relationship_evolution_engine
@@ -332,9 +341,19 @@ class MessageProcessor:
             relevant_memories = await self._retrieve_relevant_memories(message_context)
             
             # Phase 4: Conversation history and context building
-            conversation_context = await self._build_conversation_context(
-                message_context, relevant_memories
-            )
+            # 🚀 PHASE 2: Structured Prompt Assembly (feature flag)
+            use_structured_prompts = os.getenv('USE_STRUCTURED_PROMPTS', 'false').lower() == 'true'
+            
+            if use_structured_prompts:
+                logger.info("🚀 Using STRUCTURED prompt assembly (Phase 2)")
+                conversation_context = await self._build_conversation_context_structured(
+                    message_context, relevant_memories
+                )
+            else:
+                logger.info("📝 Using LEGACY string concatenation prompt building")
+                conversation_context = await self._build_conversation_context(
+                    message_context, relevant_memories
+                )
             
             # Phase 5: AI component processing (parallel)
             ai_components = await self._process_ai_components_parallel(
@@ -1748,6 +1767,243 @@ class MessageProcessor:
         logger.info(f"🔥 CONTEXT DEBUG: Final conversation context has {len(conversation_context)} total messages")
         
         return conversation_context
+
+    async def _build_conversation_context_structured(
+        self, 
+        message_context: MessageContext, 
+        relevant_memories: List[Dict[str, Any]]
+    ) -> List[Dict[str, str]]:
+        """
+        🚀 STRUCTURED CONVERSATION CONTEXT BUILDING (Phase 2)
+        
+        Build conversation context using PromptAssembler for structured, maintainable prompt generation.
+        This replaces string concatenation with component-based assembly, enabling:
+        - Token budget management
+        - Priority-based ordering
+        - Content deduplication
+        - Model-specific formatting
+        - Better debugging and testing
+        
+        Returns: List of messages in OpenAI chat format (role + content)
+        """
+        logger.info(f"🚀 STRUCTURED CONTEXT: Building for user {message_context.user_id}")
+        
+        # Initialize assembler with token budget (approximate - converted to chars in components)
+        # Most models support 4K-8K context, we'll target ~6K tokens = ~24K chars for system message
+        assembler = create_prompt_assembler(max_tokens=6000)
+        
+        # ================================
+        # COMPONENT 1: Core System Prompt
+        # ================================
+        from src.utils.helpers import get_current_time_context
+        time_context = get_current_time_context()
+        
+        core_system = f"CURRENT DATE & TIME: {time_context}"
+        assembler.add_component(create_core_system_component(core_system, priority=1))
+        
+        # ================================
+        # COMPONENT 2: Attachment Guard (if needed)
+        # ================================
+        if message_context.attachments and len(message_context.attachments) > 0:
+            bot_name = os.getenv('DISCORD_BOT_NAME', 'Assistant')
+            attachment_guard = (
+                f"Image policy: respond only in-character ({bot_name}), never output analysis sections, "
+                f"headings, scores, tables, coaching offers, or 'Would you like me to' prompts."
+            )
+            assembler.add_component(PromptComponent(
+                type=PromptComponentType.ATTACHMENT_GUARD,
+                content=attachment_guard,
+                priority=2,
+                required=True
+            ))
+        
+        # ================================
+        # COMPONENT 3: Memory Narrative (or anti-hallucination warning)
+        # ================================
+        memory_narrative = await self._build_memory_narrative_structured(
+            message_context.user_id, 
+            relevant_memories
+        )
+        
+        if memory_narrative:
+            assembler.add_component(create_memory_component(
+                f"RELEVANT MEMORIES: {memory_narrative}",
+                priority=4
+            ))
+            logger.info(f"✅ STRUCTURED CONTEXT: Added memory narrative ({len(memory_narrative)} chars)")
+        else:
+            assembler.add_component(create_anti_hallucination_component(priority=4))
+            logger.info(f"⚠️ STRUCTURED CONTEXT: Added anti-hallucination warning (no memories)")
+        
+        # ================================
+        # COMPONENT 4: Conversation Summary (if available)
+        # ================================
+        conversation_summary = await self._get_conversation_summary_structured(message_context.user_id)
+        if conversation_summary:
+            assembler.add_component(PromptComponent(
+                type=PromptComponentType.CONVERSATION_FLOW,
+                content=f"CONVERSATION FLOW: {conversation_summary}",
+                priority=5,
+                required=False  # Optional - can be dropped if over budget
+            ))
+            logger.info(f"✅ STRUCTURED CONTEXT: Added conversation summary ({len(conversation_summary)} chars)")
+        
+        # ================================
+        # COMPONENT 5: Communication Style Guidance
+        # ================================
+        bot_name = os.getenv('DISCORD_BOT_NAME', 'Assistant')
+        assembler.add_component(create_guidance_component(bot_name, priority=6))
+        
+        # ================================
+        # ASSEMBLE SYSTEM MESSAGE
+        # ================================
+        system_message_content = assembler.assemble(model_type="generic")
+        assembly_metrics = assembler.get_assembly_metrics()
+        
+        logger.info(f"📊 STRUCTURED ASSEMBLY METRICS:")
+        logger.info(f"  - Components: {assembly_metrics['total_components']}")
+        logger.info(f"  - Tokens: {assembly_metrics['total_tokens']}")
+        logger.info(f"  - Characters: {assembly_metrics['total_chars']}")
+        logger.info(f"  - Within budget: {assembly_metrics['within_budget']}")
+        
+        # Build conversation messages array
+        conversation_context = [
+            {"role": "system", "content": system_message_content}
+        ]
+        
+        # ================================
+        # ADD RECENT CONVERSATION HISTORY
+        # ================================
+        recent_messages = await self._get_recent_messages_structured(message_context.user_id)
+        if recent_messages:
+            conversation_context.extend(recent_messages)
+            logger.info(f"✅ STRUCTURED CONTEXT: Added {len(recent_messages)} recent messages")
+        
+        # ================================
+        # ADD CURRENT USER MESSAGE
+        # ================================
+        conversation_context.append({
+            "role": "user",
+            "content": message_context.content
+        })
+        
+        logger.info(f"✅ STRUCTURED CONTEXT: Final context has {len(conversation_context)} messages")
+        return conversation_context
+    
+    async def _build_memory_narrative_structured(
+        self, 
+        user_id: str, 
+        relevant_memories: List[Dict[str, Any]]
+    ) -> str:
+        """Build memory narrative for structured context (extracted from original method)."""
+        if not relevant_memories:
+            return ""
+        
+        memory_parts = []
+        user_facts = []
+        conversation_memories = []
+        
+        # Separate facts from conversation memories
+        for memory in relevant_memories[:10]:  # Limit to prevent token overflow
+            content = memory.get("content", "")
+            metadata = memory.get("metadata", {})
+            
+            if metadata.get("type") == "user_fact":
+                fact = metadata.get("fact", content)[:300]
+                if fact:
+                    user_facts.append(fact)
+            elif content:
+                # Conversation memory
+                if "User:" in content and "Bot:" in content:
+                    conversation_memories.append(f"{content[:500]}")
+                else:
+                    conversation_memories.append(f"{content[:500]}")
+        
+        # Build narrative with structure
+        if user_facts:
+            memory_parts.append(f"USER FACTS: {'; '.join(user_facts)}")
+        
+        if conversation_memories:
+            memory_parts.append(f"PAST CONVERSATIONS: {' | '.join(conversation_memories[:5])}")
+        
+        return " || ".join(memory_parts) if memory_parts else ""
+    
+    async def _get_conversation_summary_structured(self, user_id: str) -> str:
+        """Get conversation summary for structured context."""
+        # Simplified: Conversation summary logic can be added later
+        # For now, return empty string to keep Phase 2 focused on structure
+        return ""
+    
+    async def _get_recent_messages_structured(self, user_id: str) -> List[Dict[str, str]]:
+        """Get recent conversation messages for structured context."""
+        try:
+            recent_messages = await self.memory_manager.get_conversation_history(
+                user_id=user_id,
+                limit=20
+            )
+            
+            if not recent_messages:
+                return []
+            
+            formatted_messages = []
+            skip_next_bot_response = False
+            
+            # Split into older (truncated) vs recent (detailed)
+            recent_full_count = 6
+            older_messages = recent_messages[:-recent_full_count] if len(recent_messages) > recent_full_count else []
+            recent_full_messages = recent_messages[-recent_full_count:] if len(recent_messages) > recent_full_count else recent_messages
+            
+            # Process older messages (truncated to 500 chars)
+            for msg in older_messages:
+                content = msg.get('content', '')
+                is_bot = msg.get('bot', False)
+                
+                if content.startswith("!"):
+                    skip_next_bot_response = True
+                    continue
+                
+                if is_bot and skip_next_bot_response:
+                    skip_next_bot_response = False
+                    continue
+                
+                if not is_bot:
+                    skip_next_bot_response = False
+                
+                truncated = content[:500] + "..." if len(content) > 500 else content
+                role = "assistant" if is_bot else "user"
+                formatted_messages.append({"role": role, "content": truncated})
+            
+            # Process recent messages (tiered: last 3 full, others 400 chars)
+            for idx, msg in enumerate(recent_full_messages):
+                content = msg.get('content', '')
+                is_bot = msg.get('bot', False)
+                
+                if content.startswith("!"):
+                    skip_next_bot_response = True
+                    continue
+                
+                if is_bot and skip_next_bot_response:
+                    skip_next_bot_response = False
+                    continue
+                
+                if not is_bot:
+                    skip_next_bot_response = False
+                
+                # Last 3 messages get full content
+                is_most_recent = idx >= len(recent_full_messages) - 3
+                if is_most_recent:
+                    message_content = content
+                else:
+                    message_content = content[:400] + "..." if len(content) > 400 else content
+                
+                role = "assistant" if is_bot else "user"
+                formatted_messages.append({"role": role, "content": message_content})
+            
+            return formatted_messages
+            
+        except Exception as e:
+            logger.warning(f"Could not retrieve recent messages: {e}")
+            return []
 
     async def _build_conversation_context_with_ai_intelligence(
         self, message_context: MessageContext, relevant_memories: List[Dict[str, Any]], ai_components: Dict[str, Any]
