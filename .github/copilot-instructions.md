@@ -174,6 +174,50 @@
 - When implementing LOCAL dependencies, make them work directly - don't hide them behind flags
 - Use stubs/no-op implementations for missing EXTERNAL dependencies, not feature flags
 
+**🚨 WHY FEATURE FLAGS FOR LOCAL CODE ARE POISON:**
+- **YOU WILL FORGET THEM**: AI agents lose track of which code paths are active vs dormant
+- **CONFUSION MULTIPLIES**: Every conditional creates 2^N possible states (10 flags = 1024 states!)
+- **SILENT FAILURES**: Code exists but never runs because flag defaulted to false
+- **PHANTOM FEATURES**: Features that are "implemented" but require magic incantation to activate
+- **DEBUGGING NIGHTMARE**: "Is this code running?" becomes impossible to answer
+- **COGNITIVE LOAD**: Must track flag states across entire codebase
+- **TESTING HELL**: Must test every flag combination to ensure correctness
+- **MERGE CONFLICTS**: Flags in multiple branches create integration chaos
+
+**✅ CORRECT: What qualifies as "EXTERNAL dependency" needing a flag:**
+- `ENABLE_DISCORD=true` - Discord API (external service)
+- `REDIS_URL=...` - Redis connection (external infrastructure)
+- `OPENROUTER_API_KEY=...` - LLM API (external service)
+- `INFLUXDB_URL=...` - InfluxDB connection (external infrastructure)
+- `POSTGRES_HOST=...` - Database connection (external infrastructure)
+
+**❌ WRONG: What should NEVER have a flag:**
+- `USE_STRUCTURED_PROMPTS=true` - Local prompt assembly code
+- `ENABLE_MEMORY_SYSTEM=true` - Local memory manager code
+- `USE_NEW_PARSER=true` - Local parsing logic
+- `ENABLE_VALIDATION=true` - Local validation code
+- `USE_ENHANCED_CONTEXT=true` - Local context builder
+
+**🎯 THE RULE IS SIMPLE:**
+- If code lives in `src/` directory → NO FLAG, just make it work
+- If code calls external API/service → OK to have flag (with sensible default)
+- If you're tempted to add a flag for local code → STOP and just integrate it properly
+
+**💡 INSTEAD OF FLAGS FOR LOCAL CODE:**
+1. **Just integrate it** - Make the new code the default path
+2. **Keep old code as fallback** - For 1-2 weeks during validation, then delete
+3. **Use git branches** - If really uncertain, use a branch for testing
+4. **Direct testing** - Test new code directly with validation scripts
+5. **Gradual rollout** - Enable on one bot first, then expand (but no flags!)
+
+**🚨 IF YOU CATCH YOURSELF ADDING A FLAG FOR LOCAL CODE:**
+1. STOP immediately
+2. Ask: "Is this an external dependency?" 
+3. If NO → Remove the flag, integrate directly
+4. If YES → Document why it's external and what service it connects to
+
+**ENFORCEMENT**: All pull requests will be rejected if they add feature flags for local code.
+
 **🚨 CRITICAL REQUIREMENT: DIRECT VALIDATION TESTING FOR ALL NEW FEATURES**
 - **MANDATORY**: Every new feature/sprint MUST include direct Python validation testing
 - **USE PATTERN**: Follow `tests/automated/test_*_direct_validation.py` pattern established in WhisperEngine
