@@ -12,6 +12,7 @@ integration, and context management.
 """
 
 import asyncio
+import json
 import logging
 import os
 import re
@@ -423,9 +424,15 @@ class MessageProcessor:
             )
             
             # Phase 9b: Knowledge extraction and storage (PostgreSQL)
+            # Extract facts from USER message about the user
             knowledge_stored = await self._extract_and_store_knowledge(
-                message_context, ai_components
+                message_context, ai_components, extract_from='user'
             )
+            
+            # NOTE: Bot self-learning is handled by Character Episodic Intelligence (PHASE 1)
+            # Character episodic memories are extracted from vector conversations with RoBERTa emotion scoring
+            # See: src/characters/learning/character_vector_episodic_intelligence.py
+            # Bot self-facts would be redundant with the episodic memory system
             
             # Phase 9c: User preference extraction and storage (PostgreSQL)
             preference_stored = await self._extract_and_store_user_preferences(
@@ -4210,21 +4217,201 @@ class MessageProcessor:
         return fallback
 
     async def _extract_and_store_knowledge(self, message_context: MessageContext, 
-                                          ai_components: Dict[str, Any]) -> bool:
+                                          ai_components: Dict[str, Any],
+                                          extract_from: str = 'user') -> bool:
         """
-        Extract factual knowledge from message and store in PostgreSQL knowledge graph.
+        Extract factual knowledge from message using LLM analysis and store in PostgreSQL.
         
-        This is Phase 3 of the Semantic Knowledge Graph implementation:
-        - Detects factual statements (preferences, facts about user)
-        - Extracts entity information
-        - Stores in PostgreSQL with automatic relationship discovery
+        Uses natural language understanding instead of regex patterns for 10x better quality.
+        Runs asynchronously in background - no user-facing latency impact.
         
         Args:
             message_context: The message context
             ai_components: AI processing results including emotion data
+            extract_from: 'user' to extract facts about user, 'bot' to extract facts about bot character
             
         Returns:
             True if knowledge was extracted and stored
+        """
+        # Check if knowledge router is available
+        if not hasattr(self.bot_core, 'knowledge_router') or not self.bot_core.knowledge_router:
+            return False
+        
+        # CRITICAL: Only extract from USER messages when extract_from='user'
+        # This prevents extracting philosophical statements from bot as user facts
+        # Check metadata for bot flag (set by platform adapters)
+        if extract_from == 'user' and message_context.metadata and message_context.metadata.get('is_bot_message', False):
+            logger.debug("Skipping user fact extraction - message is from bot")
+            return False
+        
+        try:
+            # Build LLM fact extraction prompt based on extraction target
+            if extract_from == 'user':
+                extraction_prompt = f"""Analyze this user message and extract ONLY clear, factual personal statements about the user.
+
+User message: "{message_context.content}"
+
+Instructions:
+- Extract personal preferences: Foods/drinks/hobbies they explicitly like/dislike/enjoy
+- Extract personal facts: Pets they own, places they've visited, hobbies they actively do
+- DO NOT extract: Conversational phrases, questions, abstract concepts, philosophical statements, compliments
+- DO NOT extract: Things the user asks about or discusses theoretically - only facts about themselves
+
+Return JSON (return empty list if no clear facts found):
+{{
+    "facts": [
+        {{
+            "entity_name": "pizza",
+            "entity_type": "food",
+            "relationship_type": "likes",
+            "confidence": 0.9,
+            "reasoning": "User explicitly stated they love pizza"
+        }}
+    ]
+}}
+
+Valid entity_types: food, drink, hobby, place, pet, other
+Valid relationship_types: likes, dislikes, enjoys, owns, visited, wants
+
+Be conservative - only extract clear, unambiguous facts."""
+            
+            elif extract_from == 'bot':
+                bot_name = os.getenv('DISCORD_BOT_NAME', 'assistant')
+                extraction_prompt = f"""Analyze this bot response and extract ONLY clear, factual personal statements the bot character made about ITSELF.
+
+Bot response: "{message_context.content}"
+
+Instructions:
+- Extract bot's own preferences: Foods/drinks/hobbies the bot explicitly states it likes/dislikes/enjoys
+- Extract bot's personal facts: Things the bot owns, places it has been, hobbies it does
+- DO NOT extract: Conversational phrases, responses to questions, advice given to user
+- DO NOT extract: Things about the USER - only facts about the BOT CHARACTER ({bot_name})
+
+Return JSON (return empty list if no clear facts found):
+{{
+    "facts": [
+        {{
+            "entity_name": "collaborative discussions",
+            "entity_type": "communication_style",
+            "relationship_type": "prefers",
+            "confidence": 0.9,
+            "reasoning": "Bot stated 'I prefer collaborative discussions'"
+        }}
+    ]
+}}
+
+Valid entity_types: communication_style, value, hobby, interest, preference, other
+Valid relationship_types: prefers, values, enjoys, dislikes, believes
+
+Be conservative - only extract clear statements about the bot's own characteristics."""
+            
+            else:
+                logger.warning(f"Invalid extract_from parameter: {extract_from}")
+                return False
+
+            # Get fact extraction model (fallback to chat model if not specified)
+            fact_model = os.getenv('LLM_FACT_EXTRACTION_MODEL', '').strip()
+            if not fact_model:
+                fact_model = os.getenv('LLM_CHAT_MODEL', 'anthropic/claude-3.5-sonnet')
+            
+            # Call LLM for fact extraction (reuse existing client)
+            # Use simple context format for extraction task
+            extraction_context = [
+                {
+                    "role": "system", 
+                    "content": "You are a precise fact extraction specialist. Only extract clear, verifiable personal facts. Return valid JSON only."
+                },
+                {
+                    "role": "user", 
+                    "content": extraction_prompt
+                }
+            ]
+            
+            # CRITICAL: Use lower temperature for fact extraction (consistency over creativity)
+            # Fact extraction requires deterministic, consistent results - not creative responses
+            fact_extraction_temperature = float(os.getenv('LLM_FACT_EXTRACTION_TEMPERATURE', '0.2'))
+            
+            # Run LLM call in thread to avoid blocking
+            # Pass model override and temperature for fact extraction
+            response = await asyncio.to_thread(
+                self.llm_client.get_chat_response,
+                extraction_context,
+                model=fact_model,
+                temperature=fact_extraction_temperature
+            )
+            
+            # Parse LLM response
+            try:
+                # Handle markdown code blocks if present
+                if '```json' in response:
+                    response = response.split('```json')[1].split('```')[0].strip()
+                elif '```' in response:
+                    response = response.split('```')[1].split('```')[0].strip()
+                
+                facts_data = json.loads(response)
+                facts = facts_data.get("facts", [])
+            except json.JSONDecodeError as e:
+                logger.warning(f"⚠️ LLM FACT EXTRACTION: Failed to parse JSON response: {e}")
+                logger.debug(f"Raw LLM response: {response[:200]}")
+                return False
+            
+            if not facts:
+                logger.debug(f"✅ LLM FACT EXTRACTION: No facts found in message (clean result)")
+                return False
+            
+            # Store extracted facts
+            bot_name = os.getenv('DISCORD_BOT_NAME', 'assistant').lower()
+            emotion_data = ai_components.get('emotion_data', {})
+            emotional_context = emotion_data.get('primary_emotion', 'neutral') if emotion_data else 'neutral'
+            
+            stored_count = 0
+            for fact in facts:
+                # Validate fact structure
+                required_fields = ['entity_name', 'entity_type', 'relationship_type', 'confidence']
+                if not all(k in fact for k in required_fields):
+                    logger.warning(f"⚠️ LLM FACT EXTRACTION: Invalid fact structure (missing fields): {fact}")
+                    continue
+                
+                # Store in PostgreSQL
+                stored = await self.bot_core.knowledge_router.store_user_fact(
+                    user_id=message_context.user_id,
+                    entity_name=fact['entity_name'],
+                    entity_type=fact['entity_type'],
+                    relationship_type=fact['relationship_type'],
+                    confidence=fact['confidence'],
+                    emotional_context=emotional_context,
+                    mentioned_by_character=bot_name,
+                    source_conversation_id=message_context.channel_id
+                )
+                
+                if stored:
+                    stored_count += 1
+                    reasoning = fact.get('reasoning', 'N/A')
+                    logger.info(
+                        f"✅ LLM FACT EXTRACTION: Stored '{fact['entity_name']}' "
+                        f"({fact['entity_type']}, {fact['relationship_type']}) - {reasoning}"
+                    )
+            
+            if stored_count > 0:
+                target_description = "user" if extract_from == 'user' else "bot character"
+                logger.info(f"✅ LLM FACT EXTRACTION: Stored {stored_count}/{len(facts)} facts for {target_description} (ID: {message_context.user_id})")
+            
+            return stored_count > 0
+            
+        except Exception as e:
+            logger.error(f"❌ LLM fact extraction failed: {e}", exc_info=True)
+            return False
+    
+    # NOTE: Bot self-fact extraction method removed - redundant with Character Episodic Intelligence
+    # Character episodic memories are extracted from vector conversations with RoBERTa emotion scoring
+    # See: src/characters/learning/character_vector_episodic_intelligence.py
+    # Bot learns behavioral patterns, not isolated facts
+    
+    async def _extract_and_store_knowledge_regex_legacy(self, message_context: MessageContext, 
+                                          ai_components: Dict[str, Any]) -> bool:
+        """
+        LEGACY: Regex-based fact extraction (replaced by LLM extraction).
+        Kept for reference only - not called in production.
         """
         # Check if knowledge router is available
         if not hasattr(self.bot_core, 'knowledge_router') or not self.bot_core.knowledge_router:

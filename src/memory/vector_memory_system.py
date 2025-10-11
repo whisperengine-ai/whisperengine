@@ -914,11 +914,9 @@ class VectorMemoryStore:
     
     def _extract_keywords(self, content: str) -> List[str]:
         """Extract keywords for sparse vector search"""
-        # Simple keyword extraction (could be enhanced with NLP)
-        words = content.lower().split()
-        # Filter out common stop words and keep meaningful terms
-        stop_words = {'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'is', 'are', 'was', 'were', 'be', 'been', 'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could', 'should'}
-        keywords = [word for word in words if len(word) > 2 and word not in stop_words]
+        from src.utils.stop_words import extract_content_words
+        # Use centralized preprocessing for consistent keyword extraction
+        keywords = extract_content_words(content, min_length=3)
         return keywords[:20]  # Limit to top 20 keywords
 
     def _should_chunk_content(self, content: str) -> bool:

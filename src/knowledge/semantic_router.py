@@ -346,6 +346,7 @@ class SemanticKnowledgeRouter:
             query = """
                 SELECT 
                     fe.entity_name,
+                    fe.entity_type,
                     fe.category,
                     ufr.confidence,
                     ufr.relationship_type,
@@ -369,6 +370,7 @@ class SemanticKnowledgeRouter:
             for row in rows:
                 facts.append({
                     "entity_name": row["entity_name"],
+                    "entity_type": row["entity_type"],
                     "category": row["category"],
                     "confidence": row["confidence"],
                     "relationship_type": row["relationship_type"],

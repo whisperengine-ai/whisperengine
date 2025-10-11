@@ -150,7 +150,33 @@ docs/
 └── legacy/            # Historical documentation
 ```
 
-## � Recent Documentation Reorganization
+## 📋 Recent Documentation Reorganization
+
+**October 11, 2025**: Additional root directory cleanup completed:
+
+### New Organized Documentation Categories:
+All documentation has been moved from the root directory into properly categorized `docs/` subfolders:
+
+- **`docs/architecture/`** - Architecture decisions, system design, data flow diagrams
+- **`docs/deployment/`** - Docker, containerization, infrastructure setup guides
+- **`docs/roadmaps/`** - Development roadmaps, implementation tracking, feature planning
+- **`docs/guides/`** - User guides, setup instructions, migration guides
+- **`docs/testing/`** - Testing strategies, validation reports, test documentation
+- **`docs/bug-fixes/`** - Bug fix documentation and issue resolutions
+- **`docs/performance/`** - Performance optimization, benchmarking, profiling
+- **`docs/database/`** - Database schema, migrations, query optimization
+- **`docs/cdl-system/`** - CDL configuration, fact extraction, model tuning
+- **`docs/api/`** - API documentation and endpoint references
+- **`docs/character-system/`** - Character design, episodic memory, learning systems
+- **`docs/reports/`** - Status reports, completion summaries, phase reports
+
+### Root Directory Policy:
+- ✅ **ONLY** these files belong in root: `README.md`, `QUICKSTART.md`, `INSTALLATION.md`, `NEXT_STEPS.md`
+- ❌ **ALL OTHER** documentation must be stored under `docs/` with proper categorization
+- 📝 **UPDATE EXISTING** documentation instead of creating new files when possible
+- 🗂️ **CATEGORIZE PROPERLY** - place docs in the most appropriate subdirectory
+
+---
 
 **September 28, 2025**: Major cleanup and reorganization completed:
 

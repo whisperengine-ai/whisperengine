@@ -725,26 +725,10 @@ class MemoryPerformanceOptimizer:
 
     def _optimize_query_text(self, query_text: str) -> str:
         """Optimize query text for better search"""
-        # Simple optimization: remove common stop words and normalize
-        stop_words = {
-            "the",
-            "a",
-            "an",
-            "and",
-            "or",
-            "but",
-            "in",
-            "on",
-            "at",
-            "to",
-            "for",
-            "of",
-            "with",
-            "by",
-        }
-        words = query_text.lower().split()
-        optimized_words = [word for word in words if word not in stop_words and len(word) > 2]
-        return " ".join(optimized_words) if optimized_words else query_text
+        from src.utils.stop_words import optimize_query
+        # Use centralized query optimization for consistency
+        optimized = optimize_query(query_text, min_word_length=3)
+        return optimized if optimized else query_text
 
     def _optimize_limit(self, query_text: str, original_limit: int) -> int:
         """Optimize result limit based on query complexity"""

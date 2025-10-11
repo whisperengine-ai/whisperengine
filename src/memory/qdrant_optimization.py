@@ -201,12 +201,9 @@ class QdrantQueryOptimizer:
             # For memory/temporal queries, preserve original structure
             return query.strip()
         
-        # Word-level preprocessing for other queries
-        words = query.lower().split()
-        words = [w for w in words if w not in self.stop_words]
-        
-        # Simple grammar-preserving optimizations
-        processed_query = ' '.join(words)
+        # Use centralized preprocessing for non-temporal queries
+        from src.utils.stop_words import optimize_query
+        processed_query = optimize_query(query, min_word_length=2)
         
         logger.debug("🔍 Query optimization: '%s' → '%s'", query, processed_query)
         return processed_query

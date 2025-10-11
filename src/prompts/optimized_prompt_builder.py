@@ -508,9 +508,9 @@ class OptimizedPromptBuilder:
                     theme = self._identify_conversation_theme(content)
                     topics.add(theme)
                     
-                    words = content.lower().split()
-                    meaningful_words = [word for word in words 
-                                      if len(word) > 3 and word not in self._get_stop_words()]
+                    # Use centralized preprocessing for keyword extraction
+                    from src.utils.stop_words import extract_content_words
+                    meaningful_words = extract_content_words(content, min_length=4)
                     keywords.update(meaningful_words[:2])
             
             # 🧠 INTELLIGENCE ENHANCEMENT: Add emotional context if pattern detected

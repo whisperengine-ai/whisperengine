@@ -282,53 +282,11 @@ Flow analysis: {flow_optimization.get('flow_analysis', {})}"""
 
     def _create_safe_fallback_query(self, message: str) -> str:
         """Create a safe fallback query that feels natural"""
-
-        # Extract meaningful words for fallback
-        stop_words = {
-            "i",
-            "me",
-            "my",
-            "you",
-            "your",
-            "the",
-            "a",
-            "an",
-            "and",
-            "or",
-            "but",
-            "is",
-            "are",
-            "was",
-            "were",
-            "will",
-            "would",
-            "can",
-            "could",
-            "should",
-            "do",
-            "does",
-            "did",
-            "have",
-            "has",
-            "had",
-            "what",
-            "how",
-            "why",
-            "when",
-            "where",
-            "who",
-            "just",
-            "really",
-            "very",
-            "so",
-            "too",
-            "now",
-            "then",
-        }
-
-        words = [word.lower() for word in message.split() if word.lower() not in stop_words]
-        meaningful_words = [word for word in words if len(word) > 2][:5]
-
+        from src.utils.stop_words import extract_content_words
+        
+        # Extract meaningful words for fallback using centralized preprocessing
+        meaningful_words = extract_content_words(message, min_length=3)[:5]
+        
         return " ".join(meaningful_words) if meaningful_words else message[:30]
 
     def _create_human_fallback(

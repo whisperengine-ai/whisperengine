@@ -100,33 +100,41 @@ class CDLAIPromptIntegration:
         for fact in user_facts:
             confidence = fact.get('confidence', 0.0)
             entity = fact.get('entity_name', '')
+            entity_type = fact.get('entity_type', '')
             relationship = fact.get('relationship_type', 'related to')
             
             if not entity:
                 continue
+            
+            # Add entity type context when available (e.g., "pizza (food)")
+            entity_display = f"{entity} ({entity_type})" if entity_type else entity
                 
             # Format based on confidence levels for natural conversation
             if confidence >= confidence_threshold_high:
                 # High confidence: Definitive statements
                 if 'likes' in relationship.lower() or 'loves' in relationship.lower():
-                    context_parts.append(f"The user loves {entity}")
+                    context_parts.append(f"The user loves {entity_display}")
                 elif 'enjoys' in relationship.lower():
-                    context_parts.append(f"The user enjoys {entity}")
+                    context_parts.append(f"The user enjoys {entity_display}")
                 elif 'interested' in relationship.lower():
-                    context_parts.append(f"The user is interested in {entity}")
+                    context_parts.append(f"The user is interested in {entity_display}")
+                elif 'favorite' in relationship.lower():
+                    context_parts.append(f"The user's favorite {entity_type or 'thing'} is {entity}")
                 else:
-                    context_parts.append(f"The user {relationship} {entity}")
+                    context_parts.append(f"The user {relationship} {entity_display}")
                     
             elif confidence >= confidence_threshold_medium:
                 # Medium confidence: Tentative but acknowledged
                 if 'likes' in relationship.lower():
-                    context_parts.append(f"The user mentioned liking {entity}")
+                    context_parts.append(f"The user mentioned liking {entity_display}")
                 elif 'enjoys' in relationship.lower():
-                    context_parts.append(f"The user mentioned enjoying {entity}")
+                    context_parts.append(f"The user mentioned enjoying {entity_display}")
                 elif 'interested' in relationship.lower():
-                    context_parts.append(f"The user expressed interest in {entity}")
+                    context_parts.append(f"The user expressed interest in {entity_display}")
+                elif 'favorite' in relationship.lower():
+                    context_parts.append(f"The user mentioned {entity} as a favorite {entity_type or 'item'}")
                 else:
-                    context_parts.append(f"The user mentioned {relationship} {entity}")
+                    context_parts.append(f"The user mentioned {relationship} {entity_display}")
                     
             else:
                 # Low confidence: Uncertain/questioning
@@ -2489,6 +2497,7 @@ Stay authentic to {character.identity.name}'s personality while being transparen
                     # Try to parse fact structure - handle both dict and string formats
                     if isinstance(fact, dict):
                         entity_name = fact.get('entity_name', '')
+                        entity_type = fact.get('entity_type', '')
                         relationship = fact.get('relationship_type', 'related to')
                         confidence = fact.get('confidence', 0.0)
                     else:
@@ -2501,12 +2510,14 @@ Stay authentic to {character.identity.name}'s personality while being transparen
                         else:
                             relationship = 'related to'
                         entity_name = entity
+                        entity_type = ''
                         confidence = 0.7  # Default confidence for legacy format
                     
                     if entity_name:
-                        # Get confidence-aware formatting
+                        # Get confidence-aware formatting with entity type
                         confidence_text = await self.build_confidence_aware_context([{
                             'entity_name': entity_name,
+                            'entity_type': entity_type,
                             'relationship_type': relationship,
                             'confidence': confidence
                         }])

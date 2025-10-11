@@ -284,16 +284,14 @@ class EnhancedMemorySurpriseTrigger:
 
     def _calculate_word_overlap_similarity(self, text1: str, text2: str) -> float:
         """Enhanced word overlap similarity calculation with semantic boosting."""
-        words1 = set(text1.lower().split())
-        words2 = set(text2.lower().split())
+        from src.utils.stop_words import extract_content_words
         
-        if not words1 or not words2:
+        # Use centralized preprocessing for consistent word extraction
+        words1_filtered = set(extract_content_words(text1, min_length=2))
+        words2_filtered = set(extract_content_words(text2, min_length=2))
+        
+        if not words1_filtered or not words2_filtered:
             return 0.0
-        
-        # Remove common stop words for better semantic matching
-        stop_words = {'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'is', 'are', 'was', 'were', 'i', 'you', 'it', 'this', 'that', 'my', 'me'}
-        words1_filtered = words1 - stop_words
-        words2_filtered = words2 - stop_words
         
         # Calculate basic overlap
         intersection = words1_filtered.intersection(words2_filtered)
@@ -408,14 +406,10 @@ class EnhancedMemorySurpriseTrigger:
             
             memory_lower = memory_content.lower()
             
-            # Extract key topics from both
-            memory_words = set(memory_lower.split())
-            context_words = set(recent_content.split())
-            
-            # Remove common stop words
-            stop_words = {'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'is', 'are', 'was', 'were'}
-            memory_words = memory_words - stop_words
-            context_words = context_words - stop_words
+            # Extract key topics from both using centralized preprocessing
+            from src.utils.stop_words import extract_content_words
+            memory_words = set(extract_content_words(memory_lower, min_length=2))
+            context_words = set(extract_content_words(recent_content, min_length=2))
             
             if not memory_words or not context_words:
                 return 0.3

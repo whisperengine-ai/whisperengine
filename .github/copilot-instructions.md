@@ -111,6 +111,24 @@
 - When user asks to "document", update existing relevant doc, don't create new file
 - Focus on **implementation velocity** over documentation bureaucracy
 
+**🚨 CRITICAL: DOCUMENTATION STORAGE LOCATION**
+- **NEVER create MD files in the root directory** - they clutter the project structure
+- **ALWAYS store documentation under `docs/` folder** with proper categorization:
+  - `docs/architecture/` - Architecture decisions, system design, data flow
+  - `docs/deployment/` - Docker, containerization, infrastructure setup
+  - `docs/roadmaps/` - Development roadmaps, implementation plans
+  - `docs/guides/` - User guides, setup instructions, migration guides
+  - `docs/testing/` - Testing strategies, test documentation, validation reports
+  - `docs/bug-fixes/` - Bug fix documentation, issue resolutions
+  - `docs/performance/` - Performance optimization, benchmarking, profiling
+  - `docs/database/` - Database schema, migrations, query optimization
+  - `docs/cdl-system/` - CDL (Character Definition Language) configuration and tuning
+  - `docs/api/` - API documentation, endpoint references
+  - `docs/character-system/` - Character design, episodic memory, learning systems
+  - `docs/reports/` - Status reports, completion reports, summaries
+- **Root directory exceptions**: Only `README.md`, `QUICKSTART.md`, `INSTALLATION.md`, and `NEXT_STEPS.md` belong in root
+- **Before creating new doc**: Check if existing doc in appropriate `docs/` subfolder can be updated instead
+
 **🚨 CRITICAL NAMING CONVENTION: SEMANTIC NAMES ONLY - NO DEVELOPMENT PHASE NAMES!**
 - **NEVER use development phase names** in production code: "sprint1", "sprint2", "sprint3", "phase4", etc.
 - **USE SEMANTIC, DOMAIN-DRIVEN NAMES** that describe WHAT code does, not WHEN it was built
@@ -355,7 +373,8 @@ identity_manager = create_identity_manager(postgres_pool)
 
 ## Development Workflow
 
-### Multi-Bot Management
+
+**Multi-Bot Management**
 
 **Template-Based Architecture**: WhisperEngine uses a template-based multi-bot system that fills in environment-specific values from a stable Docker Compose template.
 
@@ -373,10 +392,13 @@ identity_manager = create_identity_manager(postgres_pool)
 ./multi-bot.sh restart jake     # ONLY for code changes (not .env changes)
 
 # ALWAYS use Docker commands for logs (multi-bot.sh logs fails consistently)
-docker logs whisperengine-jake-bot --tail 20   # Jake logs
-docker logs whisperengine-ryan-bot --tail 20   # Ryan logs  
-docker logs whisperengine-elena-bot --tail 20  # Elena logs
-docker logs whisperengine-<bot>-bot -f         # Follow any bot logs
+# 🚨 IMPORTANT: Container names may change based on deployment, compose file, or environment.
+# DO NOT hardcode container names. Use `docker ps` to discover actual running container names.
+docker ps   # List all running containers and their names
+docker logs <container_name> --tail 20   # View logs for any container
+docker logs <container_name> -f          # Follow logs for any container
+# Example: If your postgres container is named 'postgres', use:
+docker logs postgres --tail 20
 ```
 
 **Discord Message Testing**: Discord message processing requires manual triggering:
@@ -408,10 +430,13 @@ docker logs whisperengine-<bot>-bot -f         # Follow any bot logs
 ./multi-bot.sh stop elena
 
 # CRITICAL: ALWAYS use Docker commands for viewing logs
-docker logs whisperengine-elena-bot --tail 20     # Elena logs
-docker logs whisperengine-marcus-bot --tail 20    # Marcus logs  
-docker logs whisperengine-gabriel-bot --tail 20   # Gabriel logs
-docker logs whisperengine-<bot>-bot -f            # Follow any bot logs
+# 🚨 IMPORTANT: Container names may change based on deployment, compose file, or environment.
+# Use `docker ps` to discover actual running container names.
+docker ps   # List all running containers and their names
+docker logs <container_name> --tail 20     # View logs for any container
+docker logs <container_name> -f            # Follow logs for any container
+# Example: If your postgres container is named 'postgres', use:
+docker logs postgres --tail 20
 ```
 
 **Infrastructure Versions (Pinned)**:
@@ -520,12 +545,29 @@ phase4_data = ai_components.get('phase4_intelligence', {})
 
 **Environment Setup for Direct Testing**:
 ```bash
-# Required environment variables for direct Python validation
-export FASTEMBED_CACHE_PATH="/tmp/fastembed_cache"
-export QDRANT_HOST="localhost" 
-export QDRANT_PORT="6334"
-source .venv/bin/activate
+# 🚨 CRITICAL: ALWAYS include full environment setup for direct Python tests
+# Complete command pattern with all required infrastructure variables:
+source .venv/bin/activate && \
+export FASTEMBED_CACHE_PATH="/tmp/fastembed_cache" && \
+export QDRANT_HOST="localhost" && \
+export QDRANT_PORT="6334" && \
+export POSTGRES_HOST="localhost" && \
+export POSTGRES_PORT="5433" && \
+export DISCORD_BOT_NAME=elena && \
 python tests/automated/test_[feature]_direct_validation.py
+
+# With output limiting (recommended for long tests):
+source .venv/bin/activate && \
+export FASTEMBED_CACHE_PATH="/tmp/fastembed_cache" && \
+export QDRANT_HOST="localhost" && \
+export QDRANT_PORT="6334" && \
+export POSTGRES_HOST="localhost" && \
+export POSTGRES_PORT="5433" && \
+export DISCORD_BOT_NAME=elena && \
+python tests/automated/test_[feature]_direct_validation.py 2>&1 | head -100
+
+# Verify infrastructure is running first:
+docker ps | grep -E "qdrant|postgres"  # Should show both services running
 ```
 
 **Testing Prioritization**:
@@ -1529,13 +1571,35 @@ ENABLE_MEMORY_SYSTEM=true          # Creates phantom features
 **Testing Commands**: Essential testing and validation workflows:
 ```bash
 # PREFERRED: Direct Python validation (PRIMARY method for all new features)
-export FASTEMBED_CACHE_PATH="/tmp/fastembed_cache"
-export QDRANT_HOST="localhost" 
-export QDRANT_PORT="6334"
-source .venv/bin/activate
+# 🚨 CRITICAL: ALWAYS include full environment setup for direct Python tests
+source .venv/bin/activate && \
+export FASTEMBED_CACHE_PATH="/tmp/fastembed_cache" && \
+export QDRANT_HOST="localhost" && \
+export QDRANT_PORT="6334" && \
+export POSTGRES_HOST="localhost" && \
+export POSTGRES_PORT="5433" && \
+export DISCORD_BOT_NAME=elena && \
 python tests/automated/test_trendwise_direct_validation.py  # TrendWise adaptive learning features
+
+# Other feature validation tests (use same environment setup pattern):
+source .venv/bin/activate && \
+export FASTEMBED_CACHE_PATH="/tmp/fastembed_cache" && \
+export QDRANT_HOST="localhost" && \
+export QDRANT_PORT="6334" && \
+export POSTGRES_HOST="localhost" && \
+export POSTGRES_PORT="5433" && \
+export DISCORD_BOT_NAME=elena && \
 python tests/automated/test_phase4_direct_validation.py  # Phase 4 intelligence features
-python tests/automated/test_phase3_direct_validation.py  # Phase 3 intelligence features
+
+# With output limiting (recommended for long tests):
+source .venv/bin/activate && \
+export FASTEMBED_CACHE_PATH="/tmp/fastembed_cache" && \
+export QDRANT_HOST="localhost" && \
+export QDRANT_PORT="6334" && \
+export POSTGRES_HOST="localhost" && \
+export POSTGRES_PORT="5433" && \
+export DISCORD_BOT_NAME=elena && \
+python tests/automated/test_phase3_direct_validation.py 2>&1 | head -100  # Phase 3 intelligence features
 
 # NEW FEATURE VALIDATION: Always create direct validation tests for new sprints/features
 python tests/automated/test_memoryboost_complete_validation.py  # MemoryBoost (example)
