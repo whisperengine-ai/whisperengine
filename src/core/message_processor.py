@@ -341,19 +341,10 @@ class MessageProcessor:
             relevant_memories = await self._retrieve_relevant_memories(message_context)
             
             # Phase 4: Conversation history and context building
-            # 🚀 PHASE 2: Structured Prompt Assembly (feature flag)
-            use_structured_prompts = os.getenv('USE_STRUCTURED_PROMPTS', 'false').lower() == 'true'
-            
-            if use_structured_prompts:
-                logger.info("🚀 Using STRUCTURED prompt assembly (Phase 2)")
-                conversation_context = await self._build_conversation_context_structured(
-                    message_context, relevant_memories
-                )
-            else:
-                logger.info("📝 Using LEGACY string concatenation prompt building")
-                conversation_context = await self._build_conversation_context(
-                    message_context, relevant_memories
-                )
+            # 🚀 Structured Prompt Assembly (default - no feature flag!)
+            conversation_context = await self._build_conversation_context_structured(
+                message_context, relevant_memories
+            )
             
             # Phase 5: AI component processing (parallel)
             ai_components = await self._process_ai_components_parallel(
