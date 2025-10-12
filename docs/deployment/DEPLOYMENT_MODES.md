@@ -61,13 +61,14 @@ WhisperEngine offers three distinct deployment modes with clear privacy boundari
 
 ### **Setup**
 ```bash
-# Download pre-built desktop app
-# OR clone and configure for local mode
+# For End Users (Recommended)
+curl -sSL https://raw.githubusercontent.com/whisperengine-ai/whisperengine/main/setup-containerized.sh | bash
+
+# For Developers
 git clone https://github.com/whisperengine-ai/whisperengine
 cd whisperengine
 cp .env.local .env
 ./setup.sh
-python universal_native_app.py  # Local desktop only
 ```
 
 ---
@@ -99,11 +100,14 @@ python universal_native_app.py  # Local desktop only
 
 ### **Setup**
 ```bash
+# For End Users (Recommended)
+curl -sSL https://raw.githubusercontent.com/whisperengine-ai/whisperengine/main/setup-containerized.sh | bash
+
+# For Developers
 git clone https://github.com/whisperengine-ai/whisperengine
 cd whisperengine
 cp .env.cloud .env
 ./setup.sh
-python run.py  # Discord bot + cloud features
 ```
 
 ---
