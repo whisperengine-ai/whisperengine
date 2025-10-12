@@ -285,10 +285,10 @@ class CharacterPerformanceAnalyzer:
                 confidence_trends = quality_trends  # Use quality trends as proxy
             
             # Calculate conversation quality average
-            conversation_quality_avg = confidence_trends.average_value if confidence_trends else 0.5
+            conversation_quality_avg = confidence_trends.historical_average if confidence_trends else 0.5
             
             # Determine confidence score based on trend direction
-            confidence_score = 0.8 if confidence_trends and confidence_trends.direction.value == "improving" else 0.6
+            confidence_score = 0.8 if confidence_trends and confidence_trends.trend_analysis.direction.value == "improving" else 0.6
             
             return {
                 'conversation_quality_avg': conversation_quality_avg,

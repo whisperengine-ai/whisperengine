@@ -358,11 +358,29 @@ class CDLAIPromptIntegration:
         return templates[0] if templates else ""
 
     async def _filter_questions_by_character_personality(self, questions: list, character_name: str) -> list:
-        """Filter questions to match character personality and expertise"""
+        """Filter questions to match character personality and expertise - DYNAMIC DATABASE VERSION"""
         if not questions:
             return []
         
-        character_lower = character_name.lower()
+        # Load character interest topics from database (character-agnostic)
+        interest_topics = []
+        if self.enhanced_manager:
+            try:
+                from src.memory.vector_memory_system import get_normalized_bot_name_from_env
+                bot_name = get_normalized_bot_name_from_env()
+                interest_topics = await self.enhanced_manager.get_interest_topics(bot_name)
+                logger.info(f"🔍 Loaded {len(interest_topics)} interest topics for {bot_name} from database")
+            except Exception as e:
+                logger.warning(f"⚠️ Could not load interest topics from database: {e}")
+        
+        # Build topic keyword map for quick lookup
+        topic_keywords = {}
+        gap_type_preferences = {}
+        for topic in interest_topics:
+            topic_keywords[topic.topic_keyword.lower()] = topic.boost_weight
+            if topic.gap_type_preference:
+                gap_type_preferences[topic.gap_type_preference] = topic.boost_weight * 0.67  # Secondary boost (2/3 of primary)
+        
         filtered_questions = []
         
         for question_data in questions:
@@ -370,40 +388,30 @@ class CDLAIPromptIntegration:
             entity = question_data['entity']
             gap_type = question_data['gap_type']
             
-            # Character-specific filtering
-            should_include = True
+            # Dynamic personality boost based on database topics
             personality_boost = 0.0
             
-            # Elena (Marine Biologist) - naturally curious about environmental and scientific topics
-            if 'elena' in character_lower:
-                if any(topic in entity.lower() for topic in ['biology', 'marine', 'ocean', 'diving', 'science', 'research', 'environmental']):
-                    personality_boost = 0.3
-                elif gap_type in ['origin', 'experience']:  # Elena likes understanding how people discover science
-                    personality_boost = 0.2
+            # Check if entity matches any character interest topics
+            entity_lower = entity.lower()
+            for topic_keyword, boost_weight in topic_keywords.items():
+                if topic_keyword in entity_lower:
+                    personality_boost = max(personality_boost, boost_weight)
+                    logger.debug(f"✅ Topic match: '{topic_keyword}' in '{entity}' - boost={boost_weight}")
+                    break
             
-            # Marcus (AI Researcher) - interested in technology and learning processes
-            elif 'marcus' in character_lower:
-                if any(topic in entity.lower() for topic in ['ai', 'technology', 'programming', 'research', 'learning', 'analysis']):
-                    personality_boost = 0.3
-                elif gap_type in ['specifics', 'experience']:  # Marcus likes technical details
-                    personality_boost = 0.2
+            # Check if gap_type matches character preferences
+            if gap_type in gap_type_preferences:
+                personality_boost = max(personality_boost, gap_type_preferences[gap_type])
+                logger.debug(f"✅ Gap type match: '{gap_type}' - boost={gap_type_preferences[gap_type]}")
             
-            # Jake (Adventure Photographer) - interested in experiences and locations
-            elif 'jake' in character_lower:
-                if any(topic in entity.lower() for topic in ['photography', 'travel', 'adventure', 'hiking', 'climbing', 'outdoor']):
-                    personality_boost = 0.3
-                elif gap_type in ['location', 'experience']:  # Jake focuses on where and how
-                    personality_boost = 0.2
-            
-            # General curiosity boost for all characters
-            if gap_type == 'origin':  # How they got started
+            # General curiosity boost for all characters (origin questions are universally interesting)
+            if gap_type == 'origin':
                 personality_boost += 0.1
             
             # Update relevance score with personality matching
             question_data['relevance'] += personality_boost
             
-            if should_include:
-                filtered_questions.append(question_data)
+            filtered_questions.append(question_data)
         
         return filtered_questions
 
@@ -2867,34 +2875,48 @@ Stay authentic to {character.identity.name}'s personality while being transparen
                     logger.warning(f"⚠️ _get_response_guidelines: No guidelines found for bot_name={bot_name}")
                     return ""
                 
-                # Format guidelines by priority and type
+                # Format guidelines dynamically - character-agnostic approach
+                # Pull ALL guideline types from database, not just hardcoded ones
                 critical_guidelines = []
-                important_guidelines = []
-                formatting_rules = []
+                other_guidelines = []
                 
                 for guideline in guidelines:
                     logger.info(f"🔍 Processing guideline: type={guideline.guideline_type}, critical={guideline.is_critical}, content={guideline.guideline_content[:50]}...")
-                    # Don't add redundant prefixes - content already has CRITICAL/IMPORTANT labels
-                    if guideline.is_critical and guideline.guideline_type == 'response_length':
-                        critical_guidelines.append(f"⚠️  {guideline.guideline_content}")
-                    elif guideline.guideline_type == 'response_length':
-                        important_guidelines.append(f"📏 {guideline.guideline_content}")
-                    elif guideline.guideline_type == 'core_principle':
-                        critical_guidelines.append(f"🎯 {guideline.guideline_content}")
-                    elif guideline.guideline_type == 'formatting_rule':
-                        formatting_rules.append(f"📝 {guideline.guideline_content}")
+                    
+                    # Add emoji prefix based on type for readability
+                    type_emoji = {
+                        'response_length': '📏',
+                        'core_principle': '🎯',
+                        'formatting_rule': '📝',
+                        'formatting': '📝',
+                        'emotional_tone': '💝',
+                        'style': '🎨',
+                    }.get(guideline.guideline_type, '▪️')
+                    
+                    formatted_guideline = f"{type_emoji} {guideline.guideline_content}"
+                    
+                    # Separate critical vs non-critical for prioritization
+                    if guideline.is_critical:
+                        critical_guidelines.append(formatted_guideline)
+                    else:
+                        other_guidelines.append(formatted_guideline)
                 
-                # Build response guidelines section
+                # Build response guidelines section with critical guidelines first
                 guidelines_text = []
                 
+                logger.info(f"🔍 DEBUG: critical_guidelines count={len(critical_guidelines)}, other_guidelines count={len(other_guidelines)}")
+                
+                # Add all critical guidelines (these are most important)
                 if critical_guidelines:
-                    guidelines_text.extend(critical_guidelines[:3])  # Top 3 critical guidelines
+                    guidelines_text.extend(critical_guidelines)
+                    logger.info(f"✅ Added {len(critical_guidelines)} critical guidelines to prompt")
                 
-                if important_guidelines:
-                    guidelines_text.extend(important_guidelines[:2])  # Top 2 important guidelines
+                # Add up to 5 non-critical guidelines (to avoid prompt bloat)
+                if other_guidelines:
+                    guidelines_text.extend(other_guidelines[:5])
+                    logger.info(f"✅ Added {len(other_guidelines[:5])} additional guidelines to prompt")
                 
-                if formatting_rules:
-                    guidelines_text.extend(formatting_rules[:2])  # Top 2 formatting rules
+                logger.info(f"🔍 DEBUG: Final guidelines_text length={len(guidelines_text)}")
                 
                 if guidelines_text:
                     return "\n" + "\n".join(guidelines_text)
@@ -2906,5 +2928,4 @@ Stay authentic to {character.identity.name}'s personality while being transparen
                 
         except Exception as e:
             logger.debug("Could not load response guidelines: %s", e)
-            return ""
             return ""

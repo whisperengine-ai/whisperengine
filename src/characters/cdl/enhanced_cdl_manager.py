@@ -53,6 +53,7 @@ class CharacterMemory:
     triggers: Optional[List[str]] = None
 
 @dataclass
+@dataclass
 class ResponseGuideline:
     guideline_type: str  # 'response_length', 'formatting_rule', 'core_principle'
     guideline_name: str
@@ -87,7 +88,13 @@ class ResponseMode:
     response_style: str
     length_guideline: str
     tone_adjustment: str
-    conflict_resolution_priority: int
+
+@dataclass
+class InterestTopic:
+    topic_keyword: str
+    boost_weight: float
+    category: str = 'general'  # 'primary_interest', 'secondary_interest', 'general'
+    gap_type_preference: Optional[str] = None  # 'origin', 'experience', 'specifics', 'location'
 
 @dataclass
 class EmojiPattern:
@@ -299,6 +306,32 @@ class EnhancedCDLManager:
 
         except Exception as e:
             logger.error(f"Error retrieving conversation flows for {character_name}: {e}")
+            return []
+
+    async def get_interest_topics(self, character_name: str) -> List[InterestTopic]:
+        """Get character interest topics for personality-based question filtering"""
+        try:
+            async with self.pool.acquire() as conn:
+                character_id = await self._get_character_id(conn, character_name)
+                if not character_id:
+                    return []
+
+                rows = await conn.fetch("""
+                    SELECT topic_keyword, boost_weight, gap_type_preference, category
+                    FROM character_interest_topics 
+                    WHERE character_id = $1
+                    ORDER BY boost_weight DESC, topic_keyword
+                """, character_id)
+
+                return [InterestTopic(
+                    topic_keyword=row['topic_keyword'],
+                    boost_weight=row['boost_weight'],
+                    category=row['category'],
+                    gap_type_preference=row['gap_type_preference']
+                ) for row in rows]
+
+        except Exception as e:
+            logger.error(f"Error retrieving interest topics for {character_name}: {e}")
             return []
 
     async def get_message_triggers(self, character_name: str) -> List[MessageTrigger]:
