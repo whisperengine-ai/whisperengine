@@ -938,19 +938,10 @@ class CDLAIPromptIntegration:
         except Exception as e:
             logger.debug("Could not extract conversation flow guidance: %s", e)
 
-        # Add response guidelines (length constraints, formatting rules, etc.)
-        try:
-            response_guidelines = await self._get_response_guidelines(character)
-            logger.info(f"🔍 RESPONSE GUIDELINES: Retrieved guidelines length={len(response_guidelines) if response_guidelines else 0}")
-            if response_guidelines:
-                prompt += f"\n\n📏 RESPONSE FORMAT & LENGTH CONSTRAINTS:\n{response_guidelines}"
-                logger.info(f"✅ RESPONSE GUIDELINES: Added to prompt")
-            else:
-                logger.warning(f"⚠️ RESPONSE GUIDELINES: No guidelines returned from _get_response_guidelines")
-        except Exception as e:
-            logger.error(f"❌ RESPONSE GUIDELINES ERROR: Could not extract response guidelines: {e}")
-            import traceback
-            logger.error(f"❌ TRACEBACK: {traceback.format_exc()}")
+        # 🚨 GUIDELINE OVERRIDE: Response guidelines are injected at END of prompt (see line ~1586)
+        # This ensures they override memory patterns and conversation examples
+        # DO NOT inject guidelines here - they need to be positioned AFTER memories and conversation history
+        logger.info("📋 GUIDELINE POSITIONING: Response guidelines will be injected at END of prompt for maximum impact")
 
         # Add personal knowledge sections (relationships, family, career, etc.)
         try:
@@ -1579,34 +1570,35 @@ class CDLAIPromptIntegration:
 
         # Remove duplicate AI identity and conversation flow sections (moved up earlier)
         
-        # 🚨 CRITICAL: Final directive AFTER conversation history to override pattern-matching
-        # LLMs pattern-match on recent conversation examples, which can override earlier instructions
-        # This creates a strong visual override with explicit imperative commands
-        # Only triggers if the character has response_length guidelines defined
+        # 🚨 CRITICAL GUIDELINE OVERRIDE: Position guidelines at END of prompt to override memory patterns
+        # LLMs are influenced most by RECENT context (recency bias) - guidelines placed here will
+        # override patterns learned from memory examples and conversation history
+        # This prevents memory pattern contamination where imported conversations teach bad habits
         response_guidelines = await self._get_response_guidelines(character)
-        if response_guidelines and ("response" in response_guidelines.lower() or "length" in response_guidelines.lower()):
-            # Extract numeric constraints if present (e.g., "2-4 sentences", "1-2 paragraphs")
+        if response_guidelines:
+            # Extract all critical guidelines for strong override
             prompt += f"""
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🚨 CRITICAL: RESPONSE LENGTH OVERRIDE 🚨
+⚠️  CRITICAL RESPONSE GUIDELINES - OVERRIDE ALL EXAMPLES ABOVE ⚠️
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-⚠️  Your conversation history shows VERBOSE responses.
-⚠️  IGNORE those examples. THIS response MUST be SHORTER.
+The conversation history above may contain patterns from imported conversations
+or old responses that do NOT match your current character guidelines.
 
-MANDATORY CONSTRAINTS (from character guidelines):
+🚨 IGNORE those patterns. Follow THESE guidelines instead:
+
 {response_guidelines.strip()}
 
-ADDITIONAL ENFORCEMENT:
-• Write ONLY 2-4 sentences maximum
-• STOP after answering the question
-• NO elaborate formatting, stage directions, or multi-paragraph responses
-• Answer directly and naturally
+⚠️  These guidelines take precedence over ANY examples in the conversation history.
+⚠️  If you see conflicting patterns above (stage directions, excessive length, etc), IGNORE THEM.
+⚠️  Your response must comply with the guidelines above, NOT imitate old patterns.
 
-STOP WRITING after 2-4 sentences. Do not continue.
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 """
+            logger.info(f"✅ GUIDELINE OVERRIDE: Injected {len(response_guidelines)} chars at END of prompt")
+        else:
+            logger.debug("📋 GUIDELINE OVERRIDE: No guidelines to inject")
         
         prompt += f"\nRespond as {character.identity.name} to {display_name}:"
 
