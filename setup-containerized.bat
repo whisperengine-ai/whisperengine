@@ -1,6 +1,8 @@
 @echo off
 REM WhisperEngine Containerized Setup Script for Windows
 REM Downloads only necessary files - no echo.
+setlocal enabledelayedexpansion
+
 echo 🐳 Starting WhisperEngine...
 echo    This may take 2-3 minutes on first run (downloading container images)
 echo    ✨ Containers include pre-downloaded AI models (~400MB):
@@ -8,8 +10,6 @@ echo      • FastEmbed: sentence-transformers/all-MiniLM-L6-v2 (embeddings)
 echo      • RoBERTa: cardiffnlp emotion analysis (11 emotions)
 echo    🚀 No model downloads needed - instant startup!
 echo.
-
-setlocal enabledelayedexpansion
 
 echo.
 echo 🎭 WhisperEngine Containerized Setup
@@ -63,14 +63,14 @@ if exist "docker-compose.containerized.yml" if exist ".env.containerized.templat
 
 cd "%INSTALL_DIR%"
 if errorlevel 1 (
-    echo [ERROR] Failed to change to directory %INSTALL_DIR%
+    echo [ERROR] Failed to change to directory !INSTALL_DIR!
     pause
     exit /b 1
 )
 echo %CD%
 echo [SUCCESS] Using directory: %CD%
 
-if not "%INSTALL_DIR%" == "." (
+if not "!INSTALL_DIR!" == "." (
     REM Download Docker Compose file
     echo [SETUP] Downloading Docker Compose configuration...
     powershell -Command "try { Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/whisperengine-ai/whisperengine/main/docker-compose.containerized.yml' -OutFile 'docker-compose.yml' -UseBasicParsing -ErrorAction Stop } catch { Write-Host 'Download failed:' $_.Exception.Message; exit 1 }"
@@ -99,7 +99,7 @@ if not "%INSTALL_DIR%" == "." (
 REM Create .env file if it doesn't exist
 if not exist .env (
     echo [SETUP] Creating configuration file...
-    copy "%ENV_TEMPLATE%" .env >nul
+    copy "!ENV_TEMPLATE!" .env >nul
     echo [SUCCESS] Created .env file with default settings (LM Studio)
     echo [SETUP] 💡 Using LM Studio as default LLM (free, local)
     echo [SETUP] 🔧 You can edit .env later to customize settings
@@ -152,11 +152,11 @@ echo.
 
 REM Pull latest images first
 echo [SETUP] Pulling latest container images...
-docker-compose -f "%COMPOSE_FILE%" pull
+docker-compose -f "!COMPOSE_FILE!" pull
 
 REM Start WhisperEngine
 echo [SETUP] Starting services...
-docker-compose -f "%COMPOSE_FILE%" up -d
+docker-compose -f "!COMPOSE_FILE!" up -d
 
 echo.
 echo [SETUP] ⏳ Waiting for services to start...
@@ -179,7 +179,7 @@ goto wait_loop
 
 :timeout
 echo [ERROR] Services didn't start properly. Check logs:
-echo    docker-compose -f "%COMPOSE_FILE%" logs
+echo    docker-compose -f "!COMPOSE_FILE!" logs
 pause
 exit /b 1
 
@@ -207,10 +207,10 @@ echo 3. Edit .env file to customize LLM settings if needed
 echo 4. Enable Discord integration if desired
 echo.
 echo 🔧 Management commands:
-echo    docker-compose -f %COMPOSE_FILE% stop     # Stop WhisperEngine
-echo    docker-compose -f %COMPOSE_FILE% start    # Restart WhisperEngine
-echo    docker-compose -f %COMPOSE_FILE% logs -f  # View live logs
-echo    docker-compose -f %COMPOSE_FILE% down     # Stop and remove containers
+echo    docker-compose -f !COMPOSE_FILE! stop     # Stop WhisperEngine
+echo    docker-compose -f !COMPOSE_FILE! start    # Restart WhisperEngine
+echo    docker-compose -f !COMPOSE_FILE! logs -f  # View live logs
+echo    docker-compose -f !COMPOSE_FILE! down     # Stop and remove containers
 echo.
 
 REM Auto-open browser
