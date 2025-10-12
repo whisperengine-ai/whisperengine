@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# WhisperEngine Container Entrypoint with Auto-Migration
-# Runs database migrations before starting the application
+# WhisperEngine Container Entrypoint with Smart Auto-Migration
+# Automatically detects fresh vs existing databases and handles migrations appropriately
 
 set -e
 
@@ -32,13 +32,47 @@ for i in {1..30}; do
     sleep 2
 done
 
-# Run database migrations
-echo "🔄 Running database migrations..."
-if alembic upgrade head; then
-    echo "✅ Migrations applied successfully"
+# Smart migration detection
+echo "🔍 Detecting database state..."
+
+# Check if alembic_version table exists (migration tracking enabled)
+if PGPASSWORD="$POSTGRES_PASSWORD" psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" \
+   -tAc "SELECT 1 FROM information_schema.tables WHERE table_name='alembic_version'" 2>/dev/null | grep -q 1; then
+    
+    # Migration tracking exists - run normal upgrade
+    echo "📊 Migration tracking found - checking for pending migrations..."
+    if alembic upgrade head; then
+        echo "✅ Migrations applied successfully"
+    else
+        echo "❌ Migration failed!"
+        exit 1
+    fi
+    
 else
-    echo "❌ Migration failed!"
-    exit 1
+    # No alembic_version table - check if database has existing tables
+    TABLE_COUNT=$(PGPASSWORD="$POSTGRES_PASSWORD" psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" \
+                  -tAc "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='public'" 2>/dev/null || echo "0")
+    
+    if [ "$TABLE_COUNT" -gt 5 ]; then
+        # Existing database without migration tracking (v1.0.6 database)
+        echo "🏷️  Existing v1.0.6 database detected (${TABLE_COUNT} tables)"
+        echo "   Marking database as up-to-date with baseline..."
+        if alembic stamp head; then
+            echo "✅ Database marked at baseline (v1.0.6 → v1.0.7 upgrade complete)"
+        else
+            echo "❌ Failed to stamp database"
+            exit 1
+        fi
+    else
+        # Fresh database - run migrations
+        echo "🆕 Fresh database detected - running baseline migration..."
+        if alembic upgrade head; then
+            echo "✅ Baseline migration complete - database initialized"
+        else
+            echo "❌ Migration failed!"
+            exit 1
+        fi
+    fi
 fi
 
 # Show current migration status

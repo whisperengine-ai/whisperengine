@@ -55,14 +55,26 @@ python scripts/migrations/qdrant/migrate.py validate whisperengine_memory_elena
 
 ## 🔥 NEW: Database Migration System (October 11, 2025)
 
-**Status**: ✅ Ready for use  
+**Status**: ✅ Complete with Smart Auto-Migration  
 **Priority**: CRITICAL - Required for post-v1.0.6 schema changes
 
-### For v1.0.6 Existing Deployments:
+### For v1.0.7+ Deployments:
+
+**Zero manual commands required!** The smart entrypoint automatically:
+- ✅ Detects fresh vs existing databases
+- ✅ Handles v1.0.6 → v1.0.7 upgrades automatically  
+- ✅ Applies pending migrations on future upgrades
 
 ```bash
-# Mark your database as up-to-date (don't run migrations)
-./scripts/migrations/db-migrate.sh stamp head
+# For new installations or v1.0.6 upgrades - just start containers
+docker-compose up -d  # Everything automatic! ✅
+```
+
+### Manual Control (Optional):
+
+```bash
+# Only if you want explicit control over migrations
+./scripts/migrations/db-migrate.sh stamp head  # v1.0.6 users only
 ```
 
 ### For New Features Requiring Schema Changes:

@@ -103,9 +103,10 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-# Install runtime dependencies
+# Install runtime dependencies including PostgreSQL client for migrations
 RUN apt-get update && apt-get install -y \
     curl ffmpeg wget netcat-traditional procps \
+    postgresql-client \
     libopus-dev libffi-dev libnacl-dev libssl-dev \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
@@ -125,6 +126,10 @@ COPY pyproject.toml validate_config.py env_manager.py run.py ./
 COPY config/ ./config/
 COPY sql/ ./sql/
 COPY scripts/ ./scripts/
+
+# Copy Alembic migration system
+COPY alembic.ini ./
+COPY alembic/ ./alembic/
 
 # Make scripts executable
 RUN chmod +x ./scripts/*.sh
