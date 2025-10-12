@@ -104,7 +104,8 @@ Write-Host "[SUCCESS] Configuration file found" -ForegroundColor Green
 # Check if API key is needed (only for cloud providers)
 $envContent = Get-Content ".env" -Raw
 $llmClientType = "lmstudio"
-if ($envContent -match "LLM_CLIENT_TYPE=([^`r`n]+)") {
+# Use simpler regex pattern that doesn't require special escaping
+if ($envContent -match 'LLM_CLIENT_TYPE=(\S+)') {
     $llmClientType = $Matches[1].Trim()
 }
 

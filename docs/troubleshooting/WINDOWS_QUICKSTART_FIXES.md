@@ -9,12 +9,14 @@
 **Problems**:
 - Line 107: Regex pattern `[^\r\n]` not properly escaped in PowerShell
 - Line 190: Mixed quote nesting causing string termination errors
+- **Root Cause**: Character encoding issues when downloading from GitHub - backticks may not survive download on some Windows systems
 
 **Fixes Applied**:
-- ✅ Changed `[^\r\n]` to `[^`r`n]` (proper backtick escaping)
-- ✅ Changed quote style from double-with-single to single-with-double
+- ✅ Changed regex from `[^`r`n]+` to `\S+` (simpler pattern, no special characters)
+- ✅ Changed quote style on line 190 from double-with-single to single-with-double
+- ✅ Eliminates encoding-sensitive characters for better cross-system compatibility
 
-**User Impact**: PowerShell quickstart now works without syntax errors
+**User Impact**: PowerShell quickstart now works without syntax errors across all Windows systems
 
 ---
 
