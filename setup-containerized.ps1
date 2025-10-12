@@ -188,7 +188,7 @@ try {
     Write-Host "  • Ensure Docker Desktop is running"
     Write-Host "  • Check if ports are available (9090, 3001, 5432, 6333, 8086)"
     Write-Host "  • Try running cleanup script first:"
-    Write-Host "    Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/whisperengine-ai/whisperengine/main/cleanup-docker.ps1' -OutFile 'cleanup.ps1'; .\cleanup.ps1"
+    Write-Host '    Invoke-WebRequest -Uri ''https://raw.githubusercontent.com/whisperengine-ai/whisperengine/main/cleanup-docker.ps1'' -OutFile ''cleanup.ps1''; .\cleanup.ps1'
     Write-Host ""
     Read-Host "Press Enter to exit"
     exit 1
