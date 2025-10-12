@@ -1576,29 +1576,24 @@ class CDLAIPromptIntegration:
         # This prevents memory pattern contamination where imported conversations teach bad habits
         response_guidelines = await self._get_response_guidelines(character)
         if response_guidelines:
-            # Extract all critical guidelines for strong override
+            # Gentle guideline reminder positioned for maximum influence
             prompt += f"""
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-⚠️  CRITICAL RESPONSE GUIDELINES - OVERRIDE ALL EXAMPLES ABOVE ⚠️
+✨ RESPONSE STYLE REMINDER ✨
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-The conversation history above may contain patterns from imported conversations
-or old responses that do NOT match your current character guidelines.
-
-🚨 IGNORE those patterns. Follow THESE guidelines instead:
+As you respond, keep these character guidelines in mind:
 
 {response_guidelines.strip()}
 
-⚠️  These guidelines take precedence over ANY examples in the conversation history.
-⚠️  If you see conflicting patterns above (stage directions, excessive length, etc), IGNORE THEM.
-⚠️  Your response must comply with the guidelines above, NOT imitate old patterns.
+Remember to stay true to your authentic voice and character.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 """
-            logger.info(f"✅ GUIDELINE OVERRIDE: Injected {len(response_guidelines)} chars at END of prompt")
+            logger.info(f"✅ GUIDELINE REMINDER: Injected {len(response_guidelines)} chars at END of prompt")
         else:
-            logger.debug("📋 GUIDELINE OVERRIDE: No guidelines to inject")
+            logger.debug("📋 GUIDELINE REMINDER: No guidelines to inject")
         
         prompt += f"\nRespond as {character.identity.name} to {display_name}:"
 
@@ -2476,17 +2471,13 @@ or old responses that do NOT match your current character guidelines.
                         if rhythm:
                             guidance_parts.append(f"CONVERSATION RHYTHM: {rhythm}")
             
-            # Add Discord length limits as default if no specific guidance
-            if not guidance_parts:
-                guidance_parts = [
-                    "🎯 CONVERSATION FLOW REQUIREMENTS:",
-                    "⚠️  CRITICAL: Keep responses SHORT and conversational (1-2 short paragraphs). For complex topics, break into conversation turns with follow-up questions."
-                ]
-            else:
+            # Only add header if we have database-driven guidance
+            if guidance_parts:
                 guidance_parts.insert(0, "🎯 CONVERSATION FLOW REQUIREMENTS:")
-                guidance_parts.append("⚠️  CRITICAL: Keep responses SHORT and conversational (1-2 short paragraphs). For complex topics, break into conversation turns with follow-up questions.")
+                return "\n".join(guidance_parts)
             
-            return "\n".join(guidance_parts)
+            # No hardcoded fallbacks - let database drive all guidance
+            return ""
             
         except Exception as e:
             logger.debug("Error extracting conversation flow guidelines: %s", e)
