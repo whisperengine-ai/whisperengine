@@ -89,9 +89,9 @@ Once cleanup is complete, you can start fresh:
 curl -sSL https://raw.githubusercontent.com/whisperengine-ai/whisperengine/main/setup-containerized.sh | bash
 ```
 
-**Windows (PowerShell):**
+**Windows (PowerShell - Recommended):**
 ```powershell
-Invoke-WebRequest -Uri "https://raw.githubusercontent.com/whisperengine-ai/whisperengine/main/setup-containerized.bat" -OutFile "setup.bat"; .\setup.bat
+Invoke-WebRequest -Uri "https://raw.githubusercontent.com/whisperengine-ai/whisperengine/main/setup-containerized.ps1" -OutFile "setup.ps1"; .\setup.ps1
 ```
 
 **Windows (Command Prompt):**

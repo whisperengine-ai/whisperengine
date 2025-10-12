@@ -58,15 +58,17 @@ Enhanced with:
 curl -sSL https://raw.githubusercontent.com/whisperengine-ai/whisperengine/main/setup-containerized.sh | bash
 ```
 
-**Windows PowerShell:**
+**Windows PowerShell (Recommended):**
 ```powershell
-Invoke-WebRequest -Uri "https://raw.githubusercontent.com/whisperengine-ai/whisperengine/main/setup-containerized.bat" -OutFile "setup.bat"; .\setup.bat
+Invoke-WebRequest -Uri "https://raw.githubusercontent.com/whisperengine-ai/whisperengine/main/setup-containerized.ps1" -OutFile "setup.ps1"; .\setup.ps1
 ```
 
 **Windows CMD:**
 ```cmd
 curl -sSL https://raw.githubusercontent.com/whisperengine-ai/whisperengine/main/setup-containerized.bat -o setup.bat && setup.bat
 ```
+
+**Note:** Windows PowerShell users should use the native `.ps1` script, not the `.bat` file, to avoid `curl` alias conflicts.
 
 ### Cleanup Commands (No Git Required)
 
