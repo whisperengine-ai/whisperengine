@@ -68,9 +68,19 @@ async def apply_sql_file(conn, file_path, migration_name):
     
     with open(file_path, 'r') as f:
         sql = f.read()
+    # Some pg_dump exports set search_path to an empty string which breaks
+    # unqualified table references (e.g. INSERT INTO characters). Replace
+    # that pattern with an explicit public search_path so subsequent
+    # statements find the expected tables.
+    if "pg_catalog.set_config('search_path', '', false)" in sql or "SET search_path = ''" in sql:
+        print("🔧 Adjusting search_path in SQL dump to use 'public' schema")
+        sql = sql.replace("pg_catalog.set_config('search_path', '', false)", "pg_catalog.set_config('search_path', 'public', false)")
+        sql = sql.replace("SET search_path = ''", "SET search_path = 'public'")
     
     try:
         # Execute the entire SQL file
+        # Note: asyncpg supports multi-statement execution; the SQL dump
+        # contains CREATE FUNCTION... $$ bodies and other complex constructs.
         await conn.execute(sql)
         print(f"✅ Migration {migration_name} applied successfully!")
         return True
