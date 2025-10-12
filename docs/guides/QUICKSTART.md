@@ -55,7 +55,9 @@ The setup script will:
 
 After setup, you'll need to add your LLM configuration to the `.env` file:
 
-> **💡 Key Concept**: `LLM_CHAT_API_URL` is what **actually determines** your LLM provider (WhisperEngine auto-detects from the URL). `LLM_CLIENT_TYPE` is mainly used for setup hints and logging.
+> **� Need Help with Configuration?** See our detailed **[Configuration Guide](edit-env-after-quickstart.md)** for step-by-step instructions on setting up LLM providers, Discord integration, and more.
+
+> **�💡 Key Concept**: `LLM_CHAT_API_URL` is what **actually determines** your LLM provider (WhisperEngine auto-detects from the URL). `LLM_CLIENT_TYPE` is mainly used for setup hints and logging.
 
 ### **Option 1: OpenRouter (Recommended) - ✅ TESTED**
 ```bash

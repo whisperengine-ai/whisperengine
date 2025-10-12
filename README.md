@@ -150,7 +150,9 @@ Then run the setup command again. See [Cleanup Guide](docs/deployment/CLEANUP_SC
 
 ## ⚙️ Configuration Options
 
-Edit your `.env` file to customize:
+Edit your `.env` file to customize WhisperEngine settings. 
+
+> **📋 Need Help Editing?** See our **[Configuration Guide](docs/guides/edit-env-after-quickstart.md)** for step-by-step instructions on configuring LLM providers, Discord integration, and more.
 
 ```bash
 # Required: LLM Configuration (ALL fields required)

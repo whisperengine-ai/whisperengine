@@ -142,6 +142,8 @@ For production environments, see [Production Setup](#-production-setup) section 
 
 ## ⚙️ Configuration
 
+> **📋 Need Detailed Configuration Help?** See our comprehensive **[Configuration Guide](edit-env-after-quickstart.md)** for step-by-step instructions on setting up all LLM providers, Discord integration, restart procedures, and more.
+
 ### **Required Configuration**
 
 #### **LLM API Access** (Required)

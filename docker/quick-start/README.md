@@ -36,6 +36,9 @@ Your WhisperEngine instance includes:
 ## 🚀 Quick Setup
 
 ### 1. Create Your Configuration
+
+> **📋 Need Help with Configuration?** See our **[Configuration Guide](../../docs/guides/edit-env-after-quickstart.md)** for step-by-step instructions on setting up LLM providers, Discord integration, and all configuration options.
+
 ```bash
 # Copy the template and customize it
 cp .env.minimal .env

@@ -32,7 +32,7 @@ cd whisperengine
 git clone https://github.com/whisperengine-ai/whisperengine.git
 cd whisperengine
 cp .env.quickstart.template .env
-# Edit .env with your LLM API key
+# Edit .env with your LLM API key - see Configuration Guide for help: docs/guides/edit-env-after-quickstart.md
 docker-compose -f docker-compose.quickstart.yml up
 ```
 
