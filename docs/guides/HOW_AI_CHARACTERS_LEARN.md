@@ -488,7 +488,7 @@ Think of this as a highly sophisticated filing system where each memory is store
 RoBERTa is a state-of-the-art AI model specifically trained to understand human emotions in text. It analyzes emotional nuances with high accuracy.
 
 **What it detects:**
-- 7 core emotions: joy, sadness, anger, fear, surprise, disgust, neutral
+- 11 core emotions: anger, anticipation, disgust, fear, joy, love, optimism, pessimism, sadness, surprise, trust
 - Confidence levels for each emotion
 - Mixed emotional states
 - Emotional intensity and clarity
