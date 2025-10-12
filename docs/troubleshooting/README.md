@@ -1,6 +1,13 @@
 # WhisperEngine Troubleshooting Guide
 
-## 🚨 Most Common Issues
+## � Specific Issue Guides
+
+- **[YAML Error on Line 25 + WSL Issues](YAML_ERROR_SOLUTION.md)** - Windows users getting YAML syntax errors
+- **[Windows PowerShell curl Error](WINDOWS_POWERSHELL_SETUP.md)** - "blank argument where content is expected"
+- **[Windows Docker Issues](WINDOWS_DOCKER_ISSUES.md)** - Comprehensive Windows troubleshooting
+- **[Docker Compose Files Explained](../deployment/DOCKER_COMPOSE_FILES_EXPLAINED.md)** - Which file to use and why
+
+## �🚨 Most Common Issues
 
 ### Database Migration Errors
 
