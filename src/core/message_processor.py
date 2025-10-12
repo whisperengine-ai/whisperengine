@@ -5082,6 +5082,10 @@ Be conservative - only extract clear statements about the bot's own characterist
             from enum import Enum
             from dataclasses import is_dataclass, asdict
             
+            # Check if prompt logging is enabled (disabled by default for production)
+            if not os.getenv('ENABLE_PROMPT_LOGGING', 'false').lower() == 'true':
+                return
+            
             # Custom JSON encoder to handle non-serializable objects
             class CustomJSONEncoder(json.JSONEncoder):
                 def default(self, obj):
@@ -5141,6 +5145,10 @@ Be conservative - only extract clear statements about the bot's own characterist
             import json
             from datetime import datetime
             import os
+            
+            # Check if prompt logging is enabled (disabled by default for production)
+            if not os.getenv('ENABLE_PROMPT_LOGGING', 'false').lower() == 'true':
+                return
             
             bot_name = os.getenv('DISCORD_BOT_NAME', 'unknown')
             

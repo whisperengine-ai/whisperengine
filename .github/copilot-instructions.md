@@ -59,6 +59,19 @@
 
 ## 🚨 CRITICAL DEVELOPMENT CONTEXT 🚨
 
+**🚨 CRITICAL: QDRANT SCHEMA IS FROZEN - NO BREAKING CHANGES ALLOWED:**
+- **WhisperEngine v1.0.8+ is PUBLICLY RELEASED** - users have installed and are running production instances
+- **QDRANT VECTOR SCHEMA MUST REMAIN STABLE** - we do NOT have a migration path yet
+- **NEVER change Qdrant collection structure**: vector dimensions, named vector names, payload field types
+- **NEVER modify vector embedding dimensions**: 384D content/emotion/semantic vectors are LOCKED
+- **NEVER rename payload fields**: user_id, memory_type, content, timestamp, etc. are FIXED
+- **NEVER change named vector structure**: "content", "emotion", "semantic" 3D system is PERMANENT until migration system exists
+- **ADDITIVE CHANGES ONLY**: You MAY add NEW optional payload fields, but NEVER remove or rename existing fields
+- **Breaking Qdrant changes require**: Full migration system implementation + user notification + deprecation period
+- **Test on fresh Qdrant instance**: Always verify schema changes don't break existing collections
+- **When in doubt, DON'T change Qdrant schema** - ask user first if schema modification is absolutely necessary
+- **NOTE**: `bot_name` field was REMOVED from payload - each bot uses dedicated collection for isolation (no need for bot_name filtering)
+
 **🚨 CRITICAL LIVE SYSTEM OPERATIONS - ASK BEFORE RESTARTING:**
 - **NEVER restart bots, services, or containers without explicit user permission**
 - **WhisperEngine is a LIVE PRODUCTION SYSTEM** - users may be actively chatting with bots
@@ -670,9 +683,12 @@ docker exec whisperengine-elena-bot python -m pytest tests/unit/
 
 **🔧 COMPREHENSIVE PROMPT LOGGING SYSTEM**: WhisperEngine logs every prompt sent to LLM and every response received for complete debugging visibility:
 
+**⚠️ PRODUCTION CONFIGURATION**: Prompt logging is **DISABLED by default** via `ENABLE_PROMPT_LOGGING=false` to reduce disk I/O and protect user privacy in production deployments.
+
 **Location**: `logs/prompts/` directory with external Docker volume mount
 **Format**: JSON files with complete conversation context and LLM responses
 **File Pattern**: `{BotName}_{YYYYMMDD}_{HHMMSS}_{UserID}.json`
+**Enable**: Set `ENABLE_PROMPT_LOGGING=true` in `.env` file for development/debugging
 
 ```bash
 # 🚨 CRITICAL: ALWAYS check prompt logs FIRST when debugging conversation issues
@@ -877,22 +893,24 @@ await memory_manager.store_conversation(
 
 **🚨 CRITICAL: Vector Storage Design Patterns**
 
+**⚠️ SCHEMA STABILITY WARNING**: WhisperEngine v1.0.8+ is publicly released. The Qdrant schema is FROZEN until we implement a migration system. Any changes to collection structure, vector dimensions, named vector names, or payload field types are BREAKING CHANGES that will corrupt user data.
+
 **ALWAYS use Named Vectors** - Never use single vectors:
 ```python
-# ✅ CORRECT: 3D Named vectors for multi-dimensional search
+# ✅ CORRECT: 3D Named vectors for multi-dimensional search (LOCKED SCHEMA)
 vectors = {
-    "content": content_embedding,      # Main semantic content (384D)
-    "emotion": emotion_embedding,      # Emotional context (384D)
-    "semantic": semantic_embedding     # Concept/personality context (384D)
+    "content": content_embedding,      # Main semantic content (384D) - FIXED
+    "emotion": emotion_embedding,      # Emotional context (384D) - FIXED
+    "semantic": semantic_embedding     # Concept/personality context (384D) - FIXED
 }
 
 point = PointStruct(
     id=memory.id,
-    vector=vectors,  # Named vectors dict (3D system)
+    vector=vectors,  # Named vectors dict (3D system) - DO NOT MODIFY
     payload=qdrant_payload
 )
 
-# ✅ CORRECT: Query with named vectors (3D system)
+# ✅ CORRECT: Query with named vectors (3D system) - LOCKED
 results = client.search(
     collection_name=collection_name,
     query_vector=models.NamedVector(name="content", vector=query_embedding),
@@ -902,34 +920,47 @@ results = client.search(
 # ❌ WRONG: Single vector (legacy format)
 point = PointStruct(id=memory.id, vector=embedding, payload=payload)
 
+# ❌ WRONG: Changing vector dimensions (BREAKS USER DATA)
+vectors = {"content": embedding_512d}  # 384D is LOCKED
+
+# ❌ WRONG: Adding new named vectors (BREAKS EXISTING COLLECTIONS)
+vectors = {"content": ..., "emotion": ..., "semantic": ..., "new_vector": ...}
+
 # ❌ DEPRECATED: Multiple vector dimensions beyond 3D
 # WhisperEngine uses optimized 3D system (content, emotion, semantic) for performance and simplicity
 ```
 
-**ALWAYS use Bot Segmentation** - Filter by bot_name AND use correct collection:
+**ALWAYS use Bot-Specific Collection Isolation**:
 ```python
 # ✅ CORRECT: Bot-specific collection isolation (PRIMARY method)
 collection_name = os.getenv('QDRANT_COLLECTION_NAME')  # Each bot has unique collection
 
-# ✅ CORRECT: All operations must also filter by bot_name within collection
+# ✅ CORRECT: Filter by user_id within bot's dedicated collection
+# NOTE: bot_name field was REMOVED - collection isolation makes it redundant
 must_conditions = [
-    models.FieldCondition(key="user_id", match=models.MatchValue(value=user_id)),
-    models.FieldCondition(key="bot_name", match=models.MatchValue(value=get_normalized_bot_name_from_env()))
+    models.FieldCondition(key="user_id", match=models.MatchValue(value=user_id)),  # LOCKED FIELD
 ]
 
-# ✅ CORRECT: Store with bot segmentation and collection isolation
+# ✅ CORRECT: Store with collection isolation
+# LOCKED FIELDS: user_id, content, memory_type, timestamp
+# REMOVED FIELD: bot_name (collection isolation makes this redundant)
+# You MAY add NEW optional fields, but NEVER remove or rename existing ones
 payload = {
-    "user_id": user_id,
-    "bot_name": get_normalized_bot_name_from_env(),  # CRITICAL: Bot isolation
-    "content": content,
-    "memory_type": memory_type
+    "user_id": user_id,  # LOCKED - DO NOT RENAME
+    "content": content,  # LOCKED - DO NOT RENAME
+    "memory_type": memory_type,  # LOCKED - DO NOT RENAME
+    "timestamp": timestamp.isoformat(),  # LOCKED - DO NOT RENAME
+    # "new_optional_field": value  # ✅ OK to add NEW fields
 }
-
-# ❌ WRONG: Missing bot_name segmentation
-payload = {"user_id": user_id, "content": content}  # Will leak across bots!
 
 # ❌ WRONG: Using wrong collection
 collection_name = "whisperengine_memory"  # Don't hardcode - use environment variable!
+
+# ❌ WRONG: Renaming existing fields (BREAKS USER DATA)
+payload = {"user_identifier": user_id}  # DO NOT rename user_id!
+
+# ❌ WRONG: Adding bot_name field (was removed for architectural reasons)
+payload = {"user_id": user_id, "bot_name": bot_name}  # Don't add back - use collections!
 ```
 
 **Vector Retrieval Patterns** - Handle named vector responses:
@@ -1584,11 +1615,16 @@ context_result = context_detector.detect_context_patterns(
 - Document integration points, not just implementation files
 
 **🚨 CRITICAL: Vector Storage Compliance** - ALL vector operations must follow these patterns:
-- **ALWAYS use Named Vectors**: Never single vector format - use `{"content": embedding, "emotion": embedding, "semantic": embedding}` structure (3D system)
-- **ALWAYS use Bot Segmentation**: Every payload must include `bot_name` for isolation
+- **⚠️ SCHEMA IS FROZEN**: WhisperEngine v1.0.8+ is publicly released - NO breaking changes to Qdrant schema allowed
+- **ALWAYS use Named Vectors**: Never single vector format - use `{"content": embedding, "emotion": embedding, "semantic": embedding}` structure (3D system) - LOCKED
+- **NEVER change vector dimensions**: 384D content/emotion/semantic vectors are PERMANENT
+- **NEVER rename payload fields**: user_id, memory_type, content, timestamp are FIXED
+- **NEVER add new named vectors**: "content", "emotion", "semantic" 3D system is LOCKED
+- **ADDITIVE CHANGES ONLY**: You MAY add NEW optional payload fields, but NEVER remove or rename
+- **Collection-Based Isolation**: Each bot uses dedicated Qdrant collection (bot_name field was REMOVED)
 - **ALWAYS extract with helpers**: Use `_extract_named_vector()` when retrieving vectors
 - **ALWAYS query with NamedVector**: Use `models.NamedVector(name="content", vector=embedding)`
-- **NEVER bypass bot isolation**: All searches must filter by `bot_name` + `user_id`
+- **Filter by user_id within collection**: No cross-bot leakage - collections are bot-specific
 - Vector retrieval code must handle dictionary format from Qdrant named vectors
 - When in doubt, check `src/memory/vector_memory_system.py` for reference patterns
 - **3D Vector System Only**: content, emotion, semantic vectors (7D system was deprecated)
