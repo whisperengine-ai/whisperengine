@@ -153,26 +153,29 @@ Then run the setup command again. See [Cleanup Guide](docs/deployment/CLEANUP_SC
 Edit your `.env` file to customize:
 
 ```bash
-# Required: LLM Configuration
+# Required: LLM Configuration (ALL fields required)
+LLM_CLIENT_TYPE=openrouter  # or: openai, lmstudio
+LLM_CHAT_API_URL=https://openrouter.ai/api/v1  # ALWAYS REQUIRED - not auto-set by type
 LLM_CHAT_API_KEY=your_api_key_here
-LLM_CHAT_MODEL=anthropic/claude-3-haiku  # Recommended for beginners
+LLM_CHAT_MODEL=anthropic/claude-3-haiku
 
 # Optional: Discord Integration
 DISCORD_BOT_TOKEN=your_discord_token
 ENABLE_DISCORD=true
 
 # Optional: Advanced Settings
-LLM_CLIENT_TYPE=openrouter  # or: openai, local
 CHARACTER_NAME=assistant    # Default character name
 ```
 
+> **⚠️ IMPORTANT**: `LLM_CHAT_API_URL` is **ALWAYS REQUIRED** for all LLM providers! WhisperEngine does not automatically set this by type.
+
 ### **Supported LLM Providers**
 
-| Provider | Model Examples | Setup |
-|----------|---------------|--------|
-| **OpenRouter** (Recommended) | `anthropic/claude-3-haiku`<br>`openai/gpt-4o-mini` | Get API key at [openrouter.ai](https://openrouter.ai) |
-| **OpenAI** | `gpt-4o-mini`<br>`gpt-3.5-turbo` | Get API key at [platform.openai.com](https://platform.openai.com) |
-| **Local Models** | Via LM Studio or Ollama | See [Local Setup Guide](docs/setup/LOCAL_LLM_SETUP.md) |
+| Provider | API URL | Model Examples | Get API Key |
+|----------|---------|---------------|-------------|
+| **OpenRouter** (Recommended) | `https://openrouter.ai/api/v1` | `anthropic/claude-3-haiku`<br>`openai/gpt-4o-mini` | [openrouter.ai](https://openrouter.ai) |
+| **OpenAI** | `https://api.openai.com/v1` | `gpt-4o-mini`<br>`gpt-3.5-turbo` | [platform.openai.com](https://platform.openai.com) |
+| **LM Studio** (Local) | `http://host.docker.internal:1234/v1` | Your downloaded model | [lmstudio.ai](https://lmstudio.ai) |
 
 ## 📚 Documentation
 
@@ -195,36 +198,12 @@ WhisperEngine comes with example characters to get you started:
 - **🎭 Gabriel** - British Gentleman with sophisticated conversation
 - **📈 Sophia Blake** - Marketing Executive with business acumen
 
-## 🛟 Getting Help
+## 🛟 Getting Help & Support
 
-### **Need to Start Fresh?**
-
-If you encounter deployment issues or want to clean up old installations:
-
-**macOS/Linux:**
-```bash
-curl -sSL https://raw.githubusercontent.com/whisperengine-ai/whisperengine/main/cleanup-docker.sh | bash
-```
-
-**Windows (PowerShell):**
-```powershell
-Invoke-WebRequest -Uri "https://raw.githubusercontent.com/whisperengine-ai/whisperengine/main/cleanup-docker.ps1" -OutFile "cleanup.ps1"; .\cleanup.ps1
-```
-
-**Windows (Command Prompt):**
-```cmd
-curl -sSL https://raw.githubusercontent.com/whisperengine-ai/whisperengine/main/cleanup-docker.bat -o cleanup.bat && cleanup.bat
-```
-
-⚠️ **Warning:** This will remove ALL WhisperEngine data (containers, databases, logs). See [Cleanup Guide](docs/deployment/CLEANUP_SCRIPTS.md) for details.
-
-### **Documentation & Support**
-
-- **📖 Documentation**: Comprehensive guides in the [docs/](docs/) folder
-- **🧹 Cleanup Guide**: [Full cleanup documentation](docs/deployment/CLEANUP_SCRIPTS.md)
-- **🐛 Issues**: Report bugs on [GitHub Issues](https://github.com/whisperengine-ai/whisperengine/issues)
-- **💬 Community**: [Discord Server](https://discord.gg/whisperengine) (Coming Soon)
-- **📧 Support**: Contact us at support@whisperengine.ai
+- **📖 Documentation**: [Quick Start](docs/guides/QUICKSTART.md) | [Troubleshooting](docs/troubleshooting/README.md)
+- **🧹 Need to Start Fresh?**: [Cleanup Guide](docs/deployment/CLEANUP_SCRIPTS.md)
+- **🐛 Bug Reports**: [GitHub Issues](https://github.com/whisperengine-ai/whisperengine/issues)
+- **💬 Discussions**: [GitHub Discussions](https://github.com/whisperengine-ai/whisperengine/discussions)
 
 ## 🔧 Advanced Setup
 
@@ -273,10 +252,21 @@ curl -sSL https://raw.githubusercontent.com/whisperengine-ai/whisperengine/main/
 For developers who want to modify WhisperEngine's source code:
 
 ```bash
-# For developers (requires Git and development environment):
+# Clone the repository
 git clone https://github.com/whisperengine-ai/whisperengine.git
 cd whisperengine
-./setup.sh
+
+# Docker-based development (RECOMMENDED - primary workflow)
+./multi-bot.sh start elena  # Start development bot
+
+# Alternative: Native Python (requires manual dependency setup)
+python run.py  # Not recommended - use Docker for consistency
 ```
 
-**See**: [Development Setup Guide](docs/development/DEVELOPMENT_GUIDE.md) for complete development environment instructions.
+**See**: [Development Guide](docs/development/DEVELOPMENT_GUIDE.md) for complete Docker-based development workflow.
+
+**Developer Requirements:**
+- Docker Desktop for containerized development
+- Git for source code management
+- Python 3.11+ (for utility scripts only)
+- Your preferred code editor
