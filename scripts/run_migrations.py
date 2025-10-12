@@ -108,8 +108,14 @@ async def run_migrations():
         return 1
     
     try:
-        # Create migrations tracking table
-        await create_migrations_table(conn)
+        # Check if schema_migrations table exists first
+        schema_migrations_exists = await conn.fetchval("""
+            SELECT EXISTS (
+                SELECT FROM information_schema.tables 
+                WHERE table_schema = 'public' 
+                AND table_name = 'schema_migrations'
+            );
+        """)
         
         # Check if database has existing tables (besides schema_migrations)
         table_count = await conn.fetchval("""
@@ -126,10 +132,16 @@ async def run_migrations():
         if init_schema_path.exists():
             migration_name = "00_init.sql"
             
-            if not await is_migration_applied(conn, migration_name):
+            # Check if migration already applied (only if schema_migrations exists)
+            migration_applied = False
+            if schema_migrations_exists:
+                migration_applied = await is_migration_applied(conn, migration_name)
+            
+            if not migration_applied:
                 if table_count == 0:
                     print("🗄️  Database is empty - applying comprehensive init schema (73 tables)...")
                     if await apply_sql_file(conn, init_schema_path, migration_name):
+                        # After successful init, record the migration
                         await record_migration(conn, migration_name)
                         print("✅ Comprehensive schema applied - 73 tables + AI Assistant character ready!")
                     else:
@@ -137,13 +149,35 @@ async def run_migrations():
                         return 1
                 else:
                     print(f"ℹ️  Database has {table_count} tables - skipping init schema (already initialized)")
+                    # Create migrations tracking table if it doesn't exist (for existing DBs)
+                    await create_migrations_table(conn)
                     print("ℹ️  Recording init schema as applied to prevent future attempts...")
                     await record_migration(conn, migration_name)
             else:
                 print("✅ Comprehensive init schema (00_init.sql) already applied, skipping...")
         
+        # Apply seed data (safe to run multiple times due to ON CONFLICT DO NOTHING)
+        seed_data_path = Path("/app/sql/01_seed_data.sql")
+        if seed_data_path.exists():
+            seed_migration_name = "01_seed_data.sql"
+            
+            # Check if seed data already applied (only if schema_migrations exists)
+            seed_applied = False
+            if schema_migrations_exists or table_count > 0:
+                seed_applied = await is_migration_applied(conn, seed_migration_name)
+            
+            if not seed_applied:
+                print("🌱 Applying seed data (default AI Assistant character)...")
+                if await apply_sql_file(conn, seed_data_path, seed_migration_name):
+                    await record_migration(conn, seed_migration_name)
+                    print("✅ Seed data applied successfully!")
+                else:
+                    print("⚠️  Seed data failed - continuing anyway (non-critical)")
+            else:
+                print("✅ Seed data already applied, skipping...")
+        
         # QUICKSTART MODE: Skip incremental migrations - we use comprehensive 00_init.sql
-        print("ℹ️  QUICKSTART MODE: Using comprehensive sql/00_init.sql (73 tables + seed data)")
+        print("ℹ️  QUICKSTART MODE: Schema (00_init.sql) + Seed Data (01_seed_data.sql)")
         print("ℹ️  Skipping incremental migrations (sql/migrations/) - single init file deployment")
         
         print("🎉 All migrations complete!")
