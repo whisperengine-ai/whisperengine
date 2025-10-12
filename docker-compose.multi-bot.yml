@@ -13,6 +13,7 @@ services:
   db-migrate:
     image: whisperengine-bot:${VERSION:-latest}
     container_name: whisperengine-db-migrate
+    entrypoint: []  # Override entrypoint to prevent main app startup
     command: ["python", "/app/scripts/run_migrations.py"]
     environment:
       - POSTGRES_HOST=postgres
