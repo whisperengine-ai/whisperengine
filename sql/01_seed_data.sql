@@ -5,6 +5,10 @@
 -- Safe to run multiple times (uses ON CONFLICT DO NOTHING)
 -- ============================================================================
 
+-- Set search_path to public schema to ensure tables are found
+-- This is critical because 00_init.sql sets search_path to empty string
+SET search_path = public;
+
 -- ============================================================================
 -- Default AI Assistant Character for Quickstart
 -- ============================================================================
