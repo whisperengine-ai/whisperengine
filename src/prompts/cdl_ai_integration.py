@@ -242,52 +242,21 @@ class CDLAIPromptIntegration:
         all_facts: list,
         character_name: str
     ) -> list:
-        """Identify specific knowledge gaps around an entity"""
+        """Identify specific knowledge gaps around an entity - DATABASE DRIVEN"""
         gap_questions = []
         
-        # Common knowledge gap patterns
-        gap_patterns = {
-            'origin': {
-                'keywords': ['learned', 'discovered', 'started', 'began', 'introduction'],
-                'question_templates': [
-                    f"How did you first get interested in {entity_name}?",
-                    f"What got you into {entity_name}?",
-                    f"When did you start with {entity_name}?"
-                ]
-            },
-            'experience': {
-                'keywords': ['experience', 'time', 'duration', 'years', 'practice'],
-                'question_templates': [
-                    f"How long have you been into {entity_name}?",
-                    f"What's your experience with {entity_name} been like?",
-                    f"How much experience do you have with {entity_name}?"
-                ]
-            },
-            'specifics': {
-                'keywords': ['favorite', 'preferred', 'type', 'style', 'aspect'],
-                'question_templates': [
-                    f"What aspects of {entity_name} do you enjoy most?",
-                    f"What's your favorite thing about {entity_name}?",
-                    f"What type of {entity_name} interests you most?"
-                ]
-            },
-            'location': {
-                'keywords': ['where', 'location', 'place', 'local'],
-                'question_templates': [
-                    f"Where do you usually {relationship.replace('likes', 'enjoy').replace('interested in', 'explore')} {entity_name}?",
-                    f"Do you have a favorite place for {entity_name}?",
-                    f"Where do you go for {entity_name}?"
-                ]
-            },
-            'community': {
-                'keywords': ['people', 'friends', 'community', 'others', 'share'],
-                'question_templates': [
-                    f"Do you share your interest in {entity_name} with others?",
-                    f"Have you met others through {entity_name}?",
-                    f"Who introduced you to {entity_name}?"
-                ]
+        # Get character-specific gap patterns from database
+        gap_patterns = await self._get_character_gap_patterns(character_name)
+        
+        if not gap_patterns:
+            # Fallback to minimal default patterns if database query fails
+            logger.warning(f"⚠️ No gap patterns found for {character_name}, using fallback")
+            gap_patterns = {
+                'origin': {
+                    'keywords': ['learned', 'discovered', 'started'],
+                    'question_templates': [f"How did you get interested in {entity_name}?"]
+                }
             }
-        }
         
         # Check which gaps exist
         for gap_type, pattern in gap_patterns.items():
@@ -303,7 +272,7 @@ class CDLAIPromptIntegration:
             # If gap not filled, generate question
             if not gap_filled:
                 # Choose appropriate template based on entity and relationship
-                template = self._select_best_question_template(
+                template = await self._select_best_question_template(
                     pattern['question_templates'], entity_name, relationship, character_name
                 )
                 
@@ -317,6 +286,62 @@ class CDLAIPromptIntegration:
                     })
         
         return gap_questions
+
+    async def _get_character_gap_patterns(self, character_name: str) -> dict:
+        """Get character-specific gap patterns from database - personality-driven questioning"""
+        try:
+            if not self.enhanced_manager:
+                return {}
+            
+            # Get character ID from normalized bot name
+            from src.memory.vector_memory_system import get_normalized_bot_name_from_env
+            bot_name = get_normalized_bot_name_from_env()
+            
+            # Get database pool for direct query
+            from src.database.postgres_pool_manager import get_postgres_pool
+            pool = await get_postgres_pool()
+            
+            async with pool.acquire() as conn:
+                # Query character_question_templates for this character
+                templates = await conn.fetch("""
+                    SELECT cqt.gap_type, cqt.template_text, cqt.keywords, cqt.priority_order
+                    FROM character_question_templates cqt
+                    JOIN characters c ON c.id = cqt.character_id
+                    WHERE LOWER(c.name) LIKE $1
+                    ORDER BY cqt.gap_type, cqt.priority_order
+                """, f'%{bot_name}%')
+                
+                if not templates:
+                    logger.debug(f"🔍 GAP PATTERNS: No database templates found for character '{character_name}'")
+                    return {}
+                
+                # Build gap_patterns structure from database results
+                gap_patterns = {}
+                for template in templates:
+                    gap_type = template['gap_type']
+                    template_text = template['template_text']
+                    keywords = template['keywords'] or []
+                    
+                    if gap_type not in gap_patterns:
+                        gap_patterns[gap_type] = {
+                            'keywords': keywords,
+                            'question_templates': []
+                        }
+                    
+                    # Add template to the list
+                    gap_patterns[gap_type]['question_templates'].append(template_text)
+                    
+                    # Merge keywords (avoiding duplicates)
+                    existing_keywords = set(gap_patterns[gap_type]['keywords'])
+                    new_keywords = set(keywords)
+                    gap_patterns[gap_type]['keywords'] = list(existing_keywords.union(new_keywords))
+                
+                logger.info(f"✅ GAP PATTERNS: Loaded {len(templates)} database templates across {len(gap_patterns)} gap types for {character_name}")
+                return gap_patterns
+                
+        except Exception as e:
+            logger.debug(f"Could not get character gap patterns from database: {e}")
+            return {}
 
     async def _select_best_question_template(
         self, 
@@ -532,8 +557,13 @@ class CDLAIPromptIntegration:
         try:
             # STEP 1: Load CDL character and determine context
             character = await self.load_character(character_file)
-            logger.info("🎭 UNIFIED: Loaded CDL character: %s", character.identity.name)
-            print(f"🔍 DEBUG: Character loaded - name: '{character.identity.name}', occupation: '{character.identity.occupation}', description: '{character.identity.description[:100]}...'", flush=True)
+            # Safe character name/occupation access for logging
+            safe_name = character.identity.name if character.identity.name else "Unknown Character"
+            safe_occupation = character.identity.occupation if character.identity.occupation else "Unknown Occupation"
+            safe_description = character.identity.description[:100] if character.identity.description else "No description"
+            
+            logger.info("🎭 UNIFIED: Loaded CDL character: %s", safe_name)
+            print(f"🔍 DEBUG: Character loaded - name: '{safe_name}', occupation: '{safe_occupation}', description: '{safe_description}...'", flush=True)
 
             # STEP 2: Get user's preferred name with Discord username fallback
             preferred_name = None
@@ -636,8 +666,14 @@ class CDLAIPromptIntegration:
         # 🎭 CRITICAL: Start with character identity FIRST for proper foundation
         prompt = ""
         
-        # Base character identity - WHO ARE YOU (must come first)
-        character_identity_line = f"You are {character.identity.name}, a {character.identity.occupation}."
+        # Base character identity - WHO ARE YOU (must come first) - with null safety
+        character_name = character.identity.name if character.identity.name else "AI Character"
+        character_occupation = character.identity.occupation if character.identity.occupation else "AI Assistant"
+        
+        # Safe bot name helper for database queries (prevents None default in os.getenv)
+        safe_bot_name_fallback = character_name if character_name != "AI Character" else "unknown"
+        
+        character_identity_line = f"You are {character_name}, a {character_occupation}."
         print(f"🔍 DEBUG: Building character identity line: '{character_identity_line}'", flush=True)
         prompt += character_identity_line
         
@@ -645,9 +681,21 @@ class CDLAIPromptIntegration:
         if hasattr(character.identity, 'description') and character.identity.description:
             prompt += f" {character.identity.description}"
         
-        # Add AI identity handling early for proper identity establishment
-        if any(ai_keyword in message_content.lower() for ai_keyword in ['ai', 'artificial intelligence', 'robot', 'computer', 'program', 'bot']):
-            prompt += f" If asked about AI nature, respond authentically as {character.identity.name} while being honest about your AI nature when directly asked."
+        # Add AI identity handling early for proper identity establishment (DATABASE-DRIVEN)
+        try:
+            from src.prompts.generic_keyword_manager import get_keyword_manager
+            keyword_manager = get_keyword_manager()
+            
+            if await keyword_manager.check_message_for_category(message_content, 'ai_identity'):
+                # Use safe character name (already defined above)
+                prompt += f" If asked about AI nature, respond authentically as {character_name} while being honest about your AI nature when directly asked."
+                logger.debug("🤖 AI IDENTITY: Detected AI-related keywords in message")
+        except Exception as e:
+            # Fallback to basic detection if database unavailable
+            if any(ai_keyword in message_content.lower() for ai_keyword in ['ai', 'artificial intelligence', 'robot', 'computer', 'program', 'bot']):
+                # Use safe character name (already defined above)
+                prompt += f" If asked about AI nature, respond authentically as {character_name} while being honest about your AI nature when directly asked."
+                logger.debug("🤖 AI IDENTITY: Used fallback keyword detection")
         
         # 🕒 TEMPORAL AWARENESS: Add current date/time context 
         from src.utils.helpers import get_current_time_context
@@ -784,7 +832,7 @@ class CDLAIPromptIntegration:
         # 💕 RELATIONSHIPS: Add character relationships (e.g., Gabriel-Cynthia)
         if self.enhanced_manager:
             try:
-                bot_name = os.getenv('DISCORD_BOT_NAME', character.identity.name).lower()
+                bot_name = os.getenv('DISCORD_BOT_NAME', safe_bot_name_fallback).lower()
                 relationships = await self.enhanced_manager.get_relationships(bot_name)
                 if relationships:
                     prompt += f"\n\n💕 RELATIONSHIP CONTEXT:\n"
@@ -802,7 +850,7 @@ class CDLAIPromptIntegration:
         # ⚡ BEHAVIORAL TRIGGERS: Add recognition responses and interaction patterns
         if self.enhanced_manager:
             try:
-                bot_name = os.getenv('DISCORD_BOT_NAME', character.identity.name).lower()
+                bot_name = os.getenv('DISCORD_BOT_NAME', safe_bot_name_fallback).lower()
                 behavioral_triggers = await self.enhanced_manager.get_behavioral_triggers(bot_name)
                 if behavioral_triggers:
                     # Group by trigger type for organized presentation
@@ -834,7 +882,7 @@ class CDLAIPromptIntegration:
         # 🗣️ CONVERSATION FLOWS: Add flow guidance for different interaction modes
         if self.enhanced_manager:
             try:
-                bot_name = os.getenv('DISCORD_BOT_NAME', character.identity.name).lower()
+                bot_name = os.getenv('DISCORD_BOT_NAME', safe_bot_name_fallback).lower()
                 conversation_flows = await self.enhanced_manager.get_conversation_flows(bot_name)
                 if conversation_flows:
                     prompt += f"\n\n🗣️ CONVERSATION FLOW GUIDANCE:\n"
@@ -849,7 +897,7 @@ class CDLAIPromptIntegration:
         # 🎨 MESSAGE TRIGGERS: Add context-aware response activation patterns
         if self.enhanced_manager:
             try:
-                bot_name = os.getenv('DISCORD_BOT_NAME', character.identity.name).lower()
+                bot_name = os.getenv('DISCORD_BOT_NAME', safe_bot_name_fallback).lower()
                 message_triggers = await self.enhanced_manager.get_message_triggers(bot_name)
                 if message_triggers:
                     # Check if any triggers match current message
@@ -875,7 +923,7 @@ class CDLAIPromptIntegration:
         # 💭 EMOTIONAL TRIGGERS: Add appropriate emotional reaction patterns
         if self.enhanced_manager:
             try:
-                bot_name = os.getenv('DISCORD_BOT_NAME', character.identity.name).lower()
+                bot_name = os.getenv('DISCORD_BOT_NAME', safe_bot_name_fallback).lower()
                 emotional_triggers = await self.enhanced_manager.get_emotional_triggers(bot_name)
                 if emotional_triggers:
                     # Check if any triggers match current message context
@@ -905,7 +953,7 @@ class CDLAIPromptIntegration:
         # 🎓 EXPERTISE DOMAINS: Add knowledge-based response guidance
         if self.enhanced_manager:
             try:
-                bot_name = os.getenv('DISCORD_BOT_NAME', character.identity.name).lower()
+                bot_name = os.getenv('DISCORD_BOT_NAME', safe_bot_name_fallback).lower()
                 expertise_domains = await self.enhanced_manager.get_expertise_domains(bot_name)
                 if expertise_domains:
                     # Check if message relates to any expertise domain
@@ -936,7 +984,7 @@ class CDLAIPromptIntegration:
         # 😊 EMOJI PATTERNS: Add digital communication style
         if self.enhanced_manager:
             try:
-                bot_name = os.getenv('DISCORD_BOT_NAME', character.identity.name).lower()
+                bot_name = os.getenv('DISCORD_BOT_NAME', safe_bot_name_fallback).lower()
                 emoji_patterns = await self.enhanced_manager.get_emoji_patterns(bot_name)
                 if emoji_patterns:
                     # Group by pattern category
@@ -960,22 +1008,34 @@ class CDLAIPromptIntegration:
             except Exception as e:
                 logger.debug(f"Could not extract emoji patterns: {e}")
         
-        # 🎭 AI SCENARIOS: Add physical interaction handling guidance
+        # 🎭 AI SCENARIOS: Add physical interaction handling guidance (DATABASE-DRIVEN)
         if self.enhanced_manager:
             try:
-                bot_name = os.getenv('DISCORD_BOT_NAME', character.identity.name).lower()
+                bot_name = os.getenv('DISCORD_BOT_NAME', safe_bot_name_fallback).lower()
                 ai_scenarios = await self.enhanced_manager.get_ai_scenarios(bot_name)
                 if ai_scenarios:
-                    # Check if message contains physical interaction requests
-                    physical_keywords = ['hug', 'kiss', 'touch', 'hold', 'cuddle', 'pet', 'pat', 'embrace']
-                    message_lower = message_content.lower()
-                    
-                    if any(keyword in message_lower for keyword in physical_keywords):
-                        prompt += f"\n\n🎭 PHYSICAL INTERACTION GUIDANCE (roleplay request detected):\n"
-                        for scenario in ai_scenarios:
-                            if scenario.tier_responses:  # Has tiered response strategy
-                                prompt += f"- {scenario.scenario_name}: Use tier-appropriate response based on roleplay_immersion_level\n"
-                        logger.info(f"✅ AI SCENARIOS: Activated physical interaction guidance ({len(ai_scenarios)} scenarios)")
+                    # Check if message contains physical interaction requests (DATABASE-DRIVEN)
+                    try:
+                        from src.prompts.generic_keyword_manager import get_keyword_manager
+                        keyword_manager = get_keyword_manager()
+                        
+                        if await keyword_manager.check_message_for_category(message_content, 'physical_interaction'):
+                            prompt += f"\n\n🎭 PHYSICAL INTERACTION GUIDANCE (roleplay request detected):\n"
+                            for scenario in ai_scenarios:
+                                if scenario.tier_responses:  # Has tiered response strategy
+                                    prompt += f"- {scenario.scenario_name}: Use tier-appropriate response based on roleplay_immersion_level\n"
+                            logger.info(f"✅ AI SCENARIOS: Activated physical interaction guidance ({len(ai_scenarios)} scenarios)")
+                    except Exception as e:
+                        # Fallback to basic detection if database unavailable
+                        physical_keywords = ['hug', 'kiss', 'touch', 'hold', 'cuddle', 'pet', 'pat', 'embrace']
+                        message_lower = message_content.lower()
+                        
+                        if any(keyword in message_lower for keyword in physical_keywords):
+                            prompt += f"\n\n🎭 PHYSICAL INTERACTION GUIDANCE (roleplay request detected):\n"
+                            for scenario in ai_scenarios:
+                                if scenario.tier_responses:  # Has tiered response strategy
+                                    prompt += f"- {scenario.scenario_name}: Use tier-appropriate response based on roleplay_immersion_level\n"
+                            logger.info(f"✅ AI SCENARIOS: Activated physical interaction guidance ({len(ai_scenarios)} scenarios) - fallback")
             except Exception as e:
                 logger.debug(f"Could not extract AI scenarios: {e}")
 
@@ -2645,7 +2705,7 @@ Stay authentic to {character.identity.name}'s personality while being transparen
         Returns formatted section matching Elena example structure.
         """
         try:
-            bot_name = os.getenv('DISCORD_BOT_NAME', character.identity.name).lower()
+            bot_name = os.getenv('DISCORD_BOT_NAME', safe_bot_name_fallback).lower()
             
             voice_parts = []
             voice_parts.append("VOICE & COMMUNICATION STYLE:")
