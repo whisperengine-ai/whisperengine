@@ -318,44 +318,106 @@ class CDLAIPromptIntegration:
         
         return gap_questions
 
-    def _select_best_question_template(
+    async def _select_best_question_template(
         self, 
         templates: list, 
         entity_name: str, 
         relationship: str,
         character_name: str
     ) -> str:
-        """Select the best question template based on entity type and character personality"""
+        """Select the best question template based on entity type and character personality - DATABASE DRIVEN"""
         
-        # Character-specific preferences
-        character_lower = character_name.lower()
+        if not templates:
+            return ""
         
-        # Activity-based entities (diving, photography, hiking)
-        activity_entities = ['diving', 'photography', 'hiking', 'climbing', 'swimming', 'running', 'cycling']
+        # Get database-driven entity classification for this character
+        question_preference = await self._get_entity_question_preference(entity_name, character_name)
         
-        # Food entities
-        food_entities = ['pizza', 'sushi', 'thai food', 'italian', 'chinese', 'mexican']
+        if question_preference:
+            # Use database-driven preference to select appropriate template
+            return self._select_template_by_preference(templates, question_preference)
         
-        # Topic/subject entities (marine biology, AI, science)
-        topic_entities = ['biology', 'science', 'ai', 'technology', 'research', 'music', 'art']
+        # Fallback to first template if no database preference found
+        return templates[0]
+
+    async def _get_entity_question_preference(self, entity_name: str, character_name: str) -> str:
+        """Get question preference for entity from database - character-specific and extensible"""
+        try:
+            if not self.enhanced_manager:
+                return ""
+            
+            # Get character ID from normalized bot name
+            from src.memory.vector_memory_system import get_normalized_bot_name_from_env
+            bot_name = get_normalized_bot_name_from_env()
+            
+            # Get database pool for direct query
+            from src.database.postgres_pool_manager import get_postgres_pool
+            pool = await get_postgres_pool()
+            
+            async with pool.acquire() as conn:
+                # Query character_entity_categories for this character and entity
+                entity_lower = entity_name.lower()
+                
+                # Find matching entity category with highest priority
+                result = await conn.fetchrow("""
+                    SELECT cec.question_preference, cec.priority_level, cec.category_type
+                    FROM character_entity_categories cec
+                    JOIN characters c ON c.id = cec.character_id
+                    WHERE LOWER(c.name) LIKE $1
+                    AND (
+                        LOWER(cec.entity_keyword) = $2 
+                        OR $2 LIKE ('%' || LOWER(cec.entity_keyword) || '%')
+                        OR LOWER(cec.entity_keyword) LIKE ('%' || $2 || '%')
+                    )
+                    ORDER BY cec.priority_level DESC, cec.category_type
+                    LIMIT 1
+                """, f'%{bot_name}%', entity_lower)
+                
+                if result:
+                    logger.info(f"🎯 ENTITY CLASSIFICATION: Found '{entity_name}' -> question_preference='{result['question_preference']}' for {character_name}")
+                    return result['question_preference']
+                
+                logger.debug(f"🔍 ENTITY CLASSIFICATION: No database match for '{entity_name}' and character '{character_name}'")
+                return ""
+                
+        except Exception as e:
+            logger.debug(f"Could not get entity question preference from database: {e}")
+            return ""
+
+    def _select_template_by_preference(self, templates: list, preference: str) -> str:
+        """Select template based on database-driven question preference"""
+        if not templates:
+            return ""
         
-        # Select based on entity type and character
-        entity_lower = entity_name.lower()
+        # Map preferences to template selection logic
+        preference_lower = preference.lower()
         
-        if any(activity in entity_lower for activity in activity_entities):
-            # For activities, prefer experience and location questions
-            return templates[0] if 'How did you' in templates[0] else (templates[1] if len(templates) > 1 else templates[0])
+        if preference_lower == 'origin' or preference_lower == 'experience':
+            # Prefer "How did you" templates for origin/experience questions
+            for template in templates:
+                if 'How did you' in template or 'What got you' in template:
+                    return template
         
-        elif any(food in entity_lower for food in food_entities):
-            # For food, prefer discovery and specifics
-            return templates[0] if 'How did you' in templates[0] else (templates[2] if len(templates) > 2 else templates[0])
+        elif preference_lower == 'specifics':
+            # Prefer "What aspects" or "What's your favorite" for specifics
+            for template in templates:
+                if 'What aspects' in template or 'favorite' in template or 'type of' in template:
+                    return template
         
-        elif any(topic in entity_lower for topic in topic_entities):
-            # For topics, prefer origin and aspects
-            return templates[0] if 'How did you' in templates[0] else templates[0]
+        elif preference_lower == 'location':
+            # Prefer "Where do you" templates for location questions
+            for template in templates:
+                if 'Where do you' in template or 'place for' in template:
+                    return template
         
-        # Default to first template
-        return templates[0] if templates else ""
+        elif preference_lower == 'community':
+            # Prefer community/social templates
+            for template in templates:
+                if 'others' in template or 'people' in template or 'share' in template:
+                    return template
+        
+        # Fallback to first template
+        return templates[0]
 
     async def _filter_questions_by_character_personality(self, questions: list, character_name: str) -> list:
         """Filter questions to match character personality and expertise - DYNAMIC DATABASE VERSION"""
@@ -2588,44 +2650,70 @@ Stay authentic to {character.identity.name}'s personality while being transparen
             voice_parts = []
             voice_parts.append("VOICE & COMMUNICATION STYLE:")
             
-            # Query voice traits for tone, pace, accent
-            tone_value = None
-            pace_value = None
-            accent_value = None
-            speech_patterns = []
+            # Query voice traits and build groups dynamically from database
+            voice_trait_groups = {}  # Build dynamically based on actual database content
             
             if self.enhanced_manager:
                 try:
                     voice_traits = await self.enhanced_manager.get_voice_traits(bot_name)
                     
+                    # Build groups dynamically - no hardcoded trait types!
                     for trait in voice_traits:
                         trait_type = trait.trait_type.lower()
+                        trait_value = trait.trait_value
                         
-                        if trait_type == 'tone':
-                            tone_value = trait.trait_value
-                        elif trait_type == 'pace' or trait_type == 'speaking_pace':
-                            pace_value = trait.trait_value
-                        elif trait_type == 'accent':
-                            accent_value = trait.trait_value
-                        elif trait_type == 'speech_pattern':
-                            speech_patterns.append(trait.trait_value)
+                        # Create group if it doesn't exist
+                        if trait_type not in voice_trait_groups:
+                            voice_trait_groups[trait_type] = []
+                        
+                        # Add value to the appropriate group
+                        voice_trait_groups[trait_type].append(trait_value)
                     
-                    logger.info(f"✅ VOICE SECTION: Retrieved {len(voice_traits)} voice traits")
+                    logger.info(f"✅ VOICE SECTION: Retrieved {len(voice_traits)} voice traits across {len(voice_trait_groups)} trait types: {list(voice_trait_groups.keys())}")
                     
                 except Exception as e:
                     logger.debug(f"Could not query voice traits: {e}")
             
-            # Add Tone
-            if tone_value:
-                voice_parts.append(f"- Tone: {tone_value}")
+            # Add voice traits dynamically - handle ANY trait types from database
             
-            # Add Pace
-            if pace_value:
-                voice_parts.append(f"- Pace: {pace_value}")
+            # Priority order for common trait types (optional - for consistent ordering)
+            priority_traits = ['tone', 'pace', 'accent', 'preferred_word', 'avoided_word', 
+                             'sentence_structure', 'philosophical_terms', 'poetic_language',
+                             'punctuation_style', 'response_length']
             
-            # Add Accent
-            if accent_value:
-                voice_parts.append(f"- Accent: {accent_value}")
+            # Add priority traits first (if they exist)
+            for trait_type in priority_traits:
+                if trait_type in voice_trait_groups and voice_trait_groups[trait_type]:
+                    values = voice_trait_groups[trait_type]
+                    
+                    # Format based on trait type semantics
+                    if trait_type == 'preferred_word':
+                        if len(values) > 0:
+                            vocab_text = ", ".join(values[:8])  # Show all preferred words
+                            voice_parts.append(f"- Preferred words: {vocab_text}")
+                    elif trait_type == 'avoided_word':
+                        if len(values) > 0:
+                            avoid_text = ", ".join(values[:4])  # Show avoided words
+                            voice_parts.append(f"- Words to avoid: {avoid_text}")
+                    elif trait_type in ['sentence_structure', 'philosophical_terms', 'poetic_language']:
+                        patterns_text = ", ".join(values[:3])  # Combine into speech patterns
+                        voice_parts.append(f"- Speech patterns: {patterns_text}")
+                    elif trait_type == 'response_length':
+                        voice_parts.append(f"- Response style: {values[0]}")  # Take first entry
+                    elif trait_type == 'punctuation_style':
+                        voice_parts.append(f"- Punctuation: {values[0]}")  # Take first entry
+                    else:
+                        # Standard formatting for tone, pace, accent, etc.
+                        trait_label = trait_type.replace('_', ' ').title()
+                        trait_text = ", ".join(values)
+                        voice_parts.append(f"- {trait_label}: {trait_text}")
+            
+            # Add any remaining trait types not in priority list
+            for trait_type, values in voice_trait_groups.items():
+                if trait_type not in priority_traits and values:
+                    trait_label = trait_type.replace('_', ' ').title()
+                    trait_text = ", ".join(values[:3])  # Limit to 3 for unknown types
+                    voice_parts.append(f"- {trait_label}: {trait_text}")
             
             # Query cultural expressions for favorite phrases
             favorite_phrases = []
@@ -2644,11 +2732,6 @@ Stay authentic to {character.identity.name}'s personality while being transparen
                     
                 except Exception as e:
                     logger.debug(f"Could not query cultural expressions: {e}")
-            
-            # Add Speech patterns (combine speech_pattern traits + message triggers)
-            if speech_patterns:
-                patterns_text = ", ".join(speech_patterns[:5])  # Top 5
-                voice_parts.append(f"- Speech patterns: {patterns_text}")
             
             # Add Favorite phrases
             if favorite_phrases:
