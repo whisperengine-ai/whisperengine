@@ -50,15 +50,22 @@ QDRANT_COLLECTION_NAME=whisperengine_memory_elena
 
 > **⚠️ IMPORTANT**: `LLM_CHAT_API_URL` is what **actually determines** your LLM provider - WhisperEngine auto-detects the provider from the URL pattern. `LLM_CLIENT_TYPE` is used for setup hints and logging only.
 
-> **🎯 Model Selection**: WhisperEngine has been thoroughly tested with **`mistralai/mistral-small`** and **`mistralai/mistral-nemo`**. Start with these for reliable development, then experiment with others.
+> **🎯 Model Selection**: WhisperEngine has been thoroughly tested with:
+**Tested Models** (Production-Ready):
+- **Mistral**: `mistralai/mistral-small-3.2-24b-instruct`, `mistralai/mistral-medium-3.1`, `mistralai/mistral-nemo`
+- **GPT-4**: `openai/gpt-4o`
+- **GPT-5**: `openai/gpt-5-chat`
+- **Claude Sonnet**: `anthropic/claude-sonnet-4`, `anthropic/claude-3.7-sonnet`, `anthropic/claude-3.5-sonnet`
+> 
+> Start with `mistralai/mistral-small-3.2-24b-instruct` for reliable development, then experiment with others. **Avoid**: Claude Haiku (expensive, poor character quality), GPT-3.5/4o-mini (inconsistent).
 
 **Supported Provider URLs**:
-| Provider | `LLM_CLIENT_TYPE` | `LLM_CHAT_API_URL` |
-|----------|-------------------|---------------------|
-| OpenRouter | `openrouter` | `https://openrouter.ai/api/v1` |
-| OpenAI | `openai` | `https://api.openai.com/v1` |
-| Claude (via OpenRouter) | `openrouter` | `https://openrouter.ai/api/v1` |
-| LM Studio (Local) | `lmstudio` | `http://host.docker.internal:1234/v1` |
+| Provider | `LLM_CLIENT_TYPE` | `LLM_CHAT_API_URL` | API Key Required? |
+|----------|-------------------|---------------------|-------------------|
+| OpenRouter (Mistral, GPT, Claude) | `openrouter` | `https://openrouter.ai/api/v1` | ✅ Yes |
+| OpenAI Direct | `openai` | `https://api.openai.com/v1` | ✅ Yes |
+| Ollama (Local) | `ollama` | `http://host.docker.internal:11434/v1` | ❌ No - runs locally |
+| LM Studio (Local) | `lmstudio` | `http://host.docker.internal:1234/v1` | ❌ No - runs locally |
 
 ### **3. Start Development Environment**
 \`\`\`bash

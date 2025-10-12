@@ -171,14 +171,14 @@ CHARACTER_NAME=assistant    # Default character name
 
 ### **Supported LLM Providers**
 
-| Provider | `LLM_CLIENT_TYPE` | `LLM_CHAT_API_URL` | Recommended Models | Get API Key |
-|----------|-------------------|--------------------|--------------------|-------------|
-| **OpenRouter** (Recommended) | `openrouter` | `https://openrouter.ai/api/v1` | **✅ `mistralai/mistral-small`** (tested)<br>**✅ `mistralai/mistral-nemo`** (tested)<br>`anthropic/claude-3-haiku`<br>`openai/gpt-4o-mini` | [openrouter.ai](https://openrouter.ai) |
-| **OpenAI** | `openai` | `https://api.openai.com/v1` | `gpt-4o-mini`<br>`gpt-3.5-turbo` | [platform.openai.com](https://platform.openai.com) |
-| **Anthropic Claude** | `openrouter` | `https://openrouter.ai/api/v1` | `anthropic/claude-3-haiku`<br>`anthropic/claude-3.5-sonnet` | Use via OpenRouter |
-| **LM Studio** (Local) | `lmstudio` | `http://host.docker.internal:1234/v1` | Your downloaded model | [lmstudio.ai](https://lmstudio.ai) |
+| Provider | `LLM_CLIENT_TYPE` | `LLM_CHAT_API_URL` | Recommended Models | API Key Required? |
+|----------|-------------------|--------------------|--------------------|-------------------|
+| **OpenRouter** (Recommended) | `openrouter` | `https://openrouter.ai/api/v1` | **✅ Mistral**: `mistralai/mistral-small-3.2-24b-instruct`, `mistralai/mistral-medium-3.1`, `mistralai/mistral-nemo`<br>**✅ GPT-4/5**: `openai/gpt-4o`, `openai/gpt-5-chat`<br>**✅ Claude Sonnet**: `anthropic/claude-sonnet-4`, `anthropic/claude-3.7-sonnet`, `anthropic/claude-3.5-sonnet` | ✅ Yes - [Get key](https://openrouter.ai) |
+| **OpenAI Direct** | `openai` | `https://api.openai.com/v1` | **✅ GPT-4**: `gpt-4o`<br>**✅ GPT-5**: `gpt-5-chat` | ✅ Yes - [Get key](https://platform.openai.com) |
+| **Ollama** (Local) | `ollama` | `http://host.docker.internal:11434/v1` | Your downloaded model | ❌ No - runs locally |
+| **LM Studio** (Local) | `lmstudio` | `http://host.docker.internal:1234/v1` | Your downloaded model | ❌ No - runs locally |
 
-> **🎯 Getting Started**: We **strongly recommend starting with `mistralai/mistral-small`** via OpenRouter - it's been thoroughly tested with WhisperEngine and provides excellent performance. Once you're comfortable, experiment with other models!
+> **🎯 Getting Started**: We **strongly recommend starting with `mistralai/mistral-small`** via OpenRouter - it's been thoroughly tested with WhisperEngine and provides excellent character consistency. All models listed above have been tested and work well for AI characters.
 
 ## 📚 Documentation
 

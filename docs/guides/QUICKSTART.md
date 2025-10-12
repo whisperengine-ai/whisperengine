@@ -63,18 +63,26 @@ After setup, you'll need to add your LLM configuration to the `.env` file:
 LLM_CLIENT_TYPE=openrouter              # Used for: setup hints and logging
 LLM_CHAT_API_URL=https://openrouter.ai/api/v1  # CRITICAL: Determines provider
 LLM_CHAT_API_KEY=your_openrouter_key_here
-LLM_CHAT_MODEL=mistralai/mistral-small  # RECOMMENDED: Thoroughly tested with WhisperEngine
+LLM_CHAT_MODEL=mistralai/mistral-small-3.2-24b-instruct  # RECOMMENDED: Thoroughly tested with WhisperEngine
 ```
 
-**Tested Models** (Start with these!):
-- ✅ **`mistralai/mistral-small`** - Best balance of performance and cost (RECOMMENDED)
-- ✅ **`mistralai/mistral-nemo`** - Larger model for more complex interactions
+**✅ Tested Models for AI Characters** (via OpenRouter):
 
-**Other Compatible Models** (Experimental):
-- `anthropic/claude-3-haiku` - Fast, efficient Claude model
-- `anthropic/claude-3.5-sonnet` - More capable but pricier
-- `openai/gpt-4o-mini` - OpenAI's efficient model
-- `openai/gpt-4o` - Most capable but expensive
+**Mistral Models** (Best for character consistency):
+- ✅ **`mistralai/mistral-small-3.2-24b-instruct`** - Best balance of performance and cost (RECOMMENDED)
+- ✅ **`mistralai/mistral-medium-3.1`** - More capable for complex characters
+- ✅ **`mistralai/mistral-nemo`** - Good for detailed interactions
+
+**GPT-4 & GPT-5 Models** (Excellent quality):
+- ✅ **`openai/gpt-4o`** - Highly capable GPT-4 model
+- ✅ **`openai/gpt-5-chat`** - Latest GPT-5 reasoning model
+
+**Claude Sonnet Models** (Premium quality):
+- ✅ **`anthropic/claude-sonnet-4`** - Latest Claude Sonnet 4 (newest)
+- ✅ **`anthropic/claude-3.7-sonnet`** - Claude Sonnet 3.7
+- ✅ **`anthropic/claude-3.5-sonnet`** - Claude Sonnet 3.5
+
+> **⚠️ Avoid**: Claude Haiku (expensive, poor character consistency), GPT-3.5-turbo (outdated), GPT-4o-mini (inconsistent)
 
 ### **Option 2: OpenAI Direct**
 ```bash
@@ -82,29 +90,38 @@ LLM_CHAT_MODEL=mistralai/mistral-small  # RECOMMENDED: Thoroughly tested with Wh
 LLM_CLIENT_TYPE=openai
 LLM_CHAT_API_URL=https://api.openai.com/v1
 LLM_CHAT_API_KEY=your_openai_key_here
-LLM_CHAT_MODEL=gpt-4o-mini
+LLM_CHAT_MODEL=gpt-4o  # GPT-4 recommended
 ```
 
-### **Option 3: Anthropic Claude Direct**
+**Recommended Models**:
+- ✅ **`gpt-4o`** - GPT-4 Omni model
+- ✅ **`gpt-5-chat`** - Latest GPT-5 reasoning
+
+### **Option 3: Ollama (Local) - ❌ No API Key Needed**
 ```bash
-# Use Claude through OpenRouter (recommended) or Anthropic's API
-LLM_CLIENT_TYPE=openrouter
-LLM_CHAT_API_URL=https://openrouter.ai/api/v1
-LLM_CHAT_API_KEY=your_openrouter_key_here
-LLM_CHAT_MODEL=anthropic/claude-3-haiku
+# Download Ollama from https://ollama.com
+# Start Ollama and pull a model: ollama pull llama3
+LLM_CLIENT_TYPE=ollama
+LLM_CHAT_API_URL=http://host.docker.internal:11434/v1
+LLM_CHAT_API_KEY=not-needed  # Local model - no API key required
+LLM_CHAT_MODEL=llama3  # or your preferred model
 ```
 
-### **Option 4: Local Models (LM Studio)**
+**Note**: Ollama runs locally on your machine - no API key or internet connection required for inference.
+
+### **Option 4: LM Studio (Local) - ❌ No API Key Needed**
 ```bash
 # Download LM Studio from https://lmstudio.ai
 # Start LM Studio server (default port 1234)
 LLM_CLIENT_TYPE=lmstudio
 LLM_CHAT_API_URL=http://host.docker.internal:1234/v1
-LLM_CHAT_API_KEY=not-needed
+LLM_CHAT_API_KEY=not-needed  # Local model - no API key required
 LLM_CHAT_MODEL=your-downloaded-model-name
 ```
 
-> **🎯 First-Time Users**: Start with **`mistralai/mistral-small`** via OpenRouter! It's been thoroughly tested and provides excellent character consistency. Once comfortable, experiment with other models.
+**Note**: LM Studio runs locally on your machine - no API key or internet connection required for inference.
+
+> **🎯 First-Time Users**: Start with **`mistralai/mistral-small-3.2-24b-instruct`** via OpenRouter! It's been thoroughly tested and provides excellent character consistency at reasonable cost. All models listed above work well for AI characters.
 
 
 ## 🌐 Access Your AI Platform
