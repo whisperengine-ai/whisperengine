@@ -55,16 +55,28 @@ The setup script will:
 
 After setup, you'll need to add your LLM configuration to the `.env` file:
 
-### **Option 1: OpenRouter (Recommended)**
+> **💡 Key Concept**: `LLM_CHAT_API_URL` is what **actually determines** your LLM provider (WhisperEngine auto-detects from the URL). `LLM_CLIENT_TYPE` is mainly used for setup hints and logging.
+
+### **Option 1: OpenRouter (Recommended) - ✅ TESTED**
 ```bash
 # Get API key at https://openrouter.ai
-LLM_CLIENT_TYPE=openrouter
-LLM_CHAT_API_URL=https://openrouter.ai/api/v1
+LLM_CLIENT_TYPE=openrouter              # Used for: setup hints and logging
+LLM_CHAT_API_URL=https://openrouter.ai/api/v1  # CRITICAL: Determines provider
 LLM_CHAT_API_KEY=your_openrouter_key_here
-LLM_CHAT_MODEL=anthropic/claude-3-haiku
+LLM_CHAT_MODEL=mistralai/mistral-small  # RECOMMENDED: Thoroughly tested with WhisperEngine
 ```
 
-### **Option 2: OpenAI**
+**Tested Models** (Start with these!):
+- ✅ **`mistralai/mistral-small`** - Best balance of performance and cost (RECOMMENDED)
+- ✅ **`mistralai/mistral-nemo`** - Larger model for more complex interactions
+
+**Other Compatible Models** (Experimental):
+- `anthropic/claude-3-haiku` - Fast, efficient Claude model
+- `anthropic/claude-3.5-sonnet` - More capable but pricier
+- `openai/gpt-4o-mini` - OpenAI's efficient model
+- `openai/gpt-4o` - Most capable but expensive
+
+### **Option 2: OpenAI Direct**
 ```bash
 # Get API key at https://platform.openai.com
 LLM_CLIENT_TYPE=openai
@@ -73,7 +85,16 @@ LLM_CHAT_API_KEY=your_openai_key_here
 LLM_CHAT_MODEL=gpt-4o-mini
 ```
 
-### **Option 3: Local Models (LM Studio)**
+### **Option 3: Anthropic Claude Direct**
+```bash
+# Use Claude through OpenRouter (recommended) or Anthropic's API
+LLM_CLIENT_TYPE=openrouter
+LLM_CHAT_API_URL=https://openrouter.ai/api/v1
+LLM_CHAT_API_KEY=your_openrouter_key_here
+LLM_CHAT_MODEL=anthropic/claude-3-haiku
+```
+
+### **Option 4: Local Models (LM Studio)**
 ```bash
 # Download LM Studio from https://lmstudio.ai
 # Start LM Studio server (default port 1234)
@@ -83,7 +104,7 @@ LLM_CHAT_API_KEY=not-needed
 LLM_CHAT_MODEL=your-downloaded-model-name
 ```
 
-> **⚠️ IMPORTANT**: \`LLM_CHAT_API_URL\` is **ALWAYS REQUIRED** for all LLM providers! WhisperEngine does not automatically set this by type.
+> **🎯 First-Time Users**: Start with **`mistralai/mistral-small`** via OpenRouter! It's been thoroughly tested and provides excellent character consistency. Once comfortable, experiment with other models.
 
 
 ## 🌐 Access Your AI Platform

@@ -35,10 +35,12 @@ cp .env.template .env.elena
 nano .env.elena  # or your preferred editor
 
 # CRITICAL: Add all required LLM configuration
+# NOTE: LLM_CHAT_API_URL determines the actual provider (auto-detected from URL)
+# LLM_CLIENT_TYPE is mainly for setup hints and logging
 LLM_CLIENT_TYPE=openrouter
-LLM_CHAT_API_URL=https://openrouter.ai/api/v1  # ALWAYS REQUIRED
+LLM_CHAT_API_URL=https://openrouter.ai/api/v1  # CRITICAL: Determines provider
 LLM_CHAT_API_KEY=your_openrouter_key_here
-LLM_CHAT_MODEL=anthropic/claude-3-haiku
+LLM_CHAT_MODEL=mistralai/mistral-small  # RECOMMENDED: Tested model
 
 # Set bot-specific settings
 DISCORD_BOT_NAME=elena
@@ -46,7 +48,17 @@ HEALTH_CHECK_PORT=9091
 QDRANT_COLLECTION_NAME=whisperengine_memory_elena
 \`\`\`
 
-> **⚠️ IMPORTANT**: \`LLM_CHAT_API_URL\` is **ALWAYS REQUIRED** - WhisperEngine does not auto-set this by type!
+> **⚠️ IMPORTANT**: `LLM_CHAT_API_URL` is what **actually determines** your LLM provider - WhisperEngine auto-detects the provider from the URL pattern. `LLM_CLIENT_TYPE` is used for setup hints and logging only.
+
+> **🎯 Model Selection**: WhisperEngine has been thoroughly tested with **`mistralai/mistral-small`** and **`mistralai/mistral-nemo`**. Start with these for reliable development, then experiment with others.
+
+**Supported Provider URLs**:
+| Provider | `LLM_CLIENT_TYPE` | `LLM_CHAT_API_URL` |
+|----------|-------------------|---------------------|
+| OpenRouter | `openrouter` | `https://openrouter.ai/api/v1` |
+| OpenAI | `openai` | `https://api.openai.com/v1` |
+| Claude (via OpenRouter) | `openrouter` | `https://openrouter.ai/api/v1` |
+| LM Studio (Local) | `lmstudio` | `http://host.docker.internal:1234/v1` |
 
 ### **3. Start Development Environment**
 \`\`\`bash

@@ -154,10 +154,10 @@ Edit your `.env` file to customize:
 
 ```bash
 # Required: LLM Configuration (ALL fields required)
-LLM_CLIENT_TYPE=openrouter  # or: openai, lmstudio
-LLM_CHAT_API_URL=https://openrouter.ai/api/v1  # ALWAYS REQUIRED - not auto-set by type
+LLM_CLIENT_TYPE=openrouter  # Used for: setup hints and logging only
+LLM_CHAT_API_URL=https://openrouter.ai/api/v1  # CRITICAL: Determines actual provider
 LLM_CHAT_API_KEY=your_api_key_here
-LLM_CHAT_MODEL=anthropic/claude-3-haiku
+LLM_CHAT_MODEL=mistralai/mistral-small  # RECOMMENDED: Start with tested models
 
 # Optional: Discord Integration
 DISCORD_BOT_TOKEN=your_discord_token
@@ -167,15 +167,18 @@ ENABLE_DISCORD=true
 CHARACTER_NAME=assistant    # Default character name
 ```
 
-> **⚠️ IMPORTANT**: `LLM_CHAT_API_URL` is **ALWAYS REQUIRED** for all LLM providers! WhisperEngine does not automatically set this by type.
+> **⚠️ IMPORTANT**: `LLM_CHAT_API_URL` is what **actually determines your LLM provider** - WhisperEngine auto-detects the provider from the URL pattern. `LLM_CLIENT_TYPE` is mainly used for setup hints and logging.
 
 ### **Supported LLM Providers**
 
-| Provider | API URL | Model Examples | Get API Key |
-|----------|---------|---------------|-------------|
-| **OpenRouter** (Recommended) | `https://openrouter.ai/api/v1` | `anthropic/claude-3-haiku`<br>`openai/gpt-4o-mini` | [openrouter.ai](https://openrouter.ai) |
-| **OpenAI** | `https://api.openai.com/v1` | `gpt-4o-mini`<br>`gpt-3.5-turbo` | [platform.openai.com](https://platform.openai.com) |
-| **LM Studio** (Local) | `http://host.docker.internal:1234/v1` | Your downloaded model | [lmstudio.ai](https://lmstudio.ai) |
+| Provider | `LLM_CLIENT_TYPE` | `LLM_CHAT_API_URL` | Recommended Models | Get API Key |
+|----------|-------------------|--------------------|--------------------|-------------|
+| **OpenRouter** (Recommended) | `openrouter` | `https://openrouter.ai/api/v1` | **✅ `mistralai/mistral-small`** (tested)<br>**✅ `mistralai/mistral-nemo`** (tested)<br>`anthropic/claude-3-haiku`<br>`openai/gpt-4o-mini` | [openrouter.ai](https://openrouter.ai) |
+| **OpenAI** | `openai` | `https://api.openai.com/v1` | `gpt-4o-mini`<br>`gpt-3.5-turbo` | [platform.openai.com](https://platform.openai.com) |
+| **Anthropic Claude** | `openrouter` | `https://openrouter.ai/api/v1` | `anthropic/claude-3-haiku`<br>`anthropic/claude-3.5-sonnet` | Use via OpenRouter |
+| **LM Studio** (Local) | `lmstudio` | `http://host.docker.internal:1234/v1` | Your downloaded model | [lmstudio.ai](https://lmstudio.ai) |
+
+> **🎯 Getting Started**: We **strongly recommend starting with `mistralai/mistral-small`** via OpenRouter - it's been thoroughly tested with WhisperEngine and provides excellent performance. Once you're comfortable, experiment with other models!
 
 ## 📚 Documentation
 
