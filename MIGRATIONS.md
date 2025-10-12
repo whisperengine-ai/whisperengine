@@ -8,10 +8,28 @@ WhisperEngine now uses **Alembic** for safe, versioned database schema changes. 
 
 ## Quick Start
 
-### For v1.0.6 Deployments (Existing Databases)
+### For End Users (Quickstart Deployments)
 
-Your database already has the schema. Just mark it as current:
+**Upgrading from v1.0.6:**
+```bash
+# Step 1: Update to latest containers (this will include Alembic)
+docker-compose down
+docker-compose pull
+docker-compose up -d
 
+# Step 2: Mark existing database as current (prevents migration errors)
+docker exec whisperengine-assistant alembic stamp head
+
+# Step 3: Verify status
+docker exec whisperengine-assistant alembic current
+```
+
+**New Installations:**
+Migrations run automatically when containers start - no action needed!
+
+### For Developers (Git Repository)
+
+**Upgrading from v1.0.6:**
 ```bash
 # 1. Install dependencies
 pip install -r requirements-core.txt
@@ -23,8 +41,7 @@ pip install -r requirements-core.txt
 ./scripts/migrations/db-migrate.sh status
 ```
 
-### For New Installations
-
+**New Installations:**
 ```bash
 # 1. Install dependencies
 pip install -r requirements-core.txt
@@ -36,7 +53,7 @@ pip install -r requirements-core.txt
 ./scripts/migrations/db-migrate.sh status
 ```
 
-## Creating Migrations
+## Creating Migrations (Developers Only)
 
 ```bash
 # 1. Generate migration file
@@ -53,19 +70,34 @@ git commit -m "feat: Your migration description"
 
 ## Docker Integration
 
-Migrations run **automatically** when containers start. No manual steps needed!
+Migrations run **automatically** when containers start. No manual steps needed for end users!
 
+**End Users (Quickstart):**
 ```bash
-docker-compose up -d  # Migrations run before app starts
+docker-compose up -d  # Migrations run automatically
 ```
 
-## Documentation
+**Developers:**
+```bash
+# Development environment
+./bot.sh start dev  # Migrations run automatically
 
-- **Quick Start**: [`docs/guides/MIGRATION_QUICKSTART.md`](docs/guides/MIGRATION_QUICKSTART.md)
-- **Complete Guide**: [`docs/guides/DATABASE_MIGRATIONS.md`](docs/guides/DATABASE_MIGRATIONS.md)
-- **Setup Instructions**: [`docs/deployment/MIGRATION_SYSTEM_SETUP.md`](docs/deployment/MIGRATION_SYSTEM_SETUP.md)
+# Or manual migration commands
+./scripts/migrations/db-migrate.sh upgrade
+```
 
 ## Common Commands
+
+**End Users:**
+```bash
+# Check migration status
+docker exec whisperengine-assistant alembic current
+
+# For v1.0.6 upgrades only (after updating containers)
+docker exec whisperengine-assistant alembic stamp head
+```
+
+**Developers:**
 
 ```bash
 # Check status

@@ -51,6 +51,41 @@ Then run setup again.
 
 ---
 
+### Upgrading from v1.0.6
+
+**Symptoms:**
+- Error: "alembic: command not found" 
+- Database migration failures during upgrade
+- "OCI runtime exec failed" when running alembic commands
+
+**Root Cause:**
+v1.0.6 containers don't have Alembic installed. You need to update containers first.
+
+**Solution:**
+```bash
+# Step 1: Update to latest containers (includes Alembic)
+docker-compose down
+docker-compose pull
+docker-compose up -d
+
+# Step 2: ONLY THEN mark existing database as current
+docker exec whisperengine-assistant alembic stamp head
+
+# Step 3: Verify status
+docker exec whisperengine-assistant alembic current
+```
+
+**If still having issues:**
+```bash
+# Complete reset (WARNING: Deletes all data)
+curl -sSL https://raw.githubusercontent.com/whisperengine-ai/whisperengine/main/cleanup-docker.sh | bash
+
+# Then run setup again
+curl -sSL https://raw.githubusercontent.com/whisperengine-ai/whisperengine/main/setup-containerized.sh | bash
+```
+
+---
+
 ### Port Already in Use
 
 **Symptoms:**
@@ -111,7 +146,7 @@ taskkill /PID <PID> /F
    nano .env  # or vim, notepad, etc.
    
    # Restart services
-   docker-compose -f docker-compose.quickstart.yml restart
+   docker-compose restart
    ```
 
 ---
@@ -136,7 +171,7 @@ taskkill /PID <PID> /F
 
 3. **Restart web interface:**
    ```bash
-   docker-compose -f docker-compose.quickstart.yml restart whisperengine-web-ui
+   docker-compose restart whisperengine-web-ui
    ```
 
 ---

@@ -1,14 +1,247 @@
 # 🚀 WhisperEngine Quick Start Guide
 
-**Get your AI character platform running in under 5 minutes!**
+**Get your AI character platform running in under 5 minutes - no technical setup required!**
+
+> **Important**: This guide is for **end users** who want to use WhisperEngine without technical setup. If you're a developer wanting to modify the source code, see [Development Guide](../development/DEVELOPMENT_GUIDE.md).
 
 ## 📋 Prerequisites
 
-Before starting, ensure you have:
-
 ### **Required Software**
 - **[Docker Desktop](https://www.docker.com/products/docker-desktop/)** - Download and install, then start it
-- **[Git](https://git-scm.com/downloads)** - For downloading Wh**For most users**: Stick with the containerized setup above - it's simpler and faster! ⚡
+- **An LLM API Key** - Get one from [OpenRouter](https://openrouter.ai) (recommended for beginners)
+
+### **System Requirements**
+- **Windows 10+**, **macOS 10.15+**, or **Linux**
+- **4GB RAM minimum** (8GB recommended)
+- **5GB free disk space** for containers and data
+- **Internet connection** for downloading containers
+
+### **What You DON'T Need**
+- ❌ Git or source code
+- ❌ Programming knowledge
+- ❌ Python, Node.js, or development tools
+- ❌ Manual configuration files
+
+## 🚀 One-Command Installation
+
+### **macOS/Linux:**
+```bash
+curl -sSL https://raw.githubusercontent.com/whisperengine-ai/whisperengine/main/setup-containerized.sh | bash
+```
+
+### **Windows (PowerShell - Recommended):**
+```powershell
+Invoke-WebRequest -Uri "https://raw.githubusercontent.com/whisperengine-ai/whisperengine/main/setup-containerized.ps1" -OutFile "setup.ps1"; .\setup.ps1
+```
+
+### **Windows (Command Prompt):**
+```cmd
+curl -sSL https://raw.githubusercontent.com/whisperengine-ai/whisperengine/main/setup-containerized.bat -o setup.bat && setup.bat
+```
+
+## 📝 What Happens During Setup
+
+The setup script will:
+
+1. ✅ **Check Docker** - Verify Docker Desktop is running
+2. 📦 **Download Configuration** - Get only the files needed (~5KB)
+3. 🐳 **Pull Containers** - Download pre-built WhisperEngine containers (~2GB)
+4. 📝 **Create Configuration** - Set up your `.env` file
+5. 🔧 **Open Editor** - Let you add your LLM API key
+6. 🚀 **Start Services** - Launch all WhisperEngine components
+7. 🌐 **Open Browser** - Show you the web interface
+
+## 🔑 Configure Your LLM Provider
+
+After setup, you'll need to add your LLM API key to the `.env` file:
+
+### **Option 1: OpenRouter (Recommended)**
+```bash
+# Get API key at https://openrouter.ai
+LLM_CLIENT_TYPE=openrouter
+LLM_CHAT_API_KEY=your_openrouter_key_here
+LLM_CHAT_MODEL=anthropic/claude-3-haiku
+```
+
+### **Option 2: OpenAI**
+```bash
+# Get API key at https://platform.openai.com
+LLM_CLIENT_TYPE=openai
+LLM_CHAT_API_KEY=your_openai_key_here
+LLM_CHAT_MODEL=gpt-4o-mini
+```
+
+### **Option 3: Local Models (Advanced)**
+```bash
+# For LM Studio or Ollama users
+LLM_CLIENT_TYPE=local
+LLM_CHAT_API_URL=http://localhost:1234/v1
+LLM_CHAT_MODEL=your-local-model
+```
+
+## 🌐 Access Your AI Platform
+
+After setup completes, you can access:
+
+### **Web Interface** (Primary)
+- **URL**: http://localhost:3001
+- **Use For**: Creating characters, managing settings, chatting with AI
+- **Features**: Full WhisperEngine functionality
+
+### **Chat API** (Integration)
+- **URL**: http://localhost:9090/api/chat
+- **Use For**: Integrating with your own applications
+- **Format**: REST API with JSON responses
+
+### **Health Dashboard**
+- **URL**: http://localhost:9090/health
+- **Use For**: Checking system status and performance
+
+## 🎭 Creating Your First Character
+
+1. **Open Web Interface**: http://localhost:3001
+2. **Click "Create New Character"**
+3. **Define Basic Info**:
+   - Character name and description
+   - Personality traits and values
+   - Communication style preferences
+4. **Set Background Knowledge**:
+   - Professional expertise
+   - Personal experiences
+   - Interests and hobbies
+5. **Configure Behavior**:
+   - Response style (formal, casual, creative)
+   - Emotional patterns
+   - Knowledge areas
+6. **Save & Test**: Your character is ready to chat!
+
+## 💬 Testing Your Character
+
+### **Via Web Interface**
+- Use the built-in chat at http://localhost:3001
+- Test different conversation types
+- Verify personality consistency
+
+### **Via API**
+```bash
+curl -X POST http://localhost:9090/api/chat \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "user_id": "test_user",
+    "message": "Hello! Tell me about yourself.",
+    "context": {"platform": "api"}
+  }'
+```
+
+### **Via Discord** (Optional)
+1. Create a Discord bot at https://discord.com/developers/applications
+2. Add the bot token to your `.env` file:
+   ```bash
+   DISCORD_BOT_TOKEN=your_discord_token
+   ENABLE_DISCORD=true
+   ```
+3. Restart: `docker-compose restart`
+
+## 🔄 Managing Your Installation
+
+### **Daily Operations**
+
+**Start WhisperEngine:**
+```bash
+docker-compose up -d
+```
+
+**Stop WhisperEngine:**
+```bash
+docker-compose down
+```
+
+**View Logs:**
+```bash
+docker logs whisperengine-assistant
+```
+
+**Check Status:**
+```bash
+docker ps
+```
+
+### **Updates**
+
+**Update to Latest Version:**
+```bash
+# Stop current version
+docker-compose down
+
+# Pull latest containers
+docker-compose pull
+
+# Start with new version
+docker-compose up -d
+```
+
+**Check Version:**
+```bash
+curl http://localhost:9090/health
+```
+
+## 🔧 Troubleshooting
+
+### **Setup Failed?**
+
+**Check Docker is Running:**
+```bash
+docker info
+```
+
+**Check Port Availability:**
+```bash
+# These ports must be free: 3001, 9090, 5432, 6333, 8086
+lsof -i :3001
+lsof -i :9090
+```
+
+**Reset Everything:**
+```bash
+# Download and run cleanup script
+curl -sSL https://raw.githubusercontent.com/whisperengine-ai/whisperengine/main/cleanup-docker.sh | bash
+
+# Then run setup again
+curl -sSL https://raw.githubusercontent.com/whisperengine-ai/whisperengine/main/setup-containerized.sh | bash
+```
+
+### **Database Errors?**
+
+**For Users Upgrading from v1.0.6:**
+```bash
+# Step 1: Update containers first (to get Alembic)
+docker-compose down
+docker-compose pull
+docker-compose up -d
+
+# Step 2: Mark existing database as current
+docker exec whisperengine-assistant alembic stamp head
+```
+
+### **Need Help?**
+
+- **📖 Documentation**: [Troubleshooting Guide](../troubleshooting/README.md)
+- **🐛 Bug Reports**: [GitHub Issues](https://github.com/whisperengine-ai/whisperengine/issues)
+- **📧 Support**: support@whisperengine.ai
+
+## 🎯 Next Steps
+
+Once WhisperEngine is running:
+
+1. **🎭 Create Characters**: Build AI personalities for your specific needs
+2. **💬 Test Conversations**: Verify character behavior and responses
+3. **🔗 Integrate APIs**: Connect to your own applications
+4. **📊 Monitor Performance**: Use the metrics dashboard
+5. **🔄 Explore Features**: Discover advanced personality modeling
+
+---
+
+**🎉 Congratulations!** You now have a fully functional AI character platform running locally. Start creating your first character and explore the possibilities of persistent AI personalities!
 
 ## 🔄 Updating Your Installation
 
@@ -469,41 +702,9 @@ curl -X POST http://localhost:9090/api/chat \\
 2. Use `/chat` commands or mention the bot
 3. Characters respond with persistent memory
 
-## 🔧 Management Commands
+---
 
-### **View Status**
-```bash
-docker-compose -f docker-compose.quickstart.yml ps
-```
-
-### **View Logs**
-```bash
-# All services
-docker-compose -f docker-compose.quickstart.yml logs
-
-# Specific service
-docker-compose -f docker-compose.quickstart.yml logs whisperengine-assistant
-
-# Follow logs in real-time
-docker-compose -f docker-compose.quickstart.yml logs -f
-```
-
-### **Stop WhisperEngine**
-```bash
-docker-compose -f docker-compose.quickstart.yml down
-```
-
-### **Restart WhisperEngine**
-```bash
-docker-compose -f docker-compose.quickstart.yml restart
-```
-
-### **Update WhisperEngine**
-```bash
-git pull
-docker-compose -f docker-compose.quickstart.yml pull
-docker-compose -f docker-compose.quickstart.yml up -d
-```
+**🎉 Congratulations!** You now have a fully functional AI character platform running locally. Start creating your first character and explore the possibilities of persistent AI personalities!
 
 ## 🛠️ Customization Options
 

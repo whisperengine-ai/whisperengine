@@ -38,14 +38,14 @@
 - **Multiple LLM Support** - OpenRouter, OpenAI, Claude, or local models
 - **Open Source** - MIT licensed and community-driven
 
-## 🚀 Quick Start
+## 🚀 Quick Start (End Users)
 
-Get WhisperEngine running with a **single command**:
+Get WhisperEngine running with a **single command** - no technical setup required:
 
 ### **Prerequisites**
 - [Docker Desktop](https://www.docker.com/products/docker-desktop/) installed and running
 - An LLM API key (OpenRouter recommended for beginners)
-- **No Git or source code required!**
+- **No Git, source code, or programming knowledge required!**
 
 ### **1-Command Setup**
 
@@ -117,7 +117,7 @@ curl -X POST http://localhost:9090/api/chat \\
 1. Create a Discord bot at https://discord.com/developers/applications
 2. Add the bot token to your `.env` file
 3. Set `ENABLE_DISCORD=true`
-4. Restart: `docker-compose -f docker-compose.quickstart.yml restart`
+4. Restart: `docker-compose restart`
 
 ## 🔧 Troubleshooting
 
@@ -176,7 +176,8 @@ CHARACTER_NAME=assistant    # Default character name
 
 ## 📚 Documentation
 
-- **[Quick Start Guide](QUICKSTART.md)** - Detailed setup instructions
+- **[Quick Start Guide](docs/guides/QUICKSTART.md)** - Detailed end-user setup instructions
+- **[Development Guide](docs/development/DEVELOPMENT_GUIDE.md)** - Developer setup and contribution guide
 - **[Installation Guide](INSTALLATION.md)** - Complete installation options
 - **[Container Operations Guide](CONTAINERIZED_OPERATIONS_GUIDE.md)** - Updates, backups, troubleshooting
 - **[Character Creation Guide](docs/characters/CHARACTER_AUTHORING_GUIDE.md)** - Advanced character building
@@ -261,9 +262,21 @@ Unlike simple chatbots, WhisperEngine creates **persistent AI characters** with:
 **Start building your AI characters today!** 🚀
 
 ```bash
-# For end users (recommended):
+# For end users (no technical setup required):
 curl -sSL https://raw.githubusercontent.com/whisperengine-ai/whisperengine/main/setup-containerized.sh | bash
-
-# For developers:
-git clone https://github.com/whisperengine-ai/whisperengine.git && cd whisperengine && ./setup.sh
 ```
+
+---
+
+## 🔧 Developer Setup
+
+For developers who want to modify WhisperEngine's source code:
+
+```bash
+# For developers (requires Git and development environment):
+git clone https://github.com/whisperengine-ai/whisperengine.git
+cd whisperengine
+./setup.sh
+```
+
+**See**: [Development Setup Guide](docs/development/DEVELOPMENT_GUIDE.md) for complete development environment instructions.
