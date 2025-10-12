@@ -120,30 +120,31 @@ async def run_migrations():
             AND table_name != 'schema_migrations'
         """)
         
-        # ALPHA MODE: Apply init schema ONLY, skip incremental migrations
-        # Since we have no production users, we can just use the base schema
-        init_schema_path = Path("/app/sql/init_schema.sql")
+        # QUICKSTART MODE: Apply comprehensive 00_init.sql ONLY, skip incremental migrations
+        # Single authoritative database initialization file with all 73 tables
+        init_schema_path = Path("/app/sql/00_init.sql")
         if init_schema_path.exists():
-            migration_name = "00_init_schema.sql"
+            migration_name = "00_init.sql"
             
             if not await is_migration_applied(conn, migration_name):
                 if table_count == 0:
-                    print(f"🗄️  Database is empty - applying init schema...")
+                    print("🗄️  Database is empty - applying comprehensive init schema (73 tables)...")
                     if await apply_sql_file(conn, init_schema_path, migration_name):
                         await record_migration(conn, migration_name)
+                        print("✅ Comprehensive schema applied - 73 tables + AI Assistant character ready!")
                     else:
                         print("❌ Init schema failed - exiting")
                         return 1
                 else:
                     print(f"ℹ️  Database has {table_count} tables - skipping init schema (already initialized)")
-                    print(f"ℹ️  Recording init schema as applied to prevent future attempts...")
+                    print("ℹ️  Recording init schema as applied to prevent future attempts...")
                     await record_migration(conn, migration_name)
             else:
-                print(f"✅ Init schema already applied, skipping...")
+                print("✅ Comprehensive init schema (00_init.sql) already applied, skipping...")
         
-        # ALPHA MODE: Skip incremental migrations - we only use init schema
-        print("ℹ️  ALPHA MODE: Skipping incremental migrations (sql/migrations/)")
-        print("ℹ️  Using base init_schema.sql only - no production users to migrate")
+        # QUICKSTART MODE: Skip incremental migrations - we use comprehensive 00_init.sql
+        print("ℹ️  QUICKSTART MODE: Using comprehensive sql/00_init.sql (73 tables + seed data)")
+        print("ℹ️  Skipping incremental migrations (sql/migrations/) - single init file deployment")
         
         print("🎉 All migrations complete!")
         return 0

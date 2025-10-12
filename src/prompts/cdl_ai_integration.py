@@ -703,7 +703,12 @@ class CDLAIPromptIntegration:
             if hasattr(big_five, 'neuroticism'):
                 prompt += f"- {get_adaptive_trait_info(big_five.neuroticism, 'neuroticism')}\n"
 
-        # 🆕 PHASE 2: ADD RICH CHARACTER DATA FROM DATABASE
+        # � VOICE & COMMUNICATION STYLE: Consolidated section matching complete_prompt_examples format
+        voice_section = await self._build_voice_communication_section(character)
+        if voice_section:
+            prompt += f"\n\n{voice_section}"
+
+        # �🆕 PHASE 2: ADD RICH CHARACTER DATA FROM DATABASE
         # This integrates the migrated data from legacy JSON into system prompts
         
         # 💕 RELATIONSHIPS: Add character relationships (e.g., Gabriel-Cynthia)
@@ -748,33 +753,13 @@ class CDLAIPromptIntegration:
             except Exception as e:
                 logger.debug(f"Could not extract behavioral triggers: {e}")
         
-        # 💬 SPEECH PATTERNS: Add signature expressions and vocabulary
-        if self.enhanced_manager:
-            try:
-                bot_name = os.getenv('DISCORD_BOT_NAME', character.identity.name).lower()
-                speech_patterns = await self.enhanced_manager.get_speech_patterns(bot_name)
-                if speech_patterns:
-                    # Group by pattern type
-                    signature_exprs = [p for p in speech_patterns if p.pattern_type == 'signature_expression']
-                    preferred_words = [p for p in speech_patterns if p.pattern_type == 'preferred_word']
-                    avoided_words = [p for p in speech_patterns if p.pattern_type == 'avoided_word']
-                    
-                    if signature_exprs:
-                        exprs_list = ', '.join([f'"{p.pattern_value}"' for p in signature_exprs[:7]])
-                        prompt += f"\n\n💬 SIGNATURE EXPRESSIONS: {exprs_list}\n"
-                        logger.info(f"✅ SPEECH PATTERNS: Added {len(signature_exprs)} signature expressions")
-                    
-                    if preferred_words:
-                        words_list = ', '.join([p.pattern_value for p in preferred_words[:10]])
-                        prompt += f"✅ PREFERRED VOCABULARY: {words_list}\n"
-                        logger.info(f"✅ SPEECH PATTERNS: Added {len(preferred_words)} preferred words")
-                    
-                    if avoided_words:
-                        avoid_list = ', '.join([p.pattern_value for p in avoided_words])
-                        prompt += f"❌ AVOID THESE WORDS: {avoid_list}\n"
-                        logger.info(f"✅ SPEECH PATTERNS: Added {len(avoided_words)} words to avoid")
-            except Exception as e:
-                logger.debug(f"Could not extract speech patterns: {e}")
+        # NOTE: 💬 SIGNATURE EXPRESSIONS, 🌍 AUTHENTIC VOICE PATTERNS, and 🎤 VOICE CHARACTERISTICS sections
+        # have been consolidated into the unified VOICE & COMMUNICATION STYLE section above (line ~710)
+        # to match complete_prompt_examples format. Keeping these original sections commented for reference:
+        
+        # # 💬 SPEECH PATTERNS: Add signature expressions and vocabulary (MOVED TO VOICE SECTION)
+        # # 🌍 CULTURAL EXPRESSIONS: Add authentic voice patterns and phrases (MOVED TO VOICE SECTION)
+        # # 🎤 VOICE TRAITS: Add tone, rhythm, and style characteristics (MOVED TO VOICE SECTION)
         
         # 🗣️ CONVERSATION FLOWS: Add flow guidance for different interaction modes
         if self.enhanced_manager:
@@ -809,48 +794,13 @@ class CDLAIPromptIntegration:
                     if active_triggers:
                         prompt += f"\n\n🎨 ACTIVE MESSAGE TRIGGERS (respond appropriately):\n"
                         for trigger in active_triggers[:5]:  # Top 5 most relevant
-                            prompt += f"- {trigger.trigger_category}: Detected '{trigger.trigger_value}' - Apply {trigger.response_type} response\n"
+                            prompt += f"- {trigger.trigger_category}: Detected '{trigger.trigger_value}' - Apply {trigger.response_mode} response\n"
                         logger.info(f"✅ MESSAGE TRIGGERS: Activated {len(active_triggers)} triggers for current message")
             except Exception as e:
                 logger.debug(f"Could not extract message triggers: {e}")
         
-        # 🌍 CULTURAL EXPRESSIONS: Add authentic voice patterns and phrases
-        if self.enhanced_manager:
-            try:
-                bot_name = os.getenv('DISCORD_BOT_NAME', character.identity.name).lower()
-                cultural_expressions = await self.enhanced_manager.get_cultural_expressions(bot_name)
-                if cultural_expressions:
-                    # Group by expression type
-                    favorite_phrases = [e for e in cultural_expressions if e.expression_type == 'favorite_phrase']
-                    cultural_phrases = [e for e in cultural_expressions if e.expression_type in ['spanish_phrase', 'cultural_phrase']]
-                    
-                    if favorite_phrases or cultural_phrases:
-                        prompt += f"\n\n🌍 AUTHENTIC VOICE PATTERNS:\n"
-                        
-                        if favorite_phrases:
-                            phrases_list = ', '.join([f'"{e.expression_value}"' for e in favorite_phrases[:5]])
-                            prompt += f"- Favorite expressions: {phrases_list}\n"
-                        
-                        if cultural_phrases:
-                            cultural_list = ', '.join([f'"{e.expression_value}"' for e in cultural_phrases[:8]])
-                            prompt += f"- Cultural phrases (use naturally): {cultural_list}\n"
-                        
-                        logger.info(f"✅ CULTURAL EXPRESSIONS: Added {len(favorite_phrases)} favorites, {len(cultural_phrases)} cultural phrases")
-            except Exception as e:
-                logger.debug(f"Could not extract cultural expressions: {e}")
-        
-        # 🎤 VOICE TRAITS: Add tone, rhythm, and style characteristics
-        if self.enhanced_manager:
-            try:
-                bot_name = os.getenv('DISCORD_BOT_NAME', character.identity.name).lower()
-                voice_traits = await self.enhanced_manager.get_voice_traits(bot_name)
-                if voice_traits:
-                    prompt += f"\n\n🎤 VOICE CHARACTERISTICS:\n"
-                    for trait in voice_traits:
-                        prompt += f"- {trait.trait_type.replace('_', ' ').title()}: {trait.trait_value}\n"
-                    logger.info(f"✅ VOICE TRAITS: Added {len(voice_traits)} voice characteristics")
-            except Exception as e:
-                logger.debug(f"Could not extract voice traits: {e}")
+        # NOTE: 🌍 AUTHENTIC VOICE PATTERNS and 🎤 VOICE CHARACTERISTICS sections
+        # consolidated into VOICE & COMMUNICATION STYLE section (see above)
         
         # 💭 EMOTIONAL TRIGGERS: Add appropriate emotional reaction patterns
         if self.enhanced_manager:
@@ -871,7 +821,7 @@ class CDLAIPromptIntegration:
                     if active_emotional_triggers:
                         prompt += f"\n\n💭 EMOTIONAL RESPONSE GUIDANCE (current context):\n"
                         for trigger in active_emotional_triggers[:3]:  # Top 3 most relevant
-                            prompt += f"- {trigger.trigger_type.title()}: {trigger.response_guidance}\n"
+                            prompt += f"- {trigger.trigger_type.title()}: {trigger.emotional_response}\n"
                         logger.info(f"✅ EMOTIONAL TRIGGERS: Activated {len(active_emotional_triggers)} emotional triggers")
                     else:
                         # Show general emotional patterns for reference
@@ -901,10 +851,8 @@ class CDLAIPromptIntegration:
                         prompt += f"\n\n🎓 RELEVANT EXPERTISE (apply knowledge):\n"
                         for domain in relevant_domains[:3]:  # Top 3 most relevant
                             prompt += f"- **{domain.domain_name}** (Level: {domain.expertise_level}, Passion: {domain.passion_level}/10)\n"
-                            if domain.teaching_style:
-                                prompt += f"  Teaching approach: {domain.teaching_style}\n"
-                            if domain.preferred_discussion_depth:
-                                prompt += f"  Discussion depth: {domain.preferred_discussion_depth}\n"
+                            if domain.teaching_approach:
+                                prompt += f"  Teaching approach: {domain.teaching_approach}\n"
                         logger.info(f"✅ EXPERTISE DOMAINS: Activated {len(relevant_domains)} relevant domains")
                     else:
                         # Show top expertise areas for general reference
@@ -931,11 +879,11 @@ class CDLAIPromptIntegration:
                         if excitement_emojis:
                             # Show excitement level guidance
                             for emoji_pattern in excitement_emojis[:3]:  # Low, medium, high
-                                prompt += f"- {emoji_pattern.pattern_name}: {emoji_pattern.emoji}\n"
+                                prompt += f"- {emoji_pattern.pattern_name}: {emoji_pattern.emoji_sequence}\n"
                         
                         if context_emojis:
                             # Show context-specific emoji usage
-                            context_list = ', '.join([f"{e.pattern_name}: {e.emoji}" for e in context_emojis[:5]])
+                            context_list = ', '.join([f"{e.pattern_name}: {e.emoji_sequence}" for e in context_emojis[:5]])
                             prompt += f"- Context-specific: {context_list}\n"
                         
                         logger.info(f"✅ EMOJI PATTERNS: Added {len(emoji_patterns)} emoji usage patterns")
@@ -2631,6 +2579,100 @@ RESPONSE APPROACH:
 3. Suggest engaging alternatives
 
 Stay authentic to {character.identity.name}'s personality while being transparent about physical limitations."""
+
+    async def _build_voice_communication_section(self, character) -> str:
+        """
+        Build consolidated VOICE & COMMUNICATION STYLE section matching complete_prompt_examples format.
+        
+        Queries extended data tables:
+        - character_voice_traits: tone, pace, accent
+        - character_cultural_expressions: favorite phrases, cultural expressions  
+        - character_message_triggers: speech patterns keywords
+        
+        Returns formatted section matching Elena example structure.
+        """
+        try:
+            bot_name = os.getenv('DISCORD_BOT_NAME', character.identity.name).lower()
+            
+            voice_parts = []
+            voice_parts.append("VOICE & COMMUNICATION STYLE:")
+            
+            # Query voice traits for tone, pace, accent
+            tone_value = None
+            pace_value = None
+            accent_value = None
+            speech_patterns = []
+            
+            if self.enhanced_manager:
+                try:
+                    voice_traits = await self.enhanced_manager.get_voice_traits(bot_name)
+                    
+                    for trait in voice_traits:
+                        trait_type = trait.trait_type.lower()
+                        
+                        if trait_type == 'tone':
+                            tone_value = trait.trait_value
+                        elif trait_type == 'pace' or trait_type == 'speaking_pace':
+                            pace_value = trait.trait_value
+                        elif trait_type == 'accent':
+                            accent_value = trait.trait_value
+                        elif trait_type == 'speech_pattern':
+                            speech_patterns.append(trait.trait_value)
+                    
+                    logger.info(f"✅ VOICE SECTION: Retrieved {len(voice_traits)} voice traits")
+                    
+                except Exception as e:
+                    logger.debug(f"Could not query voice traits: {e}")
+            
+            # Add Tone
+            if tone_value:
+                voice_parts.append(f"- Tone: {tone_value}")
+            
+            # Add Pace
+            if pace_value:
+                voice_parts.append(f"- Pace: {pace_value}")
+            
+            # Add Accent
+            if accent_value:
+                voice_parts.append(f"- Accent: {accent_value}")
+            
+            # Query cultural expressions for favorite phrases
+            favorite_phrases = []
+            
+            if self.enhanced_manager:
+                try:
+                    cultural_expressions = await self.enhanced_manager.get_cultural_expressions(bot_name)
+                    
+                    for expr in cultural_expressions:
+                        expr_type = expr.expression_type.lower()
+                        
+                        if 'favorite' in expr_type or 'signature' in expr_type:
+                            favorite_phrases.append(expr.expression_value)
+                    
+                    logger.info(f"✅ VOICE SECTION: Retrieved {len(favorite_phrases)} favorite phrases")
+                    
+                except Exception as e:
+                    logger.debug(f"Could not query cultural expressions: {e}")
+            
+            # Add Speech patterns (combine speech_pattern traits + message triggers)
+            if speech_patterns:
+                patterns_text = ", ".join(speech_patterns[:5])  # Top 5
+                voice_parts.append(f"- Speech patterns: {patterns_text}")
+            
+            # Add Favorite phrases
+            if favorite_phrases:
+                phrases_text = ", ".join(favorite_phrases[:5])  # Top 5
+                voice_parts.append(f"- Favorite phrases: {phrases_text}")
+            
+            # Return formatted section if we have content
+            if len(voice_parts) > 1:  # More than just the header
+                return "\n".join(voice_parts)
+            else:
+                return ""
+                
+        except Exception as e:
+            logger.error(f"Failed to build voice communication section: {e}")
+            return ""
 
     async def _build_user_context_section(self, user_id: str, display_name: str) -> str:
         """
