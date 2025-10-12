@@ -54,18 +54,29 @@ if exist "docker-compose.containerized.yml" if exist ".env.containerized.templat
     )
     
     mkdir "%INSTALL_DIR%"
+    if not exist "%INSTALL_DIR%" (
+        echo [ERROR] Failed to create directory %INSTALL_DIR%
+        pause
+        exit /b 1
+    )
 )
 
 cd "%INSTALL_DIR%"
+if errorlevel 1 (
+    echo [ERROR] Failed to change to directory %INSTALL_DIR%
+    pause
+    exit /b 1
+)
+echo %CD%
 echo [SUCCESS] Using directory: %CD%
 
 if not "%INSTALL_DIR%" == "." (
     REM Download Docker Compose file
     echo [SETUP] Downloading Docker Compose configuration...
-    set COMPOSE_URL=https://raw.githubusercontent.com/whisperengine-ai/whisperengine/main/docker-compose.containerized.yml
-    powershell -Command "try { Invoke-WebRequest -Uri '%COMPOSE_URL%' -OutFile 'docker-compose.yml' -UseBasicParsing } catch { exit 1 }"
+    powershell -Command "try { Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/whisperengine-ai/whisperengine/main/docker-compose.containerized.yml' -OutFile 'docker-compose.yml' -UseBasicParsing -ErrorAction Stop } catch { Write-Host 'Download failed:' $_.Exception.Message; exit 1 }"
     if errorlevel 1 (
         echo [ERROR] Failed to download Docker Compose file
+        echo [ERROR] Please check your internet connection and try again
         pause
         exit /b 1
     )
@@ -73,10 +84,10 @@ if not "%INSTALL_DIR%" == "." (
 
     REM Download environment template
     echo [SETUP] Downloading configuration template...
-    set ENV_URL=https://raw.githubusercontent.com/whisperengine-ai/whisperengine/main/.env.containerized.template
-    powershell -Command "try { Invoke-WebRequest -Uri '%ENV_URL%' -OutFile '.env.template' -UseBasicParsing } catch { exit 1 }"
+    powershell -Command "try { Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/whisperengine-ai/whisperengine/main/.env.containerized.template' -OutFile '.env.template' -UseBasicParsing -ErrorAction Stop } catch { Write-Host 'Download failed:' $_.Exception.Message; exit 1 }"
     if errorlevel 1 (
         echo [ERROR] Failed to download environment template
+        echo [ERROR] Please check your internet connection and try again
         pause
         exit /b 1
     )

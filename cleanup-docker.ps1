@@ -80,7 +80,7 @@ if ($containers) {
 Write-Step "Removing WhisperEngine volumes..."
 
 # First, get all volumes with whisperengine in the name
-$volumes = docker volume ls --format "{{.Name}}" 2>$null | Select-String -Pattern "whisperengine" -CaseSensitive:$false
+$volumes = docker volume ls --format '{{.Name}}' 2>$null | Select-String -Pattern "whisperengine" -CaseSensitive:$false
 
 if ($volumes) {
     foreach ($volume in $volumes) {
@@ -97,7 +97,7 @@ if ($volumes) {
 # Also try common volume name patterns without prefix
 $commonVolumes = @("postgres_data", "qdrant_data", "influxdb_data", "whisperengine_logs", "grafana_data")
 foreach ($volume in $commonVolumes) {
-    $exists = docker volume ls --format "{{.Name}}" 2>$null | Select-String -Pattern "^$volume$" -Quiet
+    $exists = docker volume ls --format '{{.Name}}' 2>$null | Select-String -Pattern "^$volume$" -Quiet
     if ($exists) {
         docker volume rm $volume 2>$null | Out-Null
         Write-Success "Removed volume: $volume"
@@ -109,7 +109,7 @@ Write-Step "Removing WhisperEngine networks..."
 # Remove networks
 $networks = @("whisperengine-network", "whisperengine_default")
 foreach ($network in $networks) {
-    $exists = docker network ls --format "{{.Name}}" 2>$null | Select-String -Pattern $network -Quiet
+    $exists = docker network ls --format '{{.Name}}' 2>$null | Select-String -Pattern $network -Quiet
     if ($exists) {
         docker network rm $network 2>$null | Out-Null
         Write-Success "Removed network: $network"
