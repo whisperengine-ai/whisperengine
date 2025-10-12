@@ -111,42 +111,39 @@ async def run_migrations():
         # Create migrations tracking table
         await create_migrations_table(conn)
         
-        # Apply init schema if not already applied
+        # Check if database has existing tables (besides schema_migrations)
+        table_count = await conn.fetchval("""
+            SELECT COUNT(*) 
+            FROM information_schema.tables 
+            WHERE table_schema = 'public' 
+            AND table_type = 'BASE TABLE'
+            AND table_name != 'schema_migrations'
+        """)
+        
+        # ALPHA MODE: Apply init schema ONLY, skip incremental migrations
+        # Since we have no production users, we can just use the base schema
         init_schema_path = Path("/app/sql/init_schema.sql")
         if init_schema_path.exists():
             migration_name = "00_init_schema.sql"
             
             if not await is_migration_applied(conn, migration_name):
-                print(f"🗄️  Applying init schema...")
-                if await apply_sql_file(conn, init_schema_path, migration_name):
-                    await record_migration(conn, migration_name)
+                if table_count == 0:
+                    print(f"🗄️  Database is empty - applying init schema...")
+                    if await apply_sql_file(conn, init_schema_path, migration_name):
+                        await record_migration(conn, migration_name)
+                    else:
+                        print("❌ Init schema failed - exiting")
+                        return 1
                 else:
-                    print("❌ Init schema failed - exiting")
-                    return 1
+                    print(f"ℹ️  Database has {table_count} tables - skipping init schema (already initialized)")
+                    print(f"ℹ️  Recording init schema as applied to prevent future attempts...")
+                    await record_migration(conn, migration_name)
             else:
                 print(f"✅ Init schema already applied, skipping...")
         
-        # Apply all migrations in order
-        migrations_dir = Path("/app/sql/migrations")
-        if migrations_dir.exists():
-            print(f"🔄 Applying migrations from {migrations_dir}...")
-            
-            # Get all SQL files and sort them
-            migration_files = sorted(migrations_dir.glob("*.sql"))
-            
-            for migration_file in migration_files:
-                migration_name = migration_file.name
-                
-                if not await is_migration_applied(conn, migration_name):
-                    if await apply_sql_file(conn, migration_file, migration_name):
-                        await record_migration(conn, migration_name)
-                    else:
-                        print(f"❌ Migration {migration_name} failed - stopping")
-                        return 1
-                else:
-                    print(f"✅ Migration {migration_name} already applied, skipping...")
-        else:
-            print("ℹ️  No migrations directory found, skipping...")
+        # ALPHA MODE: Skip incremental migrations - we only use init schema
+        print("ℹ️  ALPHA MODE: Skipping incremental migrations (sql/migrations/)")
+        print("ℹ️  Using base init_schema.sql only - no production users to migrate")
         
         print("🎉 All migrations complete!")
         return 0

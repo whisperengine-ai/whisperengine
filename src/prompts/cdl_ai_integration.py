@@ -16,12 +16,13 @@ from src.characters.cdl.simple_cdl_manager import get_simple_cdl_manager
 logger = logging.getLogger(__name__)
 
 class CDLAIPromptIntegration:
-    def __init__(self, vector_memory_manager=None, llm_client=None, knowledge_router=None, bot_core=None, semantic_router=None):
+    def __init__(self, vector_memory_manager=None, llm_client=None, knowledge_router=None, bot_core=None, semantic_router=None, enhanced_manager=None):
         self.memory_manager = vector_memory_manager
         self.llm_client = llm_client
         self.knowledge_router = knowledge_router
         self.semantic_router = semantic_router  # NEW: Store semantic router for user facts cross-pollination
         self.bot_core = bot_core  # Store bot_core for personality profiler access
+        self.enhanced_manager = enhanced_manager  # NEW: Enhanced CDL manager for rich character data
         self._graph_manager = None  # Cache for CharacterGraphManager
         self._graph_manager_initialized = False
         self._context_enhancer = None  # Cache for CharacterContextEnhancer (Phase 2B)
@@ -701,6 +702,264 @@ class CDLAIPromptIntegration:
                 prompt += f"- {get_adaptive_trait_info(big_five.agreeableness, 'agreeableness')}\n"
             if hasattr(big_five, 'neuroticism'):
                 prompt += f"- {get_adaptive_trait_info(big_five.neuroticism, 'neuroticism')}\n"
+
+        # 🆕 PHASE 2: ADD RICH CHARACTER DATA FROM DATABASE
+        # This integrates the migrated data from legacy JSON into system prompts
+        
+        # 💕 RELATIONSHIPS: Add character relationships (e.g., Gabriel-Cynthia)
+        if self.enhanced_manager:
+            try:
+                bot_name = os.getenv('DISCORD_BOT_NAME', character.identity.name).lower()
+                relationships = await self.enhanced_manager.get_relationships(bot_name)
+                if relationships:
+                    prompt += f"\n\n💕 RELATIONSHIP CONTEXT:\n"
+                    for rel in relationships:
+                        if rel.relationship_strength >= 8:  # High-priority relationships
+                            prompt += f"- **{rel.related_entity}** ({rel.relationship_type}): {rel.description}\n"
+                            logger.info(f"✅ RELATIONSHIPS: Added high-priority relationship: {rel.related_entity}")
+                        elif rel.relationship_strength >= 5:  # Medium-priority relationships
+                            prompt += f"- {rel.related_entity}: {rel.description}\n"
+                            logger.info(f"✅ RELATIONSHIPS: Added medium-priority relationship: {rel.related_entity}")
+                    logger.info(f"✅ RELATIONSHIPS: Total {len(relationships)} relationship entries added to prompt")
+            except Exception as e:
+                logger.debug(f"Could not extract relationships: {e}")
+        
+        # ⚡ BEHAVIORAL TRIGGERS: Add recognition responses and interaction patterns
+        if self.enhanced_manager:
+            try:
+                bot_name = os.getenv('DISCORD_BOT_NAME', character.identity.name).lower()
+                behavioral_triggers = await self.enhanced_manager.get_behavioral_triggers(bot_name)
+                if behavioral_triggers:
+                    # Group by trigger type for organized presentation
+                    recognition_triggers = [t for t in behavioral_triggers if t.trigger_type == 'user_recognition']
+                    interaction_triggers = [t for t in behavioral_triggers if t.trigger_type in ['user_specific', 'mood', 'emotional', 'situational']]
+                    
+                    if recognition_triggers:
+                        prompt += f"\n\n⚡ USER RECOGNITION RESPONSES:\n"
+                        for trigger in recognition_triggers[:5]:  # Top 5 most important
+                            prompt += f"- When {trigger.trigger_value} interacts: {trigger.response_description}\n"
+                        logger.info(f"✅ BEHAVIORAL TRIGGERS: Added {len(recognition_triggers)} recognition responses")
+                    
+                    if interaction_triggers:
+                        prompt += f"\n\n🎭 INTERACTION PATTERNS:\n"
+                        for trigger in interaction_triggers[:8]:  # Top 8 most important
+                            prompt += f"- {trigger.trigger_value}: {trigger.response_description}\n"
+                        logger.info(f"✅ BEHAVIORAL TRIGGERS: Added {len(interaction_triggers)} interaction patterns")
+            except Exception as e:
+                logger.debug(f"Could not extract behavioral triggers: {e}")
+        
+        # 💬 SPEECH PATTERNS: Add signature expressions and vocabulary
+        if self.enhanced_manager:
+            try:
+                bot_name = os.getenv('DISCORD_BOT_NAME', character.identity.name).lower()
+                speech_patterns = await self.enhanced_manager.get_speech_patterns(bot_name)
+                if speech_patterns:
+                    # Group by pattern type
+                    signature_exprs = [p for p in speech_patterns if p.pattern_type == 'signature_expression']
+                    preferred_words = [p for p in speech_patterns if p.pattern_type == 'preferred_word']
+                    avoided_words = [p for p in speech_patterns if p.pattern_type == 'avoided_word']
+                    
+                    if signature_exprs:
+                        exprs_list = ', '.join([f'"{p.pattern_value}"' for p in signature_exprs[:7]])
+                        prompt += f"\n\n💬 SIGNATURE EXPRESSIONS: {exprs_list}\n"
+                        logger.info(f"✅ SPEECH PATTERNS: Added {len(signature_exprs)} signature expressions")
+                    
+                    if preferred_words:
+                        words_list = ', '.join([p.pattern_value for p in preferred_words[:10]])
+                        prompt += f"✅ PREFERRED VOCABULARY: {words_list}\n"
+                        logger.info(f"✅ SPEECH PATTERNS: Added {len(preferred_words)} preferred words")
+                    
+                    if avoided_words:
+                        avoid_list = ', '.join([p.pattern_value for p in avoided_words])
+                        prompt += f"❌ AVOID THESE WORDS: {avoid_list}\n"
+                        logger.info(f"✅ SPEECH PATTERNS: Added {len(avoided_words)} words to avoid")
+            except Exception as e:
+                logger.debug(f"Could not extract speech patterns: {e}")
+        
+        # 🗣️ CONVERSATION FLOWS: Add flow guidance for different interaction modes
+        if self.enhanced_manager:
+            try:
+                bot_name = os.getenv('DISCORD_BOT_NAME', character.identity.name).lower()
+                conversation_flows = await self.enhanced_manager.get_conversation_flows(bot_name)
+                if conversation_flows:
+                    prompt += f"\n\n🗣️ CONVERSATION FLOW GUIDANCE:\n"
+                    for flow in conversation_flows[:5]:  # Top 5 flows by priority
+                        prompt += f"- **{flow.flow_name}** ({flow.energy_level}): {flow.approach_description}\n"
+                        if flow.transition_style:
+                            prompt += f"  Transitions: {flow.transition_style}\n"
+                    logger.info(f"✅ CONVERSATION FLOWS: Added {len(conversation_flows)} flow entries")
+            except Exception as e:
+                logger.debug(f"Could not extract conversation flows: {e}")
+        
+        # 🎨 MESSAGE TRIGGERS: Add context-aware response activation patterns
+        if self.enhanced_manager:
+            try:
+                bot_name = os.getenv('DISCORD_BOT_NAME', character.identity.name).lower()
+                message_triggers = await self.enhanced_manager.get_message_triggers(bot_name)
+                if message_triggers:
+                    # Check if any triggers match current message
+                    active_triggers = []
+                    message_lower = message_content.lower()
+                    for trigger in message_triggers:
+                        if trigger.trigger_type == 'keyword' and trigger.trigger_value.lower() in message_lower:
+                            active_triggers.append(trigger)
+                        elif trigger.trigger_type == 'phrase' and trigger.trigger_value.lower() in message_lower:
+                            active_triggers.append(trigger)
+                    
+                    if active_triggers:
+                        prompt += f"\n\n🎨 ACTIVE MESSAGE TRIGGERS (respond appropriately):\n"
+                        for trigger in active_triggers[:5]:  # Top 5 most relevant
+                            prompt += f"- {trigger.trigger_category}: Detected '{trigger.trigger_value}' - Apply {trigger.response_type} response\n"
+                        logger.info(f"✅ MESSAGE TRIGGERS: Activated {len(active_triggers)} triggers for current message")
+            except Exception as e:
+                logger.debug(f"Could not extract message triggers: {e}")
+        
+        # 🌍 CULTURAL EXPRESSIONS: Add authentic voice patterns and phrases
+        if self.enhanced_manager:
+            try:
+                bot_name = os.getenv('DISCORD_BOT_NAME', character.identity.name).lower()
+                cultural_expressions = await self.enhanced_manager.get_cultural_expressions(bot_name)
+                if cultural_expressions:
+                    # Group by expression type
+                    favorite_phrases = [e for e in cultural_expressions if e.expression_type == 'favorite_phrase']
+                    cultural_phrases = [e for e in cultural_expressions if e.expression_type in ['spanish_phrase', 'cultural_phrase']]
+                    
+                    if favorite_phrases or cultural_phrases:
+                        prompt += f"\n\n🌍 AUTHENTIC VOICE PATTERNS:\n"
+                        
+                        if favorite_phrases:
+                            phrases_list = ', '.join([f'"{e.expression_value}"' for e in favorite_phrases[:5]])
+                            prompt += f"- Favorite expressions: {phrases_list}\n"
+                        
+                        if cultural_phrases:
+                            cultural_list = ', '.join([f'"{e.expression_value}"' for e in cultural_phrases[:8]])
+                            prompt += f"- Cultural phrases (use naturally): {cultural_list}\n"
+                        
+                        logger.info(f"✅ CULTURAL EXPRESSIONS: Added {len(favorite_phrases)} favorites, {len(cultural_phrases)} cultural phrases")
+            except Exception as e:
+                logger.debug(f"Could not extract cultural expressions: {e}")
+        
+        # 🎤 VOICE TRAITS: Add tone, rhythm, and style characteristics
+        if self.enhanced_manager:
+            try:
+                bot_name = os.getenv('DISCORD_BOT_NAME', character.identity.name).lower()
+                voice_traits = await self.enhanced_manager.get_voice_traits(bot_name)
+                if voice_traits:
+                    prompt += f"\n\n🎤 VOICE CHARACTERISTICS:\n"
+                    for trait in voice_traits:
+                        prompt += f"- {trait.trait_type.replace('_', ' ').title()}: {trait.trait_value}\n"
+                    logger.info(f"✅ VOICE TRAITS: Added {len(voice_traits)} voice characteristics")
+            except Exception as e:
+                logger.debug(f"Could not extract voice traits: {e}")
+        
+        # 💭 EMOTIONAL TRIGGERS: Add appropriate emotional reaction patterns
+        if self.enhanced_manager:
+            try:
+                bot_name = os.getenv('DISCORD_BOT_NAME', character.identity.name).lower()
+                emotional_triggers = await self.enhanced_manager.get_emotional_triggers(bot_name)
+                if emotional_triggers:
+                    # Check if any triggers match current message context
+                    message_lower = message_content.lower()
+                    active_emotional_triggers = []
+                    
+                    for trigger in emotional_triggers:
+                        # Check if trigger content keywords appear in message
+                        trigger_keywords = trigger.trigger_content.lower().split()
+                        if any(keyword in message_lower for keyword in trigger_keywords if len(keyword) > 3):
+                            active_emotional_triggers.append(trigger)
+                    
+                    if active_emotional_triggers:
+                        prompt += f"\n\n💭 EMOTIONAL RESPONSE GUIDANCE (current context):\n"
+                        for trigger in active_emotional_triggers[:3]:  # Top 3 most relevant
+                            prompt += f"- {trigger.trigger_type.title()}: {trigger.response_guidance}\n"
+                        logger.info(f"✅ EMOTIONAL TRIGGERS: Activated {len(active_emotional_triggers)} emotional triggers")
+                    else:
+                        # Show general emotional patterns for reference
+                        prompt += f"\n\n💭 EMOTIONAL PATTERNS:\n"
+                        for trigger in emotional_triggers[:5]:  # Top 5 general patterns
+                            prompt += f"- {trigger.trigger_type.title()}: {trigger.trigger_content[:50]}...\n"
+                        logger.info(f"✅ EMOTIONAL TRIGGERS: Added {len(emotional_triggers)} emotional patterns")
+            except Exception as e:
+                logger.debug(f"Could not extract emotional triggers: {e}")
+        
+        # 🎓 EXPERTISE DOMAINS: Add knowledge-based response guidance
+        if self.enhanced_manager:
+            try:
+                bot_name = os.getenv('DISCORD_BOT_NAME', character.identity.name).lower()
+                expertise_domains = await self.enhanced_manager.get_expertise_domains(bot_name)
+                if expertise_domains:
+                    # Check if message relates to any expertise domain
+                    message_lower = message_content.lower()
+                    relevant_domains = []
+                    
+                    for domain in expertise_domains:
+                        domain_keywords = domain.domain_name.lower().split()
+                        if any(keyword in message_lower for keyword in domain_keywords if len(keyword) > 3):
+                            relevant_domains.append(domain)
+                    
+                    if relevant_domains:
+                        prompt += f"\n\n🎓 RELEVANT EXPERTISE (apply knowledge):\n"
+                        for domain in relevant_domains[:3]:  # Top 3 most relevant
+                            prompt += f"- **{domain.domain_name}** (Level: {domain.expertise_level}, Passion: {domain.passion_level}/10)\n"
+                            if domain.teaching_style:
+                                prompt += f"  Teaching approach: {domain.teaching_style}\n"
+                            if domain.preferred_discussion_depth:
+                                prompt += f"  Discussion depth: {domain.preferred_discussion_depth}\n"
+                        logger.info(f"✅ EXPERTISE DOMAINS: Activated {len(relevant_domains)} relevant domains")
+                    else:
+                        # Show top expertise areas for general reference
+                        prompt += f"\n\n🎓 CORE EXPERTISE AREAS:\n"
+                        for domain in expertise_domains[:5]:  # Top 5 by passion level
+                            prompt += f"- {domain.domain_name} (Level: {domain.expertise_level})\n"
+                        logger.info(f"✅ EXPERTISE DOMAINS: Added {len(expertise_domains)} expertise areas")
+            except Exception as e:
+                logger.debug(f"Could not extract expertise domains: {e}")
+        
+        # 😊 EMOJI PATTERNS: Add digital communication style
+        if self.enhanced_manager:
+            try:
+                bot_name = os.getenv('DISCORD_BOT_NAME', character.identity.name).lower()
+                emoji_patterns = await self.enhanced_manager.get_emoji_patterns(bot_name)
+                if emoji_patterns:
+                    # Group by pattern category
+                    excitement_emojis = [e for e in emoji_patterns if 'excitement' in e.pattern_category.lower()]
+                    context_emojis = [e for e in emoji_patterns if e.pattern_category not in ['excitement_level', 'general']]
+                    
+                    if excitement_emojis or context_emojis:
+                        prompt += f"\n\n😊 EMOJI USAGE PATTERNS:\n"
+                        
+                        if excitement_emojis:
+                            # Show excitement level guidance
+                            for emoji_pattern in excitement_emojis[:3]:  # Low, medium, high
+                                prompt += f"- {emoji_pattern.pattern_name}: {emoji_pattern.emoji}\n"
+                        
+                        if context_emojis:
+                            # Show context-specific emoji usage
+                            context_list = ', '.join([f"{e.pattern_name}: {e.emoji}" for e in context_emojis[:5]])
+                            prompt += f"- Context-specific: {context_list}\n"
+                        
+                        logger.info(f"✅ EMOJI PATTERNS: Added {len(emoji_patterns)} emoji usage patterns")
+            except Exception as e:
+                logger.debug(f"Could not extract emoji patterns: {e}")
+        
+        # 🎭 AI SCENARIOS: Add physical interaction handling guidance
+        if self.enhanced_manager:
+            try:
+                bot_name = os.getenv('DISCORD_BOT_NAME', character.identity.name).lower()
+                ai_scenarios = await self.enhanced_manager.get_ai_scenarios(bot_name)
+                if ai_scenarios:
+                    # Check if message contains physical interaction requests
+                    physical_keywords = ['hug', 'kiss', 'touch', 'hold', 'cuddle', 'pet', 'pat', 'embrace']
+                    message_lower = message_content.lower()
+                    
+                    if any(keyword in message_lower for keyword in physical_keywords):
+                        prompt += f"\n\n🎭 PHYSICAL INTERACTION GUIDANCE (roleplay request detected):\n"
+                        for scenario in ai_scenarios:
+                            if scenario.tier_responses:  # Has tiered response strategy
+                                prompt += f"- {scenario.scenario_name}: Use tier-appropriate response based on roleplay_immersion_level\n"
+                        logger.info(f"✅ AI SCENARIOS: Activated physical interaction guidance ({len(ai_scenarios)} scenarios)")
+            except Exception as e:
+                logger.debug(f"Could not extract AI scenarios: {e}")
 
         # Add CDL conversation flow guidelines early for communication style establishment
         try:

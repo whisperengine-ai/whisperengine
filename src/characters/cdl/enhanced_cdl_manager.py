@@ -48,6 +48,9 @@ class CharacterMemory:
     title: str
     description: str
     emotional_impact: int = 5
+    time_period: Optional[str] = None
+    importance_level: int = 5
+    triggers: Optional[List[str]] = None
 
 @dataclass
 class ResponseGuideline:
@@ -66,6 +69,7 @@ class ConversationFlow:
     approach_description: str
     transition_style: str
     priority: int
+    context: Optional[str] = None  # Additional context for when this flow applies
 
 @dataclass
 class MessageTrigger:
@@ -145,6 +149,52 @@ class CharacterInstruction:
     priority: int = 5
     context: Optional[str] = None
     active: bool = True
+
+@dataclass
+class AIScenario:
+    scenario_type: str  # 'physical_interaction', 'activity_participation', 'example_scenario'
+    scenario_name: str
+    trigger_phrases: Optional[str] = None
+    response_pattern: Optional[str] = None
+    tier_1_response: Optional[str] = None
+    tier_2_response: Optional[str] = None
+    tier_3_response: Optional[str] = None
+    example_usage: Optional[str] = None
+
+@dataclass
+class CulturalExpression:
+    expression_type: str  # 'spanish_expression', 'favorite_phrase', 'speech_pattern', 'cultural_background'
+    expression_value: str
+    meaning: Optional[str] = None
+    usage_context: Optional[str] = None
+    emotional_context: Optional[str] = None
+    frequency: Optional[str] = None
+
+@dataclass
+class VoiceTrait:
+    trait_type: str  # 'tone', 'pace', 'volume', 'accent', 'vocabulary_level'
+    trait_value: str
+    situational_context: Optional[str] = None
+    examples: Optional[str] = None
+
+@dataclass
+class EmotionalTrigger:
+    trigger_type: str  # 'enthusiasm', 'concern', 'support', 'joy', 'worry'
+    trigger_content: str
+    trigger_category: Optional[str] = None
+    emotional_response: Optional[str] = None
+    response_intensity: Optional[str] = None
+    response_examples: Optional[str] = None
+
+@dataclass
+class ExpertiseDomain:
+    domain_name: str
+    expertise_level: Optional[str] = None
+    domain_description: Optional[str] = None
+    key_concepts: Optional[str] = None
+    teaching_approach: Optional[str] = None
+    passion_level: Optional[int] = None
+    examples: Optional[str] = None
 
 class EnhancedCDLManager:
     """Enhanced CDL Manager with comprehensive character data access"""
@@ -231,7 +281,7 @@ class EnhancedCDLManager:
 
                 rows = await conn.fetch("""
                     SELECT flow_type, flow_name, energy_level, approach_description, 
-                           transition_style, priority
+                           transition_style, priority, context
                     FROM character_conversation_flows 
                     WHERE character_id = $1
                     ORDER BY priority DESC
@@ -243,7 +293,8 @@ class EnhancedCDLManager:
                     energy_level=row['energy_level'],
                     approach_description=row['approach_description'],
                     transition_style=row['transition_style'],
-                    priority=row['priority']
+                    priority=row['priority'],
+                    context=row['context']
                 ) for row in rows]
 
         except Exception as e:
@@ -304,6 +355,261 @@ class EnhancedCDLManager:
 
         except Exception as e:
             logger.error(f"Error retrieving speech patterns for {character_name}: {e}")
+            return []
+
+    async def get_relationships(self, character_name: str) -> List[CharacterRelationship]:
+        """Get character relationships including special connections like Cynthia for Gabriel"""
+        try:
+            async with self.pool.acquire() as conn:
+                character_id = await self._get_character_id(conn, character_name)
+                if not character_id:
+                    return []
+
+                rows = await conn.fetch("""
+                    SELECT related_entity, relationship_type, relationship_strength, 
+                           description, status, communication_style, connection_nature, recognition_pattern
+                    FROM character_relationships 
+                    WHERE character_id = $1
+                    ORDER BY relationship_strength DESC
+                """, character_id)
+
+                return [CharacterRelationship(
+                    related_entity=row['related_entity'],
+                    relationship_type=row['relationship_type'],
+                    relationship_strength=row['relationship_strength'],
+                    description=row['description'],
+                    status=row['status']
+                ) for row in rows]
+
+        except Exception as e:
+            logger.error(f"Error retrieving relationships for {character_name}: {e}")
+            return []
+
+    async def get_behavioral_triggers(self, character_name: str) -> List[BehavioralTrigger]:
+        """Get behavioral triggers including recognition responses and interaction patterns"""
+        try:
+            async with self.pool.acquire() as conn:
+                character_id = await self._get_character_id(conn, character_name)
+                if not character_id:
+                    return []
+
+                rows = await conn.fetch("""
+                    SELECT trigger_type, trigger_value, response_type, response_description, intensity_level
+                    FROM character_behavioral_triggers 
+                    WHERE character_id = $1
+                    ORDER BY intensity_level DESC, trigger_type
+                """, character_id)
+
+                return [BehavioralTrigger(
+                    trigger_type=row['trigger_type'],
+                    trigger_value=row['trigger_value'],
+                    response_type=row['response_type'],
+                    response_description=row['response_description'],
+                    intensity_level=row['intensity_level']
+                ) for row in rows]
+
+        except Exception as e:
+            logger.error(f"Error retrieving behavioral triggers for {character_name}: {e}")
+            return []
+
+    async def get_communication_patterns(self, character_name: str) -> List[CommunicationPattern]:
+        """Get communication patterns including emoji usage and style"""
+        try:
+            async with self.pool.acquire() as conn:
+                character_id = await self._get_character_id(conn, character_name)
+                if not character_id:
+                    return []
+
+                rows = await conn.fetch("""
+                    SELECT pattern_type, pattern_name, pattern_value, context, frequency, description
+                    FROM character_communication_patterns 
+                    WHERE character_id = $1
+                    ORDER BY frequency DESC, pattern_type
+                """, character_id)
+
+                return [CommunicationPattern(
+                    pattern_type=row['pattern_type'],
+                    pattern_name=row['pattern_name'],
+                    pattern_value=row['pattern_value'],
+                    context=row['context'],
+                    frequency=row['frequency'],
+                    description=row['description']
+                ) for row in rows]
+
+        except Exception as e:
+            logger.error(f"Error retrieving communication patterns for {character_name}: {e}")
+            return []
+
+    async def get_emoji_patterns(self, character_name: str) -> List[EmojiPattern]:
+        """Get emoji usage patterns for different contexts and emotions"""
+        try:
+            async with self.pool.acquire() as conn:
+                character_id = await self._get_character_id(conn, character_name)
+                if not character_id:
+                    return []
+
+                rows = await conn.fetch("""
+                    SELECT pattern_category, pattern_name, emoji_sequence, usage_context, frequency
+                    FROM character_emoji_patterns 
+                    WHERE character_id = $1
+                    ORDER BY pattern_category, frequency DESC
+                """, character_id)
+
+                return [EmojiPattern(
+                    pattern_category=row['pattern_category'],
+                    pattern_name=row['pattern_name'],
+                    emoji_sequence=row['emoji_sequence'],
+                    usage_context=row['usage_context'],
+                    frequency=row['frequency']
+                ) for row in rows]
+
+        except Exception as e:
+            logger.error(f"Error retrieving emoji patterns for {character_name}: {e}")
+            return []
+
+    async def get_ai_scenarios(self, character_name: str) -> List[AIScenario]:
+        """Get AI identity handling scenarios for physical interaction requests"""
+        try:
+            async with self.pool.acquire() as conn:
+                character_id = await self._get_character_id(conn, character_name)
+                if not character_id:
+                    return []
+
+                rows = await conn.fetch("""
+                    SELECT scenario_type, scenario_name, trigger_phrases, response_pattern,
+                           tier_1_response, tier_2_response, tier_3_response, example_usage
+                    FROM character_ai_scenarios 
+                    WHERE character_id = $1
+                    ORDER BY scenario_type, scenario_name
+                """, character_id)
+
+                return [AIScenario(
+                    scenario_type=row['scenario_type'],
+                    scenario_name=row['scenario_name'],
+                    trigger_phrases=row['trigger_phrases'],
+                    response_pattern=row['response_pattern'],
+                    tier_1_response=row['tier_1_response'],
+                    tier_2_response=row['tier_2_response'],
+                    tier_3_response=row['tier_3_response'],
+                    example_usage=row['example_usage']
+                ) for row in rows]
+
+        except Exception as e:
+            logger.error(f"Error retrieving AI scenarios for {character_name}: {e}")
+            return []
+
+    async def get_cultural_expressions(self, character_name: str) -> List[CulturalExpression]:
+        """Get cultural expressions, language patterns, and heritage-specific phrases"""
+        try:
+            async with self.pool.acquire() as conn:
+                character_id = await self._get_character_id(conn, character_name)
+                if not character_id:
+                    return []
+
+                rows = await conn.fetch("""
+                    SELECT expression_type, expression_value, meaning, usage_context, 
+                           emotional_context, frequency
+                    FROM character_cultural_expressions 
+                    WHERE character_id = $1
+                    ORDER BY frequency DESC, expression_type
+                """, character_id)
+
+                return [CulturalExpression(
+                    expression_type=row['expression_type'],
+                    expression_value=row['expression_value'],
+                    meaning=row['meaning'],
+                    usage_context=row['usage_context'],
+                    emotional_context=row['emotional_context'],
+                    frequency=row['frequency']
+                ) for row in rows]
+
+        except Exception as e:
+            logger.error(f"Error retrieving cultural expressions for {character_name}: {e}")
+            return []
+
+    async def get_voice_traits(self, character_name: str) -> List[VoiceTrait]:
+        """Get voice characteristics including tone, pace, accent, and vocabulary"""
+        try:
+            async with self.pool.acquire() as conn:
+                character_id = await self._get_character_id(conn, character_name)
+                if not character_id:
+                    return []
+
+                rows = await conn.fetch("""
+                    SELECT trait_type, trait_value, situational_context, examples
+                    FROM character_voice_traits 
+                    WHERE character_id = $1
+                    ORDER BY trait_type
+                """, character_id)
+
+                return [VoiceTrait(
+                    trait_type=row['trait_type'],
+                    trait_value=row['trait_value'],
+                    situational_context=row['situational_context'],
+                    examples=row['examples']
+                ) for row in rows]
+
+        except Exception as e:
+            logger.error(f"Error retrieving voice traits for {character_name}: {e}")
+            return []
+
+    async def get_emotional_triggers(self, character_name: str) -> List[EmotionalTrigger]:
+        """Get emotional triggers and appropriate character responses"""
+        try:
+            async with self.pool.acquire() as conn:
+                character_id = await self._get_character_id(conn, character_name)
+                if not character_id:
+                    return []
+
+                rows = await conn.fetch("""
+                    SELECT trigger_type, trigger_category, trigger_content, 
+                           emotional_response, response_intensity, response_examples
+                    FROM character_emotional_triggers 
+                    WHERE character_id = $1
+                    ORDER BY trigger_type, response_intensity DESC
+                """, character_id)
+
+                return [EmotionalTrigger(
+                    trigger_type=row['trigger_type'],
+                    trigger_content=row['trigger_content'],
+                    trigger_category=row['trigger_category'],
+                    emotional_response=row['emotional_response'],
+                    response_intensity=row['response_intensity'],
+                    response_examples=row['response_examples']
+                ) for row in rows]
+
+        except Exception as e:
+            logger.error(f"Error retrieving emotional triggers for {character_name}: {e}")
+            return []
+
+    async def get_expertise_domains(self, character_name: str) -> List[ExpertiseDomain]:
+        """Get expertise domains, knowledge areas, and teaching approaches"""
+        try:
+            async with self.pool.acquire() as conn:
+                character_id = await self._get_character_id(conn, character_name)
+                if not character_id:
+                    return []
+
+                rows = await conn.fetch("""
+                    SELECT domain_name, expertise_level, domain_description, 
+                           key_concepts, teaching_approach, passion_level, examples
+                    FROM character_expertise_domains 
+                    WHERE character_id = $1
+                    ORDER BY passion_level DESC NULLS LAST, expertise_level
+                """, character_id)
+
+                return [ExpertiseDomain(
+                    domain_name=row['domain_name'],
+                    expertise_level=row['expertise_level'],
+                    domain_description=row['domain_description'],
+                    key_concepts=row['key_concepts'],
+                    teaching_approach=row['teaching_approach'],
+                    passion_level=row['passion_level'],
+                    examples=row['examples']
+                ) for row in rows]
+
+        except Exception as e:
+            logger.error(f"Error retrieving expertise domains for {character_name}: {e}")
             return []
 
 # ========================================================================================

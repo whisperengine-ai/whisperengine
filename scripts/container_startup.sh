@@ -19,20 +19,12 @@ is_container() {
     [ -f /.dockerenv ] || [ -n "${CONTAINER_MODE:-}" ]
 }
 
-# Note: Run database migrations if in container and database config available
-if is_container && [ -n "${POSTGRES_HOST:-}" ]; then
-    log "🗄️  Running database migrations..."
-    python /app/src/utils/auto_migrate.py
-    if [ $? -eq 0 ]; then
-        log "✅ Database migrations completed successfully"
-    else
-        log "❌ Database migrations failed"
-        exit 1
-    fi
-else
-    log "⏭️ Skipping migration check (not in container or no database config)"
-fi
+# NOTE: Database migrations now handled by dedicated db-migrate init container
+# See docker-compose.multi-bot.yml for db-migrate service configuration
+# Bot containers should NOT run migrations - this prevents race conditions
+# and separates concerns between infrastructure setup and application runtime
 
+log "⏭️  Skipping migrations (handled by db-migrate init container)"
 log "🎯 Starting WhisperEngine bot..."
 echo ""
 

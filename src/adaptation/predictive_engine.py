@@ -283,23 +283,25 @@ class PredictiveAdaptationEngine:
         # Pattern: Declining confidence trend
         # confidence_trend is a ConfidenceTrend dataclass with trend_analysis: TrendAnalysis attribute
         if hasattr(confidence_trend, 'trend_analysis') and confidence_trend.trend_analysis.direction == TrendDirection.DECLINING:
-            severity = confidence_trend.trend_analysis.severity
+            # Use absolute slope as severity indicator (how fast it's declining)
+            severity = abs(confidence_trend.trend_analysis.slope) if hasattr(confidence_trend.trend_analysis, 'slope') else 0.0
             current_confidence = confidence_trend.recent_confidence
             
             # Predict confidence will drop below threshold
-            if current_confidence > 0.6 and severity > 0.3:
+            if current_confidence > 0.6 and severity > 0.01:  # slope > 0.01 indicates meaningful decline
                 prediction = PredictedNeed(
                     user_id=user_id,
                     bot_name=bot_name,
                     prediction_type=PredictionType.CONFIDENCE_DECLINE,
-                    confidence=self._calculate_prediction_confidence(severity, confidence_trend),
+                    confidence=self._calculate_prediction_confidence(severity * 10, confidence_trend),  # Scale slope to 0-1 range
                     predicted_at=datetime.utcnow(),
                     likely_occurrence_time=datetime.utcnow() + timedelta(hours=horizon_hours//2),
                     description="Confidence likely to drop below 0.6 based on declining trend",
                     indicators=[
                         f"Current confidence: {current_confidence:.2f}",
-                        f"Decline severity: {severity:.2f}",
-                        f"Trend direction: {confidence_trend.trend_analysis.direction.value}"
+                        f"Decline rate (slope): {severity:.3f}",
+                        f"Trend direction: {confidence_trend.trend_analysis.direction.value}",
+                        f"Volatility: {confidence_trend.trend_analysis.volatility:.2f}"
                     ],
                     recommended_adaptations=[
                         AdaptationStrategy.INCREASE_DETAIL,
@@ -318,13 +320,27 @@ class PredictiveAdaptationEngine:
         """Predict conversation quality drops."""
         predictions = []
         
-        quality_trend = trend_data.get('quality_trend', {})
+        quality_trend = trend_data.get('quality_trend')
         if not quality_trend:
             return predictions
         
-        # Pattern: Quality degradation with conversation frequency increase
-        if (quality_trend.get('direction') == 'declining' and
-            trend_data.get('frequency_trend', {}).get('direction') == 'increasing'):
+        # Pattern: Quality degradation
+        # QualityTrend is a dataclass with satisfaction_trend, flow_trend, emotional_resonance_trend (TrendAnalysis objects)
+        # Check if any major quality metric is declining
+        satisfaction_declining = (hasattr(quality_trend, 'satisfaction_trend') and 
+                                 quality_trend.satisfaction_trend.direction == TrendDirection.DECLINING)
+        flow_declining = (hasattr(quality_trend, 'flow_trend') and 
+                         quality_trend.flow_trend.direction == TrendDirection.DECLINING)
+        emotional_resonance_declining = (hasattr(quality_trend, 'emotional_resonance_trend') and 
+                                        quality_trend.emotional_resonance_trend.direction == TrendDirection.DECLINING)
+        
+        # Check overall quality score
+        overall_score = quality_trend.overall_score if hasattr(quality_trend, 'overall_score') else 0.7
+        
+        # Predict quality drop if multiple metrics declining or overall score is low
+        if ((satisfaction_declining and flow_declining) or 
+            overall_score < 0.5 or 
+            (emotional_resonance_declining and overall_score < 0.6)):
             
             prediction = PredictedNeed(
                 user_id=user_id,
@@ -333,10 +349,12 @@ class PredictiveAdaptationEngine:
                 confidence=PredictionConfidence.MEDIUM,
                 predicted_at=datetime.utcnow(),
                 likely_occurrence_time=datetime.utcnow() + timedelta(hours=horizon_hours//3),
-                description="Quality decline likely due to increased conversation frequency",
+                description=f"Quality decline detected (score: {overall_score:.2f})",
                 indicators=[
-                    f"Quality trend: {quality_trend.get('direction')}",
-                    f"Frequency trend: {trend_data.get('frequency_trend', {}).get('direction')}"
+                    f"Overall quality score: {overall_score:.2f}",
+                    f"Satisfaction trend: {quality_trend.satisfaction_trend.direction.value if hasattr(quality_trend, 'satisfaction_trend') else 'unknown'}",
+                    f"Flow trend: {quality_trend.flow_trend.direction.value if hasattr(quality_trend, 'flow_trend') else 'unknown'}",
+                    f"Emotional resonance: {quality_trend.emotional_resonance_trend.direction.value if hasattr(quality_trend, 'emotional_resonance_trend') else 'unknown'}"
                 ],
                 recommended_adaptations=[
                     AdaptationStrategy.ENHANCE_EMPATHY,
@@ -355,15 +373,23 @@ class PredictiveAdaptationEngine:
         """Predict relationship strain based on interaction patterns."""
         predictions = []
         
-        relationship_trend = trend_data.get('relationship_trend', {})
+        relationship_trend = trend_data.get('relationship_trend')
         if not relationship_trend:
             return predictions
         
         # Pattern: Trust or affection declining
-        trust_score = relationship_trend.get('trust', 0.5)
-        affection_score = relationship_trend.get('affection', 0.5)
+        # RelationshipTrend is a dataclass with trust_trend, affection_trend attributes (TrendAnalysis objects)
+        # Access the current_value from the TrendAnalysis objects
+        trust_score = relationship_trend.trust_trend.current_value if hasattr(relationship_trend, 'trust_trend') else 0.5
+        affection_score = relationship_trend.affection_trend.current_value if hasattr(relationship_trend, 'affection_trend') else 0.5
         
-        if trust_score < 0.4 or affection_score < 0.4:
+        # Check if trust or affection are declining with low values
+        trust_declining = (hasattr(relationship_trend, 'trust_trend') and 
+                          relationship_trend.trust_trend.direction == TrendDirection.DECLINING)
+        affection_declining = (hasattr(relationship_trend, 'affection_trend') and 
+                              relationship_trend.affection_trend.direction == TrendDirection.DECLINING)
+        
+        if (trust_score < 0.4 or affection_score < 0.4) or (trust_declining and affection_declining):
             prediction = PredictedNeed(
                 user_id=user_id,
                 bot_name=bot_name,
@@ -375,7 +401,9 @@ class PredictiveAdaptationEngine:
                 indicators=[
                     f"Trust score: {trust_score:.2f}",
                     f"Affection score: {affection_score:.2f}",
-                    "Relationship metrics below healthy threshold"
+                    f"Trust trend: {relationship_trend.trust_trend.direction.value if hasattr(relationship_trend, 'trust_trend') else 'unknown'}",
+                    f"Affection trend: {relationship_trend.affection_trend.direction.value if hasattr(relationship_trend, 'affection_trend') else 'unknown'}",
+                    "Relationship metrics need attention"
                 ],
                 recommended_adaptations=[
                     AdaptationStrategy.ENHANCE_EMPATHY,
@@ -613,21 +641,42 @@ class PredictiveAdaptationEngine:
             logger.error("Failed to get trend analysis: %s", str(e))
             return {}
     
-    def _calculate_prediction_confidence(self, severity: float, trend_data: Dict) -> PredictionConfidence:
-        """Calculate confidence level for a prediction."""
+    def _calculate_prediction_confidence(self, severity: float, trend_data) -> PredictionConfidence:
+        """Calculate confidence level for a prediction.
+        
+        Args:
+            severity: Trend severity score (0-1)
+            trend_data: Can be ConfidenceTrend, RelationshipTrend, QualityTrend object, or dict
+        """
         
         # Base confidence on trend strength and data quality
         base_confidence = severity * 0.7
         
+        # Extract data points - handle both dict and dataclass objects
+        data_points = 0
+        if isinstance(trend_data, dict):
+            data_points = trend_data.get('data_points', 0)
+        elif hasattr(trend_data, 'trend_analysis'):
+            # For ConfidenceTrend, RelationshipTrend, QualityTrend - access via trend_analysis
+            data_points = trend_data.trend_analysis.data_points if hasattr(trend_data.trend_analysis, 'data_points') else 0
+        
         # Adjust for data quality
-        data_points = trend_data.get('data_points', 0)
         if data_points > 20:
             base_confidence += 0.2
         elif data_points > 10:
             base_confidence += 0.1
         
-        # Adjust for trend consistency
-        if trend_data.get('consistency', 0.0) > 0.8:
+        # Adjust for trend consistency (lower volatility = more consistent)
+        consistency = 0.0
+        if isinstance(trend_data, dict):
+            consistency = trend_data.get('consistency', 0.0)
+        elif hasattr(trend_data, 'trend_analysis'):
+            # Higher confidence and lower volatility indicates consistency
+            trend_confidence = trend_data.trend_analysis.confidence if hasattr(trend_data.trend_analysis, 'confidence') else 0.0
+            volatility = trend_data.trend_analysis.volatility if hasattr(trend_data.trend_analysis, 'volatility') else 1.0
+            consistency = trend_confidence * (1.0 - min(volatility, 1.0))
+        
+        if consistency > 0.8:
             base_confidence += 0.1
         
         # Convert to confidence enum

@@ -8,6 +8,28 @@
 # - Docker Networks: whisperengine-multi_bot_network (dev) vs whisperengine-quickstart-network (end-user)
 
 services:
+  # ===== DATABASE MIGRATION INIT CONTAINER =====
+  # Runs once before bot services start to ensure schema is up-to-date
+  db-migrate:
+    image: whisperengine-bot:${VERSION:-latest}
+    container_name: whisperengine-db-migrate
+    command: ["python", "/app/scripts/run_migrations.py"]
+    environment:
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=whisperengine
+      - POSTGRES_PASSWORD=whisperengine_password
+      - POSTGRES_DB=whisperengine
+    volumes:
+      - ./scripts:/app/scripts  # Live mount for migration scripts
+      - ./sql:/app/sql:ro       # Live mount for SQL files
+    networks:
+      - bot_network
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"  # Only run once per docker-compose up
+
   # ===== INFRASTRUCTURE SERVICES =====
   postgres:
     image: postgres:16.4-alpine

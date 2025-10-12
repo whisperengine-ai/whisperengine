@@ -37,25 +37,9 @@ logger = logging.getLogger(__name__)
 
 
 async def launcher_main():
-    """Launcher entry point with automatic database initialization."""
-    # Auto-migrate database before starting bot
-    try:
-        from src.utils.auto_migrate import DatabaseMigrator
-        
-        logger.info("🔧 Checking database connection...")
-        migrator = DatabaseMigrator()
-        
-        # Wait for PostgreSQL to be available
-        if not await migrator.wait_for_database():
-            logger.error("❌ Failed to connect to PostgreSQL. Exiting.")
-            return 1
-        
-        logger.info("✅ Database connection successful!")
-        logger.info("ℹ️  Database migrations are handled by init container in Docker deployments")
-        
-    except Exception as e:
-        logger.error(f"❌ Database connection error: {e}")
-        logger.info("⚠️ Continuing bot startup despite database connection error...")
+    """Launcher entry point."""
+    # Note: Database migrations are handled by dedicated db-migrate init container
+    # in Docker deployments. The main application should NOT run migrations.
     
     # Delegate to the bot's async main
     return await bot_async_main()

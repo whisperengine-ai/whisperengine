@@ -201,9 +201,11 @@ class DiscordBotCore:
             bot_name = os.getenv('DISCORD_BOT_NAME', 'unknown')
             
             # Initialize CDL AI integration system with required dependencies
+            # Enhanced manager will be added asynchronously after postgres pool is ready
             self.character_system = CDLAIPromptIntegration(
                 vector_memory_manager=self.memory_manager,
-                llm_client=self.llm_client
+                llm_client=self.llm_client,
+                enhanced_manager=None  # Will be set by initialize_enhanced_cdl_manager()
             )
             
             # Set character_file to None to indicate database-only mode
@@ -214,6 +216,38 @@ class DiscordBotCore:
         except Exception as e:
             self.logger.error("❌ Character system initialization failed: %s", str(e))
             # Don't raise - character system is optional
+    
+    async def initialize_enhanced_cdl_manager(self):
+        """Initialize enhanced CDL manager for rich character data (requires postgres pool)."""
+        try:
+            from src.characters.cdl.enhanced_cdl_manager import create_enhanced_cdl_manager
+            
+            # Wait for postgres pool to be available (max 30 seconds)
+            max_wait = 30
+            wait_interval = 1
+            waited = 0
+            
+            while not self.postgres_pool and waited < max_wait:
+                await asyncio.sleep(wait_interval)
+                waited += wait_interval
+            
+            # Check if postgres pool is available
+            if not self.postgres_pool:
+                self.logger.warning("⚠️ PostgreSQL pool not available after %ds - enhanced CDL manager disabled", max_wait)
+                return
+            
+            # Create enhanced CDL manager
+            enhanced_manager = create_enhanced_cdl_manager(self.postgres_pool)
+            self.logger.info("✅ Enhanced CDL manager initialized for rich character data")
+            
+            # Update character system with enhanced manager
+            if self.character_system:
+                self.character_system.enhanced_manager = enhanced_manager
+                self.logger.info("✅ Character system updated with enhanced CDL manager for relationships, triggers, and speech patterns")
+            
+        except Exception as e:
+            self.logger.error(f"❌ Enhanced CDL manager initialization failed: {e}")
+            # Don't raise - enhanced manager is optional enhancement
     
     async def initialize_knowledge_router(self):
         """Initialize semantic knowledge router for structured factual intelligence."""
@@ -431,6 +465,16 @@ class DiscordBotCore:
             await asyncio.sleep(2)
             
             self.logger.info("🔗 Integrating advanced conversation components with Discord bot...")
+            
+            # 🚨 CRITICAL: Pre-load character data for SimpleCDLManager
+            # This prevents async/sync complications during message processing
+            try:
+                from src.characters.cdl.simple_cdl_manager import get_simple_cdl_manager
+                cdl_manager = get_simple_cdl_manager()
+                await cdl_manager.preload_character_data()
+                self.logger.info("✅ SimpleCDLManager character data pre-loaded successfully")
+            except Exception as cdl_error:
+                self.logger.error(f"❌ Failed to pre-load SimpleCDLManager character data: {cdl_error}")
             
             # Phase 3: Context Switch Detection & Empathy
             if hasattr(self, 'context_switch_detector') and self.context_switch_detector:
@@ -894,6 +938,10 @@ class DiscordBotCore:
 
         # Schedule async initialization of PostgreSQL pool (required for knowledge router)
         asyncio.create_task(self.initialize_postgres_pool())
+        
+        # Schedule async initialization of enhanced CDL manager (requires postgres pool)
+        # Adds rich character data (relationships, behavioral triggers, speech patterns)
+        asyncio.create_task(self.initialize_enhanced_cdl_manager())
         
         # Schedule async initialization of Phase 4 components
         asyncio.create_task(self.initialize_conversation_intelligence())

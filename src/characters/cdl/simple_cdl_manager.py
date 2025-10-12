@@ -14,13 +14,43 @@ from typing import Dict, Any, Optional
 logger = logging.getLogger(__name__)
 
 class SimpleCDLManager:
-    """Simple CDL Manager using clean RDBMS schema"""
+    """Simple CDL manager for character data access
+    
+    ARCHITECTURE NOTE: This provides backward compatibility with legacy code that expects
+    synchronous character data access. Data is pre-loaded at bot startup to avoid async
+    complications during message processing.
+    """
     
     def __init__(self):
-        self._pool = None
         self._character_data = None
-        self._character_name = None
         self._loaded = False
+        self._pool = None
+        self._character_name = None  # Lazy-loaded from environment
+        
+    async def preload_character_data(self):
+        """Pre-load character data during bot initialization (async-safe)
+        
+        CRITICAL: Call this from bot startup (async context) to load character data
+        into cache. This avoids async/sync complications during message processing.
+        """
+        character_name = self._get_character_name()
+        logger.info("🔄 Pre-loading character data for: %s", character_name)
+        
+        try:
+            character_data = await self._load_from_database(character_name)
+            
+            if character_data:
+                self._character_data = character_data
+                logger.info("✅ Pre-loaded character data from database: %s", character_name)
+            else:
+                logger.warning("❌ No character data found in database: %s", character_name)
+                self._character_data = self._get_default_character_data()
+                
+        except Exception as e:
+            logger.error("❌ Error pre-loading character data: %s", e)
+            self._character_data = self._get_default_character_data()
+        finally:
+            self._loaded = True
         
     def _get_character_name(self) -> str:
         """Get character name from environment configuration"""
@@ -51,29 +81,42 @@ class SimpleCDLManager:
         return self._pool
         
     def _run_async(self, coro):
-        """Helper to run async functions in sync context"""
+        """Helper to run async functions in sync context
+        
+        CRITICAL FIX: When called from sync code that runs inside an async event loop
+        (like Discord emoji reactions), we can't create a NEW event loop with asyncio.run()
+        because it causes "another operation is in progress" errors with shared database pools.
+        
+        Instead, we submit the coroutine to the existing event loop using run_coroutine_threadsafe.
+        """
         try:
             # Check if we're already in an event loop
-            asyncio.get_running_loop()
-            # We're in an event loop, need to create a task
-            import concurrent.futures
-            with concurrent.futures.ThreadPoolExecutor() as executor:
-                future = executor.submit(asyncio.run, coro)
-                return future.result()
+            loop = asyncio.get_running_loop()
+            # We're in an event loop - submit to it instead of creating new one
+            future = asyncio.run_coroutine_threadsafe(coro, loop)
+            # Wait for result (this blocks the current thread but doesn't block the event loop)
+            return future.result(timeout=10.0)  # 10 second timeout for database operations
         except RuntimeError:
             # No event loop running, we can run directly
             return asyncio.run(coro)
             
     def _load_character_data(self):
-        """Load character data from database"""
+        """Load character data from database (synchronous fallback)
+        
+        ARCHITECTURE NOTE: This is a fallback for legacy code paths. Character data
+        should be pre-loaded via preload_character_data() during bot initialization.
+        If data isn't pre-loaded, this will attempt lazy loading (may have async issues).
+        """
         if self._loaded:
             return
             
+        logger.warning("⚠️ LAZY LOADING character data - should be pre-loaded at bot startup!")
+        
         try:
             character_name = self._get_character_name()
             logger.info("Loading character data for: %s", character_name)
             
-            # Load from clean RDBMS database
+            # Attempt lazy loading using async-in-sync helper (may have issues)
             character_data = self._run_async(self._load_from_database(character_name))
             
             if character_data:

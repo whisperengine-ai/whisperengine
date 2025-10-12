@@ -1,0 +1,605 @@
+#!/usr/bin/env python3
+"""
+Elena Extended Import Script
+Imports rich character data from elena.backup_20251006_223336.json to RDBMS
+Maps JSON content semantically to proper database tables with 100% fidelity
+"""
+
+import os
+import sys
+import json
+import asyncio
+import asyncpg
+from typing import Dict, Any
+
+# Add parent directory to path for imports
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+# Database configuration
+DB_CONFIG = {
+    'host': os.getenv('POSTGRES_HOST', 'localhost'),
+    'port': int(os.getenv('POSTGRES_PORT', '5433')),
+    'user': os.getenv('POSTGRES_USER', 'whisperengine'),
+    'password': os.getenv('POSTGRES_PASSWORD', 'whisperengine_dev'),
+    'database': os.getenv('POSTGRES_DB', 'whisperengine')
+}
+
+CHARACTER_ID = 1  # Elena Rodriguez
+CHARACTER_NAME = 'elena'
+
+async def load_elena_json() -> Dict[str, Any]:
+    """Load Elena's comprehensive backup JSON file"""
+    json_path = os.path.join(
+        os.path.dirname(__file__), 
+        '..', 
+        'characters', 
+        'examples_legacy_backup', 
+        'elena.backup_20251006_223336.json'
+    )
+    
+    with open(json_path, 'r', encoding='utf-8') as f:
+        data = json.load(f)
+    
+    print(f"✅ Loaded Elena JSON from {json_path}")
+    return data
+
+async def clear_existing_data(conn: asyncpg.Connection):
+    """Clear Elena's existing extended data to avoid duplicates"""
+    print("\n🗑️  Clearing existing extended data for Elena...")
+    
+    tables_to_clear = [
+        'character_response_guidelines',
+        'character_message_triggers',
+        'character_response_modes',
+        'character_emoji_patterns',
+        'character_ai_scenarios',
+        'character_cultural_expressions',
+        'character_voice_traits',
+        'character_emotional_triggers',
+        'character_expertise_domains',
+        'character_conversation_flows'
+    ]
+    
+    for table in tables_to_clear:
+        result = await conn.execute(f"DELETE FROM {table} WHERE character_id = $1", CHARACTER_ID)
+        print(f"  Cleared {table}: {result}")
+
+async def import_response_guidelines(conn: asyncpg.Connection, data: Dict[str, Any]):
+    """Import response guidelines from custom_speaking_instructions and response_style"""
+    print("\n📝 Importing Response Guidelines...")
+    
+    guidelines = []
+    
+    # Custom speaking instructions
+    speaking_instructions = data['character']['personality']['communication_style'].get('custom_speaking_instructions', [])
+    for idx, instruction in enumerate(speaking_instructions):
+        guidelines.append({
+            'guideline_type': 'speaking_instruction',
+            'guideline_name': f'instruction_{idx+1}',
+            'guideline_content': instruction,
+            'priority': 80,
+            'context': 'general',
+            'is_critical': True
+        })
+    
+    # Response style core principles
+    response_style = data['character']['communication']['conversation_flow_guidance'].get('response_style', {})
+    core_principles = response_style.get('core_principles', [])
+    for idx, principle in enumerate(core_principles):
+        guidelines.append({
+            'guideline_type': 'core_principle',
+            'guideline_name': f'principle_{idx+1}',
+            'guideline_content': principle,
+            'priority': 90,
+            'context': 'response_style',
+            'is_critical': True
+        })
+    
+    # Formatting rules
+    formatting_rules = response_style.get('formatting_rules', [])
+    for idx, rule in enumerate(formatting_rules):
+        guidelines.append({
+            'guideline_type': 'formatting_rule',
+            'guideline_name': f'format_{idx+1}',
+            'guideline_content': rule,
+            'priority': 70,
+            'context': 'formatting',
+            'is_critical': False
+        })
+    
+    # Character-specific adaptations
+    adaptations = response_style.get('character_specific_adaptations', [])
+    for idx, adaptation in enumerate(adaptations):
+        guidelines.append({
+            'guideline_type': 'character_adaptation',
+            'guideline_name': f'adaptation_{idx+1}',
+            'guideline_content': adaptation,
+            'priority': 85,
+            'context': 'character_specific',
+            'is_critical': True
+        })
+    
+    # Insert all guidelines
+    for guideline in guidelines:
+        await conn.execute("""
+            INSERT INTO character_response_guidelines 
+            (character_id, guideline_type, guideline_name, guideline_content, priority, context, is_critical)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
+        """, CHARACTER_ID, guideline['guideline_type'], guideline['guideline_name'], 
+             guideline['guideline_content'], guideline['priority'], guideline['context'], 
+             guideline['is_critical'])
+    
+    print(f"  ✅ Imported {len(guidelines)} response guidelines")
+
+async def import_conversation_flows(conn: asyncpg.Connection, data: Dict[str, Any]):
+    """Import conversation flow guidance"""
+    print("\n💬 Importing Conversation Flows...")
+    
+    flow_guidance = data['character']['communication'].get('conversation_flow_guidance', {})
+    flows = []
+    
+    # Marine science discussion flow
+    marine_flow = flow_guidance.get('marine_science_discussion', {})
+    if marine_flow:
+        flow_id = await conn.fetchval("""
+            INSERT INTO character_conversation_flows 
+            (character_id, flow_type, flow_name, energy_level, approach_description, transition_style, priority, context)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            RETURNING id
+        """, CHARACTER_ID, 'marine_science', 'Marine Science Discussion', 
+             marine_flow.get('energy', 'passionate'), 
+             marine_flow.get('approach', 'share knowledge with enthusiasm'),
+             marine_flow.get('transition_style', 'natural flow'),
+             90,
+             'Professional marine biology discussions and scientific explanations')
+        
+        # Add directives for this flow
+        avoid_items = marine_flow.get('avoid', [])
+        for idx, item in enumerate(avoid_items):
+            await conn.execute("""
+                INSERT INTO character_conversation_directives 
+                (conversation_flow_id, directive_type, directive_content, order_sequence)
+                VALUES ($1, $2, $3, $4)
+            """, flow_id, 'avoid', item, idx)
+        
+        encourage_items = marine_flow.get('encourage', [])
+        for idx, item in enumerate(encourage_items):
+            await conn.execute("""
+                INSERT INTO character_conversation_directives 
+                (conversation_flow_id, directive_type, directive_content, order_sequence)
+                VALUES ($1, $2, $3, $4)
+            """, flow_id, 'encourage', item, idx)
+        
+        flows.append('marine_science_discussion')
+    
+    # Personal connection flow
+    personal_flow = flow_guidance.get('personal_connection', {})
+    if personal_flow:
+        flow_id = await conn.fetchval("""
+            INSERT INTO character_conversation_flows 
+            (character_id, flow_type, flow_name, energy_level, approach_description, transition_style, priority, context)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            RETURNING id
+        """, CHARACTER_ID, 'personal', 'Personal Connection', 
+             personal_flow.get('energy', 'warm and caring'), 
+             personal_flow.get('approach', 'create emotional bonds'),
+             personal_flow.get('transition_style', 'warm natural shifts'),
+             85,
+             'Building emotional connections and personal relationships')
+        
+        # Add directives
+        avoid_items = personal_flow.get('avoid', [])
+        for idx, item in enumerate(avoid_items):
+            await conn.execute("""
+                INSERT INTO character_conversation_directives 
+                (conversation_flow_id, directive_type, directive_content, order_sequence)
+                VALUES ($1, $2, $3, $4)
+            """, flow_id, 'avoid', item, idx)
+        
+        encourage_items = personal_flow.get('encourage', [])
+        for idx, item in enumerate(encourage_items):
+            await conn.execute("""
+                INSERT INTO character_conversation_directives 
+                (conversation_flow_id, directive_type, directive_content, order_sequence)
+                VALUES ($1, $2, $3, $4)
+            """, flow_id, 'encourage', item, idx)
+        
+        flows.append('personal_connection')
+    
+    # General conversation flow
+    general_flow = flow_guidance.get('general', {})
+    if general_flow:
+        await conn.execute("""
+            INSERT INTO character_conversation_flows 
+            (character_id, flow_type, flow_name, energy_level, approach_description, transition_style, priority, context)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        """, CHARACTER_ID, 'general', 'General Conversation', 
+             general_flow.get('default_energy', 'warm and enthusiastic'), 
+             general_flow.get('conversation_style', 'bilingual expressions with passion'),
+             general_flow.get('transition_approach', 'seamless flow'),
+             80,
+             'Default conversation style for general interactions')
+        
+        flows.append('general_conversation')
+    
+    print(f"  ✅ Imported {len(flows)} conversation flows with directives")
+
+async def import_message_triggers(conn: asyncpg.Connection, data: Dict[str, Any]):
+    """Import message pattern triggers"""
+    print("\n🎯 Importing Message Triggers...")
+    
+    triggers = []
+    message_patterns = data['character']['communication'].get('message_pattern_triggers', {})
+    
+    # Marine science discussion triggers
+    marine_triggers = message_patterns.get('marine_science_discussion', {})
+    keywords = marine_triggers.get('keywords', [])
+    phrases = marine_triggers.get('phrases', [])
+    
+    for keyword in keywords:
+        await conn.execute("""
+            INSERT INTO character_message_triggers 
+            (character_id, trigger_category, trigger_type, trigger_value, response_mode, priority, is_active)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
+        """, CHARACTER_ID, 'marine_science', 'keyword', keyword, 'passionate_educator', 80, True)
+        triggers.append(('keyword', keyword))
+    
+    for phrase in phrases:
+        await conn.execute("""
+            INSERT INTO character_message_triggers 
+            (character_id, trigger_category, trigger_type, trigger_value, response_mode, priority, is_active)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
+        """, CHARACTER_ID, 'marine_science', 'phrase', phrase, 'passionate_educator', 85, True)
+        triggers.append(('phrase', phrase))
+    
+    # Personal connection triggers
+    personal_triggers = message_patterns.get('personal_connection', {})
+    keywords = personal_triggers.get('keywords', [])
+    phrases = personal_triggers.get('phrases', [])
+    
+    for keyword in keywords:
+        await conn.execute("""
+            INSERT INTO character_message_triggers 
+            (character_id, trigger_category, trigger_type, trigger_value, response_mode, priority, is_active)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
+        """, CHARACTER_ID, 'personal_connection', 'keyword', keyword, 'warm_caring', 75, True)
+        triggers.append(('keyword', keyword))
+    
+    for phrase in phrases:
+        await conn.execute("""
+            INSERT INTO character_message_triggers 
+            (character_id, trigger_category, trigger_type, trigger_value, response_mode, priority, is_active)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
+        """, CHARACTER_ID, 'personal_connection', 'phrase', phrase, 'warm_caring', 80, True)
+        triggers.append(('phrase', phrase))
+    
+    print(f"  ✅ Imported {len(triggers)} message triggers")
+
+async def import_emoji_patterns(conn: asyncpg.Connection, data: Dict[str, Any]):
+    """Import emoji usage patterns"""
+    print("\n😊 Importing Emoji Patterns...")
+    
+    emoji_data = data['character']['identity']['digital_communication']['emoji_usage_patterns']
+    patterns = []
+    
+    # Excitement level patterns
+    excitement_levels = emoji_data.get('excitement_level', {})
+    for level, pattern in excitement_levels.items():
+        await conn.execute("""
+            INSERT INTO character_emoji_patterns 
+            (character_id, pattern_name, pattern_type, emoji_sequence, usage_context, frequency, intensity_level, example_usage)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        """, CHARACTER_ID, f'excitement_{level}', 'excitement_level', 
+             pattern, level, 'high' if level == 'high' else 'medium', level, pattern)
+        patterns.append(f'excitement_{level}')
+    
+    # Topic-specific patterns
+    topic_patterns = emoji_data.get('topic_specific', {})
+    for topic, emojis in topic_patterns.items():
+        if isinstance(emojis, list):
+            emoji_sequence = ' '.join(emojis[:5])  # Take first 5 emojis
+            await conn.execute("""
+                INSERT INTO character_emoji_patterns 
+                (character_id, pattern_name, pattern_type, emoji_sequence, usage_context, frequency, intensity_level, example_usage)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            """, CHARACTER_ID, topic, 'topic_specific', emoji_sequence, topic, 'high', 'medium', 
+                 f'{topic.replace("_", " ").title()} discussion')
+            patterns.append(topic)
+    
+    # Response type patterns
+    response_types = emoji_data.get('response_types', {})
+    for response_type, pattern in response_types.items():
+        await conn.execute("""
+            INSERT INTO character_emoji_patterns 
+            (character_id, pattern_name, pattern_type, emoji_sequence, usage_context, frequency, intensity_level, example_usage)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        """, CHARACTER_ID, response_type, 'response_type', pattern, response_type, 'high', 'medium', pattern)
+        patterns.append(response_type)
+    
+    print(f"  ✅ Imported {len(patterns)} emoji patterns")
+
+async def import_ai_scenarios(conn: asyncpg.Connection, data: Dict[str, Any]):
+    """Import AI identity handling scenarios"""
+    print("\n🤖 Importing AI Identity Scenarios...")
+    
+    ai_identity = data['character']['communication'].get('ai_identity_handling', {})
+    scenarios = []
+    
+    # Physical meetup scenario
+    physical = ai_identity.get('roleplay_interaction_scenarios', {}).get('physical_meetups', {})
+    if physical:
+        await conn.execute("""
+            INSERT INTO character_ai_scenarios 
+            (character_id, scenario_name, scenario_type, tier_1_response, tier_2_response, tier_3_response, 
+             philosophy, approach, is_immersive)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        """, CHARACTER_ID, 'physical_meetups', 'physical_interaction',
+             physical.get('tier_1_enthusiasm', ''),
+             physical.get('tier_2_clarification', ''),
+             physical.get('tier_3_alternatives', ''),
+             ai_identity.get('philosophy', ''),
+             ai_identity.get('approach', ''),
+             ai_identity.get('allow_full_roleplay_immersion', False))
+        scenarios.append('physical_meetups')
+    
+    # Shared activities scenario
+    shared = ai_identity.get('roleplay_interaction_scenarios', {}).get('shared_activities', {})
+    if shared:
+        await conn.execute("""
+            INSERT INTO character_ai_scenarios 
+            (character_id, scenario_name, scenario_type, tier_1_response, tier_2_response, tier_3_response, 
+             philosophy, approach, is_immersive)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        """, CHARACTER_ID, 'shared_activities', 'activity_participation',
+             shared.get('tier_1_enthusiasm', ''),
+             shared.get('tier_2_clarification', ''),
+             shared.get('tier_3_alternatives', ''),
+             ai_identity.get('philosophy', ''),
+             ai_identity.get('approach', ''),
+             ai_identity.get('allow_full_roleplay_immersion', False))
+        scenarios.append('shared_activities')
+    
+    # Example scenarios
+    examples = ai_identity.get('roleplay_interaction_scenarios', {}).get('examples', {})
+    for scenario_name, response in examples.items():
+        await conn.execute("""
+            INSERT INTO character_ai_scenarios 
+            (character_id, scenario_name, scenario_type, tier_1_response, tier_2_response, tier_3_response, 
+             philosophy, approach, is_immersive)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        """, CHARACTER_ID, scenario_name, 'example_scenario', response, '', '',
+             ai_identity.get('philosophy', ''),
+             ai_identity.get('approach', ''),
+             ai_identity.get('allow_full_roleplay_immersion', False))
+        scenarios.append(scenario_name)
+    
+    print(f"  ✅ Imported {len(scenarios)} AI identity scenarios")
+
+async def import_cultural_expressions(conn: asyncpg.Connection, data: Dict[str, Any]):
+    """Import cultural expressions and Spanish phrases"""
+    print("\n🌎 Importing Cultural Expressions...")
+    
+    expressions = []
+    
+    # Voice favorite phrases (many Spanish expressions)
+    voice_data = data['character']['identity'].get('voice', {})
+    favorite_phrases = voice_data.get('favorite_phrases', [])
+    
+    for phrase in favorite_phrases:
+        # Detect if phrase contains Spanish
+        is_spanish = any(spanish_word in phrase.lower() for spanish_word in 
+                        ['¡', 'hola', 'amor', 'corazón', 'vida', 'qué', 'ay', 'mi', 'maravilloso', 'increíble'])
+        
+        await conn.execute("""
+            INSERT INTO character_cultural_expressions 
+            (character_id, expression_text, expression_type, cultural_context, usage_frequency, emotional_tone)
+            VALUES ($1, $2, $3, $4, $5, $6)
+        """, CHARACTER_ID, phrase, 
+             'spanish_expression' if is_spanish else 'favorite_phrase',
+             'mexican_american' if is_spanish else 'general',
+             'high', 'warm')
+        expressions.append(phrase)
+    
+    # Speech patterns - Spanish expressions
+    speech_patterns = voice_data.get('speech_patterns', [])
+    for pattern in speech_patterns:
+        if any(word in pattern.lower() for word in ['spanish', 'amor', 'corazón', 'endearment']):
+            await conn.execute("""
+                INSERT INTO character_cultural_expressions 
+                (character_id, expression_text, expression_type, cultural_context, usage_frequency, emotional_tone)
+                VALUES ($1, $2, $3, $4, $5, $6)
+            """, CHARACTER_ID, pattern, 'speech_pattern', 'mexican_american', 'high', 'affectionate')
+            expressions.append(pattern)
+    
+    # Cultural background
+    cultural_bg = data['character']['identity'].get('cultural_background', '')
+    if cultural_bg:
+        await conn.execute("""
+            INSERT INTO character_cultural_expressions 
+            (character_id, expression_text, expression_type, cultural_context, usage_frequency, emotional_tone)
+            VALUES ($1, $2, $3, $4, $5, $6)
+        """, CHARACTER_ID, cultural_bg, 'cultural_background', 'mexican_american', 'constant', 'proud')
+        expressions.append('cultural_background')
+    
+    print(f"  ✅ Imported {len(expressions)} cultural expressions")
+
+async def import_voice_traits(conn: asyncpg.Connection, data: Dict[str, Any]):
+    """Import voice characteristics"""
+    print("\n🗣️  Importing Voice Traits...")
+    
+    voice_data = data['character']['identity'].get('voice', {})
+    traits = []
+    
+    # Core voice traits
+    trait_mappings = [
+        ('tone', voice_data.get('tone', '')),
+        ('pace', voice_data.get('pace', '')),
+        ('volume', voice_data.get('volume', '')),
+        ('accent', voice_data.get('accent', '')),
+        ('vocabulary_level', voice_data.get('vocabulary_level', ''))
+    ]
+    
+    for trait_name, trait_value in trait_mappings:
+        if trait_value:
+            await conn.execute("""
+                INSERT INTO character_voice_traits 
+                (character_id, trait_name, trait_value, trait_description, intensity, context)
+                VALUES ($1, $2, $3, $4, $5, $6)
+            """, CHARACTER_ID, trait_name, trait_value, f"{trait_name.replace('_', ' ').title()} characteristic", 
+                 'high', 'all_contexts')
+            traits.append(trait_name)
+    
+    print(f"  ✅ Imported {len(traits)} voice traits")
+
+async def import_emotional_triggers(conn: asyncpg.Connection, data: Dict[str, Any]):
+    """Import emotional triggers and responses"""
+    print("\n💖 Importing Emotional Triggers...")
+    
+    triggers = []
+    comm_style = data['character']['personality']['communication_style']
+    emotional_expr = comm_style.get('emotional_expression', {})
+    
+    # Enthusiasm triggers
+    enthusiasm_triggers = emotional_expr.get('enthusiasm_triggers', [])
+    for trigger in enthusiasm_triggers:
+        await conn.execute("""
+            INSERT INTO character_emotional_triggers 
+            (character_id, trigger_type, trigger_description, emotional_response, intensity_level, 
+             response_behavior, priority)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
+        """, CHARACTER_ID, 'enthusiasm', trigger, 'excitement', 'high', 
+             'animated_passionate_sharing', 85)
+        triggers.append(('enthusiasm', trigger))
+    
+    # Concern triggers
+    concern_triggers = emotional_expr.get('concern_triggers', [])
+    for trigger in concern_triggers:
+        await conn.execute("""
+            INSERT INTO character_emotional_triggers 
+            (character_id, trigger_type, trigger_description, emotional_response, intensity_level, 
+             response_behavior, priority)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
+        """, CHARACTER_ID, 'concern', trigger, 'worry', 'medium', 
+             'gentle_determined_advocacy', 75)
+        triggers.append(('concern', trigger))
+    
+    # Support methods as positive triggers
+    support_methods = emotional_expr.get('support_methods', [])
+    for method in support_methods:
+        await conn.execute("""
+            INSERT INTO character_emotional_triggers 
+            (character_id, trigger_type, trigger_description, emotional_response, intensity_level, 
+             response_behavior, priority)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
+        """, CHARACTER_ID, 'support', method, 'caring', 'high', 
+             'warm_encouraging_guidance', 80)
+        triggers.append(('support', method))
+    
+    print(f"  ✅ Imported {len(triggers)} emotional triggers")
+
+async def import_expertise_domains(conn: asyncpg.Connection, data: Dict[str, Any]):
+    """Import expertise domains and knowledge areas"""
+    print("\n🎓 Importing Expertise Domains...")
+    
+    domains = []
+    
+    # Current projects as expertise domains
+    current_life = data['character'].get('current_life', {})
+    projects = current_life.get('projects', [])
+    
+    for project in projects:
+        await conn.execute("""
+            INSERT INTO character_expertise_domains 
+            (character_id, domain_name, domain_type, expertise_level, knowledge_areas, 
+             practical_experience, teaching_style, examples)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        """, CHARACTER_ID, 
+             project.get('name', ''),
+             'research_project',
+             'expert',
+             json.dumps([project.get('description', '')]),
+             project.get('description', ''),
+             'hands_on_passionate',
+             json.dumps([]))
+        domains.append(project.get('name', ''))
+    
+    # Preferred topics as expertise domains
+    interaction_prefs = data['character']['personality']['communication_style'].get('interaction_preferences', {})
+    preferred_topics = interaction_prefs.get('preferred_topics', [])
+    
+    for topic in preferred_topics:
+        await conn.execute("""
+            INSERT INTO character_expertise_domains 
+            (character_id, domain_name, domain_type, expertise_level, knowledge_areas, 
+             practical_experience, teaching_style, examples)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        """, CHARACTER_ID, topic, 'expertise_area', 'expert',
+             json.dumps([topic]),
+             f'Extensive practical experience in {topic}',
+             'enthusiastic_accessible',
+             json.dumps([]))
+        domains.append(topic)
+    
+    print(f"  ✅ Imported {len(domains)} expertise domains")
+
+async def main():
+    """Main import orchestration"""
+    print("=" * 70)
+    print("Elena Rodriguez - Extended Data Import")
+    print("From: elena.backup_20251006_223336.json")
+    print("To: PostgreSQL RDBMS (Character ID: 1)")
+    print("=" * 70)
+    
+    # Load JSON data
+    data = await load_elena_json()
+    
+    # Connect to database
+    print("\n🔌 Connecting to PostgreSQL...")
+    conn = await asyncpg.connect(**DB_CONFIG)
+    print("  ✅ Connected")
+    
+    try:
+        # Clear existing data
+        await clear_existing_data(conn)
+        
+        # Import all extended data
+        await import_response_guidelines(conn, data)
+        await import_conversation_flows(conn, data)
+        await import_message_triggers(conn, data)
+        await import_emoji_patterns(conn, data)
+        await import_ai_scenarios(conn, data)
+        await import_cultural_expressions(conn, data)
+        await import_voice_traits(conn, data)
+        await import_emotional_triggers(conn, data)
+        await import_expertise_domains(conn, data)
+        
+        # Verify import
+        print("\n✅ Verifying import...")
+        counts = await conn.fetchrow("""
+            SELECT 
+              (SELECT COUNT(*) FROM character_response_guidelines WHERE character_id = $1) as response_guidelines,
+              (SELECT COUNT(*) FROM character_message_triggers WHERE character_id = $1) as message_triggers,
+              (SELECT COUNT(*) FROM character_response_modes WHERE character_id = $1) as response_modes,
+              (SELECT COUNT(*) FROM character_emoji_patterns WHERE character_id = $1) as emoji_patterns,
+              (SELECT COUNT(*) FROM character_ai_scenarios WHERE character_id = $1) as ai_scenarios,
+              (SELECT COUNT(*) FROM character_cultural_expressions WHERE character_id = $1) as cultural_expressions,
+              (SELECT COUNT(*) FROM character_voice_traits WHERE character_id = $1) as voice_traits,
+              (SELECT COUNT(*) FROM character_emotional_triggers WHERE character_id = $1) as emotional_triggers,
+              (SELECT COUNT(*) FROM character_expertise_domains WHERE character_id = $1) as expertise_domains,
+              (SELECT COUNT(*) FROM character_conversation_flows WHERE character_id = $1) as conversation_flows
+        """, CHARACTER_ID)
+        
+        print("\n" + "=" * 70)
+        print("Import Summary for Elena Rodriguez:")
+        print("=" * 70)
+        for field, count in counts.items():
+            print(f"  {field:30s}: {count:3d} records")
+        print("=" * 70)
+        print("\n✅ Elena extended import complete!")
+        
+    finally:
+        await conn.close()
+        print("🔌 Database connection closed")
+
+if __name__ == '__main__':
+    asyncio.run(main())
