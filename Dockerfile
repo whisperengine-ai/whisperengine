@@ -175,5 +175,5 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
 # Expose default port (can be overridden)
 EXPOSE 9090
 
-# Run the application
-CMD ["python", "run.py"]
+# Set entrypoint for auto-migration
+ENTRYPOINT ["/app/scripts/docker-entrypoint.sh"]

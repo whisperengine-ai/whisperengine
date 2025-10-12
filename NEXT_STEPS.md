@@ -1,4 +1,94 @@
-# Next Steps: Validate Alternation Fixes → Structured Prompt Assembly
+# Next Steps: Database Migrations & Qdrant Schema Management
+
+## 🚨 CRITICAL: Qdrant Schema Management Gap (October 12, 2025)
+
+**Status**: 🚨 NO MIGRATION SYSTEM FOR VECTOR DATABASE  
+**Priority**: HIGH - Required for schema evolution
+
+### Problem Identified
+
+While SQL migrations (Alembic) are now in place, **Qdrant vector database has NO migration system**:
+
+❌ **Schema changes require manual collection recreation** (destroys all memories!)  
+❌ **No versioning for vector schema** (can't track v1 → v2 → v3)  
+❌ **No automated upgrade path** (validation detects issues but doesn't fix them)  
+❌ **No coordination with SQL migrations** (schemas can get out of sync)
+
+### Current State
+
+**Collection Initialization**: Application-level in `src/memory/vector_memory_system.py`
+- `_ensure_collection_exists()` - Creates 3D named vector collections on startup
+- `_create_payload_indexes()` - Creates search indexes (safe to call multiple times)
+- `_validate_and_upgrade_collection()` - Only DETECTS schema issues, doesn't FIX them
+
+**Schema Validation Only**: No automated fixes
+```python
+if missing_vectors:
+    logger.error("Collection has incomplete vector schema!")
+    logger.error("Please recreate collection or run migration script")
+    # ⚠️ Does NOT automatically fix - user must manually recreate!
+```
+
+### Quick Actions
+
+```bash
+# 1. Check current Qdrant schema status
+python scripts/migrations/qdrant/migrate.py status
+
+# 2. Create snapshots before any changes
+python scripts/migrations/qdrant/migrate.py snapshot whisperengine_memory_elena
+
+# 3. Validate schema compliance
+python scripts/migrations/qdrant/migrate.py validate whisperengine_memory_elena
+```
+
+**See**: `docs/architecture/QDRANT_SCHEMA_MANAGEMENT.md` for complete analysis and roadmap
+
+### Implementation Roadmap
+
+- **Phase 1** (Week 1): Schema version tracking + snapshot tools ✅ STARTED
+- **Phase 2** (Week 2): Migration execution with safety mechanisms
+- **Phase 3** (Week 3): Integration with Alembic SQL migrations  
+- **Phase 4** (Week 4): Production rollout and backfill
+
+---
+
+## 🔥 NEW: Database Migration System (October 11, 2025)
+
+**Status**: ✅ Ready for use  
+**Priority**: CRITICAL - Required for post-v1.0.6 schema changes
+
+### For v1.0.6 Existing Deployments:
+
+```bash
+# Mark your database as up-to-date (don't run migrations)
+./scripts/migrations/db-migrate.sh stamp head
+```
+
+### For New Features Requiring Schema Changes:
+
+```bash
+# 1. Create migration
+./scripts/migrations/db-migrate.sh create "Add your feature description"
+
+# 2. Edit alembic/versions/[generated_file].py
+#    - Add SQL in upgrade()
+#    - Add rollback SQL in downgrade()
+
+# 3. Test locally
+./scripts/migrations/db-migrate.sh upgrade
+
+# 4. Test rollback
+./scripts/migrations/db-migrate.sh downgrade -1
+
+# 5. Commit migration file
+git add alembic/versions/[generated_file].py
+git commit -m "feat: Add [feature] database migration"
+```
+
+**See**: `docs/guides/DATABASE_MIGRATIONS.md` for complete guide
+
+---
 
 ## 🔥 IMMEDIATE: Test Alternation Fixes (October 11, 2025)
 
