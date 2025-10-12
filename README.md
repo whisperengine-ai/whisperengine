@@ -119,7 +119,36 @@ curl -X POST http://localhost:9090/api/chat \\
 3. Set `ENABLE_DISCORD=true`
 4. Restart: `docker-compose -f docker-compose.quickstart.yml restart`
 
-## 🔧 Configuration Options
+## 🔧 Troubleshooting
+
+### **Setup Failed or Database Errors?**
+
+If you encounter errors like "relation already exists" or other deployment issues, run the cleanup script:
+
+**macOS/Linux:**
+```bash
+curl -sSL https://raw.githubusercontent.com/whisperengine-ai/whisperengine/main/cleanup-docker.sh | bash
+```
+
+**Windows (PowerShell):**
+```powershell
+Invoke-WebRequest -Uri "https://raw.githubusercontent.com/whisperengine-ai/whisperengine/main/cleanup-docker.ps1" -OutFile "cleanup.ps1"; .\cleanup.ps1
+```
+
+**Windows (Command Prompt):**
+```cmd
+curl -sSL https://raw.githubusercontent.com/whisperengine-ai/whisperengine/main/cleanup-docker.bat -o cleanup.bat && cleanup.bat
+```
+
+Then run the setup command again. See [Cleanup Guide](docs/deployment/CLEANUP_SCRIPTS.md) for details.
+
+### **Other Issues?**
+- Check [Troubleshooting Guide](docs/troubleshooting/README.md)
+- Verify Docker Desktop is running
+- Ensure ports 9090, 3001, 5432, 6333, and 8086 are available
+- View logs: `docker logs whisperengine-assistant`
+
+## ⚙️ Configuration Options
 
 Edit your `.env` file to customize:
 
@@ -167,7 +196,31 @@ WhisperEngine comes with example characters to get you started:
 
 ## 🛟 Getting Help
 
+### **Need to Start Fresh?**
+
+If you encounter deployment issues or want to clean up old installations:
+
+**macOS/Linux:**
+```bash
+curl -sSL https://raw.githubusercontent.com/whisperengine-ai/whisperengine/main/cleanup-docker.sh | bash
+```
+
+**Windows (PowerShell):**
+```powershell
+Invoke-WebRequest -Uri "https://raw.githubusercontent.com/whisperengine-ai/whisperengine/main/cleanup-docker.ps1" -OutFile "cleanup.ps1"; .\cleanup.ps1
+```
+
+**Windows (Command Prompt):**
+```cmd
+curl -sSL https://raw.githubusercontent.com/whisperengine-ai/whisperengine/main/cleanup-docker.bat -o cleanup.bat && cleanup.bat
+```
+
+⚠️ **Warning:** This will remove ALL WhisperEngine data (containers, databases, logs). See [Cleanup Guide](docs/deployment/CLEANUP_SCRIPTS.md) for details.
+
+### **Documentation & Support**
+
 - **📖 Documentation**: Comprehensive guides in the [docs/](docs/) folder
+- **🧹 Cleanup Guide**: [Full cleanup documentation](docs/deployment/CLEANUP_SCRIPTS.md)
 - **🐛 Issues**: Report bugs on [GitHub Issues](https://github.com/whisperengine-ai/whisperengine/issues)
 - **💬 Community**: [Discord Server](https://discord.gg/whisperengine) (Coming Soon)
 - **📧 Support**: Contact us at support@whisperengine.ai
