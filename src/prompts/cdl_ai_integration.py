@@ -699,6 +699,7 @@ class CDLAIPromptIntegration:
         
         # 🎭 TRIGGER-BASED MODE DETECTION: Detect and apply appropriate interaction mode
         mode_detection_result = None
+        active_mode = None  # 🎯 OPTIMIZATION: Track active mode for conversation flow filtering
         try:
             mode_detection_result = await self.trigger_mode_controller.detect_active_mode(
                 character_name=character_name,
@@ -707,6 +708,9 @@ class CDLAIPromptIntegration:
             )
             
             if mode_detection_result.active_mode:
+                # 🎯 OPTIMIZATION: Extract active mode for conversation flow filtering
+                active_mode = mode_detection_result.active_mode.mode_name
+                
                 # Apply mode to prompt
                 prompt = self.trigger_mode_controller.apply_mode_to_prompt(
                     base_prompt=prompt,
@@ -717,7 +721,7 @@ class CDLAIPromptIntegration:
                 # Update previous mode for next interaction
                 self._previous_mode = mode_detection_result.active_mode.mode_name
                 
-                logger.info(f"🎭 MODE APPLIED: {mode_detection_result.active_mode.mode_name} "
+                logger.info(f"🎭 MODE APPLIED: {active_mode} "
                            f"(source: {mode_detection_result.active_mode.trigger_source}, "
                            f"confidence: {mode_detection_result.active_mode.confidence:.2f}, "
                            f"triggers: {mode_detection_result.detected_triggers})")
