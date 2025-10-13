@@ -728,7 +728,7 @@ class EnhancedCDLManager:
         # Communication style
         comm_query = """
             SELECT engagement_level, formality, emotional_expression, 
-                   response_length, conversation_flow_guidance, ai_identity_handling 
+                   response_length, conversation_flow_guidance 
             FROM communication_styles 
             WHERE character_id = $1
         """
@@ -758,21 +758,9 @@ class EnhancedCDLManager:
             # This replaces JSON parsing with clean relational queries for web UI compatibility
             cdl_data['communication_style']['conversation_flow_guidance'] = await self._load_conversation_flow_guidance(conn, character_id)
                     
-            if comm_row['ai_identity_handling']:
-                try:
-                    # Handle both JSON strings and Python dict strings safely
-                    if isinstance(comm_row['ai_identity_handling'], str):
-                        # Try JSON first, then fall back to ast.literal_eval for Python dict strings
-                        try:
-                            cdl_data['communication_style']['ai_identity_handling'] = json.loads(comm_row['ai_identity_handling'])
-                        except json.JSONDecodeError:
-                            # Handle Python dict strings with single quotes
-                            cdl_data['communication_style']['ai_identity_handling'] = ast.literal_eval(comm_row['ai_identity_handling'])
-                    else:
-                        cdl_data['communication_style']['ai_identity_handling'] = comm_row['ai_identity_handling']
-                except (ValueError, SyntaxError) as e:
-                    logger.warning(f"Could not parse ai_identity_handling: {e}")
-                    cdl_data['communication_style']['ai_identity_handling'] = {}
+            # 🚀 NEW: Load AI identity handling from normalized roleplay config table
+            # This replaces complex parsing of denormalized ai_identity_handling text field
+            cdl_data['communication_style']['ai_identity_handling'] = await self._load_ai_identity_from_normalized_tables(conn, character_id)
         
         # Values and beliefs
         values_query = """
@@ -1092,37 +1080,6 @@ class EnhancedCDLManager:
         except:
             return "Standard conversation approach"
     
-    def _format_ai_identity_handling(self, json_string: str) -> str:
-        """🚨 FIX: Convert raw JSON AI identity handling to human-readable format"""
-        try:
-            import json
-            if not json_string or json_string == '{}':
-                return "Standard AI identity approach"
-                
-            data = json.loads(json_string) if isinstance(json_string, str) else json_string
-            if not isinstance(data, dict):
-                return str(data)
-                
-            # Extract key information
-            immersion = data.get('allow_full_roleplay_immersion', False)
-            philosophy = data.get('philosophy', '')
-            approach = data.get('approach', '')
-            
-            parts = []
-            if immersion:
-                parts.append("Full roleplay immersion allowed")
-            else:
-                parts.append("Honest about AI nature")
-                
-            if philosophy:
-                parts.append(f"Philosophy: {philosophy}")
-            if approach:
-                parts.append(f"Approach: {approach}")
-                
-            return "; ".join(parts) if parts else "Standard AI identity approach"
-        except:
-            return "Standard AI identity approach"
-
     async def _load_conversation_flow_guidance(self, conn, character_id: int) -> Dict[str, Any]:
         """Load conversation flow guidance from normalized RDBMS tables (replaces JSON parsing)."""
         guidance_data = {}
@@ -1227,6 +1184,67 @@ class EnhancedCDLManager:
         except Exception as e:
             logger.error(f"Error loading conversation flow guidance from RDBMS: {e}")
             return {}
+
+    async def _load_ai_identity_from_normalized_tables(self, conn, character_id: int) -> Dict[str, Any]:
+        """Load AI identity handling from normalized roleplay config tables (replaces text field parsing)."""
+        try:
+            # Load core roleplay configuration
+            roleplay_query = """
+                SELECT allow_full_roleplay_immersion, philosophy, strategy
+                FROM character_roleplay_config 
+                WHERE character_id = $1
+            """
+            roleplay_row = await conn.fetchrow(roleplay_query, character_id)
+            
+            if not roleplay_row:
+                logger.warning(f"No roleplay config found for character {character_id}, using defaults")
+                return {
+                    'allow_full_roleplay_immersion': False,
+                    'philosophy': '',
+                    'approach': ''
+                }
+            
+            # Build core AI identity structure
+            ai_identity = {
+                'allow_full_roleplay_immersion': roleplay_row['allow_full_roleplay_immersion'] or False,
+                'philosophy': roleplay_row['philosophy'] or '',
+                'approach': roleplay_row['strategy'] or ''
+            }
+            
+            # Load roleplay interaction scenarios from normalized table
+            scenarios_query = """
+                SELECT scenario_name, response_pattern, tier_1_response, tier_2_response, tier_3_response
+                FROM character_roleplay_scenarios_v2 
+                WHERE character_id = $1
+                ORDER BY scenario_name
+            """
+            scenario_rows = await conn.fetch(scenarios_query, character_id)
+            
+            if scenario_rows:
+                roleplay_scenarios = {}
+                for scenario_row in scenario_rows:
+                    scenario_name = scenario_row['scenario_name']
+                    roleplay_scenarios[scenario_name] = {
+                        'response_pattern': scenario_row['response_pattern'] or '',
+                        'tier_1_response': scenario_row['tier_1_response'] or '',
+                        'tier_2_response': scenario_row['tier_2_response'] or '',
+                        'tier_3_response': scenario_row['tier_3_response'] or ''
+                    }
+                
+                if roleplay_scenarios:
+                    ai_identity['roleplay_interaction_scenarios'] = roleplay_scenarios
+            
+            logger.info(f"✅ NORMALIZED: Loaded AI identity config for character {character_id} from roleplay tables")
+            return ai_identity
+            
+        except Exception as e:
+            logger.error(f"Error loading AI identity from normalized tables: {e}")
+            # Return safe defaults on error
+            return {
+                'allow_full_roleplay_immersion': False,
+                'philosophy': '',
+                'approach': ''
+            }
 
 # ========================================================================================
 # FACTORY FUNCTION (maintains same API as simple manager)

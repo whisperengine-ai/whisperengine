@@ -7,7 +7,7 @@ import logging
 import os
 from datetime import datetime
 from zoneinfo import ZoneInfo
-from typing import Dict, Optional
+from typing import Dict, Optional, Any
 from pathlib import Path
 
 from src.characters.cdl.parser import Character
@@ -80,6 +80,13 @@ class CDLAIPromptIntegration:
                         operation, optimization_ratio * 100)
         except Exception as e:
             logger.warning("Failed to record fidelity optimization metrics: %s", str(e))
+
+    def _get_safe_bot_name(self, character=None):
+        """Helper method to get safe bot name with fallback."""
+        fallback = "unknown"
+        if character and hasattr(character, 'identity') and hasattr(character.identity, 'name'):
+            fallback = character.identity.name
+        return os.getenv('DISCORD_BOT_NAME', fallback).lower()
 
     async def build_confidence_aware_context(
         self,
@@ -904,20 +911,10 @@ class CDLAIPromptIntegration:
         # # 🌍 CULTURAL EXPRESSIONS: Add authentic voice patterns and phrases (MOVED TO VOICE SECTION)
         # # 🎤 VOICE TRAITS: Add tone, rhythm, and style characteristics (MOVED TO VOICE SECTION)
         
-        # 🗣️ CONVERSATION FLOWS: Add flow guidance for different interaction modes
-        if self.enhanced_manager:
-            try:
-                bot_name = os.getenv('DISCORD_BOT_NAME', safe_bot_name_fallback).lower()
-                conversation_flows = await self.enhanced_manager.get_conversation_flows(bot_name)
-                if conversation_flows:
-                    prompt += f"\n\n🗣️ CONVERSATION FLOW GUIDANCE:\n"
-                    for flow in conversation_flows[:5]:  # Top 5 flows by priority
-                        prompt += f"- **{flow.flow_name}** ({flow.energy_level}): {flow.approach_description}\n"
-                        if flow.transition_style:
-                            prompt += f"  Transitions: {flow.transition_style}\n"
-                    logger.info(f"✅ CONVERSATION FLOWS: Added {len(conversation_flows)} flow entries")
-            except Exception as e:
-                logger.debug(f"Could not extract conversation flows: {e}")
+        # 🗣️ CONVERSATION FLOWS: Now handled by trigger-based mode controller above
+        # Conversation flow guidance is intelligently selected based on message context and triggers.
+        # The active mode detection system applies only relevant guidance instead of dumping all flows.
+        # This prevents prompt bloat and ensures contextually appropriate responses.
         
         # 🎨 MESSAGE TRIGGERS: Now handled by trigger-based mode controller above
         # Message pattern triggers are used for mode switching logic instead of prompt dumping.
@@ -926,64 +923,134 @@ class CDLAIPromptIntegration:
         # NOTE: 🌍 AUTHENTIC VOICE PATTERNS and 🎤 VOICE CHARACTERISTICS sections
         # consolidated into VOICE & COMMUNICATION STYLE section (see above)
         
-        # 💭 EMOTIONAL TRIGGERS: Add appropriate emotional reaction patterns
+        # 💭 EMOTIONAL TRIGGERS: Intelligent multi-source trigger system
         if self.enhanced_manager:
             try:
                 bot_name = os.getenv('DISCORD_BOT_NAME', safe_bot_name_fallback).lower()
                 emotional_triggers = await self.enhanced_manager.get_emotional_triggers(bot_name)
                 if emotional_triggers:
-                    # Check if any triggers match current message context
-                    message_lower = message_content.lower()
-                    active_emotional_triggers = []
+                    # 🧠 INTELLIGENT TRIGGER FUSION: Use AI components instead of keyword matching
+                    try:
+                        from src.prompts.intelligent_trigger_fusion import get_intelligent_trigger_fusion
+                        trigger_fusion = get_intelligent_trigger_fusion()
+                        
+                        # Get AI components from pipeline_result
+                        ai_components = {}
+                        if hasattr(pipeline_result, 'metadata') and pipeline_result.metadata:
+                            ai_components = pipeline_result.metadata.get('ai_components', {})
+                        
+                        # Intelligent emotional trigger decision
+                        trigger_decision = await trigger_fusion.should_trigger_emotional_guidance(ai_components, message_content)
+                        
+                        if trigger_decision.should_trigger:
+                            # Get contextually relevant triggers based on decision evidence
+                            relevant_triggers = []
+                            for trigger in emotional_triggers:
+                                # Use decision context to filter relevant triggers
+                                trigger_relevance = self._calculate_trigger_relevance(trigger, trigger_decision.context_factors)
+                                if trigger_relevance > 0.5:
+                                    relevant_triggers.append(trigger)
+                            
+                            if relevant_triggers:
+                                prompt += f"\n\n💭 EMOTIONAL RESPONSE GUIDANCE (AI-detected context):\n"
+                                for trigger in relevant_triggers[:3]:  # Top 3 most relevant
+                                    prompt += f"- {trigger.trigger_type.title()}: {trigger.emotional_response}\n"
+                                logger.info(f"✅ EMOTIONAL TRIGGERS: AI fusion activated {len(relevant_triggers)} triggers "
+                                           f"(confidence: {trigger_decision.confidence:.2f}, reason: {trigger_decision.trigger_reason})")
+                            else:
+                                logger.debug(f"💭 EMOTIONAL TRIGGERS: AI fusion suggested trigger but no relevant patterns found")
+                        else:
+                            # No active emotional triggers - character will use base personality
+                            logger.debug(f"💭 EMOTIONAL TRIGGERS: AI fusion decided against triggering "
+                                       f"(confidence: {trigger_decision.confidence:.2f}, reason: {trigger_decision.trigger_reason})")
                     
-                    for trigger in emotional_triggers:
-                        # Check if trigger content keywords appear in message
-                        trigger_keywords = trigger.trigger_content.lower().split()
-                        if any(keyword in message_lower for keyword in trigger_keywords if len(keyword) > 3):
-                            active_emotional_triggers.append(trigger)
-                    
-                    if active_emotional_triggers:
-                        prompt += f"\n\n💭 EMOTIONAL RESPONSE GUIDANCE (current context):\n"
-                        for trigger in active_emotional_triggers[:3]:  # Top 3 most relevant
-                            prompt += f"- {trigger.trigger_type.title()}: {trigger.emotional_response}\n"
-                        logger.info(f"✅ EMOTIONAL TRIGGERS: Activated {len(active_emotional_triggers)} emotional triggers")
-                    else:
-                        # Show general emotional patterns for reference
-                        prompt += f"\n\n💭 EMOTIONAL PATTERNS:\n"
-                        for trigger in emotional_triggers[:5]:  # Top 5 general patterns
-                            prompt += f"- {trigger.trigger_type.title()}: {trigger.trigger_content[:50]}...\n"
-                        logger.info(f"✅ EMOTIONAL TRIGGERS: Added {len(emotional_triggers)} emotional patterns")
+                    except ImportError:
+                        # Fallback to keyword matching if fusion system unavailable
+                        logger.debug("Intelligent trigger fusion unavailable, using keyword fallback")
+                        message_lower = message_content.lower()
+                        active_emotional_triggers = []
+                        
+                        for trigger in emotional_triggers:
+                            # Check if trigger content keywords appear in message
+                            trigger_keywords = trigger.trigger_content.lower().split()
+                            if any(keyword in message_lower for keyword in trigger_keywords if len(keyword) > 3):
+                                active_emotional_triggers.append(trigger)
+                        
+                        if active_emotional_triggers:
+                            prompt += f"\n\n💭 EMOTIONAL RESPONSE GUIDANCE (keyword fallback):\n"
+                            for trigger in active_emotional_triggers[:3]:  # Top 3 most relevant
+                                prompt += f"- {trigger.trigger_type.title()}: {trigger.emotional_response}\n"
+                            logger.info(f"✅ EMOTIONAL TRIGGERS: Keyword fallback activated {len(active_emotional_triggers)} triggers")
+                        else:
+                            # No active emotional triggers - character will use base personality
+                            logger.debug(f"💭 EMOTIONAL TRIGGERS: No keyword triggers activated from {len(emotional_triggers)} available patterns")
             except Exception as e:
                 logger.debug(f"Could not extract emotional triggers: {e}")
         
-        # 🎓 EXPERTISE DOMAINS: Add knowledge-based response guidance
+        # 🎓 EXPERTISE DOMAINS: Intelligent multi-source activation system
         if self.enhanced_manager:
             try:
                 bot_name = os.getenv('DISCORD_BOT_NAME', safe_bot_name_fallback).lower()
                 expertise_domains = await self.enhanced_manager.get_expertise_domains(bot_name)
                 if expertise_domains:
-                    # Check if message relates to any expertise domain
-                    message_lower = message_content.lower()
-                    relevant_domains = []
+                    # 🧠 INTELLIGENT TRIGGER FUSION: Use AI components instead of keyword matching
+                    try:
+                        from src.prompts.intelligent_trigger_fusion import get_intelligent_trigger_fusion
+                        trigger_fusion = get_intelligent_trigger_fusion()
+                        
+                        # Get AI components from pipeline_result
+                        ai_components = {}
+                        if hasattr(pipeline_result, 'metadata') and pipeline_result.metadata:
+                            ai_components = pipeline_result.metadata.get('ai_components', {})
+                        
+                        # Intelligent expertise trigger decision
+                        trigger_decision = await trigger_fusion.should_trigger_expertise_domain(ai_components, message_content)
+                        
+                        if trigger_decision.should_trigger:
+                            # Get contextually relevant domains based on decision evidence
+                            relevant_domains = []
+                            for domain in expertise_domains:
+                                # Use semantic relevance instead of keyword matching
+                                domain_relevance = self._calculate_domain_relevance(domain, trigger_decision.context_factors, message_content)
+                                if domain_relevance > 0.4:  # Lower threshold since it's semantic
+                                    relevant_domains.append(domain)
+                            
+                            if relevant_domains:
+                                prompt += f"\n\n🎓 RELEVANT EXPERTISE (AI-detected context):\n"
+                                for domain in relevant_domains[:3]:  # Top 3 most relevant
+                                    prompt += f"- **{domain.domain_name}** (Level: {domain.expertise_level}, Passion: {domain.passion_level}/10)\n"
+                                    if domain.teaching_approach:
+                                        prompt += f"  Teaching approach: {domain.teaching_approach}\n"
+                                logger.info(f"✅ EXPERTISE DOMAINS: AI fusion activated {len(relevant_domains)} domains "
+                                           f"(confidence: {trigger_decision.confidence:.2f}, reason: {trigger_decision.trigger_reason})")
+                            else:
+                                logger.debug(f"🎓 EXPERTISE DOMAINS: AI fusion suggested trigger but no relevant domains found")
+                        else:
+                            # No relevant expertise domains - character will use general knowledge
+                            logger.debug(f"🎓 EXPERTISE DOMAINS: AI fusion decided against triggering "
+                                       f"(confidence: {trigger_decision.confidence:.2f}, reason: {trigger_decision.trigger_reason})")
                     
-                    for domain in expertise_domains:
-                        domain_keywords = domain.domain_name.lower().split()
-                        if any(keyword in message_lower for keyword in domain_keywords if len(keyword) > 3):
-                            relevant_domains.append(domain)
-                    
-                    if relevant_domains:
-                        prompt += f"\n\n🎓 RELEVANT EXPERTISE (apply knowledge):\n"
-                        for domain in relevant_domains[:3]:  # Top 3 most relevant
-                            prompt += f"- **{domain.domain_name}** (Level: {domain.expertise_level}, Passion: {domain.passion_level}/10)\n"
-                            if domain.teaching_approach:
-                                prompt += f"  Teaching approach: {domain.teaching_approach}\n"
-                        logger.info(f"✅ EXPERTISE DOMAINS: Activated {len(relevant_domains)} relevant domains")
-                    else:
-                        # Show top expertise areas for general reference
-                        prompt += f"\n\n🎓 CORE EXPERTISE AREAS:\n"
-                        for domain in expertise_domains[:5]:  # Top 5 by passion level
-                            prompt += f"- {domain.domain_name} (Level: {domain.expertise_level})\n"
-                        logger.info(f"✅ EXPERTISE DOMAINS: Added {len(expertise_domains)} expertise areas")
+                    except ImportError:
+                        # Fallback to keyword matching if fusion system unavailable
+                        logger.debug("Intelligent trigger fusion unavailable, using keyword fallback")
+                        message_lower = message_content.lower()
+                        relevant_domains = []
+                        
+                        for domain in expertise_domains:
+                            domain_keywords = domain.domain_name.lower().split()
+                            if any(keyword in message_lower for keyword in domain_keywords if len(keyword) > 3):
+                                relevant_domains.append(domain)
+                        
+                        if relevant_domains:
+                            prompt += f"\n\n🎓 RELEVANT EXPERTISE (keyword fallback):\n"
+                            for domain in relevant_domains[:3]:  # Top 3 most relevant
+                                prompt += f"- **{domain.domain_name}** (Level: {domain.expertise_level}, Passion: {domain.passion_level}/10)\n"
+                                if domain.teaching_approach:
+                                    prompt += f"  Teaching approach: {domain.teaching_approach}\n"
+                            logger.info(f"✅ EXPERTISE DOMAINS: Keyword fallback activated {len(relevant_domains)} domains")
+                        else:
+                            # No relevant expertise domains - character will use general knowledge
+                            logger.debug(f"🎓 EXPERTISE DOMAINS: No keyword domains activated from {len(expertise_domains)} available areas")
             except Exception as e:
                 logger.debug(f"Could not extract expertise domains: {e}")
         
@@ -2038,6 +2105,92 @@ Remember to stay true to your authentic voice and character.
         
         return self._graph_manager
 
+    def _calculate_trigger_relevance(self, trigger, context_factors: Dict[str, Any]) -> float:
+        """
+        Calculate relevance of an emotional trigger based on AI decision context.
+        Uses semantic analysis instead of keyword matching.
+        """
+        relevance = 0.0
+        
+        # Base relevance from trigger type
+        if hasattr(trigger, 'trigger_type'):
+            trigger_type = trigger.trigger_type.lower()
+            
+            # Check if context factors suggest this trigger type
+            for factor_name, factor_data in context_factors.items():
+                if isinstance(factor_data, dict):
+                    # Look for emotional alignment
+                    primary_emotion = factor_data.get('primary_emotion', '').lower()
+                    if trigger_type in primary_emotion or primary_emotion in trigger_type:
+                        relevance += 0.7
+                    
+                    # Check for intensity alignment
+                    emotional_intensity = factor_data.get('emotional_intensity', 0.0)
+                    if emotional_intensity > 0.7 and 'intense' in trigger_type:
+                        relevance += 0.3
+                    elif emotional_intensity < 0.4 and 'gentle' in trigger_type:
+                        relevance += 0.3
+        
+        return min(relevance, 1.0)
+    
+    def _calculate_domain_relevance(self, domain, context_factors: Dict[str, Any], message_content: str) -> float:
+        """
+        Calculate relevance of an expertise domain based on AI decision context.
+        Uses semantic and contextual analysis instead of keyword matching.
+        """
+        relevance = 0.0
+        domain_name_lower = domain.domain_name.lower()
+        
+        # Check conversation intelligence signals
+        for factor_name, factor_data in context_factors.items():
+            if isinstance(factor_data, dict):
+                # Topic evolution signals
+                topic_evolution = factor_data.get('topic_evolution', '')
+                if isinstance(topic_evolution, str):
+                    if 'technical' in topic_evolution and any(term in domain_name_lower for term in ['science', 'research', 'analysis', 'technology']):
+                        relevance += 0.8
+                    elif 'creative' in topic_evolution and any(term in domain_name_lower for term in ['art', 'design', 'creative', 'writing']):
+                        relevance += 0.8
+                
+                # Learning emotion signals
+                if factor_data.get('detected_learning_pattern'):
+                    # Any domain is relevant when user is in learning mode
+                    relevance += 0.6
+                
+                # Primary emotion alignment
+                primary_emotion = factor_data.get('primary_emotion', '').lower()
+                if primary_emotion in ['curiosity', 'interest'] and hasattr(domain, 'passion_level'):
+                    # High passion domains more relevant for curious users
+                    passion_boost = min(domain.passion_level / 10.0, 0.4)
+                    relevance += passion_boost
+        
+        # Semantic content analysis (simple but effective)
+        message_lower = message_content.lower()
+        domain_keywords = domain_name_lower.split()
+        
+        # Look for domain-related terms in message
+        for keyword in domain_keywords:
+            if len(keyword) > 3 and keyword in message_lower:
+                relevance += 0.3
+        
+        # Check for related terms (basic semantic expansion)
+        domain_semantic_map = {
+            'marine': ['ocean', 'sea', 'water', 'fish', 'coral', 'underwater'],
+            'biology': ['life', 'organism', 'science', 'nature', 'ecosystem'],
+            'computer': ['tech', 'software', 'programming', 'digital', 'code'],
+            'art': ['creative', 'design', 'visual', 'aesthetic', 'beauty'],
+            'music': ['sound', 'song', 'melody', 'rhythm', 'audio']
+        }
+        
+        for domain_term, related_terms in domain_semantic_map.items():
+            if domain_term in domain_name_lower:
+                for related_term in related_terms:
+                    if related_term in message_lower:
+                        relevance += 0.2
+                        break  # Only add bonus once per domain term
+        
+        return min(relevance, 1.0)
+
     async def _get_context_enhancer(self):
         """Get or initialize CharacterContextEnhancer (cached) - Phase 2B"""
         if not self._context_enhancer:
@@ -2782,7 +2935,7 @@ Stay authentic to {character.identity.name}'s personality while being transparen
         Returns formatted section matching Elena example structure.
         """
         try:
-            bot_name = os.getenv('DISCORD_BOT_NAME', safe_bot_name_fallback).lower()
+            bot_name = self._get_safe_bot_name(character)
             
             voice_parts = []
             voice_parts.append("VOICE & COMMUNICATION STYLE:")
