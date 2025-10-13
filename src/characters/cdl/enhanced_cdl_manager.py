@@ -89,6 +89,16 @@ class ResponseMode:
     length_guideline: str
     tone_adjustment: str
 
+@dataclass 
+class InteractionMode:
+    mode_name: str  # 'creative', 'technical', 'educational', 'casual'
+    mode_description: str
+    trigger_keywords: List[str]  # Keywords that activate this mode
+    response_guidelines: str  # How to respond in this mode
+    avoid_patterns: List[str]  # What to avoid in this mode
+    is_default: bool  # Whether this is the default mode
+    priority: int
+
 @dataclass
 class InterestTopic:
     topic_keyword: str
@@ -361,6 +371,36 @@ class EnhancedCDLManager:
 
         except Exception as e:
             logger.error(f"Error retrieving message triggers for {character_name}: {e}")
+            return []
+
+    async def get_interaction_modes(self, character_name: str) -> List[InteractionMode]:
+        """Get interaction modes for context-aware response switching"""
+        try:
+            async with self.pool.acquire() as conn:
+                character_id = await self._get_character_id(conn, character_name)
+                if not character_id:
+                    return []
+
+                rows = await conn.fetch("""
+                    SELECT mode_name, mode_description, trigger_keywords, 
+                           response_guidelines, avoid_patterns, is_default, priority
+                    FROM cdl_interaction_modes 
+                    WHERE character_id = $1
+                    ORDER BY priority DESC, is_default DESC
+                """, character_id)
+
+                return [InteractionMode(
+                    mode_name=row['mode_name'],
+                    mode_description=row['mode_description'],
+                    trigger_keywords=row['trigger_keywords'] or [],
+                    response_guidelines=row['response_guidelines'] or '',
+                    avoid_patterns=row['avoid_patterns'] or [],
+                    is_default=row['is_default'],
+                    priority=row['priority']
+                ) for row in rows]
+
+        except Exception as e:
+            logger.error(f"Error retrieving interaction modes for {character_name}: {e}")
             return []
 
     async def get_speech_patterns(self, character_name: str) -> List[SpeechPattern]:

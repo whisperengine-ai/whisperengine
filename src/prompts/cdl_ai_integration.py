@@ -12,6 +12,7 @@ from pathlib import Path
 
 from src.characters.cdl.parser import Character
 from src.characters.cdl.simple_cdl_manager import get_simple_cdl_manager
+from src.prompts.trigger_mode_controller import TriggerModeController
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +27,10 @@ class CDLAIPromptIntegration:
         self._graph_manager = None  # Cache for CharacterGraphManager
         self._graph_manager_initialized = False
         self._context_enhancer = None  # Cache for CharacterContextEnhancer (Phase 2B)
+        
+        # 🎭 TRIGGER-BASED MODE CONTROL: Initialize intelligent mode switching
+        self.trigger_mode_controller = TriggerModeController(enhanced_manager=enhanced_manager)
+        self._previous_mode = None  # Track mode changes for transition detection
         
         # 🚀 PERFORMANCE: Character caching for load_character performance
         self._cached_character = None
@@ -685,6 +690,33 @@ class CDLAIPromptIntegration:
         if hasattr(character.identity, 'description') and character.identity.description:
             prompt += f" {character.identity.description}"
         
+        # 🎭 TRIGGER-BASED MODE DETECTION: Detect and apply appropriate interaction mode
+        mode_detection_result = None
+        try:
+            mode_detection_result = await self.trigger_mode_controller.detect_active_mode(
+                character_name=character_name,
+                message_content=message_content,
+                previous_mode=self._previous_mode
+            )
+            
+            if mode_detection_result.active_mode:
+                # Apply mode to prompt
+                prompt = self.trigger_mode_controller.apply_mode_to_prompt(
+                    base_prompt=prompt,
+                    active_mode=mode_detection_result.active_mode,
+                    mode_switched=mode_detection_result.mode_switched
+                )
+                
+                # Update previous mode for next interaction
+                self._previous_mode = mode_detection_result.active_mode.mode_name
+                
+                logger.info(f"🎭 MODE APPLIED: {mode_detection_result.active_mode.mode_name} "
+                           f"(source: {mode_detection_result.active_mode.trigger_source}, "
+                           f"confidence: {mode_detection_result.active_mode.confidence:.2f}, "
+                           f"triggers: {mode_detection_result.detected_triggers})")
+        except Exception as e:
+            logger.debug(f"Could not detect interaction mode: {e}")
+        
         # 🚀 DYNAMIC CUSTOM FIELDS: Build from all available character data sections
         try:
             full_character_data = character.get_full_character_data()
@@ -859,29 +891,10 @@ class CDLAIPromptIntegration:
             except Exception as e:
                 logger.debug(f"Could not extract relationships: {e}")
         
-        # ⚡ BEHAVIORAL TRIGGERS: Add recognition responses and interaction patterns
-        if self.enhanced_manager:
-            try:
-                bot_name = os.getenv('DISCORD_BOT_NAME', safe_bot_name_fallback).lower()
-                behavioral_triggers = await self.enhanced_manager.get_behavioral_triggers(bot_name)
-                if behavioral_triggers:
-                    # Group by trigger type for organized presentation
-                    recognition_triggers = [t for t in behavioral_triggers if t.trigger_type == 'user_recognition']
-                    interaction_triggers = [t for t in behavioral_triggers if t.trigger_type in ['user_specific', 'mood', 'emotional', 'situational']]
-                    
-                    if recognition_triggers:
-                        prompt += f"\n\n⚡ USER RECOGNITION RESPONSES:\n"
-                        for trigger in recognition_triggers[:5]:  # Top 5 most important
-                            prompt += f"- When {trigger.trigger_value} interacts: {trigger.response_description}\n"
-                        logger.info(f"✅ BEHAVIORAL TRIGGERS: Added {len(recognition_triggers)} recognition responses")
-                    
-                    if interaction_triggers:
-                        prompt += f"\n\n🎭 INTERACTION PATTERNS:\n"
-                        for trigger in interaction_triggers[:8]:  # Top 8 most important
-                            prompt += f"- {trigger.trigger_value}: {trigger.response_description}\n"
-                        logger.info(f"✅ BEHAVIORAL TRIGGERS: Added {len(interaction_triggers)} interaction patterns")
-            except Exception as e:
-                logger.debug(f"Could not extract behavioral triggers: {e}")
+        # ⚡ BEHAVIORAL TRIGGERS: Now handled by trigger-based mode controller above
+        # Recognition responses and interaction patterns are applied through mode switching logic
+        # instead of being dumped as prompt text. This provides intelligent behavior control
+        # rather than raw data injection.
         
         # NOTE: 💬 SIGNATURE EXPRESSIONS, 🌍 AUTHENTIC VOICE PATTERNS, and 🎤 VOICE CHARACTERISTICS sections
         # have been consolidated into the unified VOICE & COMMUNICATION STYLE section above (line ~710)
@@ -906,28 +919,9 @@ class CDLAIPromptIntegration:
             except Exception as e:
                 logger.debug(f"Could not extract conversation flows: {e}")
         
-        # 🎨 MESSAGE TRIGGERS: Add context-aware response activation patterns
-        if self.enhanced_manager:
-            try:
-                bot_name = os.getenv('DISCORD_BOT_NAME', safe_bot_name_fallback).lower()
-                message_triggers = await self.enhanced_manager.get_message_triggers(bot_name)
-                if message_triggers:
-                    # Check if any triggers match current message
-                    active_triggers = []
-                    message_lower = message_content.lower()
-                    for trigger in message_triggers:
-                        if trigger.trigger_type == 'keyword' and trigger.trigger_value.lower() in message_lower:
-                            active_triggers.append(trigger)
-                        elif trigger.trigger_type == 'phrase' and trigger.trigger_value.lower() in message_lower:
-                            active_triggers.append(trigger)
-                    
-                    if active_triggers:
-                        prompt += f"\n\n🎨 ACTIVE MESSAGE TRIGGERS (respond appropriately):\n"
-                        for trigger in active_triggers[:5]:  # Top 5 most relevant
-                            prompt += f"- {trigger.trigger_category}: Detected '{trigger.trigger_value}' - Apply {trigger.response_mode} response\n"
-                        logger.info(f"✅ MESSAGE TRIGGERS: Activated {len(active_triggers)} triggers for current message")
-            except Exception as e:
-                logger.debug(f"Could not extract message triggers: {e}")
+        # 🎨 MESSAGE TRIGGERS: Now handled by trigger-based mode controller above
+        # Message pattern triggers are used for mode switching logic instead of prompt dumping.
+        # Active triggers are detected and applied through intelligent mode selection.
         
         # NOTE: 🌍 AUTHENTIC VOICE PATTERNS and 🎤 VOICE CHARACTERISTICS sections
         # consolidated into VOICE & COMMUNICATION STYLE section (see above)
@@ -3108,9 +3102,17 @@ Stay authentic to {character.identity.name}'s personality while being transparen
         """🚀 DYNAMIC FIELD BUILDER: Build prompt sections from all available custom fields"""
         dynamic_sections = []
         
+        # Sections that are handled by specialized logic, not dumped as prompt text
+        skip_sections = [
+            'identity',  # Handled separately as character identity
+            'behavioral_triggers',  # Now handled by trigger-based mode controller
+            'message_triggers',  # Now handled by trigger-based mode controller
+            'interaction_modes'  # Now handled by trigger-based mode controller
+        ]
+        
         # Process each data section dynamically
         for section_name, section_data in full_character_data.items():
-            if section_name in ['identity']:  # Skip identity as it's handled separately
+            if section_name in skip_sections:
                 continue
                 
             section_content = await self._process_data_section(section_name, section_data, character_name)
