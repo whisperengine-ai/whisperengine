@@ -8,6 +8,8 @@ access to rich character data through clean relational design.
 """
 
 import os
+import json
+import ast
 import asyncio
 import logging
 from typing import Dict, Any, List, Optional, Tuple
@@ -713,10 +715,15 @@ class EnhancedCDLManager:
         if traits_rows:
             cdl_data['personality'] = {'big_five': {}}
             for trait in traits_rows:
-                cdl_data['personality']['big_five'][trait['trait_name']] = {
-                    'value': float(trait['trait_value']) if trait['trait_value'] else 0.0,
-                    'intensity': trait['intensity'] or ''
-                }
+                trait_name = trait['trait_name']
+                trait_value = float(trait['trait_value']) if trait['trait_value'] else 0.0
+                intensity = trait['intensity'] or 'medium'
+                
+                # 🚨 FIX: Generate human-readable trait description instead of raw dict
+                level = 'Very High' if trait_value >= 0.9 else 'High' if trait_value >= 0.7 else 'Moderate' if trait_value >= 0.4 else 'Low'
+                trait_display = trait_name.replace('_', ' ').title()
+                
+                cdl_data['personality']['big_five'][trait_name] = f"{trait_display}: {level} ({trait_value:.2f}) - {intensity} intensity"
         
         # Communication style
         comm_query = """
@@ -747,17 +754,25 @@ class EnhancedCDLManager:
                 }
             }
             
-            # Add additional fields if they exist
-            if comm_row['conversation_flow_guidance']:
-                cdl_data['communication_style']['conversation_flow_guidance'] = {
-                    'value': comm_row['conversation_flow_guidance'],
-                    'description': 'Conversation flow guidance'
-                }
+            # 🚨 NEW: Load conversation flow guidance from normalized RDBMS tables
+            # This replaces JSON parsing with clean relational queries for web UI compatibility
+            cdl_data['communication_style']['conversation_flow_guidance'] = await self._load_conversation_flow_guidance(conn, character_id)
+                    
             if comm_row['ai_identity_handling']:
-                cdl_data['communication_style']['ai_identity_handling'] = {
-                    'value': comm_row['ai_identity_handling'], 
-                    'description': 'AI identity handling approach'
-                }
+                try:
+                    # Handle both JSON strings and Python dict strings safely
+                    if isinstance(comm_row['ai_identity_handling'], str):
+                        # Try JSON first, then fall back to ast.literal_eval for Python dict strings
+                        try:
+                            cdl_data['communication_style']['ai_identity_handling'] = json.loads(comm_row['ai_identity_handling'])
+                        except json.JSONDecodeError:
+                            # Handle Python dict strings with single quotes
+                            cdl_data['communication_style']['ai_identity_handling'] = ast.literal_eval(comm_row['ai_identity_handling'])
+                    else:
+                        cdl_data['communication_style']['ai_identity_handling'] = comm_row['ai_identity_handling']
+                except (ValueError, SyntaxError) as e:
+                    logger.warning(f"Could not parse ai_identity_handling: {e}")
+                    cdl_data['communication_style']['ai_identity_handling'] = {}
         
         # Values and beliefs
         values_query = """
@@ -1053,6 +1068,166 @@ class EnhancedCDLManager:
             bot_name = bot_name[4:]  # Remove bot_ prefix
         return await self.get_character_by_name(bot_name)
 
+    def _format_conversation_guidance(self, json_string: str) -> str:
+        """🚨 FIX: Convert raw JSON conversation guidance to human-readable format"""
+        try:
+            import json
+            if not json_string or json_string == '{}':
+                return "Standard conversation approach"
+                
+            data = json.loads(json_string) if isinstance(json_string, str) else json_string
+            if not isinstance(data, dict):
+                return str(data)
+                
+            # Format key conversation modes
+            formatted_parts = []
+            for mode, details in data.items():
+                if isinstance(details, dict):
+                    energy = details.get('energy', '')
+                    approach = details.get('approach', '')
+                    if energy and approach:
+                        formatted_parts.append(f"• {mode.replace('_', ' ').title()}: {energy} - {approach}")
+                        
+            return "; ".join(formatted_parts) if formatted_parts else "Adaptive conversation style"
+        except:
+            return "Standard conversation approach"
+    
+    def _format_ai_identity_handling(self, json_string: str) -> str:
+        """🚨 FIX: Convert raw JSON AI identity handling to human-readable format"""
+        try:
+            import json
+            if not json_string or json_string == '{}':
+                return "Standard AI identity approach"
+                
+            data = json.loads(json_string) if isinstance(json_string, str) else json_string
+            if not isinstance(data, dict):
+                return str(data)
+                
+            # Extract key information
+            immersion = data.get('allow_full_roleplay_immersion', False)
+            philosophy = data.get('philosophy', '')
+            approach = data.get('approach', '')
+            
+            parts = []
+            if immersion:
+                parts.append("Full roleplay immersion allowed")
+            else:
+                parts.append("Honest about AI nature")
+                
+            if philosophy:
+                parts.append(f"Philosophy: {philosophy}")
+            if approach:
+                parts.append(f"Approach: {approach}")
+                
+            return "; ".join(parts) if parts else "Standard AI identity approach"
+        except:
+            return "Standard AI identity approach"
+
+    async def _load_conversation_flow_guidance(self, conn, character_id: int) -> Dict[str, Any]:
+        """Load conversation flow guidance from normalized RDBMS tables (replaces JSON parsing)."""
+        guidance_data = {}
+        
+        try:
+            # Load conversation modes
+            modes_query = """
+                SELECT mode_name, energy_level, approach, transition_style
+                FROM character_conversation_modes 
+                WHERE character_id = $1
+                ORDER BY mode_name
+            """
+            mode_rows = await conn.fetch(modes_query, character_id)
+            
+            for mode_row in mode_rows:
+                mode_name = mode_row['mode_name']
+                mode_data = {
+                    'energy': mode_row['energy_level'] or '',
+                    'approach': mode_row['approach'] or '',
+                    'transition_style': mode_row['transition_style'] or '',
+                    'avoid': [],
+                    'encourage': [],
+                    'examples': []
+                }
+                
+                # Load guidance items for this mode
+                guidance_query = """
+                    SELECT guidance_type, guidance_text
+                    FROM character_mode_guidance mg
+                    JOIN character_conversation_modes cm ON mg.mode_id = cm.id
+                    WHERE cm.character_id = $1 AND cm.mode_name = $2
+                    ORDER BY mg.sort_order
+                """
+                guidance_rows = await conn.fetch(guidance_query, character_id, mode_name)
+                
+                for guidance_row in guidance_rows:
+                    guidance_type = guidance_row['guidance_type']
+                    guidance_text = guidance_row['guidance_text']
+                    
+                    if guidance_type in ['avoid', 'encourage']:
+                        mode_data[guidance_type].append(guidance_text)
+                
+                # Load examples for this mode
+                examples_query = """
+                    SELECT example_text
+                    FROM character_mode_examples me
+                    JOIN character_conversation_modes cm ON me.mode_id = cm.id
+                    WHERE cm.character_id = $1 AND cm.mode_name = $2
+                    ORDER BY me.sort_order
+                """
+                example_rows = await conn.fetch(examples_query, character_id, mode_name)
+                
+                for example_row in example_rows:
+                    mode_data['examples'].append(example_row['example_text'])
+                
+                guidance_data[mode_name] = mode_data
+            
+            # Load general conversation settings
+            general_query = """
+                SELECT default_energy, conversation_style, transition_approach
+                FROM character_general_conversation
+                WHERE character_id = $1
+            """
+            general_row = await conn.fetchrow(general_query, character_id)
+            
+            if general_row:
+                guidance_data['general'] = {
+                    'default_energy': general_row['default_energy'] or '',
+                    'conversation_style': general_row['conversation_style'] or '',
+                    'transition_approach': general_row['transition_approach'] or ''
+                }
+            
+            # Load response style
+            response_style_query = """
+                SELECT item_type, item_text
+                FROM character_response_style_items rsi
+                JOIN character_response_style rs ON rsi.response_style_id = rs.id
+                WHERE rs.character_id = $1
+                ORDER BY rsi.item_type, rsi.sort_order
+            """
+            response_rows = await conn.fetch(response_style_query, character_id)
+            
+            if response_rows:
+                response_style = {
+                    'core_principles': [],
+                    'formatting_rules': [],
+                    'character_specific_adaptations': []
+                }
+                
+                for response_row in response_rows:
+                    item_type = response_row['item_type']
+                    item_text = response_row['item_text']
+                    
+                    if item_type in response_style:
+                        response_style[item_type].append(item_text)
+                
+                guidance_data['response_style'] = response_style
+            
+            logger.info(f"✅ NORMALIZED: Loaded conversation flow guidance for character {character_id} from RDBMS tables")
+            return guidance_data
+            
+        except Exception as e:
+            logger.error(f"Error loading conversation flow guidance from RDBMS: {e}")
+            return {}
+
 # ========================================================================================
 # FACTORY FUNCTION (maintains same API as simple manager)
 # ========================================================================================
@@ -1097,6 +1272,10 @@ async def test_enhanced_manager():
             print(f"❌ Could not load {character_name} data")
         
         await pool.close()
+    # ========================================================================================
+# FACTORY FUNCTION (maintains same API as simple manager)
+# ========================================================================================
+
         
     except Exception as e:
         print(f"❌ Test failed: {e}")

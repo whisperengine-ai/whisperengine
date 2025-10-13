@@ -177,11 +177,13 @@ class SimpleCDLManager:
         for trait_row in personality_rows:
             trait_name = trait_row['trait_name']
             trait_value = float(trait_row['trait_value'] or 0.5)
-            big_five[trait_name] = {
-                'value': trait_value,
-                'intensity': trait_row['intensity'] or 'medium',
-                'description': trait_row['description'] or f'{trait_name} trait'
-            }
+            intensity = trait_row['intensity'] or 'medium'
+            
+            # 🚨 FIX: Generate human-readable trait description instead of raw dict
+            level = 'Very High' if trait_value >= 0.9 else 'High' if trait_value >= 0.7 else 'Moderate' if trait_value >= 0.4 else 'Low'
+            trait_display = trait_name.replace('_', ' ').title()
+            
+            big_five[trait_name] = f"{trait_display}: {level} ({trait_value:.2f}) - {intensity} intensity"
             
         personality = {
             'big_five': big_five
@@ -190,11 +192,12 @@ class SimpleCDLManager:
         # Build communication section
         communication = {
             'engagement_level': float(char_row['engagement_level'] or 0.7),
-            'formality': {'value': char_row['formality'] or 'informal'},
+            'formality': char_row['formality'] or 'informal',  # 🚨 FIX: Remove dict wrapper
             'emotional_expression': float(char_row['emotional_expression'] or 0.6),
             'response_length': char_row['response_length'] or 'medium',
-            'conversation_flow_guidance': char_row['conversation_flow_guidance'] or '',
-            'ai_identity_handling': char_row['ai_identity_handling'] or ''
+            # 🚨 FIX: Parse JSON strings and convert to readable format
+            'conversation_flow_guidance': self._format_conversation_guidance(char_row['conversation_flow_guidance'] or '{}'),
+            'ai_identity_handling': self._format_ai_identity_handling(char_row['ai_identity_handling'] or '{}')
         }
         
         # Build values and beliefs section
@@ -532,6 +535,61 @@ class SimpleCDLManager:
             logger.info("✨ SimpleCharacter created with enhanced data sections: %s", enhanced_keys)
                 
         return SimpleCharacter(self._character_data)
+
+    def _format_conversation_guidance(self, json_string: str) -> str:
+        """🚨 FIX: Convert raw JSON conversation guidance to human-readable format"""
+        try:
+            import json
+            if not json_string or json_string == '{}':
+                return "Standard conversation approach"
+                
+            data = json.loads(json_string) if isinstance(json_string, str) else json_string
+            if not isinstance(data, dict):
+                return str(data)
+                
+            # Format key conversation modes
+            formatted_parts = []
+            for mode, details in data.items():
+                if isinstance(details, dict):
+                    energy = details.get('energy', '')
+                    approach = details.get('approach', '')
+                    if energy and approach:
+                        formatted_parts.append(f"• {mode.replace('_', ' ').title()}: {energy} - {approach}")
+                        
+            return "; ".join(formatted_parts) if formatted_parts else "Adaptive conversation style"
+        except:
+            return "Standard conversation approach"
+    
+    def _format_ai_identity_handling(self, json_string: str) -> str:
+        """🚨 FIX: Convert raw JSON AI identity handling to human-readable format"""
+        try:
+            import json
+            if not json_string or json_string == '{}':
+                return "Standard AI identity approach"
+                
+            data = json.loads(json_string) if isinstance(json_string, str) else json_string
+            if not isinstance(data, dict):
+                return str(data)
+                
+            # Extract key information
+            immersion = data.get('allow_full_roleplay_immersion', False)
+            philosophy = data.get('philosophy', '')
+            approach = data.get('approach', '')
+            
+            parts = []
+            if immersion:
+                parts.append("Full roleplay immersion allowed")
+            else:
+                parts.append("Honest about AI nature")
+                
+            if philosophy:
+                parts.append(f"Philosophy: {philosophy}")
+            if approach:
+                parts.append(f"Approach: {approach}")
+                
+            return "; ".join(parts) if parts else "Standard AI identity approach"
+        except:
+            return "Standard AI identity approach"
 
 # Module-level manager instance
 _simple_cdl_manager = None

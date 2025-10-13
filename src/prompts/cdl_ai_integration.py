@@ -2589,7 +2589,7 @@ Remember to stay true to your authentic voice and character.
             return ""
 
     def _extract_conversation_flow_guidelines(self, character) -> str:
-        """Extract conversation flow guidelines directly from character object."""
+        """Extract conversation flow guidelines directly from character object - supports flexible character-specific fields."""
         try:
             guidance_parts = []
             
@@ -2634,6 +2634,41 @@ Remember to stay true to your authentic voice and character.
                         rhythm = flow_opt.get('conversation_rhythm', '')
                         if rhythm:
                             guidance_parts.append(f"CONVERSATION RHYTHM: {rhythm}")
+                    
+                    # 🚨 NEW: Dynamic character-specific conversation modes (like triggers pattern)
+                    # Parse any other top-level keys as character-specific conversation modes
+                    # Examples: Elena=marine_education, Marcus=technical_education, Ryan=game_development
+                    for mode_name, mode_data in flow_guidance.items():
+                        # Skip already processed standard sections
+                        if mode_name in ['platform_awareness', 'flow_optimization']:
+                            continue
+                            
+                        if isinstance(mode_data, dict):
+                            # Extract key mode information
+                            energy = mode_data.get('energy', '')
+                            approach = mode_data.get('approach', '')
+                            
+                            # Format mode name for display
+                            display_name = mode_name.replace('_', ' ').title()
+                            
+                            if energy or approach:
+                                mode_desc = f"{display_name}"
+                                if energy:
+                                    mode_desc += f" ({energy})"
+                                if approach:
+                                    mode_desc += f": {approach}"
+                                guidance_parts.append(f"🎭 {mode_desc}")
+                            
+                            # Add specific guidance arrays if present
+                            encourage = mode_data.get('encourage', [])
+                            if encourage and isinstance(encourage, list):
+                                for item in encourage[:2]:  # Limit to prevent prompt bloat
+                                    guidance_parts.append(f"  ✅ {item}")
+                            
+                            avoid = mode_data.get('avoid', [])
+                            if avoid and isinstance(avoid, list):
+                                for item in avoid[:2]:  # Limit to prevent prompt bloat
+                                    guidance_parts.append(f"  ❌ {item}")
             
             # Only add header if we have database-driven guidance
             if guidance_parts:
