@@ -243,6 +243,10 @@ class DiscordBotCore:
             # Update character system with enhanced manager
             if self.character_system:
                 self.character_system.enhanced_manager = enhanced_manager
+                # 🐛 FIX: Also update TriggerModeController's enhanced_manager reference
+                if hasattr(self.character_system, 'trigger_mode_controller') and self.character_system.trigger_mode_controller:
+                    self.character_system.trigger_mode_controller.enhanced_manager = enhanced_manager
+                    self.logger.info("✅ TriggerModeController updated with enhanced CDL manager for database-driven mode detection")
                 self.logger.info("✅ Character system updated with enhanced CDL manager for relationships, triggers, and speech patterns")
             
         except Exception as e:
