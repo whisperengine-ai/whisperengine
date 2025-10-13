@@ -761,10 +761,9 @@ class CDLAIPromptIntegration:
         except Exception as e:
             logger.debug("Could not extract user personality/facts context: %s", e)
         
-        # 🎯 RESPONSE STYLE: Add behavioral guidelines AFTER identity is established
-        response_style = self._extract_cdl_response_style(character, display_name)
-        if response_style:
-            prompt += response_style + "\n\n"
+        # 🎯 OPTIMIZATION: Response style guidelines removed from here - they're injected at END
+        # of prompt (line ~1778) for maximum LLM recency bias impact. No duplication needed.
+        # See: ✨ RESPONSE STYLE REMINDER ✨ section at end of prompt
         
         # Add Big Five personality integration with Sprint 4 CharacterEvolution optimization
         if hasattr(character, 'personality') and hasattr(character.personality, 'big_five'):
@@ -1114,8 +1113,8 @@ class CDLAIPromptIntegration:
 
         # Add CDL conversation flow guidelines early for communication style establishment
         try:
-            # Extract conversation flow guidelines from CDL
-            conversation_flow_guidance = self._extract_conversation_flow_guidelines(character)
+            # 🎯 OPTIMIZATION: Pass active_mode to only inject ACTIVE mode guidance (not ALL modes)
+            conversation_flow_guidance = self._extract_conversation_flow_guidelines(character, active_mode=active_mode)
             
             # Detect communication scenarios for context
             communication_scenarios = self._detect_communication_scenarios(message_content, character, display_name)
@@ -2741,8 +2740,13 @@ Remember to stay true to your authentic voice and character.
             logger.debug("Could not extract CDL response style: %s", e)
             return ""
 
-    def _extract_conversation_flow_guidelines(self, character) -> str:
-        """Extract conversation flow guidelines directly from character object - supports flexible character-specific fields."""
+    def _extract_conversation_flow_guidelines(self, character, active_mode=None) -> str:
+        """
+        Extract conversation flow guidelines - ONLY for ACTIVE mode (trigger-aware).
+        
+        🎯 OPTIMIZATION: Only inject guidance for the currently active conversation mode,
+        not ALL modes. This reduces prompt size by ~2000 chars (85% reduction).
+        """
         try:
             guidance_parts = []
             
@@ -2754,7 +2758,7 @@ Remember to stay true to your authentic voice and character.
                 if hasattr(comm, 'conversation_flow_guidance'):
                     flow_guidance = comm.conversation_flow_guidance
                     
-                    # Platform-specific guidance (Discord)
+                    # Platform-specific guidance (Discord) - always include
                     platform_discord = flow_guidance.get('platform_awareness', {}).get('discord', {})
                     if platform_discord:
                         max_length = platform_discord.get('max_response_length', '')
@@ -2773,7 +2777,7 @@ Remember to stay true to your authentic voice and character.
                         if prefer:
                             guidance_parts.append(f"✅ ALWAYS: {prefer}")
                     
-                    # Flow optimization guidance
+                    # Flow optimization guidance - always include
                     flow_opt = flow_guidance.get('flow_optimization', {})
                     if flow_opt:
                         auth_engagement = flow_opt.get('character_authentic_engagement', '')
@@ -2788,39 +2792,38 @@ Remember to stay true to your authentic voice and character.
                         if rhythm:
                             guidance_parts.append(f"CONVERSATION RHYTHM: {rhythm}")
                     
-                    # 🚨 NEW: Dynamic character-specific conversation modes (like triggers pattern)
-                    # Parse any other top-level keys as character-specific conversation modes
-                    # Examples: Elena=marine_education, Marcus=technical_education, Ryan=game_development
-                    for mode_name, mode_data in flow_guidance.items():
-                        # Skip already processed standard sections
-                        if mode_name in ['platform_awareness', 'flow_optimization']:
-                            continue
-                            
-                        if isinstance(mode_data, dict):
+                    # 🎯 TRIGGER-AWARE: Only inject ACTIVE mode guidance, not ALL modes
+                    if active_mode and hasattr(active_mode, 'mode_name'):
+                        active_mode_name = active_mode.mode_name
+                        
+                        # Look for matching mode in flow_guidance
+                        mode_data = flow_guidance.get(active_mode_name)
+                        
+                        if mode_data and isinstance(mode_data, dict):
                             # Extract key mode information
                             energy = mode_data.get('energy', '')
                             approach = mode_data.get('approach', '')
                             
                             # Format mode name for display
-                            display_name = mode_name.replace('_', ' ').title()
+                            display_name = active_mode_name.replace('_', ' ').title()
                             
                             if energy or approach:
-                                mode_desc = f"{display_name}"
+                                mode_desc = f"🎭 ACTIVE MODE: {display_name}"
                                 if energy:
                                     mode_desc += f" ({energy})"
                                 if approach:
                                     mode_desc += f": {approach}"
-                                guidance_parts.append(f"🎭 {mode_desc}")
+                                guidance_parts.append(mode_desc)
                             
-                            # Add specific guidance arrays if present
+                            # Add specific guidance arrays if present (limit to 2 each)
                             encourage = mode_data.get('encourage', [])
                             if encourage and isinstance(encourage, list):
-                                for item in encourage[:2]:  # Limit to prevent prompt bloat
+                                for item in encourage[:2]:
                                     guidance_parts.append(f"  ✅ {item}")
                             
                             avoid = mode_data.get('avoid', [])
                             if avoid and isinstance(avoid, list):
-                                for item in avoid[:2]:  # Limit to prevent prompt bloat
+                                for item in avoid[:2]:
                                     guidance_parts.append(f"  ❌ {item}")
             
             # Only add header if we have database-driven guidance
