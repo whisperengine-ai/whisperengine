@@ -45,6 +45,8 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-bot_user}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-bot_password_change_me}
       POSTGRES_INITDB_ARGS: "--auth-host=scram-sha-256"
+    env_file:
+      - .env
     volumes:
       # Option 1: Named volume (default - managed by Docker)
       - postgres_data:/var/lib/postgresql/data

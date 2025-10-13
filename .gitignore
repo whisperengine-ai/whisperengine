@@ -140,6 +140,12 @@ docker-data/
 *.h5
 *.ckpt
 
+# Model cache directories
+cache/
+fastembed_cache/
+huggingface_cache/
+.cache/
+
 # Temporary development files
 
 # Data and runtime files

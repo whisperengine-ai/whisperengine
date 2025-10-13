@@ -50,6 +50,8 @@ services:
       DOCKER_INFLUXDB_INIT_ORG: ${INFLUXDB_ORG:-whisperengine}
       DOCKER_INFLUXDB_INIT_BUCKET: ${INFLUXDB_BUCKET:-temporal_intelligence}
       DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: ${INFLUXDB_TOKEN:-whisperengine_admin_token}
+    env_file:
+      - .env
     ports:
       - "8086:8086"
     volumes:
@@ -73,6 +75,8 @@ services:
       GF_FEATURE_TOGGLES_ENABLE: publicDashboards
       INFLUXDB_USER: ${INFLUXDB_USER:-admin}
       INFLUXDB_PASSWORD: ${INFLUXDB_PASSWORD:-whisperengine_metrics}
+    env_file:
+      - .env
     ports:
       - "3000:3000"
     volumes:
