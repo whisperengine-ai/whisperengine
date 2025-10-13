@@ -376,30 +376,55 @@ class EnhancedCDLManager:
             return []
 
     async def get_interaction_modes(self, character_name: str) -> List[InteractionMode]:
-        """Get interaction modes for context-aware response switching"""
+        """
+        Get interaction modes for context-aware response switching.
+        Uses existing character_conversation_modes, character_mode_guidance, and character_message_triggers tables.
+        """
         try:
             async with self.pool.acquire() as conn:
                 character_id = await self._get_character_id(conn, character_name)
                 if not character_id:
                     return []
 
+                # Query actual database schema (character_conversation_modes + character_mode_guidance + character_message_triggers)
                 rows = await conn.fetch("""
-                    SELECT mode_name, mode_description, trigger_keywords, 
-                           response_guidelines, avoid_patterns, is_default, priority
-                    FROM cdl_interaction_modes 
-                    WHERE character_id = $1
-                    ORDER BY priority DESC, is_default DESC
+                    SELECT DISTINCT
+                        ccm.mode_name,
+                        ccm.approach as mode_description,
+                        ccm.energy_level as response_guidelines,
+                        COALESCE(
+                            array_agg(DISTINCT cmt.trigger_value) FILTER (WHERE cmt.trigger_value IS NOT NULL),
+                            ARRAY[]::text[]
+                        ) as trigger_keywords,
+                        COALESCE(
+                            array_agg(DISTINCT cmg.guidance_text) FILTER (WHERE cmg.guidance_type = 'avoid'),
+                            ARRAY[]::text[]
+                        ) as avoid_patterns,
+                        false as is_default,
+                        1 as priority
+                    FROM character_conversation_modes ccm
+                    LEFT JOIN character_mode_guidance cmg ON ccm.id = cmg.mode_id
+                    LEFT JOIN character_message_triggers cmt ON cmt.character_id = ccm.character_id 
+                        AND (cmt.response_mode = ccm.mode_name OR cmt.trigger_category LIKE '%' || ccm.mode_name || '%')
+                    WHERE ccm.character_id = $1
+                    GROUP BY ccm.id, ccm.mode_name, ccm.approach, ccm.energy_level
+                    ORDER BY ccm.mode_name
                 """, character_id)
 
-                return [InteractionMode(
-                    mode_name=row['mode_name'],
-                    mode_description=row['mode_description'],
-                    trigger_keywords=row['trigger_keywords'] or [],
-                    response_guidelines=row['response_guidelines'] or '',
-                    avoid_patterns=row['avoid_patterns'] or [],
-                    is_default=row['is_default'],
-                    priority=row['priority']
-                ) for row in rows]
+                modes = []
+                for row in rows:
+                    modes.append(InteractionMode(
+                        mode_name=row['mode_name'],
+                        mode_description=row['mode_description'] or '',
+                        trigger_keywords=row['trigger_keywords'] or [],
+                        response_guidelines=row['response_guidelines'] or '',
+                        avoid_patterns=row['avoid_patterns'] or [],
+                        is_default=row['is_default'],
+                        priority=row['priority']
+                    ))
+                
+                logger.info(f"✅ INTERACTION MODES: Loaded {len(modes)} modes for {character_name}: {[m.mode_name for m in modes]}")
+                return modes
 
         except Exception as e:
             logger.error(f"Error retrieving interaction modes for {character_name}: {e}")
