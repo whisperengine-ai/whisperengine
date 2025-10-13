@@ -3881,13 +3881,18 @@ class VectorMemoryManager:
             else:
                 logger.info(f"🧠 EMOTION AUDIT: No pre-analyzed emotion data provided for user {user_id}")
             
-            # Store user message
+            # 🚨 FIX: Capture user message timestamp explicitly to ensure proper chronological ordering
+            from datetime import datetime, timedelta
+            user_timestamp = datetime.utcnow()
+            
+            # Store user message with explicit timestamp
             user_memory = VectorMemory(
                 id=str(uuid4()),  # Pure UUID for Qdrant compatibility
                 user_id=user_id,
                 memory_type=MemoryType.CONVERSATION,
                 content=user_message,
                 source="user_message",
+                timestamp=user_timestamp,  # 🚨 FIX: Explicit timestamp
                 metadata={
                     "channel_id": channel_id,
                     "emotion_data": pre_analyzed_emotion_data,
@@ -3899,13 +3904,18 @@ class VectorMemoryManager:
             await self.vector_store.store_memory(user_memory)
             logger.debug(f"MEMORY MANAGER DEBUG: User memory stored successfully")
             
-            # Store bot response
+            # 🚨 FIX: Bot response gets timestamp 1ms after user message to ensure correct ordering
+            # This prevents timestamp collisions that cause messages to appear out of order in LLM prompts
+            bot_timestamp = user_timestamp + timedelta(milliseconds=1)
+            
+            # Store bot response with guaranteed later timestamp
             bot_memory = VectorMemory(
                 id=str(uuid4()),  # Pure UUID for Qdrant compatibility
                 user_id=user_id,
                 memory_type=MemoryType.CONVERSATION,
                 content=bot_response,
                 source="bot_response",
+                timestamp=bot_timestamp,  # 🚨 FIX: Always 1ms after user message
                 metadata={
                     "channel_id": channel_id,
                     "role": "bot",
