@@ -195,8 +195,8 @@ class SimpleCDLManager:
             'formality': char_row['formality'] or 'informal',  # 🚨 FIX: Remove dict wrapper
             'emotional_expression': float(char_row['emotional_expression'] or 0.6),
             'response_length': char_row['response_length'] or 'medium',
-            # 🚨 FIX: Parse JSON strings and convert to readable format
-            'conversation_flow_guidance': self._format_conversation_guidance(char_row['conversation_flow_guidance'] or '{}'),
+            # 🚨 DEPRECATED: conversation_flow_guidance removed (field dropped from database)
+            # Flow guidance now accessed via character_conversation_modes normalized tables
             'ai_identity_handling': self._format_ai_identity_handling(char_row['ai_identity_handling'] or '{}')
         }
         
@@ -505,7 +505,7 @@ class SimpleCDLManager:
                         self.message_pattern_triggers = self._create_message_triggers()
                         
                         # Add communication style data (defaults for now)
-                        self.conversation_flow_guidance = data.get('conversation_flow_guidance', {})
+                        # 🚨 DEPRECATED: conversation_flow_guidance removed (field dropped from database)
                         self.ai_identity_handling = data.get('ai_identity_handling', {})
                         self.collaboration_style = data.get('collaboration_style', '')
                         self.length_management = data.get('length_management', '')

@@ -32,10 +32,6 @@ class CDLAIPromptIntegration:
         self.trigger_mode_controller = TriggerModeController(enhanced_manager=enhanced_manager)
         self._previous_mode = None  # Track mode changes for transition detection
         
-        # 🚀 PERFORMANCE: Character caching for load_character performance
-        self._cached_character = None
-        self._cached_character_bot_name = None
-        
         # Initialize the optimized prompt builder for size management
         from src.prompts.optimized_prompt_builder import create_optimized_prompt_builder
         self.optimized_builder = create_optimized_prompt_builder(
@@ -699,6 +695,7 @@ class CDLAIPromptIntegration:
         
         # 🎭 TRIGGER-BASED MODE DETECTION: Detect and apply appropriate interaction mode
         mode_detection_result = None
+        active_mode = None  # 🎯 OPTIMIZATION: Track active mode object for conversation flow filtering
         try:
             mode_detection_result = await self.trigger_mode_controller.detect_active_mode(
                 character_name=character_name,
@@ -707,6 +704,10 @@ class CDLAIPromptIntegration:
             )
             
             if mode_detection_result.active_mode:
+                # 🎯 OPTIMIZATION: Keep full InteractionMode object for conversation flow filtering
+                # _extract_conversation_flow_guidelines() expects InteractionMode object, not just string
+                active_mode = mode_detection_result.active_mode
+                
                 # Apply mode to prompt
                 prompt = self.trigger_mode_controller.apply_mode_to_prompt(
                     base_prompt=prompt,
@@ -717,7 +718,7 @@ class CDLAIPromptIntegration:
                 # Update previous mode for next interaction
                 self._previous_mode = mode_detection_result.active_mode.mode_name
                 
-                logger.info(f"🎭 MODE APPLIED: {mode_detection_result.active_mode.mode_name} "
+                logger.info(f"🎭 MODE APPLIED: {active_mode} "
                            f"(source: {mode_detection_result.active_mode.trigger_source}, "
                            f"confidence: {mode_detection_result.active_mode.confidence:.2f}, "
                            f"triggers: {mode_detection_result.detected_triggers})")
@@ -761,10 +762,9 @@ class CDLAIPromptIntegration:
         except Exception as e:
             logger.debug("Could not extract user personality/facts context: %s", e)
         
-        # 🎯 RESPONSE STYLE: Add behavioral guidelines AFTER identity is established
-        response_style = self._extract_cdl_response_style(character, display_name)
-        if response_style:
-            prompt += response_style + "\n\n"
+        # 🎯 OPTIMIZATION: Response style guidelines removed from here - they're injected at END
+        # of prompt (line ~1778) for maximum LLM recency bias impact. No duplication needed.
+        # See: ✨ RESPONSE STYLE REMINDER ✨ section at end of prompt
         
         # Add Big Five personality integration with Sprint 4 CharacterEvolution optimization
         if hasattr(character, 'personality') and hasattr(character.personality, 'big_five'):
@@ -1114,8 +1114,8 @@ class CDLAIPromptIntegration:
 
         # Add CDL conversation flow guidelines early for communication style establishment
         try:
-            # Extract conversation flow guidelines from CDL
-            conversation_flow_guidance = self._extract_conversation_flow_guidelines(character)
+            # 🎯 OPTIMIZATION: Pass active_mode to only inject ACTIVE mode guidance (not ALL modes)
+            conversation_flow_guidance = self._extract_conversation_flow_guidelines(character, active_mode=active_mode)
             
             # Detect communication scenarios for context
             communication_scenarios = self._detect_communication_scenarios(message_content, character, display_name)
@@ -1936,12 +1936,6 @@ Remember to stay true to your authentic voice and character.
             from src.memory.vector_memory_system import get_normalized_bot_name_from_env
             bot_name = get_normalized_bot_name_from_env()
             
-            # 🚀 PERFORMANCE: Check cache first
-            if (self._cached_character is not None and 
-                self._cached_character_bot_name == bot_name):
-                logger.debug("🚀 CDL: Using cached character for bot: %s", bot_name)
-                return self._cached_character
-            
             logger.info("🔍 CDL: Loading character for bot: %s", bot_name)
             
             # 🚀 ENHANCED: Use comprehensive enhanced CDL manager instead of minimal query
@@ -2013,10 +2007,6 @@ Remember to stay true to your authentic voice and character.
                     return self._character_data
             
             character = EnhancedCharacter(character_data)
-            
-            # 🚀 PERFORMANCE: Cache the character for future calls
-            self._cached_character = character
-            self._cached_character_bot_name = bot_name
             
             logger.info("✅ CDL: Created enhanced character object - name: '%s', occupation: '%s', data sections: %s", 
                        character.identity.name, character.identity.occupation, list(character_data.keys()))
@@ -2741,98 +2731,72 @@ Remember to stay true to your authentic voice and character.
             logger.debug("Could not extract CDL response style: %s", e)
             return ""
 
-    def _extract_conversation_flow_guidelines(self, character) -> str:
-        """Extract conversation flow guidelines directly from character object - supports flexible character-specific fields."""
+    def _extract_conversation_flow_guidelines(self, character, active_mode=None) -> str:
+        """
+        Extract conversation flow guidelines - ONLY for ACTIVE mode (trigger-aware).
+        
+        🎯 OPTIMIZATION: Only inject guidance for the currently active conversation mode,
+        not ALL modes. Uses normalized database tables, NOT JSON fields.
+        This reduces prompt size by ~2000 chars (85% reduction).
+        
+        🚨 CRITICAL: This function should ONLY use the active_mode parameter (InteractionMode object)
+        which contains data from normalized tables (character_conversation_modes, character_mode_guidance).
+        Do NOT load from conversation_flow_guidance JSON field - that's deprecated legacy data.
+        """
         try:
             guidance_parts = []
             
-            # Access communication data directly from character object
-            if hasattr(character, 'communication'):
-                comm = character.communication
+            # 🎯 TRIGGER-AWARE: Only inject ACTIVE mode guidance from normalized database
+            if active_mode:
+                # active_mode is an InteractionMode object from get_interaction_modes() 
+                # which queries normalized tables: character_conversation_modes + character_mode_guidance
                 
-                # Extract conversation flow guidance from communication object
-                if hasattr(comm, 'conversation_flow_guidance'):
-                    flow_guidance = comm.conversation_flow_guidance
-                    
-                    # Platform-specific guidance (Discord)
-                    platform_discord = flow_guidance.get('platform_awareness', {}).get('discord', {})
-                    if platform_discord:
-                        max_length = platform_discord.get('max_response_length', '')
-                        if max_length:
-                            guidance_parts.append(f"🚨 CRITICAL LENGTH LIMIT: {max_length}")
-                        
-                        collab_style = platform_discord.get('collaboration_style', '')
-                        if collab_style:
-                            guidance_parts.append(f"CONVERSATION STYLE: {collab_style}")
-                        
-                        avoid = platform_discord.get('avoid', '')
-                        if avoid:
-                            guidance_parts.append(f"❌ NEVER: {avoid}")
-                        
-                        prefer = platform_discord.get('prefer', '')
-                        if prefer:
-                            guidance_parts.append(f"✅ ALWAYS: {prefer}")
-                    
-                    # Flow optimization guidance
-                    flow_opt = flow_guidance.get('flow_optimization', {})
-                    if flow_opt:
-                        auth_engagement = flow_opt.get('character_authentic_engagement', '')
-                        if auth_engagement:
-                            guidance_parts.append(f"ENGAGEMENT PATTERN: {auth_engagement}")
-                        
-                        length_mgmt = flow_opt.get('length_management', '')
-                        if length_mgmt:
-                            guidance_parts.append(f"LENGTH STRATEGY: {length_mgmt}")
-                        
-                        rhythm = flow_opt.get('conversation_rhythm', '')
-                        if rhythm:
-                            guidance_parts.append(f"CONVERSATION RHYTHM: {rhythm}")
-                    
-                    # 🚨 NEW: Dynamic character-specific conversation modes (like triggers pattern)
-                    # Parse any other top-level keys as character-specific conversation modes
-                    # Examples: Elena=marine_education, Marcus=technical_education, Ryan=game_development
-                    for mode_name, mode_data in flow_guidance.items():
-                        # Skip already processed standard sections
-                        if mode_name in ['platform_awareness', 'flow_optimization']:
-                            continue
-                            
-                        if isinstance(mode_data, dict):
-                            # Extract key mode information
-                            energy = mode_data.get('energy', '')
-                            approach = mode_data.get('approach', '')
-                            
-                            # Format mode name for display
-                            display_name = mode_name.replace('_', ' ').title()
-                            
-                            if energy or approach:
-                                mode_desc = f"{display_name}"
-                                if energy:
-                                    mode_desc += f" ({energy})"
-                                if approach:
-                                    mode_desc += f": {approach}"
-                                guidance_parts.append(f"🎭 {mode_desc}")
-                            
-                            # Add specific guidance arrays if present
-                            encourage = mode_data.get('encourage', [])
-                            if encourage and isinstance(encourage, list):
-                                for item in encourage[:2]:  # Limit to prevent prompt bloat
-                                    guidance_parts.append(f"  ✅ {item}")
-                            
-                            avoid = mode_data.get('avoid', [])
-                            if avoid and isinstance(avoid, list):
-                                for item in avoid[:2]:  # Limit to prevent prompt bloat
-                                    guidance_parts.append(f"  ❌ {item}")
+                # Format mode name for display
+                mode_name = active_mode.mode_name
+                display_name = mode_name.replace('_', ' ').title()
+                
+                # Build active mode description from normalized data
+                mode_desc_parts = [f"🎭 ACTIVE MODE: {display_name}"]
+                
+                # Add mode description (from character_conversation_modes.approach)
+                if active_mode.mode_description:
+                    mode_desc_parts.append(f"({active_mode.mode_description})")
+                
+                # Add response guidelines (from character_conversation_modes.energy_level)
+                if active_mode.response_guidelines:
+                    mode_desc_parts.append(f"- Energy: {active_mode.response_guidelines}")
+                
+                guidance_parts.append(" ".join(mode_desc_parts))
+                
+                # Add encourage patterns (from character_mode_guidance WHERE guidance_type='encourage')
+                # Limit to top 3 for prompt efficiency
+                if active_mode.response_guidelines and isinstance(active_mode.response_guidelines, str):
+                    # response_guidelines from energy_level field
+                    guidance_parts.append(f"✅ Approach: {active_mode.response_guidelines}")
+                
+                # Add avoid patterns (from character_mode_guidance WHERE guidance_type='avoid')
+                # Limit to top 3 for prompt efficiency
+                if active_mode.avoid_patterns and len(active_mode.avoid_patterns) > 0:
+                    guidance_parts.append("❌ Avoid:")
+                    for pattern in active_mode.avoid_patterns[:3]:  # Top 3 only
+                        guidance_parts.append(f"  • {pattern}")
+                
+                logger.info(f"✅ CONVERSATION FLOW: Using active mode '{mode_name}' from normalized database (NOT JSON)")
             
-            # Only add header if we have database-driven guidance
+            else:
+                # No active mode detected - use minimal generic guidance
+                logger.info(f"ℹ️ CONVERSATION FLOW: No active mode detected, using minimal generic guidance")
+                guidance_parts.append("🎭 CONVERSATION MODE: General conversational engagement")
+            
+            # Only add header if we have guidance
             if guidance_parts:
                 guidance_parts.insert(0, "🎯 CONVERSATION FLOW REQUIREMENTS:")
                 return "\n".join(guidance_parts)
             
-            # No hardcoded fallbacks - let database drive all guidance
             return ""
             
         except Exception as e:
-            logger.debug("Error extracting conversation flow guidelines: %s", e)
+            logger.error(f"Error extracting conversation flow guidelines: {e}", exc_info=True)
             return ""
 
     def _detect_physical_interaction_request(self, message: str) -> bool:
