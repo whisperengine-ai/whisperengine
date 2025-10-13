@@ -759,7 +759,7 @@ class EnhancedCDLManager:
         # Communication style
         comm_query = """
             SELECT engagement_level, formality, emotional_expression, 
-                   response_length, conversation_flow_guidance 
+                   response_length
             FROM communication_styles 
             WHERE character_id = $1
         """
