@@ -248,12 +248,6 @@ class DiscordBotCore:
                     self.character_system.trigger_mode_controller.enhanced_manager = enhanced_manager
                     self.logger.info("✅ TriggerModeController updated with enhanced CDL manager for database-driven mode detection")
                 self.logger.info("✅ Character system updated with enhanced CDL manager for relationships, triggers, and speech patterns")
-                
-                # 🚀 TIER 1 CACHE: Preload stable character data
-                try:
-                    await self.character_system.preload_tier1_stable_data()
-                except Exception as e:
-                    self.logger.warning("⚠️ Tier 1 cache preload failed (will use fresh queries): %s", e)
             
         except Exception as e:
             self.logger.error(f"❌ Enhanced CDL manager initialization failed: {e}")
