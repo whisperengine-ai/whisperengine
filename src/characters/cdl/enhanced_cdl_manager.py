@@ -1247,9 +1247,10 @@ class EnhancedCDLManager:
             }
             
             # Load roleplay interaction scenarios from normalized table
+            # Get roleplay scenarios
             scenarios_query = """
                 SELECT scenario_name, response_pattern, tier_1_response, tier_2_response, tier_3_response
-                FROM character_roleplay_scenarios_v2 
+                FROM character_roleplay_scenarios 
                 WHERE character_id = $1
                 ORDER BY scenario_name
             """
