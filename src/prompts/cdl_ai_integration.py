@@ -32,10 +32,6 @@ class CDLAIPromptIntegration:
         self.trigger_mode_controller = TriggerModeController(enhanced_manager=enhanced_manager)
         self._previous_mode = None  # Track mode changes for transition detection
         
-        # 🚀 PERFORMANCE: Character caching for load_character performance
-        self._cached_character = None
-        self._cached_character_bot_name = None
-        
         # Initialize the optimized prompt builder for size management
         from src.prompts.optimized_prompt_builder import create_optimized_prompt_builder
         self.optimized_builder = create_optimized_prompt_builder(
@@ -1940,12 +1936,6 @@ Remember to stay true to your authentic voice and character.
             from src.memory.vector_memory_system import get_normalized_bot_name_from_env
             bot_name = get_normalized_bot_name_from_env()
             
-            # 🚀 PERFORMANCE: Check cache first
-            if (self._cached_character is not None and 
-                self._cached_character_bot_name == bot_name):
-                logger.debug("🚀 CDL: Using cached character for bot: %s", bot_name)
-                return self._cached_character
-            
             logger.info("🔍 CDL: Loading character for bot: %s", bot_name)
             
             # 🚀 ENHANCED: Use comprehensive enhanced CDL manager instead of minimal query
@@ -2017,10 +2007,6 @@ Remember to stay true to your authentic voice and character.
                     return self._character_data
             
             character = EnhancedCharacter(character_data)
-            
-            # 🚀 PERFORMANCE: Cache the character for future calls
-            self._cached_character = character
-            self._cached_character_bot_name = bot_name
             
             logger.info("✅ CDL: Created enhanced character object - name: '%s', occupation: '%s', data sections: %s", 
                        character.identity.name, character.identity.occupation, list(character_data.keys()))

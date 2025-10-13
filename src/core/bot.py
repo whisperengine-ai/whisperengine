@@ -240,6 +240,9 @@ class DiscordBotCore:
             enhanced_manager = create_enhanced_cdl_manager(self.postgres_pool)
             self.logger.info("✅ Enhanced CDL manager initialized for rich character data")
             
+            # 🚨 PRE-FLIGHT CHECK: Validate character exists in database
+            await self.validate_character_exists(enhanced_manager)
+            
             # Update character system with enhanced manager
             if self.character_system:
                 self.character_system.enhanced_manager = enhanced_manager
@@ -252,6 +255,43 @@ class DiscordBotCore:
         except Exception as e:
             self.logger.error(f"❌ Enhanced CDL manager initialization failed: {e}")
             # Don't raise - enhanced manager is optional enhancement
+    
+    async def validate_character_exists(self, enhanced_manager):
+        """
+        Pre-flight check: Validate character exists in database before accepting messages.
+        This provides fail-fast feedback at startup instead of silent failure on first message.
+        
+        Note: Does NOT cache character data - validation only for startup safety.
+        """
+        try:
+            from src.memory.vector_memory_system import get_normalized_bot_name_from_env
+            bot_name = get_normalized_bot_name_from_env()
+            
+            self.logger.info("🔍 CDL Pre-flight: Validating character '%s' exists in database...", bot_name)
+            
+            # Quick existence check - just verify character_identity record exists
+            character_data = await enhanced_manager.get_character_by_name(bot_name)
+            
+            if not character_data:
+                error_msg = f"❌ STARTUP FAILED: Character '{bot_name}' not found in CDL database!"
+                self.logger.error(error_msg)
+                self.logger.error("💡 Fix: Import character with 'python batch_import_characters.py' or create CDL entry")
+                raise RuntimeError(error_msg)
+            
+            # Extract character name for confirmation
+            identity_data = character_data.get('identity', {})
+            character_name = identity_data.get('name', 'Unknown')
+            character_occupation = identity_data.get('occupation', '')
+            
+            self.logger.info("✅ CDL Pre-flight: Character validated - '%s' (%s) ready", 
+                           character_name, character_occupation)
+            
+        except RuntimeError:
+            # Re-raise validation failures to stop bot startup
+            raise
+        except Exception as e:
+            self.logger.error("❌ CDL Pre-flight validation failed: %s", e)
+            raise RuntimeError(f"Character validation failed: {e}")
     
     async def initialize_knowledge_router(self):
         """Initialize semantic knowledge router for structured factual intelligence."""
@@ -469,25 +509,6 @@ class DiscordBotCore:
             await asyncio.sleep(2)
             
             self.logger.info("🔗 Integrating advanced conversation components with Discord bot...")
-            
-            # 🚨 CRITICAL: Pre-load character data for CDL integration performance
-            # This prevents async/sync complications during message processing
-            try:
-                from src.prompts.cdl_ai_integration import CDLAIPromptIntegration
-                cdl_integration = CDLAIPromptIntegration()
-                # Pre-load character using enhanced load_character method
-                character = await cdl_integration.load_character()
-                self.logger.info(f"✅ Enhanced CDL character data pre-loaded: {character.identity.name}")
-            except Exception as cdl_error:
-                self.logger.error(f"❌ Failed to pre-load enhanced CDL character data: {cdl_error}")
-                # Fallback to simple CDL manager pre-loading
-                try:
-                    from src.characters.cdl.simple_cdl_manager import get_simple_cdl_manager
-                    cdl_manager = get_simple_cdl_manager()
-                    await cdl_manager.preload_character_data()
-                    self.logger.info("✅ Fallback: SimpleCDLManager character data pre-loaded")
-                except Exception as fallback_error:
-                    self.logger.error(f"❌ Fallback pre-loading also failed: {fallback_error}")
             
             # Phase 3: Context Switch Detection & Empathy
             if hasattr(self, 'context_switch_detector') and self.context_switch_detector:
