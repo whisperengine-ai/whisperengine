@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react'
 
-// Types for timeline data
+// --- Types for timeline data ---
 interface LearningMilestone {
   id: string
   timestamp: Date
@@ -46,6 +46,161 @@ interface CharacterEvolutionTimelineProps {
   showMetrics?: boolean
 }
 
+type LearningType = LearningMilestone['type']
+
+// --- Module-scoped helpers (stable references for hooks) ---
+
+// Get learning milestone icon
+const getMilestoneIcon = (type: string) => {
+  switch (type) {
+    case 'growth_insight': return '🌱'
+    case 'user_observation': return '👁️'
+    case 'memory_surprise': return '💡'
+    case 'knowledge_evolution': return '📚'
+    case 'emotional_growth': return '💖'
+    case 'relationship_awareness': return '🤝'
+    default: return '✨'
+  }
+}
+
+// Get learning type color
+const getTypeColor = (type: string) => {
+  switch (type) {
+    case 'growth_insight': return 'bg-green-100 text-green-800 border-green-200'
+    case 'user_observation': return 'bg-blue-100 text-blue-800 border-blue-200'
+    case 'memory_surprise': return 'bg-yellow-100 text-yellow-800 border-yellow-200'
+    case 'knowledge_evolution': return 'bg-purple-100 text-purple-800 border-purple-200'
+    case 'emotional_growth': return 'bg-pink-100 text-pink-800 border-pink-200'
+    case 'relationship_awareness': return 'bg-indigo-100 text-indigo-800 border-indigo-200'
+    default: return 'bg-gray-100 text-gray-800 border-gray-200'
+  }
+}
+
+// Format learning type for display
+const formatLearningType = (type: string) => {
+  return type.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())
+}
+
+const getMilestoneTitle = (type: LearningType, index: number) => {
+  const titles: Record<LearningType, string[]> = {
+    growth_insight: [
+      'Recognized personal growth pattern',
+      'Understood character development need',
+      'Identified learning opportunity',
+      'Gained self-awareness insight'
+    ],
+    user_observation: [
+      'Noticed user communication pattern',
+      'Recognized user emotional state',
+      'Identified user preference',
+      'Understood user learning style'
+    ],
+    memory_surprise: [
+      'Connected distant conversation topics',
+      'Recalled relevant past interaction',
+      'Linked emotional patterns across time',
+      'Discovered memory connection'
+    ],
+    knowledge_evolution: [
+      'Learned new domain knowledge',
+      'Updated understanding of topic',
+      'Integrated complex information',
+      'Expanded knowledge base'
+    ],
+    emotional_growth: [
+      'Developed deeper empathy',
+      'Enhanced emotional intelligence',
+      'Improved emotional response',
+      'Strengthened emotional connection'
+    ],
+    relationship_awareness: [
+      'Recognized relationship milestone',
+      'Understood trust development',
+      'Identified communication improvement',
+      'Strengthened personal bond'
+    ]
+  }
+  
+  const typeList = titles[type] || ['Learning milestone']
+  return typeList[index % typeList.length]
+}
+
+const getMilestoneDescription = (type: LearningType, index: number) => {
+  const descriptions: Record<LearningType, string[]> = {
+    growth_insight: [
+      'The character recognized an opportunity for personal development during the conversation.',
+      'A moment of self-reflection led to deeper understanding of character capabilities.',
+      'The character identified areas for growth based on user interaction patterns.',
+      'New insights emerged about the character\'s evolving personality and responses.'
+    ],
+    user_observation: [
+      'The character observed and learned from the user\'s communication preferences.',
+      'Pattern recognition revealed important aspects of the user\'s personality.',
+      'The character noticed subtle cues about the user\'s emotional state and needs.',
+      'Deep listening led to better understanding of the user\'s learning style.'
+    ],
+    memory_surprise: [
+      'An unexpected connection was made between current and past conversations.',
+      'The character was surprised by a relevant memory that enhanced the discussion.',
+      'A seemingly unrelated memory provided valuable context for the current topic.',
+      'The character discovered patterns by connecting memories across different timeframes.'
+    ],
+    knowledge_evolution: [
+      'The character integrated new information to expand domain expertise.',
+      'Complex concepts were processed and added to the knowledge base.',
+      'The character updated its understanding based on new evidence or perspectives.',
+      'Learning occurred through thoughtful analysis of presented information.'
+    ],
+    emotional_growth: [
+      'The character developed a more nuanced understanding of emotional dynamics.',
+      'Empathy deepened through careful attention to emotional cues and responses.',
+      'The character learned to respond more appropriately to complex emotional situations.',
+      'Emotional intelligence improved through practice and reflection.'
+    ],
+    relationship_awareness: [
+      'The character recognized an important development in the relationship dynamic.',
+      'Trust and understanding reached a new level through meaningful interaction.',
+      'The character became aware of how the relationship has evolved over time.',
+      'Personal connection strengthened through shared experiences and mutual understanding.'
+    ]
+  }
+  
+  const typeList = descriptions[type] || ['A learning moment occurred.']
+  return typeList[index % typeList.length]
+}
+
+// Generate realistic mock milestones
+const generateMockMilestones = (count: number): LearningMilestone[] => {
+  const types: LearningType[] = [
+    'growth_insight', 'user_observation', 'memory_surprise', 
+    'knowledge_evolution', 'emotional_growth', 'relationship_awareness'
+  ]
+  
+  const milestones: LearningMilestone[] = []
+  const now = Date.now()
+
+  for (let i = 0; i < count; i++) {
+    const type = types[Math.floor(Math.random() * types.length)]
+    const daysAgo = Math.floor(Math.random() * 30) + 1
+    const timestamp = new Date(now - daysAgo * 24 * 60 * 60 * 1000)
+
+    milestones.push({
+      id: `milestone_${i}`,
+      timestamp,
+      type,
+      title: getMilestoneTitle(type, i),
+      description: getMilestoneDescription(type, i),
+      confidence: Math.random() * 0.3 + 0.7, // 70-100%
+      messageContext: `User discussed ${type.replace('_', ' ')} in conversation`,
+      characterResponse: `Character demonstrated understanding of ${type.replace('_', ' ')}`
+    })
+  }
+
+  return milestones.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())
+}
+
+// (removed duplicate interface declarations)
+
 const CharacterEvolutionTimeline: React.FC<CharacterEvolutionTimelineProps> = ({
   characterName = '',
   apiEndpoint = '',
@@ -58,37 +213,6 @@ const CharacterEvolutionTimeline: React.FC<CharacterEvolutionTimelineProps> = ({
   const [error, setError] = useState<string | null>(null)
   const [selectedPhase, setSelectedPhase] = useState<string | null>(null)
   const [viewMode, setViewMode] = useState<'timeline' | 'phases' | 'metrics'>('timeline')
-
-  // Get learning milestone icon
-  const getMilestoneIcon = (type: string) => {
-    switch (type) {
-      case 'growth_insight': return '🌱'
-      case 'user_observation': return '👁️'
-      case 'memory_surprise': return '💡'
-      case 'knowledge_evolution': return '📚'
-      case 'emotional_growth': return '💖'
-      case 'relationship_awareness': return '🤝'
-      default: return '✨'
-    }
-  }
-
-  // Get learning type color
-  const getTypeColor = (type: string) => {
-    switch (type) {
-      case 'growth_insight': return 'bg-green-100 text-green-800 border-green-200'
-      case 'user_observation': return 'bg-blue-100 text-blue-800 border-blue-200'
-      case 'memory_surprise': return 'bg-yellow-100 text-yellow-800 border-yellow-200'
-      case 'knowledge_evolution': return 'bg-purple-100 text-purple-800 border-purple-200'
-      case 'emotional_growth': return 'bg-pink-100 text-pink-800 border-pink-200'
-      case 'relationship_awareness': return 'bg-indigo-100 text-indigo-800 border-indigo-200'
-      default: return 'bg-gray-100 text-gray-800 border-gray-200'
-    }
-  }
-
-  // Format learning type for display
-  const formatLearningType = (type: string) => {
-    return type.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())
-  }
 
   // Load evolution data from API or generate mock data
   const loadEvolutionData = useCallback(async () => {
@@ -174,125 +298,7 @@ const CharacterEvolutionTimeline: React.FC<CharacterEvolutionTimelineProps> = ({
     } finally {
       setLoading(false)
     }
-  }, [apiEndpoint, characterName, maxMilestones, showPhases])
-
-  // Generate realistic mock milestones
-  const generateMockMilestones = (count: number): LearningMilestone[] => {
-    const types: LearningMilestone['type'][] = [
-      'growth_insight', 'user_observation', 'memory_surprise', 
-      'knowledge_evolution', 'emotional_growth', 'relationship_awareness'
-    ]
-    
-    const milestones: LearningMilestone[] = []
-    const now = Date.now()
-
-    for (let i = 0; i < count; i++) {
-      const type = types[Math.floor(Math.random() * types.length)]
-      const daysAgo = Math.floor(Math.random() * 30) + 1
-      const timestamp = new Date(now - daysAgo * 24 * 60 * 60 * 1000)
-
-      milestones.push({
-        id: `milestone_${i}`,
-        timestamp,
-        type,
-        title: getMilestoneTitle(type, i),
-        description: getMilestoneDescription(type, i),
-        confidence: Math.random() * 0.3 + 0.7, // 70-100%
-        messageContext: `User discussed ${type.replace('_', ' ')} in conversation`,
-        characterResponse: `Character demonstrated understanding of ${type.replace('_', ' ')}`
-      })
-    }
-
-    return milestones.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())
-  }
-
-  const getMilestoneTitle = (type: string, index: number) => {
-    const titles = {
-      growth_insight: [
-        'Recognized personal growth pattern',
-        'Understood character development need',
-        'Identified learning opportunity',
-        'Gained self-awareness insight'
-      ],
-      user_observation: [
-        'Noticed user communication pattern',
-        'Recognized user emotional state',
-        'Identified user preference',
-        'Understood user learning style'
-      ],
-      memory_surprise: [
-        'Connected distant conversation topics',
-        'Recalled relevant past interaction',
-        'Linked emotional patterns across time',
-        'Discovered memory connection'
-      ],
-      knowledge_evolution: [
-        'Learned new domain knowledge',
-        'Updated understanding of topic',
-        'Integrated complex information',
-        'Expanded knowledge base'
-      ],
-      emotional_growth: [
-        'Developed deeper empathy',
-        'Enhanced emotional intelligence',
-        'Improved emotional response',
-        'Strengthened emotional connection'
-      ],
-      relationship_awareness: [
-        'Recognized relationship milestone',
-        'Understood trust development',
-        'Identified communication improvement',
-        'Strengthened personal bond'
-      ]
-    }
-    
-    const typeList = titles[type as keyof typeof titles] || ['Learning milestone']
-    return typeList[index % typeList.length]
-  }
-
-  const getMilestoneDescription = (type: string, index: number) => {
-    const descriptions = {
-      growth_insight: [
-        'The character recognized an opportunity for personal development during the conversation.',
-        'A moment of self-reflection led to deeper understanding of character capabilities.',
-        'The character identified areas for growth based on user interaction patterns.',
-        'New insights emerged about the character\'s evolving personality and responses.'
-      ],
-      user_observation: [
-        'The character observed and learned from the user\'s communication preferences.',
-        'Pattern recognition revealed important aspects of the user\'s personality.',
-        'The character noticed subtle cues about the user\'s emotional state and needs.',
-        'Deep listening led to better understanding of the user\'s learning style.'
-      ],
-      memory_surprise: [
-        'An unexpected connection was made between current and past conversations.',
-        'The character was surprised by a relevant memory that enhanced the discussion.',
-        'A seemingly unrelated memory provided valuable context for the current topic.',
-        'The character discovered patterns by connecting memories across different timeframes.'
-      ],
-      knowledge_evolution: [
-        'The character integrated new information to expand domain expertise.',
-        'Complex concepts were processed and added to the knowledge base.',
-        'The character updated its understanding based on new evidence or perspectives.',
-        'Learning occurred through thoughtful analysis of presented information.'
-      ],
-      emotional_growth: [
-        'The character developed a more nuanced understanding of emotional dynamics.',
-        'Empathy deepened through careful attention to emotional cues and responses.',
-        'The character learned to respond more appropriately to complex emotional situations.',
-        'Emotional intelligence improved through practice and reflection.'
-      ],
-      relationship_awareness: [
-        'The character recognized an important development in the relationship dynamic.',
-        'Trust and understanding reached a new level through meaningful interaction.',
-        'The character became aware of how the relationship has evolved over time.',
-        'Personal connection strengthened through shared experiences and mutual understanding.'
-      ]
-    }
-    
-    const typeList = descriptions[type as keyof typeof descriptions] || ['A learning moment occurred.']
-    return typeList[index % typeList.length]
-  }
+  }, [apiEndpoint, characterName, maxMilestones, showPhases, showMetrics])
 
   useEffect(() => {
     loadEvolutionData()

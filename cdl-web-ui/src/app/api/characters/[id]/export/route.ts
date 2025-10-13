@@ -30,7 +30,21 @@ export async function GET(request: NextRequest, { params }: PageProps) {
     }
 
     // Convert character to clean YAML structure
-    const yamlStructure: any = {
+    const yamlStructure: {
+      name: string
+      identity: {
+        name: string
+        occupation: string | null
+        description: string | null
+        archetype: string
+        allow_full_roleplay_immersion: boolean
+      }
+      metadata: Record<string, unknown>
+      personality?: unknown
+      communication?: unknown
+      values?: unknown
+      interests?: unknown
+    } = {
       name: character.name,
       identity: {
         name: character.name,

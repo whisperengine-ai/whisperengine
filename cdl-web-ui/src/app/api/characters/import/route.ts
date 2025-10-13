@@ -18,9 +18,9 @@ export async function POST(request: NextRequest) {
     const fileContent = await file.text()
     
     // Parse YAML
-    let yamlData: any
+    let yamlDataUnknown: unknown
     try {
-      yamlData = yaml.load(fileContent) as any
+      yamlDataUnknown = yaml.load(fileContent)
     } catch (yamlError) {
       return NextResponse.json({
         success: false,
@@ -29,34 +29,69 @@ export async function POST(request: NextRequest) {
       }, { status: 400 })
     }
 
+    // Basic shape validation
+    if (typeof yamlDataUnknown !== 'object' || yamlDataUnknown === null) {
+      return NextResponse.json({
+        success: false,
+        error: 'Invalid YAML structure'
+      }, { status: 400 })
+    }
+
+    const yamlData = yamlDataUnknown as Record<string, unknown>
+
     // Validate required fields
-    if (!yamlData.name) {
+    const nameVal = yamlData.name
+    if (typeof nameVal !== 'string' || !nameVal) {
       return NextResponse.json({
         success: false,
         error: 'Missing required field: name'
       }, { status: 400 })
     }
 
+    const metadata = (yamlData.metadata && typeof yamlData.metadata === 'object')
+      ? (yamlData.metadata as Record<string, unknown>)
+      : undefined
+    const identity = (yamlData.identity && typeof yamlData.identity === 'object')
+      ? (yamlData.identity as Record<string, unknown>)
+      : undefined
+
+    const getString = (obj: Record<string, unknown> | undefined, key: string): string | undefined => {
+      const v = obj?.[key]
+      return typeof v === 'string' ? v : undefined
+    }
+    const getBoolean = (obj: Record<string, unknown> | undefined, key: string): boolean | undefined => {
+      const v = obj?.[key]
+      return typeof v === 'boolean' ? v : undefined
+    }
+    const getObject = (v: unknown): Record<string, unknown> => (typeof v === 'object' && v !== null ? (v as Record<string, unknown>) : {})
+    const getArray = (v: unknown): unknown[] => (Array.isArray(v) ? v : [])
+
+    type Archetype = 'real-world' | 'fantasy' | 'narrative-ai'
+    const getArchetype = (val: unknown): Archetype => {
+      if (val === 'fantasy' || val === 'narrative-ai' || val === 'real-world') return val
+      return 'real-world'
+    }
+
     // Convert YAML structure to database format
     const characterData = {
-      name: yamlData.name,
-      normalized_name: yamlData.metadata?.normalized_name || yamlData.name.toLowerCase().replace(/[^a-z0-9]/g, '_'),
-      occupation: yamlData.identity?.occupation || null,
-      description: yamlData.identity?.description || null,
-      character_archetype: yamlData.identity?.archetype || 'real-world',
-      allow_full_roleplay_immersion: yamlData.identity?.allow_full_roleplay_immersion || false,
+      name: nameVal,
+      normalized_name: getString(metadata, 'normalized_name') || nameVal.toLowerCase().replace(/[^a-z0-9]/g, '_'),
+      occupation: getString(identity, 'occupation') || null,
+      description: getString(identity, 'description') || null,
+  character_archetype: getArchetype(getString(identity, 'archetype')),
+      allow_full_roleplay_immersion: getBoolean(identity, 'allow_full_roleplay_immersion') ?? false,
       cdl_data: {
-        identity: yamlData.identity || {},
-        personality: yamlData.personality || {},
-        communication: yamlData.communication || {},
-        values: yamlData.values || [],
-        interests: yamlData.interests || [],
-        background: yamlData.background || {},
-        speech_patterns: yamlData.speech_patterns || {},
-        personal_knowledge: yamlData.personal_knowledge || {},
-        roleplay_config: yamlData.roleplay_config || {},
+        identity: identity || {},
+        personality: getObject(yamlData.personality),
+        communication: getObject(yamlData.communication),
+        values: getArray(yamlData.values),
+        interests: getArray(yamlData.interests),
+        background: getObject(yamlData.background),
+        speech_patterns: getObject(yamlData.speech_patterns),
+        personal_knowledge: getObject(yamlData.personal_knowledge),
+        roleplay_config: getObject(yamlData.roleplay_config),
         metadata: {
-          ...yamlData.metadata,
+          ...(metadata || {}),
           import_date: new Date().toISOString(),
           import_source: 'yaml_file',
           original_filename: file.name
@@ -69,7 +104,7 @@ export async function POST(request: NextRequest) {
     
     return NextResponse.json({
       success: true,
-      message: `Character "${yamlData.name}" imported successfully`,
+  message: `Character "${nameVal}" imported successfully`,
       character: {
         id: character.id,
         name: character.name,
