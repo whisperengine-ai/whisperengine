@@ -11,6 +11,8 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-whisperengine}
       POSTGRES_USER: ${POSTGRES_USER:-whisperengine_user}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-secure_password_123}
+    env_file:
+      - .env
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
     volumes:

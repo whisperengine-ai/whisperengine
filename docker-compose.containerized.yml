@@ -75,6 +75,8 @@ services:
       - ROBERTA_EMOTION_MODEL_NAME=cardiffnlp/twitter-roberta-base-emotion-multilabel-latest
       - EMBEDDING_MODEL=sentence-transformers/all-MiniLM-L6-v2
       
+    env_file:
+      - .env
     volumes:
       - whisperengine_logs:/app/logs
     networks:
@@ -167,6 +169,8 @@ services:
       - DOCKER_INFLUXDB_INIT_ORG=${INFLUXDB_ORG:-whisperengine}
       - DOCKER_INFLUXDB_INIT_BUCKET=${INFLUXDB_BUCKET:-performance_metrics}
       - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=${INFLUXDB_TOKEN:-whisperengine-fidelity-first-metrics-token}
+    env_file:
+      - .env
     volumes:
       - influxdb_data:/var/lib/influxdb2
       - influxdb_config:/etc/influxdb2
