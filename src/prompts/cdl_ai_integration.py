@@ -36,6 +36,12 @@ class CDLAIPromptIntegration:
         self._cached_character = None
         self._cached_character_bot_name = None
         
+        # 🚀 TIER 1 CACHE: Stable character data (rare changes - cache with bot restart)
+        self._cached_voice_traits = None
+        self._cached_cultural_expressions = None
+        self._cached_ai_scenarios = None
+        self._cached_interest_topics = None
+        
         # Initialize the optimized prompt builder for size management
         from src.prompts.optimized_prompt_builder import create_optimized_prompt_builder
         self.optimized_builder = create_optimized_prompt_builder(
@@ -471,8 +477,12 @@ class CDLAIPromptIntegration:
             try:
                 from src.memory.vector_memory_system import get_normalized_bot_name_from_env
                 bot_name = get_normalized_bot_name_from_env()
-                interest_topics = await self.enhanced_manager.get_interest_topics(bot_name)
-                logger.info(f"🔍 Loaded {len(interest_topics)} interest topics for {bot_name} from database")
+                # 🚀 TIER 1 CACHE: Use cached interest topics (stable data)
+                interest_topics = self._cached_interest_topics
+                if interest_topics is None:  # Fallback if cache not loaded
+                    interest_topics = await self.enhanced_manager.get_interest_topics(bot_name)
+                    logger.debug("⚠️ TIER 1 CACHE MISS: Fetched interest topics fresh (cache not preloaded)")
+                logger.info(f"🔍 Loaded {len(interest_topics)} interest topics for {bot_name} from {'cache' if self._cached_interest_topics else 'database'}")
             except Exception as e:
                 logger.warning(f"⚠️ Could not load interest topics from database: {e}")
         
@@ -1089,7 +1099,12 @@ class CDLAIPromptIntegration:
         if self.enhanced_manager:
             try:
                 bot_name = os.getenv('DISCORD_BOT_NAME', safe_bot_name_fallback).lower()
-                ai_scenarios = await self.enhanced_manager.get_ai_scenarios(bot_name)
+                # 🚀 TIER 1 CACHE: Use cached AI scenarios (stable data)
+                ai_scenarios = self._cached_ai_scenarios
+                if ai_scenarios is None:  # Fallback if cache not loaded
+                    ai_scenarios = await self.enhanced_manager.get_ai_scenarios(bot_name)
+                    logger.debug("⚠️ TIER 1 CACHE MISS: Fetched AI scenarios fresh (cache not preloaded)")
+                
                 if ai_scenarios:
                     # Check if message contains physical interaction requests (DATABASE-DRIVEN)
                     try:
@@ -2044,6 +2059,42 @@ Remember to stay true to your authentic voice and character.
             
             return FallbackCharacter()
 
+    async def preload_tier1_stable_data(self):
+        """
+        🚀 TIER 1 CACHING: Preload stable character data during bot initialization.
+        
+        These fields rarely change (character identity/personality core) so caching
+        them eliminates unnecessary database queries while maintaining immediate
+        feedback for dynamic fields (relationships, triggers, expertise).
+        
+        Cache invalidation: Bot restart via ./multi-bot.sh restart <bot>
+        """
+        try:
+            from src.memory.vector_memory_system import get_normalized_bot_name_from_env
+            bot_name = get_normalized_bot_name_from_env()
+            
+            if not self.enhanced_manager:
+                logger.warning("⚠️ TIER 1 CACHE: Enhanced manager not available - skipping preload")
+                return
+            
+            logger.info("🚀 TIER 1 CACHE: Preloading stable character data for %s...", bot_name)
+            
+            # Cache stable data that rarely changes
+            self._cached_voice_traits = await self.enhanced_manager.get_voice_traits(bot_name)
+            self._cached_cultural_expressions = await self.enhanced_manager.get_cultural_expressions(bot_name)
+            self._cached_ai_scenarios = await self.enhanced_manager.get_ai_scenarios(bot_name)
+            self._cached_interest_topics = await self.enhanced_manager.get_interest_topics(bot_name)
+            
+            logger.info("✅ TIER 1 CACHE: Preloaded %d voice traits, %d cultural expressions, %d AI scenarios, %d interest topics",
+                       len(self._cached_voice_traits) if self._cached_voice_traits else 0,
+                       len(self._cached_cultural_expressions) if self._cached_cultural_expressions else 0,
+                       len(self._cached_ai_scenarios) if self._cached_ai_scenarios else 0,
+                       len(self._cached_interest_topics) if self._cached_interest_topics else 0)
+            
+        except Exception as e:
+            logger.warning("⚠️ TIER 1 CACHE: Preload failed (will fetch fresh): %s", e)
+            # Not fatal - will fall back to fresh queries
+
     async def _get_graph_manager(self):
         """Get or initialize CharacterGraphManager (cached)"""
         if not self._graph_manager_initialized:
@@ -2923,7 +2974,11 @@ Stay authentic to {character.identity.name}'s personality while being transparen
             
             if self.enhanced_manager:
                 try:
-                    voice_traits = await self.enhanced_manager.get_voice_traits(bot_name)
+                    # 🚀 TIER 1 CACHE: Use cached voice traits (stable data)
+                    voice_traits = self._cached_voice_traits
+                    if voice_traits is None:  # Fallback if cache not loaded
+                        voice_traits = await self.enhanced_manager.get_voice_traits(bot_name)
+                        logger.debug("⚠️ TIER 1 CACHE MISS: Fetched voice traits fresh (cache not preloaded)")
                     
                     # Build groups dynamically - no hardcoded trait types!
                     for trait in voice_traits:
@@ -2988,7 +3043,11 @@ Stay authentic to {character.identity.name}'s personality while being transparen
             
             if self.enhanced_manager:
                 try:
-                    cultural_expressions = await self.enhanced_manager.get_cultural_expressions(bot_name)
+                    # 🚀 TIER 1 CACHE: Use cached cultural expressions (stable data)
+                    cultural_expressions = self._cached_cultural_expressions
+                    if cultural_expressions is None:  # Fallback if cache not loaded
+                        cultural_expressions = await self.enhanced_manager.get_cultural_expressions(bot_name)
+                        logger.debug("⚠️ TIER 1 CACHE MISS: Fetched cultural expressions fresh (cache not preloaded)")
                     
                     for expr in cultural_expressions:
                         expr_type = expr.expression_type.lower()
