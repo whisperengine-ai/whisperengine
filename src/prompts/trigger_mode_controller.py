@@ -91,11 +91,14 @@ class TriggerModeController:
             # First, try to get database-driven interaction modes
             interaction_modes = []
             if self.enhanced_manager:
+                logger.info(f"🎭 MODE DETECTION: Attempting to load database modes for {character_name}")
                 try:
                     interaction_modes = await self.enhanced_manager.get_interaction_modes(character_name)
-                    logger.debug(f"🎭 MODE DETECTION: Found {len(interaction_modes)} database modes for {character_name}")
+                    logger.info(f"🎭 MODE DETECTION: Found {len(interaction_modes)} database modes for {character_name}")
                 except Exception as e:
-                    logger.debug(f"Could not get interaction modes from database: {e}")
+                    logger.error(f"❌ ERROR: Could not get interaction modes from database: {e}", exc_info=True)
+            else:
+                logger.warning(f"⚠️ MODE DETECTION: enhanced_manager is None, using fallback modes")
             
             # Database-driven mode detection
             if interaction_modes:
