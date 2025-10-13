@@ -9,6 +9,7 @@ export default function CharactersPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [cloning, setCloning] = useState<number | null>(null)
+  const [importing, setImporting] = useState(false)
 
   useEffect(() => {
     loadCharacters()
@@ -64,6 +65,49 @@ export default function CharactersPage() {
     }
   }
 
+  const handleImportCharacter = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+    
+    setImporting(true)
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+      
+      const response = await fetch('/api/characters/import', {
+        method: 'POST',
+        body: formData
+      })
+      
+      const result = await response.json()
+      
+      if (response.ok) {
+        alert(`✅ ${result.message}`)
+        loadCharacters() // Refresh the list
+      } else {
+        alert(`❌ Import failed: ${result.error}`)
+      }
+    } catch (error) {
+      console.error('Error importing character:', error)
+      alert(`❌ Import failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    } finally {
+      setImporting(false)
+      // Reset the file input
+      event.target.value = ''
+    }
+  }
+
+  const handleExportCharacter = (characterId: number) => {
+    // Create download link for YAML export
+    const exportUrl = `/api/characters/${characterId}/export`
+    const link = document.createElement('a')
+    link.href = exportUrl
+    link.download = `character_${characterId}.yaml`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -102,9 +146,24 @@ export default function CharactersPage() {
         <div className="bg-white rounded-lg shadow p-6">
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-xl font-semibold">Character List</h2>
-            <Link href="/characters/new" className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">
-              + New Character
-            </Link>
+            <div className="flex space-x-3">
+              {/* Import Character Button */}
+              <label className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 cursor-pointer">
+                {importing ? 'Importing...' : '📁 Import YAML'}
+                <input
+                  type="file"
+                  accept=".yaml,.yml"
+                  onChange={handleImportCharacter}
+                  disabled={importing}
+                  className="hidden"
+                />
+              </label>
+              
+              {/* New Character Button */}
+              <Link href="/characters/new" className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">
+                + New Character
+              </Link>
+            </div>
           </div>
 
           {error ? (
@@ -187,6 +246,13 @@ export default function CharactersPage() {
                             <Link href={`/characters/${character.id}/view`} className="text-gray-600 hover:text-gray-900">
                               View
                             </Link>
+                            <button
+                              onClick={() => handleExportCharacter(character.id!)}
+                              className="text-purple-600 hover:text-purple-900"
+                              title="Export character as YAML"
+                            >
+                              📤 Export
+                            </button>
                             <button
                               onClick={() => handleCloneCharacter(character)}
                               disabled={cloning === character.id}
