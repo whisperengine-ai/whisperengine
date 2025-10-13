@@ -380,12 +380,16 @@ class EnhancedCDLManager:
         Get interaction modes for context-aware response switching.
         Uses existing character_conversation_modes, character_mode_guidance, and character_message_triggers tables.
         """
+        logger.info(f"🎭 GET_INTERACTION_MODES: Called for character '{character_name}'")
         try:
             async with self.pool.acquire() as conn:
                 character_id = await self._get_character_id(conn, character_name)
                 if not character_id:
+                    logger.warning(f"🎭 GET_INTERACTION_MODES: No character ID found for '{character_name}'")
                     return []
 
+                logger.info(f"🎭 GET_INTERACTION_MODES: Querying database for character_id={character_id}")
+                
                 # Query actual database schema (character_conversation_modes + character_mode_guidance + character_message_triggers)
                 rows = await conn.fetch("""
                     SELECT DISTINCT
@@ -411,6 +415,8 @@ class EnhancedCDLManager:
                     ORDER BY ccm.mode_name
                 """, character_id)
 
+                logger.info(f"🎭 GET_INTERACTION_MODES: Query returned {len(rows)} rows")
+
                 modes = []
                 for row in rows:
                     modes.append(InteractionMode(
@@ -427,7 +433,7 @@ class EnhancedCDLManager:
                 return modes
 
         except Exception as e:
-            logger.error(f"Error retrieving interaction modes for {character_name}: {e}")
+            logger.error(f"❌ ERROR retrieving interaction modes for {character_name}: {e}", exc_info=True)
             return []
 
     async def get_speech_patterns(self, character_name: str) -> List[SpeechPattern]:
