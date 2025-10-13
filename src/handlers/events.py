@@ -490,11 +490,11 @@ class BotEventHandlers:
         Uses database-based CDL system (post-migration from JSON files).
         """
         try:
-            # Use database-based CDL system (post-JSON migration)
-            from src.characters.cdl.simple_cdl_manager import get_simple_cdl_manager
+            # 🚀 FIXED: Use proper CDL integration instead of bypass
+            from src.prompts.cdl_ai_integration import CDLAIPromptIntegration
             
-            cdl_manager = get_simple_cdl_manager()
-            character = cdl_manager.get_character_object()
+            cdl_integration = CDLAIPromptIntegration()
+            character = await cdl_integration.load_character()
             
             # Extract occupation and identity for character type classification
             occupation = character.identity.occupation.lower() if character.identity.occupation else ""
@@ -1265,23 +1265,24 @@ class BotEventHandlers:
 
             logger.info(f"🎭 CDL CHARACTER DEBUG: Loading character data for bot {bot_name}")
 
-            # Use database-based CDL system
-            from src.characters.cdl.simple_cdl_manager import get_simple_cdl_manager
-            cdl_manager = get_simple_cdl_manager()
-            
-            # Get character data from database using bot name
-            character = cdl_manager.get_character_object()
-            if not character or not character.identity.name:
-                logger.error(f"🚨 CDL CHARACTER ERROR: Failed to load character data for bot {bot_name}")
-                logger.error("Check that character exists in PostgreSQL database and environment variables are correct.")
-                return None
-                
-            logger.info(f"🎭 CDL CHARACTER: Using character {character.identity.name} for user {user_id}")
-            
-            # Import CDL integration modules
+            # 🚀 STOP BYPASS: Use CDL integration directly (load_character called internally)
             from src.prompts.cdl_ai_integration import CDLAIPromptIntegration
             from src.prompts.ai_pipeline_vector_integration import VectorAIPipelineResult
             from datetime import datetime
+            
+            # Use centralized character system if available, otherwise create new instance
+            if self.character_system:
+                cdl_integration = self.character_system
+                logger.info(f"🎭 CDL: Using centralized character system for {user_id}")
+            else:
+                # Fallback: Create CDL integration instance
+                cdl_integration = CDLAIPromptIntegration(
+                    vector_memory_manager=self.memory_manager,
+                    llm_client=self.llm_client
+                )
+                logger.warning(f"⚠️ CDL: Using fallback CDL instance for {user_id} - character system not initialized")
+            
+            logger.info(f"🎭 CDL CHARACTER: Loading character via load_character() for user {user_id} (no bypass)")
             
             # Create AI pipeline result from available context data WITH CONTEXT ANALYSIS
             pipeline_result = VectorAIPipelineResult(
@@ -1336,9 +1337,8 @@ class BotEventHandlers:
             # Get user's display name for better identification
             user_display_name = getattr(message.author, 'display_name', None) or getattr(message.author, 'name', None)
             
-            # 🚀 FULL INTELLIGENCE: Use complete character-aware prompt with all emotional intelligence
+            # 🚀 FIXED: Use correct method signature (user_id first, character loaded internally)
             character_prompt = await cdl_integration.create_unified_character_prompt(
-                character=character,
                 user_id=user_id,
                 message_content=message.content,
                 pipeline_result=pipeline_result,
@@ -1398,7 +1398,7 @@ class BotEventHandlers:
                 })
                 logger.info(f"🎭 CDL CHARACTER: Added character prompt as new system message ({len(character_prompt)} chars)")
             
-            logger.info(f"🎭 CDL CHARACTER: Enhanced conversation context with {character.identity.name} personality")
+            logger.info(f"🎭 CDL CHARACTER: Enhanced conversation context with character personality (loaded via load_character)")
             return enhanced_context
             
         except Exception as e:
@@ -1477,11 +1477,11 @@ class BotEventHandlers:
         Uses database-based CDL system (post-migration from JSON files).
         """
         try:
-            # Use database-based CDL system (post-JSON migration)
-            from src.characters.cdl.simple_cdl_manager import get_simple_cdl_manager
+            # 🚀 FIXED: Use proper CDL integration instead of bypass
+            from src.prompts.cdl_ai_integration import CDLAIPromptIntegration
             
-            cdl_manager = get_simple_cdl_manager()
-            character = cdl_manager.get_character_object()
+            cdl_integration = CDLAIPromptIntegration()
+            character = await cdl_integration.load_character()
             
             indicators = []
             
@@ -1517,11 +1517,11 @@ class BotEventHandlers:
         Uses database-based CDL system (post-migration from JSON files).
         """
         try:
-            # Use database-based CDL system (post-JSON migration)
-            from src.characters.cdl.simple_cdl_manager import get_simple_cdl_manager
+            # 🚀 FIXED: Use proper CDL integration instead of bypass  
+            from src.prompts.cdl_ai_integration import CDLAIPromptIntegration
             
-            cdl_manager = get_simple_cdl_manager()
-            character = cdl_manager.get_character_object()
+            cdl_integration = CDLAIPromptIntegration()
+            character = await cdl_integration.load_character()
             
             name = character.identity.name if character.identity.name else ""
             occupation = character.identity.occupation if character.identity.occupation else ""

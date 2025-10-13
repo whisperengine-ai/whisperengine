@@ -27,6 +27,10 @@ class CDLAIPromptIntegration:
         self._graph_manager_initialized = False
         self._context_enhancer = None  # Cache for CharacterContextEnhancer (Phase 2B)
         
+        # 🚀 PERFORMANCE: Character caching for load_character performance
+        self._cached_character = None
+        self._cached_character_bot_name = None
+        
         # Initialize the optimized prompt builder for size management
         from src.prompts.optimized_prompt_builder import create_optimized_prompt_builder
         self.optimized_builder = create_optimized_prompt_builder(
@@ -680,6 +684,14 @@ class CDLAIPromptIntegration:
         # Add character description
         if hasattr(character.identity, 'description') and character.identity.description:
             prompt += f" {character.identity.description}"
+        
+        # 🚀 DYNAMIC CUSTOM FIELDS: Build from all available character data sections
+        try:
+            full_character_data = character.get_full_character_data()
+            prompt += await self._build_dynamic_custom_fields(full_character_data, character_name)
+            logger.info(f"✅ DYNAMIC FIELDS: Built custom field sections from {len(full_character_data)} data sections")
+        except Exception as e:
+            logger.debug(f"Could not build dynamic custom fields: {e}")
         
         # Add AI identity handling early for proper identity establishment (DATABASE-DRIVEN)
         try:
@@ -1852,66 +1864,103 @@ Remember to stay true to your authentic voice and character.
         """
         Load a character from database using bot name from environment.
         
-        Simple approach: Get bot name from env, query database for basic fields needed for prompt.
+        🚀 ENHANCED APPROACH: Use comprehensive enhanced CDL manager for full character data
+        including personality traits, communication patterns, relationships, memories, etc.
         The character_file parameter is kept for compatibility but ignored.
+        
+        🚀 PERFORMANCE: Caching implemented for improved performance.
         """
         try:
             # Get bot name from environment
             from src.memory.vector_memory_system import get_normalized_bot_name_from_env
             bot_name = get_normalized_bot_name_from_env()
+            
+            # 🚀 PERFORMANCE: Check cache first
+            if (self._cached_character is not None and 
+                self._cached_character_bot_name == bot_name):
+                logger.debug("🚀 CDL: Using cached character for bot: %s", bot_name)
+                return self._cached_character
+            
             logger.info("🔍 CDL: Loading character for bot: %s", bot_name)
             
-            # Get database pool
+            # 🚀 ENHANCED: Use comprehensive enhanced CDL manager instead of minimal query
+            from src.characters.cdl.enhanced_cdl_manager import create_enhanced_cdl_manager
             from src.database.postgres_pool_manager import get_postgres_pool
-            pool = await get_postgres_pool()
             
-            # Simple direct database query for prompt fields
-            async with pool.acquire() as conn:
-                query = """
-                    SELECT name, occupation, description, allow_full_roleplay 
-                    FROM characters 
-                    WHERE LOWER(normalized_name) = LOWER($1)
-                """
-                row = await conn.fetchrow(query, bot_name)
+            pool = await get_postgres_pool()
+            if not pool:
+                logger.error("❌ CDL: No database pool available")
+                raise RuntimeError("Database pool not available")
                 
-                if not row:
-                    logger.error("❌ CDL: Character '%s' not found in database", bot_name)
-                    # Return fallback character
-                    class FallbackCharacter:
-                        def __init__(self):
-                            self.identity = self._create_identity()
+            enhanced_manager = create_enhanced_cdl_manager(pool)
+            
+            # Load complete character data from all CDL tables
+            character_data = await enhanced_manager.get_character_by_name(bot_name)
+            
+            if not character_data:
+                logger.error("❌ CDL: Character '%s' not found in database", bot_name)
+                # Return fallback character
+                class FallbackCharacter:
+                    def __init__(self):
+                        self.identity = self._create_identity()
+                        self.allow_full_roleplay_immersion = False
                             
-                        def _create_identity(self):
-                            class Identity:
-                                def __init__(self):
-                                    self.name = "Unknown"
-                                    self.occupation = ""
-                                    self.description = ""
-                            return Identity()
-                    
-                    return FallbackCharacter()
-                
-                logger.info("✅ CDL: Found character: %s (%s)", row['name'], row['occupation'])
-                
-                # Create simple character object with just what we need for prompts
-                class SimpleCharacter:
-                    def __init__(self, db_row):
-                        self.identity = self._create_identity(db_row)
-                        self.allow_full_roleplay_immersion = db_row.get('allow_full_roleplay', False)
-                        
-                    def _create_identity(self, db_row):
+                    def _create_identity(self):
                         class Identity:
-                            def __init__(self, row):
-                                self.name = row['name']
-                                self.occupation = row['occupation'] or ""
-                                self.description = row['description'] or ""
-                        return Identity(db_row)
+                            def __init__(self):
+                                self.name = "Unknown"
+                                self.occupation = ""
+                                self.description = ""
+                        return Identity()
                 
-                character = SimpleCharacter(row)
-                logger.info("✅ CDL: Created character object - name: '%s', occupation: '%s'", 
-                           character.identity.name, character.identity.occupation)
+                return FallbackCharacter()
+            
+            # Extract core identity data
+            identity_data = character_data.get('identity', {})
+            character_name = identity_data.get('name', 'Unknown')
+            character_occupation = identity_data.get('occupation', '')
+            character_description = identity_data.get('description', '')
+            allow_roleplay = character_data.get('allow_full_roleplay_immersion', False)
+            
+            logger.info("✅ CDL: Found character: %s (%s)", character_name, character_occupation)
+            
+            # 🚀 ENHANCED: Create rich character object with complete CDL data access
+            class EnhancedCharacter:
+                def __init__(self, character_data):
+                    self.identity = self._create_identity(character_data.get('identity', {}))
+                    self.allow_full_roleplay_immersion = character_data.get('allow_full_roleplay_immersion', False)
+                    
+                    # Store complete character data for access to personality, communication, etc.
+                    self._character_data = character_data
+                    self.personality = character_data.get('personality', {})
+                    self.communication = character_data.get('communication', {})
+                    self.relationships = character_data.get('relationships', {})
+                    self.memories = character_data.get('key_memories', {})
+                    self.behavioral_triggers = character_data.get('behavioral_triggers', {})
+                    
+                def _create_identity(self, identity_data):
+                    class Identity:
+                        def __init__(self, data):
+                            self.name = data.get('name', 'Unknown')
+                            self.occupation = data.get('occupation', '')
+                            self.description = data.get('description', '')
+                            self.archetype = data.get('archetype', '')
+                    return Identity(identity_data)
                 
-                return character
+                def get_full_character_data(self):
+                    """Access to complete character data for advanced integrations"""
+                    return self._character_data
+            
+            character = EnhancedCharacter(character_data)
+            
+            # 🚀 PERFORMANCE: Cache the character for future calls
+            self._cached_character = character
+            self._cached_character_bot_name = bot_name
+            
+            logger.info("✅ CDL: Created enhanced character object - name: '%s', occupation: '%s', data sections: %s", 
+                       character.identity.name, character.identity.occupation, list(character_data.keys()))
+            
+            return character
             
         except Exception as e:
             logger.error("❌ CDL: Failed to load character: %s", e)
@@ -1960,13 +2009,12 @@ Remember to stay true to your authentic voice and character.
                         print(f"🎯 GRAPH INIT: Failed to get centralized pool: {e}", flush=True)
                         logger.warning("🎯 GRAPH INIT: Failed to get centralized pool: %s", str(e))
                 
-                # Final fallback to CDL manager's pool
+                # 🚀 FIXED: Use centralized database pool instead of CDL manager bypass
                 if not postgres_pool:
-                    print("🎯 GRAPH INIT: Using CDL manager fallback pool...", flush=True)
-                    logger.warning("🎯 GRAPH INIT: Using CDL manager fallback pool...")
-                    from src.characters.cdl.simple_cdl_manager import get_simple_cdl_manager
-                    cdl_manager = get_simple_cdl_manager()
-                    postgres_pool = await cdl_manager._get_database_pool()
+                    print("🎯 GRAPH INIT: Using centralized database pool fallback...", flush=True)
+                    logger.warning("🎯 GRAPH INIT: Using centralized database pool fallback...")
+                    from src.database.postgres_pool_manager import get_postgres_pool
+                    postgres_pool = await get_postgres_pool()
                 
                 if not postgres_pool:
                     logger.error("❌ GRAPH INIT: No PostgreSQL pool available")
@@ -3055,3 +3103,120 @@ Stay authentic to {character.identity.name}'s personality while being transparen
         except Exception as e:
             logger.debug("Could not load response guidelines: %s", e)
             return ""
+
+    async def _build_dynamic_custom_fields(self, full_character_data: dict, character_name: str) -> str:
+        """🚀 DYNAMIC FIELD BUILDER: Build prompt sections from all available custom fields"""
+        dynamic_sections = []
+        
+        # Process each data section dynamically
+        for section_name, section_data in full_character_data.items():
+            if section_name in ['identity']:  # Skip identity as it's handled separately
+                continue
+                
+            section_content = await self._process_data_section(section_name, section_data, character_name)
+            if section_content:
+                dynamic_sections.append(section_content)
+        
+        return ''.join(dynamic_sections) if dynamic_sections else ""
+    
+    async def _process_data_section(self, section_name: str, section_data, character_name: str) -> str:
+        """Process individual data section into prompt content"""
+        if not section_data:
+            return ""
+        
+        try:
+            # Handle different data types
+            if isinstance(section_data, dict):
+                return await self._process_dict_section(section_name, section_data, character_name)
+            elif isinstance(section_data, list):
+                return await self._process_list_section(section_name, section_data, character_name)
+            elif isinstance(section_data, str):
+                return f"\n\n🎯 {section_name.upper().replace('_', ' ')}: {section_data}"
+            elif isinstance(section_data, bool):
+                if section_data:  # Only add if True
+                    return f"\n\n✅ {section_name.upper().replace('_', ' ')}: Enabled"
+            else:
+                return f"\n\n📋 {section_name.upper().replace('_', ' ')}: {str(section_data)}"
+        except Exception as e:
+            logger.debug(f"Could not process section {section_name}: {e}")
+            return ""
+    
+    async def _process_dict_section(self, section_name: str, section_data: dict, character_name: str) -> str:
+        """Process dictionary data sections with nested custom fields"""
+        if not section_data:
+            return ""
+        
+        section_parts = []
+        section_header = f"\n\n🎯 {section_name.upper().replace('_', ' ')}:"
+        
+        for field_name, field_value in section_data.items():
+            if not field_value:
+                continue
+                
+            field_title = field_name.replace('_', ' ').title()
+            
+            if isinstance(field_value, dict):
+                # Nested dictionary - format as sub-sections
+                nested_parts = []
+                for sub_key, sub_value in field_value.items():
+                    if sub_value:
+                        sub_title = sub_key.replace('_', ' ').title()
+                        nested_parts.append(f"  • {sub_title}: {sub_value}")
+                
+                if nested_parts:
+                    section_parts.append(f"\n📋 {field_title}:")
+                    section_parts.extend(nested_parts)
+            
+            elif isinstance(field_value, list):
+                # List of items
+                if field_value:
+                    section_parts.append(f"\n📋 {field_title}:")
+                    for item in field_value:
+                        section_parts.append(f"  • {item}")
+            
+            else:
+                # Simple field
+                section_parts.append(f"\n📋 {field_title}: {field_value}")
+        
+        if section_parts:
+            return section_header + ''.join(section_parts)
+        return ""
+    
+    async def _process_list_section(self, section_name: str, section_data: list, character_name: str) -> str:
+        """Process list data sections (behavioral triggers, relationships, etc.)"""
+        if not section_data:
+            return ""
+        
+        section_header = f"\n\n🎯 {section_name.upper().replace('_', ' ')}:"
+        items = []
+        
+        for item in section_data:
+            if hasattr(item, '__dict__'):
+                # Object with attributes
+                item_parts = []
+                for attr_name, attr_value in item.__dict__.items():
+                    if attr_value and not attr_name.startswith('_'):
+                        attr_title = attr_name.replace('_', ' ').title()
+                        item_parts.append(f"{attr_title}: {attr_value}")
+                
+                if item_parts:
+                    items.append(f"\n  • {' | '.join(item_parts)}")
+            
+            elif isinstance(item, dict):
+                # Dictionary item
+                item_parts = []
+                for key, value in item.items():
+                    if value:
+                        key_title = key.replace('_', ' ').title()
+                        item_parts.append(f"{key_title}: {value}")
+                
+                if item_parts:
+                    items.append(f"\n  • {' | '.join(item_parts)}")
+            
+            else:
+                # Simple item
+                items.append(f"\n  • {item}")
+        
+        if items:
+            return section_header + ''.join(items)
+        return ""

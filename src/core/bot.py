@@ -466,15 +466,24 @@ class DiscordBotCore:
             
             self.logger.info("🔗 Integrating advanced conversation components with Discord bot...")
             
-            # 🚨 CRITICAL: Pre-load character data for SimpleCDLManager
+            # 🚨 CRITICAL: Pre-load character data for CDL integration performance
             # This prevents async/sync complications during message processing
             try:
-                from src.characters.cdl.simple_cdl_manager import get_simple_cdl_manager
-                cdl_manager = get_simple_cdl_manager()
-                await cdl_manager.preload_character_data()
-                self.logger.info("✅ SimpleCDLManager character data pre-loaded successfully")
+                from src.prompts.cdl_ai_integration import CDLAIPromptIntegration
+                cdl_integration = CDLAIPromptIntegration()
+                # Pre-load character using enhanced load_character method
+                character = await cdl_integration.load_character()
+                self.logger.info(f"✅ Enhanced CDL character data pre-loaded: {character.identity.name}")
             except Exception as cdl_error:
-                self.logger.error(f"❌ Failed to pre-load SimpleCDLManager character data: {cdl_error}")
+                self.logger.error(f"❌ Failed to pre-load enhanced CDL character data: {cdl_error}")
+                # Fallback to simple CDL manager pre-loading
+                try:
+                    from src.characters.cdl.simple_cdl_manager import get_simple_cdl_manager
+                    cdl_manager = get_simple_cdl_manager()
+                    await cdl_manager.preload_character_data()
+                    self.logger.info("✅ Fallback: SimpleCDLManager character data pre-loaded")
+                except Exception as fallback_error:
+                    self.logger.error(f"❌ Fallback pre-loading also failed: {fallback_error}")
             
             # Phase 3: Context Switch Detection & Empathy
             if hasattr(self, 'context_switch_detector') and self.context_switch_detector:
