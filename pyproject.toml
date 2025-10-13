@@ -7,14 +7,14 @@ name = "whisperengine"
 version = "1.0.9"
 description = "WhisperEngine - Privacy-first AI conversation and roleplay platform"
 authors = [{name = "whisperengine-ai", email = "contact@whisperengine.ai"}]
-license = {text = "MIT"}
+license = {text = "GPL-3.0-or-later"}
 readme = "README.md"
 requires-python = ">=3.13"
 keywords = ["discord", "bot", "ai", "memory", "privacy", "personality", "whisperengine"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: MIT License",
+    "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.13",
     "Topic :: Communications :: Chat",
