@@ -2749,97 +2749,67 @@ Remember to stay true to your authentic voice and character.
         Extract conversation flow guidelines - ONLY for ACTIVE mode (trigger-aware).
         
         🎯 OPTIMIZATION: Only inject guidance for the currently active conversation mode,
-        not ALL modes. This reduces prompt size by ~2000 chars (85% reduction).
+        not ALL modes. Uses normalized database tables, NOT JSON fields.
+        This reduces prompt size by ~2000 chars (85% reduction).
+        
+        🚨 CRITICAL: This function should ONLY use the active_mode parameter (InteractionMode object)
+        which contains data from normalized tables (character_conversation_modes, character_mode_guidance).
+        Do NOT load from conversation_flow_guidance JSON field - that's deprecated legacy data.
         """
         try:
             guidance_parts = []
             
-            # Access communication data directly from character object
-            if hasattr(character, 'communication'):
-                comm = character.communication
+            # 🎯 TRIGGER-AWARE: Only inject ACTIVE mode guidance from normalized database
+            if active_mode:
+                # active_mode is an InteractionMode object from get_interaction_modes() 
+                # which queries normalized tables: character_conversation_modes + character_mode_guidance
                 
-                # Extract conversation flow guidance from communication object
-                if hasattr(comm, 'conversation_flow_guidance'):
-                    flow_guidance = comm.conversation_flow_guidance
-                    
-                    # Platform-specific guidance (Discord) - always include
-                    platform_discord = flow_guidance.get('platform_awareness', {}).get('discord', {})
-                    if platform_discord:
-                        max_length = platform_discord.get('max_response_length', '')
-                        if max_length:
-                            guidance_parts.append(f"🚨 CRITICAL LENGTH LIMIT: {max_length}")
-                        
-                        collab_style = platform_discord.get('collaboration_style', '')
-                        if collab_style:
-                            guidance_parts.append(f"CONVERSATION STYLE: {collab_style}")
-                        
-                        avoid = platform_discord.get('avoid', '')
-                        if avoid:
-                            guidance_parts.append(f"❌ NEVER: {avoid}")
-                        
-                        prefer = platform_discord.get('prefer', '')
-                        if prefer:
-                            guidance_parts.append(f"✅ ALWAYS: {prefer}")
-                    
-                    # Flow optimization guidance - always include
-                    flow_opt = flow_guidance.get('flow_optimization', {})
-                    if flow_opt:
-                        auth_engagement = flow_opt.get('character_authentic_engagement', '')
-                        if auth_engagement:
-                            guidance_parts.append(f"ENGAGEMENT PATTERN: {auth_engagement}")
-                        
-                        length_mgmt = flow_opt.get('length_management', '')
-                        if length_mgmt:
-                            guidance_parts.append(f"LENGTH STRATEGY: {length_mgmt}")
-                        
-                        rhythm = flow_opt.get('conversation_rhythm', '')
-                        if rhythm:
-                            guidance_parts.append(f"CONVERSATION RHYTHM: {rhythm}")
-                    
-                    # 🎯 TRIGGER-AWARE: Only inject ACTIVE mode guidance, not ALL modes
-                    if active_mode and hasattr(active_mode, 'mode_name'):
-                        active_mode_name = active_mode.mode_name
-                        
-                        # Look for matching mode in flow_guidance
-                        mode_data = flow_guidance.get(active_mode_name)
-                        
-                        if mode_data and isinstance(mode_data, dict):
-                            # Extract key mode information
-                            energy = mode_data.get('energy', '')
-                            approach = mode_data.get('approach', '')
-                            
-                            # Format mode name for display
-                            display_name = active_mode_name.replace('_', ' ').title()
-                            
-                            if energy or approach:
-                                mode_desc = f"🎭 ACTIVE MODE: {display_name}"
-                                if energy:
-                                    mode_desc += f" ({energy})"
-                                if approach:
-                                    mode_desc += f": {approach}"
-                                guidance_parts.append(mode_desc)
-                            
-                            # Add specific guidance arrays if present (limit to 2 each)
-                            encourage = mode_data.get('encourage', [])
-                            if encourage and isinstance(encourage, list):
-                                for item in encourage[:2]:
-                                    guidance_parts.append(f"  ✅ {item}")
-                            
-                            avoid = mode_data.get('avoid', [])
-                            if avoid and isinstance(avoid, list):
-                                for item in avoid[:2]:
-                                    guidance_parts.append(f"  ❌ {item}")
+                # Format mode name for display
+                mode_name = active_mode.mode_name
+                display_name = mode_name.replace('_', ' ').title()
+                
+                # Build active mode description from normalized data
+                mode_desc_parts = [f"🎭 ACTIVE MODE: {display_name}"]
+                
+                # Add mode description (from character_conversation_modes.approach)
+                if active_mode.mode_description:
+                    mode_desc_parts.append(f"({active_mode.mode_description})")
+                
+                # Add response guidelines (from character_conversation_modes.energy_level)
+                if active_mode.response_guidelines:
+                    mode_desc_parts.append(f"- Energy: {active_mode.response_guidelines}")
+                
+                guidance_parts.append(" ".join(mode_desc_parts))
+                
+                # Add encourage patterns (from character_mode_guidance WHERE guidance_type='encourage')
+                # Limit to top 3 for prompt efficiency
+                if active_mode.response_guidelines and isinstance(active_mode.response_guidelines, str):
+                    # response_guidelines from energy_level field
+                    guidance_parts.append(f"✅ Approach: {active_mode.response_guidelines}")
+                
+                # Add avoid patterns (from character_mode_guidance WHERE guidance_type='avoid')
+                # Limit to top 3 for prompt efficiency
+                if active_mode.avoid_patterns and len(active_mode.avoid_patterns) > 0:
+                    guidance_parts.append("❌ Avoid:")
+                    for pattern in active_mode.avoid_patterns[:3]:  # Top 3 only
+                        guidance_parts.append(f"  • {pattern}")
+                
+                logger.info(f"✅ CONVERSATION FLOW: Using active mode '{mode_name}' from normalized database (NOT JSON)")
             
-            # Only add header if we have database-driven guidance
+            else:
+                # No active mode detected - use minimal generic guidance
+                logger.info(f"ℹ️ CONVERSATION FLOW: No active mode detected, using minimal generic guidance")
+                guidance_parts.append("🎭 CONVERSATION MODE: General conversational engagement")
+            
+            # Only add header if we have guidance
             if guidance_parts:
                 guidance_parts.insert(0, "🎯 CONVERSATION FLOW REQUIREMENTS:")
                 return "\n".join(guidance_parts)
             
-            # No hardcoded fallbacks - let database drive all guidance
             return ""
             
         except Exception as e:
-            logger.debug("Error extracting conversation flow guidelines: %s", e)
+            logger.error(f"Error extracting conversation flow guidelines: {e}", exc_info=True)
             return ""
 
     def _detect_physical_interaction_request(self, message: str) -> bool:

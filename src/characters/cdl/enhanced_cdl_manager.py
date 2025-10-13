@@ -785,9 +785,13 @@ class EnhancedCDLManager:
                 }
             }
             
-            # 🚨 NEW: Load conversation flow guidance from normalized RDBMS tables
-            # This replaces JSON parsing with clean relational queries for web UI compatibility
-            cdl_data['communication_style']['conversation_flow_guidance'] = await self._load_conversation_flow_guidance(conn, character_id)
+            # 🚨 DEPRECATED: conversation_flow_guidance loading removed (no longer used in prompts)
+            # Conversation flow data is accessed directly via get_interaction_modes() which queries:
+            # - character_conversation_modes (mode definitions)
+            # - character_mode_guidance (avoid/encourage patterns)
+            # - character_mode_examples (usage examples)
+            # This is only loaded when needed during prompt building, not during character object initialization.
+            # Data still exists in normalized tables for web UI editing.
                     
             # 🚀 NEW: Load AI identity handling from normalized roleplay config table
             # This replaces complex parsing of denormalized ai_identity_handling text field
