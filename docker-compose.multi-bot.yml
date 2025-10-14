@@ -185,6 +185,8 @@ services:
     image: whisperengine-bot:${VERSION:-latest}
     container_name: jake-bot
     restart: unless-stopped
+    entrypoint: []  # Override Docker entrypoint for direct Python execution
+    command: ["python", "run.py"]
     env_file:
       - .env.jake
     environment:
@@ -263,6 +265,8 @@ services:
     image: whisperengine-bot:${VERSION:-latest}
     container_name: marcus-bot
     restart: unless-stopped
+    entrypoint: []  # Override Docker entrypoint for direct Python execution
+    command: ["python", "run.py"]
     env_file:
       - .env.marcus
     environment:
@@ -341,6 +345,8 @@ services:
     image: whisperengine-bot:${VERSION:-latest}
     container_name: dotty-bot
     restart: unless-stopped
+    entrypoint: []  # Override Docker entrypoint for direct Python execution
+    command: ["python", "run.py"]
     env_file:
       - .env.dotty
     environment:
@@ -419,6 +425,8 @@ services:
     image: whisperengine-bot:${VERSION:-latest}
     container_name: dream-bot
     restart: unless-stopped
+    entrypoint: []  # Override Docker entrypoint for direct Python execution
+    command: ["python", "run.py"]
     env_file:
       - .env.dream
     environment:
@@ -497,6 +505,8 @@ services:
     image: whisperengine-bot:${VERSION:-latest}
     container_name: aetheris-bot
     restart: unless-stopped
+    entrypoint: []  # Override Docker entrypoint for direct Python execution
+    command: ["python", "run.py"]
     env_file:
       - .env.aetheris
     environment:
@@ -575,6 +585,8 @@ services:
     image: whisperengine-bot:${VERSION:-latest}
     container_name: elena-bot
     restart: unless-stopped
+    entrypoint: []  # Override Docker entrypoint for direct Python execution
+    command: ["python", "run.py"]
     env_file:
       - .env.elena
     environment:
@@ -653,6 +665,8 @@ services:
     image: whisperengine-bot:${VERSION:-latest}
     container_name: aethys-bot
     restart: unless-stopped
+    entrypoint: []  # Override Docker entrypoint for direct Python execution
+    command: ["python", "run.py"]
     env_file:
       - .env.aethys
     environment:
@@ -731,6 +745,8 @@ services:
     image: whisperengine-bot:${VERSION:-latest}
     container_name: ryan-bot
     restart: unless-stopped
+    entrypoint: []  # Override Docker entrypoint for direct Python execution
+    command: ["python", "run.py"]
     env_file:
       - .env.ryan
     environment:
@@ -809,6 +825,8 @@ services:
     image: whisperengine-bot:${VERSION:-latest}
     container_name: gabriel-bot
     restart: unless-stopped
+    entrypoint: []  # Override Docker entrypoint for direct Python execution
+    command: ["python", "run.py"]
     env_file:
       - .env.gabriel
     environment:
@@ -887,6 +905,8 @@ services:
     image: whisperengine-bot:${VERSION:-latest}
     container_name: sophia-bot
     restart: unless-stopped
+    entrypoint: []  # Override Docker entrypoint for direct Python execution
+    command: ["python", "run.py"]
     env_file:
       - .env.sophia
     environment:

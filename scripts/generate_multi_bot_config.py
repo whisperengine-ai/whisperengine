@@ -154,6 +154,8 @@ class BotConfigDiscovery:
     image: whisperengine-bot:${{VERSION:-latest}}
     container_name: {config['container_name']}
     restart: unless-stopped
+    entrypoint: []  # Override Docker entrypoint for direct Python execution
+    command: ["python", "run.py"]
     env_file:
       - {config['env_file']}
     environment:"""
