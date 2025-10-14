@@ -5,7 +5,7 @@ datasources:
   - name: InfluxDB-WhisperEngine
     type: influxdb
     access: proxy
-    url: http://whisperengine-multi-influxdb:8086
+    url: http://influxdb:8086
     database: performance_metrics
     user: whisperengine
     password: whisperengine_metrics
