@@ -7,6 +7,7 @@ import {
   getCharacterDeploymentConfig,
   createOrUpdateCharacterDeploymentConfig
 } from '@/lib/db'
+import { CharacterLLMConfig, CharacterDiscordConfig, CharacterDeploymentConfig } from '@/types/cdl'
 
 interface RouteParams {
   params: Promise<{ id: string }>
@@ -60,7 +61,11 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     const data = await request.json()
     
-    const results: any = {}
+    const results: {
+      llm_config?: CharacterLLMConfig
+      discord_config?: CharacterDiscordConfig
+      deployment_config?: CharacterDeploymentConfig
+    } = {}
 
     // Update LLM config if provided
     if (data.llm_config) {

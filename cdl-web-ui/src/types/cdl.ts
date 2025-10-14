@@ -138,15 +138,30 @@ export interface CharacterDiscordConfig {
 export interface CharacterDeploymentConfig {
   id: number
   character_id: number
+  
+  // Deployment Settings
   health_check_port: number | null
   container_name: string | null
   docker_image: string
+  
+  // Environment Overrides
   env_overrides: Record<string, unknown>
+  
+  // Resource Limits
   memory_limit: string
   cpu_limit: string
+  
+  // Deployment Status
   deployment_status: 'inactive' | 'pending' | 'active' | 'failed'
   last_deployed_at: string | null
   deployment_logs: string | null
+  
+  // Auto-deployment settings (additional fields for UI)
+  enabled?: boolean
+  auto_start?: boolean
+  port?: number // Alias for health_check_port for UI convenience
+  
+  // Configuration metadata
   is_active: boolean
   created_at: string
   updated_at: string

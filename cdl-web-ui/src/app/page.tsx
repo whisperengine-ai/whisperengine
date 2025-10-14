@@ -1,16 +1,20 @@
 import Link from 'next/link'
+import GettingStarted from '@/components/GettingStarted'
 
 export default function Home() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
       <div className="container mx-auto px-4 py-16">
+        {/* Getting Started Section */}
+        <GettingStarted />
+
         <div className="text-center mb-16">
           <h1 className="text-5xl font-bold text-gray-900 mb-4">
-            CDL Authoring Tool
+            WhisperEngine Platform
           </h1>
           <p className="text-xl text-gray-800 max-w-3xl mx-auto">
-            Character Definition Language (CDL) Web UI for creating, editing, and managing 
-            character personalities, traits, communication styles, and knowledge bases.
+            Zero-Configuration AI Character Platform. Create, configure, and deploy 
+            AI characters with personalities, memory, and intelligence - all via Web UI.
           </p>
         </div>
 
