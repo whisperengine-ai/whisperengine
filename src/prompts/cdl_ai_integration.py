@@ -3170,7 +3170,7 @@ Stay authentic to {character.identity.name}'s personality while being transparen
                 logger.info(f"🔍 _get_response_guidelines: Retrieved {len(guidelines)} guidelines from database")
                 
                 if not guidelines:
-                    logger.warning(f"⚠️ _get_response_guidelines: No guidelines found for bot_name={bot_name}")
+                    logger.debug(f"📝 _get_response_guidelines: No guidelines found for bot_name={bot_name} (guidelines are optional)")
                     return ""
                 
                 # Format guidelines dynamically - character-agnostic approach
