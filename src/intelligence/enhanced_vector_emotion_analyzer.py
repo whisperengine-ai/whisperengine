@@ -311,6 +311,167 @@ class EnhancedVectorEmotionAnalyzer:
         
         return False, truncated_content
     
+    def _analyze_with_chunking(self, content: str) -> Optional[Dict[str, float]]:
+        """
+        Analyze long content using semantic chunking for better emotion detection.
+        
+        Args:
+            content: The text content to analyze (longer than RoBERTa limits)
+            
+        Returns:
+            Dictionary of emotion scores or None if chunking fails
+        """
+        try:
+            # Create semantic chunks that preserve meaning
+            chunks = self._create_semantic_chunks(content, max_chunk_size=350)  # Conservative size
+            
+            if not chunks:
+                logger.warning("🔄 CHUNKED ANALYSIS: Failed to create chunks")
+                return None
+            
+            logger.info(f"🔄 CHUNKED ANALYSIS: Created {len(chunks)} chunks for analysis")
+            
+            # Analyze each chunk with RoBERTa
+            chunk_results = []
+            for i, chunk in enumerate(chunks):
+                try:
+                    if hasattr(self, '_roberta_classifier') and self._roberta_classifier:
+                        results = self._roberta_classifier(chunk)
+                        if results and len(results) > 0:
+                            chunk_emotions = {}
+                            for result in results[0]:
+                                # Type ignore for transformers library compatibility
+                                raw_label = result["label"]  # type: ignore
+                                confidence = result["score"]  # type: ignore
+                                emotion_label = self._map_roberta_emotion_label(raw_label)
+                                chunk_emotions[emotion_label] = confidence
+                            
+                            chunk_results.append({
+                                'chunk_index': i,
+                                'chunk_length': len(chunk),
+                                'emotions': chunk_emotions
+                            })
+                            logger.debug(f"🔄 CHUNKED ANALYSIS: Chunk {i+1}/{len(chunks)} analyzed: {chunk_emotions}")
+                        
+                except Exception as e:
+                    logger.warning(f"🔄 CHUNKED ANALYSIS: Failed to analyze chunk {i+1}: {e}")
+                    continue
+            
+            if not chunk_results:
+                logger.warning("🔄 CHUNKED ANALYSIS: No chunks analyzed successfully")
+                return None
+            
+            # Synthesize results using weighted average
+            synthesized = self._synthesize_chunk_emotions(chunk_results)
+            logger.info(f"🔄 CHUNKED ANALYSIS: Synthesized final emotions: {synthesized}")
+            
+            return synthesized
+            
+        except Exception as e:
+            logger.error(f"🔄 CHUNKED ANALYSIS: Chunking analysis failed: {e}")
+            return None
+    
+    def _create_semantic_chunks(self, content: str, max_chunk_size: int = 350) -> List[str]:
+        """
+        Create semantically meaningful chunks that preserve sentence boundaries.
+        
+        Args:
+            content: The text to chunk
+            max_chunk_size: Maximum characters per chunk
+            
+        Returns:
+            List of text chunks
+        """
+        import re
+        
+        # Split into sentences using basic sentence detection
+        sentence_endings = r'[.!?]+\s+'
+        sentences = re.split(sentence_endings, content.strip())
+        
+        if len(sentences) <= 1:
+            # Fallback to paragraph splitting if no sentence boundaries
+            paragraphs = content.split('\n\n')
+            if len(paragraphs) > 1:
+                sentences = paragraphs
+            else:
+                # Last resort: split on periods, exclamation marks, question marks
+                sentences = re.split(r'[.!?]+', content)
+        
+        chunks = []
+        current_chunk = ""
+        
+        for sentence in sentences:
+            sentence = sentence.strip()
+            if not sentence:
+                continue
+                
+            # Check if adding this sentence would exceed limit
+            test_chunk = current_chunk + (" " if current_chunk else "") + sentence
+            
+            if len(test_chunk) <= max_chunk_size:
+                current_chunk = test_chunk
+            else:
+                # Current chunk is full, start new one
+                if current_chunk:
+                    chunks.append(current_chunk)
+                
+                # If single sentence is too long, truncate it
+                if len(sentence) > max_chunk_size:
+                    sentence = sentence[:max_chunk_size-3] + "..."
+                
+                current_chunk = sentence
+        
+        # Add final chunk
+        if current_chunk:
+            chunks.append(current_chunk)
+        
+        return chunks
+    
+    def _synthesize_chunk_emotions(self, chunk_results: List[Dict]) -> Dict[str, float]:
+        """
+        Synthesize emotions from multiple chunks using weighted average.
+        
+        Args:
+            chunk_results: List of chunk analysis results
+            
+        Returns:
+            Dictionary of synthesized emotion scores
+        """
+        if not chunk_results:
+            return {}
+        
+        # Weight by chunk length and position (first/last chunks get slight boost)
+        total_weight = 0
+        emotion_totals = {}
+        
+        for i, chunk_result in enumerate(chunk_results):
+            chunk_emotions = chunk_result['emotions']
+            chunk_length = chunk_result['chunk_length']
+            
+            # Base weight by length
+            weight = chunk_length
+            
+            # Position weighting: first and last chunks are often more emotionally significant
+            if i == 0 or i == len(chunk_results) - 1:
+                weight *= 1.2  # 20% boost for first/last chunks
+            
+            total_weight += weight
+            
+            for emotion, score in chunk_emotions.items():
+                if emotion not in emotion_totals:
+                    emotion_totals[emotion] = 0
+                emotion_totals[emotion] += score * weight
+        
+        # Calculate weighted averages
+        if total_weight == 0:
+            return {}
+        
+        synthesized = {}
+        for emotion, total in emotion_totals.items():
+            synthesized[emotion] = total / total_weight
+        
+        return synthesized
+    
     async def analyze_emotion(
         self, 
         content: str, 
@@ -514,19 +675,30 @@ class EnhancedVectorEmotionAnalyzer:
                         if not is_safe:
                             logger.warning(
                                 "🚨 ROBERTA TOKEN LIMIT: Content was truncated to fit RoBERTa 514 token limit. "
-                                "Results may be incomplete. Consider using fallback emotion analysis."
+                                "Results may be incomplete. Consider using chunking analysis for better accuracy."
                             )
-                            # For extremely long content, we might want to skip RoBERTa entirely
-                            # and go straight to VADER or return neutral emotion
+                            # For very long content, try chunking before falling back to VADER
                             estimated_original_tokens = len(content) // 4
                             if estimated_original_tokens > ROBERTA_MAX_TOKENS * 2:  # Much too long
                                 logger.info(
-                                    f"🚨 ROBERTA TOKEN LIMIT: Content too long ({estimated_original_tokens} tokens), "
-                                    "skipping RoBERTa and using neutral emotion"
+                                    f"🚨 ROBERTA TOKEN LIMIT: Content very long ({estimated_original_tokens} tokens), "
+                                    "attempting chunked analysis"
                                 )
-                                emotion_scores["neutral"] = 0.9
-                                emotion_scores["unknown"] = 0.1
-                                return emotion_scores
+                                # Try chunked analysis for very long content
+                                chunked_emotions = self._analyze_with_chunking(content)
+                                if chunked_emotions:
+                                    logger.info(f"🔄 CHUNKED ANALYSIS: Successfully analyzed long content with chunking: {chunked_emotions}")
+                                    return chunked_emotions
+                                else:
+                                    logger.info("🔄 CHUNKED ANALYSIS: Chunking failed, falling back to VADER")
+                                    # Fall through to VADER analysis
+                            else:
+                                # For moderately long content, try chunking before truncation
+                                chunked_emotions = self._analyze_with_chunking(content)
+                                if chunked_emotions:
+                                    logger.info(f"🔄 CHUNKED ANALYSIS: Used chunking instead of truncation: {chunked_emotions}")
+                                    return chunked_emotions
+                                # If chunking fails, continue with truncated content
                         
                         # 🔒 CRITICAL: Analyze emotions with RoBERTa (thread-safe access to shared classifier)
                         logger.debug(f"🤖 ROBERTA ANALYSIS: Running RoBERTa inference on content")
@@ -538,8 +710,8 @@ class EnhancedVectorEmotionAnalyzer:
                     # Solution: Find the single strongest emotion in 11-emotion space, THEN map to 7-emotion taxonomy
                     raw_emotions = {}  # Store all 11 emotions with original labels
                     for result in results[0]:  # First (only) text result
-                        raw_label = result["label"]
-                        confidence = result["score"]
+                        raw_label = result["label"]  # type: ignore
+                        confidence = result["score"]  # type: ignore
                         raw_emotions[raw_label] = confidence
                         logger.info(f"🤖 ROBERTA ANALYSIS: Cardiff detected {raw_label}: {confidence:.3f}")
                     
@@ -685,20 +857,49 @@ class EnhancedVectorEmotionAnalyzer:
             return {"neutral": 0.5}
     
     def _analyze_emoji_emotions(self, content: str) -> Dict[str, float]:
-        """Analyze emotions from emojis in the content"""
-        emoji_emotions = {
-            "joy": ["😀", "😁", "😂", "😃", "😄", "😆", "😊", "😍", "🤩", "❤️", "💖", "🥰"],
-            "sadness": ["😢", "😭", "😔", "💔", "😞", "😟", "🥺", "😰"],
-            "anger": ["😠", "😡", "🤬", "💢"],
-            "surprise": ["😲", "😱", "🤯", "😯"],
-            "fear": ["😰", "😱", "😨", "😬"],
-            "excitement": ["🤩", "🎉", "🔥", "⚡", "💥"],
-            "gratitude": ["🙏", "💝", "🤗"],
-            "curiosity": ["🤔", "❓", "🧐"]
-        }
+        """Analyze emotions from emojis in the content using UniversalEmotionTaxonomy"""
+        try:
+            from src.intelligence.emotion_taxonomy import UniversalEmotionTaxonomy, standardize_emotion
+            
+            # Get core emotion mappings from the universal taxonomy
+            emotion_emoji_map = {}
+            for core_emotion, mapping in UniversalEmotionTaxonomy.EMOTION_MAPPINGS.items():
+                emotion_name = core_emotion.value  # Convert enum to string
+                emoji_list = mapping.bot_emoji_choices
+                if emoji_list:  # Only include emotions that have emoji choices
+                    emotion_emoji_map[emotion_name] = emoji_list.copy()
+            
+            # Add extended emotions using taxonomy's standardization system
+            # These extended emotions are already mapped in the taxonomy but need emoji choices
+            extended_emotions = {
+                "excitement": ["🤩", "🎉", "🔥", "⚡", "💥"],
+                "gratitude": ["🙏", "💝", "🤗"],  
+                "curiosity": ["🤔", "❓", "🧐"]
+            }
+            
+            for extended_emotion, additional_emojis in extended_emotions.items():
+                # Get the core emotion this maps to via taxonomy
+                core_emotion_name = standardize_emotion(extended_emotion)
+                
+                # Start with core emotion's emojis and add extended emotion's specific emojis
+                core_emojis = emotion_emoji_map.get(core_emotion_name, [])
+                emotion_emoji_map[extended_emotion] = core_emojis + additional_emojis
+            
+        except ImportError:
+            # Fallback to hardcoded mapping if taxonomy unavailable
+            emotion_emoji_map = {
+                "joy": ["😀", "😁", "😂", "😃", "😄", "😆", "😊", "😍", "🤩", "❤️", "💖", "🥰"],
+                "sadness": ["😢", "😭", "😔", "💔", "😞", "😟", "🥺", "😰"],
+                "anger": ["😠", "😡", "🤬", "💢"],
+                "surprise": ["😲", "😱", "🤯", "😯"],
+                "fear": ["😰", "😱", "😨", "😬"],
+                "excitement": ["🤩", "🎉", "🔥", "⚡", "💥"],
+                "gratitude": ["🙏", "💝", "🤗"],
+                "curiosity": ["🤔", "❓", "🧐"]
+            }
         
         emotion_scores = {}
-        for emotion, emojis in emoji_emotions.items():
+        for emotion, emojis in emotion_emoji_map.items():
             count = sum(content.count(emoji) for emoji in emojis)
             if count > 0:
                 emotion_scores[emotion] = min(count * 0.3, 1.0)  # Each emoji adds 0.3, max 1.0

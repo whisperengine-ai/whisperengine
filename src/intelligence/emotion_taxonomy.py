@@ -16,16 +16,21 @@ logger = logging.getLogger(__name__)
 
 class CoreEmotion(Enum):
     """
-    7 core emotions from RoBERTa model - our canonical standard.
-    All other emotion systems map to these.
+    11 core emotions from Cardiff NLP RoBERTa model - our canonical standard.
+    Expanded from 7 to 11 emotions for higher fidelity emotion detection.
     """
     ANGER = "anger"
+    ANTICIPATION = "anticipation"
     DISGUST = "disgust" 
     FEAR = "fear"
     JOY = "joy"
+    LOVE = "love"
     NEUTRAL = "neutral"
+    OPTIMISM = "optimism"
+    PESSIMISM = "pessimism"
     SADNESS = "sadness"
     SURPRISE = "surprise"
+    TRUST = "trust"
 
 
 @dataclass
@@ -108,6 +113,51 @@ class UniversalEmotionTaxonomy:
             emoji_reactions=["neutral_thoughtful"],
             bot_emoji_choices=["😐", "🤔", "💭"],  # Truly neutral expressions
             character_emojis={}  # Use CDL files instead of hardcoded mappings
+        ),
+        
+        CoreEmotion.ANTICIPATION: EmotionMapping(
+            core_emotion=CoreEmotion.ANTICIPATION,
+            roberta_label="anticipation",
+            confidence_threshold=0.6,
+            emoji_reactions=["positive_mild", "excitement"],
+            bot_emoji_choices=["🤗", "😊", "✨"],
+            character_emojis={}
+        ),
+        
+        CoreEmotion.LOVE: EmotionMapping(
+            core_emotion=CoreEmotion.LOVE,
+            roberta_label="love",
+            confidence_threshold=0.6,
+            emoji_reactions=["positive_strong", "gratitude"],
+            bot_emoji_choices=["❤️", "💕", "🥰"],
+            character_emojis={}
+        ),
+        
+        CoreEmotion.OPTIMISM: EmotionMapping(
+            core_emotion=CoreEmotion.OPTIMISM,
+            roberta_label="optimism",
+            confidence_threshold=0.6,
+            emoji_reactions=["positive_strong", "positive_mild"],
+            bot_emoji_choices=["😊", "🌟", "✨"],
+            character_emojis={}
+        ),
+        
+        CoreEmotion.PESSIMISM: EmotionMapping(
+            core_emotion=CoreEmotion.PESSIMISM,
+            roberta_label="pessimism",
+            confidence_threshold=0.6,
+            emoji_reactions=["negative_mild", "disappointment"],
+            bot_emoji_choices=["😔", "😞", "😕"],
+            character_emojis={}
+        ),
+        
+        CoreEmotion.TRUST: EmotionMapping(
+            core_emotion=CoreEmotion.TRUST,
+            roberta_label="trust",
+            confidence_threshold=0.6,
+            emoji_reactions=["positive_mild", "gratitude"],
+            bot_emoji_choices=["😊", "🤝", "💙"],
+            character_emojis={}
         )
     }
     
@@ -221,16 +271,21 @@ class UniversalEmotionTaxonomy:
         if emotion_lower in roberta_labels:
             return emotion_lower
             
-        # Extended emotion mapping
+        # Extended emotion mapping - now uses 11-emotion taxonomy for higher fidelity
         extended_mappings = {
             "excitement": "joy",
             "excited": "joy",  # Common form
             "contentment": "joy", 
-            "gratitude": "joy",
-            "grateful": "joy",  # Common form
-            "love": "joy",
-            "hope": "joy",
+            "gratitude": "love",  # Better fit with 11-emotion taxonomy
+            "grateful": "love",  # Common form - better fit
+            "love": "love",  # Direct mapping now available
+            "hope": "optimism",  # Better fit with 11-emotion taxonomy
             "happy": "joy",  # Critical basic form
+            "confidence": "trust",  # Better fit with 11-emotion taxonomy
+            "confident": "trust",  # Common form
+            "expectation": "anticipation",  # Better fit
+            "expecting": "anticipation",  # Common form
+            "looking_forward": "anticipation",  # Natural mapping
             "frustration": "anger",
             "frustrated": "anger",  # Common form
             "angry": "anger",  # Critical basic form
@@ -242,15 +297,17 @@ class UniversalEmotionTaxonomy:
             "curiosity": "surprise",
             "surprised": "surprise",  # Critical basic form
             "disgusted": "disgust",  # Critical basic form
-            "disappointed": "sadness",
-            "disappointment": "sadness",
+            "disappointed": "pessimism",  # Better fit with 11-emotion taxonomy
+            "disappointment": "pessimism",  # Better fit
             "upset": "sadness",  # Common form
             "distressed": "sadness",  # Common form
             "sad": "sadness",  # Critical mapping
+            "despair": "pessimism",  # Better fit
+            "hopeless": "pessimism",  # Better fit
             "positive_strong": "joy",
-            "positive_mild": "joy", 
+            "positive_mild": "optimism",  # Better granularity
             "negative_strong": "anger",
-            "negative_mild": "sadness",
+            "negative_mild": "pessimism",  # Better granularity 
             "neutral_thoughtful": "neutral",
             "confusion": "fear",
             "confused": "fear",  # Common form
