@@ -105,7 +105,7 @@ class FidelityMetricsCollector:
                  influxdb_bucket: Optional[str] = None):
         
         # Use environment variables with fallback defaults
-        self.influxdb_url = influxdb_url or os.getenv('INFLUXDB_URL', 'http://localhost:8086')
+        self.influxdb_url = influxdb_url or os.getenv('INFLUXDB_URL', 'http://localhost:8087')
         self.influxdb_token = influxdb_token or os.getenv('INFLUXDB_TOKEN', 'whisperengine-fidelity-first-metrics-token')
         self.influxdb_org = influxdb_org or os.getenv('INFLUXDB_ORG', 'whisperengine')
         self.influxdb_bucket = influxdb_bucket or os.getenv('INFLUXDB_BUCKET', 'performance_metrics')

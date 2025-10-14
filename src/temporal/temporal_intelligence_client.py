@@ -102,7 +102,7 @@ class TemporalIntelligenceClient:
         """Initialize InfluxDB client with configuration"""
         try:
             self.client = InfluxDBClient(
-                url=os.getenv('INFLUXDB_URL', 'http://localhost:8086'),
+                url=os.getenv('INFLUXDB_URL', 'http://localhost:8087'),
                 token=os.getenv('INFLUXDB_TOKEN'),
                 org=os.getenv('INFLUXDB_ORG')
             )

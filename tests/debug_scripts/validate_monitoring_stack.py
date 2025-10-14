@@ -20,8 +20,8 @@ class MonitoringStackValidator:
     """Validates WhisperEngine InfluxDB + Grafana monitoring stack"""
     
     def __init__(self):
-        self.influxdb_url = "http://localhost:8086"
-        self.grafana_url = "http://localhost:3000"
+        self.influxdb_url = "http://localhost:8087"
+        self.grafana_url = "http://localhost:3002"
         self.elena_bot_url = "http://localhost:9091"
         self.gabriel_bot_url = "http://localhost:9095"
         self.sophia_bot_url = "http://localhost:9096"
@@ -331,7 +331,7 @@ class MonitoringStackValidator:
         success_rate = len([r for r in self.test_results if r['status'] == 'PASS']) / len(self.test_results) * 100
         if success_rate >= 80:
             recommendations.append("✅ Monitoring stack is healthy - dashboards should be fully functional")
-            recommendations.append("📊 Access Grafana dashboards at http://localhost:3000")
+            recommendations.append("📊 Access Grafana dashboards at http://localhost:3002")
         elif success_rate >= 60:
             recommendations.append("⚠️  Monitoring stack partially functional - some features may be limited")
         else:

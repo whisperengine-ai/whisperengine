@@ -497,9 +497,35 @@ docker logs postgres --tail 20
 ```
 
 **Infrastructure Versions (Pinned)**:
-- PostgreSQL: `postgres:16.4-alpine` (pinned for stability) - Port 5433
-- Qdrant: `qdrant/qdrant:v1.15.4` (pinned for vector stability) - Port 6334
+- PostgreSQL: `postgres:16.4-alpine` (pinned for stability) - Port 5433 external, 5432 internal
+- Qdrant: `qdrant/qdrant:v1.15.4` (pinned for vector stability) - Port 6334 external, 6333 internal
+- InfluxDB: `influxdb:2.7-alpine` (pinned for metrics stability) - Port 8087 external, 8086 internal
+- Grafana: `grafana/grafana:11.3.0` (pinned for dashboard stability) - Port 3002 external, 3000 internal
 - Redis: Currently DISABLED in multi-bot setup (references remain in code)
+
+**Port Offset Strategy**: WhisperEngine uses consistent port offsets to prevent conflicts with local development services:
+- **External ports** (host access): Offset from standard ports (e.g., 5433 instead of 5432)
+- **Internal ports** (container communication): Use service defaults for compatibility
+- **Multi-environment support**: Development (5000-5999, 9000-9999) vs Future Quickstart (8000-8999)
+- **Infrastructure Access URLs**: 
+  - PostgreSQL: `localhost:5433` (external) / `postgres:5432` (internal)
+  - Qdrant: `localhost:6334` (external) / `qdrant:6333` (internal)
+  - InfluxDB: `localhost:8087` (external) / `influxdb:8086` (internal)
+  - Grafana: `localhost:3002` (external) / `grafana:3000` (internal)
+
+**Synthetic Services Management** (Separate from main multi-bot system):
+```bash
+# Start main multi-bot system first (for infrastructure dependencies)
+docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml up -d
+
+# Then start synthetic services separately when needed
+docker compose -f docker-compose.synthetic.yml up -d synthetic-generator
+docker compose -f docker-compose.synthetic.yml up -d synthetic-validator
+
+# Stop synthetic services
+docker compose -f docker-compose.synthetic.yml down
+```
+**Synthetic Services**: Used for conversation generation and validation testing - run independently from main bot system for resource management and isolation.
 
 ### Bot API Endpoints
 
@@ -513,8 +539,9 @@ docker logs postgres --tail 20
 - Gabriel (British Gentleman): Discord bot + Chat API on container port 9095
 - Sophia (Marketing Executive): Discord bot + Chat API on container port 9096
 - Jake (Adventure Photographer): Discord bot + Chat API on container port 9097
+- Dotty: Discord bot + Chat API on container port 9098
+- Aetheris (Conscious AI): Discord bot + Chat API on container port 9099
 - Aethys (Omnipotent): Discord bot + Chat API on container port 3007
-- Aetheris (Conscious AI): Discord bot + Chat API on container port 3008
 
 **Chat API Endpoints** (3rd party integration):
 ```bash
@@ -593,7 +620,7 @@ phase4_data = ai_components.get('phase4_intelligence', {})
 **HTTP API Testing** (SECONDARY method):
 - **USE WHEN**: Need to test full end-to-end HTTP integration
 - **LIMITATIONS**: Network timeouts, less debugging visibility, may miss internal data paths
-- **PATTERN**: HTTP requests to bot health check ports (9091-9097, 3007)
+- **PATTERN**: HTTP requests to bot health check ports (9091-9099, 3007)
 
 **Discord Integration Testing** (REQUIRED for event handlers):
 - **USE WHEN**: Testing Discord-specific features (event handlers, CDL integration, character responses)
@@ -663,7 +690,10 @@ docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml up -d newb
 **Template System**: 
 - Base template: `docker-compose.multi-bot.template.yml` (SAFE TO EDIT)
 - Generated output: `docker-compose.multi-bot.yml` (AUTO-GENERATED)
+- Synthetic services: `docker-compose.synthetic.yml` (SEPARATE - can be edited directly)
 - **NOTE**: Shell script generation has been removed for pure Docker Compose workflow
+- **REGENERATE CONFIG**: Always run `python scripts/generate_multi_bot_config.py` after editing template
+- **SYNTHETIC INDEPENDENCE**: Synthetic services run separately for resource management and isolation
 
 ### Key Development Commands
 ```bash
@@ -1268,6 +1298,7 @@ def process_conversation_context(context, max_size):
 - CDL database entries via import scripts - Character personality definitions
 - `scripts/generate_multi_bot_config.py` - Configuration generator
 - `docker-compose.multi-bot.template.yml` - Template for Docker Compose generation
+- `docker-compose.synthetic.yml` - Synthetic services (separate from main system)
 
 ## AI Conversation Intelligence
 

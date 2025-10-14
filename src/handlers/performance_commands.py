@@ -229,7 +229,7 @@ class PerformanceCommands:
                     inline=False
                 )
             
-            embed.set_footer(text="InfluxDB dashboard: http://localhost:8086")
+            embed.set_footer(text="InfluxDB dashboard: http://localhost:8087")
             
             await thinking_msg.edit(content="", embed=embed)
             
@@ -269,7 +269,7 @@ class PerformanceCommands:
                 inline=False
             )
             
-            embed.set_footer(text="View metrics at: http://localhost:8086")
+            embed.set_footer(text="View metrics at: http://localhost:8087")
             
             await thinking_msg.edit(content="", embed=embed)
             

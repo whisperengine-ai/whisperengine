@@ -53,7 +53,7 @@ services:
     env_file:
       - .env
     ports:
-      - "8086:8086"
+      - "8087:8086"
     volumes:
       - influxdb_data:/var/lib/influxdb2
       - influxdb_config:/etc/influxdb2
@@ -78,7 +78,7 @@ services:
     env_file:
       - .env
     ports:
-      - "3000:3000"
+      - "3002:3000"
     volumes:
       - grafana_data:/var/lib/grafana
       - ./grafana-config/datasource.yml:/etc/grafana/provisioning/datasources/datasource.yml

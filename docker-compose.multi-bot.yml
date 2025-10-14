@@ -96,7 +96,7 @@ services:
       DOCKER_INFLUXDB_INIT_BUCKET: performance_metrics
       DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: whisperengine-fidelity-first-metrics-token
     ports:
-      - "8086:8086"  # InfluxDB (Dev: 8086, Quickstart: 8087)
+      - "8087:8086"  # InfluxDB (Dev: 8087, Quickstart: 8088)
     volumes:
       - influxdb_data:/var/lib/influxdb2
       - influxdb_config:/etc/influxdb2
@@ -121,7 +121,7 @@ services:
       INFLUXDB_USER: whisperengine
       INFLUXDB_PASSWORD: whisperengine_metrics
     ports:
-      - "3000:3000"  # Grafana (Dev: 3000, Quickstart: not included)
+      - "3002:3000"  # Grafana (Dev: 3002, Quickstart: 8001)
     volumes:
       - grafana_data:/var/lib/grafana
       - ./grafana-config/datasource.yml:/etc/grafana/provisioning/datasources/datasource.yml:ro

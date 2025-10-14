@@ -26,8 +26,8 @@ This document provides comprehensive setup and usage instructions for WhisperEng
 ./setup_monitoring.sh setup
 
 # Access dashboards
-open http://localhost:3000  # Grafana (admin/admin)
-open http://localhost:8086  # InfluxDB Web UI
+open http://localhost:3002  # Grafana (admin/admin)
+open http://localhost:8087  # InfluxDB Web UI
 ```
 
 ### Individual Components
