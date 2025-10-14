@@ -1240,37 +1240,16 @@ class EnhancedCDLManager:
                 }
             
             # Build core AI identity structure
+            # NOTE: Removed legacy roleplay_interaction_scenarios loading from character_roleplay_scenarios table
+            # Modern system uses character_ai_scenarios table with generic_keyword_templates for trigger detection
+            # See get_ai_scenarios() method and cdl_ai_integration.py line 1092 for active implementation
             ai_identity = {
                 'allow_full_roleplay_immersion': roleplay_row['allow_full_roleplay_immersion'] or False,
                 'philosophy': roleplay_row['philosophy'] or '',
                 'approach': roleplay_row['strategy'] or ''
             }
             
-            # Load roleplay interaction scenarios from normalized table
-            # Get roleplay scenarios
-            scenarios_query = """
-                SELECT scenario_name, response_pattern, tier_1_response, tier_2_response, tier_3_response
-                FROM character_roleplay_scenarios 
-                WHERE character_id = $1
-                ORDER BY scenario_name
-            """
-            scenario_rows = await conn.fetch(scenarios_query, character_id)
-            
-            if scenario_rows:
-                roleplay_scenarios = {}
-                for scenario_row in scenario_rows:
-                    scenario_name = scenario_row['scenario_name']
-                    roleplay_scenarios[scenario_name] = {
-                        'response_pattern': scenario_row['response_pattern'] or '',
-                        'tier_1_response': scenario_row['tier_1_response'] or '',
-                        'tier_2_response': scenario_row['tier_2_response'] or '',
-                        'tier_3_response': scenario_row['tier_3_response'] or ''
-                    }
-                
-                if roleplay_scenarios:
-                    ai_identity['roleplay_interaction_scenarios'] = roleplay_scenarios
-            
-            logger.info(f"✅ NORMALIZED: Loaded AI identity config for character {character_id} from roleplay tables")
+            logger.info(f"✅ NORMALIZED: Loaded AI identity config for character {character_id} from roleplay_config table")
             return ai_identity
             
         except Exception as e:

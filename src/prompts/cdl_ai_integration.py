@@ -728,7 +728,7 @@ class CDLAIPromptIntegration:
         # 🚀 DYNAMIC CUSTOM FIELDS: Build from all available character data sections
         try:
             full_character_data = character.get_full_character_data()
-            prompt += await self._build_dynamic_custom_fields(full_character_data, character_name)
+            prompt += await self._build_dynamic_custom_fields(full_character_data, character_name, message_content)
             logger.info(f"✅ DYNAMIC FIELDS: Built custom field sections from {len(full_character_data)} data sections")
         except Exception as e:
             logger.debug(f"Could not build dynamic custom fields: {e}")
@@ -3250,8 +3250,12 @@ Stay authentic to {character.identity.name}'s personality while being transparen
             logger.debug("Could not load response guidelines: %s", e)
             return ""
 
-    async def _build_dynamic_custom_fields(self, full_character_data: dict, character_name: str) -> str:
-        """🚀 DYNAMIC FIELD BUILDER: Build prompt sections from all available custom fields"""
+    async def _build_dynamic_custom_fields(self, full_character_data: dict, character_name: str, message_content: str = "") -> str:
+        """🚀 DYNAMIC FIELD BUILDER: Build prompt sections from all available custom fields
+        
+        OPTIMIZATION: Context-aware section insertion - only include sections when relevant
+        to reduce prompt bloat and improve token efficiency.
+        """
         dynamic_sections = []
         
         # Sections that are handled by specialized logic, not dumped as prompt text
@@ -3262,10 +3266,57 @@ Stay authentic to {character.identity.name}'s personality while being transparen
             'interaction_modes'  # Now handled by trigger-based mode controller
         ]
         
-        # Process each data section dynamically
+        # 🚨 OPTIMIZATION: Sections that are rarely needed - skip unless empty or low-value
+        # These bloat prompts without adding conversational value in most contexts
+        conditional_skip_sections = [
+            'metadata',  # Version/tags/author - not useful for character responses
+            'communication_patterns',  # Redundant with VOICE & COMMUNICATION STYLE section
+        ]
+        
+        # 🎯 CONTEXT-AWARE: Sections only inserted when message content suggests relevance
+        contextual_sections = {
+            'values_and_beliefs': ['value', 'belief', 'fear', 'principle', 'ethic', 'moral', 'important to you', 'care about'],
+            'abilities': ['skill', 'ability', 'expertise', 'can you', 'know how to', 'experience in', 'good at'],
+            'background': ['history', 'past', 'grew up', 'background', 'education', 'career', 'where did you', 'family'],
+        }
+        
+        # Process each data section dynamically with smart filtering
         for section_name, section_data in full_character_data.items():
             if section_name in skip_sections:
                 continue
+            
+            # Skip low-value metadata sections
+            if section_name in conditional_skip_sections:
+                logger.debug(f"⏭️ OPTIMIZATION: Skipping low-value section: {section_name}")
+                continue
+            
+            # 🎯 CONTEXT-AWARE: Check if contextual section should be included
+            if section_name in contextual_sections:
+                keywords = contextual_sections[section_name]
+                message_lower = message_content.lower()
+                
+                # Only include if message contains relevant keywords
+                if not any(keyword in message_lower for keyword in keywords):
+                    logger.debug(f"⏭️ CONTEXT: Skipping {section_name} (not relevant to message)")
+                    continue
+                else:
+                    logger.info(f"✅ CONTEXT: Including {section_name} (message matches keywords)")
+            
+            # Skip sections with empty/None data to avoid prompt bloat
+            if not section_data:
+                logger.debug(f"⏭️ EMPTY: Skipping empty section: {section_name}")
+                continue
+            
+            # Skip background section if all entries have empty descriptions (common issue)
+            if section_name == 'background' and isinstance(section_data, dict):
+                has_content = False
+                for category, entries in section_data.items():
+                    if isinstance(entries, list) and any(entry.get('description') for entry in entries):
+                        has_content = True
+                        break
+                if not has_content:
+                    logger.debug(f"⏭️ EMPTY: Skipping background section (no actual content)")
+                    continue
                 
             section_content = await self._process_data_section(section_name, section_data, character_name)
             if section_content:
@@ -3310,23 +3361,76 @@ Stay authentic to {character.identity.name}'s personality while being transparen
             field_title = field_name.replace('_', ' ').title()
             
             if isinstance(field_value, dict):
-                # Nested dictionary - format as sub-sections
-                nested_parts = []
-                for sub_key, sub_value in field_value.items():
-                    if sub_value:
-                        sub_title = sub_key.replace('_', ' ').title()
-                        nested_parts.append(f"  • {sub_title}: {sub_value}")
-                
-                if nested_parts:
-                    section_parts.append(f"\n📋 {field_title}:")
-                    section_parts.extend(nested_parts)
+                # 🚨 FIX: Properly format nested dicts (values_and_beliefs, ai_identity_handling)
+                # Check if dict has standard keys like 'description', 'philosophy', etc.
+                if 'description' in field_value:
+                    # Values/beliefs format: {'key': 'fear_1', 'description': 'text', 'importance': 'high'}
+                    desc = field_value.get('description', '')
+                    importance = field_value.get('importance', '')
+                    if importance:
+                        section_parts.append(f"\n📋 {field_title}:  • {desc} (Importance: {importance})")
+                    else:
+                        section_parts.append(f"\n📋 {field_title}:  • {desc}")
+                elif 'philosophy' in field_value or 'approach' in field_value:
+                    # AI identity handling format: {'philosophy': '...', 'approach': '...', ...}
+                    nested_parts = []
+                    for sub_key, sub_value in field_value.items():
+                        if sub_value and sub_key not in ['tier_1_response', 'tier_2_response', 'tier_3_response', 'response_pattern']:
+                            # Skip tier responses - too verbose for main prompt
+                            sub_title = sub_key.replace('_', ' ').title()
+                            # Truncate long values for readability
+                            if isinstance(sub_value, str) and len(sub_value) > 150:
+                                sub_value = sub_value[:147] + "..."
+                            nested_parts.append(f"  • {sub_title}: {sub_value}")
+                    
+                    if nested_parts:
+                        section_parts.append(f"\n📋 {field_title}:")
+                        section_parts.extend(nested_parts)
+                else:
+                    # Generic nested dictionary - format as sub-sections
+                    nested_parts = []
+                    for sub_key, sub_value in field_value.items():
+                        if sub_value:
+                            sub_title = sub_key.replace('_', ' ').title()
+                            # 🚨 FIX: Handle nested dicts/lists properly, don't just stringify
+                            if isinstance(sub_value, dict):
+                                # Further nested - create compact representation
+                                compact = ', '.join([f"{k}: {v}" for k, v in sub_value.items() if v][:3])
+                                nested_parts.append(f"  • {sub_title}: {compact}")
+                            elif isinstance(sub_value, list):
+                                # Nested list - show first few items
+                                items = ', '.join([str(item) for item in sub_value[:3]])
+                                if len(sub_value) > 3:
+                                    items += f" (and {len(sub_value) - 3} more)"
+                                nested_parts.append(f"  • {sub_title}: {items}")
+                            else:
+                                nested_parts.append(f"  • {sub_title}: {sub_value}")
+                    
+                    if nested_parts:
+                        section_parts.append(f"\n📋 {field_title}:")
+                        section_parts.extend(nested_parts)
             
             elif isinstance(field_value, list):
-                # List of items
+                # 🚨 FIX: Properly format lists (don't dump raw dict objects)
                 if field_value:
                     section_parts.append(f"\n📋 {field_title}:")
                     for item in field_value:
-                        section_parts.append(f"  • {item}")
+                        if isinstance(item, dict):
+                            # List of dicts (common in values_and_beliefs)
+                            if 'description' in item:
+                                desc = item.get('description', '')
+                                importance = item.get('importance', '')
+                                if importance:
+                                    section_parts.append(f"  • {desc} (Importance: {importance})")
+                                else:
+                                    section_parts.append(f"  • {desc}")
+                            else:
+                                # Generic dict in list - create compact representation
+                                compact = ', '.join([f"{k}: {v}" for k, v in item.items() if v][:3])
+                                section_parts.append(f"  • {compact}")
+                        else:
+                            # Simple item
+                            section_parts.append(f"  • {item}")
             
             else:
                 # Simple field
