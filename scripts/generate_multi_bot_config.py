@@ -135,11 +135,11 @@ class BotConfigDiscovery:
             "HF_HUB_OFFLINE=false",
             "TRANSFORMERS_OFFLINE=0",
             # HuggingFace cache configuration - use pre-downloaded models from container
-            "HF_HOME=/app/.cache/huggingface",
-            "TRANSFORMERS_CACHE=/app/.cache/huggingface", 
-            "HF_DATASETS_CACHE=/app/.cache/huggingface",
-            "HUGGINGFACE_HUB_CACHE=/app/.cache/huggingface",
-            "FASTEMBED_CACHE_PATH=/app/.cache/fastembed",
+            "HF_HOME=/app/cache/huggingface",
+            "TRANSFORMERS_CACHE=/app/cache/huggingface", 
+            "HF_DATASETS_CACHE=/app/cache/huggingface",
+            "HUGGINGFACE_HUB_CACHE=/app/cache/huggingface",
+            "FASTEMBED_CACHE_PATH=/app/cache/fastembed",
             # Logging and debug
             "LOG_LEVEL=${LOG_LEVEL:-INFO}",
             "DEBUG_MODE=false",
@@ -193,7 +193,7 @@ class BotConfigDiscovery:
       - ./logs:/app/logs  # External mount for prompt/response logs
       - ./sql:/app/sql:ro
       # Shared Hugging Face cache (all bots share models)
-      - huggingface_cache:/app/.cache/huggingface
+      - huggingface_cache:/app/cache/huggingface
       # Live code mounting for development (no rebuild needed)
       - ./src:/app/src
       - ./scripts:/app/scripts
