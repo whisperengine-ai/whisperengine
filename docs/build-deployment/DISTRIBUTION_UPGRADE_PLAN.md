@@ -11,7 +11,7 @@ Current bundled DialoGPT models have **1,024 token limit** but WhisperEngine sys
 - **Context**: 4,096 tokens (vs 1,024 DialoGPT)
 - **Quality**: Significantly better conversations
 - **Compatibility**: Direct drop-in replacement
-- **License**: MIT (commercial use OK)
+- **License**: GPL-3.0 (copyleft open source)
 
 ### 2. Distribution Strategy for Non-Technical Users
 

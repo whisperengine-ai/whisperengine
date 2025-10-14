@@ -2,7 +2,7 @@
 
 **AI Character Platform with Persistent Memory & Adaptive Learning Intelligence**
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 [![Alpha](https://img.shields.io/badge/Status-Alpha-orange.svg)](https://github.com/whisperengine-ai/whisperengine)
 
 > 🚀 **Get started in 2 minutes** with our single-command setup! [Jump to Quick Start](#-quick-start) ↓
@@ -36,7 +36,7 @@
 - **REST API** - Integrate with any application
 - **Discord Integration** - Optional Discord bot functionality
 - **Multiple LLM Support** - OpenRouter, OpenAI, Claude, or local models
-- **Open Source** - MIT licensed and community-driven
+- **Open Source** - GNU GPL v3 licensed and community-driven
 
 ## 🚀 Quick Start (End Users)
 
@@ -229,7 +229,11 @@ WhisperEngine is open source and welcomes contributions!
 
 ## 📄 License
 
-WhisperEngine is licensed under the **MIT License**. See [LICENSE](LICENSE) for details.
+WhisperEngine is licensed under the **GNU General Public License v3.0**. See [LICENSE](LICENSE) for details.
+
+This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
 
 ---
 

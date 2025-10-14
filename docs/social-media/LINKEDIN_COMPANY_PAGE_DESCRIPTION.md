@@ -20,7 +20,7 @@ WhisperEngine builds sophisticated AI roleplay characters with conversation inte
 
 **🌊 Architecture**: Fidelity-first design that preserves character authenticity while scaling intelligence capabilities through modular, extensible systems.
 
-**Open Source** | **Community Driven** | **MIT Licensed**
+**Open Source** | **Community Driven** | **GPL v3.0 Licensed**
 
 **Repository**: https://github.com/whisperengine-ai/whisperengine
 
@@ -101,7 +101,7 @@ WhisperEngine is an open source platform for building AI roleplay characters wit
 - Protocol-based dependency injection for modular development
 
 **Open Source Philosophy**:
-We believe advanced conversation AI should be accessible, transparent, and community-driven. Our MIT-licensed platform enables developers to build character-driven AI experiences while contributing to collective advancement of conversation intelligence.
+We believe advanced conversation AI should be accessible, transparent, and community-driven. Our GPL v3.0-licensed platform ensures all derivative works remain open source while enabling developers to build character-driven AI experiences and contribute to collective advancement of conversation intelligence.
 
 **Current Status**:
 Phase3 Intelligence validation complete, demonstrating sophisticated conversation awareness across comprehensive testing scenarios. Active development community with regular contributions and technical discussions.

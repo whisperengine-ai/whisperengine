@@ -21,13 +21,13 @@
 ## 🚀 Development Setup
 
 ### **1. Clone the Repository**
-\`\`\`bash
+```bash
 git clone https://github.com/whisperengine-ai/whisperengine.git
 cd whisperengine
-\`\`\`
+```
 
 ### **2. Configure Environment**
-\`\`\`bash
+```bash
 # Copy environment template for development bot
 cp .env.template .env.elena
 
@@ -46,7 +46,7 @@ LLM_CHAT_MODEL=mistralai/mistral-small  # RECOMMENDED: Tested model
 DISCORD_BOT_NAME=elena
 HEALTH_CHECK_PORT=9091
 QDRANT_COLLECTION_NAME=whisperengine_memory_elena
-\`\`\`
+```
 
 > **⚠️ IMPORTANT**: `LLM_CHAT_API_URL` is what **actually determines** your LLM provider - WhisperEngine auto-detects the provider from the URL pattern. `LLM_CLIENT_TYPE` is used for setup hints and logging only.
 
@@ -60,6 +60,7 @@ QDRANT_COLLECTION_NAME=whisperengine_memory_elena
 > Start with `mistralai/mistral-small-3.2-24b-instruct` for reliable development, then experiment with others. **Avoid**: Claude Haiku (expensive, poor character quality), GPT-3.5/4o-mini (inconsistent).
 
 **Supported Provider URLs**:
+
 | Provider | `LLM_CLIENT_TYPE` | `LLM_CHAT_API_URL` | API Key Required? |
 |----------|-------------------|---------------------|-------------------|
 | OpenRouter (Mistral, GPT, Claude) | `openrouter` | `https://openrouter.ai/api/v1` | ✅ Yes |
@@ -68,7 +69,7 @@ QDRANT_COLLECTION_NAME=whisperengine_memory_elena
 | LM Studio (Local) | `lmstudio` | `http://host.docker.internal:1234/v1` | ❌ No - runs locally |
 
 ### **3. Start Development Environment**
-\`\`\`bash
+```bash
 # Start infrastructure + development bot (RECOMMENDED)
 ./multi-bot.sh start elena
 
@@ -77,13 +78,13 @@ docker logs whisperengine-elena-bot -f
 
 # Check health
 curl http://localhost:9091/health
-\`\`\`
+```
 
 ### **4. Verify Setup**
-\`\`\`bash
+```bash
 # Test API endpoint
-curl -X POST http://localhost:9091/api/chat \\
-  -H "Content-Type: application/json" \\
+curl -X POST http://localhost:9091/api/chat \
+  -H "Content-Type: application/json" \
   -d '{
     "user_id": "dev_user",
     "message": "Hello from development!",
@@ -92,7 +93,7 @@ curl -X POST http://localhost:9091/api/chat \\
 
 # Check all containers running
 docker ps
-\`\`\`
+```
 
 ## 🏗️ Development Architecture
 
@@ -113,7 +114,7 @@ docker ps
 - **Hot Reload**: Code changes reflected without rebuild (where supported)
 
 **Start Development:**
-\`\`\`bash
+```bash
 # Start single bot for development
 ./multi-bot.sh start elena
 
@@ -126,7 +127,7 @@ docker ps
 
 # View logs
 docker logs whisperengine-elena-bot -f
-\`\`\`
+```
 
 ### **Native Python** (Optional - NOT Recommended)
 
@@ -142,7 +143,7 @@ docker logs whisperengine-elena-bot -f
 - No multi-bot testing
 
 **If you must:**
-\`\`\`bash
+```bash
 # Create virtual environment
 python -m venv .venv
 source .venv/bin/activate  # macOS/Linux
@@ -155,14 +156,14 @@ docker-compose up postgres qdrant redis -d
 
 # Run bot natively (not recommended)
 python run.py
-\`\`\`
+```
 
 ## 🔧 Development Workflows
 
 ### **Making Code Changes**
 
 **Standard Development Workflow:**
-\`\`\`bash
+```bash
 # 1. Start your development bot
 ./multi-bot.sh start elena
 
@@ -175,23 +176,23 @@ python run.py
 docker logs whisperengine-elena-bot -f --tail 50
 
 # 5. Test your changes
-curl -X POST http://localhost:9091/api/chat \\
-  -H "Content-Type: application/json" \\
+curl -X POST http://localhost:9091/api/chat \
+  -H "Content-Type: application/json" \
   -d '{"user_id": "dev", "message": "test", "context": {}}'
-\`\`\`
+```
 
 **Environment Changes:**
-\`\`\`bash
+```bash
 # Environment changes require FULL stop/start (not just restart)
 ./multi-bot.sh stop elena
 # Edit .env.elena
 ./multi-bot.sh start elena
-\`\`\`
+```
 
 ### **Testing Your Changes**
 
 **Direct Python Validation** (PREFERRED method):
-\`\`\`bash
+```bash
 # Set up environment
 source .venv/bin/activate
 export FASTEMBED_CACHE_PATH="/tmp/fastembed_cache"
@@ -203,13 +204,13 @@ export DISCORD_BOT_NAME=elena
 
 # Run direct validation tests
 python tests/automated/test_your_feature_direct_validation.py
-\`\`\`
+```
 
 **HTTP API Testing:**
-\`\`\`bash
+```bash
 # Test bot API endpoint
-curl -X POST http://localhost:9091/api/chat \\
-  -H "Content-Type: application/json" \\
+curl -X POST http://localhost:9091/api/chat \
+  -H "Content-Type: application/json" \
   -d '{
     "user_id": "test_dev",
     "message": "Hello from development!",
@@ -218,10 +219,10 @@ curl -X POST http://localhost:9091/api/chat \\
 
 # Check health endpoint
 curl http://localhost:9091/health
-\`\`\`
+```
 
 **Discord Integration Testing:**
-\`\`\`bash
+```bash
 # Add Discord token to .env.elena
 DISCORD_BOT_TOKEN=your_dev_bot_token
 ENABLE_DISCORD=true
@@ -230,22 +231,22 @@ ENABLE_DISCORD=true
 ./multi-bot.sh restart elena
 
 # Send message in Discord to test
-\`\`\`
+```
 
 **Unit Tests:**
-\`\`\`bash
+```bash
 # Run in container (recommended)
 docker exec whisperengine-elena-bot python -m pytest tests/unit/
 
 # Or with virtual environment
 source .venv/bin/activate
 pytest tests/unit/
-\`\`\`
+```
 
 ### **Debugging**
 
 **View Logs:**
-\`\`\`bash
+```bash
 # Follow live logs
 docker logs whisperengine-elena-bot -f
 
@@ -255,30 +256,29 @@ docker logs whisperengine-elena-bot --tail 100
 # All logs from specific service
 docker logs whisperengine-postgres -f
 docker logs whisperengine-qdrant -f
-\`\`\`
+```
 
 **Interactive Container Shell:**
-\`\`\`bash
+```bash
 # Enter running container
 docker exec -it whisperengine-elena-bot /bin/bash
 
 # Run commands inside container
 docker exec whisperengine-elena-bot python -c "import sys; print(sys.version)"
-\`\`\`
+```
 
 **Database Debugging:**
-\`\`\`bash
+```bash
 # Connect to PostgreSQL
 docker exec -it whisperengine-postgres psql -U whisperengine -d whisperengine
 
 # Check CDL character data
-\sql
 SELECT name, normalized_name FROM cdl_identity;
-\\q
-\`\`\`
+# Exit with \q
+```
 
 **Prompt Logging** (enable for debugging):
-\`\`\`bash
+```bash
 # In .env.elena
 ENABLE_PROMPT_LOGGING=true
 
@@ -288,12 +288,12 @@ ENABLE_PROMPT_LOGGING=true
 # View logged prompts
 ls -la logs/prompts/Elena_*
 cat logs/prompts/Elena_20251012_143000_*.json
-\`\`\`
+```
 
 ### **Database Development**
 
 **Running Migrations:**
-\`\`\`bash
+```bash
 # Mark database as current version (after updates)
 docker exec whisperengine-elena-bot alembic stamp head
 
@@ -302,10 +302,10 @@ docker exec whisperengine-elena-bot alembic upgrade head
 
 # Check migration status
 docker exec whisperengine-elena-bot alembic current
-\`\`\`
+```
 
 **Creating New Migrations:**
-\`\`\`bash
+```bash
 # Generate migration
 docker exec whisperengine-elena-bot alembic revision -m "Add your feature"
 
@@ -314,10 +314,10 @@ docker exec whisperengine-elena-bot alembic revision -m "Add your feature"
 
 # Test migration
 docker exec whisperengine-elena-bot alembic upgrade head
-\`\`\`
+```
 
 **Resetting Development Database:**
-\`\`\`bash
+```bash
 # Stop all services
 ./multi-bot.sh stop
 
@@ -326,14 +326,14 @@ docker volume rm whisperengine_postgres_data
 
 # Restart - migrations run automatically
 ./multi-bot.sh start elena
-\`\`\`
+```
 
 ## 🎭 Character Development
 
 ### **Creating Test Characters**
 
 **Via Web Interface:**
-\`\`\`bash
+```bash
 # Start web UI development
 cd cdl-web-ui
 npm install
@@ -341,71 +341,71 @@ npm run dev
 
 # Access at http://localhost:3000
 # Create characters via UI
-\`\`\`
+```
 
 **Via Database Import:**
-\`\`\`bash
+```bash
 # Import legacy JSON characters
 source .venv/bin/activate
 python batch_import_characters.py
 
 # Or create directly in PostgreSQL CDL tables
 docker exec -it whisperengine-postgres psql -U whisperengine
-\`\`\`
+```
 
 ### **Testing Character Behavior**
 
 **Direct Validation Testing:**
-\`\`\`bash
+```bash
 # Create character-specific test
 # Example: tests/automated/test_elena_character_validation.py
 
 source .venv/bin/activate
 export DISCORD_BOT_NAME=elena
 python tests/automated/test_elena_character_validation.py
-\`\`\`
+```
 
 **API Testing:**
-\`\`\`bash
+```bash
 # Test character responses
-curl -X POST http://localhost:9091/api/chat \\
-  -H "Content-Type: application/json" \\
+curl -X POST http://localhost:9091/api/chat \
+  -H "Content-Type: application/json" \
   -d '{
     "user_id": "test_dev",
     "message": "Tell me about your background",
     "context": {"platform": "api"}
   }'
-\`\`\`
+```
 
-## �� Building and Distribution
+## 🏗️ Building and Distribution
 
 ### **Building Docker Images**
 
 **Local Build:**
-\`\`\`bash
+```bash
 # Build main application
 docker build -t whisperengine/whisperengine:dev .
 
 # Test built image
-docker run -it --rm \\
-  --env-file .env.elena \\
-  -p 9091:9091 \\
+docker run -it --rm \
+  --env-file .env.elena \
+  -p 9091:9091 \
   whisperengine/whisperengine:dev
-\`\`\`
+```
 
 **Multi-platform Build** (for distribution):
-\`\`\`bash
+```bash
 # Use build script
 ./rebuild-multiplatform.sh
 
 # Or manual buildx
-docker buildx build --platform linux/amd64,linux/arm64 \\
-  -t whisperengine/whisperengine:latest \\
+docker buildx build --platform linux/amd64,linux/arm64 \
+  -t whisperengine/whisperengine:latest \
   --push .
-\`\`\`
+```
 
 **Push to Docker Hub:**
-\`\`\`bash
+```bash
 # Tag version
 docker tag whisperengine/whisperengine:latest whisperengine/whisperengine:v1.0.9
 
@@ -415,12 +415,12 @@ docker push whisperengine/whisperengine:latest
 
 # Or use helper script
 ./push-to-dockerhub.sh whisperengine v1.0.9
-\`\`\`
+```
 
 ## 🔍 Common Development Issues
 
 ### **Port Conflicts**
-\`\`\`bash
+```bash
 # Check what's using ports
 lsof -i :9091  # Bot API
 lsof -i :5433  # PostgreSQL
@@ -428,10 +428,10 @@ lsof -i :6334  # Qdrant
 
 # Kill conflicting process
 kill -9 <PID>
-\`\`\`
+```
 
 ### **Container Won't Start**
-\`\`\`bash
+```bash
 # Check logs
 docker logs whisperengine-elena-bot
 
@@ -440,10 +440,10 @@ docker system df
 
 # Clean up if needed
 docker system prune
-\`\`\`
+```
 
 ### **Database Connection Errors**
-\`\`\`bash
+```bash
 # Check PostgreSQL is running
 docker ps | grep postgres
 
@@ -452,19 +452,19 @@ docker exec whisperengine-postgres pg_isready
 
 # View PostgreSQL logs
 docker logs whisperengine-postgres
-\`\`\`
+```
 
 ### **Missing Dependencies**
-\`\`\`bash
+```bash
 # Rebuild container with fresh dependencies
 docker-compose build --no-cache whisperengine-elena-bot
 
 # Or pull latest image
 docker pull whisperengine/whisperengine:latest
-\`\`\`
+```
 
 ### **Environment Not Loading**
-\`\`\`bash
+```bash
 # Verify .env.elena exists
 ls -la .env.elena
 
@@ -474,25 +474,25 @@ cat multi-bot.sh | grep elena
 # Regenerate multi-bot config
 source .venv/bin/activate
 python scripts/generate_multi_bot_config.py
-\`\`\`
+```
 
 ## 🤝 Contributing
 
 ### **Development Workflow**
 
 1. **Fork & Clone**
-   \`\`\`bash
+   ```bash
    git clone https://github.com/YOUR_USERNAME/whisperengine.git
    cd whisperengine
-   \`\`\`
+   ```
 
 2. **Create Feature Branch**
-   \`\`\`bash
+   ```bash
    git checkout -b feature/your-feature-name
-   \`\`\`
+   ```
 
 3. **Set Up Development**
-   \`\`\`bash
+   ```bash
    # Copy environment
    cp .env.template .env.elena
    
@@ -501,15 +501,15 @@ python scripts/generate_multi_bot_config.py
    
    # Start development
    ./multi-bot.sh start elena
-   \`\`\`
+   ```
 
 4. **Make Changes**
    - Edit code (changes are live-mounted)
-   - Restart bot to apply: \`./multi-bot.sh restart elena\`
+   - Restart bot to apply: `./multi-bot.sh restart elena`
    - Test your changes
 
 5. **Test Changes**
-   \`\`\`bash
+   ```bash
    # Direct validation tests (REQUIRED for new features)
    python tests/automated/test_your_feature_direct_validation.py
    
@@ -518,14 +518,14 @@ python scripts/generate_multi_bot_config.py
    
    # Unit tests
    docker exec whisperengine-elena-bot python -m pytest tests/unit/
-   \`\`\`
+   ```
 
 6. **Commit & Push**
-   \`\`\`bash
+   ```bash
    git add .
    git commit -m "feat: your feature description"
    git push origin feature/your-feature-name
-   \`\`\`
+   ```
 
 7. **Submit Pull Request**
    - Create PR on GitHub
@@ -542,7 +542,7 @@ python scripts/generate_multi_bot_config.py
 
 **Async Patterns:**
 - All major operations should be async
-- Use \`await\` for database and LLM calls
+- Use `await` for database and LLM calls
 - Follow scatter-gather concurrency patterns
 
 **Error Handling:**
@@ -558,7 +558,7 @@ python scripts/generate_multi_bot_config.py
 ### **Testing Requirements**
 
 **For New Features:**
-1. **Direct validation test** (REQUIRED) - \`tests/automated/test_feature_direct_validation.py\`
+1. **Direct validation test** (REQUIRED) - `tests/automated/test_feature_direct_validation.py`
 2. **HTTP API test** (if API changes)
 3. **Unit tests** (for new modules)
 4. **Integration test** (if multiple systems involved)
@@ -581,7 +581,7 @@ python scripts/generate_multi_bot_config.py
 - **📖 Documentation**: Browse [docs/](../) folder
 - **🐛 Issues**: [GitHub Issues](https://github.com/whisperengine-ai/whisperengine/issues)
 - **💬 Discussions**: [GitHub Discussions](https://github.com/whisperengine-ai/whisperengine/discussions)
-- **📝 Copilot Instructions**: See \`.github/copilot-instructions.md\` for detailed development patterns
+- **📝 Copilot Instructions**: See `.github/copilot-instructions.md` for detailed development patterns
 
 ---
 

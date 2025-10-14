@@ -3,7 +3,7 @@
 
 [![Docker Build](https://github.com/WhisperEngine-AI/whisperengine/actions/workflows/docker-publish.yml/badge.svg)](https://github.com/WhisperEngine-AI/whisperengine/actions/workflows/docker-publish.yml)
 [![Docker Hub](https://img.shields.io/docker/pulls/whisperengine/whisperengine.svg)](https://hub.docker.com/r/whisperengine/whisperengine)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 
 WhisperEngine lets you create deeply personalized AI companions with real emotional intelligence, lasting memories, and unique personalities. Unlike cloud-based AI services, everything runs locally on your machine - your conversations, relationships, and personal data never leave your computer.
 
@@ -124,7 +124,7 @@ Whether you're building your first AI companion or deploying enterprise-scale pe
 
 ## 📄 **License & Contributing**
 
-WhisperEngine is open source under the **[MIT License](LICENSE)** - you're free to use, modify, and distribute it however you like.
+WhisperEngine is open source under the **[GNU General Public License v3.0](LICENSE)** - ensuring all derivative works remain open source and benefit the community.
 
 **Want to contribute?** We welcome:
 - 🐛 Bug fixes and improvements  
@@ -277,7 +277,7 @@ Built for real-world deployment with enterprise-grade infrastructure:
 
 ## 📄 **License**
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the GNU General Public License v3.0 - see the [LICENSE](LICENSE) file for details.
 
 ## 🤝 **Contributing**
 

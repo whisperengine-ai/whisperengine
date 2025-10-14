@@ -5,7 +5,7 @@ FROM python:3.13-slim
 LABEL org.opencontainers.image.title="WhisperEngine Discord Bot" \
       org.opencontainers.image.description="Privacy-first Discord bot with AI memory and emotional intelligence" \
       org.opencontainers.image.vendor="WhisperEngine AI" \
-      org.opencontainers.image.licenses="MIT" \
+      org.opencontainers.image.licenses="GPL-3.0" \
       org.opencontainers.image.source="https://github.com/whisperengine-ai/whisperengine" \
       org.opencontainers.image.documentation="https://github.com/whisperengine-ai/whisperengine/wiki"
 

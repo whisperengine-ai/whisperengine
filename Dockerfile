@@ -88,7 +88,7 @@ FROM base AS production
 LABEL org.opencontainers.image.title="WhisperEngine Assistant" \
       org.opencontainers.image.description="AI Character Platform with Persistent Memory" \
       org.opencontainers.image.vendor="WhisperEngine AI" \
-      org.opencontainers.image.licenses="MIT" \
+      org.opencontainers.image.licenses="GPL-3.0" \
       org.opencontainers.image.source="https://github.com/whisperengine-ai/whisperengine" \
       org.opencontainers.image.documentation="https://github.com/whisperengine-ai/whisperengine/docs"
 

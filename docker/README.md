@@ -113,7 +113,7 @@ docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml up -d elen
 
 ## 📝 License
 
-MIT License - See [LICENSE](https://github.com/whisperengine-ai/whisperengine/blob/main/LICENSE) for details.
+GNU General Public License v3.0 - See [LICENSE](https://github.com/whisperengine-ai/whisperengine/blob/main/LICENSE) for details.
 
 ---
 

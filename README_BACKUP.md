@@ -4,7 +4,7 @@
 
 **Multi-Character Discord AI Roleplay System with Vector-Native Memory & Adaptive Learning Intelligence**
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 [![Alpha](https://img.shields.io/badge/Status-Alpha-orange.svg)](https://github.com/whisperengine-ai/whisperengine)
 
 > 📋 **New to WhisperEngine?** Read our [Discord Welcome Guide](docs/community/DISCORD_WELCOME_GUIDE.md) and [Responsible AI Statement](docs/community/RESPONSIBLE_AI_STATEMENT.md) to understand our inclusive approach to AI Roleplay Character interactions.
@@ -936,7 +936,7 @@ For detailed technical information, setup guides, and development documentation:
 
 ## 🤝 Community & Contributing
 
-WhisperEngine is open source under the MIT License. We welcome contributions:
+WhisperEngine is open source under the GNU General Public License v3.0. We welcome contributions:
 
 - 🐛 **Bug Reports**: [GitHub Issues](https://github.com/whisperengine-ai/whisperengine/issues)
 - 💬 **Discussions**: [GitHub Discussions](https://github.com/whisperengine-ai/whisperengine/discussions)
@@ -1366,7 +1366,7 @@ Whether you're building your first AI Roleplay Character or deploying enterprise
 
 ## 📄 **License & Contributing**
 
-WhisperEngine is open source under the **[MIT License](LICENSE)** - you're free to use, modify, and distribute it however you like.
+WhisperEngine is open source under the **[GNU General Public License v3.0](LICENSE)** - ensuring all derivative works remain open source and benefit the community.
 
 **Want to contribute?** We welcome:
 - 🐛 Bug fixes and improvements  
