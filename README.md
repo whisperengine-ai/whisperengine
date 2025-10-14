@@ -86,7 +86,9 @@ Get WhisperEngine running to explore AI character conversations:
 
 ### **What You'll Need**
 - [Docker Desktop](https://www.docker.com/products/docker-desktop/) for containerized deployment
-- An LLM API key (OpenRouter works well for testing)
+- **LLM Access** (choose one):
+  - LLM API key (OpenRouter, OpenAI, Anthropic, etc.) **OR**
+  - Local LLM (Ollama, LM Studio, or similar - no API key needed)
 - **No programming experience needed** - setup scripts handle the technical details
 
 ### **Quick Setup**
@@ -111,7 +113,7 @@ The setup script will:
 2. 📦 Download only configuration files (~5KB)
 3. 🐳 Pull pre-built containers from Docker Hub
 4. 📝 Create your configuration file 
-5. 🔧 Open the config file for you to add your API key
+5. 🔧 Open the config file for you to add your LLM settings (API key or local LLM)
 6. 🚀 Start all services automatically
 7. 🌐 Open the web interface in your browser
 
@@ -197,19 +199,27 @@ curl -X POST http://localhost:9090/api/chat \\
 
 ## ⚙️ Configuration
 
-WhisperEngine needs an LLM API key for character AI conversations. The setup script will guide you through basic configuration.
+WhisperEngine needs LLM access for character AI conversations. The setup script will guide you through basic configuration.
 
 **📋 [Configuration Guide](docs/guides/edit-env-after-quickstart.md)** - LLM providers, Discord integration, and system settings
 
-**Basic Setup:**
+**Basic Setup (API-based LLM):**
 ```bash
-# Required: Add your LLM API key
+# For API-based LLMs: Add your API key
 LLM_CHAT_API_URL=https://openrouter.ai/api/v1
 LLM_CHAT_API_KEY=your_api_key_here
 LLM_CHAT_MODEL=mistralai/mistral-small
 ```
 
-**Recommended for testing**: Start with [OpenRouter](https://openrouter.ai) + `mistralai/mistral-small` for consistent character behavior.
+**Basic Setup (Local LLM):**
+```bash
+# For local LLMs like Ollama or LM Studio: No API key needed
+LLM_CHAT_API_URL=http://localhost:11434/v1  # Ollama default
+# LLM_CHAT_API_KEY=  # Leave empty for local LLMs
+LLM_CHAT_MODEL=llama3.1:8b  # Or your preferred local model
+```
+
+**Recommended**: Start with [OpenRouter](https://openrouter.ai) + `mistralai/mistral-small` for testing, or [Ollama](https://ollama.ai) for local setup.
 
 ## 📚 Documentation
 
