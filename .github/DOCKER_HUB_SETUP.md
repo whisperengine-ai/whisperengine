@@ -101,9 +101,8 @@ docker run -d --name whisperengine \
   -e DISCORD_BOT_TOKEN=your_token \
   whisperengine/whisperengine:latest
 
-# Or with docker-compose
-curl -sSL https://raw.githubusercontent.com/whisperengine-ai/whisperengine/main/docker/quick-start/docker-compose.yml -o docker-compose.yml
-docker-compose up -d
+# Or use containerized setup (recommended)
+curl -sSL https://raw.githubusercontent.com/whisperengine-ai/whisperengine/main/setup-containerized.sh | bash
 ```
 
 ## 🔍 Troubleshooting
