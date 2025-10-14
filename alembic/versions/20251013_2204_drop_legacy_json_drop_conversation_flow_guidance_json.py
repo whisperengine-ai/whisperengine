@@ -24,6 +24,7 @@ from typing import Sequence, Union
 
 from alembic import op
 import sqlalchemy as sa
+import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
@@ -45,19 +46,39 @@ def upgrade() -> None:
     This migration completes the cleanup by removing the deprecated field.
     """
     
-    # Optional: Create backup table for safety (commented out by default)
-    # op.execute("""
-    #     CREATE TABLE communication_styles_backup AS 
-    #     SELECT * FROM communication_styles
-    # """)
+    # Check if column exists before trying to drop it
+    conn = op.get_bind()
+    column_exists_result = conn.execute(sa.text("""
+        SELECT EXISTS (
+            SELECT FROM information_schema.columns 
+            WHERE table_name = 'communication_styles' 
+            AND column_name = 'conversation_flow_guidance'
+        )
+    """))
+    row = column_exists_result.fetchone()
+    column_exists = row[0] if row else False
     
-    # Drop the legacy JSON column
-    op.drop_column('communication_styles', 'conversation_flow_guidance')
-    
-    print("✅ Dropped conversation_flow_guidance column from communication_styles")
-    print("   Data is now served from normalized tables:")
-    print("   - character_conversation_modes (mode definitions)")
-    print("   - character_mode_guidance (avoid/encourage patterns)")
+    if column_exists:
+        # Optional: Create backup table for safety (commented out by default)
+        # op.execute("""
+        #     CREATE TABLE communication_styles_backup AS 
+        #     SELECT * FROM communication_styles
+        # """)
+        
+        # Drop the legacy JSON column
+        op.drop_column('communication_styles', 'conversation_flow_guidance')
+        
+        print("✅ Dropped conversation_flow_guidance column from communication_styles")
+        print("   Data is now served from normalized tables:")
+        print("   - character_conversation_modes (mode definitions)")
+        print("   - character_mode_guidance (avoid/encourage patterns)")
+        print("   - character_mode_examples (usage examples)")
+    else:
+        print("✅ Column conversation_flow_guidance already removed from communication_styles")
+        print("   Data is now served from normalized tables:")
+        print("   - character_conversation_modes (mode definitions)")
+        print("   - character_mode_guidance (avoid/encourage patterns)")
+        print("   - character_mode_examples (usage examples)")
     print("   - character_mode_examples (usage examples)")
 
 

@@ -37,32 +37,63 @@ def upgrade():
     print("\n🧹 PHASE 1 & 2: CDL Database Cleanup")
     print("=" * 60)
     
+    conn = op.get_bind()
+    backup_count = 0
+    v2_count = 0
+    
     # Phase 1: Drop orphaned backup table (no foreign key dependencies)
     print("\n📦 PHASE 1: Dropping orphaned backup table...")
     print("  - Checking character_conversation_flows_json_backup...")
     
-    conn = op.get_bind()
-    result = conn.execute(sa.text(
-        "SELECT COUNT(*) as count FROM character_conversation_flows_json_backup"
-    ))
-    backup_count = result.fetchone()[0]
-    print(f"  - Found {backup_count} backup records (will be dropped)")
+    # Check if table exists first
+    table_exists_result = conn.execute(sa.text("""
+        SELECT EXISTS (
+            SELECT FROM information_schema.tables 
+            WHERE table_name = 'character_conversation_flows_json_backup'
+        )
+    """))
+    row = table_exists_result.fetchone()
+    table_exists = row[0] if row else False
     
-    op.execute("DROP TABLE IF EXISTS character_conversation_flows_json_backup CASCADE")
-    print("  ✅ Dropped character_conversation_flows_json_backup")
+    if table_exists:
+        result = conn.execute(sa.text(
+            "SELECT COUNT(*) as count FROM character_conversation_flows_json_backup"
+        ))
+        row = result.fetchone()
+        backup_count = row[0] if row else 0
+        print(f"  - Found {backup_count} backup records (will be dropped)")
+        
+        op.execute("DROP TABLE IF EXISTS character_conversation_flows_json_backup CASCADE")
+        print("  ✅ Dropped character_conversation_flows_json_backup")
+    else:
+        print("  ✅ Table character_conversation_flows_json_backup already cleaned up")
     
     # Phase 2: Drop abandoned V2 emotional triggers
     print("\n📦 PHASE 2: Cleaning up versioned tables...")
     print("  - Checking character_emotional_triggers_v2...")
     
-    result = conn.execute(sa.text(
-        "SELECT COUNT(*) as count FROM character_emotional_triggers_v2"
-    ))
-    v2_count = result.fetchone()[0]
-    print(f"  - Found {v2_count} V2 trigger records (abandoned migration)")
+    # Check if V2 table exists
+    v2_exists_result = conn.execute(sa.text("""
+        SELECT EXISTS (
+            SELECT FROM information_schema.tables 
+            WHERE table_name = 'character_emotional_triggers_v2'
+        )
+    """))
+    row = v2_exists_result.fetchone()
+    v2_exists = row[0] if row else False
     
-    op.execute("DROP TABLE IF EXISTS character_emotional_triggers_v2 CASCADE")
-    print("  ✅ Dropped character_emotional_triggers_v2")
+    if v2_exists:
+        result = conn.execute(sa.text(
+            "SELECT COUNT(*) as count FROM character_emotional_triggers_v2"
+        ))
+        row = result.fetchone()
+        v2_count = row[0] if row else 0
+        print(f"  - Found {v2_count} V2 trigger records (abandoned migration)")
+        
+        op.execute("DROP TABLE IF EXISTS character_emotional_triggers_v2 CASCADE")
+        print("  ✅ Dropped character_emotional_triggers_v2")
+    else:
+        print("  ✅ Table character_emotional_triggers_v2 already cleaned up")
     
     # Phase 2: Rename roleplay scenarios tables (remove _v2 suffix)
     print("\n  - Renaming character_roleplay_scenarios_v2...")
@@ -72,11 +103,27 @@ def upgrade():
         SELECT COUNT(*) FROM information_schema.tables 
         WHERE table_name = 'character_roleplay_scenarios' AND table_schema = 'public'
     """))
-    if result.fetchone()[0] > 0:
+    row = result.fetchone()
+    target_exists = row[0] > 0 if row else False
+    
+    if target_exists:
         print("  ⚠️  character_roleplay_scenarios already exists, skipping rename")
     else:
-        op.execute("ALTER TABLE character_roleplay_scenarios_v2 RENAME TO character_roleplay_scenarios")
-        print("  ✅ Renamed character_roleplay_scenarios_v2 → character_roleplay_scenarios")
+        # Check if source table exists before renaming
+        source_result = conn.execute(sa.text("""
+            SELECT EXISTS (
+                SELECT FROM information_schema.tables 
+                WHERE table_name = 'character_roleplay_scenarios_v2'
+            )
+        """))
+        row = source_result.fetchone()
+        source_exists = row[0] if row else False
+        
+        if source_exists:
+            op.execute("ALTER TABLE character_roleplay_scenarios_v2 RENAME TO character_roleplay_scenarios")
+            print("  ✅ Renamed character_roleplay_scenarios_v2 → character_roleplay_scenarios")
+        else:
+            print("  ℹ️  character_roleplay_scenarios_v2 doesn't exist, skipping rename")
     
     print("\n  - Renaming character_scenario_triggers_v2...")
     
@@ -85,16 +132,32 @@ def upgrade():
         SELECT COUNT(*) FROM information_schema.tables 
         WHERE table_name = 'character_scenario_triggers' AND table_schema = 'public'
     """))
-    if result.fetchone()[0] > 0:
+    row = result.fetchone()
+    target_exists = row[0] > 0 if row else False
+    
+    if target_exists:
         print("  ⚠️  character_scenario_triggers already exists, skipping rename")
     else:
-        op.execute("ALTER TABLE character_scenario_triggers_v2 RENAME TO character_scenario_triggers")
-        print("  ✅ Renamed character_scenario_triggers_v2 → character_scenario_triggers")
+        # Check if source table exists before renaming
+        source_result = conn.execute(sa.text("""
+            SELECT EXISTS (
+                SELECT FROM information_schema.tables 
+                WHERE table_name = 'character_scenario_triggers_v2'
+            )
+        """))
+        row = source_result.fetchone()
+        source_exists = row[0] if row else False
+        
+        if source_exists:
+            op.execute("ALTER TABLE character_scenario_triggers_v2 RENAME TO character_scenario_triggers")
+            print("  ✅ Renamed character_scenario_triggers_v2 → character_scenario_triggers")
+        else:
+            print("  ℹ️  character_scenario_triggers_v2 doesn't exist, skipping rename")
     
     print("\n" + "=" * 60)
     print("✅ Phase 1 & 2 cleanup complete!")
     print(f"   - Dropped {backup_count + v2_count} orphaned rows")
-    print("   - Removed _v2 version suffixes from 2 tables")
+    print("   - Removed _v2 version suffixes from available tables")
     print("   - Storage reclaimed: ~150 kB")
     print("\n⚠️  IMPORTANT: Update code references:")
     print("   - File: src/characters/cdl/enhanced_cdl_manager.py:1252")

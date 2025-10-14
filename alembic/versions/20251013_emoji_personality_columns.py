@@ -52,58 +52,53 @@ def upgrade():
     print("\n✨ ADDING EMOJI PERSONALITY COLUMNS TO CHARACTERS TABLE")
     print("=" * 70)
     
+    conn = op.get_bind()
+    columns_to_add = [
+        ('emoji_frequency', 'moderate', 'How often character uses emojis: none, minimal, low, moderate, high, selective_symbolic'),
+        ('emoji_style', 'general', 'Character emoji aesthetic: warm_expressive, mystical_ancient, technical_minimal, etc.'),
+        ('emoji_combination', 'text_with_accent_emoji', 'How emojis mix with text: emoji_only, text_only, text_plus_emoji, text_with_accent_emoji, minimal_symbolic_emoji'),
+        ('emoji_placement', 'end_of_message', 'Where to place emojis: end_of_message, integrated_throughout, sparse_meaningful, ceremonial_meaningful'),
+        ('emoji_age_demographic', 'millennial', 'Age-appropriate emoji usage: gen_z, millennial, gen_x, timeless_eternal'),
+        ('emoji_cultural_influence', 'general', 'Cultural context for emoji choice: general, latina_warm, cosmic_mythological, british_reserved, etc.')
+    ]
+    
     # Add emoji personality configuration columns
     print("\n📋 Adding emoji personality columns...")
     
-    op.add_column('characters', sa.Column(
-        'emoji_frequency',
-        sa.String(50),
-        nullable=False,
-        server_default='moderate',
-        comment='How often character uses emojis: none, minimal, low, moderate, high, selective_symbolic'
-    ))
+    for column_name, default_value, comment in columns_to_add:
+        # Check if column already exists
+        column_exists_result = conn.execute(sa.text(f"""
+            SELECT EXISTS (
+                SELECT FROM information_schema.columns 
+                WHERE table_name = 'characters' 
+                AND column_name = '{column_name}'
+            )
+        """))
+        row = column_exists_result.fetchone()
+        column_exists = row[0] if row else False
+        
+        if not column_exists:
+            if 'influence' in column_name:
+                op.add_column('characters', sa.Column(
+                    column_name,
+                    sa.String(100),
+                    nullable=False,
+                    server_default=default_value,
+                    comment=comment
+                ))
+            else:
+                op.add_column('characters', sa.Column(
+                    column_name,
+                    sa.String(50),
+                    nullable=False,
+                    server_default=default_value,
+                    comment=comment
+                ))
+            print(f"    ✅ Added {column_name} column")
+        else:
+            print(f"    ℹ️  Column {column_name} already exists, skipping")
     
-    op.add_column('characters', sa.Column(
-        'emoji_style',
-        sa.String(100),
-        nullable=False,
-        server_default='general',
-        comment='Character emoji aesthetic: warm_expressive, mystical_ancient, technical_minimal, etc.'
-    ))
-    
-    op.add_column('characters', sa.Column(
-        'emoji_combination',
-        sa.String(50),
-        nullable=False,
-        server_default='text_with_accent_emoji',
-        comment='How emojis mix with text: emoji_only, text_only, text_plus_emoji, text_with_accent_emoji, minimal_symbolic_emoji'
-    ))
-    
-    op.add_column('characters', sa.Column(
-        'emoji_placement',
-        sa.String(50),
-        nullable=False,
-        server_default='end_of_message',
-        comment='Where to place emojis: end_of_message, integrated_throughout, sparse_meaningful, ceremonial_meaningful'
-    ))
-    
-    op.add_column('characters', sa.Column(
-        'emoji_age_demographic',
-        sa.String(50),
-        nullable=False,
-        server_default='millennial',
-        comment='Age-appropriate emoji usage: gen_z, millennial, gen_x, timeless_eternal'
-    ))
-    
-    op.add_column('characters', sa.Column(
-        'emoji_cultural_influence',
-        sa.String(100),
-        nullable=False,
-        server_default='general',
-        comment='Cultural context for emoji choice: general, latina_warm, cosmic_mythological, british_reserved, etc.'
-    ))
-    
-    print("✅ Emoji personality columns added successfully!")
+    print("✅ Emoji personality columns processing complete!")
     
     # Set character-specific emoji personality settings
     print("\n🎭 Setting character-specific emoji personalities...")

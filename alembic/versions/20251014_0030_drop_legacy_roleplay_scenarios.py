@@ -55,28 +55,54 @@ def upgrade():
     # Step 1: Show current data before dropping
     print("\n📊 CURRENT STATE:")
     
-    # Check character_roleplay_scenarios
-    result = conn.execute(sa.text("""
-        SELECT c.name, COUNT(*) as scenario_count
-        FROM character_roleplay_scenarios crs
-        JOIN characters c ON crs.character_id = c.id
-        GROUP BY c.name
+    # Check if character_roleplay_scenarios table exists
+    roleplay_exists_result = conn.execute(sa.text("""
+        SELECT EXISTS (
+            SELECT FROM information_schema.tables 
+            WHERE table_name = 'character_roleplay_scenarios'
+        )
     """))
-    roleplay_data = result.fetchall()
+    row = roleplay_exists_result.fetchone()
+    roleplay_exists = row[0] if row else False
     
-    if roleplay_data:
-        print("  character_roleplay_scenarios:")
-        for row in roleplay_data:
-            print(f"    - {row[0]}: {row[1]} scenarios")
+    if roleplay_exists:
+        # Check character_roleplay_scenarios
+        result = conn.execute(sa.text("""
+            SELECT c.name, COUNT(*) as scenario_count
+            FROM character_roleplay_scenarios crs
+            JOIN characters c ON crs.character_id = c.id
+            GROUP BY c.name
+        """))
+        roleplay_data = result.fetchall()
+        
+        if roleplay_data:
+            print("  character_roleplay_scenarios:")
+            for row in roleplay_data:
+                print(f"    - {row[0]}: {row[1]} scenarios")
+        else:
+            print("  character_roleplay_scenarios: empty")
     else:
-        print("  character_roleplay_scenarios: EMPTY")
+        print("  character_roleplay_scenarios: table doesn't exist")
     
     # Check character_scenario_triggers
-    result = conn.execute(sa.text(
-        "SELECT COUNT(*) as count FROM character_scenario_triggers"
-    ))
-    trigger_count = result.fetchone()[0]
-    print(f"  character_scenario_triggers: {trigger_count} triggers")
+    trigger_exists_result = conn.execute(sa.text("""
+        SELECT EXISTS (
+            SELECT FROM information_schema.tables 
+            WHERE table_name = 'character_scenario_triggers'
+        )
+    """))
+    row = trigger_exists_result.fetchone()
+    trigger_exists = row[0] if row else False
+    
+    if trigger_exists:
+        result = conn.execute(sa.text(
+            "SELECT COUNT(*) as count FROM character_scenario_triggers"
+        ))
+        row = result.fetchone()
+        trigger_count = row[0] if row else 0
+        print(f"  character_scenario_triggers: {trigger_count} triggers")
+    else:
+        print("  character_scenario_triggers: table doesn't exist")
     
     # Show modern replacement system
     print("\n✅ MODERN REPLACEMENT (keeping):")
@@ -97,12 +123,18 @@ def upgrade():
     print("\n🗑️  DROPPING LEGACY TABLES:")
     
     print("  1. Dropping character_scenario_triggers...")
-    op.drop_table('character_scenario_triggers')
-    print("     ✅ Dropped character_scenario_triggers")
+    if trigger_exists:
+        op.drop_table('character_scenario_triggers')
+        print("     ✅ Dropped character_scenario_triggers")
+    else:
+        print("     ℹ️  character_scenario_triggers doesn't exist, skipping")
     
     print("  2. Dropping character_roleplay_scenarios...")
-    op.drop_table('character_roleplay_scenarios')
-    print("     ✅ Dropped character_roleplay_scenarios")
+    if roleplay_exists:
+        op.drop_table('character_roleplay_scenarios')
+        print("     ✅ Dropped character_roleplay_scenarios")
+    else:
+        print("     ℹ️  character_roleplay_scenarios doesn't exist, skipping")
     
     print("\n✨ CLEANUP COMPLETE")
     print("=" * 60)

@@ -7,6 +7,7 @@ import asyncio
 import asyncpg
 import os
 import sys
+import subprocess
 from pathlib import Path
 from datetime import datetime
 
@@ -136,8 +137,48 @@ async def run_migrations():
             AND table_name != 'schema_migrations'
         """)
         
+        # Check if this is an Alembic-managed database
+        alembic_version_exists = await conn.fetchval("""
+            SELECT EXISTS (
+                SELECT FROM information_schema.tables 
+                WHERE table_schema = 'public' 
+                AND table_name = 'alembic_version'
+            );
+        """)
+        
+        if alembic_version_exists:
+            print("🔍 Detected Alembic-managed database - running Alembic migrations...")
+            print("ℹ️  PRODUCTION MODE: Using Alembic incremental migrations")
+            
+            # Run Alembic migrations
+            # Set the database URL for Alembic
+            database_url = f"postgresql://{user}:{password}@{host}:{port}/{database}"
+            env = os.environ.copy()
+            env['DATABASE_URL'] = database_url
+            
+            try:
+                # Run Alembic upgrade to head
+                result = subprocess.run([
+                    'alembic', 'upgrade', 'head'
+                ], cwd='/app', env=env, capture_output=True, text=True)
+                
+                if result.returncode == 0:
+                    print("✅ Alembic migrations completed successfully!")
+                    print("🎉 All migrations complete!")
+                    return 0
+                else:
+                    print(f"❌ Alembic migration failed!")
+                    print(f"STDOUT: {result.stdout}")
+                    print(f"STDERR: {result.stderr}")
+                    return 1
+                    
+            except Exception as e:
+                print(f"❌ Failed to run Alembic migrations: {e}")
+                return 1
+        
         # QUICKSTART MODE: Apply comprehensive 00_init.sql ONLY, skip incremental migrations
         # Single authoritative database initialization file with all 73 tables
+        print("ℹ️  QUICKSTART MODE: New database detected - using comprehensive schema")
         init_schema_path = Path("/app/sql/00_init.sql")
         if init_schema_path.exists():
             migration_name = "00_init.sql"
