@@ -58,7 +58,7 @@
 ```bash
 # 1. Add category to your character JSON
 # 2. Restart your bot
-./multi-bot.sh restart your-bot-name
+docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml restart your-bot-name
 
 # 3. Test with obvious prompt
 # Send a message that should trigger your category behavior
@@ -96,7 +96,7 @@
 
 **Category not working?**
 1. Check spelling: `warm_affectionate` not `warm_affectionate`
-2. Restart bot: `./multi-bot.sh restart bot-name`
+2. Restart bot: `docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml restart bot-name`
 3. Verify JSON: Use a JSON validator
 4. Check path: Must be under `communication_style`
 

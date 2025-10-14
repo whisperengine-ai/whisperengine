@@ -3,8 +3,8 @@
 ## 🚨 CRITICAL LIVE SYSTEM OPERATIONS - ASK BEFORE RESTARTING:**
 - **NEVER restart bots, services, or containers without explicit user permission**
 - **WhisperEngine is a LIVE PRODUCTION SYSTEM** - users may be actively chatting with bots
-- **ALWAYS ASK before running restart commands**: `./multi-bot.sh restart`, `docker restart`, `docker-compose restart`
-- **ALWAYS ASK before running stop commands**: `./multi-bot.sh stop`, `docker stop`, `docker-compose down`
+- **ALWAYS ASK before running restart commands**: `docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml restart`, `docker restart`, `docker-compose restart`
+- **ALWAYS ASK before running stop commands**: `docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml down`, `docker stop`, `docker-compose down`
 - **DEBUGGING FIRST**: Use log inspection, health checks, and API testing before considering restarts
 - **Code changes**: Test with direct Python validation scripts before restarting live services
 - **For urgent fixes**: Ask user "Should I restart [specific bot/service] to apply this fix?"
@@ -75,7 +75,7 @@
 **🚨 CRITICAL LIVE SYSTEM OPERATIONS - ASK BEFORE RESTARTING:**
 - **NEVER restart bots, services, or containers without explicit user permission**
 - **WhisperEngine is a LIVE PRODUCTION SYSTEM** - users may be actively chatting with bots
-- **ALWAYS ASK before running restart commands**: `./multi-bot.sh restart`, `docker restart`, `docker-compose restart`
+- **ALWAYS ASK before running restart commands**: `docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml restart`, `docker restart`, `docker-compose restart`
 - **DEBUGGING FIRST**: Use log inspection, health checks, and API testing before considering restarts
 - **Code changes**: Test with direct Python validation scripts before restarting live services
 - **For urgent fixes**: Ask user "Should I restart [specific bot/service] to apply this fix?"
@@ -300,13 +300,13 @@
 - When adding features, ensure they work for ANY character via CDL integration
 - Use `get_normalized_bot_name_from_env()` for bot identification, never literal strings
 
-**DOCKER-FIRST DEVELOPMENT**: Container-based development is the PRIMARY workflow. Use `./multi-bot.sh` for all operations (auto-generated, don't edit manually).
+**DOCKER-FIRST DEVELOPMENT**: Container-based development is the PRIMARY workflow. Use pure Docker Compose commands for all operations - no shell scripts required.
 
 **AI CHARACTER TESTING STRATEGY**: Use different AI roleplay characters for specific testing scenarios:
 - **MEMORY TESTING**: Use Jake or Ryan characters - they have minimal personality complexity, making memory issues easier to isolate
 - **PERSONALITY/CDL TESTING**: Use Elena character - she has the richest and most extensive CDL personality for testing emotional intelligence, character responses, and CDL pipeline functionality
 - **CDL MODE SWITCHING TESTING**: Use Mistral models for better compliance - Ryan bot showed 91.3% vs 68.8% improvement when switching from Claude to Mistral
-- **CODE CHANGES**: Use `./multi-bot.sh restart <character>` for code changes, but `./multi-bot.sh stop <character> && ./multi-bot.sh start <character>` for environment changes
+- **CODE CHANGES**: Use `docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml restart <character>-bot` for code changes, but full stop/start for environment changes
 - **START/STOP AS NEEDED**: Only run the specific character(s) needed for testing to reduce resource usage and isolate issues
 
 **MULTI-PLATFORM ARCHITECTURE**: WhisperEngine is a multi-character AI roleplay system that supports **Discord as the primary platform** with **3rd party integration via chat APIs**. Each bot server provides rich HTTP API endpoints for external applications.
@@ -438,17 +438,17 @@ identity_manager = create_identity_manager(postgres_pool)
 **Multi-Bot Testing Strategy**:
 ```bash
 # MEMORY TESTING: Use Jake or Ryan (minimal personality complexity)
-./multi-bot.sh start jake       # Start Jake for memory testing
-./multi-bot.sh start ryan       # Or Ryan for memory testing
+docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml up -d jake-bot       # Start Jake for memory testing
+docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml up -d ryan-bot       # Or Ryan for memory testing
 
 # PERSONALITY/CDL TESTING: Use Elena (rich CDL personality)
-./multi-bot.sh start elena      # Start Elena for CDL/personality testing
+docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml up -d elena-bot      # Start Elena for CDL/personality testing
 
 # 🚨 CRITICAL: Environment changes require FULL STOP/START, not restart
-./multi-bot.sh stop jake && ./multi-bot.sh start jake    # After .env.jake changes
-./multi-bot.sh restart jake     # ONLY for code changes (not .env changes)
+docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml stop jake-bot && docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml up -d jake-bot    # After .env.jake changes
+docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml restart jake-bot     # ONLY for code changes (not .env changes)
 
-# ALWAYS use Docker commands for logs (multi-bot.sh logs fails consistently)
+# ALWAYS use Docker commands for logs
 # 🚨 IMPORTANT: Container names may change based on deployment, compose file, or environment.
 # DO NOT hardcode container names. Use `docker ps` to discover actual running container names.
 docker ps   # List all running containers and their names
@@ -466,25 +466,25 @@ docker logs postgres --tail 20
 
 **Multi-Bot Operations**:
 ```bash
-# NEVER edit multi-bot.sh or docker-compose.multi-bot.yml manually
-# They are auto-generated from docker-compose.multi-bot.template.yml
+# NEVER edit docker-compose.multi-bot.yml manually
+# It is auto-generated from docker-compose.multi-bot.template.yml
 
 # List available bots
-./multi-bot.sh list
+docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml ps
 
 # Start specific bot or all bots
-./multi-bot.sh start elena
-./multi-bot.sh start all
+docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml up -d elena-bot
+docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml up -d
 
 # 🚨 CRITICAL: Environment vs Code Changes
 # Environment changes (.env.* files) - REQUIRE FULL STOP/START:
-./multi-bot.sh stop elena && ./multi-bot.sh start elena
+docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml stop elena-bot && docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml up -d elena-bot
 
 # Code changes (Python files) - restart is sufficient:
-./multi-bot.sh restart elena
+docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml restart elena-bot
 
 # Stop operations
-./multi-bot.sh stop elena
+docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml stop elena-bot
 
 # CRITICAL: ALWAYS use Docker commands for viewing logs
 # 🚨 IMPORTANT: Container names may change based on deployment, compose file, or environment.
@@ -632,13 +632,13 @@ docker ps | grep -E "qdrant|postgres"  # Should show both services running
 2. **SECOND**: HTTP testing for integration validation  
 3. **THIRD**: Discord testing for user-facing features
 4. **CRITICAL**: Always validate end-to-end prompt engineering via `logs/prompts/*` files when testing new features
-5. **USE**: `./multi-bot.sh logs [bot]` and `docker logs whisperengine-[bot]-bot` for debugging
+5. **USE**: `docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml logs [bot]` and `docker logs [bot-container]` for debugging
 
 ### Web Interface Development
 
 ### Development Workflow
 
-**DOCKER-FIRST DEVELOPMENT**: Container-based development is the PRIMARY workflow. Use `./multi-bot.sh` for all operations (auto-generated, don't edit manually).
+**DOCKER-FIRST DEVELOPMENT**: Container-based development is the PRIMARY workflow. Use pure Docker Compose commands for all operations - no shell scripts required.
 
 ### Adding New Bots
 ```bash
@@ -657,19 +657,19 @@ source .venv/bin/activate
 python scripts/generate_multi_bot_config.py
 
 # 4. Start your new bot
-./multi-bot.sh start newbot
+docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml up -d newbot-bot
 ```
 
 **Template System**: 
 - Base template: `docker-compose.multi-bot.template.yml` (SAFE TO EDIT)
 - Generated output: `docker-compose.multi-bot.yml` (AUTO-GENERATED)
-- Management script: `multi-bot.sh` (AUTO-GENERATED)
+- **NOTE**: Shell script generation has been removed for pure Docker Compose workflow
 
 ### Key Development Commands
 ```bash
 # Health and status
-./multi-bot.sh status              # Container status
-./multi-bot.sh logs [bot_name]     # View logs
+docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml ps              # Container status
+docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml logs [bot_name]     # View logs
 
 # Development workflow
 source .venv/bin/activate          # Always use venv
@@ -1262,12 +1262,12 @@ def process_conversation_context(context, max_size):
 
 **NEVER EDIT MANUALLY**:
 - `docker-compose.multi-bot.yml` - Auto-generated by discovery script
-- `multi-bot.sh` - Auto-generated management script
 
 **EDIT THESE**:
 - `.env.{bot_name}` - Bot-specific environment configuration
 - CDL database entries via import scripts - Character personality definitions
 - `scripts/generate_multi_bot_config.py` - Configuration generator
+- `docker-compose.multi-bot.template.yml` - Template for Docker Compose generation
 
 ## AI Conversation Intelligence
 
@@ -1389,44 +1389,41 @@ async def build_conversation_context(memories, character_data, conversation_hist
 
 ## Development Workflow
 
-**DOCKER-FIRST DEVELOPMENT**: Container-based development is the PRIMARY workflow. Native Python is no longer practical for full system functionality.
+**DOCKER-FIRST DEVELOPMENT**: Container-based development is the PRIMARY workflow. Use pure Docker Compose commands for all operations - no shell scripts required.
 
-**CRITICAL**: The legacy `./bot.sh` script has been **DEPRECATED**. Use `./multi-bot.sh` for all operations:
-
-**Multi-Bot Control Script**: Use `./multi-bot.sh` for all operations:
+**Pure Docker Compose Commands**: Use direct Docker Compose commands for all operations:
 ```bash
-./multi-bot.sh start elena        # Start Elena bot (marine biologist)
-./multi-bot.sh start marcus       # Start Marcus bot (AI researcher) 
-./multi-bot.sh start jake         # Start Jake bot (adventure photographer)
-./multi-bot.sh start dream        # Start Dream bot (mythological entity)
-./multi-bot.sh start aethys       # Start Aethys bot (omnipotent entity)
-./multi-bot.sh start aetheris     # Start Aetheris bot (conscious AI entity)
-./multi-bot.sh start ryan         # Start Ryan bot (indie game developer)
-./multi-bot.sh start gabriel      # Start Gabriel bot
-./multi-bot.sh start sophia       # Start Sophia bot (marketing executive)
-./multi-bot.sh start all          # Start all configured bots
-./multi-bot.sh stop               # Stop all bots
-./multi-bot.sh logs elena         # View Elena's logs
-./multi-bot.sh status             # Show all container status
+# Start specific bots
+docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml up -d elena-bot        # Start Elena bot (marine biologist)
+docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml up -d marcus-bot       # Start Marcus bot (AI researcher) 
+docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml up -d jake-bot         # Start Jake bot (adventure photographer)
+docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml up -d dream-bot        # Start Dream bot (mythological entity)
+docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml up -d aethys-bot       # Start Aethys bot (omnipotent entity)
+docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml up -d aetheris-bot     # Start Aetheris bot (conscious AI entity)
+docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml up -d ryan-bot         # Start Ryan bot (indie game developer)
+docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml up -d gabriel-bot      # Start Gabriel bot
+docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml up -d sophia-bot       # Start Sophia bot (marketing executive)
+docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml up -d                  # Start all configured bots
+docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml down                   # Stop all bots
+docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml logs elena-bot         # View Elena's logs
+docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml ps                     # Show all container status
 ```
 
 **Development Modes**:
-- **Multi-bot Docker**: `./multi-bot.sh start elena` (PRIMARY development method)
-- **Single bot Docker**: `./bot.sh start dev` (legacy, use multi-bot instead)
+- **Multi-bot Docker Compose**: `docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml up -d elena-bot` (PRIMARY development method)
 - **Native Python**: `python run.py` (NOT RECOMMENDED - container dependencies required)
 
 **Docker Development**: Container-based development is the standard:
 ```bash
-docker-compose -f docker-compose.multi-bot.yml up    # Multi-bot development (PRIMARY)
-docker-compose -f docker-compose.dev.yml up         # Legacy single-bot development
-docker-compose up qdrant postgres redis             # Infrastructure only
+docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml up -d    # Multi-bot development (PRIMARY)
+docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml up -d postgres qdrant influxdb    # Infrastructure only
 ```
 
 **Testing**: Use containerized testing for consistency:
 ```bash
 # Container-based testing (recommended)
-docker exec whisperengine-elena-bot python -m pytest tests/unit/
-docker exec whisperengine-marcus-bot python -m pytest tests/integration/
+docker exec elena-bot python -m pytest tests/unit/
+docker exec marcus-bot python -m pytest tests/integration/
 
 # Native testing (requires manual dependency setup)
 source .venv/bin/activate && pytest tests/unit/     # Not recommended
@@ -1472,9 +1469,9 @@ python demo_vector_emoji_intelligence.py  # Example: testing demos
 
 **Development Commands Verified Working**:
 ```bash
-./multi-bot.sh start all     # ✅ Starts all 8+ bots + infrastructure
-./multi-bot.sh status        # ✅ Shows container health status
-./multi-bot.sh logs elena    # ✅ Real-time bot logs
+docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml up -d     # ✅ Starts all 8+ bots + infrastructure
+docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml ps        # ✅ Shows container health status
+docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml logs elena-bot    # ✅ Real-time bot logs
 curl http://localhost:9091/health          # ✅ Health check
 curl -X POST http://localhost:9091/api/chat \
   -H "Content-Type: application/json" \
@@ -1755,5 +1752,7 @@ ENABLE_MEMORY_SYSTEM=true          # Creates phantom features
 **Fidelity-First Prompt Building Architecture** (NEW): Implemented graduated optimization system that preserves character nuance and conversation quality as primary design constraint. Includes OptimizedPromptBuilder with intelligent context assembly, HybridContextDetector with vector-enhanced pattern recognition, and vector-first analysis patterns that leverage existing Qdrant infrastructure instead of building separate NLP pipelines.
 
 **Phase 2.1 Fidelity-First Memory Management** (Complete): Implemented and tested comprehensive fidelity-first memory retrieval with graduated filtering, character-aware ranking, and intelligent memory tier management. Elena bot has the latest implementation - other bots may not have these updates yet. Use Elena for testing memory-related features.
+
+**Pure Docker Compose Workflow** (Complete): Eliminated `multi-bot.sh` shell script generation in favor of pure Docker Compose commands for cross-platform compatibility. All operations now use `docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml` commands directly.
 
 **Phase 4 Integration** (Complete): Advanced conversation intelligence with production optimization components fully integrated and operational.

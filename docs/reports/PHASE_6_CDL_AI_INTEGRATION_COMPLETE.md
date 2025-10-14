@@ -135,7 +135,7 @@ No hardcoded character names - works for Elena, Marcus, Sophia, Ryan, Dream, Aet
 7. Measure prompt size impact (before/after extended data)
 
 ### Manual Testing Steps
-1. Start Elena bot: `./multi-bot.sh start elena`
+1. Start Elena bot: `docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml up -d elena-bot`
 2. Send message with marine science keywords: "Tell me about coral reefs"
    - Should activate: message triggers, expertise domains, maybe emotional triggers
 3. Send message with Spanish: "¿Cómo estás?"
@@ -143,6 +143,7 @@ No hardcoded character names - works for Elena, Marcus, Sophia, Ryan, Dream, Aet
 4. Send message with physical interaction: "Can I hug you?"
    - Should activate: AI scenarios physical interaction guidance
 5. Check prompt logs: `logs/prompts/Elena_*.json`
+```
    - Verify all 6 new sections present in system prompt
    - Confirm context-aware activation working
 

@@ -110,7 +110,7 @@ result = assembler.assemble(model_type="generic")
 USE_STRUCTURED_PROMPTS=true
 
 # Restart bot to apply
-./multi-bot.sh restart elena
+docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml restart elena-bot
 ```
 
 **Disable structured prompts (legacy)**:
@@ -119,7 +119,7 @@ USE_STRUCTURED_PROMPTS=true
 USE_STRUCTURED_PROMPTS=false
 
 # Or comment out/remove the line (defaults to false)
-./multi-bot.sh restart elena
+docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml restart elena-bot
 ```
 
 ### Validation Checklist
@@ -137,7 +137,7 @@ USE_STRUCTURED_PROMPTS=false
 1. **Enable flag on Elena bot** (test environment):
    ```bash
    echo "USE_STRUCTURED_PROMPTS=true" >> .env.elena
-   ./multi-bot.sh restart elena
+   docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml restart elena-bot
    ```
 
 2. **Send test messages** via Discord to Elena

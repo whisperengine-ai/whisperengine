@@ -24,11 +24,11 @@ Deploy each character as its own dedicated bot instance with persistent memory:
 
 ```bash
 # Each character runs as a separate bot with dedicated environment file
-./multi-bot.sh start elena    # Elena Rodriguez bot (marine biologist)
-./multi-bot.sh start marcus   # Marcus Thompson bot (AI researcher)
-./multi-bot.sh start jake     # Jake Sterling bot (adventure photographer)
-./multi-bot.sh start gabriel  # Gabriel bot
-./multi-bot.sh start all      # Start all available character bots
+docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml up -d elena-bot    # Elena Rodriguez bot (marine biologist)
+docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml up -d marcus-bot   # Marcus Thompson bot (AI researcher)
+docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml up -d jake-bot     # Jake Sterling bot (adventure photographer)
+docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml up -d gabriel-bot  # Gabriel bot
+docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml up -d              # Start all available character bots
 ```
 
 **Character-specific environment files:**

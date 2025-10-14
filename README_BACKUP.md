@@ -527,11 +527,11 @@ cp .env.template .env.elena
 python scripts/generate_multi_bot_config.py
 
 # 4. Start complete infrastructure + Elena bot
-./multi-bot.sh start elena
+docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml up -d elena-bot
 
 # 5. Monitor the system
-./multi-bot.sh status
-./multi-bot.sh logs elena
+docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml ps
+docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml logs elena-bot
 ```
 
 #### 🪟 Windows (Docker Commands Method)
@@ -563,13 +563,13 @@ docker-compose -f docker-compose.multi-bot.yml ps
 docker-compose -f docker-compose.multi-bot.yml logs -f elena-bot
 
 # 8. Stop everything when done
-docker-compose -f docker-compose.multi-bot.yml down
+docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml down
 ```
 
 **Windows Alternative Methods:**
-- **Git Bash**: If you have Git for Windows installed, you can use the shell scripts: `./multi-bot.sh start elena`
+- **Git Bash**: Use Git Bash or Windows Terminal for Docker Compose commands: `docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml up -d elena-bot`
 - **WSL2**: Install Windows Subsystem for Linux to use the Linux/Unix commands above
-- **PowerShell Core**: Some shell scripts may work in PowerShell Core 7+
+- **PowerShell Core**: Docker Compose commands work natively in PowerShell Core 7+
 
 **🎯 What You Get Out of the Box:**
 - **Elena Bot** - Marine biologist character running on port 9091
@@ -595,7 +595,7 @@ Each character runs as an independent Discord bot with HTTP Chat API:
 
 **🔗 HTTP Chat API Example:**
 ```bash
-# Chat with Elena (after starting ./multi-bot.sh start elena)
+# Chat with Elena (after starting: docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml up -d elena-bot)
 curl -X POST http://localhost:9091/api/chat \
   -H "Content-Type: application/json" \
   -d '{
@@ -609,22 +609,22 @@ curl -X POST http://localhost:9091/api/chat \
 
 ### 🏃‍♂️ Quick Commands
 
-#### Linux/macOS/Unix Commands:
+#### Cross-Platform Docker Compose Commands:
 ```bash
 # Start all characters and infrastructure
-./multi-bot.sh start all
+docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml up -d
 
 # Start specific character
-./multi-bot.sh start elena
+docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml up -d elena-bot
 
 # View logs for troubleshooting
-./multi-bot.sh logs elena
+docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml logs elena-bot
 
 # Check system health
-./multi-bot.sh status
+docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml ps
 
 # Stop everything
-./multi-bot.sh stop
+docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml down
 ```
 
 #### Windows Docker Commands:
@@ -816,17 +816,17 @@ If you prefer shell-like commands, you have options:
 **Option 1: Git Bash (Recommended)**
 ```bash
 # After installing Git for Windows, use Git Bash terminal
-./multi-bot.sh start elena
-./multi-bot.sh logs elena
-./multi-bot.sh status
+docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml up -d elena-bot
+docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml logs elena-bot
+docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml ps
 ```
 
 **Option 2: WSL2 Ubuntu**
 ```bash
 # Install WSL2 Ubuntu from Microsoft Store
 wsl --install Ubuntu
-# Then use Linux commands normally
-./multi-bot.sh start elena
+# Then use Docker Compose commands normally
+docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml up -d elena-bot
 ```
 
 **Option 3: PowerShell Functions**
@@ -976,11 +976,11 @@ cp .env.template .env.marcus  # Add more characters as needed
 python scripts/generate_multi_bot_config.py
 
 # Start infrastructure + all configured bots
-./multi-bot.sh start all
+docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml up -d
 
 # Or start specific characters
-./multi-bot.sh start elena
-./multi-bot.sh start marcus
+docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml up -d elena-bot
+docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml up -d marcus-bot
 ```
 
 **What You Get:**
@@ -1048,7 +1048,7 @@ cp .env.template .env.local
 # OLLAMA_MODEL=llama3.1:8b
 
 # 3. Start complete local stack
-./multi-bot.sh start elena  # Runs with local LLM
+docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml up -d elena-bot  # Runs with local LLM
 
 # 4. Import your ChatGPT history (optional)
 python scripts/import_chatgpt_history.py ~/Downloads/conversations.json

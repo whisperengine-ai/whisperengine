@@ -199,8 +199,8 @@ python scripts/quick_character_test.py
 ## Troubleshooting
 
 ### Bot Not Responding
-1. Check if bot container is running: `./multi-bot.sh status`
-2. Check bot logs: `docker logs whisperengine-{bot}-bot --tail 20`
+1. Check if bot container is running: `docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml ps`
+2. Check bot logs: `docker logs {bot}-bot --tail 20`
 3. Verify health endpoint: `curl http://localhost:{port}/health`
 
 ### Low Pass Rates

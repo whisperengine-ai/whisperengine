@@ -180,7 +180,7 @@ The smoke test analyzes Docker container logs to detect:
 
 1. **Running Infrastructure**: All bots must be running
    ```bash
-   ./multi-bot.sh start all
+   docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml up -d
    ```
 
 2. **Virtual Environment**: Python virtual environment must be activated
@@ -200,8 +200,8 @@ The smoke test analyzes Docker container logs to detect:
 ### Common Issues
 
 **"Connection refused" errors**: 
-- Ensure all bots are running: `./multi-bot.sh status`
-- Restart if needed: `./multi-bot.sh restart all`
+- Ensure all bots are running: `docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml ps`
+- Restart if needed: `docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml restart`
 
 **"Read timed out" errors**:
 - Some bots may be slow to respond under load

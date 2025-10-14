@@ -80,7 +80,7 @@ The following metrics were eliminated as **redundant or phantom metrics**:
 
 ```bash
 # Start your character bot to begin collecting metrics
-./multi-bot.sh start elena
+docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml up -d elena-bot
 
 # Verify InfluxDB is recording metrics
 docker exec whisperengine-multi-influxdb influx query \
@@ -832,10 +832,10 @@ MEMORY_SIMILARITY_THRESHOLD=0.75
 
 ```bash
 # Start control bot (original)
-./multi-bot.sh start elena
+docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml up -d elena-bot
 
 # Start experimental bot (with tuning)
-./multi-bot.sh start elena-experimental
+docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml up -d elena-experimental-bot
 ```
 
 ### 4.3 Compare Results After 7 Days
@@ -1185,13 +1185,13 @@ docker exec whisperengine-multi-influxdb influx query \
   'from(bucket: "performance_metrics") |> range(start: -7d)'
 
 # Restart bot after tuning
-./multi-bot.sh restart elena
+docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml restart elena-bot
 
 # Check bot logs for errors
-docker logs whisperengine-elena-bot --tail 50
+docker logs elena-bot --tail 50
 
 # Check metrics recording
-docker logs whisperengine-multi-influxdb --tail 30
+docker logs influxdb --tail 30
 ```
 
 ---
@@ -1556,7 +1556,7 @@ python scripts/generate_baseline_report.py sage
 nano characters/examples/sage.json
 
 # 2. Restart bot (full stop/start for CDL changes)
-./multi-bot.sh stop sage && ./multi-bot.sh start sage
+docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml stop sage-bot && docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml up -d sage-bot
 
 # 3. Test with conversation
 # 4. Observe results
@@ -1600,8 +1600,8 @@ DISCORD_BOT_TOKEN=your_discord_token_here               # Discord auth
 nano .env.sage
 
 # 2. CRITICAL: Full stop/start required (not just restart)
-./multi-bot.sh stop sage
-./multi-bot.sh start sage
+docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml stop sage-bot
+docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml up -d sage-bot
 
 # 3. Test
 # 4. Iterate
@@ -1632,12 +1632,12 @@ class EnhancedVectorEmotionAnalyzer:
 ```bash
 # Option 1: Add to .env.sage (if __init__ supports it)
 echo "EMOTION_SENSITIVITY_THRESHOLD=0.40" >> .env.sage
-./multi-bot.sh stop sage && ./multi-bot.sh start sage
+docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml stop sage-bot && docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml up -d sage-bot
 
 # Option 2: Edit Python code directly (not recommended)
 nano src/intelligence/enhanced_vector_emotion_analyzer.py
 # Change: self.emotion_threshold = 0.40
-./multi-bot.sh restart sage  # Code change = restart OK
+docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml restart sage-bot  # Code change = restart OK
 ```
 
 #### 3.2 Relationship Scoring

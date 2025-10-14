@@ -498,7 +498,7 @@ python src/validation/validate_cdl.py structure characters/examples/your_charact
 **Step 4**: Test manually
 ```bash
 # Start bot
-./multi-bot.sh start your_character
+docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml up -d your-character-bot
 
 # Send Discord message: "Hey [character], wanna grab coffee?"
 # Verify 3-tier response pattern

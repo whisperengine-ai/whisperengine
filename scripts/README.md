@@ -202,7 +202,7 @@ Each bot provides these endpoints:
 
 These scripts are designed to work with the WhisperEngine multi-bot system:
 
-1. **Start Infrastructure**: `./multi-bot.sh start all`
+1. **Start Infrastructure**: `docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml up -d`
 2. **Run Tests**: `python scripts/test_bot_apis.py`
 3. **Check Results**: Review logs and endpoint functionality
 
@@ -210,7 +210,7 @@ These scripts are designed to work with the WhisperEngine multi-bot system:
 
 **Common Issues**:
 
-- **Connection Refused**: Ensure bots are running (`./multi-bot.sh status`)
+- **Connection Refused**: Ensure bots are running (`docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml ps`)
 - **Timeout Errors**: Check bot health and container status
 - **Permission Errors**: Ensure scripts are executable (`chmod +x`)
 - **Import Errors**: Activate virtual environment (`source .venv/bin/activate`)
@@ -218,10 +218,10 @@ These scripts are designed to work with the WhisperEngine multi-bot system:
 **Debug Commands**:
 ```bash
 # Check bot container status
-./multi-bot.sh status
+docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml ps
 
 # Check individual bot logs
-./multi-bot.sh logs elena
+docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml logs elena-bot
 
 # Test single endpoint manually
 curl http://localhost:9091/health

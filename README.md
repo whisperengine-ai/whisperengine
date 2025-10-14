@@ -262,7 +262,7 @@ git clone https://github.com/whisperengine-ai/whisperengine.git
 cd whisperengine
 
 # Docker-based development (RECOMMENDED - primary workflow)
-./multi-bot.sh start elena  # Start development bot
+docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml up -d elena-bot  # Start development bot
 
 # Alternative: Native Python (requires manual dependency setup)
 python run.py  # Not recommended - use Docker for consistency

@@ -246,7 +246,7 @@ class ConversationManager:
 
 ### **Sprint Setup**
 - [ ] **Sprint branch**: Create feature branch for sprint work
-- [ ] **Environment**: Verify all bots running via `./multi-bot.sh status`
+- [ ] **Environment**: Verify all bots running via `docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml ps`
 - [ ] **Database**: Confirm PostgreSQL connectivity and schema
 - [ ] **Testing**: Prepare test users and conversation scenarios
 

@@ -21,9 +21,9 @@ CDL characters integrate with WhisperEngine's multi-bot architecture:
 Each character runs as a dedicated bot with isolated memory:
 ```bash
 # Dedicated character bots with persistent relationships
-./multi-bot.sh start elena    # Elena Rodriguez (marine biologist)  
-./multi-bot.sh start marcus   # Marcus Thompson (AI researcher)
-./multi-bot.sh start gabriel  # Gabriel
+docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml up -d elena-bot    # Elena Rodriguez (marine biologist)  
+docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml up -d marcus-bot   # Marcus Thompson (AI researcher)
+docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml up -d gabriel-bot  # Gabriel
 ```
 
 ### **Single-Bot Character Switching**  

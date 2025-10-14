@@ -154,7 +154,7 @@ vim backups/characters_yaml/2025-10-13/elena_rodriguez.yaml
 python scripts/import_character_from_yaml.py backups/characters_yaml/2025-10-13/elena_rodriguez.yaml --overwrite
 
 # Restart bot to reload
-./multi-bot.sh restart elena
+docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml restart elena-bot
 ```
 
 ### 5. Disaster Recovery
@@ -267,7 +267,7 @@ Characters are loaded on bot startup. After importing character changes:
 python scripts/import_character_from_yaml.py elena_updated.yaml --overwrite
 
 # Restart bot to reload character from database
-./multi-bot.sh restart elena
+docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml restart elena-bot
 ```
 
 ### Automated Backups

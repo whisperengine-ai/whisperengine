@@ -53,8 +53,8 @@ python scripts/test_emotion_improvements.py
 
 ### Test in Elena Bot Container
 ```bash
-./multi-bot.sh start elena
-docker exec whisperengine-elena-bot python -c "
+docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml up -d elena-bot
+docker exec elena-bot python -c "
 from src.intelligence.emotion_taxonomy import UniversalEmotionTaxonomy
 results = UniversalEmotionTaxonomy.vader_sentiment_to_emotions({'pos': 0.8, 'neg': 0.1, 'neu': 0.1, 'compound': 0.7})
 print('Container test:', [(e.value, i) for e, i, _ in results])
