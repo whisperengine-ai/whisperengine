@@ -33,6 +33,7 @@ from src.prompts.prompt_components import (
     create_memory_component,
     create_anti_hallucination_component,
     create_guidance_component,
+    create_user_facts_component,
     PromptComponent,
     PromptComponentType
 )
@@ -367,6 +368,16 @@ class MessageProcessor:
             
             # Phase 2: Name detection and storage
             await self._process_name_detection(message_context)
+            
+            # Phase 2.25: Memory summary detection and processing
+            memory_summary_result = await self._process_memory_summary_detection(message_context)
+            if memory_summary_result:
+                # Return memory summary directly if detected
+                return ProcessingResult(
+                    response=memory_summary_result,
+                    success=True,
+                    metadata={"message_type": "memory_summary"}
+                )
             
             # Phase 2.5: Workflow detection and transaction processing (platform-agnostic)
             await self._process_workflow_detection(message_context)
@@ -1112,6 +1123,159 @@ class MessageProcessor:
             logger.error("🎯 WORKFLOW ERROR: Failed to process workflow detection: %s", e)
             # Don't fail the entire message processing if workflow detection fails
             logger.error("🎯 WORKFLOW ERROR: Continuing with normal message processing")
+
+    async def _process_memory_summary_detection(self, message_context: MessageContext) -> Optional[str]:
+        """
+        🧠 MEMORY SUMMARY DETECTION
+        
+        Detect if user is asking for a memory summary and generate comprehensive response.
+        Returns the summary response if detected, None otherwise.
+        """
+        try:
+            content_lower = message_context.content.lower().strip()
+            
+            # Memory summary trigger patterns
+            memory_triggers = [
+                'what do you remember about me',
+                'what do you know about me',
+                'tell me what you remember',
+                'what have you learned about me',
+                'summarize what you know about me',
+                'what do you remember',
+                'memory summary',
+                'what facts do you have about me',
+                'what do you remember from our conversations'
+            ]
+            
+            # Check if message matches memory summary patterns
+            is_memory_request = any(trigger in content_lower for trigger in memory_triggers)
+            
+            if not is_memory_request:
+                return None
+                
+            logger.info("🧠 MEMORY SUMMARY: Detected memory summary request from user %s", 
+                       message_context.user_id)
+            
+            # Generate comprehensive memory summary
+            summary = await self._generate_memory_summary(message_context.user_id)
+            
+            logger.info("🧠 MEMORY SUMMARY: Generated summary (%d chars) for user %s", 
+                       len(summary), message_context.user_id)
+            
+            return summary
+            
+        except Exception as e:
+            logger.error("🧠 MEMORY SUMMARY ERROR: Failed to process memory summary detection: %s", e)
+            return None
+
+    async def _generate_memory_summary(self, user_id: str) -> str:
+        """
+        Generate comprehensive memory summary for a user.
+        
+        Combines facts from knowledge graph with conversation memories.
+        """
+        try:
+            summary_parts = []
+            
+            # 1. Get user facts from knowledge graph
+            if hasattr(self.bot_core, 'knowledge_router') and self.bot_core.knowledge_router:
+                facts = await self.bot_core.knowledge_router.get_temporally_relevant_facts(
+                    user_id=user_id,
+                    lookback_days=180,  # Longer lookback for summary
+                    limit=30  # More facts for comprehensive summary
+                )
+                
+                if facts:
+                    logger.debug("🧠 Retrieved %d facts for memory summary", len(facts))
+                    
+                    # Categorize facts
+                    preferences = []
+                    background = []
+                    relationships = []
+                    activities = []
+                    possessions = []
+                    other_facts = []
+                    
+                    for fact in facts:
+                        entity_name = fact.get('entity_name', '')
+                        relationship_type = fact.get('relationship_type', '')
+                        confidence = fact.get('weighted_confidence', fact.get('confidence', 0.5))
+                        potentially_outdated = fact.get('potentially_outdated', False)
+                        
+                        # Skip very low confidence facts
+                        if confidence < 0.4 or potentially_outdated:
+                            continue
+                        
+                        # Categorize by relationship type
+                        if relationship_type in ['likes', 'loves', 'enjoys', 'prefers', 'dislikes', 'hates']:
+                            preferences.append(f"{relationship_type} {entity_name}")
+                        elif relationship_type in ['works_at', 'studies_at', 'lives_in', 'from']:
+                            background.append(f"{relationship_type.replace('_', ' ')} {entity_name}")
+                        elif relationship_type in ['son', 'daughter', 'parent', 'sibling', 'friend', 'partner']:
+                            relationships.append(f"{relationship_type} {entity_name}")
+                        elif relationship_type in ['visited', 'goes_to', 'attends', 'plays', 'does']:
+                            activities.append(f"{relationship_type.replace('_', ' ')} {entity_name}")
+                        elif relationship_type in ['owns', 'has']:
+                            possessions.append(f"{relationship_type} {entity_name}")
+                        else:
+                            other_facts.append(f"{relationship_type.replace('_', ' ')} {entity_name}")
+                    
+                    # Build categorized summary
+                    if preferences:
+                        summary_parts.append(f"**Your Preferences:** {', '.join(preferences[:12])}")
+                    if background:
+                        summary_parts.append(f"**Background:** {', '.join(background[:8])}")
+                    if relationships:
+                        summary_parts.append(f"**Family & Relationships:** {', '.join(relationships[:8])}")
+                    if activities:
+                        summary_parts.append(f"**Activities & Interests:** {', '.join(activities[:8])}")
+                    if possessions:
+                        summary_parts.append(f"**Things You Have:** {', '.join(possessions[:8])}")
+                    if other_facts:
+                        summary_parts.append(f"**Other Details:** {', '.join(other_facts[:6])}")
+            
+            # 2. Get recent conversation themes if memory manager available
+            if self.memory_manager:
+                try:
+                    recent_memories = await self.memory_manager.retrieve_relevant_memories(
+                        user_id=user_id,
+                        query="conversation themes topics discussed",
+                        limit=8
+                    )
+                    
+                    if recent_memories:
+                        themes = []
+                        for memory in recent_memories[:5]:
+                            content = memory.get('content', '')
+                            if content and len(content) > 20:
+                                # Extract theme from memory content
+                                if len(content) > 100:
+                                    theme = content[:97] + "..."
+                                else:
+                                    theme = content
+                                themes.append(theme)
+                        
+                        if themes:
+                            summary_parts.append(f"**Recent Conversation Themes:** {' | '.join(themes)}")
+                            
+                except Exception as e:
+                    logger.warning("🧠 Could not retrieve conversation themes: %s", e)
+            
+            # 3. Build final summary
+            if summary_parts:
+                intro = "Here's what I remember about you:\n\n"
+                summary = intro + "\n\n".join(summary_parts)
+                
+                # Add friendly note about memory system
+                summary += "\n\n*This summary is based on our conversations and the details you've shared with me. If anything seems incorrect or outdated, feel free to let me know!*"
+            else:
+                summary = "I don't have much stored information about you yet, but I'm learning as we chat! Feel free to share more about yourself - I'll remember the important details for our future conversations."
+            
+            return summary
+            
+        except Exception as e:
+            logger.error("🧠 MEMORY SUMMARY ERROR: Failed to generate memory summary: %s", e)
+            return "I'm having trouble accessing my memory right now, but I'm still here to chat! Our conversation history helps me understand you better as we talk."
 
     async def _retrieve_relevant_memories(self, message_context: MessageContext) -> List[Dict[str, Any]]:
         """Retrieve relevant memories with context-aware filtering and MemoryBoost optimization."""
@@ -1900,7 +2064,21 @@ class MessageProcessor:
             ))
         
         # ================================
-        # COMPONENT 3: Memory Narrative (or anti-hallucination warning)
+        # COMPONENT 3: User Facts and Preferences
+        # ================================
+        user_facts_content = await self._build_user_facts_content(
+            message_context.user_id, 
+            message_context.content  # Pass message content for context-based filtering
+        )
+        if user_facts_content:
+            assembler.add_component(create_user_facts_component(
+                user_facts_content,
+                priority=3
+            ))
+            logger.info(f"✅ STRUCTURED CONTEXT: Added user facts ({len(user_facts_content)} chars)")
+        
+        # ================================
+        # COMPONENT 4: Memory Narrative (or anti-hallucination warning)
         # ================================
         memory_narrative = await self._build_memory_narrative_structured(
             message_context.user_id, 
@@ -1910,31 +2088,31 @@ class MessageProcessor:
         if memory_narrative:
             assembler.add_component(create_memory_component(
                 f"RELEVANT MEMORIES: {memory_narrative}",
-                priority=4
+                priority=5
             ))
             logger.info(f"✅ STRUCTURED CONTEXT: Added memory narrative ({len(memory_narrative)} chars)")
         else:
-            assembler.add_component(create_anti_hallucination_component(priority=4))
+            assembler.add_component(create_anti_hallucination_component(priority=5))
             logger.info(f"⚠️ STRUCTURED CONTEXT: Added anti-hallucination warning (no memories)")
         
         # ================================
-        # COMPONENT 4: Conversation Summary (if available)
+        # COMPONENT 5: Conversation Summary (if available)
         # ================================
         conversation_summary = await self._get_conversation_summary_structured(message_context.user_id)
         if conversation_summary:
             assembler.add_component(PromptComponent(
                 type=PromptComponentType.CONVERSATION_FLOW,
                 content=f"CONVERSATION FLOW: {conversation_summary}",
-                priority=5,
+                priority=6,
                 required=False  # Optional - can be dropped if over budget
             ))
             logger.info(f"✅ STRUCTURED CONTEXT: Added conversation summary ({len(conversation_summary)} chars)")
         
         # ================================
-        # COMPONENT 5: Communication Style Guidance
+        # COMPONENT 6: Communication Style Guidance
         # ================================
         bot_name = os.getenv('DISCORD_BOT_NAME', 'Assistant')
-        assembler.add_component(create_guidance_component(bot_name, priority=6))
+        assembler.add_component(create_guidance_component(bot_name, priority=7))
         
         # ================================
         # ASSEMBLE SYSTEM MESSAGE
@@ -2015,6 +2193,191 @@ class MessageProcessor:
         # Simplified: Conversation summary logic can be added later
         # For now, return empty string to keep Phase 2 focused on structure
         return ""
+    
+    async def _build_user_facts_content(self, user_id: str, message_content: str = "") -> str:
+        """
+        Build user facts and preferences content for conversation context.
+        
+        Retrieves temporally-weighted facts from the knowledge graph and formats
+        them for inclusion in the system prompt to make characters aware of
+        user preferences, interests, and background information.
+        
+        Enhanced with context-based filtering to prioritize facts relevant to 
+        the current conversation topic.
+        
+        Args:
+            user_id: User identifier
+            message_content: Current message content for context-based filtering
+            
+        Returns:
+            Formatted user facts content string, or empty string if no facts available
+        """
+        try:
+            # Check if knowledge router is available
+            if not hasattr(self.bot_core, 'knowledge_router') or not self.bot_core.knowledge_router:
+                logger.debug("🔍 USER FACTS: Knowledge router not available")
+                return ""
+
+            # Get temporally relevant facts (recent facts weighted higher)
+            facts = await self.bot_core.knowledge_router.get_temporally_relevant_facts(
+                user_id=user_id,
+                lookback_days=90,  # 3 months of facts
+                limit=25  # Increased limit for better context filtering
+            )
+            
+            if not facts:
+                logger.debug(f"🔍 USER FACTS: No facts found for user {user_id}")
+                return ""
+
+            # Apply context-based filtering if message content provided
+            if message_content:
+                facts = await self._filter_facts_by_context(facts, message_content)
+            
+            # Format facts for conversation context
+            fact_lines = []
+            current_facts = []
+            preferences = []
+            background = []
+            
+            for fact in facts:
+                entity_name = fact.get('entity_name', '')
+                entity_type = fact.get('entity_type', '')
+                relationship_type = fact.get('relationship_type', '')
+                confidence = fact.get('weighted_confidence', fact.get('confidence', 0.5))
+                potentially_outdated = fact.get('potentially_outdated', False)
+                
+                # Skip low confidence or potentially outdated facts
+                if confidence < 0.6 or potentially_outdated:
+                    continue
+                
+                # Categorize facts by type
+                if relationship_type in ['likes', 'loves', 'enjoys', 'prefers']:
+                    preferences.append(f"{relationship_type} {entity_name}")
+                elif relationship_type in ['works_at', 'studies_at', 'lives_in']:
+                    background.append(f"{relationship_type.replace('_', ' ')} {entity_name}")
+                elif relationship_type in ['owns', 'has', 'knows']:
+                    current_facts.append(f"{relationship_type} {entity_name}")
+                else:
+                    current_facts.append(f"{relationship_type.replace('_', ' ')} {entity_name}")
+            
+            # Dynamic limits based on content length to stay within context limits
+            max_total_chars = 300  # Target max characters for facts
+            current_chars = 0
+            
+            # Build formatted content with dynamic limiting
+            if preferences and current_chars < max_total_chars:
+                pref_content = f"PREFERENCES: {', '.join(preferences[:8])}"
+                if current_chars + len(pref_content) < max_total_chars:
+                    fact_lines.append(pref_content)
+                    current_chars += len(pref_content)
+            
+            if background and current_chars < max_total_chars:
+                bg_content = f"BACKGROUND: {', '.join(background[:5])}"
+                if current_chars + len(bg_content) < max_total_chars:
+                    fact_lines.append(bg_content)
+                    current_chars += len(bg_content)
+                    
+            if current_facts and current_chars < max_total_chars:
+                current_content = f"CURRENT: {', '.join(current_facts[:7])}"
+                if current_chars + len(current_content) < max_total_chars:
+                    fact_lines.append(current_content)
+                    current_chars += len(current_content)
+            
+            if fact_lines:
+                content = f"USER FACTS: {' | '.join(fact_lines)}"
+                
+                # Final length check - truncate if too long
+                if len(content) > 400:
+                    content = content[:397] + "..."
+                    logger.info(f"📏 USER FACTS: Truncated facts content to stay within limits")
+                
+                logger.info(f"✅ USER FACTS: Built facts content for user {user_id} ({len(content)} chars, {len(facts)} facts, context-filtered: {bool(message_content)})")
+                return content
+            else:
+                logger.debug(f"🔍 USER FACTS: No high-confidence facts for user {user_id}")
+                return ""
+                
+        except Exception as e:
+            logger.error(f"❌ USER FACTS: Error building facts content for user {user_id}: {e}")
+            return ""
+
+    async def _filter_facts_by_context(self, facts: List[Dict[str, Any]], message_content: str) -> List[Dict[str, Any]]:
+        """
+        Filter facts based on relevance to current conversation context.
+        
+        Uses semantic similarity to prioritize facts that are topically relevant
+        to the current message, helping to surface the most useful information.
+        """
+        try:
+            if not facts or not message_content:
+                return facts
+            
+            message_lower = message_content.lower()
+            
+            # Extract key topics from message
+            topic_keywords = self._extract_topic_keywords(message_lower)
+            
+            # Score facts based on context relevance
+            scored_facts = []
+            for fact in facts:
+                entity_name = fact.get('entity_name', '').lower()
+                relationship_type = fact.get('relationship_type', '').lower()
+                entity_type = fact.get('entity_type', '').lower()
+                
+                # Base score from temporal confidence
+                score = fact.get('weighted_confidence', fact.get('confidence', 0.5))
+                
+                # Boost score if fact relates to message topics
+                context_boost = 0.0
+                
+                # Direct entity mention
+                if entity_name in message_lower:
+                    context_boost += 0.4
+                
+                # Topic keyword matches
+                for keyword in topic_keywords:
+                    if keyword in entity_name or keyword in relationship_type:
+                        context_boost += 0.2
+                
+                # Category relevance boosts
+                if any(food_word in message_lower for food_word in ['food', 'eat', 'hungry', 'dinner', 'lunch', 'restaurant']):
+                    if relationship_type in ['likes', 'loves', 'enjoys'] and any(food_type in entity_name for food_type in ['pizza', 'sushi', 'coffee', 'tea']):
+                        context_boost += 0.3
+                
+                if any(pet_word in message_lower for pet_word in ['cat', 'dog', 'pet', 'animal']):
+                    if 'cat' in entity_name or 'dog' in entity_name or relationship_type == 'owns' and entity_type == 'animal':
+                        context_boost += 0.3
+                
+                if any(work_word in message_lower for work_word in ['work', 'job', 'career', 'office']):
+                    if relationship_type in ['works_at', 'studies_at']:
+                        context_boost += 0.3
+                
+                final_score = min(1.0, score + context_boost)
+                scored_facts.append((fact, final_score))
+            
+            # Sort by relevance score and return top facts
+            scored_facts.sort(key=lambda x: x[1], reverse=True)
+            
+            # Return top 15 most relevant facts
+            filtered_facts = [fact for fact, score in scored_facts[:15]]
+            
+            logger.debug(f"🎯 CONTEXT FILTER: Filtered {len(facts)} facts to {len(filtered_facts)} based on message context")
+            return filtered_facts
+            
+        except Exception as e:
+            logger.warning(f"Context filtering failed, using original facts: {e}")
+            return facts
+
+    def _extract_topic_keywords(self, message: str) -> List[str]:
+        """Extract key topic words from message for context matching."""
+        # Common stop words to ignore
+        stop_words = {'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'i', 'you', 'he', 'she', 'it', 'we', 'they', 'my', 'your', 'his', 'her', 'its', 'our', 'their', 'this', 'that', 'these', 'those', 'is', 'are', 'was', 'were', 'be', 'been', 'being', 'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could', 'should', 'can', 'may', 'might', 'must'}
+        
+        # Extract meaningful words (3+ characters, not stop words)
+        words = [word.strip('.,!?;:"()[]{}') for word in message.split()]
+        keywords = [word for word in words if len(word) >= 3 and word.lower() not in stop_words]
+        
+        return keywords[:10]  # Top 10 topic keywords
     
     async def _get_recent_messages_structured(self, user_id: str) -> List[Dict[str, str]]:
         """Get recent conversation messages for structured context."""
@@ -4631,8 +4994,14 @@ Return JSON (return empty list if no clear facts found):
     ]
 }}
 
-Valid entity_types: food, drink, hobby, place, pet, other
-Valid relationship_types: likes, dislikes, enjoys, owns, visited, wants
+Valid entity_types: food, drink, hobby, place, pet, skill, goal, occupation, other
+Valid relationship_types: 
+- Preferences: likes, dislikes, enjoys, loves, hates, prefers
+- Possessions: owns, has, bought, sold, lost
+- Actions: visited, traveled_to, went_to, does, practices, plays
+- Aspirations: wants, needs, plans_to, hopes_to, dreams_of
+- Experiences: tried, learned, studied, worked_at, lived_in
+- Relationships: knows, friends_with, family_of, works_with
 
 Be conservative - only extract clear, unambiguous facts."""
             
@@ -4661,8 +5030,11 @@ Return JSON (return empty list if no clear facts found):
     ]
 }}
 
-Valid entity_types: communication_style, value, hobby, interest, preference, other
-Valid relationship_types: prefers, values, enjoys, dislikes, believes
+Valid entity_types: communication_style, value, hobby, interest, preference, skill, knowledge_area, other
+Valid relationship_types: 
+- Preferences: prefers, likes, enjoys, values, believes, prioritizes
+- Abilities: excels_at, struggles_with, knows_about, specializes_in
+- Characteristics: is_good_at, tends_to, always, never
 
 Be conservative - only extract clear statements about the bot's own characteristics."""
             
@@ -4899,10 +5271,11 @@ Be conservative - only extract clear statements about the bot's own characterist
         
         try:
             content = message_context.content
-            
-            # Preferred name patterns with regex (case-insensitive for keywords, preserves name capitalization)
             import re
             
+            preferences_detected = []
+            
+            # 1. PREFERRED NAME PATTERNS
             name_patterns = [
                 # "My name is Mark" - captures capitalized names
                 r"(?:my|My)\s+name\s+is\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)",
@@ -4920,45 +5293,120 @@ Be conservative - only extract clear statements about the bot's own characterist
                 r"(?:i|I)[''']m\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)",
             ]
             
-            detected_name = None
-            matched_pattern = None
-            
             for pattern in name_patterns:
-                match = re.search(pattern, content)  # Search in original content to preserve capitalization
+                match = re.search(pattern, content)
                 if match:
                     detected_name = match.group(1).strip()
-                    matched_pattern = pattern
-                    logger.debug(f"🔍 PREFERENCE: Detected name '{detected_name}' with pattern: {pattern}")
+                    if 2 <= len(detected_name) <= 50:  # Validate name length
+                        preferences_detected.append({
+                            'type': 'preferred_name',
+                            'value': detected_name,
+                            'confidence': 0.95,
+                            'pattern': pattern
+                        })
+                        logger.debug(f"🔍 PREFERENCE: Detected name '{detected_name}'")
+                        break
+            
+            # 2. TIMEZONE PATTERNS
+            timezone_patterns = [
+                # "I'm in EST", "I'm in Pacific time"
+                r"(?:i|I)[''']?m\s+in\s+([A-Z]{2,4}|Pacific|Eastern|Central|Mountain|GMT|UTC)(?:\s+time)?",
+                # "My timezone is EST"
+                r"(?:my|My)\s+(?:timezone|time\s+zone)\s+is\s+([A-Z]{2,4}|Pacific|Eastern|Central|Mountain|GMT|UTC)",
+                # "I live in EST", "I'm on PST"
+                r"(?:i|I)\s+(?:live\s+in|am\s+on|use)\s+([A-Z]{2,4}|Pacific|Eastern|Central|Mountain|GMT|UTC)(?:\s+time)?",
+            ]
+            
+            for pattern in timezone_patterns:
+                match = re.search(pattern, content, re.IGNORECASE)
+                if match:
+                    timezone = match.group(1).upper()
+                    preferences_detected.append({
+                        'type': 'timezone',
+                        'value': timezone,
+                        'confidence': 0.90,
+                        'pattern': pattern
+                    })
+                    logger.debug(f"🔍 PREFERENCE: Detected timezone '{timezone}'")
                     break
             
-            if detected_name:
-                # Validate name (basic sanity checks)
-                if len(detected_name) < 2 or len(detected_name) > 50:
-                    logger.debug(f"⚠️ PREFERENCE: Rejected name '{detected_name}' (invalid length)")
-                    return False
-                
-                # Store in PostgreSQL with high confidence (explicit user statement)
+            # 3. LOCATION PATTERNS
+            location_patterns = [
+                # "I live in Seattle", "I'm from Chicago"
+                r"(?:i|I)\s+(?:live\s+in|am\s+from|reside\s+in)\s+([A-Z][a-zA-Z\s]{2,30})",
+                # "I'm in New York", "I'm located in Boston"
+                r"(?:i|I)[''']?m\s+(?:in|located\s+in)\s+([A-Z][a-zA-Z\s]{2,30})",
+                # "My location is Seattle"
+                r"(?:my|My)\s+location\s+is\s+([A-Z][a-zA-Z\s]{2,30})",
+            ]
+            
+            for pattern in location_patterns:
+                match = re.search(pattern, content)
+                if match:
+                    location = match.group(1).strip()
+                    # Basic validation - exclude common false positives
+                    if len(location) >= 3 and location.lower() not in ['the', 'and', 'but', 'for', 'you', 'are']:
+                        preferences_detected.append({
+                            'type': 'location',
+                            'value': location,
+                            'confidence': 0.85,
+                            'pattern': pattern
+                        })
+                        logger.debug(f"🔍 PREFERENCE: Detected location '{location}'")
+                        break
+            
+            # 4. COMMUNICATION STYLE PATTERNS
+            comm_style_patterns = [
+                # "I prefer short responses", "I like detailed explanations"
+                r"(?:i|I)\s+(?:prefer|like)\s+(short|brief|long|detailed|simple|technical)\s+(?:responses|answers|explanations)",
+                # "Keep it brief", "Make it detailed"
+                r"(?:keep\s+it|make\s+it)\s+(brief|short|detailed|simple|technical)",
+                # "I want concise answers"
+                r"(?:i|I)\s+want\s+(concise|brief|detailed|thorough)\s+(?:answers|responses)",
+            ]
+            
+            for pattern in comm_style_patterns:
+                match = re.search(pattern, content, re.IGNORECASE)
+                if match:
+                    style = match.group(1).lower()
+                    preferences_detected.append({
+                        'type': 'communication_style',
+                        'value': style,
+                        'confidence': 0.80,
+                        'pattern': pattern
+                    })
+                    logger.debug(f"🔍 PREFERENCE: Detected communication style '{style}'")
+                    break
+            
+            # Store all detected preferences
+            stored_any = False
+            for pref in preferences_detected:
                 stored = await self.bot_core.knowledge_router.store_user_preference(
                     user_id=message_context.user_id,
-                    preference_type='preferred_name',
-                    preference_value=detected_name,
-                    confidence=0.95,  # High confidence for explicit statements
+                    preference_type=pref['type'],
+                    preference_value=pref['value'],
+                    confidence=pref['confidence'],
                     metadata={
-                        'detected_pattern': matched_pattern,
+                        'detected_pattern': pref['pattern'],
                         'source_message': content[:100],  # First 100 chars for debugging
-                        'channel_id': message_context.channel_id
+                        'channel_id': message_context.channel_id,
+                        'detection_method': 'regex_pattern'
                     }
                 )
                 
                 if stored:
-                    logger.info(f"✅ PREFERENCE: Stored preferred name '{detected_name}' "
+                    stored_any = True
+                    logger.info(f"✅ PREFERENCE: Stored {pref['type']}='{pref['value']}' "
                               f"for user {message_context.user_id}")
-                    return True
                 else:
-                    logger.warning(f"⚠️ PREFERENCE: Failed to store name '{detected_name}' "
+                    logger.warning(f"⚠️ PREFERENCE: Failed to store {pref['type']}='{pref['value']}' "
                                  f"for user {message_context.user_id}")
             
-            return False
+            if stored_any:
+                logger.info(f"✅ PREFERENCE: Stored {len(preferences_detected)} preferences "
+                          f"for user {message_context.user_id}")
+            
+            return stored_any
             
         except Exception as e:
             logger.error(f"❌ Preference extraction failed: {e}")

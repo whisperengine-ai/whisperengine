@@ -244,6 +244,33 @@ def create_guidance_component(
     )
 
 
+def create_user_facts_component(
+    facts_content: str,
+    priority: int = 3,
+    required: bool = False,
+    metadata: Optional[Dict[str, Any]] = None
+) -> PromptComponent:
+    """Create a user facts component for conversation context.
+    
+    Args:
+        facts_content: Formatted user facts and preferences
+        priority: Priority (default: 3, between core system and memory)
+        required: Whether component is required (default: False)
+        metadata: Optional metadata dict
+        
+    Returns:
+        PromptComponent configured for user facts
+    """
+    return PromptComponent(
+        type=PromptComponentType.USER_FACTS,
+        content=facts_content,
+        priority=priority,
+        required=required,
+        condition=lambda: bool(facts_content and facts_content.strip()),
+        metadata=metadata or {}
+    )
+
+
 def create_ai_intelligence_component(
     content: str,
     priority: int = 7,

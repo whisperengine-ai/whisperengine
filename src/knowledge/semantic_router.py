@@ -135,6 +135,89 @@ class SemanticKnowledgeRouter:
             }
         }
     
+    def _get_opposing_relationships(self) -> Dict[str, List[str]]:
+        """
+        Define opposing relationship mappings for conflict detection.
+        
+        Returns:
+            Dictionary mapping relationship types to their opposing types
+        """
+        return {
+            'likes': ['dislikes', 'hates', 'avoids'],
+            'loves': ['dislikes', 'hates', 'avoids'],
+            'enjoys': ['dislikes', 'hates', 'avoids'],
+            'prefers': ['dislikes', 'avoids', 'rejects'],
+            'wants': ['rejects', 'avoids', 'dislikes'],
+            'needs': ['rejects', 'avoids'],
+            'supports': ['opposes', 'rejects'],
+            'trusts': ['distrusts', 'suspects'],
+            'believes': ['doubts', 'rejects'],
+            # Reverse mappings
+            'dislikes': ['likes', 'loves', 'enjoys', 'prefers', 'wants'],
+            'hates': ['likes', 'loves', 'enjoys'],
+            'avoids': ['likes', 'loves', 'enjoys', 'prefers', 'wants', 'needs'],
+            'rejects': ['wants', 'needs', 'prefers', 'supports', 'believes'],
+            'opposes': ['supports'],
+            'distrusts': ['trusts'],
+            'doubts': ['believes'],
+            'suspects': ['trusts']
+        }
+    
+    async def _detect_opposing_relationships(self, conn, user_id: str, entity_id: str, 
+                                           new_relationship: str, new_confidence: float) -> Optional[str]:
+        """
+        Detect and resolve opposing relationship conflicts.
+        
+        Args:
+            conn: Database connection
+            user_id: User identifier
+            entity_id: Entity identifier
+            new_relationship: New relationship type being added
+            new_confidence: Confidence of new relationship
+            
+        Returns:
+            'keep_existing', 'resolved', or None if no conflicts
+        """
+        opposing_relationships = self._get_opposing_relationships()
+        
+        if new_relationship not in opposing_relationships:
+            return None
+            
+        # Check for existing opposing relationships
+        opposing_types = opposing_relationships[new_relationship]
+        conflicts = await conn.fetch("""
+            SELECT relationship_type, confidence, updated_at, mentioned_by_character
+            FROM user_fact_relationships 
+            WHERE user_id = $1 AND entity_id = $2 
+            AND relationship_type = ANY($3)
+            ORDER BY confidence DESC, updated_at DESC
+        """, user_id, entity_id, opposing_types)
+        
+        if not conflicts:
+            return None
+            
+        for conflict in conflicts:
+            conflict_confidence = float(conflict['confidence'])
+            
+            if conflict_confidence > new_confidence:
+                # Keep stronger existing opposing relationship
+                logger.info(f"⚠️ CONFLICT DETECTED: Keeping stronger existing '{conflict['relationship_type']}' "
+                           f"(confidence: {conflict_confidence:.2f}) over new '{new_relationship}' "
+                           f"(confidence: {new_confidence:.2f}) for entity {entity_id}")
+                return 'keep_existing'
+            else:
+                # Replace weaker opposing relationship with stronger new one
+                await conn.execute("""
+                    DELETE FROM user_fact_relationships 
+                    WHERE user_id = $1 AND entity_id = $2 AND relationship_type = $3
+                """, user_id, entity_id, conflict['relationship_type'])
+                
+                logger.info(f"🔄 CONFLICT RESOLVED: Replaced weaker '{conflict['relationship_type']}' "
+                           f"(confidence: {conflict_confidence:.2f}) with stronger '{new_relationship}' "
+                           f"(confidence: {new_confidence:.2f}) for entity {entity_id}")
+        
+        return 'resolved'
+    
     async def analyze_query_intent(self, query: str) -> IntentAnalysisResult:
         """
         Analyze query to determine intent and routing strategy with fuzzy matching.
@@ -383,6 +466,106 @@ class SemanticKnowledgeRouter:
             logger.info(f"🎭 Retrieved {len(facts)} character-aware facts for {character_name}")
             return facts
     
+    async def get_temporally_relevant_facts(
+        self, 
+        user_id: str, 
+        lookback_days: int = 90,
+        limit: int = 20
+    ) -> List[Dict[str, Any]]:
+        """
+        Retrieve user facts with temporal relevance weighting.
+        Recent facts are weighted higher, and potentially outdated facts are flagged.
+        
+        Args:
+            user_id: User identifier
+            lookback_days: How many days back to consider (default 90)
+            limit: Maximum number of results
+            
+        Returns:
+            List of facts with temporal relevance scoring
+        """
+        async with self.postgres.acquire() as conn:
+            query = """
+                SELECT 
+                    ufr.*,
+                    fe.entity_name,
+                    fe.entity_type,
+                    fe.category,
+                    fe.attributes,
+                    
+                    -- Temporal relevance scoring (0.4 to 1.0)
+                    CASE 
+                        WHEN ufr.updated_at > NOW() - INTERVAL '30 days' THEN 1.0
+                        WHEN ufr.updated_at > NOW() - INTERVAL '60 days' THEN 0.8
+                        WHEN ufr.updated_at > NOW() - INTERVAL '90 days' THEN 0.6
+                        ELSE 0.4
+                    END as temporal_relevance,
+                    
+                    -- Fact age in days
+                    EXTRACT(days FROM NOW() - ufr.updated_at) as fact_age_days,
+                    
+                    -- Detect potentially outdated facts based on relationship type
+                    CASE 
+                        WHEN ufr.relationship_type IN ('works_at', 'lives_in', 'studies_at') 
+                        AND ufr.updated_at < NOW() - INTERVAL '180 days' THEN true
+                        
+                        WHEN ufr.relationship_type IN ('wants', 'plans', 'intends', 'dreams_of')
+                        AND ufr.updated_at < NOW() - INTERVAL '60 days' THEN true
+                        
+                        WHEN ufr.relationship_type IN ('dating', 'in_relationship_with')
+                        AND ufr.updated_at < NOW() - INTERVAL '120 days' THEN true
+                        
+                        WHEN ufr.relationship_type IN ('feels', 'currently_feeling')
+                        AND ufr.updated_at < NOW() - INTERVAL '7 days' THEN true
+                        
+                        ELSE false
+                    END as potentially_outdated,
+                    
+                    -- Weighted confidence combining original confidence with temporal relevance
+                    (ufr.confidence * 
+                     CASE 
+                        WHEN ufr.updated_at > NOW() - INTERVAL '30 days' THEN 1.0
+                        WHEN ufr.updated_at > NOW() - INTERVAL '60 days' THEN 0.8
+                        WHEN ufr.updated_at > NOW() - INTERVAL '90 days' THEN 0.6
+                        ELSE 0.4
+                     END
+                    ) as weighted_confidence
+                    
+                FROM user_fact_relationships ufr
+                JOIN fact_entities fe ON ufr.entity_id = fe.id
+                WHERE ufr.user_id = $1
+                AND ufr.updated_at > NOW() - ($2 || ' days')::INTERVAL
+                ORDER BY 
+                    weighted_confidence DESC,
+                    ufr.updated_at DESC
+                LIMIT $3
+            """
+            
+            rows = await conn.fetch(query, user_id, str(lookback_days), limit)
+            
+            facts = []
+            for row in rows:
+                facts.append({
+                    "entity_name": row["entity_name"],
+                    "entity_type": row["entity_type"],
+                    "category": row["category"],
+                    "relationship_type": row["relationship_type"],
+                    "confidence": float(row["confidence"]),
+                    "weighted_confidence": float(row["weighted_confidence"]),
+                    "temporal_relevance": float(row["temporal_relevance"]),
+                    "fact_age_days": int(row["fact_age_days"]) if row["fact_age_days"] else 0,
+                    "potentially_outdated": bool(row["potentially_outdated"]),
+                    "emotional_context": row["emotional_context"],
+                    "mentioned_by_character": row["mentioned_by_character"],
+                    "created_at": row["created_at"],
+                    "updated_at": row["updated_at"],
+                    "context_metadata": row["context_metadata"]
+                })
+            
+            logger.info(f"⏰ Retrieved {len(facts)} temporally-weighted facts for user {user_id} "
+                       f"(lookback: {lookback_days} days)")
+            return facts
+    
     async def store_user_fact(
         self,
         user_id: str,
@@ -437,7 +620,18 @@ class SemanticKnowledgeRouter:
                         RETURNING id
                     """, entity_type, entity_name, category, json.dumps(attributes or {}))
                     
-                    # Insert or update user-fact relationship
+                    # Check for opposing relationship conflicts before storing
+                    conflict_result = await self._detect_opposing_relationships(
+                        conn, user_id, entity_id, relationship_type, confidence
+                    )
+                    
+                    if conflict_result == 'keep_existing':
+                        # Don't store the new relationship, existing opposing one is stronger
+                        logger.info(f"🚫 CONFLICT: Skipped storing '{relationship_type}' for {entity_name} - "
+                                   f"stronger opposing relationship exists")
+                        return True
+                    
+                    # Insert or update user-fact relationship (conflicts already resolved)
                     await conn.execute("""
                         INSERT INTO user_fact_relationships 
                         (user_id, entity_id, relationship_type, confidence, emotional_context, 
@@ -941,6 +1135,346 @@ class SemanticKnowledgeRouter:
         except Exception as e:
             logger.error(f"❌ Failed to get related entities: {e}")
             return []
+
+    async def get_user_recommendations(
+        self,
+        user_id: str,
+        recommendation_type: str = "interests",
+        limit: int = 5
+    ) -> List[Dict[str, Any]]:
+        """
+        Generate personalized recommendations based on user's existing facts and graph relationships.
+        
+        Uses the entity relationship graph to suggest new interests, activities, or items
+        based on what the user already likes or enjoys.
+        
+        Args:
+            user_id: User identifier
+            recommendation_type: Type of recommendations ('interests', 'activities', 'food', etc.)
+            limit: Maximum number of recommendations
+            
+        Returns:
+            List of recommended entities with reasons and confidence scores
+            
+        Example:
+            recommendations = await router.get_user_recommendations(
+                user_id="123456789",
+                recommendation_type="interests",
+                limit=3
+            )
+            # Returns: [
+            #   {
+            #     'entity_name': 'photography', 
+            #     'entity_type': 'hobby',
+            #     'reason': 'Similar to hiking (liked)',
+            #     'confidence': 0.75,
+            #     'similarity_score': 0.68
+            #   }
+            # ]
+        """
+        try:
+            async with self.postgres.acquire() as conn:
+                # Get user's highly-rated interests as recommendation seeds
+                user_seeds = await conn.fetch("""
+                    SELECT fe.entity_name, fe.entity_type, fe.category,
+                           ufr.relationship_type, ufr.confidence
+                    FROM user_fact_relationships ufr
+                    JOIN fact_entities fe ON ufr.entity_id = fe.id
+                    WHERE ufr.user_id = $1
+                      AND ufr.relationship_type IN ('likes', 'enjoys', 'loves')
+                      AND ufr.confidence >= 0.7
+                      AND ($2 = 'all' OR fe.entity_type = $2 OR fe.category = $2)
+                    ORDER BY ufr.confidence DESC
+                    LIMIT 10
+                """, user_id, recommendation_type)
+                
+                if not user_seeds:
+                    logger.info(f"🤷 No high-confidence user preferences found for recommendations")
+                    return []
+                
+                recommendations = {}  # Use dict to avoid duplicates
+                
+                # For each seed interest, find similar entities
+                for seed in user_seeds:
+                    seed_name = seed['entity_name']
+                    seed_type = seed['entity_type']
+                    seed_confidence = seed['confidence']
+                    
+                    # Find similar entities using trigram similarity and explicit relationships
+                    similar_entities = await conn.fetch("""
+                        WITH similar_by_name AS (
+                            -- Find entities with similar names
+                            SELECT fe.entity_name, fe.entity_type, fe.category,
+                                   similarity(fe.entity_name, $1) as similarity_score,
+                                   'name_similarity' as reason_type
+                            FROM fact_entities fe
+                            WHERE fe.entity_name != $1
+                              AND similarity(fe.entity_name, $1) > 0.3
+                              AND fe.entity_type = $2
+                        ),
+                        similar_by_graph AS (
+                            -- Find entities connected by explicit relationships
+                            SELECT fe2.entity_name, fe2.entity_type, fe2.category,
+                                   er.weight as similarity_score,
+                                   'graph_connection' as reason_type
+                            FROM fact_entities fe1
+                            JOIN entity_relationships er ON fe1.id = er.from_entity_id
+                            JOIN fact_entities fe2 ON er.to_entity_id = fe2.id
+                            WHERE fe1.entity_name = $1 
+                              AND fe1.entity_type = $2
+                              AND er.weight > 0.3
+                        ),
+                        combined_similar AS (
+                            SELECT * FROM similar_by_name
+                            UNION ALL
+                            SELECT * FROM similar_by_graph
+                        )
+                        SELECT entity_name, entity_type, category, 
+                               MAX(similarity_score) as best_similarity,
+                               reason_type
+                        FROM combined_similar
+                        WHERE entity_name NOT IN (
+                            -- Exclude things user already has relationship with
+                            SELECT fe.entity_name 
+                            FROM user_fact_relationships ufr2
+                            JOIN fact_entities fe ON ufr2.entity_id = fe.id
+                            WHERE ufr2.user_id = $3
+                        )
+                        GROUP BY entity_name, entity_type, category, reason_type
+                        ORDER BY best_similarity DESC
+                        LIMIT 5
+                    """, seed_name, seed_type, user_id)
+                    
+                    # Add recommendations with context
+                    for similar in similar_entities:
+                        entity_name = similar['entity_name']
+                        if entity_name not in recommendations:
+                            # Calculate confidence based on similarity and seed confidence
+                            base_confidence = float(similar['best_similarity']) * seed_confidence
+                            
+                            recommendations[entity_name] = {
+                                'entity_name': entity_name,
+                                'entity_type': similar['entity_type'],
+                                'category': similar['category'],
+                                'reason': f"Similar to {seed_name} ({seed['relationship_type']})",
+                                'confidence': min(base_confidence, 0.9),  # Cap at 0.9
+                                'similarity_score': float(similar['best_similarity']),
+                                'reason_type': similar['reason_type'],
+                                'seed_entity': seed_name,
+                                'seed_confidence': seed_confidence
+                            }
+                
+                # Sort by confidence and return top recommendations
+                sorted_recommendations = sorted(
+                    recommendations.values(), 
+                    key=lambda x: x['confidence'], 
+                    reverse=True
+                )[:limit]
+                
+                logger.info(f"💡 Generated {len(sorted_recommendations)} recommendations for user {user_id}")
+                return sorted_recommendations
+                
+        except Exception as e:
+            logger.error(f"❌ Failed to generate recommendations: {e}")
+            return []
+    
+    async def deprecate_outdated_facts(self, dry_run: bool = True) -> Dict[str, int]:
+        """
+        Actively deprecate facts that are likely outdated based on their age and type.
+        
+        This method:
+        1. Identifies facts that are likely stale based on relationship type and age
+        2. Gradually reduces confidence for aging facts
+        3. Soft-deletes facts that are very likely obsolete
+        4. Preserves all original data (reversible operations)
+        
+        Args:
+            dry_run: If True, only reports what would be changed without making changes
+            
+        Returns:
+            Dictionary with counts of deprecated and confidence-reduced facts
+        """
+        try:
+            # Define staleness rules: relationship_type -> max_days_before_suspicious
+            staleness_rules = {
+                # Career/Work facts (change frequently)
+                'works_at': 365,          # Jobs change yearly
+                'employed_by': 365,
+                'job_title': 365,
+                
+                # Location facts (change occasionally)  
+                'lives_in': 730,          # Address changes every 2 years
+                'resides_in': 730,
+                'located_in': 730,
+                
+                # Education facts (longer-term but do change)
+                'studies_at': 1460,       # Education programs are multi-year
+                'enrolled_in': 1460,
+                'attends': 1460,
+                
+                # Short-term intentions/plans
+                'wants': 90,              # Desires change seasonally
+                'plans': 30,              # Plans are short-term
+                'intends': 60,            # Intentions are medium-term
+                'thinking_about': 14,     # Thoughts change quickly
+                'considering': 30,
+                
+                # Relationship status (changes occasionally)
+                'dating': 180,            # Relationship status changes
+                'in_relationship_with': 180,
+                'married_to': 1095,       # Marriage more stable
+                
+                # Feelings/emotional states (very short-term)
+                'feels': 7,               # Feelings change weekly
+                'feeling': 7,
+                'currently_feeling': 3,   # Current feelings change quickly
+                'mood': 1,                # Moods change daily
+                
+                # Possessions/ownership (longer-term)
+                'owns': 1095,             # Possessions are longer-term (3 years)
+                'has': 365,               # General "has" relationship
+                
+                # Travel/experiences (medium-term relevance)
+                'visited': 1095,          # Travel experiences stay relevant longer
+                'been_to': 1095,
+                'traveled_to': 1095
+            }
+            
+            deprecated_count = 0
+            confidence_reduced_count = 0
+            facts_processed = 0
+            
+            async with self.postgres.acquire() as conn:
+                for relationship_type, max_days in staleness_rules.items():
+                    
+                    # Find potentially outdated facts for this relationship type
+                    outdated_facts = await conn.fetch("""
+                        SELECT 
+                            ufr.user_id, 
+                            ufr.entity_id, 
+                            ufr.confidence, 
+                            ufr.updated_at,
+                            fe.entity_name,
+                            EXTRACT(days FROM NOW() - ufr.updated_at) as days_old
+                        FROM user_fact_relationships ufr
+                        JOIN fact_entities fe ON ufr.entity_id = fe.id
+                        WHERE ufr.relationship_type = $1
+                        AND ufr.updated_at < NOW() - ($2 || ' days')::INTERVAL
+                        AND ufr.confidence > 0.2
+                        ORDER BY ufr.updated_at ASC
+                    """, relationship_type, str(max_days))
+                    
+                    for fact in outdated_facts:
+                        facts_processed += 1
+                        days_old = float(fact['days_old'])
+                        
+                        # Calculate degradation factor based on how overdue the fact is
+                        overdue_days = days_old - max_days
+                        degradation_factor = max(0.2, 1.0 - (overdue_days / (max_days * 1.5)))
+                        new_confidence = float(fact['confidence']) * degradation_factor
+                        
+                        if new_confidence < 0.3:
+                            # Mark for soft deprecation (very low confidence + metadata flag)
+                            if not dry_run:
+                                await conn.execute("""
+                                    UPDATE user_fact_relationships 
+                                    SET 
+                                        confidence = 0.1,
+                                        context_metadata = COALESCE(context_metadata, '{}'::jsonb) || 
+                                                         jsonb_build_object(
+                                                             'deprecated', true,
+                                                             'reason', 'temporal_staleness',
+                                                             'original_confidence', $4,
+                                                             'deprecated_at', $5
+                                                         )
+                                    WHERE user_id = $1 AND entity_id = $2 AND relationship_type = $3
+                                """, fact['user_id'], fact['entity_id'], relationship_type, 
+                                float(fact['confidence']), datetime.now().isoformat())
+                            deprecated_count += 1
+                            
+                            logger.info(f"🗑️ DEPRECATED: {fact['entity_name']} ({relationship_type}) "
+                                       f"for user {fact['user_id'][-6:]} - {days_old:.0f} days old")
+                        else:
+                            # Gradually reduce confidence
+                            if not dry_run:
+                                await conn.execute("""
+                                    UPDATE user_fact_relationships 
+                                    SET confidence = $4
+                                    WHERE user_id = $1 AND entity_id = $2 AND relationship_type = $3
+                                """, fact['user_id'], fact['entity_id'], relationship_type, new_confidence)
+                            confidence_reduced_count += 1
+                            
+                            logger.info(f"📉 CONFIDENCE REDUCED: {fact['entity_name']} ({relationship_type}) "
+                                       f"from {fact['confidence']:.2f} to {new_confidence:.2f} "
+                                       f"- {days_old:.0f} days old")
+            
+            result = {
+                'facts_processed': facts_processed,
+                'deprecated': deprecated_count,
+                'confidence_reduced': confidence_reduced_count,
+                'dry_run': dry_run
+            }
+            
+            logger.info(f"📊 FACT DEPRECATION {'SIMULATION' if dry_run else 'COMPLETED'}: "
+                       f"{facts_processed} facts processed, "
+                       f"{deprecated_count} deprecated, "
+                       f"{confidence_reduced_count} confidence reduced")
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"❌ Failed to deprecate outdated facts: {e}")
+            return {
+                'facts_processed': 0,
+                'deprecated': 0,
+                'confidence_reduced': 0,
+                'error': str(e),
+                'dry_run': dry_run
+            }
+    
+    async def restore_deprecated_facts(self, user_id: Optional[str] = None) -> int:
+        """
+        Restore facts that were deprecated by the deprecation system.
+        
+        Args:
+            user_id: If provided, only restore facts for this user. If None, restore all.
+            
+        Returns:
+            Number of facts restored
+        """
+        try:
+            async with self.postgres.acquire() as conn:
+                if user_id:
+                    query = """
+                        UPDATE user_fact_relationships 
+                        SET 
+                            confidence = COALESCE((context_metadata->>'original_confidence')::float, 0.8),
+                            context_metadata = context_metadata - 'deprecated' - 'reason' - 'original_confidence' - 'deprecated_at'
+                        WHERE user_id = $1 
+                        AND context_metadata->>'deprecated' = 'true'
+                    """
+                    result = await conn.execute(query, user_id)
+                else:
+                    query = """
+                        UPDATE user_fact_relationships 
+                        SET 
+                            confidence = COALESCE((context_metadata->>'original_confidence')::float, 0.8),
+                            context_metadata = context_metadata - 'deprecated' - 'reason' - 'original_confidence' - 'deprecated_at'
+                        WHERE context_metadata->>'deprecated' = 'true'
+                    """
+                    result = await conn.execute(query)
+                
+                # Extract the number of affected rows from the result
+                affected_rows = int(result.split()[-1]) if result else 0
+                
+                logger.info(f"🔄 RESTORED {affected_rows} deprecated facts" + 
+                           (f" for user {user_id}" if user_id else ""))
+                
+                return affected_rows
+                
+        except Exception as e:
+            logger.error(f"❌ Failed to restore deprecated facts: {e}")
+            return 0
 
 
 # Factory function for easy integration
