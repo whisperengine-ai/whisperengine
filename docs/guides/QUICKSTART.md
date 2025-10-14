@@ -187,7 +187,7 @@ curl -X POST http://localhost:9090/api/chat \\
    DISCORD_BOT_TOKEN=your_discord_token
    ENABLE_DISCORD=true
    \`\`\`
-3. Restart: \`docker-compose restart\`
+3. Stop and restart: \`docker-compose stop && docker-compose up -d\`
 
 ## 🔄 Managing Your Installation
 
@@ -371,7 +371,7 @@ LLM_CHAT_MODEL=mistralai/mistral-7b-instruct
    DISCORD_BOT_TOKEN=your_bot_token_here
    ENABLE_DISCORD=true
    \`\`\`
-3. **Restart**: \`docker-compose restart\`
+3. **Stop and restart**: \`docker-compose stop && docker-compose up -d\`
 4. **Invite Bot**: Use OAuth2 URL Generator in Discord Developer Portal
 
 ### **Multi-Character Setup**

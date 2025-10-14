@@ -352,7 +352,7 @@ class StatusCommandHandlers:
             )
             embed.add_field(
                 name="How to enable",
-                value="Set `VOICE_SUPPORT_ENABLED=true` in your .env file and restart the bot.",
+                value="Set `VOICE_SUPPORT_ENABLED=true` in your .env file and stop/start the bot.",
                 inline=False,
             )
             embed.add_field(

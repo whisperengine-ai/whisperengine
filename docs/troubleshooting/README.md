@@ -145,8 +145,8 @@ taskkill /PID <PID> /F
    # Edit your .env file
    nano .env  # or vim, notepad, etc.
    
-   # Restart services
-   docker-compose restart
+   # Stop and restart services (required for .env changes)
+   docker-compose stop && docker-compose up -d
    ```
 
 ---

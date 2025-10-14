@@ -112,7 +112,8 @@ BOT_SYSTEM_PROMPT_FILE=./prompts/professional_ai_template.md
 # 😊 Casual friend
 BOT_SYSTEM_PROMPT_FILE=./prompts/casual_friend_template.md
 
-# Restart: docker-compose restart
+# Stop and restart after .env changes:
+# docker-compose stop && docker-compose up -d
 ```
 
 ## 🔧 Management Commands
@@ -138,8 +139,8 @@ docker-compose logs whisperengine-bot
 # Verify token is correct
 grep DISCORD_BOT_TOKEN .env
 
-# Restart services
-docker-compose restart
+# Stop and restart services (for .env changes)
+docker-compose stop && docker-compose up -d
 ```
 
 **Can't connect to LLM?**
