@@ -1,6 +1,9 @@
 # Enhanced WhisperEngine External Chat API
 
-The WhisperEngine External Chat API has been enhanced to include user facts and relationship metrics in all responses.
+> **📖 For complete API documentation, see [Chat API Reference](./CHAT_API_REFERENCE.md)**  
+> This document provides a quick overview of enhanced features. For full integration details, request/response schemas, error handling, and code examples, refer to the comprehensive Chat API Reference.
+
+The WhisperEngine External Chat API has been enhanced to include user facts and relationship metrics in all responses (available in `extended` metadata level).
 
 ## New Response Fields
 

@@ -1,6 +1,9 @@
 # Enriched Metadata API Response
 
-**Date**: October 5, 2025  
+> **📖 For complete API documentation, see [Chat API Reference](./CHAT_API_REFERENCE.md)**  
+> This document provides detailed metadata structure and field descriptions. For full integration guide, endpoints, error handling, and code examples, refer to the comprehensive Chat API Reference.
+
+**Date**: October 13, 2025  
 **Status**: ✅ Production Ready  
 **Audience**: 3rd Party Developers & Integration Partners  
 **Purpose**: Comprehensive AI intelligence data for chat applications and analytics dashboards

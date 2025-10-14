@@ -189,7 +189,7 @@ CHARACTER_NAME=assistant    # Default character name
 - **[Installation Guide](INSTALLATION.md)** - Complete installation options
 - **[Container Operations Guide](CONTAINERIZED_OPERATIONS_GUIDE.md)** - Updates, backups, troubleshooting
 - **[Character Creation Guide](docs/characters/CHARACTER_AUTHORING_GUIDE.md)** - Advanced character building
-- **[API Documentation](docs/api/README.md)** - Integration guide
+- **[API Documentation](docs/api/CHAT_API_REFERENCE.md)** - Complete Chat API reference for third-party integration
 - **[Discord Setup](docs/discord/DISCORD_SETUP.md)** - Discord bot configuration
 - **[Troubleshooting](docs/troubleshooting/README.md)** - Common issues and solutions
 
@@ -217,7 +217,7 @@ For production deployment, multi-character setups, or custom configurations:
 - **[Multi-Character Setup](docs/setup/MULTI_CHARACTER_SETUP.md)** - Run multiple characters simultaneously
 - **[Production Deployment](docs/deployment/PRODUCTION_SETUP.md)** - Secure, scalable deployment
 - **[Custom Models](docs/setup/LOCAL_LLM_SETUP.md)** - Use local or custom LLM models
-- **[API Integration](docs/api/INTEGRATION_GUIDE.md)** - Embed in your applications
+- **[API Integration](docs/api/CHAT_API_REFERENCE.md)** - Complete Chat API reference for developers
 
 ## 🤝 Contributing
 

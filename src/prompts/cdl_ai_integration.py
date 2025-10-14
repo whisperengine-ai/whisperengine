@@ -1054,32 +1054,10 @@ class CDLAIPromptIntegration:
             except Exception as e:
                 logger.debug(f"Could not extract expertise domains: {e}")
         
-        # 😊 EMOJI PATTERNS: Add digital communication style
-        if self.enhanced_manager:
-            try:
-                bot_name = os.getenv('DISCORD_BOT_NAME', safe_bot_name_fallback).lower()
-                emoji_patterns = await self.enhanced_manager.get_emoji_patterns(bot_name)
-                if emoji_patterns:
-                    # Group by pattern category
-                    excitement_emojis = [e for e in emoji_patterns if 'excitement' in e.pattern_category.lower()]
-                    context_emojis = [e for e in emoji_patterns if e.pattern_category not in ['excitement_level', 'general']]
-                    
-                    if excitement_emojis or context_emojis:
-                        prompt += f"\n\n😊 EMOJI USAGE PATTERNS:\n"
-                        
-                        if excitement_emojis:
-                            # Show excitement level guidance
-                            for emoji_pattern in excitement_emojis[:3]:  # Low, medium, high
-                                prompt += f"- {emoji_pattern.pattern_name}: {emoji_pattern.emoji_sequence}\n"
-                        
-                        if context_emojis:
-                            # Show context-specific emoji usage
-                            context_list = ', '.join([f"{e.pattern_name}: {e.emoji_sequence}" for e in context_emojis[:5]])
-                            prompt += f"- Context-specific: {context_list}\n"
-                        
-                        logger.info(f"✅ EMOJI PATTERNS: Added {len(emoji_patterns)} emoji usage patterns")
-            except Exception as e:
-                logger.debug(f"Could not extract emoji patterns: {e}")
+        # 😊 EMOJI PATTERNS: Now handled by Phase 7.6 DatabaseEmojiSelector in message_processor.py
+        # Legacy emoji prompt injection REMOVED - emojis are intelligently selected post-LLM
+        # using bot emotion analysis, character personality dials, and context-aware filtering.
+        # See: src/intelligence/database_emoji_selector.py for intelligent emoji selection
         
         # 🎭 AI SCENARIOS: Add physical interaction handling guidance (DATABASE-DRIVEN)
         if self.enhanced_manager:

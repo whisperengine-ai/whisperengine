@@ -41,6 +41,9 @@ from src.prompts.prompt_components import (
 from src.relationships.evolution_engine import create_relationship_evolution_engine
 from src.relationships.trust_recovery import create_trust_recovery_system
 
+# Emoji Intelligence component
+from src.intelligence.database_emoji_selector import create_database_emoji_selector
+
 logger = logging.getLogger(__name__)
 
 
@@ -296,9 +299,40 @@ class MessageProcessor:
             logger.warning("Character intelligence coordinator not available: %s", e)
             self.learning_moment_detector = None
         
+        # Database Emoji Selector: Lazy initialization (postgres_pool may not be ready yet)
+        self.emoji_selector = None
+        self._emoji_selector_init_attempted = False  # Track if we've tried to initialize
+        self._try_initialize_emoji_selector()  # Try to initialize now (may succeed or defer)
+        
+        # Get character name for emoji selection
+        self.character_name = get_normalized_bot_name_from_env()
+        
         # Track processing state for debugging
         self._last_security_validation = None
         self._last_emotional_context = None
+    
+    def _try_initialize_emoji_selector(self):
+        """
+        Try to initialize database emoji selector (lazy initialization).
+        Can be called multiple times - only initializes once when postgres_pool becomes available.
+        """
+        # Skip if already initialized or already failed
+        if self.emoji_selector or self._emoji_selector_init_attempted:
+            return
+        
+        try:
+            # Get PostgreSQL pool from bot_core
+            postgres_pool = getattr(self.bot_core, 'postgres_pool', None) if self.bot_core else None
+            if postgres_pool:
+                self.emoji_selector = create_database_emoji_selector(postgres_pool)
+                logger.info("✨ Database Emoji Selector initialized - intelligent post-LLM emoji decoration enabled")
+                self._emoji_selector_init_attempted = True
+            else:
+                # Don't mark as attempted yet - pool may become available later
+                logger.debug("PostgreSQL pool not yet available - emoji selector initialization deferred")
+        except Exception as e:
+            logger.warning("Database emoji selector initialization failed: %s", e)
+            self._emoji_selector_init_attempted = True  # Don't retry on failure
 
     @handle_errors(category=ErrorCategory.VALIDATION, severity=ErrorSeverity.HIGH)
     async def process_message(self, message_context: MessageContext) -> ProcessingResult:
@@ -389,6 +423,58 @@ class MessageProcessor:
             # Phase 7.5: Analyze bot's emotional state from response (SERIAL to avoid RoBERTa conflicts)
             bot_emotion = await self._analyze_bot_emotion_with_shared_analyzer(response, message_context, ai_components)
             ai_components['bot_emotion'] = bot_emotion
+            
+            # Phase 7.6: Intelligent Emoji Decoration (NEW - Database-driven post-LLM enhancement)
+            # Try to initialize emoji selector if not yet available (lazy initialization)
+            if not self.emoji_selector:
+                self._try_initialize_emoji_selector()
+            
+            if self.emoji_selector and self.character_name:
+                try:
+                    emoji_selection = await self.emoji_selector.select_emojis(
+                        character_name=self.character_name,
+                        bot_emotion_data=bot_emotion,
+                        user_emotion_data=ai_components.get('emotion_analysis'),
+                        detected_topics=ai_components.get('detected_topics', []),
+                        response_type=ai_components.get('response_type'),
+                        message_content=response,
+                        sentiment=ai_components.get('sentiment')
+                    )
+                    
+                    if emoji_selection.should_use and emoji_selection.emojis:
+                        # Apply emojis to response
+                        original_response = response
+                        response = self.emoji_selector.apply_emojis(
+                            response,
+                            emoji_selection.emojis,
+                            emoji_selection.placement
+                        )
+                        
+                        # Store emoji selection metadata for debugging/analysis
+                        ai_components['emoji_selection'] = {
+                            'emojis': emoji_selection.emojis,
+                            'placement': emoji_selection.placement,
+                            'reasoning': emoji_selection.reasoning,
+                            'source': emoji_selection.source,
+                            'original_length': len(original_response),
+                            'decorated_length': len(response)
+                        }
+                        
+                        logger.debug(
+                            "✨ Emoji decoration applied: %s emojis from %s - %s",
+                            len(emoji_selection.emojis),
+                            emoji_selection.source,
+                            emoji_selection.reasoning
+                        )
+                    else:
+                        logger.debug(
+                            "✨ Emoji decoration skipped: %s",
+                            emoji_selection.reasoning if emoji_selection else "selector unavailable"
+                        )
+                
+                except Exception as e:
+                    logger.warning("Emoji decoration failed (non-critical): %s", e)
+                    # Continue processing - emoji decoration failure shouldn't break the response
             
             # STAGE 2: Enhanced AI Ethics for Character Learning - Monitor and enhance response
             if self.enhanced_ai_ethics:
