@@ -113,39 +113,20 @@ The setup script will:
 2. 📦 Download only configuration files (~5KB)
 3. 🐳 Pull pre-built containers from Docker Hub
 4. 📝 Create your configuration file 
-5. 🔧 Open the config file for you to add your LLM settings (API key or local LLM)
-6. 🚀 Start all services automatically
-7. 🌐 Open the web interface in your browser
+5.  Start all services automatically
+6. 🌐 Open the web interface in your browser
 
-**📋 Follow-up Guides:**
-- **[Configuration Guide](docs/guides/edit-env-after-quickstart.md)** - Configure LLM providers, Discord, advanced settings
-- **[Troubleshooting](docs/troubleshooting/README.md)** - Common issues and solutions
-- **[Cleanup Scripts](docs/deployment/CLEANUP_SCRIPTS.md)** - Fresh restart if needed
+## ⚙️ Next Step: Configuration
 
-### **What You Get**
+**Before creating characters, you'll need to configure your LLM access.**
 
-After setup, you'll have an environment for exploring AI characters:
+WhisperEngine works with both API-based LLMs (OpenRouter, OpenAI, Anthropic) and local LLMs (Ollama, LM Studio). 
 
-- **🌐 Web Interface**: http://localhost:3001 - Simple UI for character exploration
-- **💬 Chat API**: http://localhost:9090/api/chat - Programmatic access for testing
-- **📊 System Status**: http://localhost:9090/health - Basic health monitoring
-- **🧠 Vector Database**: Qdrant for persistent memory
-- **💾 Data Storage**: PostgreSQL for character data and conversation logs
-- **📈 Metrics Storage**: InfluxDB for temporal analytics and usage patterns
-
-**Technical Components:**
-- **🤖 RoBERTa Emotion Analysis** - Pre-configured transformer for emotion detection
-- **🎯 384D Vector Embeddings** - Memory implementation with semantic vectors
-- **📈 Real-Time Processing** - Sub-second analysis for interactions
-- **🛡️ Safety Tools** - Built-in ethics and security components
-- **🎯 Learning Systems** - Character adaptation and personalization features
-
-**Optional Components:**
-- **📊 Grafana Dashboard** - Visual monitoring (developer installation includes basic setup)
+**📋 [Complete Configuration Guide](docs/guides/edit-env-after-quickstart.md)** - Step-by-step setup for all LLM providers, Discord integration, and system settings.
 
 ## 🎭 Creating Your Character
 
-Try customizing the basic AI assistant or creating new characters:
+After configuration, try customizing the basic AI assistant or creating new characters:
 
 1. **Open the Web Interface**: http://localhost:3001
 2. **Start with the Default Assistant** or **Click "Create New Character"**
@@ -197,29 +178,9 @@ curl -X POST http://localhost:9090/api/chat \\
 
 **Other issues?** Check the **[Troubleshooting Guide](docs/troubleshooting/README.md)** or view logs: `docker logs whisperengine-assistant`
 
-## ⚙️ Configuration
-
-WhisperEngine needs LLM access for character AI conversations. The setup script will guide you through basic configuration.
-
-**📋 [Configuration Guide](docs/guides/edit-env-after-quickstart.md)** - LLM providers, Discord integration, and system settings
-
-**Basic Setup (API-based LLM):**
-```bash
-# For API-based LLMs: Add your API key
-LLM_CHAT_API_URL=https://openrouter.ai/api/v1
-LLM_CHAT_API_KEY=your_api_key_here
-LLM_CHAT_MODEL=mistralai/mistral-small
-```
-
-**Basic Setup (Local LLM):**
-```bash
-# For local LLMs like Ollama or LM Studio: No API key needed
-LLM_CHAT_API_URL=http://localhost:11434/v1  # Ollama default
-# LLM_CHAT_API_KEY=  # Leave empty for local LLMs
-LLM_CHAT_MODEL=llama3.1:8b  # Or your preferred local model
-```
-
-**Recommended**: Start with [OpenRouter](https://openrouter.ai) + `mistralai/mistral-small` for testing, or [Ollama](https://ollama.ai) for local setup.
+**📋 Additional Guides:**
+- **[Troubleshooting Guide](docs/troubleshooting/README.md)** - Common issues and detailed solutions
+- **[Cleanup Scripts](docs/deployment/CLEANUP_SCRIPTS.md)** - Fresh restart if needed
 
 ## 📚 Documentation
 
