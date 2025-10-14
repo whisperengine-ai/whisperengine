@@ -5,7 +5,9 @@
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 [![Alpha](https://img.shields.io/badge/Status-Alpha-orange.svg)](https://github.com/whisperengine-ai/whisperengine)
 
-> 🧪 **Exploring AI character conversations** with persistent memory and emotional understanding! [Try it out](#-quick-start) ↓
+> 🧪 **Exploring AI character conversations** with persistent memory and emotional understanding! [Try it out](#-try-whisperengine) ↓
+
+**Quick Navigation:** [🚀 Try It](#-try-whisperengine) | [⚙️ Configuration](#%EF%B8%8F-next-step-configuration) | [🎭 Create Characters](#-creating-your-character) | [📚 Documentation](#-documentation)
 
 ## 🎯 What is WhisperEngine?
 
@@ -17,6 +19,8 @@
 - 🎭 **AI Roleplay** with emotionally intelligent characters
 - 🔬 **AI Enthusiasts** exploring conversation patterns and personality modeling
 - 🛠️ **Personal AI Projects** - build your own character AI system
+
+> 🚀 **Want to start immediately?** [Skip to installation](#-try-whisperengine) | **Want to understand the technology?** Continue reading below ↓
 
 ## 🏗️ Five Key Areas in AI Character Conversation
 
@@ -65,6 +69,25 @@ WhisperEngine explores five areas that contribute to more realistic AI character
 ---
 
 **🔬 Want to understand how it works?** Read our guide: **[How WhisperEngine's AI Characters Learn and Remember You](docs/guides/HOW_AI_CHARACTERS_LEARN.md)** - technical details about the five areas and implementation approaches.
+
+## 🤖 What's Included
+
+WhisperEngine includes a **basic AI assistant** that you can customize and extend:
+
+### 🔧 **Default Assistant Features:**
+- **Conversational AI** - Standard chat functionality with memory
+- **Emotional Intelligence** - RoBERTa-powered emotion recognition
+- **Persistent Memory** - Vector-based conversation history
+- **Customizable Personality** - Modify traits through configuration
+- **Safety Controls** - Built-in ethical interaction boundaries
+
+### 🎨 **Your Character Creation Options:**
+- **Modify the Default Assistant** - Adjust personality traits and communication style
+- **Create Custom Characters** - Build your own using the Character Definition Language (CDL)
+- **Explore Different Archetypes** - Professional, creative, analytical, or supportive roles
+- **Test AI Conversation Features** - Experiment with the five key areas in a safe environment
+
+> ⚠️ **Note**: WhisperEngine provides the framework and tools - you're responsible for creating and configuring any specific character personalities according to your needs and local regulations. [See complete AI disclaimers](docs/legal/AI_DISCLAIMERS.md).
 
 ## ✨ Project Features
 
@@ -193,25 +216,6 @@ curl -X POST http://localhost:9090/api/chat \\
 - **[Character Creation](docs/characters/CHARACTER_AUTHORING_GUIDE.md)** | **[API Reference](docs/api/CHAT_API_REFERENCE.md)** | **[Multi-Character Setup](docs/setup/MULTI_CHARACTER_SETUP.md)**
 - **[Development Guide](docs/development/DEVELOPMENT_GUIDE.md)** - For developers and contributors
 
-## 🤖 What's Included
-
-WhisperEngine includes a **basic AI assistant** that you can customize and extend:
-
-### 🔧 **Default Assistant Features:**
-- **Conversational AI** - Standard chat functionality with memory
-- **Emotional Intelligence** - RoBERTa-powered emotion recognition
-- **Persistent Memory** - Vector-based conversation history
-- **Customizable Personality** - Modify traits through configuration
-- **Safety Controls** - Built-in ethical interaction boundaries
-
-### 🎨 **Your Character Creation Options:**
-- **Modify the Default Assistant** - Adjust personality traits and communication style
-- **Create Custom Characters** - Build your own using the Character Definition Language (CDL)
-- **Explore Different Archetypes** - Professional, creative, analytical, or supportive roles
-- **Test AI Conversation Features** - Experiment with the five key areas in a safe environment
-
-> ⚠️ **Note**: WhisperEngine provides the framework and tools - you're responsible for creating and configuring any specific character personalities according to your needs and local regulations.
-
 ## 🛟 Getting Help
 
 **[Troubleshooting Guide](docs/troubleshooting/README.md)** | **[Cleanup Scripts](docs/deployment/CLEANUP_SCRIPTS.md)** | **[GitHub Issues](https://github.com/whisperengine-ai/whisperengine/issues)** | **[Discussions](https://github.com/whisperengine-ai/whisperengine/discussions)**
@@ -228,10 +232,24 @@ WhisperEngine is open source and welcomes contributions!
 - **[Development Setup](docs/development/DEVELOPMENT_SETUP.md)** - Local development environment
 - **[Architecture Overview](docs/architecture/README.md)** - System design and components
 
-## 📄 License
+## ⚠️ AI Disclaimers & Limitations
+
+**Important:** WhisperEngine enables AI character creation. Key limitations:
+
+- **🤖 AI Limitations**: Characters may hallucinate or provide inaccurate information. Not suitable for factual, medical, or legal advice.
+- **👤 User Responsibility**: You are fully responsible for all AI-generated content and ensuring compliance with applicable laws.
+- **🛡️ No Warranty**: Software provided "as is" without warranty. Educational/experimental use only.
+
+**📋 [Complete AI Safety & Legal Disclaimers](docs/legal/AI_DISCLAIMERS.md)** - Comprehensive limitations, responsibilities, and legal considerations.
+
+> By using WhisperEngine, you acknowledge these limitations and accept full responsibility for your use of the system.
+
+## 📄 License & Disclaimer
 
 WhisperEngine is licensed under the **GNU General Public License v3.0**. See [LICENSE](LICENSE) for details.
 
 This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 
 This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+
+**Additional AI System Disclaimer:** WhisperEngine enables AI character creation and conversation. Users assume all responsibility for AI-generated content, character configurations, and compliance with applicable laws and ethical guidelines. The software is provided for educational and experimental purposes only.
