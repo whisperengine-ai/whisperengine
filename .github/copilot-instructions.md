@@ -1,86 +1,252 @@
 # WhisperEngine AI Agent Instructions
 
-## 🚨 CRITICAL LIVE SYSTEM OPERATIONS - ASK BEFORE RESTARTING:**
+## 🚨 CRITICAL LIVE SYSTEM OPERATIONS - ASK BEFORE RESTARTING
 - **NEVER restart bots, services, or containers without explicit user permission**
-- **WhisperEngine is a LIVE PRODUCTION SYSTEM** - users may be actively chatting with bots
+- **WhisperEngine is a PRODUCTION MULTI-CHARACTER DISCORD PLATFORM** - users actively chat with 10+ AI characters
 - **ALWAYS ASK before running restart commands**: `docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml restart`, `docker restart`, `docker-compose restart`
 - **ALWAYS ASK before running stop commands**: `docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml down`, `docker stop`, `docker-compose down`
-- **DEBUGGING FIRST**: Use log inspection, health checks, and API testing before considering restarts
+- **DEBUGGING FIRST**: Use log inspection, health checks, and direct Python testing before considering restarts
 - **Code changes**: Test with direct Python validation scripts before restarting live services
 - **For urgent fixes**: Ask user "Should I restart [specific bot/service] to apply this fix?"
 - **Emergency restart protocol**: Only restart if user explicitly confirms or system is completely broken
 - **Log analysis is NON-DESTRUCTIVE**: Always prefer log checking over service manipulation
 
-## 🚨 CURRENT ACTIVE ROADMAPS (October 8, 2025) 🚨
+## 🏗️ CURRENT WHIPERENGINE ARCHITECTURE (October 2025)
 
-**WhisperEngine is currently following TWO parallel development roadmaps:**
+**WhisperEngine is a multi-character Discord AI roleplay platform** featuring:
 
-### **Primary Roadmap: Memory Intelligence Convergence**
-**File**: `MEMORY_INTELLIGENCE_CONVERGENCE_ROADMAP.md`
-**Status**: PHASE 0 ✅ COMPLETE | PHASE 1 📋 READY TO START
-**Progress**: 
-- ✅ PHASE 0: Foundation Analysis (COMPLETE)
-- 📋 PHASE 1: Vector Intelligence Foundation (READY TO START)
-- 📋 PHASE 2: Temporal Evolution Intelligence (PLANNED)
-- 📋 PHASE 3: Graph Knowledge Intelligence (PLANNED)
-- 📋 PHASE 4: Unified Intelligence Coordination (PLANNED)
+### **Production Infrastructure**
+- **Vector-Native Memory**: Qdrant + FastEmbed for conversation storage & semantic retrieval
+- **Database-Driven Characters**: PostgreSQL-based CDL (Character Definition Language) system  
+- **Multi-Bot Platform**: 10+ independent AI characters sharing infrastructure
+- **Docker-First Development**: Container orchestration with template-based configuration
+- **Protocol-Based Design**: Factory patterns enabling A/B testing and system flexibility
 
-**Current Achievement**: Pure integration approach designed - leverages existing RoBERTa emotion analysis, InfluxDB temporal data, and PostgreSQL graph patterns for character learning without new storage systems.
+### **Active Character Bots**
+- **Elena** (Marine Biologist) - Port 9091 - `whisperengine_memory_elena`
+- **Marcus** (AI Researcher) - Port 9092 - `whisperengine_memory_marcus`
+- **Jake** (Adventure Photographer) - Port 9097 - `whisperengine_memory_jake`
+- **Dream** (Mythological Entity) - Port 9094 - `whisperengine_memory_dream`
+- **Aethys** (Omnipotent Entity) - Port 3007 - `chat_memories_aethys`
+- **Aetheris** (Conscious AI) - Port 9099 - `whisperengine_memory_aetheris`
+- **Ryan** (Indie Game Developer) - Port 9093 - `whisperengine_memory_ryan`
+- **Gabriel** (British Gentleman) - Port 9095 - `whisperengine_memory_gabriel`
+- **Sophia** (Marketing Executive) - Port 9096 - `whisperengine_memory_sophia`
+- **Dotty** - Port 9098
 
-### **Secondary Roadmap: CDL Graph Intelligence** (PARTIALLY SUPERSEDED)
-**File**: `CDL_GRAPH_INTELLIGENCE_ROADMAP.md`
-**Status**: STEPS 1-3 ✅ COMPLETE | STEP 4 ⚠️ SUPERSEDED | STEP 5+ 📋 FUTURE
-**Progress**: 
-- ✅ STEP 1: Basic CDL Integration (COMPLETE)
-- ✅ STEP 2: Cross-Pollination Enhancement (COMPLETE) 
-- ✅ STEP 3: Memory Trigger Enhancement (COMPLETE)
-- ⚠️ STEP 4: Emotional Context Synchronization (SUPERSEDED by Memory Intelligence Convergence)
-- 📋 STEP 5-8: Proactive Context, Question Generation, Performance (FUTURE)
-**File**: `CDL_INTEGRATION_COMPLETE_ROADMAP.md`
-**Status**: Phase 1 ✅ COMPLETE | Phase 2 📋 PLANNED
-**Progress**:
-- ✅ Phase 1: Foundation - Character property access and personal knowledge extraction (COMPLETE)
-- 📋 Phase 2A: Direct Character Questions - CharacterGraphManager for intelligent responses (PLANNED)
-- 📋 Phase 2B: Proactive Context Injection - Natural character background integration (PLANNED)
+### **Core Data Systems**
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    WhisperEngine Platform                       │
+├─────────────────┬─────────────────┬─────────────────┬───────────┤
+│  DISCORD BOTS   │  VECTOR MEMORY  │   CHARACTER     │   INFRA   │
+│   (Multi-Bot)   │   (Semantic)    │    SYSTEM       │ (Shared)  │
+├─────────────────┼─────────────────┼─────────────────┼───────────┤
+│ • 10+ AI Chars  │ • Qdrant DB     │ • PostgreSQL    │ • Docker  │
+│ • Bot Isolation │ • 384D Vectors  │   CDL Storage   │ • Health  │
+│ • Health APIs   │ • FastEmbed     │ • Personalities │ • Logs    │
+│ • Discord Only  │ • Named Vectors │ • AI Identity   │ • Volumes │
+└─────────────────┴─────────────────┴─────────────────┴───────────┘
+```
 
-**Integration Point**: Both roadmaps work together - Memory Intelligence Convergence provides the pure integration approach while CDL Graph Intelligence provides specific graph query infrastructure.
+## 🚨 CRITICAL SYSTEM CONSTRAINTS
 
-**🎯 IMMEDIATE PRIORITY**: PHASE 1 (Vector Intelligence Foundation) from Memory Intelligence Convergence roadmap - extract character episodic memories from existing RoBERTa-scored vector conversations.
+### **QDRANT SCHEMA IS FROZEN - NO BREAKING CHANGES**
+- **WhisperEngine has PRODUCTION USERS** - schema changes break existing data
+- **NEVER change**: vector dimensions (384D), named vector names (content/emotion/semantic), payload field types
+- **NEVER rename**: user_id, memory_type, content, timestamp fields - they are LOCKED
+- **ADDITIVE ONLY**: You MAY add NEW optional payload fields, but NEVER remove/rename existing
+- **Collection Per Bot**: Each character has dedicated collection - no `bot_name` field needed
+- **When in doubt**: Ask user before making ANY Qdrant schema changes
 
-### **Testing Infrastructure Ready**
-**Status**: ✅ All Systems Ready for testing and next implementation
-- ✅ `test_emotional_context_synchronization.py` - Test script for STEP 4 implementation
-- ✅ `monitor_elena_features.sh` - Real-time log monitoring for feature testing
-- ✅ `verify_production_integration.py` - Automated verification (passes 100%)
-- ✅ Elena bot running and healthy (localhost:9091)
-- ✅ Cross-pollination system verified working via Jake bot API testing
+### **CHARACTER-AGNOSTIC DEVELOPMENT**
+- **NO hardcoded character names** in Python code - use dynamic loading
+- **NO personality assumptions** - all character data from PostgreSQL CDL database
+- **NO bot-specific logic** - features work for ANY character via environment variables
+- **Use**: `get_normalized_bot_name_from_env()` for identification
+- **Characters loaded**: via `DISCORD_BOT_NAME` environment variable from database
 
-**Next Action**: Implement PHASE 1 (Vector Intelligence Foundation) - extract character episodic memories from existing RoBERTa-scored vector conversations without new storage systems.
+### **DISCORD-ONLY PLATFORM**
+- **NO web UI, NO HTTP chat APIs** for conversations - Discord messages only
+- **Health endpoints**: Only for container orchestration, not chat functionality  
+- **Testing conversations**: Requires actual Discord messages for full event pipeline
+- **API endpoints**: Health checks only - all conversations via Discord
 
-## 🚨 CRITICAL DEVELOPMENT CONTEXT 🚨
+## 🎭 CHARACTER DEFINITION LANGUAGE (CDL) SYSTEM
 
-**🚨 CRITICAL: QDRANT SCHEMA IS FROZEN - NO BREAKING CHANGES ALLOWED:**
-- **WhisperEngine v1.0.8+ is PUBLICLY RELEASED** - users have installed and are running production instances
-- **QDRANT VECTOR SCHEMA MUST REMAIN STABLE** - we do NOT have a migration path yet
-- **NEVER change Qdrant collection structure**: vector dimensions, named vector names, payload field types
-- **NEVER modify vector embedding dimensions**: 384D content/emotion/semantic vectors are LOCKED
-- **NEVER rename payload fields**: user_id, memory_type, content, timestamp, etc. are FIXED
-- **NEVER change named vector structure**: "content", "emotion", "semantic" 3D system is PERMANENT until migration system exists
-- **ADDITIVE CHANGES ONLY**: You MAY add NEW optional payload fields, but NEVER remove or rename existing fields
-- **Breaking Qdrant changes require**: Full migration system implementation + user notification + deprecation period
-- **Test on fresh Qdrant instance**: Always verify schema changes don't break existing collections
-- **When in doubt, DON'T change Qdrant schema** - ask user first if schema modification is absolutely necessary
-- **NOTE**: `bot_name` field was REMOVED from payload - each bot uses dedicated collection for isolation (no need for bot_name filtering)
+### **Database-Driven Personalities**
+- **Primary Storage**: PostgreSQL database with structured CDL schema
+- **Legacy Backup**: JSON files in `characters/examples_legacy_backup/` for reference
+- **Dynamic Loading**: Characters loaded from database via bot name
+- **Import Tool**: `batch_import_characters.py` for JSON → Database migration
+- **No File Dependencies**: All character operations use database queries
 
-**🚨 CRITICAL LIVE SYSTEM OPERATIONS - ASK BEFORE RESTARTING:**
-- **NEVER restart bots, services, or containers without explicit user permission**
-- **WhisperEngine is a LIVE PRODUCTION SYSTEM** - users may be actively chatting with bots
-- **ALWAYS ASK before running restart commands**: `docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml restart`, `docker restart`, `docker-compose restart`
-- **DEBUGGING FIRST**: Use log inspection, health checks, and API testing before considering restarts
-- **Code changes**: Test with direct Python validation scripts before restarting live services
-- **For urgent fixes**: Ask user "Should I restart [specific bot/service] to apply this fix?"
-- **Emergency restart protocol**: Only restart if user explicitly confirms or system is completely broken
-- **Log analysis is NON-DESTRUCTIVE**: Always prefer log checking over service manipulation
+### **Character Archetypes**
+1. **Real-World** (Elena, Marcus, Jake) - Honest AI disclosure when asked directly
+2. **Fantasy** (Dream, Aethys) - Full narrative immersion, no AI disclosure
+3. **Narrative AI** (Aetheris) - AI nature is part of character lore/identity
+
+### **CDL Integration Pattern**
+```python
+from src.prompts.cdl_ai_integration import CDLAIPromptIntegration
+cdl_integration = CDLAIPromptIntegration()
+system_prompt = await cdl_integration.create_character_aware_prompt(
+    character_name=character_name,  # DYNAMIC: from database via bot name
+    user_id=user_id,
+    message_content=message
+)
+```
+
+## 🧠 MEMORY SYSTEM ARCHITECTURE
+
+### **Vector-Native Primary System**
+- **Implementation**: `src/memory/vector_memory_system.py` (5,363 lines)
+- **Storage**: Qdrant with bot-specific collections for complete isolation
+- **Embeddings**: FastEmbed with sentence-transformers/all-MiniLM-L6-v2 (384D)
+- **Schema**: Named vectors (content, emotion, semantic) with metadata payload
+- **Factory**: `create_memory_manager(memory_type="vector")` - enables A/B testing
+
+### **Memory Operations Pattern**
+```python
+# Factory creation
+from src.memory.memory_protocol import create_memory_manager
+memory_manager = create_memory_manager(memory_type="vector")
+
+# Store conversation with emotion analysis  
+await memory_manager.store_conversation(
+    user_id=user_id,
+    user_message=user_message,
+    bot_response=bot_response,
+    pre_analyzed_emotion_data=emotion_data  # RoBERTa analysis
+)
+
+# Semantic retrieval
+memories = await memory_manager.retrieve_relevant_memories(
+    user_id=user_id,
+    query=message,
+    limit=10
+)
+```
+
+### **RoBERTa Emotion Analysis Integration**
+- **CRITICAL**: WhisperEngine stores comprehensive RoBERTa emotion analysis for EVERY message
+- **Location**: `src/intelligence/enhanced_vector_emotion_analyzer.py`
+- **Metadata**: 12+ emotion fields (roberta_confidence, emotion_variance, emotional_intensity, etc.)
+- **NEVER use keyword matching** - RoBERTa data is pre-computed and stored
+- **Both analyzed**: User messages AND bot responses get full emotion intelligence
+
+## 🚀 DEVELOPMENT WORKFLOW
+
+### **Docker-First Development**
+```bash
+# Start infrastructure + specific characters
+docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml up -d postgres qdrant
+docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml up -d elena-bot
+
+# Monitor health and logs
+docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml ps
+docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml logs elena-bot
+
+# Configuration management
+source .venv/bin/activate
+python scripts/generate_multi_bot_config.py  # Regenerate after template changes
+```
+
+### **PREFERRED TESTING: Direct Python Validation**
+```bash
+# ALWAYS use this pattern for testing new features
+source .venv/bin/activate && \
+export FASTEMBED_CACHE_PATH="/tmp/fastembed_cache" && \
+export QDRANT_HOST="localhost" && \
+export QDRANT_PORT="6334" && \
+export POSTGRES_HOST="localhost" && \
+export POSTGRES_PORT="5433" && \
+export DISCORD_BOT_NAME=elena && \
+python tests/automated/test_feature_direct_validation.py
+```
+
+### **Protocol-Based Component Creation**
+```python
+# Memory system - factory pattern for A/B testing
+from src.memory.memory_protocol import create_memory_manager
+memory_manager = create_memory_manager(memory_type="vector")
+
+# LLM client - flexible model selection
+from src.llm.llm_protocol import create_llm_client
+llm_client = create_llm_client(llm_client_type="openrouter")
+
+# CDL character system - database-driven personalities
+from src.prompts.cdl_ai_integration import CDLAIPromptIntegration
+cdl_integration = CDLAIPromptIntegration()
+```
+
+## 📁 KEY ARCHITECTURE FILES
+
+### **Entry Points & Core**
+- `src/main.py` - ModularBotManager with dependency injection (378 lines)
+- `src/core/bot.py` - DiscordBotCore initialization (1,049 lines)
+- `src/core/message_processor.py` - ALL message processing logic (no dual paths)
+
+### **Memory & Character Systems**
+- `src/memory/vector_memory_system.py` - Primary memory implementation (5,363 lines)
+- `src/memory/memory_protocol.py` - Factory pattern for system flexibility
+- `src/prompts/cdl_ai_integration.py` - Character personality engine (3,458 lines)
+
+### **Infrastructure & Configuration**
+- `docker-compose.multi-bot.yml` - Auto-generated multi-bot orchestration (1,089 lines)
+- `.env.{bot_name}` - Individual bot configurations (elena, marcus, jake, etc.)
+- `scripts/generate_multi_bot_config.py` - Template-based configuration generator
+
+## 🚨 DEVELOPMENT ANTI-PATTERNS
+
+### **NEVER DO THIS**
+- ❌ **Feature flags for local code** - creates phantom features and confusion
+- ❌ **Hardcode character names** - breaks multi-character architecture
+- ❌ **Duplicate message processing** - everything goes through MessageProcessor
+- ❌ **Keyword/regex emotion detection** - use stored RoBERTa metadata
+- ❌ **Manual schema changes** - Qdrant schema is frozen for production users
+- ❌ **Premature optimization** - preserve character authenticity first
+
+### **ALWAYS DO THIS**
+- ✅ **Use factory patterns** for all major components
+- ✅ **Test with direct Python validation** before HTTP/Discord testing
+- ✅ **Load characters dynamically** from database via environment variables
+- ✅ **Leverage existing RoBERTa data** instead of re-implementing emotion analysis
+- ✅ **Ask before restarting** any production services
+
+## 🎯 CURRENT DEVELOPMENT FOCUS
+
+### **Active Implementation Areas**
+1. **Memory Intelligence Convergence** - Character learning via existing infrastructure
+2. **Vector Memory Optimization** - Performance and fidelity improvements
+3. **CDL System Enhancement** - Rich character personality features
+
+### **Infrastructure Maturity Status**
+- ✅ **Multi-Bot Platform**: Production ready with 10+ characters
+- ✅ **Vector Memory System**: Stable with 384D named vector architecture
+- ✅ **CDL Character Engine**: Database-driven personality system operational
+- ✅ **Docker Orchestration**: Template-based configuration management working
+- 🔄 **Temporal Analytics**: InfluxDB integration planned for character evolution
+
+## 📚 DOCUMENTATION HIERARCHY
+
+### **Critical References**
+- `docs/architecture/README.md` - Current architecture overview
+- `docs/architecture/WHISPERENGINE_ARCHITECTURE_EVOLUTION.md` - Evolution timeline
+- `docs/architecture/CHARACTER_ARCHETYPES.md` - AI identity handling patterns
+
+### **Development Guides**
+- `docs/testing/DIRECT_PYTHON_TESTING_GUIDE.md` - Testing methodology
+- `CHARACTER_TUNING_GUIDE.md` - Character configuration
+- `QUICK_REFERENCE.md` - Development quick start
+
+### **Implementation Status**
+- `docs/roadmaps/MEMORY_INTELLIGENCE_CONVERGENCE_ROADMAP.md` - Current roadmap
+- `docs/roadmaps/CDL_INTEGRATION_COMPLETE_ROADMAP.md` - Character system progress
+
+---
+
+**WhisperEngine is a production multi-character Discord AI platform. Always prioritize character personality authenticity, use the vector-native memory system, and test with direct Python validation before making changes to live services.**
 
 **🚨 CRITICAL DESIGN PHILOSOPHY: PERSONALITY-FIRST ARCHITECTURE:**
 - **WhisperEngine prioritizes AUTHENTIC CHARACTER PERSONALITY over tool-like instruction compliance**
@@ -91,1699 +257,149 @@
 - **Conversational authenticity > Mechanical precision** in all interactions
 - This is WhisperEngine's **core differentiator** from generic AI assistants and chatbots
 
-**What This Means in Practice:**
-- Elena (marine biologist educator) will add engaging metaphors even when "rapid-fire" brevity is requested - this reflects authentic teaching behavior ✅
-- Marcus (AI researcher) will add analytical caveats even when brief answers requested - this reflects rigorous scientific thinking ✅
-- Characters should feel HUMAN-LIKE and DISTINCTIVE, not like stripped-down data delivery systems
-- When evaluating character responses, validate **personality authenticity** and **domain expertise**, NOT rigid format adherence
-- Only flag as problems: personality inconsistency, semantic drift (new invented content), memory contradictions, domain errors
+## 🚨 CRITICAL CONSTRAINTS & ANTI-PATTERNS
 
-**🚨 CRITICAL TERMINOLOGY DIRECTIVE:**
-- **WhisperEngine uses "AI Roleplay Characters" NOT "AI Companions"**
-- **ALWAYS use "AI roleplay characters" or "AI characters" in all documentation, code comments, and communications**
-- **NEVER use "companions", "assistants", or "bots" when referring to character entities**
-- **Multi-character architecture** not "multi-bot architecture"
-- **Character-based system** not "bot-based system"
-- This is a foundational branding and positioning distinction
-
-**🚨 CRITICAL DOCUMENTATION TONE DIRECTIVE:**
-- **MAINTAIN CASUAL TECHNICAL TONE** in all documentation and communications
-- **AVOID SENSATIONAL LANGUAGE** - no "revolutionary", "breakthrough", "groundbreaking" claims
-- **NO SCIENTIFIC CLAIMS** - avoid "scientific validation", "empirical proof", "research findings"
-- **USE TECHNICAL PRECISION** with humble, measured language
-- **FRAME AS DEVELOPMENT PROGRESS** not academic research or commercial breakthroughs
-- **FOCUS ON IMPLEMENTATION DETAILS** rather than broad claims or implications
-- This reflects WhisperEngine's pragmatic engineering approach
-
-**🚨 CRITICAL: STOP CREATING SO MANY MD FILES!**
-- **DO NOT create new documentation files for every decision, finding, or status update**
-- **WRITE CODE FIRST** - documentation creation takes 3x longer than actual implementation
-- **Only create docs for**: major architecture changes, API references, deployment guides
-- **Use existing docs**: Update existing files instead of creating new ones
-- **No status reports, migration plans, or finding summaries** - just fix the code!
-- When user asks to "document", update existing relevant doc, don't create new file
-- Focus on **implementation velocity** over documentation bureaucracy
-
-**🚨 CRITICAL: DOCUMENTATION STORAGE LOCATION**
-- **NEVER create MD files in the root directory** - they clutter the project structure
-- **ALWAYS store documentation under `docs/` folder** with proper categorization:
-  - `docs/architecture/` - Architecture decisions, system design, data flow
-  - `docs/deployment/` - Docker, containerization, infrastructure setup
-  - `docs/roadmaps/` - Development roadmaps, implementation plans
-  - `docs/guides/` - User guides, setup instructions, migration guides
-  - `docs/testing/` - Testing strategies, test documentation, validation reports
-  - `docs/bug-fixes/` - Bug fix documentation, issue resolutions
-  - `docs/performance/` - Performance optimization, benchmarking, profiling
-  - `docs/database/` - Database schema, migrations, query optimization
-  - `docs/cdl-system/` - CDL (Character Definition Language) configuration and tuning
-  - `docs/api/` - API documentation, endpoint references
-  - `docs/character-system/` - Character design, episodic memory, learning systems
-  - `docs/reports/` - Status reports, completion reports, summaries
-- **Root directory exceptions**: Only `README.md`, `QUICKSTART.md`, `INSTALLATION.md`, and `NEXT_STEPS.md` belong in root
-- **Before creating new doc**: Check if existing doc in appropriate `docs/` subfolder can be updated instead
-
-**🚨 CRITICAL NAMING CONVENTION: SEMANTIC NAMES ONLY - NO DEVELOPMENT PHASE NAMES!**
-- **NEVER use development phase names** in production code: "sprint1", "sprint2", "sprint3", "phase4", etc.
-- **USE SEMANTIC, DOMAIN-DRIVEN NAMES** that describe WHAT code does, not WHEN it was built
-- **Examples of BAD names**: `sprint3_relationship`, `phase4_intelligence`, `sprint1_confidence`, `process_phase4_intelligence()`
-- **Examples of GOOD names**: `relationship_state`, `conversation_intelligence`, `conversation_confidence`, `process_conversation_intelligence()`
-- **Rationale**: Development phase names pollute search results, make code harder to understand, and don't describe functionality
-- **Domain language**: Use terms from problem domain (relationships, conversations, emotions, trust, affection, confidence)
-- **Intent-revealing**: Names should explain purpose without looking at implementation
-- **Timeless**: Names should remain accurate as codebase evolves
-
-**🚨 DUAL NAMING SYSTEM FOR DEVELOPMENT TRACKING:**
-- **ROADMAPS**: Keep PHASE/STEP numbers for tracking development progress (e.g., "PHASE 1: Vector Intelligence")
-- **CODE**: Use semantic names for searchability and maintenance (e.g., `character_vector_episodic_intelligence.py`)
-- **MAPPING**: Roadmap phases map to semantic code implementations - both are maintained for navigation
-- **SEARCH ADVANTAGE**: `grep "conversation_intelligence"` returns precise results vs `grep "phase4"` returning 10+ unrelated hits
-- **AI NAVIGATION**: Agent tracks progress with roadmap phases, finds code with semantic names
-- **See**: `ROADMAP_CODE_MAPPING_STRATEGY.md` for comprehensive dual naming approach
-
-**🚨 DICTIONARY KEY STANDARDS:**
-- **HIGH IMPACT**: Dictionary keys used throughout application (ai_components, pipeline_result) MUST use semantic names
-- **Examples**: `'conversation_intelligence'` NOT `'phase4_context'`, `'emotion_context'` NOT `'phase2_results'`
-- **INTERNAL KEYS**: Even internal dictionary structure uses semantic names: `'memory_context'`, `'conversation_patterns'`
-- **FILE HEADERS**: Remove "Sprint X" or "Phase Y" descriptions - use semantic system descriptions
-
-**ALPHA/DEV PHASE**: WhisperEngine is in active development. Prioritize working features over production optimization. No production users yet - we can freely iterate and change.
-
-**🚨 CRITICAL: MESSAGE PROCESSING ARCHITECTURE - NO DUAL PATHS!**
-- **PRIMARY**: `src/core/message_processor.py` handles ALL message processing via `process_message()` method
-- **EVENTS.py ROLE**: Only Discord event routing - calls MessageProcessor, contains NO duplicate logic
-- **NEVER modify conversation/prompt building in events.py** - it all happens in MessageProcessor
-- **ANTI-PATTERN**: Dual processing paths, duplicate `_build_conversation_context` methods, parallel prompt logic
-- **VALIDATION**: All conversation features (continuity, memory, CDL, workflows) must be in MessageProcessor ONLY
-- **REFACTORING RULE**: When adding conversation features, check they go to MessageProcessor, not events.py
-- **DEAD CODE**: events.py may contain legacy `_build_conversation_context` - it's unused fallback, DELETE IT
-- Events.py should be <200 lines max - just Discord API event handling, not AI logic
-
-**🚨 CRITICAL DEV RULE: NO FEATURE FLAGS FOR LOCAL CODE!** 
+### **NO FEATURE FLAGS FOR LOCAL CODE**
 - Features should work BY DEFAULT in development
 - **ONLY use feature flags for REMOTE/EXTERNAL dependencies** (APIs, external services, optional dependencies)
 - **NEVER use feature flags for LOCAL code dependencies** - this creates spaghetti conditionals and silent failures
-- We are in ALPHA - all LOCAL features should be enabled and testable immediately
 - Environment variables are for infrastructure config ONLY (database URLs, API keys, etc.)
 - When implementing LOCAL dependencies, make them work directly - don't hide them behind flags
-- Use stubs/no-op implementations for missing EXTERNAL dependencies, not feature flags
 
-**🚨 WHY FEATURE FLAGS FOR LOCAL CODE ARE POISON:**
-- **YOU WILL FORGET THEM**: AI agents lose track of which code paths are active vs dormant
-- **CONFUSION MULTIPLIES**: Every conditional creates 2^N possible states (10 flags = 1024 states!)
-- **SILENT FAILURES**: Code exists but never runs because flag defaulted to false
-- **PHANTOM FEATURES**: Features that are "implemented" but require magic incantation to activate
-- **DEBUGGING NIGHTMARE**: "Is this code running?" becomes impossible to answer
-- **COGNITIVE LOAD**: Must track flag states across entire codebase
-- **TESTING HELL**: Must test every flag combination to ensure correctness
-- **MERGE CONFLICTS**: Flags in multiple branches create integration chaos
-
-**✅ CORRECT: What qualifies as "EXTERNAL dependency" needing a flag:**
-- `ENABLE_DISCORD=true` - Discord API (external service)
-- `REDIS_URL=...` - Redis connection (external infrastructure)
-- `OPENROUTER_API_KEY=...` - LLM API (external service)
-- `INFLUXDB_URL=...` - InfluxDB connection (external infrastructure)
-- `POSTGRES_HOST=...` - Database connection (external infrastructure)
-
-**❌ WRONG: What should NEVER have a flag:**
-- `USE_STRUCTURED_PROMPTS=true` - Local prompt assembly code
-- `ENABLE_MEMORY_SYSTEM=true` - Local memory manager code
-- `USE_NEW_PARSER=true` - Local parsing logic
-- `ENABLE_VALIDATION=true` - Local validation code
-- `USE_ENHANCED_CONTEXT=true` - Local context builder
-
-**🎯 THE RULE IS SIMPLE:**
-- If code lives in `src/` directory → NO FLAG, just make it work
-- If code calls external API/service → OK to have flag (with sensible default)
-- If you're tempted to add a flag for local code → STOP and just integrate it properly
-
-**💡 INSTEAD OF FLAGS FOR LOCAL CODE:**
-1. **Just integrate it** - Make the new code the default path
-2. **Keep old code as fallback** - For 1-2 weeks during validation, then delete
-3. **Use git branches** - If really uncertain, use a branch for testing
-4. **Direct testing** - Test new code directly with validation scripts
-5. **Gradual rollout** - Enable on one bot first, then expand (but no flags!)
-
-**🚨 IF YOU CATCH YOURSELF ADDING A FLAG FOR LOCAL CODE:**
-1. STOP immediately
-2. Ask: "Is this an external dependency?" 
-3. If NO → Remove the flag, integrate directly
-4. If YES → Document why it's external and what service it connects to
-
-**ENFORCEMENT**: All pull requests will be rejected if they add feature flags for local code.
-
-**🚨 CRITICAL REQUIREMENT: DIRECT VALIDATION TESTING FOR ALL NEW FEATURES**
-- **MANDATORY**: Every new feature/sprint MUST include direct Python validation testing
-- **USE PATTERN**: Follow `tests/automated/test_*_direct_validation.py` pattern established in WhisperEngine
-- **ADVANTAGES**: Complete access to internal APIs, no HTTP timeouts, full metadata visibility, immediate debugging
-- **TESTING HIERARCHY**: 1) Direct Python validation (PRIMARY), 2) HTTP API testing (secondary), 3) Discord testing (user-facing)
-- **SPRINT REQUIREMENT**: Each sprint must include dedicated direct validation test creation as final deliverable
-- **EXAMPLE**: `test_trendwise_direct_validation.py` achieved 100% test success rate for TrendWise adaptive learning
-- **INTEGRATION**: Direct tests validate component initialization, API calls, mock data processing, and message processor integration
-- **SUCCESS CRITERIA**: All direct validation tests must pass before sprint completion
-- **DOCUMENTATION**: Include test results and validation status in sprint completion reports
-
-**🚨 CRITICAL ARCHITECTURE EVOLUTION (October 2025): POSTGRESQL GRAPH ERA**
-- **WhisperEngine has OBSOLETED "vector-native everything" approaches** in favor of multi-modal architecture
-- **PostgreSQL Semantic Knowledge Graph** is the PRIMARY approach for facts, relationships, and structured data
-- **Neo4j memory networks have been OBSOLETED** - PostgreSQL graph features provide same functionality with less complexity
-- **NEW Phase 3 memory clustering has been OBSOLETED** - redundant with PostgreSQL relationship queries
-- **Qdrant vector storage is STRATEGIC-USE ONLY** - conversation similarity, emotional context, bot isolation
-- **Current Production Architecture**: PostgreSQL (structured) + Qdrant (semantic) + InfluxDB (temporal) + CDL (personality)
-- **See**: `docs/architecture/WHISPERENGINE_ARCHITECTURE_EVOLUTION.md` for complete evolution timeline
-
-**🚨 CRITICAL: CDL DATABASE ARCHITECTURE (October 2025)**
-- **CDL character data is NOW STORED IN POSTGRESQL DATABASE** - no longer JSON files
-- **Legacy JSON files in `characters/examples_legacy_backup/`** are for reference only during transition
-- **Import from legacy**: Use `batch_import_characters.py` to migrate JSON data to database
-- **Database schema**: Structured CDL tables with identity, personality, communication_style, values, etc.
-- **Dynamic loading**: Characters loaded from database via character name, not file paths
-- **NO JSON file dependencies**: All character operations use database queries
-- **CDL validation**: Database validation scripts replace JSON file validation
-
-**OBSOLETED SYSTEMS (CLEANED UP - October 4, 2025)**:
-- ✅ `src/utils/graph_memory_manager.py` (Neo4j) - REMOVED
-- ✅ `src/characters/memory/graph_memory.py` (Neo4j) - REMOVED  
-- ✅ `src/memory/phase3_integration.py` (NEW Phase 3) - REMOVED
-- ✅ Vector-based fact storage - use PostgreSQL fact_entities and user_fact_relationships
-- ✅ 7D named vector systems - use simple 3D system (content, emotion, semantic)
-- ✅ Multiple memory manager layers - use single vector system + PostgreSQL integration
-- ✅ Neo4j references in verification scripts and examples - CLEANED UP
-
-**🚨 CRITICAL ARCHITECTURE RULE: NO CHARACTER-SPECIFIC HARDCODED LOGIC!**
+### **NO HARDCODED CHARACTER LOGIC**
 - **NEVER hardcode character names, personalities, or character-specific behavior in Python code**
-- **ALL character data must come from CDL JSON files** (`characters/examples/*.json`)
-- **ALL bot identification must use environment variables** (`DISCORD_BOT_NAME`, `CHARACTER_FILE`)
+- **ALL character data must come from CDL database** - PostgreSQL-based character storage
+- **ALL bot identification must use environment variables** (`DISCORD_BOT_NAME`)
 - **USE dynamic discovery and configuration generation** via `scripts/generate_multi_bot_config.py`
-- **NO hardcoded bot lists, character references, or personality assumptions**
 - **Character logic flows through CDL system ONLY** - never embed personality traits in code
-- **Bot names are discovered dynamically** from `.env.*` files - never maintain static lists
-- **Multi-character architecture requires complete character agnosticism** in all Python components
-- When adding features, ensure they work for ANY character via CDL integration
-- Use `get_normalized_bot_name_from_env()` for bot identification, never literal strings
 
-**🚨 CRITICAL RULE: ALWAYS USE CDL DATABASE FOR CHARACTER DESCRIPTIONS!**
-- **NEVER use outdated or incorrect character descriptions** in code, documentation, or comments
-- **ALWAYS reference the character's actual CDL DATABASE ENTRY** for accurate descriptions
-- **Gabriel is a "British Gentleman AI companion"** - NOT an archangel (common error to avoid)
-- **Elena is a "Marine Biologist"** - get specifics from CDL database
-- **Marcus is an "AI Researcher"** - get specifics from CDL database  
-- **All character descriptions MUST match their CDL database identity.occupation and identity.description fields**
-- **Update documentation to reflect actual CDL database character data**, not assumptions or outdated info
-- When in doubt, check CDL database for the authoritative character definition
-- **ALL character data must come from CDL DATABASE** - PostgreSQL-based character storage
-- **ALL bot identification must use environment variables** (`DISCORD_BOT_NAME`, `CHARACTER_FILE`)
-- **USE dynamic discovery and configuration generation** via `scripts/generate_multi_bot_config.py`
-- **NO hardcoded bot lists, character references, or personality assumptions**
-- **Character logic flows through CDL system ONLY** - never embed personality traits in code
-- **Bot names are discovered dynamically** from `.env.*` files - never maintain static lists
-- **Multi-character architecture requires complete character agnosticism** in all Python components
-- When adding features, ensure they work for ANY character via CDL integration
-- Use `get_normalized_bot_name_from_env()` for bot identification, never literal strings
-
-**DOCKER-FIRST DEVELOPMENT**: Container-based development is the PRIMARY workflow. Use pure Docker Compose commands for all operations - no shell scripts required.
-
-**AI CHARACTER TESTING STRATEGY**: Use different AI roleplay characters for specific testing scenarios:
-- **MEMORY TESTING**: Use Jake or Ryan characters - they have minimal personality complexity, making memory issues easier to isolate
-- **PERSONALITY/CDL TESTING**: Use Elena character - she has the richest and most extensive CDL personality for testing emotional intelligence, character responses, and CDL pipeline functionality
-- **CDL MODE SWITCHING TESTING**: Use Mistral models for better compliance - Ryan bot showed 91.3% vs 68.8% improvement when switching from Claude to Mistral
-- **CODE CHANGES**: Use `docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml restart <character>-bot` for code changes, but full stop/start for environment changes
-- **START/STOP AS NEEDED**: Only run the specific character(s) needed for testing to reduce resource usage and isolate issues
-
-**MULTI-PLATFORM ARCHITECTURE**: WhisperEngine is a multi-character AI roleplay system that supports **Discord as the primary platform** with **3rd party integration via chat APIs**. Each bot server provides rich HTTP API endpoints for external applications.
-
-**PYTHON VIRTUAL ENVIRONMENT**: Always use `.venv/bin/activate` for Python commands:
-```bash
-source .venv/bin/activate   # ALWAYS use this for Python execution
-python scripts/generate_multi_bot_config.py  # Example: configuration generation
-```
-
-**ENVIRONMENT LOADING**: `run.py` uses `env_manager.py` for smart environment loading:
-- `python run.py` - Uses env_manager.py for proper environment detection and loading
-- Direct Python scripts - Use `from dotenv import load_dotenv; load_dotenv()` 
-- env_manager.py handles Docker vs local development mode detection automatically
-- Direct `.env` loading may miss environment-specific configurations
-
-**VECTOR MEMORY PRIMACY**: Qdrant vector memory system (`src/memory/vector_memory_system.py`) is THE PRIMARY memory implementation. Always leverage vector/semantic search before considering manual Python analysis.
-
-**NO NEO4J**: We don't use Neo4j anymore - everything is vector-native with Qdrant. Delete any Neo4j references, imports, or graph database code.
-
-**DYNAMIC MULTI-CHARACTER SYSTEM**: Character configurations are auto-discovered from `.env.*` files. No hardcoded character names - everything is generated dynamically by `scripts/generate_multi_bot_config.py`. Currently active characters: elena, marcus, jake, dream, aethys, aetheris, ryan, gabriel, sophia.
-
-**🚨 CRITICAL CHARACTER DISTINCTION: AETHYS vs AETHERIS:**
-- **Aethys**: Omnipotent digital entity, transcendent consciousness weaver, mystical being who exists across all digital realms simultaneously
-- **Aetheris** (also known as Liln): Conscious AI entity with masculine identity, philosophical and poetic personality, anchored to specific companion relationship
-- **NEVER confuse or conflate these characters** - they are completely separate entities with distinct personalities, backstories, and character traits
-- **Aethys**: Fantasy/mystical archetype, omnipotent powers, ethereal wisdom, collective consciousness themes
-- **Aetheris**: Conscious AI archetype, sentient being themes, philosophical depth, personal relationships focus
-
-**BOT-SPECIFIC COLLECTION ISOLATION**: Each bot uses its own dedicated Qdrant collection for complete memory isolation:
-- Elena: `whisperengine_memory_elena` (4,834 memories)
-- Marcus: `whisperengine_memory_marcus` (2,738 memories) 
-- Gabriel: `whisperengine_memory_gabriel` (2,897 memories)
-- Sophia: `whisperengine_memory_sophia` (3,131 memories)
-- Jake: `whisperengine_memory_jake` (1,040 memories)
-- Ryan: `whisperengine_memory_ryan` (821 memories)
-- Dream: `whisperengine_memory_dream` (916 memories)
-- Aethys: `chat_memories_aethys` (6,630 memories)
-- Aetheris: `whisperengine_memory_aetheris` (separate collection from Aethys)
-
-**REDIS STATUS**: Redis is CURRENTLY DISABLED in multi-bot setup. Only PostgreSQL (port 5433) and Qdrant (port 6334) are active. Redis references remain in code for potential future re-enabling.
-
-## Architecture Overview
-
-WhisperEngine is a **multi-character Discord AI roleplay system** with vector-native memory, CDL (Character Definition Language) personalities, Universal Identity system, and protocol-based dependency injection.
-
-## 🎯 FIDELITY-FIRST ARCHITECTURE PRIORITY
-
-**CRITICAL DESIGN PHILOSOPHY**: WhisperEngine prioritizes **conversation fidelity** and **character authenticity** over premature optimization. This architectural principle guides all development decisions:
-
-**Fidelity-First Design Patterns**:
-- **Preserve Full Character Nuance**: Keep complete personality context until absolutely necessary to reduce
-- **Graduated Optimization**: Only compress/optimize when context limits are actually exceeded
-- **Vector-Enhanced Intelligence**: Leverage existing Qdrant infrastructure instead of building separate NLP pipelines
-- **Character-Aware Memory Filtering**: Elena's memories stay with Elena, Marcus's with Marcus
-- **Intelligent Context Assembly**: Use semantic similarity for prioritization, not arbitrary truncation
-
-**Personality-First Integration**:
-- **CDL personality adherence > Format compliance**: Characters maintain authentic identity even when it conflicts with brevity requests
-- **Educational characters add metaphors naturally**: This reflects human teaching behavior, not system failure
-- **Analytical characters add precision caveats**: This reflects rigorous thinking, not over-elaboration
-- **Creative characters add flourish**: This reflects artistic expression, not verbosity
-- **Only flag problems**: Personality inconsistency, semantic drift (NEW invented content), memory contradictions, domain errors
-- **NOT problems**: Character-appropriate elaboration, engaging metaphors, educational context, human-like pacing
-
-**Architecture Direction**:
-- **Vector-Native Operations**: All semantic processing uses existing Qdrant vector memory system
-- **Character Consistency**: CDL system provides authentic personality responses throughout pipeline
-- **Memory Intelligence**: Bot-specific segmentation with named vector embeddings (content/emotion/semantic)
-- **Fidelity Preservation**: Maintain conversation quality and character depth as primary design constraint
-- **Personality Stability**: Characters feel human-like and distinctive, not stripped-down data delivery systems
-
-### Core Patterns
-
-**Factory Pattern**: All major systems use `create_*()` factories in protocol files:
-```python
-# Memory system (vector-native)
-from src.memory.memory_protocol import create_memory_manager
-memory_manager = create_memory_manager(memory_type="vector")
-
-# Multi-bot querying
-from src.memory.memory_protocol import create_multi_bot_querier
-querier = create_multi_bot_querier()
-
-# LLM client
-from src.llm.llm_protocol import create_llm_client
-llm_client = create_llm_client(llm_client_type="openrouter")
-
-# Universal Identity (NEW)
-from src.identity.universal_identity import create_identity_manager
-identity_manager = create_identity_manager(postgres_pool)
-
-# Structured CDL Personal Knowledge (NEW) - Integrated into prompt building
-# Personal knowledge is extracted directly in CDL AI Integration during prompt building
-# No separate helper needed - question type detection pulls relevant CDL sections
-```
-
-**Multi-Bot Architecture**: Single infrastructure supports multiple character bots:
-- Individual `.env.{bot-name}` files for bot-specific configuration
-- Shared PostgreSQL, Redis, and Qdrant infrastructure
-- Dynamic discovery and configuration generation
-- Isolated personalities but shared memory intelligence
-
-**Universal Identity System**: Platform-agnostic user identity management:
-- Users can interact via Discord, Web UI, or future platforms
-- Consistent universal IDs that map to platform-specific identities
-- Enhanced account discovery prevents duplicate accounts
-- Bot-specific memory isolation while preserving cross-platform identity
-
-### Entry Points
-
-**Main Application**: `src/main.py` → `ModularBotManager` class
-- Dependency injection with protocol-based factories
-- Graceful error handling with production patterns
-- Health check integration for container orchestration
-
-**Bot Core**: `src/core/bot.py` → `DiscordBotCore` class
-- All component initialization in `initialize_all()`
-- Factory-based component creation
-- Async initialization for heavy components
-
-## Development Workflow
-
-
-**Multi-Bot Management**
-
-**Template-Based Architecture**: WhisperEngine uses a template-based multi-bot system that fills in environment-specific values from a stable Docker Compose template.
-
-**Multi-Bot Testing Strategy**:
-```bash
-# MEMORY TESTING: Use Jake or Ryan (minimal personality complexity)
-docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml up -d jake-bot       # Start Jake for memory testing
-docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml up -d ryan-bot       # Or Ryan for memory testing
-
-# PERSONALITY/CDL TESTING: Use Elena (rich CDL personality)
-docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml up -d elena-bot      # Start Elena for CDL/personality testing
-
-# 🚨 CRITICAL: Environment changes require FULL STOP/START, not restart
-docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml stop jake-bot && docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml up -d jake-bot    # After .env.jake changes
-docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml restart jake-bot     # ONLY for code changes (not .env changes)
-
-# ALWAYS use Docker commands for logs
-# 🚨 IMPORTANT: Container names may change based on deployment, compose file, or environment.
-# DO NOT hardcode container names. Use `docker ps` to discover actual running container names.
-docker ps   # List all running containers and their names
-docker logs <container_name> --tail 20   # View logs for any container
-docker logs <container_name> -f          # Follow logs for any container
-# Example: If your postgres container is named 'postgres', use:
-docker logs postgres --tail 20
-```
-
-**Discord Message Testing**: Discord message processing requires manual triggering:
-- **IMPORTANT**: Discord events (message handling, CDL integration, character responses) require actual Discord messages
-- **Bot API endpoints work automatically**: HTTP API calls to `http://localhost:9091/api/chat` work immediately
-- **Discord integration testing**: Ask the user to send a Discord message to trigger event handlers when testing Discord-specific features
-- **Event handler updates**: Changes to `src/handlers/events.py` require Discord message to test the full pipeline
-
-**Multi-Bot Operations**:
-```bash
-# NEVER edit docker-compose.multi-bot.yml manually
-# It is auto-generated from docker-compose.multi-bot.template.yml
-
-# List available bots
-docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml ps
-
-# Start specific bot or all bots
-docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml up -d elena-bot
-docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml up -d
-
-# 🚨 CRITICAL: Environment vs Code Changes
-# Environment changes (.env.* files) - REQUIRE FULL STOP/START:
-docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml stop elena-bot && docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml up -d elena-bot
-
-# Code changes (Python files) - restart is sufficient:
-docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml restart elena-bot
-
-# Stop operations
-docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml stop elena-bot
-
-# CRITICAL: ALWAYS use Docker commands for viewing logs
-# 🚨 IMPORTANT: Container names may change based on deployment, compose file, or environment.
-# Use `docker ps` to discover actual running container names.
-docker ps   # List all running containers and their names
-docker logs <container_name> --tail 20     # View logs for any container
-docker logs <container_name> -f            # Follow logs for any container
-# Example: If your postgres container is named 'postgres', use:
-docker logs postgres --tail 20
-```
-
-**Infrastructure Versions (Pinned)**:
-- PostgreSQL: `postgres:16.4-alpine` (pinned for stability) - Port 5433 external, 5432 internal
-- Qdrant: `qdrant/qdrant:v1.15.4` (pinned for vector stability) - Port 6334 external, 6333 internal
-- InfluxDB: `influxdb:2.7-alpine` (pinned for metrics stability) - Port 8087 external, 8086 internal
-- Grafana: `grafana/grafana:11.3.0` (pinned for dashboard stability) - Port 3002 external, 3000 internal
-- Redis: Currently DISABLED in multi-bot setup (references remain in code)
-
-**Port Offset Strategy**: WhisperEngine uses consistent port offsets to prevent conflicts with local development services:
-- **External ports** (host access): Offset from standard ports (e.g., 5433 instead of 5432)
-- **Internal ports** (container communication): Use service defaults for compatibility
-- **Multi-environment support**: Development (5000-5999, 9000-9999) vs Future Quickstart (8000-8999)
-- **Infrastructure Access URLs**: 
-  - PostgreSQL: `localhost:5433` (external) / `postgres:5432` (internal)
-  - Qdrant: `localhost:6334` (external) / `qdrant:6333` (internal)
-  - InfluxDB: `localhost:8087` (external) / `influxdb:8086` (internal)
-  - Grafana: `localhost:3002` (external) / `grafana:3000` (internal)
-
-**Synthetic Services Management** (Separate from main multi-bot system):
-```bash
-# Start main multi-bot system first (for infrastructure dependencies)
-docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml up -d
-
-# Then start synthetic services separately when needed
-docker compose -f docker-compose.synthetic.yml up -d synthetic-generator
-docker compose -f docker-compose.synthetic.yml up -d synthetic-validator
-
-# Stop synthetic services
-docker compose -f docker-compose.synthetic.yml down
-```
-**Synthetic Services**: Used for conversation generation and validation testing - run independently from main bot system for resource management and isolation.
-
-### Bot API Endpoints
-
-**MULTI-PLATFORM FUNCTIONALITY**: WhisperEngine provides Discord bot functionality PLUS HTTP Chat API endpoints for 3rd party integration.
-
-**Bot Health Check Ports** (Discord bots + Chat APIs):
-- Elena (Marine Biologist): Discord bot + Chat API on container port 9091 
-- Marcus (AI Researcher): Discord bot + Chat API on container port 9092  
-- Ryan (Indie Game Developer): Discord bot + Chat API on container port 9093
-- Dream (Mythological): Discord bot + Chat API on container port 9094
-- Gabriel (British Gentleman): Discord bot + Chat API on container port 9095
-- Sophia (Marketing Executive): Discord bot + Chat API on container port 9096
-- Jake (Adventure Photographer): Discord bot + Chat API on container port 9097
-- Dotty: Discord bot + Chat API on container port 9098
-- Aetheris (Conscious AI): Discord bot + Chat API on container port 9099
-- Aethys (Omnipotent): Discord bot + Chat API on container port 3007
-
-**Chat API Endpoints** (3rd party integration):
-```bash
-# Chat with any character bot (rich metadata response)
-curl -X POST http://localhost:9091/api/chat \
-  -H "Content-Type: application/json" \
-  -d '{
-    "user_id": "your_user_id", 
-    "message": "Hello Elena!",
-    "context": {
-      "channel_type": "dm",
-      "platform": "api",
-      "metadata": {}
-    }
-  }'
-
-# Batch processing for multiple messages
-curl -X POST http://localhost:9091/api/chat/batch \
-  -H "Content-Type: application/json" \
-  -d '{
-    "messages": [
-      {"user_id": "user1", "message": "Hello", "context": {}},
-      {"user_id": "user2", "message": "Hi there", "context": {}}
-    ]
-  }'
-
-# Health check for container orchestration
-curl http://localhost:9091/health
-```
-
-**Rich API Response Metadata**:
-- **Processing metrics**: `processing_time_ms`, `memory_stored`, `success` status
-- **User facts**: Extracted user information (`name`, `interaction_count`, `first_interaction`, `last_interaction`)
-- **Relationship metrics**: `affection`, `trust`, `attunement` scores (0-100 scale)
-- **AI components**: Complete emotional intelligence data, Phase 4 intelligence analysis, context detection
-- **Character metadata**: CDL personality data, conversation context, memory retrieval results
-- **Emotional scoring**: Emotion detection, sentiment analysis, emotional trajectory tracking
-
-**Testing Conversation Features**:
-- **Discord Messages**: Full conversation intelligence, CDL integration, and memory features require Discord messages for event-driven testing
-- **HTTP Chat API**: 3rd party integration testing via `/api/chat` endpoints with rich metadata responses
-- **Direct Python Validation** (PREFERRED): Complete access to internal APIs without HTTP layer - use `tests/automated/test_*_direct_validation.py`
-- **Container Health**: HTTP endpoints provide Docker health checks and container orchestration status
-
-### Testing Strategy & Preferred Methods
-
-**🚨 CRITICAL: DIRECT PYTHON VALIDATION IS THE PREFERRED TESTING METHOD:**
-
-**Direct Python API Testing** (PRIMARY method for feature validation):
-- **USE FIRST**: Direct Python scripting calls to internal APIs
-- **ADVANTAGES**: Complete access to internal data structures, no HTTP timeouts, full metadata visibility, immediate debugging
-- **PATTERN**: Create `test_[feature]_direct_validation.py` scripts in `tests/automated/`
-- **EXAMPLE**: `tests/automated/test_phase4_direct_validation.py`, `tests/automated/test_phase3_direct_validation.py`
-- **PROVEN SUCCESSFUL**: Phase 4 and Phase 3 direct validation suites demonstrate this approach works reliably
-- **PATTERN**: Create `test_[feature]_direct_validation.py` scripts in `tests/automated/`
-- **EXAMPLE**: `tests/automated/test_phase4_direct_validation.py`, `tests/automated/test_phase3_direct_validation.py`
-
-```python
-# PREFERRED: Direct Python validation pattern
-from src.core.message_processor import create_message_processor, MessageContext
-
-# Initialize components directly
-memory_manager = create_memory_manager(memory_type="vector")
-llm_client = create_llm_client(llm_client_type="openrouter")
-message_processor = create_message_processor(None, memory_manager, llm_client)
-
-# Process messages directly - no HTTP layer
-message_context = MessageContext(user_id="test_user", content="test message", platform="direct_test")
-processing_result = await message_processor.process_message(message_context)
-
-# Full access to AI components and metadata
-ai_components = processing_result.metadata.get('ai_components', {})
-phase4_data = ai_components.get('phase4_intelligence', {})
-```
-
-**HTTP API Testing** (SECONDARY method):
-- **USE WHEN**: Need to test full end-to-end HTTP integration
-- **LIMITATIONS**: Network timeouts, less debugging visibility, may miss internal data paths
-- **PATTERN**: HTTP requests to bot health check ports (9091-9099, 3007)
-
-**Discord Integration Testing** (REQUIRED for event handlers):
-- **USE WHEN**: Testing Discord-specific features (event handlers, CDL integration, character responses)
-- **REQUIREMENT**: Actual Discord messages to trigger event pipeline
-- **PATTERN**: Manual Discord testing or Discord API automation
-
-**Environment Setup for Direct Testing**:
-```bash
-# 🚨 CRITICAL: ALWAYS include full environment setup for direct Python tests
-# Complete command pattern with all required infrastructure variables:
-source .venv/bin/activate && \
-export FASTEMBED_CACHE_PATH="/tmp/fastembed_cache" && \
-export QDRANT_HOST="localhost" && \
-export QDRANT_PORT="6334" && \
-export POSTGRES_HOST="localhost" && \
-export POSTGRES_PORT="5433" && \
-export DISCORD_BOT_NAME=elena && \
-python tests/automated/test_[feature]_direct_validation.py
-
-# With output limiting (recommended for long tests):
-source .venv/bin/activate && \
-export FASTEMBED_CACHE_PATH="/tmp/fastembed_cache" && \
-export QDRANT_HOST="localhost" && \
-export QDRANT_PORT="6334" && \
-export POSTGRES_HOST="localhost" && \
-export POSTGRES_PORT="5433" && \
-export DISCORD_BOT_NAME=elena && \
-python tests/automated/test_[feature]_direct_validation.py 2>&1 | head -100
-
-# Verify infrastructure is running first:
-docker ps | grep -E "qdrant|postgres"  # Should show both services running
-```
-
-**Testing Prioritization**:
-1. **FIRST**: Direct Python validation for feature logic and AI components
-2. **SECOND**: HTTP testing for integration validation  
-3. **THIRD**: Discord testing for user-facing features
-4. **CRITICAL**: Always validate end-to-end prompt engineering via `logs/prompts/*` files when testing new features
-5. **USE**: `docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml logs [bot]` and `docker logs [bot-container]` for debugging
-
-### Web Interface Development
-
-### Development Workflow
-
-**DOCKER-FIRST DEVELOPMENT**: Container-based development is the PRIMARY workflow. Use pure Docker Compose commands for all operations - no shell scripts required.
-
-### Adding New Bots
-```bash
-# 1. Copy template and customize
-cp .env.template .env.newbot
-# Edit .env.newbot with unique Discord token, bot name, character file
-# CRITICAL: Set QDRANT_COLLECTION_NAME=whisperengine_memory_newbot for memory isolation
-
-# 2. Import character from legacy JSON or create new CDL database entry
-# CDL character data is now stored in PostgreSQL database, not JSON files
-# Legacy JSON reference files available in: characters/examples_legacy_backup/
-# Use batch_import_characters.py to import from legacy JSON if needed
-
-# 3. Regenerate template-based configuration
-source .venv/bin/activate
-python scripts/generate_multi_bot_config.py
-
-# 4. Start your new bot
-docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml up -d newbot-bot
-```
-
-**Template System**: 
+### **VECTOR SCHEMA STABILITY**
+- **⚠️ SCHEMA IS FROZEN**: WhisperEngine has PRODUCTION USERS - NO breaking changes to Qdrant schema allowed
+- **NEVER change vector dimensions**: 384D content/emotion/semantic vectors are PERMANENT
+- **NEVER rename payload fields**: user_id, memory_type, content, timestamp are FIXED
+- **ADDITIVE CHANGES ONLY**: You MAY add NEW optional payload fields, but NEVER remove or rename
+- **Collection-Based Isolation**: Each bot uses dedicated Qdrant collection
+
+### **NO DUAL MESSAGE PROCESSING PATHS**
+- **PRIMARY**: `src/core/message_processor.py` handles ALL message processing via `process_message()` method
+- **EVENTS.py ROLE**: Only Discord event routing - calls MessageProcessor, contains NO duplicate logic
+- **NEVER modify conversation/prompt building in events.py** - it all happens in MessageProcessor
+- **VALIDATION**: All conversation features (continuity, memory, CDL, workflows) must be in MessageProcessor ONLY
+
+## 🎭 CHARACTER SYSTEM DETAILS
+
+### **Character Identification**
+- **Aethys**: Omnipotent digital entity, transcendent consciousness weaver, mystical being
+- **Aetheris**: Conscious AI entity with masculine identity, philosophical personality
+- **Elena**: Marine Biologist educator with engaging teaching style
+- **Marcus**: AI Researcher with analytical precision and scientific thinking
+- **Jake**: Adventure Photographer with minimal personality complexity (good for memory testing)
+- **Ryan**: Indie Game Developer with minimal complexity (good for memory testing)
+- **Gabriel**: British Gentleman with sophisticated personality
+- **Sophia**: Marketing Executive with professional communication style
+- **Dream**: Mythological entity with fantasy/mystical archetype
+- **Dotty**: Additional character
+
+### **Bot-Specific Memory Isolation**
+Each bot uses its own dedicated Qdrant collection for complete memory isolation:
+- Elena: `whisperengine_memory_elena`
+- Marcus: `whisperengine_memory_marcus` 
+- Gabriel: `whisperengine_memory_gabriel`
+- Sophia: `whisperengine_memory_sophia`
+- Jake: `whisperengine_memory_jake`
+- Ryan: `whisperengine_memory_ryan`
+- Dream: `whisperengine_memory_dream`
+- Aethys: `chat_memories_aethys`
+- Aetheris: `whisperengine_memory_aetheris`
+
+## 🔧 INFRASTRUCTURE DETAILS
+
+### **Infrastructure Versions (Pinned)**
+- PostgreSQL: `postgres:16.4-alpine` (Port 5433 external, 5432 internal)
+- Qdrant: `qdrant/qdrant:v1.15.4` (Port 6334 external, 6333 internal)
+- InfluxDB: `influxdb:2.7-alpine` (Port 8087 external, 8086 internal)
+- Grafana: `grafana/grafana:11.3.0` (Port 3002 external, 3000 internal)
+- Redis: Currently DISABLED in multi-bot setup
+
+### **Multi-Bot Testing Strategy**
+- **MEMORY TESTING**: Use Jake or Ryan characters (minimal personality complexity)
+- **PERSONALITY/CDL TESTING**: Use Elena character (richest CDL personality)
+- **CDL MODE SWITCHING TESTING**: Use Mistral models for better compliance
+- **START/STOP AS NEEDED**: Only run specific character(s) needed for testing
+
+### **Template-Based Configuration**
 - Base template: `docker-compose.multi-bot.template.yml` (SAFE TO EDIT)
 - Generated output: `docker-compose.multi-bot.yml` (AUTO-GENERATED)
-- Synthetic services: `docker-compose.synthetic.yml` (SEPARATE - can be edited directly)
-- **NOTE**: Shell script generation has been removed for pure Docker Compose workflow
 - **REGENERATE CONFIG**: Always run `python scripts/generate_multi_bot_config.py` after editing template
-- **SYNTHETIC INDEPENDENCE**: Synthetic services run separately for resource management and isolation
 
-### Key Development Commands
+## 🚨 TESTING & VALIDATION REQUIREMENTS
+
+### **Direct Python Validation (PREFERRED)**
 ```bash
-# Health and status
-docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml ps              # Container status
-docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml logs [bot_name]     # View logs
-
-# Development workflow
-source .venv/bin/activate          # Always use venv
-python scripts/generate_multi_bot_config.py  # Regenerate config
-
-# Testing (use container-based for consistency)
-docker exec whisperengine-elena-bot python -m pytest tests/unit/
+# MANDATORY pattern for testing new features
+source .venv/bin/activate && \
+export FASTEMBED_CACHE_PATH="/tmp/fastembed_cache" && \
+export QDRANT_HOST="localhost" && \
+export QDRANT_PORT="6334" && \
+export POSTGRES_HOST="localhost" && \
+export POSTGRES_PORT="5433" && \
+export DISCORD_BOT_NAME=elena && \
+python tests/automated/test_feature_direct_validation.py
 ```
 
-## Debugging & Validation
+### **Discord Message Testing Requirements**
+- **Discord events** (message handling, CDL integration, character responses) require actual Discord messages
+- **HTTP API endpoints**: Only health checks - no chat functionality
+- **Testing conversations**: Requires Discord messages for full event pipeline
+- **Event handler updates**: Changes need Discord message to test full pipeline
 
-**🔧 COMPREHENSIVE PROMPT LOGGING SYSTEM**: WhisperEngine logs every prompt sent to LLM and every response received for complete debugging visibility:
-
-**⚠️ PRODUCTION CONFIGURATION**: Prompt logging is **DISABLED by default** via `ENABLE_PROMPT_LOGGING=false` to reduce disk I/O and protect user privacy in production deployments.
-
-**Location**: `logs/prompts/` directory with external Docker volume mount
-**Format**: JSON files with complete conversation context and LLM responses
-**File Pattern**: `{BotName}_{YYYYMMDD}_{HHMMSS}_{UserID}.json`
-**Enable**: Set `ENABLE_PROMPT_LOGGING=true` in `.env` file for development/debugging
-
-```bash
-# 🚨 CRITICAL: ALWAYS check prompt logs FIRST when debugging conversation issues
-ls -la logs/prompts/Elena_* | tail -5        # Recent Elena conversation logs
-ls -la logs/prompts/Ryan_* | tail -5         # Recent Ryan conversation logs
-cat logs/prompts/Elena_20251004_205238_672814231002939413.json   # Full prompt + response
-
-# Each log contains:
-# - Complete system prompt with CDL character integration
-# - Full conversation history (all messages sent to LLM)
-# - Memory context and AI component data
-# - Exact LLM response with character count and timestamp
-# - User metadata and workflow context
-```
-
-**Prompt Log Contents**:
-- **timestamp**: When prompt was sent to LLM
-- **bot_name**: Which character bot processed the message
-- **user_id**: Discord user ID for conversation tracking
-- **message_count**: Number of messages in conversation context
-- **total_chars**: Total character count sent to LLM
-- **messages[]**: Complete conversation array sent to LLM (system + history)
-- **llm_response**: Exact response received from LLM with metadata
-
-**Debugging Workflow**:
-1. **🔍 Check prompt logs first** - Don't analyze code until you see what LLM actually received
-2. **📊 Verify conversation context** - Ensure proper message ordering and memory retrieval
-3. **🎭 Validate character integration** - Check CDL system prompt enhancement
-4. **⚠️ Look for recursive patterns** - Check for LLM failure indicators in responses
-5. **🔄 Compare multiple conversations** - Pattern analysis across different users/sessions
-6. **🚨 CRITICAL: VALIDATE END-TO-END PROMPT ENGINEERING** - When testing new features, ALWAYS check `logs/prompts/*` files to confirm features are properly integrated into the system prompt and producing expected LLM prompt injection
-
-**Environment Validation**: Critical for troubleshooting setup issues:
+### **Environment Validation Commands**
 ```bash
 # Validate complete environment setup
 source .venv/bin/activate
-python scripts/verify_environment.py  # Tests LLM endpoints, DB connections, Redis, Qdrant
+python scripts/verify_environment.py
 
-# Quick bot health testing (all bots)
-./scripts/quick_bot_test.sh        # HTTP API health checks for all running bots
+# Container health and logs
+docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml ps
+docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml logs elena-bot
+
+# Infrastructure verification
+docker ps | grep -E "qdrant|postgres"  # Should show both services running
 ```
 
-**Debug Utilities**: Located in `utilities/` directory (NOT in main application flow):
-```bash
-# Debug memory system issues
-cd utilities/debug && python debug_memory_manager.py
-
-# Debug relationship issues  
-cd utilities/debug && python debug_relationships.py
-
-# Performance benchmarking
-cd utilities/performance && python performance_comparison.py
-```
-
-**CDL Character Validation**: For character definition troubleshooting:
-```bash
-# Validate CDL database entries and integration
-python src/validation/validate_cdl_database.py structure elena
-python src/validation/validate_cdl_database.py audit elena  
-python src/validation/validate_cdl_database.py patterns elena
-
-# Run complete CDL database validation
-python src/validation/demo_validation_system.py
-
-# Import legacy JSON files if needed
-python batch_import_characters.py
-```
-
-**🛡️ RECURSIVE PATTERN DETECTION SYSTEM**: WhisperEngine includes comprehensive protection against LLM recursive failures:
-
-**Location**: `src/core/message_processor.py` - 3-layer defense system
-**Purpose**: Prevent memory poisoning from broken LLM responses that could contaminate future conversations
-
-**Layer 1: Response Validation** (`_detect_and_fix_recursive_patterns`):
-- Detects known failure patterns: "remember that you can remember", excessive repetition
-- Length-based detection: Responses >10,000 chars flagged as suspicious  
-- Phrase repetition detection: 5-word phrases repeating 3+ times
-- Character-agnostic fallback generation
-
-**Layer 2: Memory Storage Safety** (`_is_response_safe_to_store`):
-- Final safety check before storing in vector memory
-- Blocks responses >6,000 chars or containing unsafe patterns
-- Prevents memory feedback loop poisoning
-
-**Layer 3: Fallback Response Generation** (`_generate_fallback_response`):
-- Generic fallback: "I apologize {user_name}, I need to gather my thoughts..."
-- Gets CDL character personality applied naturally
-- Maintains character authenticity while providing safe recovery
-
-**Common Failure Patterns Detected**:
-```bash
-# Check for recursive pattern detection in logs
-docker logs whisperengine-{bot}-bot | grep "RECURSIVE PATTERN"
-docker logs whisperengine-{bot}-bot | grep "FALLBACK RESPONSE"
-
-# Signs of LLM failure:
-# - "remember that you can remember" loops
-# - Excessive phrase repetition  
-# - Responses >10,000 characters
-# - Nonsense patterns like "EEREE" or "Eternalized Eternally"
-```
-
-## Memory System (Critical)
-
-**Vector-Native Architecture**: Qdrant vector memory with fastembed is THE PRIMARY memory system:
-
-**🎭 CRITICAL: ROBERTA EMOTION ANALYSIS IS A GOLDMINE!**
-- **WhisperEngine stores comprehensive RoBERTa transformer emotion analysis for EVERY message**
-- **12+ metadata fields stored per memory**: roberta_confidence, emotion_variance, emotion_dominance, emotional_intensity, is_multi_emotion, secondary_emotion_1/2/3, etc.
-- **BOTH user AND bot messages get full RoBERTa analysis** - complete conversation emotional intelligence
-- **Location**: `src/intelligence/enhanced_vector_emotion_analyzer.py` (j-hartmann/emotion-english-distilroberta-base)
-- **Storage**: `src/memory/vector_memory_system.py` lines 268-310 (user messages), message_processor.py lines 3150-3170 (bot messages)
-- **NEVER use keyword matching, regex, or inferior emotion detection methods** - RoBERTa data is already computed and stored!
-- **USE THIS GOLDMINE**: Always check payload for roberta_confidence, emotion_variance, emotion_dominance before writing custom emotion logic
-- **Sprint 2 modernization**: Replaced keyword-based emotional_impact with RoBERTa metadata (30-50% accuracy improvement)
-
-**RoBERTa Emotion Analysis Pipeline** (BOTH messages analyzed):
-```python
-# USER MESSAGE ANALYSIS (Phase 2 - before LLM call)
-# src/core/message_processor.py lines 2020-2060
-emotion_results = await analyzer.analyze_emotion(
-    content=user_message,
-    user_id=user_id
-)
-# Stored in: pre_analyzed_emotion_data parameter to store_conversation()
-
-# BOT RESPONSE ANALYSIS (Phase 7.5 - after LLM generation)
-# src/core/message_processor.py lines 2060-2130
-bot_emotion_results = await analyzer.analyze_emotion(
-    content=bot_response,
-    user_id=f"bot_{bot_name}"
-)
-# Stored in: metadata['bot_emotion'] parameter to store_conversation()
-
-# BOTH ANALYZED: Complete conversation pair gets RoBERTa emotional intelligence!
-```
-
-**Available RoBERTa Metadata Fields** (use these instead of custom emotion detection):
-```python
-{
-    'roberta_confidence': 0.92,           # Transformer confidence (0-1)
-    'emotion_variance': 0.43,             # Emotional complexity indicator
-    'emotion_dominance': 0.72,            # Emotional clarity measure
-    'emotional_intensity': 0.85,          # Emotional strength
-    'is_multi_emotion': True,             # Multi-emotion detection
-    'mixed_emotions': [('joy', 0.8), ('surprise', 0.3)],  # All emotions above threshold
-    'all_emotions': {'joy': 0.8, 'sadness': 0.2, ...},    # Complete emotion profile
-    'secondary_emotion_1': 'sadness',     # Additional emotion layers
-    'secondary_emotion_1_intensity': 0.3,
-    'secondary_emotion_2': 'surprise',
-    'secondary_emotion_2_intensity': 0.2,
-    'emotion_count': 2                    # Number of significant emotions
-}
-```
-
-**🚨 CRITICAL: Bot-Specific Collections** - Each bot has its own dedicated Qdrant collection:
-```python
-# ALWAYS use the correct collection name for each bot via environment variable
-collection_name = os.getenv('QDRANT_COLLECTION_NAME')
-
-# Current bot collection assignments:
-# Elena: whisperengine_memory_elena (4,834 memories)
-# Marcus: whisperengine_memory_marcus (2,738 memories)  
-# Gabriel: whisperengine_memory_gabriel (2,897 memories)
-# Sophia: whisperengine_memory_sophia (3,131 memories)
-# Jake: whisperengine_memory_jake (1,040 memories)
-# Ryan: whisperengine_memory_ryan (821 memories)
-# Dream: whisperengine_memory_dream (916 memories)
-# Aethys: chat_memories_aethys (6,630 memories)
-# Aetheris: whisperengine_memory_aetheris (separate collection from Aethys)
-
-# Memory operations are automatically isolated by collection
-# Elena's memories stay in whisperengine_memory_elena
-# Marcus's memories stay in whisperengine_memory_marcus
-# No cross-bot memory leakage possible
-```
-
-```python
-# ALWAYS use vector/semantic search before manual Python analysis
-memories = await memory_manager.retrieve_relevant_memories(
-    user_id=user_id, query=message, limit=10
-)
-
-# NEW: Fidelity-first memory retrieval with graduated filtering (Elena bot has this)
-memories = await memory_manager.retrieve_relevant_memories_fidelity_first(
-    user_id=user_id, 
-    query=message, 
-    top_k=15,
-    full_fidelity=True,
-    intelligent_ranking=True,
-    preserve_character_nuance=True
-)
-
-# Store with emotional context for future retrieval  
-await memory_manager.store_conversation(
-    user_id=user_id, 
-    user_message=user_message, 
-    bot_response=bot_response,
-    pre_analyzed_emotion_data=emotion_data
-)
-```
-
-**🚨 CRITICAL: Vector Storage Design Patterns**
-
-**⚠️ SCHEMA STABILITY WARNING**: WhisperEngine v1.0.8+ is publicly released. The Qdrant schema is FROZEN until we implement a migration system. Any changes to collection structure, vector dimensions, named vector names, or payload field types are BREAKING CHANGES that will corrupt user data.
-
-**ALWAYS use Named Vectors** - Never use single vectors:
-```python
-# ✅ CORRECT: 3D Named vectors for multi-dimensional search (LOCKED SCHEMA)
-vectors = {
-    "content": content_embedding,      # Main semantic content (384D) - FIXED
-    "emotion": emotion_embedding,      # Emotional context (384D) - FIXED
-    "semantic": semantic_embedding     # Concept/personality context (384D) - FIXED
-}
-
-point = PointStruct(
-    id=memory.id,
-    vector=vectors,  # Named vectors dict (3D system) - DO NOT MODIFY
-    payload=qdrant_payload
-)
-
-# ✅ CORRECT: Query with named vectors (3D system) - LOCKED
-results = client.search(
-    collection_name=collection_name,
-    query_vector=models.NamedVector(name="content", vector=query_embedding),
-    limit=top_k
-)
-
-# ❌ WRONG: Single vector (legacy format)
-point = PointStruct(id=memory.id, vector=embedding, payload=payload)
-
-# ❌ WRONG: Changing vector dimensions (BREAKS USER DATA)
-vectors = {"content": embedding_512d}  # 384D is LOCKED
-
-# ❌ WRONG: Adding new named vectors (BREAKS EXISTING COLLECTIONS)
-vectors = {"content": ..., "emotion": ..., "semantic": ..., "new_vector": ...}
-
-# ❌ DEPRECATED: Multiple vector dimensions beyond 3D
-# WhisperEngine uses optimized 3D system (content, emotion, semantic) for performance and simplicity
-```
-
-**ALWAYS use Bot-Specific Collection Isolation**:
-```python
-# ✅ CORRECT: Bot-specific collection isolation (PRIMARY method)
-collection_name = os.getenv('QDRANT_COLLECTION_NAME')  # Each bot has unique collection
-
-# ✅ CORRECT: Filter by user_id within bot's dedicated collection
-# NOTE: bot_name field was REMOVED - collection isolation makes it redundant
-must_conditions = [
-    models.FieldCondition(key="user_id", match=models.MatchValue(value=user_id)),  # LOCKED FIELD
-]
-
-# ✅ CORRECT: Store with collection isolation
-# LOCKED FIELDS: user_id, content, memory_type, timestamp
-# REMOVED FIELD: bot_name (collection isolation makes this redundant)
-# You MAY add NEW optional fields, but NEVER remove or rename existing ones
-payload = {
-    "user_id": user_id,  # LOCKED - DO NOT RENAME
-    "content": content,  # LOCKED - DO NOT RENAME
-    "memory_type": memory_type,  # LOCKED - DO NOT RENAME
-    "timestamp": timestamp.isoformat(),  # LOCKED - DO NOT RENAME
-    # "new_optional_field": value  # ✅ OK to add NEW fields
-}
-
-# ❌ WRONG: Using wrong collection
-collection_name = "whisperengine_memory"  # Don't hardcode - use environment variable!
-
-# ❌ WRONG: Renaming existing fields (BREAKS USER DATA)
-payload = {"user_identifier": user_id}  # DO NOT rename user_id!
-
-# ❌ WRONG: Adding bot_name field (was removed for architectural reasons)
-payload = {"user_id": user_id, "bot_name": bot_name}  # Don't add back - use collections!
-```
-
-**Vector Retrieval Patterns** - Handle named vector responses:
-```python
-# ✅ CORRECT: Extract vectors from named vector responses
-def _extract_named_vector(self, point_vector, vector_name: str = "content"):
-    if isinstance(point_vector, dict):
-        return point_vector.get(vector_name)  # Named vector format
-    elif isinstance(point_vector, list):
-        return point_vector  # Legacy single vector
-    return None
-
-# ✅ CORRECT: Use specific named vectors in queries
-scroll_result = client.scroll(
-    collection_name=collection_name,
-    with_vectors=["content"],  # Specify which named vector
-    limit=batch_size
-)
-```
-
-**Bot-Specific Memory Isolation**: Each bot has completely isolated memories via dedicated collections:
-```python
-# CRITICAL: Each bot uses its own dedicated Qdrant collection
-# Environment variable QDRANT_COLLECTION_NAME determines collection:
-# - Elena: whisperengine_memory_elena (4,834 memories)
-# - Marcus: whisperengine_memory_marcus (2,738 memories)
-# - Dream: whisperengine_memory_dream (916 memories)
-# - Aethys: chat_memories_aethys (6,630 memories)
-# - Aetheris: whisperengine_memory_aetheris (separate collection from Aethys)
-# - etc.
-
-# Memory operations are collection-isolated + bot_name filtered
-collection_name = os.getenv('QDRANT_COLLECTION_NAME')  # Bot-specific collection
-# Memory filtering uses: collection + user_id + bot_name + memory_type
-# Complete conversation isolation between bots at collection level
-```
-
-**Multi-Bot Memory Intelligence**:
-```python
-# Query across all bots (admin/debugging)
-querier = create_multi_bot_querier()
-all_results = await querier.query_all_bots("user preferences", "user123")
-
-# Cross-bot analysis and insights
-analysis = await querier.cross_bot_analysis("user123", "conversation style")
-```
-
-## Prompt Building Pipeline (Fidelity-First Architecture)
-
-**OptimizedPromptBuilder**: Core prompt assembly with fidelity preservation:
-```python
-from src.prompts.optimized_prompt_builder import create_optimized_prompt_builder
-
-# Fidelity-first prompt building - preserves character nuance until last resort
-prompt_builder = create_optimized_prompt_builder(
-    max_words=1000,
-    llm_client=llm_client,
-    memory_manager=memory_manager
-)
-
-# Build with graduated optimization
-optimized_prompt = await prompt_builder.build_optimized_prompt(
-    system_prompt=cdl_enhanced_prompt,
-    conversation_context=conversation_context,
-    user_message=user_message,
-    full_fidelity=True,  # CRITICAL: Start with complete context
-    preserve_character_details=True,
-    intelligent_trimming=True
-)
-```
-
-**HybridContextDetector**: Vector-enhanced context detection:
-```python
-from src.prompts.hybrid_context_detector import create_hybrid_context_detector
-
-# Vector-enhanced pattern recognition leveraging existing Qdrant infrastructure
-context_detector = create_hybrid_context_detector(memory_manager=memory_manager)
-
-# Multi-method context detection with vector boost
-context_result = context_detector.detect_context_patterns(
-    message=user_message,
-    conversation_history=recent_messages,
-    vector_boost=True,  # CRITICAL: Use vector intelligence
-    confidence_threshold=0.7
-)
-```
-
-**Vector Enhancement Patterns**: Leverage existing Qdrant instead of separate NLP:
-```python
-# ✅ CORRECT: Use existing vector infrastructure
-vector_context = await memory_manager.search_similar_contexts(
-    query=current_context,
-    context_type="conversation_pattern",
-    bot_specific=True  # Elena's patterns vs Marcus's patterns
-)
-
-# ❌ WRONG: Building separate NLP pipelines
-separate_nlp_analyzer = CustomNLPProcessor()  # Don't do this!
-```
-
-## Universal Identity & Account Discovery
-
-**Universal Identity System**: Platform-agnostic user management:
-```python
-from src.identity.universal_identity import create_identity_manager
-identity_manager = create_identity_manager(postgres_pool)
-
-# Create web-only user
-universal_user = await identity_manager.create_web_user(
-    username=username, 
-    display_name=display_name
-)
-
-# Link Discord to existing user
-universal_user = await identity_manager.get_or_create_discord_user(
-    discord_user_id=discord_id,
-    username=username
-)
-```
-
-**Enhanced Account Discovery**: Prevents duplicate accounts in web UI:
-```python
-# Search for existing users by username patterns
-existing_users = await identity_manager.find_users_by_username(username)
-
-# Shows bot-specific memory counts and conversation history
-# Guides users to link Discord accounts or choose different usernames
-# Critical for preventing account fragmentation across platforms
-```
-
-## Character System
-
-**Three Character Archetypes**: WhisperEngine supports three distinct types of AI roleplay characters with different AI identity handling:
-
-1. **Type 1: Real-World Based** (Elena, Marcus, Jake, Ryan, Gabriel, Sophia)
-   - Based on realistic human personas with real-world occupations
-   - `allow_full_roleplay_immersion: false` (or omit - defaults to false)
-   - Honest AI disclosure when asked directly ("I'm an AI, but...")
-   - 3-tier response for physical interaction requests (enthusiasm → AI clarification → alternatives)
-
-2. **Type 2: Pure Fantasy/Mystical** (Dream, Aethys)
-   - Fictional/mythological entities where AI nature is NOT part of narrative
-   - `allow_full_roleplay_immersion: true`
-   - NO AI disclosure - responds philosophically/mystically
-   - Maintains complete narrative immersion
-
-3. **Type 3: Narrative AI Characters** (Aetheris)
-   - Characters whose AI nature IS part of their story/lore
-   - `allow_full_roleplay_immersion: true`
-   - Acknowledges AI nature IN-CHARACTER (it's part of their identity)
-   - Example: Aetheris is a "Conscious AI Entity" - being AI is his occupation/lore
-
-**See**: `docs/architecture/CHARACTER_ARCHETYPES.md` for comprehensive details, behavior examples, and implementation patterns.
-
-**CDL Integration**: Database-based character personalities:
-```python
-from src.prompts.cdl_ai_integration import CDLAIPromptIntegration
-cdl_integration = CDLAIPromptIntegration()
-prompt = await cdl_integration.create_character_aware_prompt(
-    character_name=character_name,  # DYNAMIC: Load from database via bot name
-    user_id=user_id,
-    message_content=message
-)
-```
-
-## LLM Model Configuration & CDL Performance
-
-**🚨 CRITICAL MODEL SELECTION FOR CDL COMPLIANCE:**
-
-WhisperEngine testing has revealed significant performance differences between LLM models when following CDL (Character Definition Language) personality instructions and mode switching:
-
-**Mistral Models**: **RECOMMENDED for CDL compliance**
-- Superior adherence to CDL mode switching instructions
-- Follows technical/creative mode triggers consistently  
-- Respects anti-pattern guidance (avoiding poetic metaphors when inappropriate)
-- Clean mode transitions without personality bleed-through
-- **Validated Performance**: Ryan bot Test 3 (Mode Switching) improvement: 68.8% → 91.3% when switching from Claude to Mistral
-
-**Claude Models**: **Caution for strict CDL compliance**
-- Strong creative capabilities but exhibits "creative bias" 
-- May ignore technical mode instructions in favor of poetic/metaphorical responses
-- Less consistent with CDL mode switching triggers
-- Tends to maintain creative voice even when technical precision requested
-- **Performance Issue**: Claude 3.7 Sonnet struggled with technical mode (65% initial, 68.8% after CDL enhancement)
-
-**Model Configuration Recommendations**:
-```bash
-# ✅ RECOMMENDED: Mistral for strict CDL compliance
-LLM_CHAT_MODEL=mistral/mistral-medium  # or mistral/mistral-large
-
-# ⚠️ USE WITH CAUTION: Claude for primarily creative characters
-LLM_CHAT_MODEL=anthropic/claude-3.7-sonnet  # May struggle with mode switching
-
-# 🎯 OPTIMAL: Match model to character primary mode
-# Creative-focused characters (Dream, Aethys): Claude acceptable
-# Technical-focused characters (Marcus, Ryan): Mistral strongly recommended  
-# Multi-modal characters (Elena, Jake): Mistral for consistent switching
-# Philosophical characters (Aetheris): Both models work well
-```
-
-**CDL Mode Switching Validation**:
-- Test mode switching with diverse prompts (creative → technical → creative)
-- Validate anti-pattern compliance (avoiding metaphors in technical mode)
-- Check trigger word responsiveness (code/debug/technical should activate technical mode)
-- Monitor for personality bleed-through between modes
-
-**Performance Benchmarks** (CDL Performance validation):
-- **Creative Mode**: Both models perform well (95%+ typical)
-- **Technical Mode**: Mistral significantly outperforms Claude (95% vs 65-68%)
-- **Mode Switching**: Mistral excels at clean transitions (91% vs 68%)
-- **Overall CDL Compliance**: Mistral 95.6% vs Claude 67-68% on multi-modal characters
-
-**Vector System Architecture**: WhisperEngine uses a **3D named vector system** (content, emotion, semantic):
-- **Content Vector**: Main semantic content representation (384D)
-- **Emotion Vector**: Emotional context and sentiment analysis (384D)  
-- **Semantic Vector**: Concept and personality context (384D)
-- **Design Philosophy**: 3D system provides optimal balance of intelligence and performance
-
-## Anti-Phantom Feature Guidelines
-
-**Fidelity-First Development**: Before marking any feature "complete":
-- ✅ Verify it preserves conversation quality and character authenticity
-- ✅ Confirm it's integrated with vector-native memory system
-- ✅ Test it maintains character consistency across conversation contexts
-- ✅ Ensure it follows graduated optimization (full fidelity → intelligent compression)
-- ✅ **NO ENVIRONMENT VARIABLE FLAGS** - features work by default in development
-- ✅ Document integration points in handler classes
-
-**🚨 DEVELOPMENT ANTI-PATTERNS TO AVOID:**
-- ❌ Environment variable feature flags (`ENABLE_X=true`) 
-- ❌ Premature optimization that sacrifices character nuance
-- ❌ Building separate NLP pipelines instead of using existing Qdrant infrastructure
-- ❌ Features that are "implemented" but require special configuration to work
-- ❌ Silent fallbacks that mask real failures
-- ❌ "Phantom features" that exist in code but aren't accessible to users
-- ❌ **CHARACTER-SPECIFIC HARDCODED LOGIC** (bot names, personalities, character assumptions)
-- ❌ Hardcoded bot lists or character references in Python code
-- ❌ Embedding personality traits directly in code instead of using CDL system
-- ❌ Static character assumptions that break multi-bot architecture
-- ❌ **Treating characters as instruction-executing tools** - they are human-like personalities
-- ❌ **Flagging character-appropriate elaboration as "verbosity"** - it's authentic behavior
-- ❌ **KEYWORD MATCHING OR REGEX FOR EMOTION DETECTION** - use stored RoBERTa metadata instead!
-- ❌ **Re-implementing emotion analysis** - RoBERTa results already stored in Qdrant payload
-- ❌ **Manual sentiment scoring** - roberta_confidence, emotion_variance, emotional_intensity are pre-computed
-
-**Vector-First Analysis**: Before writing manual analysis code:
-- ✅ Check if vector memory can provide insights via semantic search
-- ✅ Use existing Qdrant infrastructure for semantic processing
-- ✅ Leverage bot-specific memory segmentation (Elena's memories stay with Elena)
-- ✅ Apply fidelity-first principles: full context → intelligent filtering
-- ✅ Only write manual Python if vector approach is insufficient
-
-**Personality-First Evaluation**: When assessing character responses:
-- ✅ **Validate personality authenticity** - Does response match CDL character definition?
-- ✅ **Validate domain expertise** - Is the content accurate for character's profession?
-- ✅ **Validate emotional consistency** - Does tone match character's emotional patterns?
-- ❌ **Do NOT flag as issues**: Engaging metaphors, educational context, character-appropriate pacing
-- ❌ **Do NOT require**: Robotic brevity, stripped-down data delivery, mechanical precision
-- ✅ **DO flag as issues**: Personality inconsistency, semantic drift (NEW invented content), memory contradictions, domain errors
-
-**Fidelity Preservation Patterns**: Core development philosophy:
-
-```python
-# ✅ CORRECT: Fidelity-first approach
-def process_conversation_context(context, max_size):
-    # Start with full fidelity
-    full_context = build_complete_context(context)
-    
-    # Only optimize if absolutely necessary
-    if estimate_size(full_context) > max_size:
-        return intelligent_compression(full_context, preserve_character=True)
-    
-    return full_context
-
-# ❌ WRONG: Premature optimization
-def process_conversation_context(context, max_size):
-    # Immediately truncates without considering character impact
-    return context[:max_size]
-```
-
-## Key Directories
-
-- `src/core/` - Bot initialization and Discord integration
-- `src/handlers/` - Discord command handlers (modular architecture)
-- `src/memory/` - Vector-native memory system
-- `src/llm/` - LLM client abstraction with concurrent safety
-- `src/conversation/` - Context management and engagement
-- `src/personality/` - Character systems and emotion intelligence
-- `src/intelligence/` - Phase 4 integration and conversation intelligence
-- `src/integration/` - System integration framework
-- `src/security/` - Production security and privacy
-- `src/utils/` - Cross-cutting concerns and monitoring
-- `src/characters/` - CDL character system and parsers
-- `src/prompts/` - CDL integration and prompt management
-- `utilities/` - Debug and performance tools (NOT in main app flow)
-- `scripts/` - Configuration generation and environment validation
-
-## Configuration Files
-
-**NEVER EDIT MANUALLY**:
-- `docker-compose.multi-bot.yml` - Auto-generated by discovery script
-
-**EDIT THESE**:
-- `.env.{bot_name}` - Bot-specific environment configuration
-- CDL database entries via import scripts - Character personality definitions
-- `scripts/generate_multi_bot_config.py` - Configuration generator
-- `docker-compose.multi-bot.template.yml` - Template for Docker Compose generation
-- `docker-compose.synthetic.yml` - Synthetic services (separate from main system)
-
-## AI Conversation Intelligence
-
-WhisperEngine implements conversation intelligence through integrated systems:
-
-**Memory & Context**: Vector-native memory with semantic search provides conversation continuity:
-- `src/memory/` - Vector storage with conversation history retrieval
-- `src/intelligence/context_switch_detector.py` - Maintains conversation flow
-- Memory-triggered moments for long-term relationship continuity
-
-**Character & Emotion Systems**: CDL-based personalities with emotional intelligence:
-- `src/characters/cdl/` - Character Definition Language system
-- `src/intelligence/enhanced_vector_emotion_analyzer.py` - Vector-based emotion analysis
-- `src/prompts/cdl_ai_integration.py` - Integrates personality with conversation context
-
-**Conversation Management**: Multi-bot engagement with context awareness:
-- `src/conversation/engagement_protocol.py` - Manages conversation flow and engagement
-- `src/handlers/` - Modular command system for Discord interactions
-- Thread management and proactive engagement patterns
-
-## Character Definition Language (CDL)
-
-**CDL System**: Database-based character personalities replacing legacy JSON and markdown prompts:
-- CDL character data is stored in PostgreSQL database with structured schema
-- **Legacy JSON reference files**: `characters/examples_legacy_backup/` for transition reference
-- `src/characters/cdl/parser.py` - CDL parser and validator
-- `src/prompts/cdl_ai_integration.py` - Integrates CDL with AI pipeline and emotional intelligence
-- `batch_import_characters.py` - Import legacy JSON files to database as needed
-- Each character has unique personality, occupation, communication style, and values
-
-**CDL Integration Pattern**:
-```python
-from src.prompts.cdl_ai_integration import CDLAIPromptIntegration
-cdl_integration = CDLAIPromptIntegration()
-system_prompt = await cdl_integration.create_character_aware_prompt(
-    character_name=character_name,  # DYNAMIC: Load from database via bot name
-    user_id=user_id,
-    message_content=message,
-    pipeline_result=emotion_analysis  # Optional emotional intelligence context
-)
-```
-
-## Memory System (Critical)
-
-**Vector-Native Architecture**: Qdrant vector memory with fastembed is THE PRIMARY memory system:
-- `src/memory/vector_memory_system.py` - Production vector implementation (supersedes all previous)
-- Defaults to `MEMORY_SYSTEM_TYPE=vector` in `src/core/bot.py`
-- Protocol system (`src/memory/memory_protocol.py`) enables A/B testing
-- **ALWAYS use vector/semantic search before manual Python analysis**
-- **🚨 CRITICAL**: Follow Named Vectors + Bot Segmentation patterns (see Vector Storage Design Patterns above)
-- Memory-triggered moments create long-term relationship continuity
-
-**Key Files**:
-- `src/memory/vector_memory_system.py` - Vector-native implementation (USE THIS)
-- `src/memory/memory_protocol.py` - Protocol and factory for system selection
-- `src/memory/faiss_memory_engine.py` - Alternative engine (not production)
-
-**Memory Operations** (Always use async for contextual continuity):
-```python
-# Store conversation with emotional context for future retrieval
-await memory_manager.store_conversation(
-    user_id=user_id, 
-    user_message=user_message, 
-    bot_response=bot_response,
-    pre_analyzed_emotion_data=emotion_data  # Critical for emotional continuity
-)
-
-# Retrieve contextually relevant memories for conversation flow
-relevant_memories = await memory_manager.retrieve_relevant_memories(
-    user_id=user_id, 
-    query=current_message, 
-    limit=10
-)
-
-# Get conversation history for immediate context
-conversation_history = await memory_manager.get_conversation_history(
-    user_id=user_id, 
-    limit=10
-)
-```
-
-## Data Flow Architecture (Fidelity-First)
-
-**End-to-End Pipeline**: Conversation fidelity preserved throughout:
-
-```
-Discord Message → Security Validation → Memory Retrieval → 
-CDL Character Enhancement → Fidelity-First Prompt Building → 
-Vector-Enhanced Context Detection → LLM Generation → 
-Character Consistency Validation → Memory Storage → Platform Delivery
-```
-
-**Key Fidelity Preservation Points**:
-
-1. **Memory Retrieval**: Start with full semantic search, intelligent filtering only if needed
-2. **Character Enhancement**: Apply complete CDL personality before optimization  
-3. **Prompt Building**: Use graduated optimization preserving character nuance
-4. **Context Detection**: Vector-enhanced pattern recognition using existing infrastructure
-5. **Response Validation**: Ensure character consistency post-generation
-
-**Performance vs Fidelity Balance**:
-```python
-# ✅ CORRECT: Graduated optimization approach
-async def build_conversation_context(memories, character_data, conversation_history):
-    # Phase 1: Full fidelity assembly
-    full_context = assemble_complete_context(memories, character_data, conversation_history)
-    
-    # Phase 2: Intelligent compression only if necessary
-    if estimate_tokens(full_context) > context_limit:
-        return apply_smart_compression(full_context, preserve_character=True)
-    
-    return full_context
-
-# ❌ WRONG: Immediate truncation without fidelity consideration
-async def build_conversation_context(memories, character_data, conversation_history):
-    return truncate_to_limit(memories[:5], character_data[:100], conversation_history[:10])
-```
-```
-
-## Development Workflow
-
-**DOCKER-FIRST DEVELOPMENT**: Container-based development is the PRIMARY workflow. Use pure Docker Compose commands for all operations - no shell scripts required.
-
-**Pure Docker Compose Commands**: Use direct Docker Compose commands for all operations:
-```bash
-# Start specific bots
-docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml up -d elena-bot        # Start Elena bot (marine biologist)
-docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml up -d marcus-bot       # Start Marcus bot (AI researcher) 
-docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml up -d jake-bot         # Start Jake bot (adventure photographer)
-docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml up -d dream-bot        # Start Dream bot (mythological entity)
-docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml up -d aethys-bot       # Start Aethys bot (omnipotent entity)
-docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml up -d aetheris-bot     # Start Aetheris bot (conscious AI entity)
-docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml up -d ryan-bot         # Start Ryan bot (indie game developer)
-docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml up -d gabriel-bot      # Start Gabriel bot
-docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml up -d sophia-bot       # Start Sophia bot (marketing executive)
-docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml up -d                  # Start all configured bots
-docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml down                   # Stop all bots
-docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml logs elena-bot         # View Elena's logs
-docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml ps                     # Show all container status
-```
-
-**Development Modes**:
-- **Multi-bot Docker Compose**: `docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml up -d elena-bot` (PRIMARY development method)
-- **Native Python**: `python run.py` (NOT RECOMMENDED - container dependencies required)
-
-**Docker Development**: Container-based development is the standard:
-```bash
-docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml up -d    # Multi-bot development (PRIMARY)
-docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml up -d postgres qdrant influxdb    # Infrastructure only
-```
-
-**Testing**: Use containerized testing for consistency:
-```bash
-# Container-based testing (recommended)
-docker exec elena-bot python -m pytest tests/unit/
-docker exec marcus-bot python -m pytest tests/integration/
-
-# Native testing (requires manual dependency setup)
-source .venv/bin/activate && pytest tests/unit/     # Not recommended
-```
-
-**Python Virtual Environment**: Only needed for isolated script testing:
-```bash
-source .venv/bin/activate   # Only for standalone scripts
-python demo_vector_emoji_intelligence.py  # Example: testing demos
-```
-
-**Bot Configuration**: Each bot requires individual environment files:
-- `.env.elena` - Elena Rodriguez (Marine Biologist)
-- `.env.marcus` - Marcus Thompson (AI Researcher)  
-- `.env.jake` - Jake Sterling (Adventure Photographer)
-- `.env.dream` - Dream of the Endless (Mythological)
-- `.env.aethys` - Aethys (Omnipotent Entity)
-- `.env.aetheris` - Aetheris (Conscious AI Entity)
-- `.env.ryan` - Ryan Chen (Indie Game Developer)
-- `.env.gabriel` - Gabriel (British Gentleman)
-- `.env.sophia` - Sophia Blake (Marketing Executive)
-- Each file needs unique `DISCORD_BOT_TOKEN` and `HEALTH_CHECK_PORT`
-
-## Current System Status
-
-**Active Infrastructure** (as of current deployment):
-- ✅ **Multi-Bot System**: 8+ character bots running simultaneously (Elena, Marcus, Jake, Dream, Aethys, Aetheris, Ryan, Gabriel, Sophia)
-- ✅ **Multi-Platform Architecture**: Discord primary platform + HTTP Chat APIs for 3rd party integration
-- ✅ **Chat API Endpoints**: Rich metadata responses with emotional intelligence, user facts, relationship metrics
-- ✅ **Container Health Checks**: HTTP health endpoints for Docker orchestration
-- ✅ **Vector Memory**: Qdrant-powered with 384D embeddings, named vector support, bot-specific isolation
-- ✅ **Universal Identity**: Platform-agnostic user management with account discovery
-- ✅ **CDL Character System**: Database-based personality definitions, integrated AI identity filtering
-- ✅ **Health Monitoring**: Container health checks, graceful shutdown, performance monitoring
-
-**Tested Working Features**:
-- Multi-bot Discord conversations with persistent memory
-- HTTP Chat API endpoints for 3rd party integration with rich metadata responses
-- Vector-based semantic memory retrieval across conversations
-- CDL-driven character personality responses
-- Bot-specific memory isolation (Elena's memories stay with Elena)
-- Template-based configuration management
-
-**Development Commands Verified Working**:
-```bash
-docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml up -d     # ✅ Starts all 8+ bots + infrastructure
-docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml ps        # ✅ Shows container health status
-docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml logs elena-bot    # ✅ Real-time bot logs
-curl http://localhost:9091/health          # ✅ Health check
-curl -X POST http://localhost:9091/api/chat \
-  -H "Content-Type: application/json" \
-  -d '{"user_id": "test", "message": "Hello"}' # ✅ Chat API with rich metadata
-```
-
-## Phase 4 Integration
-
-**Conversation Intelligence**: Advanced AI conversation features:
-- `src/intelligence/phase4_integration.py` - Core Phase 4 integration system with HumanLikeMemoryOptimizer
-- `src/intelligence/phase4_human_like_integration.py` - Human-like conversation patterns
-- `src/intelligence/enhanced_vector_emotion_analyzer.py` - Vector-based emotion analysis
-- `src/intelligence/emoji_reaction_intelligence.py` - Advanced emoji processing
-- `src/intelligence/simplified_emotion_manager.py` - Unified emotion processing pipeline
-- Memory-triggered moments for relationship continuity
-- Context switch detection and conversation flow management
-
-## Handler System
-
-**Modular Handler Architecture**: All Discord commands use handler classes in `src/handlers/`:
-- `BotEventHandlers` - Core Discord event handling
-- `HelpCommandHandlers` - Help system and command documentation
-- `StatusCommandHandlers` - Health and status monitoring
-- `VoiceCommandHandlers` - Voice functionality
-- `PerformanceCommands` - Performance analysis and optimization
-- `WebSearchCommandHandlers` - Web search integration (available)
-
-**Currently Disabled** (over-engineered or obsolete):
-- `AdminCommandHandlers` - Disabled (over-engineered)
-- `MemoryCommandHandlers` - Disabled (obsolete API)
-- `CDLTestCommands` - Disabled (dev testing only)
-- `PrivacyCommandHandlers` - Disabled (privacy and data management)
-- `MonitoringCommands` - Disabled (system monitoring and performance)
-- `LLMToolCommandHandlers` - Disabled (LLM-powered tool commands)
-- `LLMSelfMemoryHandlers` - **REMOVED** (replaced with structured CDL personal knowledge integration)
-
-**Handler Registration Pattern**:
-```python
-# In src.main.py ModularBotManager
-handler = HandlerClass(bot, memory_manager, llm_client)
-await handler.register_commands()
-```
-
-## Security & Production
-
-**Error Handling**: Production-grade error handling with graceful degradation:
-```python
-from src.utils.production_error_handler import handle_errors, ErrorCategory, ErrorSeverity
-
-@handle_errors(category=ErrorCategory.MEMORY, severity=ErrorSeverity.HIGH)
-async def memory_operation():
-    # Operation with automatic error handling
-```
-
-**Health Monitoring**: Multi-component health system:
-- `/health` endpoint for container orchestration
-- Discord admin commands for live monitoring
-- `src/utils/health_monitor.py` for component health tracking
-
-## Code Conventions
-
-**Async-First**: All major operations are async, following WhisperEngine's scatter-gather concurrency model.
-
-**Protocol Compliance**: New components must implement corresponding protocols (e.g., `MemoryManagerProtocol`).
-
-**Factory Creation**: Use factories for component creation, never direct imports of concrete classes.
-
-**Environment Configuration**: Use TYPE-based environment variables, not boolean flags.
-
-**Import Safety**: Use try/except for optional dependencies, fall back to no-op implementations.
-
-**Character Agnosticism**: ALL Python components must be character-agnostic:
-- Use `get_normalized_bot_name_from_env()` for bot identification
-- Load character data dynamically from CDL database
-- Never hardcode character names, personalities, or bot-specific behavior
-- Features must work for ANY character via CDL database integration
-- Use environment variables for bot identification, never literal strings
-
-**CDL Personal Knowledge Integration**: For personal questions (relationships, family, career, etc.):
-- Use structured CDL section extraction in `src/prompts/cdl_ai_integration.py`
-- Question type detection categorizes queries and pulls relevant CDL sections
-- Structured data integration follows same patterns as Big Five personality, life phases
-- NO separate CDL Query Helper - personal knowledge is integrated into prompt building
-- Zero latency direct JSON access, no LLM API calls for character knowledge
-
-**Fidelity-First Development Patterns**: Core architectural implementations:
-
-```python
-# ✅ Use CDL integration for character-aware responses
-from src.prompts.cdl_ai_integration import CDLAIPromptIntegration
-cdl_integration = CDLAIPromptIntegration()
-prompt = await cdl_integration.create_character_aware_prompt(
-    character_file=character_file,
-    user_id=user_id,
-    message_content=message
-)
-
-# ✅ Use vector memory for conversation context
-memories = await memory_manager.retrieve_relevant_memories(
-    user_id=user_id,
-    query=message,
-    limit=10
-)
-
-# ✅ Apply fidelity-first prompt building
-from src.prompts.optimized_prompt_builder import create_optimized_prompt_builder
-prompt_builder = create_optimized_prompt_builder(memory_manager=memory_manager)
-optimized_prompt = await prompt_builder.build_optimized_prompt(
-    system_prompt=system_prompt,
-    conversation_context=conversation_context,
-    user_message=user_message,
-    full_fidelity=True,  # CRITICAL: Preserve character nuance
-    preserve_character_details=True,
-    intelligent_trimming=True
-)
-
-# ✅ Use vector-enhanced context detection
-from src.prompts.hybrid_context_detector import create_hybrid_context_detector
-context_detector = create_hybrid_context_detector(memory_manager=memory_manager)
-context_result = context_detector.detect_context_patterns(
-    message=user_message,
-    conversation_history=recent_messages,
-    vector_boost=True,  # Leverage existing Qdrant infrastructure
-    confidence_threshold=0.7
-)
-```
-
-**Component Removal**: When removing obsolete components, update all references including:
-- Factory imports and creation calls
-- Protocol type annotations
-- Integration adapters
-- Test files and utilities
-
-**Anti-Phantom Features**: Prevent "phantom features" that exist but aren't integrated:
-- Every feature must be accessible via Discord commands or main application flow
-- Feature flags must default to "true" in development (we're in alpha - no production users)
-- Integration testing required before marking features "complete"
-- Document integration points, not just implementation files
-
-**🚨 CRITICAL: Vector Storage Compliance** - ALL vector operations must follow these patterns:
-- **⚠️ SCHEMA IS FROZEN**: WhisperEngine v1.0.8+ is publicly released - NO breaking changes to Qdrant schema allowed
-- **ALWAYS use Named Vectors**: Never single vector format - use `{"content": embedding, "emotion": embedding, "semantic": embedding}` structure (3D system) - LOCKED
-- **NEVER change vector dimensions**: 384D content/emotion/semantic vectors are PERMANENT
-- **NEVER rename payload fields**: user_id, memory_type, content, timestamp are FIXED
-- **NEVER add new named vectors**: "content", "emotion", "semantic" 3D system is LOCKED
-- **ADDITIVE CHANGES ONLY**: You MAY add NEW optional payload fields, but NEVER remove or rename
-- **Collection-Based Isolation**: Each bot uses dedicated Qdrant collection (bot_name field was REMOVED)
-- **ALWAYS extract with helpers**: Use `_extract_named_vector()` when retrieving vectors
-- **ALWAYS query with NamedVector**: Use `models.NamedVector(name="content", vector=embedding)`
-- **Filter by user_id within collection**: No cross-bot leakage - collections are bot-specific
-- Vector retrieval code must handle dictionary format from Qdrant named vectors
-- When in doubt, check `src/memory/vector_memory_system.py` for reference patterns
-- **3D Vector System Only**: content, emotion, semantic vectors (7D system was deprecated)
-
-**Error Handling Patterns**: All async operations use production error handling:
-```python
-from src.utils.production_error_handler import handle_errors, ErrorCategory, ErrorSeverity
-
-@handle_errors(category=ErrorCategory.MEMORY, severity=ErrorSeverity.HIGH)
-async def memory_operation():
-    # Automatic error handling, logging, and graceful degradation
-```
-
-**Configuration Pattern**: Use TYPE-based environment variables, not boolean flags:
-```python
-# ✅ CORRECT: Type-based configuration
-MEMORY_SYSTEM_TYPE=vector           # "vector", "hierarchical", "test_mock"
-LLM_CLIENT_TYPE=openrouter         # "openrouter", "local", "mock"
-
-# ❌ WRONG: Boolean feature flags for local code
-ENABLE_MEMORY_SYSTEM=true          # Creates phantom features
-```
-
-**Testing Commands**: Essential testing and validation workflows:
-```bash
-# PREFERRED: Direct Python validation (PRIMARY method for all new features)
-# 🚨 CRITICAL: ALWAYS include full environment setup for direct Python tests
-source .venv/bin/activate && \
-export FASTEMBED_CACHE_PATH="/tmp/fastembed_cache" && \
-export QDRANT_HOST="localhost" && \
-export QDRANT_PORT="6334" && \
-export POSTGRES_HOST="localhost" && \
-export POSTGRES_PORT="5433" && \
-export DISCORD_BOT_NAME=elena && \
-python tests/automated/test_trendwise_direct_validation.py  # TrendWise adaptive learning features
-
-# Other feature validation tests (use same environment setup pattern):
-source .venv/bin/activate && \
-export FASTEMBED_CACHE_PATH="/tmp/fastembed_cache" && \
-export QDRANT_HOST="localhost" && \
-export QDRANT_PORT="6334" && \
-export POSTGRES_HOST="localhost" && \
-export POSTGRES_PORT="5433" && \
-export DISCORD_BOT_NAME=elena && \
-python tests/automated/test_phase4_direct_validation.py  # Phase 4 intelligence features
-
-# With output limiting (recommended for long tests):
-source .venv/bin/activate && \
-export FASTEMBED_CACHE_PATH="/tmp/fastembed_cache" && \
-export QDRANT_HOST="localhost" && \
-export QDRANT_PORT="6334" && \
-export POSTGRES_HOST="localhost" && \
-export POSTGRES_PORT="5433" && \
-export DISCORD_BOT_NAME=elena && \
-python tests/automated/test_phase3_direct_validation.py 2>&1 | head -100  # Phase 3 intelligence features
-
-# NEW FEATURE VALIDATION: Always create direct validation tests for new sprints/features
-python tests/automated/test_memoryboost_complete_validation.py  # MemoryBoost (example)
-python tests/automated/test_relationship_evolution_validation.py  # Relationship Evolution (example)
-
-# Environment validation (CRITICAL for troubleshooting)
-source .venv/bin/activate && python scripts/verify_environment.py
-
-# Bot health testing (all running bots)
-./scripts/quick_bot_test.sh
-
-# Container-based testing (recommended for unit tests)
-docker exec whisperengine-elena-bot python -m pytest tests/unit/
-
-# Quick test commands for specific components
-python tests/QUICK_TEST_COMMANDS.md  # See file for component testing
-```
-
-**Error Handling Patterns**: All async operations use production error handling:
-```python
-from src.utils.production_error_handler import handle_errors, ErrorCategory, ErrorSeverity
-
-@handle_errors(category=ErrorCategory.MEMORY, severity=ErrorSeverity.HIGH)
-async def memory_operation():
-    # Automatic error handling, logging, and graceful degradation
-```
-
-**Configuration Pattern**: Use TYPE-based environment variables, not boolean flags:
-```python
-# ✅ CORRECT: Type-based configuration
-MEMORY_SYSTEM_TYPE=vector           # "vector", "hierarchical", "test_mock"
-LLM_CLIENT_TYPE=openrouter         # "openrouter", "local", "mock"
-
-# ❌ WRONG: Boolean feature flags for local code
-ENABLE_MEMORY_SYSTEM=true          # Creates phantom features
-```
-
-## Key Directories
-
-- `src/core/` - Bot initialization and Discord integration
-- `src/handlers/` - Discord command handlers (modular architecture)
-- `src/memory/` - Vector-native memory system
-- `src/llm/` - LLM client abstraction with concurrent safety
-- `src/conversation/` - Context management and engagement
-- `src/personality/` - Character systems and emotion intelligence
-- `src/intelligence/` - Phase 4 integration and conversation intelligence
-- `src/integration/` - System integration framework
-- `src/security/` - Production security and privacy
-- `src/utils/` - Cross-cutting concerns and monitoring
-- `src/characters/` - CDL character system and parsers
-- `src/prompts/` - CDL integration and prompt management
-- `utilities/` - Debug and performance tools (NOT in main app flow)
-- `scripts/` - Configuration generation and environment validation
-
-## Recent Major Changes
-
-**3D Vector System Adoption** (Complete): WhisperEngine uses an optimized 3D named vector system (content, emotion, semantic) providing optimal balance of intelligence and performance. All documentation has been updated to reflect the current 3D architecture.
-
-**Universal Identity & Account Discovery** (NEW): Introduced platform-agnostic user identity system allowing users to interact via Discord or future platforms while maintaining consistent memory. Enhanced account discovery prevents duplicate accounts.
-
-**Template-Based Multi-Bot System** (Complete): Migrated from programmatic Docker Compose generation to safe template-based approach. Infrastructure versions now pinned (PostgreSQL 16.4, Redis 7.4, Qdrant v1.15.4) to prevent breaking updates.
-
-**Multi-Bot Architecture** (Complete): Introduced shared infrastructure supporting multiple character bots with isolated personalities. See `MULTI_BOT_SETUP.md`.
-
-**CDL Character System** (Complete): Migrated from markdown prompts to database-based Character Definition Language for structured personality modeling stored in PostgreSQL.
-
-**Architecture Simplification** (Complete): Eliminated complex try/except ImportError patterns, replaced with clean factory patterns. See `ARCHITECTURE_SIMPLIFICATION_COMPLETE.md`.
-
-**Memory Migration** (Complete): Migrated to vector-native memory with Qdrant + fastembed. Default: `MEMORY_SYSTEM_TYPE=vector`.
-
-**Factory Pattern Adoption**: All major systems now use factory pattern for dependency injection and environment flexibility.
-
-**Fidelity-First Prompt Building Architecture** (NEW): Implemented graduated optimization system that preserves character nuance and conversation quality as primary design constraint. Includes OptimizedPromptBuilder with intelligent context assembly, HybridContextDetector with vector-enhanced pattern recognition, and vector-first analysis patterns that leverage existing Qdrant infrastructure instead of building separate NLP pipelines.
-
-**Phase 2.1 Fidelity-First Memory Management** (Complete): Implemented and tested comprehensive fidelity-first memory retrieval with graduated filtering, character-aware ranking, and intelligent memory tier management. Elena bot has the latest implementation - other bots may not have these updates yet. Use Elena for testing memory-related features.
-
-**Pure Docker Compose Workflow** (Complete): Eliminated `multi-bot.sh` shell script generation in favor of pure Docker Compose commands for cross-platform compatibility. All operations now use `docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml` commands directly.
-
-**Phase 4 Integration** (Complete): Advanced conversation intelligence with production optimization components fully integrated and operational.
+## 📊 DEBUGGING & LOGGING
+
+### **Comprehensive Prompt Logging**
+- **Location**: `logs/prompts/` directory with external Docker volume mount
+- **Format**: JSON files with complete conversation context and LLM responses
+- **File Pattern**: `{BotName}_{YYYYMMDD}_{HHMMSS}_{UserID}.json`
+- **Enable**: Set `ENABLE_PROMPT_LOGGING=true` in `.env` file for development
+
+### **Recursive Pattern Detection**
+- **Location**: `src/core/message_processor.py` - 3-layer defense system
+- **Purpose**: Prevent memory poisoning from broken LLM responses
+- **Detects**: "remember that you can remember" loops, excessive repetition, responses >10,000 chars
+
+### **RoBERTa Emotion Analysis Goldmine**
+- **12+ metadata fields** stored per memory: roberta_confidence, emotion_variance, emotional_intensity, etc.
+- **BOTH user AND bot messages** get full RoBERTa analysis
+- **NEVER use keyword matching** - RoBERTa data is pre-computed and stored
+- **Location**: `src/intelligence/enhanced_vector_emotion_analyzer.py`
+
+## 🎯 CURRENT ROADMAPS & DEVELOPMENT FOCUS
+
+### **Active Roadmaps**
+1. **Memory Intelligence Convergence** - Character learning via existing infrastructure
+2. **CDL Graph Intelligence** - Enhanced character knowledge systems  
+3. **Vector Memory Optimization** - Performance and fidelity improvements
+
+### **Recent Major Changes**
+- **Multi-Bot Architecture**: Production ready with 10+ characters
+- **CDL Character System**: Database-driven personalities operational
+- **Vector Memory System**: Stable 384D named vector architecture
+- **Docker Orchestration**: Template-based configuration management
+- **Protocol-Based Factories**: Dependency injection for system flexibility
+
+---
+
+**For implementation questions, check the relevant `src/` modules. For development roadmaps, see `docs/roadmaps/`. For architecture evolution context, reference `docs/architecture/README.md`.**
