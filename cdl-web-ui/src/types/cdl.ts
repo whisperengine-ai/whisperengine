@@ -98,6 +98,66 @@ export interface EvolutionHistory {
   validation_status: 'pending' | 'validated' | 'rejected'
 }
 
+export interface CharacterLLMConfig {
+  id: number
+  character_id: number
+  llm_client_type: string
+  llm_chat_api_url: string
+  llm_chat_model: string
+  llm_chat_api_key: string | null
+  llm_temperature: number
+  llm_max_tokens: number
+  llm_top_p: number
+  llm_frequency_penalty: number
+  llm_presence_penalty: number
+  is_active: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface CharacterDiscordConfig {
+  id: number
+  character_id: number
+  discord_bot_token: string | null
+  discord_application_id: string | null
+  discord_public_key: string | null
+  enable_discord: boolean
+  discord_guild_restrictions: string[]
+  discord_channel_restrictions: string[]
+  discord_status: 'online' | 'idle' | 'dnd' | 'invisible'
+  discord_activity_type: 'playing' | 'streaming' | 'listening' | 'watching'
+  discord_activity_name: string
+  response_delay_min: number
+  response_delay_max: number
+  typing_indicator: boolean
+  is_active: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface CharacterDeploymentConfig {
+  id: number
+  character_id: number
+  health_check_port: number | null
+  container_name: string | null
+  docker_image: string
+  env_overrides: Record<string, unknown>
+  memory_limit: string
+  cpu_limit: string
+  deployment_status: 'inactive' | 'pending' | 'active' | 'failed'
+  last_deployed_at: string | null
+  deployment_logs: string | null
+  is_active: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface CharacterWithConfigs extends Character {
+  llm_config?: CharacterLLMConfig
+  discord_config?: CharacterDiscordConfig
+  deployment_config?: CharacterDeploymentConfig
+}
+
 export interface InteractionMode {
   id: number
   character_id: number
