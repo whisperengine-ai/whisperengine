@@ -36,8 +36,8 @@ export default function CharacterView({ character }: CharacterViewProps) {
   }
 
   const InfoSection = ({ title, children }: { title: string; children: React.ReactNode }) => (
-    <div className="bg-white rounded-lg shadow p-6">
-      <h3 className="text-lg font-medium text-gray-900 mb-4">{title}</h3>
+    <div className="bg-gray-800 rounded-lg shadow p-6">
+      <h3 className="text-lg font-medium text-gray-100 mb-4">{title}</h3>
       {children}
     </div>
   )
@@ -45,7 +45,7 @@ export default function CharacterView({ character }: CharacterViewProps) {
   const InfoRow = ({ label, value }: { label: string; value: string | number | boolean | null | undefined }) => (
     <div className="flex justify-between py-2 border-b border-gray-100 last:border-b-0">
       <span className="text-sm font-medium text-gray-500">{label}</span>
-      <span className="text-sm text-gray-900">
+      <span className="text-sm text-gray-100">
         {value === null || value === undefined ? 'Not set' : 
          typeof value === 'boolean' ? (value ? 'Yes' : 'No') : 
          String(value)}
@@ -75,8 +75,8 @@ export default function CharacterView({ character }: CharacterViewProps) {
         
         {character.description && (
           <div className="mt-4">
-            <h4 className="text-sm font-medium text-gray-700 mb-2">Description</h4>
-            <p className="text-sm text-gray-600 bg-gray-50 p-3 rounded">{character.description}</p>
+            <h4 className="text-sm font-medium text-gray-300 mb-2">Description</h4>
+            <p className="text-sm text-gray-400 bg-gray-900 p-3 rounded">{character.description}</p>
           </div>
         )}
       </InfoSection>
@@ -88,7 +88,7 @@ export default function CharacterView({ character }: CharacterViewProps) {
             {/* Big Five if available */}
             {(character.cdl_data as any)?.personality?.big_five && (
               <div>
-                <h4 className="text-sm font-medium text-gray-700 mb-2">Big Five Traits</h4>
+                <h4 className="text-sm font-medium text-gray-300 mb-2">Big Five Traits</h4>
                 <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
                   {Object.entries((character.cdl_data as any).personality.big_five).map(([trait, value]) => (
                     <div key={trait} className="text-center">
@@ -103,7 +103,7 @@ export default function CharacterView({ character }: CharacterViewProps) {
             {/* Values */}
             {(character.cdl_data as any)?.personality?.values && Array.isArray((character.cdl_data as any).personality.values) && (
               <div>
-                <h4 className="text-sm font-medium text-gray-700 mb-2">Core Values</h4>
+                <h4 className="text-sm font-medium text-gray-300 mb-2">Core Values</h4>
                 <div className="flex flex-wrap gap-2">
                   {(character.cdl_data as any).personality.values.map((value: string, index: number) => (
                     <span key={index} className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded">

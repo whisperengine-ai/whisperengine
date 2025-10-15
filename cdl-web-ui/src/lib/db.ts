@@ -8,12 +8,16 @@ class DatabaseAdapter {
   private pool: Pool;
 
   constructor() {
+    // Determine the appropriate database host based on environment
+    const isDocker = process.env.NODE_ENV === 'production' || process.env.DOCKER_ENV === 'true';
+    const defaultHost = isDocker ? 'host.docker.internal' : 'localhost';
+    
     this.pool = new Pool({
-      host: process.env.PGHOST || 'host.docker.internal',
-      port: parseInt(process.env.PGPORT || '5433'),
-      database: process.env.PGDATABASE || 'whisperengine',
-      user: process.env.PGUSER || 'whisperengine',
-      password: process.env.PGPASSWORD || 'whisperengine_password',
+      host: process.env.POSTGRES_HOST || defaultHost,
+      port: parseInt(process.env.POSTGRES_PORT || '5432'),
+      database: process.env.POSTGRES_DB || 'whisperengine',
+      user: process.env.POSTGRES_USER || 'whisperengine',
+      password: process.env.POSTGRES_PASSWORD || 'whisperengine_password',
       ssl: false,
     });
   }
@@ -27,6 +31,61 @@ class DatabaseAdapter {
     } catch (error) {
       console.error('Database connection test failed:', error);
       return false;
+    }
+  }
+
+  // Helper methods for normalized schema
+  async getCharacterIdentityDetails(characterId: number): Promise<any> {
+    const client = await this.pool.connect();
+    try {
+      const result = await client.query(
+        'SELECT * FROM character_identity_details WHERE character_id = $1',
+        [characterId]
+      );
+      return result.rows[0] || null;
+    } finally {
+      client.release();
+    }
+  }
+
+  async getCharacterPersonalityTraits(characterId: number): Promise<any> {
+    const client = await this.pool.connect();
+    try {
+      const result = await client.query(
+        'SELECT trait_name, trait_value FROM personality_traits WHERE character_id = $1',
+        [characterId]
+      );
+      
+      const traits: any = {
+        openness: 0.5,
+        conscientiousness: 0.5,
+        extraversion: 0.5,
+        agreeableness: 0.5,
+        neuroticism: 0.5
+      };
+
+      result.rows.forEach(row => {
+        if (traits.hasOwnProperty(row.trait_name)) {
+          traits[row.trait_name] = parseFloat(row.trait_value);
+        }
+      });
+
+      return traits;
+    } finally {
+      client.release();
+    }
+  }
+
+  async getCharacterValues(characterId: number): Promise<string[]> {
+    const client = await this.pool.connect();
+    try {
+      const result = await client.query(
+        'SELECT value_key FROM character_values WHERE character_id = $1 ORDER BY importance_level DESC, value_key',
+        [characterId]
+      );
+      return result.rows.map(row => row.value_key);
+    } finally {
+      client.release();
     }
   }
 
@@ -51,8 +110,8 @@ class DatabaseAdapter {
         age_range: null,
         background: null,
         description: row.description || null,
-        character_archetype: row.archetype || 'real-world',
-        allow_full_roleplay_immersion: row.allow_full_roleplay || false,
+        archetype: row.archetype || 'real-world',
+        allow_full_roleplay: row.allow_full_roleplay || false,
         cdl_data: {
           identity: {
             name: row.name,
@@ -82,6 +141,14 @@ class DatabaseAdapter {
       }
 
       const row = result.rows[0];
+      
+      // Load related data from normalized tables
+      const [identityDetails, personalityTraits, characterValues] = await Promise.all([
+        this.getCharacterIdentityDetails(id),
+        this.getCharacterPersonalityTraits(id),
+        this.getCharacterValues(id)
+      ]);
+
       return {
         id: parseInt(row.id),
         name: row.name,
@@ -92,17 +159,22 @@ class DatabaseAdapter {
         is_active: row.is_active,
         version: 1,
         occupation: row.occupation || null,
-        location: null,
+        location: identityDetails?.location || null,
         age_range: null,
         background: null,
         description: row.description || null,
-        character_archetype: row.archetype || 'real-world',
-        allow_full_roleplay_immersion: row.allow_full_roleplay || false,
+        archetype: row.archetype || 'real-world',
+        allow_full_roleplay: row.allow_full_roleplay || false,
         cdl_data: {
           identity: {
             name: row.name,
             occupation: row.occupation || '',
-            description: row.description || ''
+            description: row.description || '',
+            location: identityDetails?.location || ''
+          },
+          personality: {
+            big_five: personalityTraits,
+            values: characterValues
           },
           allow_full_roleplay_immersion: row.allow_full_roleplay || false
         },
@@ -114,9 +186,69 @@ class DatabaseAdapter {
     }
   }
 
+  // Helper methods to save to normalized tables
+  async saveCharacterIdentityDetails(characterId: number, identityData: any, client?: any): Promise<void> {
+    const dbClient = client || await this.pool.connect();
+    try {
+      await dbClient.query(`
+        INSERT INTO character_identity_details (character_id, full_name, location)
+        VALUES ($1, $2, $3)
+        ON CONFLICT (character_id) 
+        DO UPDATE SET
+          full_name = EXCLUDED.full_name,
+          location = EXCLUDED.location
+      `, [characterId, identityData.name, identityData.location]);
+    } finally {
+      if (!client) {
+        dbClient.release();
+      }
+    }
+  }
+
+  async saveCharacterPersonalityTraits(characterId: number, traits: any, client?: any): Promise<void> {
+    const dbClient = client || await this.pool.connect();
+    try {
+      // Delete existing traits and insert new ones
+      await dbClient.query('DELETE FROM personality_traits WHERE character_id = $1', [characterId]);
+      
+      for (const [traitName, traitValue] of Object.entries(traits)) {
+        await dbClient.query(`
+          INSERT INTO personality_traits (character_id, trait_name, trait_value)
+          VALUES ($1, $2, $3)
+        `, [characterId, traitName, traitValue]);
+      }
+    } finally {
+      if (!client) {
+        dbClient.release();
+      }
+    }
+  }
+
+  async saveCharacterValues(characterId: number, values: string[], client?: any): Promise<void> {
+    const dbClient = client || await this.pool.connect();
+    try {
+      // Delete existing values and insert new ones
+      await dbClient.query('DELETE FROM character_values WHERE character_id = $1', [characterId]);
+      
+      for (const value of values) {
+        await dbClient.query(`
+          INSERT INTO character_values (character_id, value_key, value_description)
+          VALUES ($1, $2, $3)
+        `, [characterId, value, value]);
+      }
+    } finally {
+      if (!client) {
+        dbClient.release();
+      }
+    }
+  }
+
   async updateCharacter(id: number, characterData: Partial<Character>): Promise<Character | null> {
     const client = await this.pool.connect();
     try {
+      await client.query('BEGIN');
+
+      // Update main character table
       const result = await client.query(
         `UPDATE characters 
          SET name = COALESCE($2, name),
@@ -134,36 +266,68 @@ class DatabaseAdapter {
           characterData.normalized_name,
           characterData.occupation,
           characterData.description,
-          characterData.character_archetype,
-          characterData.allow_full_roleplay_immersion
+          characterData.archetype,
+          characterData.allow_full_roleplay
         ]
       );
 
       if (result.rows.length === 0) {
+        await client.query('ROLLBACK');
         return null;
       }
 
-      const row = result.rows[0];
-      return {
-        id: parseInt(row.id),
-        name: row.name,
-        normalized_name: row.normalized_name,
-        bot_name: row.normalized_name,
-        created_at: row.created_at,
-        updated_at: row.updated_at,
-        is_active: row.is_active,
-        version: 1,
-        occupation: row.occupation,
-        location: null,
-        age_range: null,
-        background: null,
-        description: row.description,
-        character_archetype: row.archetype,
-        allow_full_roleplay_immersion: row.allow_full_roleplay,
-        cdl_data: characterData.cdl_data || {},
-        created_by: null,
-        notes: null,
-      };
+      // Save CDL data to normalized tables if provided
+      if (characterData.cdl_data) {
+        const cdl = characterData.cdl_data as any;
+        
+        // Save identity details
+        if (cdl.identity) {
+          await this.saveCharacterIdentityDetails(id, cdl.identity);
+        }
+        
+        // Save personality data
+        if (cdl.personality) {
+          if (cdl.personality.big_five) {
+            await this.saveCharacterPersonalityTraits(id, cdl.personality.big_five);
+          }
+          if (cdl.personality.values) {
+            await this.saveCharacterValues(id, cdl.personality.values);
+          }
+        }
+      }
+
+      await client.query('COMMIT');
+
+      // Return the updated character with all related data
+      return await this.getCharacterById(id);
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  async deleteCharacter(id: number): Promise<boolean> {
+    const client = await this.pool.connect();
+    try {
+      // First check if character exists
+      const checkResult = await client.query(
+        'SELECT id FROM characters WHERE id = $1',
+        [id]
+      );
+
+      if (checkResult.rows.length === 0) {
+        return false; // Character doesn't exist
+      }
+
+      // Delete character (cascading deletes will handle configs)
+      const deleteResult = await client.query(
+        'DELETE FROM characters WHERE id = $1',
+        [id]
+      );
+
+      return deleteResult.rowCount !== null && deleteResult.rowCount > 0;
     } finally {
       client.release();
     }
@@ -174,7 +338,25 @@ class DatabaseAdapter {
     try {
       await client.query('BEGIN');
 
-      const normalizedName = characterData.name?.toLowerCase().replace(/[^a-z0-9]/g, '_') || '';
+      // Generate a unique normalized name
+      let baseNormalizedName = characterData.name?.toLowerCase().replace(/[^a-z0-9]/g, '_') || '';
+      let normalizedName = baseNormalizedName;
+      let counter = 1;
+      
+      // Check for existing normalized names and add a counter if needed
+      while (true) {
+        const existingResult = await client.query(
+          'SELECT id FROM characters WHERE normalized_name = $1',
+          [normalizedName]
+        );
+        
+        if (existingResult.rows.length === 0) {
+          break; // Name is unique
+        }
+        
+        normalizedName = `${baseNormalizedName}_${counter}`;
+        counter++;
+      }
       
       // Insert main character record
       const characterResult = await client.query(
@@ -186,8 +368,8 @@ class DatabaseAdapter {
           normalizedName,
           characterData.occupation || null,
           characterData.description || null,
-          characterData.character_archetype || 'real-world',
-          characterData.allow_full_roleplay_immersion || false,
+          characterData.archetype || 'real_world',
+          characterData.allow_full_roleplay || false,
           true
         ]
       );
@@ -195,15 +377,30 @@ class DatabaseAdapter {
       const characterId = parseInt(characterResult.rows[0].id);
       const row = characterResult.rows[0];
 
+      // Save CDL data to normalized tables if provided
+      if (characterData.cdl_data) {
+        const cdl = characterData.cdl_data as any;
+        
+        // Save identity details
+        if (cdl.identity) {
+          await this.saveCharacterIdentityDetails(characterId, cdl.identity, client);
+        }
+        
+        // Save personality data
+        if (cdl.personality) {
+          if (cdl.personality.big_five) {
+            await this.saveCharacterPersonalityTraits(characterId, cdl.personality.big_five, client);
+          }
+          if (cdl.personality.values && cdl.personality.values.length > 0) {
+            await this.saveCharacterValues(characterId, cdl.personality.values, client);
+          }
+        }
+      }
+
       await client.query('COMMIT');
 
-      // Merge Discord configuration into cdl_data for the response
-      const enhancedCdlData = {
-        ...characterData.cdl_data,
-        discord_config: (characterData as Record<string, unknown>).discord_config || {}
-      };
-
-      return {
+      // Return the created character with all related data
+      return await this.getCharacterById(characterId) || {
         id: characterId,
         name: row.name,
         normalized_name: row.normalized_name,
@@ -217,9 +414,9 @@ class DatabaseAdapter {
         age_range: null,
         background: null,
         description: row.description,
-        character_archetype: row.archetype,
-        allow_full_roleplay_immersion: row.allow_full_roleplay,
-        cdl_data: enhancedCdlData,
+        archetype: row.archetype,
+        allow_full_roleplay: row.allow_full_roleplay,
+        cdl_data: characterData.cdl_data || {},
         created_by: null,
         notes: null,
       };
@@ -286,20 +483,40 @@ class DatabaseAdapter {
   async createOrUpdateCharacterLLMConfig(characterId: number, config: Partial<CharacterLLMConfig>): Promise<CharacterLLMConfig> {
     const client = await this.pool.connect();
     try {
-      // First, deactivate any existing active config
-      await client.query(
-        'UPDATE character_llm_config SET is_active = false WHERE character_id = $1 AND is_active = true',
-        [characterId]
-      );
-
-      // Insert new config
+      // Use UPSERT to handle existing records
       const result = await client.query(`
-        INSERT INTO character_llm_config (
-          character_id, llm_client_type, llm_chat_api_url, llm_chat_model, 
-          llm_chat_api_key, llm_temperature, llm_max_tokens, llm_top_p,
-          llm_frequency_penalty, llm_presence_penalty, is_active
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, true)
-        RETURNING *
+        WITH existing AS (
+          SELECT id FROM character_llm_config 
+          WHERE character_id = $1 AND is_active = true
+        ),
+        updated AS (
+          UPDATE character_llm_config 
+          SET llm_client_type = $2,
+              llm_chat_api_url = $3,
+              llm_chat_model = $4,
+              llm_chat_api_key = $5,
+              llm_temperature = $6,
+              llm_max_tokens = $7,
+              llm_top_p = $8,
+              llm_frequency_penalty = $9,
+              llm_presence_penalty = $10,
+              updated_at = CURRENT_TIMESTAMP
+          WHERE character_id = $1 AND is_active = true
+          RETURNING *
+        ),
+        inserted AS (
+          INSERT INTO character_llm_config (
+            character_id, llm_client_type, llm_chat_api_url, llm_chat_model, 
+            llm_chat_api_key, llm_temperature, llm_max_tokens, llm_top_p,
+            llm_frequency_penalty, llm_presence_penalty, is_active
+          )
+          SELECT $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, true
+          WHERE NOT EXISTS (SELECT 1 FROM existing)
+          RETURNING *
+        )
+        SELECT * FROM updated
+        UNION ALL
+        SELECT * FROM inserted
       `, [
         characterId,
         config.llm_client_type || 'openrouter',
@@ -330,6 +547,19 @@ class DatabaseAdapter {
         created_at: row.created_at,
         updated_at: row.updated_at
       };
+    } finally {
+      client.release();
+    }
+  }
+
+  async deleteCharacterLLMConfig(characterId: number): Promise<boolean> {
+    const client = await this.pool.connect();
+    try {
+      const result = await client.query(
+        'DELETE FROM character_llm_config WHERE character_id = $1',
+        [characterId]
+      );
+      return result.rowCount !== null && result.rowCount > 0;
     } finally {
       client.release();
     }
@@ -382,29 +612,25 @@ class DatabaseAdapter {
         [characterId]
       );
 
-      // Insert new config
+      // Insert new config using actual schema columns
       const result = await client.query(`
         INSERT INTO character_discord_config (
-          character_id, discord_bot_token, discord_application_id, discord_public_key,
-          enable_discord, discord_guild_restrictions, discord_channel_restrictions,
-          discord_status, discord_activity_type, discord_activity_name,
-          response_delay_min, response_delay_max, typing_indicator, is_active
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, true)
+          character_id, discord_bot_token, discord_application_id, discord_guild_id,
+          discord_status_message, discord_activity_type, max_message_length,
+          typing_delay_seconds, enable_reactions, enable_typing_indicator, is_active
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, true)
         RETURNING *
       `, [
         characterId,
         config.discord_bot_token || null,
         config.discord_application_id || null,
-        config.discord_public_key || null,
-        config.enable_discord || false,
-        config.discord_guild_restrictions || [],
-        config.discord_channel_restrictions || [],
+        config.discord_guild_id || null,
         config.discord_status || 'online',
-        config.discord_activity_type || 'watching',
-        config.discord_activity_name || 'conversations',
-        config.response_delay_min || 1000,
-        config.response_delay_max || 3000,
-        config.typing_indicator || true
+        config.discord_activity_type || 'playing',
+        config.max_message_length || 2000,
+        config.typing_delay_seconds || 2.0,
+        config.enable_reactions || true,
+        config.enable_typing_indicator || true
       ]);
 
       const row = result.rows[0];
@@ -413,20 +639,33 @@ class DatabaseAdapter {
         character_id: parseInt(row.character_id),
         discord_bot_token: row.discord_bot_token,
         discord_application_id: row.discord_application_id,
-        discord_public_key: row.discord_public_key,
-        enable_discord: row.enable_discord,
-        discord_guild_restrictions: row.discord_guild_restrictions || [],
-        discord_channel_restrictions: row.discord_channel_restrictions || [],
-        discord_status: row.discord_status,
+        discord_guild_id: row.discord_guild_id,
+        enable_discord: true, // Assume enabled if config exists
+        discord_guild_restrictions: [], // Map from guild_id if needed
+        discord_channel_restrictions: [], // Not in schema
+        discord_status: row.discord_status_message,
         discord_activity_type: row.discord_activity_type,
-        discord_activity_name: row.discord_activity_name,
-        response_delay_min: parseInt(row.response_delay_min),
-        response_delay_max: parseInt(row.response_delay_max),
-        typing_indicator: row.typing_indicator,
+        max_message_length: parseInt(row.max_message_length),
+        typing_delay_seconds: parseFloat(row.typing_delay_seconds),
+        enable_reactions: row.enable_reactions,
+        enable_typing_indicator: row.enable_typing_indicator,
         is_active: row.is_active,
         created_at: row.created_at,
         updated_at: row.updated_at
       };
+    } finally {
+      client.release();
+    }
+  }
+
+  async deleteCharacterDiscordConfig(characterId: number): Promise<boolean> {
+    const client = await this.pool.connect();
+    try {
+      const result = await client.query(
+        'DELETE FROM character_discord_config WHERE character_id = $1',
+        [characterId]
+      );
+      return result.rowCount !== null && result.rowCount > 0;
     } finally {
       client.release();
     }
@@ -525,6 +764,19 @@ class DatabaseAdapter {
     }
   }
 
+  async deleteCharacterDeploymentConfig(characterId: number): Promise<boolean> {
+    const client = await this.pool.connect();
+    try {
+      const result = await client.query(
+        'DELETE FROM character_deployment_config WHERE character_id = $1',
+        [characterId]
+      );
+      return result.rowCount !== null && result.rowCount > 0;
+    } finally {
+      client.release();
+    }
+  }
+
   // Get character with all configurations
   async getCharacterWithConfigs(id: number): Promise<CharacterWithConfigs | null> {
     const character = await this.getCharacterById(id);
@@ -606,6 +858,26 @@ export async function createOrUpdateCharacterDeploymentConfig(characterId: numbe
 export async function getCharacterWithConfigs(id: number): Promise<CharacterWithConfigs | null> {
   const db = new DatabaseAdapter();
   return await db.getCharacterWithConfigs(id);
+}
+
+export async function deleteCharacter(id: number): Promise<boolean> {
+  const db = new DatabaseAdapter();
+  return await db.deleteCharacter(id);
+}
+
+export async function deleteCharacterLLMConfig(characterId: number): Promise<boolean> {
+  const db = new DatabaseAdapter();
+  return await db.deleteCharacterLLMConfig(characterId);
+}
+
+export async function deleteCharacterDiscordConfig(characterId: number): Promise<boolean> {
+  const db = new DatabaseAdapter();
+  return await db.deleteCharacterDiscordConfig(characterId);
+}
+
+export async function deleteCharacterDeploymentConfig(characterId: number): Promise<boolean> {
+  const db = new DatabaseAdapter();
+  return await db.deleteCharacterDeploymentConfig(characterId);
 }
 
 const db = new DatabaseAdapter();

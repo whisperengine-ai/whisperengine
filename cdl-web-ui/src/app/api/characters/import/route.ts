@@ -1,6 +1,70 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createCharacter } from '@/lib/db'
 import * as yaml from 'js-yaml'
+import { Pool } from 'pg'
+
+const pool = new Pool({
+  host: process.env.POSTGRES_HOST || 'localhost',
+  port: parseInt(process.env.POSTGRES_PORT || '5433'),
+  database: process.env.POSTGRES_DB || 'whisperengine',
+  user: process.env.POSTGRES_USER || 'whisperengine',
+  password: process.env.POSTGRES_PASSWORD || 'whisperengine_pass',
+})
+
+// Helper function to create character within existing transaction
+async function createCharacterWithinTransaction(client: any, characterData: any) {
+  // Generate a unique normalized name
+  let baseNormalizedName = characterData.name?.toLowerCase().replace(/[^a-z0-9]/g, '_') || '';
+  let normalizedName = characterData.normalized_name || baseNormalizedName;
+  let counter = 1;
+  
+  // Check for existing normalized names and add a counter if needed
+  while (true) {
+    const existingResult = await client.query(
+      'SELECT id FROM characters WHERE normalized_name = $1',
+      [normalizedName]
+    );
+    
+    if (existingResult.rows.length === 0) {
+      break; // Name is unique
+    }
+    
+    normalizedName = `${baseNormalizedName}_${counter}`;
+    counter++;
+  }
+  
+  // Insert main character record
+  const characterResult = await client.query(
+    `INSERT INTO characters (name, normalized_name, occupation, description, archetype, allow_full_roleplay, is_active, created_at, updated_at) 
+     VALUES ($1, $2, $3, $4, $5, $6, $7, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) 
+     RETURNING id, name, normalized_name, occupation, description, archetype, allow_full_roleplay, is_active, created_at, updated_at`,
+    [
+      characterData.name,
+      normalizedName,
+      characterData.occupation || null,
+      characterData.description || null,
+      characterData.archetype || 'real-world',
+      characterData.allow_full_roleplay || false,
+      true
+    ]
+  );
+
+  const characterId = parseInt(characterResult.rows[0].id);
+  const row = characterResult.rows[0];
+
+  return {
+    id: characterId,
+    name: row.name,
+    normalized_name: row.normalized_name,
+    occupation: row.occupation,
+    description: row.description,
+    archetype: row.archetype,
+    allow_full_roleplay: row.allow_full_roleplay,
+    is_active: row.is_active,
+    created_at: row.created_at,
+    updated_at: row.updated_at
+  };
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -78,8 +142,8 @@ export async function POST(request: NextRequest) {
       normalized_name: getString(metadata, 'normalized_name') || nameVal.toLowerCase().replace(/[^a-z0-9]/g, '_'),
       occupation: getString(identity, 'occupation') || null,
       description: getString(identity, 'description') || null,
-  character_archetype: getArchetype(getString(identity, 'archetype')),
-      allow_full_roleplay_immersion: getBoolean(identity, 'allow_full_roleplay_immersion') ?? false,
+  archetype: getArchetype(getString(identity, 'archetype')),
+      allow_full_roleplay: getBoolean(identity, 'allow_full_roleplay_immersion') ?? false,
       cdl_data: {
         identity: identity || {},
         personality: getObject(yamlData.personality),
@@ -99,20 +163,104 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Create character in database
-    const character = await createCharacter(characterData)
+    // Start a single transaction for entire import operation
+    const client = await pool.connect()
+    let character: any = null
     
-    return NextResponse.json({
-      success: true,
-  message: `Character "${nameVal}" imported successfully`,
-      character: {
-        id: character.id,
-        name: character.name,
-        normalized_name: character.normalized_name,
-        occupation: character.occupation,
-        description: character.description
+    try {
+      await client.query('BEGIN')
+      
+      // Create character in database within the transaction
+      character = await createCharacterWithinTransaction(client, characterData)
+      
+      // Import background entries
+      const backgroundData = yamlData.background as Record<string, unknown> | undefined
+      if (backgroundData && Array.isArray(backgroundData.entries)) {
+        for (const entry of backgroundData.entries) {
+          if (typeof entry === 'object' && entry !== null) {
+            const bgEntry = entry as Record<string, unknown>
+            await client.query(`
+              INSERT INTO character_background (character_id, category, period, title, description, importance_level)
+              VALUES ($1, $2, $3, $4, $5, $6)
+            `, [
+              character.id,
+              getString(bgEntry, 'category') || 'General',
+              getString(bgEntry, 'period') || getString(bgEntry, 'timeframe') || null,
+              getString(bgEntry, 'title') || null,
+              getString(bgEntry, 'description') || getString(bgEntry, 'content') || null,
+              typeof bgEntry.importance_level === 'number' ? bgEntry.importance_level : 5
+            ])
+          }
+        }
       }
-    }, { status: 201 })
+      
+      // Import interests
+      const interestsData = yamlData.interests as Record<string, unknown> | undefined
+      if (interestsData && Array.isArray(interestsData.entries)) {
+        for (const entry of interestsData.entries) {
+          if (typeof entry === 'object' && entry !== null) {
+            const interestEntry = entry as Record<string, unknown>
+            await client.query(`
+              INSERT INTO character_interests (character_id, category, interest_text, proficiency_level, importance, display_order)
+              VALUES ($1, $2, $3, $4, $5, $6)
+            `, [
+              character.id,
+              getString(interestEntry, 'category') || 'General',
+              getString(interestEntry, 'interest_text') || null,
+              typeof interestEntry.proficiency_level === 'number' ? interestEntry.proficiency_level : 5,
+              getString(interestEntry, 'importance') || 'Medium',
+              typeof interestEntry.display_order === 'number' ? interestEntry.display_order : 1
+            ])
+          }
+        }
+      }
+      
+      // Import speech patterns
+      const speechData = yamlData.speech_patterns as Record<string, unknown> | undefined
+      if (speechData && Array.isArray(speechData.patterns)) {
+        for (const pattern of speechData.patterns) {
+          if (typeof pattern === 'object' && pattern !== null) {
+            const speechPattern = pattern as Record<string, unknown>
+            await client.query(`
+              INSERT INTO character_speech_patterns (character_id, pattern_type, pattern_value, usage_frequency, context, priority)
+              VALUES ($1, $2, $3, $4, $5, $6)
+            `, [
+              character.id,
+              getString(speechPattern, 'pattern_type') || 'General',
+              getString(speechPattern, 'pattern_value') || getString(speechPattern, 'pattern') || null,
+              getString(speechPattern, 'usage_frequency') || getString(speechPattern, 'frequency') || 'Medium',
+              getString(speechPattern, 'context') || null,
+              typeof speechPattern.priority === 'number' ? speechPattern.priority : 5
+            ])
+          }
+        }
+      }
+      
+      await client.query('COMMIT')
+      
+      return NextResponse.json({
+        success: true,
+        message: `Character "${nameVal}" imported successfully`,
+        character: {
+          id: character.id,
+          name: character.name,
+          normalized_name: character.normalized_name,
+          occupation: character.occupation,
+          description: character.description
+        }
+      }, { status: 201 })
+
+    } catch (importError) {
+      await client.query('ROLLBACK')
+      console.error('Error during complete import operation:', importError)
+      
+      return NextResponse.json({
+        success: false,
+        error: `Import failed: ${importError instanceof Error ? importError.message : 'Unknown error'}`
+      }, { status: 500 })
+    } finally {
+      client.release()
+    }
 
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error'

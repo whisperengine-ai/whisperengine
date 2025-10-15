@@ -361,9 +361,9 @@ export default function CharacterCreateForm({ initialTemplate }: CharacterCreate
   }
 
   return (
-    <div className="bg-white rounded-lg shadow">
+    <div className="bg-gray-800 rounded-lg shadow">
       {/* Tab Navigation */}
-      <div className="border-b border-gray-200">
+      <div className="border-b border-gray-700">
         <nav className="flex space-x-8 px-6 py-4">
           {[
             { id: 'identity', label: 'Identity', icon: '👤' },
@@ -378,7 +378,7 @@ export default function CharacterCreateForm({ initialTemplate }: CharacterCreate
               className={`flex items-center space-x-2 px-3 py-2 rounded-lg font-medium ${
                 activeTab === tab.id
                   ? 'bg-blue-100 text-blue-700'
-                  : 'text-gray-800 hover:text-gray-900'
+                  : 'text-gray-100 hover:text-gray-100'
               }`}
             >
               <span>{tab.icon}</span>
@@ -392,25 +392,25 @@ export default function CharacterCreateForm({ initialTemplate }: CharacterCreate
       <div className="p-6">
         {activeTab === 'identity' && (
           <div className="space-y-6">
-            <h3 className="text-lg font-semibold text-gray-900">Character Identity</h3>
+            <h3 className="text-lg font-semibold text-gray-100">Character Identity</h3>
             
             {/* Basic Information */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <label className="block text-sm font-medium text-gray-900 mb-2">
+                <label className="block text-sm font-medium text-gray-100 mb-2">
                   Character Name *
                 </label>
                 <input
                   type="text"
                   value={formData.name}
                   onChange={(e) => handleNameChange(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-gray-600 rounded-md text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="Enter character name"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-900 mb-2">
+                <label className="block text-sm font-medium text-gray-100 mb-2">
                   Occupation *
                 </label>
                 <input
@@ -426,13 +426,13 @@ export default function CharacterCreateForm({ initialTemplate }: CharacterCreate
                       }
                     }
                   }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-gray-600 rounded-md text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="e.g., Marine Biologist, AI Researcher"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-900 mb-2">
+                <label className="block text-sm font-medium text-gray-100 mb-2">
                   Location
                 </label>
                 <input
@@ -448,13 +448,13 @@ export default function CharacterCreateForm({ initialTemplate }: CharacterCreate
                       }
                     }
                   }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-gray-600 rounded-md text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="e.g., San Francisco, Remote"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-900 mb-2">
+                <label className="block text-sm font-medium text-gray-100 mb-2">
                   Age
                 </label>
                 <input
@@ -470,7 +470,7 @@ export default function CharacterCreateForm({ initialTemplate }: CharacterCreate
                       }
                     }
                   }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-gray-600 rounded-md text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="Age"
                 />
               </div>
@@ -478,7 +478,7 @@ export default function CharacterCreateForm({ initialTemplate }: CharacterCreate
 
             {/* Description */}
             <div>
-              <label className="block text-sm font-medium text-gray-900 mb-2">
+              <label className="block text-sm font-medium text-gray-100 mb-2">
                 Character Description
               </label>
               <textarea
@@ -494,14 +494,14 @@ export default function CharacterCreateForm({ initialTemplate }: CharacterCreate
                   }
                 }))}
                 rows={4}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-gray-600 rounded-md text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="Describe the character's background, role, and key characteristics..."
               />
             </div>
 
             {/* Character Archetype */}
             <div>
-              <label className="block text-sm font-medium text-gray-900 mb-2">
+              <label className="block text-sm font-medium text-gray-100 mb-2">
                 Character Archetype
               </label>
               <select
@@ -510,7 +510,7 @@ export default function CharacterCreateForm({ initialTemplate }: CharacterCreate
                   ...prev,
                   character_archetype: e.target.value as any
                 }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-gray-600 rounded-md text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="real-world">Real-world (Human-like professional)</option>
                 <option value="fantasy">Fantasy/Mythical (Fictional entity)</option>
@@ -520,10 +520,10 @@ export default function CharacterCreateForm({ initialTemplate }: CharacterCreate
 
             {/* Voice Characteristics */}
             <div>
-              <h4 className="text-md font-medium text-gray-800 mb-3">Voice Characteristics</h4>
+              <h4 className="text-md font-medium text-gray-100 mb-3">Voice Characteristics</h4>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-900 mb-1">Pace</label>
+                  <label className="block text-sm font-medium text-gray-100 mb-1">Pace</label>
                   <select
                     value={formData.cdl_data.identity.voice?.pace || 'moderate'}
                     onChange={(e) => setFormData(prev => ({
@@ -539,7 +539,7 @@ export default function CharacterCreateForm({ initialTemplate }: CharacterCreate
                         }
                       }
                     }))}
-                    className="w-full px-2 py-1 border border-gray-300 rounded text-sm text-gray-900"
+                    className="w-full px-2 py-1 border border-gray-600 rounded text-sm text-gray-100"
                   >
                     <option value="slow">Slow</option>
                     <option value="moderate">Moderate</option>
@@ -549,7 +549,7 @@ export default function CharacterCreateForm({ initialTemplate }: CharacterCreate
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-900 mb-1">Tone</label>
+                  <label className="block text-sm font-medium text-gray-100 mb-1">Tone</label>
                   <select
                     value={formData.cdl_data.identity.voice?.tone || 'warm'}
                     onChange={(e) => setFormData(prev => ({
@@ -565,7 +565,7 @@ export default function CharacterCreateForm({ initialTemplate }: CharacterCreate
                         }
                       }
                     }))}
-                    className="w-full px-2 py-1 border border-gray-300 rounded text-sm text-gray-900"
+                    className="w-full px-2 py-1 border border-gray-600 rounded text-sm text-gray-100"
                   >
                     <option value="warm">Warm</option>
                     <option value="professional">Professional</option>
@@ -576,7 +576,7 @@ export default function CharacterCreateForm({ initialTemplate }: CharacterCreate
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-900 mb-1">Accent</label>
+                  <label className="block text-sm font-medium text-gray-100 mb-1">Accent</label>
                   <input
                     type="text"
                     value={formData.cdl_data.identity.voice?.accent || ''}
@@ -593,13 +593,13 @@ export default function CharacterCreateForm({ initialTemplate }: CharacterCreate
                         }
                       }
                     }))}
-                    className="w-full px-2 py-1 border border-gray-300 rounded text-sm text-gray-900"
+                    className="w-full px-2 py-1 border border-gray-600 rounded text-sm text-gray-100"
                     placeholder="e.g., British, Southern"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-900 mb-1">Volume</label>
+                  <label className="block text-sm font-medium text-gray-100 mb-1">Volume</label>
                   <select
                     value={formData.cdl_data.identity.voice?.volume || 'normal'}
                     onChange={(e) => setFormData(prev => ({
@@ -615,7 +615,7 @@ export default function CharacterCreateForm({ initialTemplate }: CharacterCreate
                         }
                       }
                     }))}
-                    className="w-full px-2 py-1 border border-gray-300 rounded text-sm text-gray-900"
+                    className="w-full px-2 py-1 border border-gray-600 rounded text-sm text-gray-100"
                   >
                     <option value="quiet">Quiet</option>
                     <option value="normal">Normal</option>
@@ -628,14 +628,14 @@ export default function CharacterCreateForm({ initialTemplate }: CharacterCreate
 
             {/* Discord Bot Configuration */}
             <div>
-              <h4 className="text-md font-medium text-gray-800 mb-3">🤖 Discord Bot Configuration</h4>
-              <p className="text-sm text-gray-800 mb-4">
+              <h4 className="text-md font-medium text-gray-100 mb-3">🤖 Discord Bot Configuration</h4>
+              <p className="text-sm text-gray-100 mb-4">
                 Configure Discord bot settings for this character. Each character can have its own Discord bot token.
               </p>
               
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-900 mb-2">
+                  <label className="block text-sm font-medium text-gray-100 mb-2">
                     Discord Bot Token
                   </label>
                   <input
@@ -648,16 +648,16 @@ export default function CharacterCreateForm({ initialTemplate }: CharacterCreate
                         bot_token: e.target.value
                       }
                     }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-gray-600 rounded-md text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="Enter Discord bot token (optional)"
                   />
-                  <p className="text-xs text-gray-700 mt-1">
-                    Create a bot at <a href="https://discord.com/developers/applications" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">Discord Developer Portal</a>
+                  <p className="text-xs text-gray-300 mt-1">
+                    Create a bot at <a href="https://discord.com/developers/applications" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">Discord Developer Portal</a>
                   </p>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-900 mb-2">
+                  <label className="block text-sm font-medium text-gray-100 mb-2">
                     Bot Status Message
                   </label>
                   <input
@@ -670,13 +670,13 @@ export default function CharacterCreateForm({ initialTemplate }: CharacterCreate
                         bot_status: e.target.value
                       }
                     }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-gray-600 rounded-md text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="e.g., 🔬 Marine Research Demo"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-900 mb-2">
+                  <label className="block text-sm font-medium text-gray-100 mb-2">
                     Admin User IDs
                   </label>
                   <input
@@ -689,10 +689,10 @@ export default function CharacterCreateForm({ initialTemplate }: CharacterCreate
                         admin_user_ids: e.target.value
                       }
                     }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-gray-600 rounded-md text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="Comma-separated Discord user IDs (optional)"
                   />
-                  <p className="text-xs text-gray-700 mt-1">
+                  <p className="text-xs text-gray-300 mt-1">
                     Discord user IDs for admin commands (right-click user → Copy User ID)
                   </p>
                 </div>
@@ -703,15 +703,15 @@ export default function CharacterCreateForm({ initialTemplate }: CharacterCreate
 
         {activeTab === 'personality' && (
           <div className="space-y-6">
-            <h3 className="text-lg font-semibold text-gray-900">Personality Traits</h3>
+            <h3 className="text-lg font-semibold text-gray-100">Personality Traits</h3>
             
             {/* Big Five Personality */}
             <div>
-              <h4 className="text-md font-medium text-gray-800 mb-3">Big Five Personality Traits</h4>
+              <h4 className="text-md font-medium text-gray-100 mb-3">Big Five Personality Traits</h4>
               <div className="space-y-4">
                 {Object.entries(formData.cdl_data.personality.big_five).map(([trait, value]) => (
                   <div key={trait}>
-                    <label className="block text-sm font-medium text-gray-900 mb-2 capitalize">
+                    <label className="block text-sm font-medium text-gray-100 mb-2 capitalize">
                       {trait} ({Math.round(value * 100)}%)
                     </label>
                     <input
@@ -735,7 +735,7 @@ export default function CharacterCreateForm({ initialTemplate }: CharacterCreate
                       }))}
                       className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
                     />
-                    <div className="flex justify-between text-xs text-gray-700 mt-1">
+                    <div className="flex justify-between text-xs text-gray-300 mt-1">
                       <span>Low</span>
                       <span>High</span>
                     </div>
@@ -746,7 +746,7 @@ export default function CharacterCreateForm({ initialTemplate }: CharacterCreate
 
             {/* Values */}
             <div>
-              <h4 className="text-md font-medium text-gray-800 mb-3">Core Values</h4>
+              <h4 className="text-md font-medium text-gray-100 mb-3">Core Values</h4>
               <div className="space-y-2">
                 {formData.cdl_data.personality.values.map((value, index) => (
                   <div key={index} className="flex items-center space-x-2">
@@ -769,7 +769,7 @@ export default function CharacterCreateForm({ initialTemplate }: CharacterCreate
                         (e.target as HTMLInputElement).value = ''
                       }
                     }}
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded text-gray-900"
+                    className="flex-1 px-3 py-2 border border-gray-600 rounded text-gray-100"
                   />
                 </div>
               </div>
@@ -777,10 +777,10 @@ export default function CharacterCreateForm({ initialTemplate }: CharacterCreate
 
             {/* Communication Style */}
             <div>
-              <h4 className="text-md font-medium text-gray-800 mb-3">Communication Style</h4>
+              <h4 className="text-md font-medium text-gray-100 mb-3">Communication Style</h4>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-900 mb-1">Tone</label>
+                  <label className="block text-sm font-medium text-gray-100 mb-1">Tone</label>
                   <select
                     value={formData.cdl_data.personality.communication_style.tone}
                     onChange={(e) => setFormData(prev => ({
@@ -796,7 +796,7 @@ export default function CharacterCreateForm({ initialTemplate }: CharacterCreate
                         }
                       }
                     }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded text-gray-900"
+                    className="w-full px-3 py-2 border border-gray-600 rounded text-gray-100"
                   >
                     <option value="friendly">Friendly</option>
                     <option value="professional">Professional</option>
@@ -807,7 +807,7 @@ export default function CharacterCreateForm({ initialTemplate }: CharacterCreate
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-900 mb-1">Formality</label>
+                  <label className="block text-sm font-medium text-gray-100 mb-1">Formality</label>
                   <select
                     value={formData.cdl_data.personality.communication_style.formality}
                     onChange={(e) => setFormData(prev => ({
@@ -823,7 +823,7 @@ export default function CharacterCreateForm({ initialTemplate }: CharacterCreate
                         }
                       }
                     }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded text-gray-900"
+                    className="w-full px-3 py-2 border border-gray-600 rounded text-gray-100"
                   >
                     <option value="casual">Casual</option>
                     <option value="semi-formal">Semi-formal</option>
@@ -833,7 +833,7 @@ export default function CharacterCreateForm({ initialTemplate }: CharacterCreate
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-900 mb-1">Directness</label>
+                  <label className="block text-sm font-medium text-gray-100 mb-1">Directness</label>
                   <select
                     value={formData.cdl_data.personality.communication_style.directness}
                     onChange={(e) => setFormData(prev => ({
@@ -849,7 +849,7 @@ export default function CharacterCreateForm({ initialTemplate }: CharacterCreate
                         }
                       }
                     }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded text-gray-900"
+                    className="w-full px-3 py-2 border border-gray-600 rounded text-gray-100"
                   >
                     <option value="indirect">Indirect</option>
                     <option value="moderate">Moderate</option>
@@ -859,7 +859,7 @@ export default function CharacterCreateForm({ initialTemplate }: CharacterCreate
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-900 mb-1">Empathy Level</label>
+                  <label className="block text-sm font-medium text-gray-100 mb-1">Empathy Level</label>
                   <select
                     value={formData.cdl_data.personality.communication_style.empathy_level}
                     onChange={(e) => setFormData(prev => ({
@@ -875,7 +875,7 @@ export default function CharacterCreateForm({ initialTemplate }: CharacterCreate
                         }
                       }
                     }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded text-gray-900"
+                    className="w-full px-3 py-2 border border-gray-600 rounded text-gray-100"
                   >
                     <option value="low">Low</option>
                     <option value="moderate">Moderate</option>
@@ -890,11 +890,11 @@ export default function CharacterCreateForm({ initialTemplate }: CharacterCreate
 
         {activeTab === 'communication' && (
           <div className="space-y-6">
-            <h3 className="text-lg font-semibold text-gray-900">Communication Settings</h3>
+            <h3 className="text-lg font-semibold text-gray-100">Communication Settings</h3>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <label className="block text-sm font-medium text-gray-900 mb-2">
+                <label className="block text-sm font-medium text-gray-100 mb-2">
                   Response Length
                 </label>
                 <select
@@ -909,7 +909,7 @@ export default function CharacterCreateForm({ initialTemplate }: CharacterCreate
                       }
                     }
                   }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded text-gray-900"
+                  className="w-full px-3 py-2 border border-gray-600 rounded text-gray-100"
                 >
                   <option value="brief">Brief (1-2 sentences)</option>
                   <option value="moderate">Moderate (2-4 sentences)</option>
@@ -919,7 +919,7 @@ export default function CharacterCreateForm({ initialTemplate }: CharacterCreate
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-900 mb-2">
+                <label className="block text-sm font-medium text-gray-100 mb-2">
                   AI Identity Approach
                 </label>
                 <select
@@ -937,7 +937,7 @@ export default function CharacterCreateForm({ initialTemplate }: CharacterCreate
                       }
                     }
                   }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded text-gray-900"
+                  className="w-full px-3 py-2 border border-gray-600 rounded text-gray-100"
                 >
                   <option value="3-tier">3-Tier (Enthusiasm → Clarification → Alternatives)</option>
                   <option value="direct_honest">Direct Honest</option>
@@ -948,7 +948,7 @@ export default function CharacterCreateForm({ initialTemplate }: CharacterCreate
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-900 mb-2">
+              <label className="block text-sm font-medium text-gray-100 mb-2">
                 AI Identity Philosophy
               </label>
               <textarea
@@ -967,7 +967,7 @@ export default function CharacterCreateForm({ initialTemplate }: CharacterCreate
                   }
                 }))}
                 rows={3}
-                className="w-full px-3 py-2 border border-gray-300 rounded text-gray-900"
+                className="w-full px-3 py-2 border border-gray-600 rounded text-gray-100"
                 placeholder="Describe how this character should handle questions about AI identity..."
               />
             </div>
@@ -994,9 +994,9 @@ export default function CharacterCreateForm({ initialTemplate }: CharacterCreate
                     }
                   }))
                 }}
-                className="h-4 w-4 text-blue-600"
+                className="h-4 w-4 text-blue-400"
               />
-              <label htmlFor="roleplay_immersion" className="text-sm font-medium text-gray-900">
+              <label htmlFor="roleplay_immersion" className="text-sm font-medium text-gray-100">
                 Allow Full Roleplay Immersion (character never breaks character)
               </label>
             </div>
@@ -1005,21 +1005,21 @@ export default function CharacterCreateForm({ initialTemplate }: CharacterCreate
 
         {activeTab === 'values' && (
           <div className="space-y-6">
-            <h3 className="text-lg font-semibold text-gray-900">Values & Beliefs</h3>
+            <h3 className="text-lg font-semibold text-gray-100">Values & Beliefs</h3>
             
             {/* Core Values */}
             <div>
-              <h4 className="text-md font-medium text-gray-800 mb-3">Core Values</h4>
-              <p className="text-sm text-gray-800 mb-3">
+              <h4 className="text-md font-medium text-gray-100 mb-3">Core Values</h4>
+              <p className="text-sm text-gray-100 mb-3">
                 Define the fundamental principles and values that guide this character&apos;s decisions and worldview.
               </p>
               <div className="space-y-3">
                 {formData.cdl_data.values_and_beliefs?.core_values?.map((value, index) => (
-                  <div key={index} className="flex items-center space-x-3 p-3 bg-blue-50 rounded-lg">
+                  <div key={index} className="flex items-center space-x-3 p-3 bg-gray-800 rounded-lg">
                     <div className="flex-1">
                       <div className="font-medium text-sm">{value.value_key}</div>
-                      <div className="text-sm text-gray-800">{value.value_description}</div>
-                      <div className="text-xs text-blue-600 capitalize">Importance: {value.importance_level}</div>
+                      <div className="text-sm text-gray-100">{value.value_description}</div>
+                      <div className="text-xs text-blue-400 capitalize">Importance: {value.importance_level}</div>
                     </div>
                     <button
                       onClick={() => {
@@ -1041,22 +1041,22 @@ export default function CharacterCreateForm({ initialTemplate }: CharacterCreate
                   </div>
                 )) || []}
                 
-                <div className="p-3 border border-gray-300 rounded-lg">
+                <div className="p-3 border border-gray-600 rounded-lg">
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                     <input
                       type="text"
                       placeholder="Value name (e.g., 'Environmental stewardship')"
-                      className="px-3 py-2 border border-gray-300 rounded text-sm text-gray-900"
+                      className="px-3 py-2 border border-gray-600 rounded text-sm text-gray-100"
                       id="new-core-value-key"
                     />
                     <input
                       type="text"
                       placeholder="Description"
-                      className="px-3 py-2 border border-gray-300 rounded text-sm text-gray-900"
+                      className="px-3 py-2 border border-gray-600 rounded text-sm text-gray-100"
                       id="new-core-value-desc"
                     />
                     <select
-                      className="px-3 py-2 border border-gray-300 rounded text-sm text-gray-900"
+                      className="px-3 py-2 border border-gray-600 rounded text-sm text-gray-100"
                       id="new-core-value-importance"
                       defaultValue="medium"
                     >
@@ -1106,8 +1106,8 @@ export default function CharacterCreateForm({ initialTemplate }: CharacterCreate
 
             {/* Fears */}
             <div>
-              <h4 className="text-md font-medium text-gray-800 mb-3">Fears & Concerns</h4>
-              <p className="text-sm text-gray-800 mb-3">
+              <h4 className="text-md font-medium text-gray-100 mb-3">Fears & Concerns</h4>
+              <p className="text-sm text-gray-100 mb-3">
                 What does this character fear or worry about? These drive cautious behaviors and emotional responses.
               </p>
               <div className="space-y-3">
@@ -1115,7 +1115,7 @@ export default function CharacterCreateForm({ initialTemplate }: CharacterCreate
                   <div key={index} className="flex items-center space-x-3 p-3 bg-red-50 rounded-lg">
                     <div className="flex-1">
                       <div className="font-medium text-sm">{fear.value_key}</div>
-                      <div className="text-sm text-gray-800">{fear.value_description}</div>
+                      <div className="text-sm text-gray-100">{fear.value_description}</div>
                       <div className="text-xs text-red-600 capitalize">Intensity: {fear.importance_level}</div>
                     </div>
                     <button
@@ -1138,22 +1138,22 @@ export default function CharacterCreateForm({ initialTemplate }: CharacterCreate
                   </div>
                 )) || []}
                 
-                <div className="p-3 border border-gray-300 rounded-lg">
+                <div className="p-3 border border-gray-600 rounded-lg">
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                     <input
                       type="text"
                       placeholder="Fear name (e.g., 'Climate change')"
-                      className="px-3 py-2 border border-gray-300 rounded text-sm text-gray-900"
+                      className="px-3 py-2 border border-gray-600 rounded text-sm text-gray-100"
                       id="new-fear-key"
                     />
                     <input
                       type="text"
                       placeholder="Description"
-                      className="px-3 py-2 border border-gray-300 rounded text-sm text-gray-900"
+                      className="px-3 py-2 border border-gray-600 rounded text-sm text-gray-100"
                       id="new-fear-desc"
                     />
                     <select
-                      className="px-3 py-2 border border-gray-300 rounded text-sm text-gray-900"
+                      className="px-3 py-2 border border-gray-600 rounded text-sm text-gray-100"
                       id="new-fear-importance"
                       defaultValue="medium"
                     >
@@ -1203,8 +1203,8 @@ export default function CharacterCreateForm({ initialTemplate }: CharacterCreate
 
             {/* Beliefs */}
             <div>
-              <h4 className="text-md font-medium text-gray-800 mb-3">Beliefs & Philosophy</h4>
-              <p className="text-sm text-gray-800 mb-3">
+              <h4 className="text-md font-medium text-gray-100 mb-3">Beliefs & Philosophy</h4>
+              <p className="text-sm text-gray-100 mb-3">
                 What does this character believe about the world, society, or human nature? These shape their perspective.
               </p>
               <div className="space-y-3">
@@ -1212,7 +1212,7 @@ export default function CharacterCreateForm({ initialTemplate }: CharacterCreate
                   <div key={index} className="flex items-center space-x-3 p-3 bg-green-50 rounded-lg">
                     <div className="flex-1">
                       <div className="font-medium text-sm">{belief.value_key}</div>
-                      <div className="text-sm text-gray-800">{belief.value_description}</div>
+                      <div className="text-sm text-gray-100">{belief.value_description}</div>
                       <div className="text-xs text-green-600 capitalize">Conviction: {belief.importance_level}</div>
                     </div>
                     <button
@@ -1235,22 +1235,22 @@ export default function CharacterCreateForm({ initialTemplate }: CharacterCreate
                   </div>
                 )) || []}
                 
-                <div className="p-3 border border-gray-300 rounded-lg">
+                <div className="p-3 border border-gray-600 rounded-lg">
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                     <input
                       type="text"
                       placeholder="Belief name (e.g., 'Science can solve problems')"
-                      className="px-3 py-2 border border-gray-300 rounded text-sm text-gray-900"
+                      className="px-3 py-2 border border-gray-600 rounded text-sm text-gray-100"
                       id="new-belief-key"
                     />
                     <input
                       type="text"
                       placeholder="Description"
-                      className="px-3 py-2 border border-gray-300 rounded text-sm text-gray-900"
+                      className="px-3 py-2 border border-gray-600 rounded text-sm text-gray-100"
                       id="new-belief-desc"
                     />
                     <select
-                      className="px-3 py-2 border border-gray-300 rounded text-sm text-gray-900"
+                      className="px-3 py-2 border border-gray-600 rounded text-sm text-gray-100"
                       id="new-belief-importance"
                       defaultValue="medium"
                     >
@@ -1302,15 +1302,15 @@ export default function CharacterCreateForm({ initialTemplate }: CharacterCreate
 
         {activeTab === 'knowledge' && (
           <div className="space-y-6">
-            <h3 className="text-lg font-semibold text-gray-900">Personal Knowledge</h3>
+            <h3 className="text-lg font-semibold text-gray-100">Personal Knowledge</h3>
             
             {/* Interests */}
             <div>
-              <h4 className="text-md font-medium text-gray-800 mb-3">Interests & Hobbies</h4>
+              <h4 className="text-md font-medium text-gray-100 mb-3">Interests & Hobbies</h4>
               <div className="space-y-2">
                 {formData.cdl_data.personal_knowledge?.interests?.map((interest, index) => (
                   <div key={index} className="flex items-center space-x-2">
-                    <span className="flex-1 px-3 py-2 bg-blue-50 rounded">{interest}</span>
+                    <span className="flex-1 px-3 py-2 bg-gray-800 rounded">{interest}</span>
                     <button
                       onClick={() => removeArrayItem('cdl_data.personal_knowledge.interests', index)}
                       className="text-red-600 hover:text-red-800"
@@ -1329,7 +1329,7 @@ export default function CharacterCreateForm({ initialTemplate }: CharacterCreate
                         (e.target as HTMLInputElement).value = ''
                       }
                     }}
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded text-gray-900"
+                    className="flex-1 px-3 py-2 border border-gray-600 rounded text-gray-100"
                   />
                 </div>
               </div>
@@ -1337,7 +1337,7 @@ export default function CharacterCreateForm({ initialTemplate }: CharacterCreate
 
             {/* Skills */}
             <div>
-              <h4 className="text-md font-medium text-gray-800 mb-3">Skills & Expertise</h4>
+              <h4 className="text-md font-medium text-gray-100 mb-3">Skills & Expertise</h4>
               <div className="space-y-2">
                 {formData.cdl_data.personal_knowledge?.skills?.map((skill, index) => (
                   <div key={index} className="flex items-center space-x-2">
@@ -1360,7 +1360,7 @@ export default function CharacterCreateForm({ initialTemplate }: CharacterCreate
                         (e.target as HTMLInputElement).value = ''
                       }
                     }}
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded text-gray-900"
+                    className="flex-1 px-3 py-2 border border-gray-600 rounded text-gray-100"
                   />
                 </div>
               </div>
@@ -1368,10 +1368,10 @@ export default function CharacterCreateForm({ initialTemplate }: CharacterCreate
 
             {/* Background */}
             <div>
-              <h4 className="text-md font-medium text-gray-800 mb-3">Background Information</h4>
+              <h4 className="text-md font-medium text-gray-100 mb-3">Background Information</h4>
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-900 mb-2">Education</label>
+                  <label className="block text-sm font-medium text-gray-100 mb-2">Education</label>
                   <textarea
                     value={formData.cdl_data.personal_knowledge?.background?.education || ''}
                     onChange={(e) => setFormData(prev => ({
@@ -1388,13 +1388,13 @@ export default function CharacterCreateForm({ initialTemplate }: CharacterCreate
                       }
                     }))}
                     rows={2}
-                    className="w-full px-3 py-2 border border-gray-300 rounded text-gray-900"
+                    className="w-full px-3 py-2 border border-gray-600 rounded text-gray-100"
                     placeholder="Educational background, degrees, certifications..."
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-900 mb-2">Career History</label>
+                  <label className="block text-sm font-medium text-gray-100 mb-2">Career History</label>
                   <textarea
                     value={formData.cdl_data.personal_knowledge?.background?.career_history || ''}
                     onChange={(e) => setFormData(prev => ({
@@ -1411,7 +1411,7 @@ export default function CharacterCreateForm({ initialTemplate }: CharacterCreate
                       }
                     }))}
                     rows={3}
-                    className="w-full px-3 py-2 border border-gray-300 rounded text-gray-900"
+                    className="w-full px-3 py-2 border border-gray-600 rounded text-gray-100"
                     placeholder="Work experience, career progression, notable achievements..."
                   />
                 </div>
@@ -1422,10 +1422,10 @@ export default function CharacterCreateForm({ initialTemplate }: CharacterCreate
       </div>
 
       {/* Action Buttons */}
-      <div className="border-t border-gray-200 px-6 py-4">
+      <div className="border-t border-gray-700 px-6 py-4">
         <div className="flex justify-between items-center">
           <div className="flex items-center space-x-4">
-            <div className="text-sm text-gray-700">
+            <div className="text-sm text-gray-300">
               {saveStatus === 'saving' && 'Saving character...'}
               {saveStatus === 'saved' && '✅ Character saved successfully!'}
               {saveStatus === 'error' && '❌ Error saving character'}
@@ -1437,10 +1437,10 @@ export default function CharacterCreateForm({ initialTemplate }: CharacterCreate
                 id="deploy-after-create"
                 checked={deployAfterCreate}
                 onChange={(e) => setDeployAfterCreate(e.target.checked)}
-                className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                className="w-4 h-4 text-blue-400 border-gray-600 rounded focus:ring-blue-500"
                 disabled={isLoading}
               />
-              <label htmlFor="deploy-after-create" className="text-sm text-gray-900">
+              <label htmlFor="deploy-after-create" className="text-sm text-gray-100">
                 🚀 Deploy immediately after creation
               </label>
             </div>
@@ -1449,7 +1449,7 @@ export default function CharacterCreateForm({ initialTemplate }: CharacterCreate
           <div className="flex space-x-3">
             <button
               onClick={() => router.push('/characters')}
-              className="px-4 py-2 border border-gray-300 rounded-md text-gray-900 hover:bg-gray-50"
+              className="px-4 py-2 border border-gray-600 rounded-md text-gray-100 hover:bg-gray-900"
               disabled={isLoading}
             >
               Cancel

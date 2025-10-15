@@ -12,7 +12,7 @@ export async function GET() {
       characters: characters,
       debug: {
         first_character: characters[0] || null,
-        bot_names: characters.map(c => ({ name: c.name, bot_name: c.bot_name, character_archetype: c.character_archetype }))
+        bot_names: characters.map(c => ({ name: c.name, bot_name: c.bot_name, archetype: c.archetype }))
       }
     })
   } catch (error) {

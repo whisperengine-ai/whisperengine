@@ -18,8 +18,8 @@ export interface Character {
   description: string | null
   
   // Character archetype and AI behavior
-  character_archetype: 'real-world' | 'fantasy' | 'narrative-ai'
-  allow_full_roleplay_immersion: boolean
+  archetype: 'real-world' | 'fantasy' | 'narrative-ai'
+  allow_full_roleplay: boolean
   
   // Enhanced JSONB CDL data
   cdl_data: Record<string, unknown> | null
@@ -120,16 +120,16 @@ export interface CharacterDiscordConfig {
   character_id: number
   discord_bot_token: string | null
   discord_application_id: string | null
-  discord_public_key: string | null
+  discord_guild_id: string | null
   enable_discord: boolean
   discord_guild_restrictions: string[]
   discord_channel_restrictions: string[]
   discord_status: 'online' | 'idle' | 'dnd' | 'invisible'
   discord_activity_type: 'playing' | 'streaming' | 'listening' | 'watching'
-  discord_activity_name: string
-  response_delay_min: number
-  response_delay_max: number
-  typing_indicator: boolean
+  max_message_length: number
+  typing_delay_seconds: number
+  enable_reactions: boolean
+  enable_typing_indicator: boolean
   is_active: boolean
   created_at: string
   updated_at: string
@@ -195,8 +195,8 @@ export interface CharacterFormData {
   age_range?: string
   background?: string
   description?: string
-  character_archetype: 'real-world' | 'fantasy' | 'narrative-ai'
-  allow_full_roleplay_immersion: boolean
+  archetype: 'real-world' | 'fantasy' | 'narrative-ai'
+  allow_full_roleplay: boolean
   notes?: string
 }
 

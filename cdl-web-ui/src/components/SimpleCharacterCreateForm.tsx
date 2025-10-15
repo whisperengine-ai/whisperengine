@@ -50,17 +50,17 @@ const defaultCharacterData: SimpleCharacterData = {
   character_archetype: 'real-world',
   allow_full_roleplay_immersion: false,
   big_five: {
-    openness: 0.5,
-    conscientiousness: 0.5,
-    extraversion: 0.5,
-    agreeableness: 0.5,
-    neuroticism: 0.5
+    openness: 0.7,        // Slightly curious and open to new experiences
+    conscientiousness: 0.7, // Reasonably organized and reliable
+    extraversion: 0.6,     // Slightly more social than introverted  
+    agreeableness: 0.8,    // Friendly and cooperative
+    neuroticism: 0.3       // Generally stable and calm
   },
-  values: [],
+  values: ['helpfulness', 'honesty', 'learning'], // Good starter values
   llm_config: {
     llm_client_type: 'openrouter',
     llm_chat_api_url: 'https://openrouter.ai/api/v1',
-    llm_chat_model: '',
+    llm_chat_model: 'anthropic/claude-3-haiku',
     llm_chat_api_key: '',
     llm_temperature: 0.7
   },
@@ -128,15 +128,14 @@ export default function SimpleCharacterCreateForm() {
           name: characterData.name,
           occupation: characterData.occupation,
           description: characterData.description,
-          location: characterData.location,
-          archetype: characterData.character_archetype,
-          allow_full_roleplay: characterData.allow_full_roleplay_immersion,
+          character_archetype: characterData.character_archetype,
+          allow_full_roleplay_immersion: characterData.allow_full_roleplay_immersion,
           cdl_data: {
             identity: {
               name: characterData.name,
               occupation: characterData.occupation,
               description: characterData.description,
-              location: characterData.location
+              location: characterData.location || ''
             },
             personality: {
               big_five: characterData.big_five,
@@ -169,7 +168,7 @@ export default function SimpleCharacterCreateForm() {
         })
       })
 
-      router.push(`/characters/${characterId}`)
+      router.push(`/characters/${characterId}?mode=edit`)
     } catch (error) {
       console.error('Error creating character:', error)
       alert('Failed to create character. Please try again.')
@@ -198,7 +197,7 @@ export default function SimpleCharacterCreateForm() {
               <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
                 step === currentStep ? 'bg-blue-600 text-white' :
                 step < currentStep ? 'bg-green-600 text-white' :
-                'bg-gray-300 text-gray-600'
+                'bg-gray-300 text-gray-400'
               }`}>
                 {step}
               </div>
@@ -206,7 +205,7 @@ export default function SimpleCharacterCreateForm() {
             </div>
           ))}
         </div>
-        <div className="flex justify-between mt-2 text-sm text-gray-600">
+        <div className="flex justify-between mt-2 text-sm text-gray-400">
           <span>Basic Info</span>
           <span>Personality</span>
           <span>LLM Config</span>
@@ -214,7 +213,7 @@ export default function SimpleCharacterCreateForm() {
         </div>
       </div>
 
-      <div className="bg-white rounded-lg shadow p-6">
+      <div className="bg-gray-800 rounded-lg shadow p-6">
         {/* Step 1: Basic Information */}
         {currentStep === 1 && (
           <div className="space-y-4">
@@ -222,44 +221,44 @@ export default function SimpleCharacterCreateForm() {
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-900 mb-2">Character Name *</label>
+                <label className="block text-sm font-medium text-gray-100 mb-2">Character Name *</label>
                 <input
                   type="text"
                   value={characterData.name}
                   onChange={(e) => updateField('name', e.target.value)}
-                  placeholder="Elena, Marcus, Dream..."
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900"
+                  placeholder="Assistant, Helper, Guide..."
+                  className="w-full border border-gray-600 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-100"
                 />
               </div>
               
               <div>
-                <label className="block text-sm font-medium text-gray-900 mb-2">Occupation *</label>
+                <label className="block text-sm font-medium text-gray-100 mb-2">Occupation *</label>
                 <input
                   type="text"
                   value={characterData.occupation}
                   onChange={(e) => updateField('occupation', e.target.value)}
                   placeholder="Marine Biologist, AI Researcher..."
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900"
+                  className="w-full border border-gray-600 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-100"
                 />
               </div>
               
               <div>
-                <label className="block text-sm font-medium text-gray-900 mb-2">Location</label>
+                <label className="block text-sm font-medium text-gray-100 mb-2">Location</label>
                 <input
                   type="text"
                   value={characterData.location}
                   onChange={(e) => updateField('location', e.target.value)}
                   placeholder="San Francisco, London..."
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900"
+                  className="w-full border border-gray-600 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-100"
                 />
               </div>
               
               <div>
-                <label className="block text-sm font-medium text-gray-900 mb-2">Character Type</label>
+                <label className="block text-sm font-medium text-gray-100 mb-2">Character Type</label>
                 <select
                   value={characterData.character_archetype}
                   onChange={(e) => updateField('character_archetype', e.target.value)}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900"
+                  className="w-full border border-gray-600 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-100"
                 >
                   <option value="real-world">Real-world (honest about AI)</option>
                   <option value="fantasy">Fantasy (full roleplay)</option>
@@ -269,13 +268,13 @@ export default function SimpleCharacterCreateForm() {
             </div>
             
             <div>
-              <label className="block text-sm font-medium text-gray-900 mb-2">Description</label>
+              <label className="block text-sm font-medium text-gray-100 mb-2">Description</label>
               <textarea
                 value={characterData.description}
                 onChange={(e) => updateField('description', e.target.value)}
                 rows={3}
                 placeholder="Brief description of the character's background and personality..."
-                className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900"
+                className="w-full border border-gray-600 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-100"
               />
             </div>
 
@@ -286,7 +285,7 @@ export default function SimpleCharacterCreateForm() {
                 onChange={(e) => updateField('allow_full_roleplay_immersion', e.target.checked)}
                 className="mr-2"
               />
-              <label className="text-sm font-medium text-gray-900">Allow full roleplay immersion</label>
+              <label className="text-sm font-medium text-gray-100">Allow full roleplay immersion</label>
             </div>
           </div>
         )}
@@ -298,11 +297,11 @@ export default function SimpleCharacterCreateForm() {
             
             {/* Big Five Traits */}
             <div>
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Big Five Personality Traits</h3>
+              <h3 className="text-lg font-medium text-gray-100 mb-4">Big Five Personality Traits</h3>
               <div className="space-y-4">
                 {Object.entries(characterData.big_five).map(([trait, value]) => (
                   <div key={trait}>
-                    <label className="block text-sm font-medium text-gray-900 mb-2 capitalize">
+                    <label className="block text-sm font-medium text-gray-100 mb-2 capitalize">
                       {trait} ({Number(value).toFixed(1)})
                     </label>
                     <input
@@ -325,11 +324,11 @@ export default function SimpleCharacterCreateForm() {
 
             {/* Core Values */}
             <div>
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Core Values</h3>
+              <h3 className="text-lg font-medium text-gray-100 mb-4">Core Values</h3>
               
               {/* Quick Add Common Values */}
               <div className="mb-4">
-                <h4 className="text-sm font-medium text-gray-900 mb-2">Quick Add</h4>
+                <h4 className="text-sm font-medium text-gray-100 mb-2">Quick Add</h4>
                 <div className="flex flex-wrap gap-2">
                   {commonValues.map((value) => (
                     <button
@@ -339,7 +338,7 @@ export default function SimpleCharacterCreateForm() {
                       className={`px-3 py-1 text-sm rounded ${
                         characterData.values.includes(value)
                           ? 'bg-green-100 text-green-800 cursor-not-allowed'
-                          : 'bg-gray-100 hover:bg-gray-200 text-gray-900'
+                          : 'bg-gray-100 hover:bg-gray-200 text-gray-100'
                       }`}
                     >
                       {value} {characterData.values.includes(value) && '✓'}
@@ -355,7 +354,7 @@ export default function SimpleCharacterCreateForm() {
                   value={newValue}
                   onChange={(e) => setNewValue(e.target.value)}
                   placeholder="Add custom value..."
-                  className="flex-1 border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="flex-1 border border-gray-600 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   onKeyPress={(e) => e.key === 'Enter' && addValue()}
                 />
                 <button
@@ -373,7 +372,7 @@ export default function SimpleCharacterCreateForm() {
                     {value}
                     <button
                       onClick={() => removeValue(value)}
-                      className="ml-2 text-blue-600 hover:text-blue-800"
+                      className="ml-2 text-blue-400 hover:text-blue-800"
                     >
                       ×
                     </button>
@@ -391,7 +390,7 @@ export default function SimpleCharacterCreateForm() {
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-900 mb-2">Provider</label>
+                <label className="block text-sm font-medium text-gray-100 mb-2">Provider</label>
                 <select
                   value={characterData.llm_config.llm_client_type}
                   onChange={(e) => {
@@ -410,7 +409,7 @@ export default function SimpleCharacterCreateForm() {
                       updateField('llm_config.llm_chat_api_url', providerUrls[newProvider]);
                     }
                   }}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900"
+                  className="w-full border border-gray-600 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-100"
                 >
                   <option value="openrouter">OpenRouter</option>
                   <option value="openai">OpenAI</option>
@@ -420,39 +419,39 @@ export default function SimpleCharacterCreateForm() {
               </div>
               
               <div>
-                <label className="block text-sm font-medium text-gray-900 mb-2">Model</label>
+                <label className="block text-sm font-medium text-gray-100 mb-2">Model</label>
                 <input
                   type="text"
                   value={characterData.llm_config.llm_chat_model}
                   onChange={(e) => updateField('llm_config.llm_chat_model', e.target.value)}
                   placeholder="e.g., gpt-4, meta-llama/llama-3.1-8b-instruct"
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900"
+                  className="w-full border border-gray-600 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-100"
                 />
               </div>
               
               <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-900 mb-2">API URL</label>
+                <label className="block text-sm font-medium text-gray-100 mb-2">API URL</label>
                 <input
                   type="url"
                   value={characterData.llm_config.llm_chat_api_url}
                   onChange={(e) => updateField('llm_config.llm_chat_api_url', e.target.value)}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900"
+                  className="w-full border border-gray-600 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-100"
                 />
               </div>
               
               <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-900 mb-2">API Key *</label>
+                <label className="block text-sm font-medium text-gray-100 mb-2">API Key *</label>
                 <input
                   type="password"
                   value={characterData.llm_config.llm_chat_api_key}
                   onChange={(e) => updateField('llm_config.llm_chat_api_key', e.target.value)}
                   placeholder="Enter your API key"
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900"
+                  className="w-full border border-gray-600 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-100"
                 />
               </div>
               
               <div>
-                <label className="block text-sm font-medium text-gray-900 mb-2">
+                <label className="block text-sm font-medium text-gray-100 mb-2">
                   Temperature ({characterData.llm_config.llm_temperature})
                 </label>
                 <input
@@ -481,28 +480,28 @@ export default function SimpleCharacterCreateForm() {
                 onChange={(e) => updateField('discord_config.enable_discord', e.target.checked)}
                 className="mr-2"
               />
-              <label className="text-sm font-medium text-gray-900">Enable Discord Integration</label>
+              <label className="text-sm font-medium text-gray-100">Enable Discord Integration</label>
             </div>
 
             {characterData.discord_config.enable_discord && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-900 mb-2">Discord Bot Token *</label>
+                  <label className="block text-sm font-medium text-gray-100 mb-2">Discord Bot Token *</label>
                   <input
                     type="password"
                     value={characterData.discord_config.discord_bot_token || ''}
                     onChange={(e) => updateField('discord_config.discord_bot_token', e.target.value)}
                     placeholder="Enter Discord bot token"
-                    className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900"
+                    className="w-full border border-gray-600 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-100"
                   />
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium text-gray-900 mb-2">Status</label>
+                  <label className="block text-sm font-medium text-gray-100 mb-2">Status</label>
                   <select
                     value={characterData.discord_config.discord_status}
                     onChange={(e) => updateField('discord_config.discord_status', e.target.value)}
-                    className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900"
+                    className="w-full border border-gray-600 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-100"
                   >
                     <option value="online">Online</option>
                     <option value="idle">Idle</option>
@@ -512,21 +511,21 @@ export default function SimpleCharacterCreateForm() {
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium text-gray-900 mb-2">Activity Name</label>
+                  <label className="block text-sm font-medium text-gray-100 mb-2">Activity Name</label>
                   <input
                     type="text"
                     value={characterData.discord_config.discord_activity_name}
                     onChange={(e) => updateField('discord_config.discord_activity_name', e.target.value)}
                     placeholder="conversations"
-                    className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900"
+                    className="w-full border border-gray-600 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-100"
                   />
                 </div>
               </div>
             )}
 
             {!characterData.discord_config.enable_discord && (
-              <div className="bg-gray-50 p-4 rounded-lg">
-                <p className="text-sm text-gray-600">
+              <div className="bg-gray-900 p-4 rounded-lg">
+                <p className="text-sm text-gray-400">
                   Discord integration is disabled. This character will only be accessible via API endpoints.
                 </p>
               </div>
@@ -539,7 +538,7 @@ export default function SimpleCharacterCreateForm() {
           <button
             onClick={() => setCurrentStep(prev => prev - 1)}
             disabled={currentStep === 1}
-            className="px-4 py-2 text-gray-600 bg-gray-100 rounded-md hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-4 py-2 text-gray-400 bg-gray-100 rounded-md hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Previous
           </button>

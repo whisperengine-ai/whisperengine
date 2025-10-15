@@ -34,8 +34,16 @@ ENV NODE_ENV=production
 # Uncomment the following line in case you want to disable telemetry during runtime.
 ENV NEXT_TELEMETRY_DISABLED=1
 
+# Install Docker CLI for deployment management
+RUN apk add --no-cache docker-cli
+
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
+
+# Create docker group with GID that matches host (usually 999 or 998)
+# and add nextjs user to it
+RUN addgroup -g 999 docker || addgroup -g 998 docker || addgroup docker
+RUN adduser nextjs docker
 
 COPY --from=builder /app/public ./public
 

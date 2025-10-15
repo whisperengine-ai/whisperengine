@@ -133,29 +133,29 @@ export default function ConfigPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading configuration...</p>
+          <p className="mt-4 text-gray-400">Loading configuration...</p>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-900">
       {/* Navigation */}
-      <nav className="bg-white shadow-sm border-b">
+      <nav className="bg-gray-800 shadow-sm border-b">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center space-x-8">
-            <Link href="/" className="text-xl font-bold text-blue-600">
+            <Link href="/" className="text-xl font-bold text-blue-400">
               CDL Authoring Tool
             </Link>
             <div className="flex space-x-6">
-              <Link href="/characters" className="text-gray-600 hover:text-blue-600">
+              <Link href="/characters" className="text-gray-400 hover:text-blue-400">
                 Characters
               </Link>
-              <Link href="/config" className="text-blue-600 font-medium">
+              <Link href="/config" className="text-blue-400 font-medium">
                 Configuration
               </Link>
             </div>
@@ -166,8 +166,8 @@ export default function ConfigPage() {
       {/* Main Content */}
       <div className="container mx-auto px-4 py-8 max-w-4xl">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">System Configuration</h1>
-          <p className="text-gray-600">Configure LLM providers, Discord integration, and system settings.</p>
+          <h1 className="text-3xl font-bold text-gray-100 mb-2">System Configuration</h1>
+          <p className="text-gray-400">Configure LLM providers, Discord integration, and system settings.</p>
         </div>
 
         {/* Message */}
@@ -182,18 +182,18 @@ export default function ConfigPage() {
 
         <div className="space-y-8">
           {/* LLM Configuration */}
-          <div className="bg-white rounded-lg shadow p-6">
+          <div className="bg-gray-800 rounded-lg shadow p-6">
             <h2 className="text-xl font-semibold mb-4">🤖 LLM Provider Configuration</h2>
             
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-gray-300 mb-2">
                   LLM Provider
                 </label>
                 <select
                   value={config.llm_client_type}
                   onChange={(e) => handleProviderChange(e.target.value)}
-                  className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full p-2 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 >
                   {llmProviders.map(provider => (
                     <option key={provider.id} value={provider.id}>
@@ -204,26 +204,26 @@ export default function ConfigPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-gray-300 mb-2">
                   API Endpoint
                 </label>
                 <input
                   type="url"
                   value={config.llm_chat_api_url}
                   onChange={(e) => setConfig({...config, llm_chat_api_url: e.target.value})}
-                  className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full p-2 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   placeholder="https://api.openai.com/v1"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-gray-300 mb-2">
                   Model
                 </label>
                 <select
                   value={config.llm_chat_model}
                   onChange={(e) => setConfig({...config, llm_chat_model: e.target.value})}
-                  className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full p-2 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 >
                   {llmProviders.find(p => p.id === config.llm_client_type)?.models.map(model => (
                     <option key={model} value={model}>
@@ -234,7 +234,7 @@ export default function ConfigPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-gray-300 mb-2">
                   API Key
                   <span className="text-red-500 ml-1">*</span>
                 </label>
@@ -242,10 +242,10 @@ export default function ConfigPage() {
                   type="password"
                   value={config.llm_chat_api_key}
                   onChange={(e) => setConfig({...config, llm_chat_api_key: e.target.value})}
-                  className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full p-2 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   placeholder="Your API key (required)"
                 />
-                <p className="text-sm text-gray-600 mt-1">
+                <p className="text-sm text-gray-400 mt-1">
                   Required for AI character functionality
                 </p>
               </div>
@@ -253,7 +253,7 @@ export default function ConfigPage() {
           </div>
 
           {/* Discord Configuration */}
-          <div className="bg-white rounded-lg shadow p-6">
+          <div className="bg-gray-800 rounded-lg shadow p-6">
             <h2 className="text-xl font-semibold mb-4">💬 Discord Integration (Optional)</h2>
             
             <div className="space-y-4">
@@ -263,26 +263,26 @@ export default function ConfigPage() {
                   id="enable_discord"
                   checked={config.enable_discord}
                   onChange={(e) => setConfig({...config, enable_discord: e.target.checked})}
-                  className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                  className="w-4 h-4 text-blue-400 border-gray-600 rounded focus:ring-blue-500"
                 />
-                <label htmlFor="enable_discord" className="text-sm font-medium text-gray-700">
+                <label htmlFor="enable_discord" className="text-sm font-medium text-gray-300">
                   Enable Discord Bot Integration
                 </label>
               </div>
 
               {config.enable_discord && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
                     Discord Bot Token
                   </label>
                   <input
                     type="password"
                     value={config.discord_bot_token}
                     onChange={(e) => setConfig({...config, discord_bot_token: e.target.value})}
-                    className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    className="w-full p-2 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     placeholder="Your Discord bot token"
                   />
-                  <p className="text-sm text-gray-600 mt-1">
+                  <p className="text-sm text-gray-400 mt-1">
                     Get this from the Discord Developer Portal
                   </p>
                 </div>
@@ -291,10 +291,10 @@ export default function ConfigPage() {
           </div>
 
           {/* Advanced Settings */}
-          <div className="bg-white rounded-lg shadow p-6">
+          <div className="bg-gray-800 rounded-lg shadow p-6">
             <button
               onClick={() => setShowAdvanced(!showAdvanced)}
-              className="flex items-center space-x-2 text-gray-700 hover:text-gray-900 mb-4"
+              className="flex items-center space-x-2 text-gray-300 hover:text-gray-100 mb-4"
             >
               <span className="text-xl font-semibold">⚙️ Advanced Settings</span>
               <span className={`transform transition-transform ${showAdvanced ? 'rotate-180' : ''}`}>
@@ -304,7 +304,7 @@ export default function ConfigPage() {
 
             {showAdvanced && (
               <div className="space-y-4 border-t pt-4">
-                <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded text-sm text-blue-800">
+                <div className="mb-4 p-3 bg-gray-800 border border-blue-200 rounded text-sm text-blue-800">
                   <div className="font-medium mb-1">💡 Automatic Configuration</div>
                   <div className="text-blue-700">
                     WhisperEngine automatically configures memory system (vector-based), character intelligence (CDL), and emotional intelligence (RoBERTa). No manual setup required.
@@ -313,52 +313,52 @@ export default function ConfigPage() {
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-gray-300 mb-2">
                       PostgreSQL Host
                     </label>
                     <input
                       type="text"
                       value={config.postgres_host}
                       onChange={(e) => setConfig({...config, postgres_host: e.target.value})}
-                      className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full p-2 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-gray-300 mb-2">
                       PostgreSQL Port
                     </label>
                     <input
                       type="text"
                       value={config.postgres_port}
                       onChange={(e) => setConfig({...config, postgres_port: e.target.value})}
-                      className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full p-2 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     />
                   </div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-gray-300 mb-2">
                       Qdrant Host
                     </label>
                     <input
                       type="text"
                       value={config.qdrant_host}
                       onChange={(e) => setConfig({...config, qdrant_host: e.target.value})}
-                      className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full p-2 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-gray-300 mb-2">
                       Qdrant Port
                     </label>
                     <input
                       type="text"
                       value={config.qdrant_port}
                       onChange={(e) => setConfig({...config, qdrant_port: e.target.value})}
-                      className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full p-2 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     />
                   </div>
                 </div>
@@ -370,7 +370,7 @@ export default function ConfigPage() {
           <div className="flex justify-between items-center">
             <Link 
               href="/" 
-              className="text-blue-600 hover:text-blue-800 font-medium"
+              className="text-blue-400 hover:text-blue-800 font-medium"
             >
               ← Back to Home
             </Link>

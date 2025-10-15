@@ -102,16 +102,7 @@ export async function POST(request: NextRequest) {
     const { updateCharacterActiveStatus } = await import('@/lib/db')
     await updateCharacterActiveStatus(parseInt(characterId), true)
 
-    // Regenerate multi-bot configuration if the script exists
-    const scriptPath = path.join(process.cwd(), '../scripts/generate_multi_bot_config.py')
-    try {
-      await fs.access(scriptPath)
-      const workingDir = path.join(process.cwd(), '..')
-      await execAsync('python scripts/generate_multi_bot_config.py', { cwd: workingDir })
-      console.log('Multi-bot configuration regenerated')
-    } catch (error) {
-      console.log('Multi-bot script not found or failed to run:', error)
-    }
+        // Configuration regeneration not needed for quickstart deployment
 
     return NextResponse.json({
       success: true,

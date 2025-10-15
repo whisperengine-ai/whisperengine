@@ -51,8 +51,8 @@ export async function POST(
         name: template.name,
         normalized_name: template.name.toLowerCase().replace(/[^a-z0-9]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, ''),
         bot_name: template.name.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 20),
-        character_archetype: template.cdlData.communication.ai_identity_handling.allow_full_roleplay_immersion ? 'fantasy' : 'real-world',
-        allow_full_roleplay_immersion: template.cdlData.communication.ai_identity_handling.allow_full_roleplay_immersion,
+        archetype: template.cdlData.communication.ai_identity_handling.allow_full_roleplay_immersion ? 'fantasy' : 'real-world',
+        allow_full_roleplay: template.cdlData.communication.ai_identity_handling.allow_full_roleplay_immersion,
         cdl_data: {
           ...template.cdlData,
           // Add template metadata

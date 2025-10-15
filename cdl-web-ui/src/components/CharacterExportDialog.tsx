@@ -59,7 +59,7 @@ export default function CharacterExportDialog({ character, isOpen, onClose }: Ch
           ai_identity_handling: {
             approach: character.cdl_data?.communication?.ai_identity_handling?.approach || '3-tier',
             philosophy: character.cdl_data?.communication?.ai_identity_handling?.philosophy || 'honest_with_alternatives',
-            allow_full_roleplay_immersion: character.allow_full_roleplay_immersion || false
+            allow_full_roleplay: character.allow_full_roleplay || false
           }
         }
       }
@@ -109,7 +109,7 @@ export default function CharacterExportDialog({ character, isOpen, onClose }: Ch
 name: "${data.name}"
 normalized_name: "${data.normalized_name}"
 character_archetype: "${data.character_archetype}"
-allow_full_roleplay_immersion: ${data.allow_full_roleplay_immersion}
+allow_full_roleplay_immersion: ${data.allow_full_roleplay}
 
 cdl_data:
   identity:
@@ -139,7 +139,7 @@ ${data.cdl_data.personality.values.map((v: string) => `      - "${v}"`).join('\n
     ai_identity_handling:
       approach: "${data.cdl_data.communication.ai_identity_handling.approach}"
       philosophy: "${data.cdl_data.communication.ai_identity_handling.philosophy}"
-      allow_full_roleplay_immersion: ${data.cdl_data.communication.ai_identity_handling.allow_full_roleplay_immersion}
+      allow_full_roleplay_immersion: ${data.cdl_data.communication.ai_identity_handling.allow_full_roleplay}
 
 ${includeSystemPrompts ? `
 system_integration:
@@ -168,7 +168,33 @@ system_integration:
     }
   }
 
-  const handleDownload = () => {
+  const handleDownload = async () => {
+    if (exportFormat === 'yaml') {
+      // Use the comprehensive export API for YAML
+      try {
+        const response = await fetch(`/api/characters/${character.id}/export`)
+        if (response.ok) {
+          const blob = await response.blob()
+          const url = URL.createObjectURL(blob)
+          const link = document.createElement('a')
+          link.href = url
+          link.download = `${character.normalized_name || 'character'}_complete.yaml`
+          document.body.appendChild(link)
+          link.click()
+          document.body.removeChild(link)
+          URL.revokeObjectURL(url)
+          return
+        } else {
+          console.error('Failed to export via API')
+          // Fallback to client-side generation
+        }
+      } catch (error) {
+        console.error('Error using export API:', error)
+        // Fallback to client-side generation
+      }
+    }
+    
+    // Client-side generation for JSON/template or YAML fallback
     const data = formatExportData()
     const extension = exportFormat === 'yaml' ? 'yml' : 'json'
     const filename = `${character.normalized_name || 'character'}.${extension}`
@@ -186,14 +212,14 @@ system_integration:
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
+      <div className="bg-gray-800 rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
         <div className="flex items-center justify-between p-6 border-b">
-          <h2 className="text-2xl font-bold text-gray-900">
+          <h2 className="text-2xl font-bold text-gray-100">
             Export Character: {character.name}
           </h2>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 text-2xl"
+            className="text-gray-400 hover:text-gray-400 text-2xl"
           >
             ×
           </button>
@@ -206,13 +232,13 @@ system_integration:
             
             <div className="grid md:grid-cols-3 gap-4 mb-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-gray-300 mb-2">
                   Export Format
                 </label>
                 <select
                   value={exportFormat}
                   onChange={(e) => setExportFormat(e.target.value as 'json' | 'yaml' | 'template')}
-                  className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full p-2 border border-gray-600 rounded-md focus:ring-blue-500 focus:border-blue-500"
                 >
                   <option value="json">JSON (Complete)</option>
                   <option value="yaml">YAML (Human Readable)</option>
@@ -228,7 +254,7 @@ system_integration:
                   onChange={(e) => setIncludePersonalData(e.target.checked)}
                   className="mr-2"
                 />
-                <label htmlFor="includePersonalData" className="text-sm text-gray-700">
+                <label htmlFor="includePersonalData" className="text-sm text-gray-300">
                   Include Personal Knowledge
                 </label>
               </div>
@@ -241,13 +267,13 @@ system_integration:
                   onChange={(e) => setIncludeSystemPrompts(e.target.checked)}
                   className="mr-2"
                 />
-                <label htmlFor="includeSystemPrompts" className="text-sm text-gray-700">
+                <label htmlFor="includeSystemPrompts" className="text-sm text-gray-300">
                   Include System Prompts
                 </label>
               </div>
             </div>
 
-            <div className="bg-blue-50 p-4 rounded-lg mb-4">
+            <div className="bg-gray-800 p-4 rounded-lg mb-4">
               <h4 className="font-medium text-blue-900 mb-2">Format Information:</h4>
               <div className="text-blue-800 text-sm space-y-1">
                 {exportFormat === 'json' && (
@@ -293,9 +319,9 @@ system_integration:
           </div>
 
           {/* Usage Instructions */}
-          <div className="bg-gray-50 p-4 rounded-lg">
-            <h4 className="font-medium text-gray-900 mb-2">Usage Instructions:</h4>
-            <div className="text-gray-700 text-sm space-y-1">
+          <div className="bg-gray-900 p-4 rounded-lg">
+            <h4 className="font-medium text-gray-100 mb-2">Usage Instructions:</h4>
+            <div className="text-gray-300 text-sm space-y-1">
               <p>• <strong>JSON Format:</strong> Import into WhisperEngine or other CDL-compatible systems</p>
               <p>• <strong>YAML Format:</strong> Human-readable format for documentation or Git repositories</p>
               <p>• <strong>Character Template:</strong> Add to characterTemplates.ts for reuse in the Character Wizard</p>
@@ -304,10 +330,10 @@ system_integration:
           </div>
         </div>
 
-        <div className="flex justify-end space-x-4 p-6 border-t bg-gray-50">
+        <div className="flex justify-end space-x-4 p-6 border-t bg-gray-900">
           <button
             onClick={onClose}
-            className="px-6 py-2 text-gray-600 hover:text-gray-800 font-medium"
+            className="px-6 py-2 text-gray-400 hover:text-gray-100 font-medium"
           >
             Close
           </button>

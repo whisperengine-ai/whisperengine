@@ -125,9 +125,9 @@ export default function DeploymentManager({ character }: DeploymentManagerProps)
       case 'running': return 'text-green-600 bg-green-100'
       case 'starting': return 'text-yellow-600 bg-yellow-100'
       case 'stopping': return 'text-orange-600 bg-orange-100'
-      case 'stopped': return 'text-gray-600 bg-gray-100'
+      case 'stopped': return 'text-gray-400 bg-gray-100'
       case 'error': return 'text-red-600 bg-red-100'
-      default: return 'text-gray-600 bg-gray-100'
+      default: return 'text-gray-400 bg-gray-100'
     }
   }
 
@@ -143,8 +143,8 @@ export default function DeploymentManager({ character }: DeploymentManagerProps)
   }
 
   return (
-    <div className="bg-white rounded-lg shadow p-6">
-      <h3 className="text-lg font-semibold text-gray-900 mb-4">
+    <div className="bg-gray-800 rounded-lg shadow p-6">
+      <h3 className="text-lg font-semibold text-gray-100 mb-4">
         🚀 Deployment Status
       </h3>
 
@@ -157,11 +157,11 @@ export default function DeploymentManager({ character }: DeploymentManagerProps)
       {deploymentStatus ? (
         <div className="space-y-4">
           {/* Status Overview */}
-          <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+          <div className="flex items-center justify-between p-4 bg-gray-900 rounded-lg">
             <div className="flex items-center space-x-3">
               <span className="text-2xl">{getStatusIcon(deploymentStatus.status)}</span>
               <div>
-                <p className="font-medium text-gray-900">{character.name}</p>
+                <p className="font-medium text-gray-100">{character.name}</p>
                 <div className="flex items-center space-x-2">
                   <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(deploymentStatus.status)}`}>
                     {deploymentStatus.status.toUpperCase()}
@@ -194,29 +194,29 @@ export default function DeploymentManager({ character }: DeploymentManagerProps)
           {/* Deployment Details */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700">Container Name</label>
-              <p className="mt-1 text-sm text-gray-900 font-mono">{deploymentStatus.container_name}</p>
+              <label className="block text-sm font-medium text-gray-300">Container Name</label>
+              <p className="mt-1 text-sm text-gray-100 font-mono">{deploymentStatus.container_name}</p>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700">Health Check</label>
+              <label className="block text-sm font-medium text-gray-300">Health Check</label>
               <a 
                 href={deploymentStatus.health_check_url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="mt-1 text-sm text-blue-600 hover:text-blue-800 underline"
+                className="mt-1 text-sm text-blue-400 hover:text-blue-800 underline"
               >
                 {deploymentStatus.health_check_url}
               </a>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700">Deployed At</label>
-              <p className="mt-1 text-sm text-gray-900">
+              <label className="block text-sm font-medium text-gray-300">Deployed At</label>
+              <p className="mt-1 text-sm text-gray-100">
                 {new Date(deploymentStatus.created_at).toLocaleString()}
               </p>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700">Chat Endpoint</label>
-              <p className="mt-1 text-sm text-gray-900 font-mono">
+              <label className="block text-sm font-medium text-gray-300">Chat Endpoint</label>
+              <p className="mt-1 text-sm text-gray-100 font-mono">
                 http://localhost:{deploymentStatus.port}/api/chat
               </p>
             </div>
@@ -224,7 +224,7 @@ export default function DeploymentManager({ character }: DeploymentManagerProps)
 
           {/* Quick Actions */}
           <div className="border-t pt-4">
-            <h4 className="text-sm font-medium text-gray-700 mb-2">Quick Actions</h4>
+            <h4 className="text-sm font-medium text-gray-300 mb-2">Quick Actions</h4>
             <div className="flex space-x-2">
               <button
                 onClick={() => window.open(deploymentStatus.health_check_url, '_blank')}
@@ -244,8 +244,8 @@ export default function DeploymentManager({ character }: DeploymentManagerProps)
       ) : (
         <div className="text-center py-8">
           <div className="text-gray-400 text-6xl mb-4">🚀</div>
-          <h4 className="text-lg font-medium text-gray-900 mb-2">Character Not Deployed</h4>
-          <p className="text-gray-600 mb-4">
+          <h4 className="text-lg font-medium text-gray-100 mb-2">Character Not Deployed</h4>
+          <p className="text-gray-400 mb-4">
             Deploy this character to start chatting with {character.name}
           </p>
           <button
@@ -259,7 +259,7 @@ export default function DeploymentManager({ character }: DeploymentManagerProps)
       )}
 
       {/* Help Section */}
-      <div className="mt-6 p-4 bg-blue-50 rounded-lg">
+      <div className="mt-6 p-4 bg-gray-800 rounded-lg">
         <h4 className="text-sm font-medium text-blue-900 mb-2">💡 How Deployment Works</h4>
         <ul className="text-sm text-blue-800 space-y-1">
           <li>• Character configurations are loaded from the database</li>

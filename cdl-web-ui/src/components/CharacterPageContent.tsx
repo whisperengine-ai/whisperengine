@@ -2,7 +2,7 @@
 
 import { Character } from '@/types/cdl'
 import CharacterView from './CharacterView'
-import SimpleCharacterEditForm from './SimpleCharacterEditForm'
+import UnifiedCharacterInterface from './UnifiedCharacterInterface'
 
 interface CharacterPageContentProps {
   character: Character
@@ -12,14 +12,14 @@ interface CharacterPageContentProps {
 export default function CharacterPageContent({ character, mode }: CharacterPageContentProps) {
   if (mode === 'edit') {
     return (
-      <div className="bg-white rounded-lg shadow">
-        <SimpleCharacterEditForm character={character} />
+      <div>
+        <UnifiedCharacterInterface character={character} />
       </div>
     )
   }
 
   return (
-    <div className="bg-white rounded-lg shadow">
+    <div className="bg-gray-800 rounded-lg shadow">
       <CharacterView character={character} />
     </div>
   )
