@@ -19,6 +19,8 @@ Welcome to the WhisperEngine documentation hub. This directory contains comprehe
 ## 🎭 Character System
 
 ### **Character Definition Language (CDL)**
+- **[CDL Database Guide](CDL_DATABASE_GUIDE.md)** ⭐ **NEW!** - Complete database schema reference for creating AI characters
+- **[Quickstart CDL Reference](QUICKSTART_CDL_REFERENCE.md)** ⭐ **NEW!** - Quick reference guide for Quickstart users
 - **[CDL Specification](characters/cdl-specification.md)** - Complete CDL syntax and structure
 - **[Character Creation Guide](characters/cdl-implementation.md)** - Step-by-step character creation
 - **[Character Categories Reference](characters/CHARACTER_CATEGORIES_QUICK_REFERENCE.md)** - Pre-built personality templates
