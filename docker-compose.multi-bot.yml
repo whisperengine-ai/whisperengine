@@ -12,7 +12,7 @@ services:
   # Runs once before bot services start to ensure schema is up-to-date
   db-migrate:
     image: whisperengine-bot:${VERSION:-latest}
-    container_name: whisperengine-db-migrate
+    container_name: whisperengine-multi-db-migrate
     entrypoint: []  # Override entrypoint to prevent main app startup
     command: ["python", "/app/scripts/run_migrations.py"]
     environment:
@@ -30,11 +30,17 @@ services:
       postgres:
         condition: service_healthy
     restart: "no"  # Only run once per docker-compose up
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "2"
+        tag: "db-migrate-{.ImageName}-{.Name}-{.ID}"
 
   # ===== INFRASTRUCTURE SERVICES =====
   postgres:
     image: postgres:16.4-alpine
-    container_name: postgres
+    container_name: whisperengine-multi-postgres
     restart: unless-stopped
     environment:
       POSTGRES_DB: whisperengine
@@ -53,6 +59,12 @@ services:
       timeout: 10s
       retries: 5
       start_period: 40s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
+        tag: "postgres-{.ImageName}-{.Name}-{.ID}"
 
   # Redis - Commented out since we're using vector-native memory with Qdrant only
   # redis:
@@ -73,7 +85,7 @@ services:
 
   qdrant:
     image: qdrant/qdrant:v1.15.4
-    container_name: qdrant
+    container_name: whisperengine-multi-qdrant
     restart: unless-stopped
     ports:
       - "6334:6333"  # Qdrant (Dev: 6334, Quickstart: 8333)
@@ -83,10 +95,16 @@ services:
       - bot_network
     # Health check disabled - Qdrant containers have minimal tooling
     # Bots will retry connections if Qdrant isn't ready yet
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "25m"
+        max-file: "3"
+        tag: "qdrant-{.ImageName}-{.Name}-{.ID}"
 
   influxdb:
     image: influxdb:2.7-alpine
-    container_name: influxdb
+    container_name: whisperengine-multi-influxdb
     restart: unless-stopped
     environment:
       DOCKER_INFLUXDB_INIT_MODE: setup
@@ -108,11 +126,17 @@ services:
       timeout: 10s
       retries: 3
       start_period: 60s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "25m"
+        max-file: "3"
+        tag: "influxdb-{.ImageName}-{.Name}-{.ID}"
 
   # Grafana monitoring dashboard for development environment
   grafana:
     image: grafana/grafana:11.3.0
-    container_name: grafana
+    container_name: whisperengine-multi-grafana
     restart: unless-stopped
     environment:
       GF_SECURITY_ADMIN_USER: ${GRAFANA_USER:-admin}
@@ -137,13 +161,19 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "25m"
+        max-file: "3"
+        tag: "grafana-{.ImageName}-{.Name}-{.ID}"
 
   # CDL Web UI for character authoring and management
   cdl-web-ui:
     build:
       context: ./cdl-web-ui
       dockerfile: Dockerfile
-    container_name: cdl-web-ui
+    container_name: whisperengine-multi-cdl-web-ui
     restart: unless-stopped
     environment:
       # PostgreSQL connection (same as WhisperEngine bots)
@@ -167,6 +197,12 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "25m"
+        max-file: "3"
+        tag: "cdl-web-ui-{.ImageName}-{.Name}-{.ID}"
 
   # ===== SHARED BOT IMAGE BUILD =====
   whisperengine-bot-builder:
@@ -183,7 +219,7 @@ services:
   # ===== BOT SERVICES (populated dynamically) =====
   jake-bot:
     image: whisperengine-bot:${VERSION:-latest}
-    container_name: jake-bot
+    container_name: whisperengine-multi-jake-bot
     restart: unless-stopped
     entrypoint: []  # Override Docker entrypoint for direct Python execution
     command: ["python", "run.py"]
@@ -263,7 +299,7 @@ services:
 
   marcus-bot:
     image: whisperengine-bot:${VERSION:-latest}
-    container_name: marcus-bot
+    container_name: whisperengine-multi-marcus-bot
     restart: unless-stopped
     entrypoint: []  # Override Docker entrypoint for direct Python execution
     command: ["python", "run.py"]
@@ -343,7 +379,7 @@ services:
 
   dotty-bot:
     image: whisperengine-bot:${VERSION:-latest}
-    container_name: dotty-bot
+    container_name: whisperengine-multi-dotty-bot
     restart: unless-stopped
     entrypoint: []  # Override Docker entrypoint for direct Python execution
     command: ["python", "run.py"]
@@ -423,7 +459,7 @@ services:
 
   dream-bot:
     image: whisperengine-bot:${VERSION:-latest}
-    container_name: dream-bot
+    container_name: whisperengine-multi-dream-bot
     restart: unless-stopped
     entrypoint: []  # Override Docker entrypoint for direct Python execution
     command: ["python", "run.py"]
@@ -503,7 +539,7 @@ services:
 
   aetheris-bot:
     image: whisperengine-bot:${VERSION:-latest}
-    container_name: aetheris-bot
+    container_name: whisperengine-multi-aetheris-bot
     restart: unless-stopped
     entrypoint: []  # Override Docker entrypoint for direct Python execution
     command: ["python", "run.py"]
@@ -583,7 +619,7 @@ services:
 
   elena-bot:
     image: whisperengine-bot:${VERSION:-latest}
-    container_name: elena-bot
+    container_name: whisperengine-multi-elena-bot
     restart: unless-stopped
     entrypoint: []  # Override Docker entrypoint for direct Python execution
     command: ["python", "run.py"]
@@ -663,7 +699,7 @@ services:
 
   aethys-bot:
     image: whisperengine-bot:${VERSION:-latest}
-    container_name: aethys-bot
+    container_name: whisperengine-multi-aethys-bot
     restart: unless-stopped
     entrypoint: []  # Override Docker entrypoint for direct Python execution
     command: ["python", "run.py"]
@@ -743,7 +779,7 @@ services:
 
   ryan-bot:
     image: whisperengine-bot:${VERSION:-latest}
-    container_name: ryan-bot
+    container_name: whisperengine-multi-ryan-bot
     restart: unless-stopped
     entrypoint: []  # Override Docker entrypoint for direct Python execution
     command: ["python", "run.py"]
@@ -823,7 +859,7 @@ services:
 
   gabriel-bot:
     image: whisperengine-bot:${VERSION:-latest}
-    container_name: gabriel-bot
+    container_name: whisperengine-multi-gabriel-bot
     restart: unless-stopped
     entrypoint: []  # Override Docker entrypoint for direct Python execution
     command: ["python", "run.py"]
@@ -903,7 +939,7 @@ services:
 
   sophia-bot:
     image: whisperengine-bot:${VERSION:-latest}
-    container_name: sophia-bot
+    container_name: whisperengine-multi-sophia-bot
     restart: unless-stopped
     entrypoint: []  # Override Docker entrypoint for direct Python execution
     command: ["python", "run.py"]
@@ -986,6 +1022,11 @@ networks:
   bot_network:
     name: whisperengine-multi_bot_network
     driver: bridge
+    # Development network - external access enabled for debugging
+    internal: false
+    ipam:
+      config:
+        - subnet: 172.21.0.0/16
 
 # ===== VOLUMES =====
 volumes:
@@ -997,10 +1038,13 @@ volumes:
     name: whisperengine-multi_qdrant_data
   influxdb_data:
     name: whisperengine-multi_influxdb_data
+    external: true
   influxdb_config:
     name: whisperengine-multi_influxdb_config
+    external: true
   grafana_data:
     name: whisperengine-multi_grafana_data
+    external: true
   
   # Shared Hugging Face cache (all bots share to avoid duplicate downloads)
   huggingface_cache:

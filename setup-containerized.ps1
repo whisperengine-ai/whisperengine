@@ -176,7 +176,7 @@ Write-Host ""
 
 # Start services
 try {
-    docker-compose -f $composeFile up -d
+    docker compose -p whisperengine-containerized -f $composeFile up -d
     if ($LASTEXITCODE -ne 0) {
         throw "Docker Compose failed with exit code $LASTEXITCODE"
     }
@@ -207,7 +207,7 @@ Write-Host ""
 Write-Host "[SETUP] Checking service health..." -ForegroundColor Blue
 
 try {
-    $response = Invoke-WebRequest -Uri "http://localhost:9090/health" -UseBasicParsing -TimeoutSec 5 -ErrorAction SilentlyContinue
+    $response = Invoke-WebRequest -Uri "http://localhost:8090/health" -UseBasicParsing -TimeoutSec 5 -ErrorAction SilentlyContinue
     if ($response.StatusCode -eq 200) {
         Write-Host "[SUCCESS] WhisperEngine API is healthy!" -ForegroundColor Green
     }
@@ -216,7 +216,7 @@ try {
 }
 
 try {
-    $response = Invoke-WebRequest -Uri "http://localhost:3001" -UseBasicParsing -TimeoutSec 5 -ErrorAction SilentlyContinue
+    $response = Invoke-WebRequest -Uri "http://localhost:8001" -UseBasicParsing -TimeoutSec 5 -ErrorAction SilentlyContinue
     if ($response.StatusCode -eq 200) {
         Write-Host "[SUCCESS] Web UI is healthy!" -ForegroundColor Green
     }
@@ -230,19 +230,19 @@ Write-Host "✨ WhisperEngine is running!" -ForegroundColor Green
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "🌐 Access your WhisperEngine:" -ForegroundColor Cyan
-Write-Host "   • Web Interface: http://localhost:3001" -ForegroundColor Yellow
-Write-Host "   • Chat API: http://localhost:9090/api/chat" -ForegroundColor Yellow
-Write-Host "   • Health Check: http://localhost:9090/health" -ForegroundColor Yellow
+Write-Host "   • Web Interface: http://localhost:8001" -ForegroundColor Yellow
+Write-Host "   • Chat API: http://localhost:8090/api/chat" -ForegroundColor Yellow
+Write-Host "   • Health Check: http://localhost:8090/health" -ForegroundColor Yellow
 Write-Host ""
 Write-Host "📚 Next steps:" -ForegroundColor Cyan
-Write-Host "   • Open http://localhost:3001 to create characters" -ForegroundColor White
+Write-Host "   • Open http://localhost:8001 to create characters" -ForegroundColor White
 Write-Host "   • Test the API with curl or Postman" -ForegroundColor White
 Write-Host "   • Check logs: docker logs whisperengine-assistant" -ForegroundColor White
 Write-Host ""
 Write-Host "🛠️  Useful commands:" -ForegroundColor Cyan
-Write-Host "   • Stop: docker-compose -f $composeFile down" -ForegroundColor White
-Write-Host "   • Restart: docker-compose -f $composeFile restart" -ForegroundColor White
-Write-Host "   • View logs: docker-compose -f $composeFile logs -f" -ForegroundColor White
+Write-Host "   • Stop: docker compose -p whisperengine-containerized -f $composeFile down" -ForegroundColor White
+Write-Host "   • Restart: docker compose -p whisperengine-containerized -f $composeFile restart" -ForegroundColor White
+Write-Host "   • View logs: docker compose -p whisperengine-containerized -f $composeFile logs -f" -ForegroundColor White
 Write-Host ""
 Write-Host "📖 Documentation: https://github.com/whisperengine-ai/whisperengine" -ForegroundColor Cyan
 Write-Host ""
@@ -250,7 +250,7 @@ Write-Host ""
 # Open browser
 Write-Host "Opening web interface in browser..." -ForegroundColor Blue
 Start-Sleep -Seconds 2
-Start-Process "http://localhost:3001"
+Start-Process "http://localhost:8001"
 
 Write-Host ""
 Write-Host "Press Enter to exit" -ForegroundColor Gray

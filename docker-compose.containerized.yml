@@ -1,12 +1,16 @@
-# WhisperEngine - Containerized Deployment
+# WhisperEngine - Containerized Deployment (Single Assistant)
 # No source code required - uses pre-built Docker Hub images
 # Uses :latest tags for automatic updates
+# 
+# Project: whisperengine-containerized (separate from multi-bot: whisperengine-multi)
+# Network: whisperengine-containerized-network
+# Ports: 8000-8999 range (no conflicts with multi-bot 5000-5999, 9000-9999 range)
 
 services:
   # Database migration init container (runs once before bot starts)
   db-migrate:
     image: whisperengine/whisperengine:latest
-    container_name: whisperengine-db-migrate
+    container_name: whisperengine-containerized-db-migrate
     entrypoint: []  # Override entrypoint to prevent main app startup
     command: ["python", "/app/scripts/run_migrations.py"]
     environment:
@@ -16,20 +20,26 @@ services:
       - POSTGRES_PASSWORD=whisperengine_password
       - POSTGRES_DB=whisperengine
     networks:
-      - whisperengine-network
+      - whisperengine-containerized-network
     depends_on:
       postgres:
         condition: service_healthy
     restart: "no"  # Only run once
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "2"
+        tag: "db-migrate-{.ImageName}-{.Name}-{.ID}"
 
   # Main WhisperEngine Assistant (AI Chat API)
   whisperengine-assistant:
     image: whisperengine/whisperengine:latest
-    container_name: whisperengine-assistant
+    container_name: whisperengine-containerized-assistant
     entrypoint: []  # Override broken entrypoint from Dockerfile
     command: ["python", "/app/run.py"]  # Use run.py as the main entry point
     ports:
-      - "9090:9090"  # Chat API endpoint
+      - "8090:9090"  # Chat API endpoint (containerized: 8090, multi-bot: 9090-9099)
     environment:
       # Core infrastructure
       - POSTGRES_HOST=postgres
@@ -80,9 +90,9 @@ services:
     env_file:
       - .env
     volumes:
-      - whisperengine_logs:/app/logs
+      - whisperengine_containerized_logs:/app/logs
     networks:
-      - whisperengine-network
+      - whisperengine-containerized-network
     depends_on:
       postgres:
         condition: service_healthy
@@ -93,18 +103,32 @@ services:
       influxdb:
         condition: service_healthy
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '1.0'
+        reservations:
+          memory: 512M
+          cpus: '0.25'
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9090/health"]
       interval: 30s
       timeout: 10s
       retries: 3
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "5"
+        tag: "assistant-{.ImageName}-{.Name}-{.ID}"
 
   # CDL Web UI for character creation and management
   cdl-web-ui:
     image: whisperengine/whisperengine-ui:latest
-    container_name: whisperengine-web-ui
+    container_name: whisperengine-containerized-web-ui
     ports:
-      - "3001:3000"  # Web interface
+      - "8001:3000"  # Web interface (containerized: 8001, multi-bot: 3001)
     environment:
       - NODE_ENV=production
       - NEXT_TELEMETRY_DISABLED=1
@@ -125,54 +149,98 @@ services:
       # API endpoint for bot management
       - WHISPERENGINE_API_URL=http://whisperengine-assistant:9090
     networks:
-      - whisperengine-network
+      - whisperengine-containerized-network
     depends_on:
       postgres:
         condition: service_healthy
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+        reservations:
+          memory: 128M
+          cpus: '0.1'
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "3"
+        tag: "web-ui-{.ImageName}-{.Name}-{.ID}"
 
   # PostgreSQL Database
   postgres:
     image: postgres:16.4-alpine
-    container_name: whisperengine-postgres
+    container_name: whisperengine-containerized-postgres
     environment:
       - POSTGRES_DB=whisperengine
       - POSTGRES_USER=whisperengine
       - POSTGRES_PASSWORD=whisperengine_password
       - POSTGRES_INITDB_ARGS=--auth-host=scram-sha-256
+    # No external ports - internal access only for production security
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - postgres_containerized_data:/var/lib/postgresql/data
       # SQL init scripts will be included in the assistant image and run via application
     networks:
-      - whisperengine-network
+      - whisperengine-containerized-network
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+        reservations:
+          memory: 128M
+          cpus: '0.1'
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U whisperengine -d whisperengine"]
       interval: 10s
       timeout: 5s
       retries: 5
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "25m"
+        max-file: "3"
+        tag: "postgres-{.ImageName}-{.Name}-{.ID}"
 
   # Qdrant Vector Database
   qdrant:
     image: qdrant/qdrant:v1.15.4
-    container_name: whisperengine-qdrant
+    container_name: whisperengine-containerized-qdrant
+    # No external ports - internal access only for production security
     volumes:
-      - qdrant_data:/qdrant/storage
+      - qdrant_containerized_data:/qdrant/storage
     environment:
       - QDRANT__SERVICE__HTTP_PORT=6333
       - QDRANT__SERVICE__GRPC_PORT=6334
     networks:
-      - whisperengine-network
+      - whisperengine-containerized-network
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '0.5'
+        reservations:
+          memory: 256M
+          cpus: '0.1'
     # Health check disabled - Qdrant containers have minimal tooling
     # Application will retry connections if Qdrant isn't ready yet
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "25m"
+        max-file: "3"
+        tag: "qdrant-{.ImageName}-{.Name}-{.ID}"
 
   # InfluxDB Time-Series Database (Temporal Intelligence & Machine Learning)
   influxdb:
     image: influxdb:2.7-alpine
-    container_name: whisperengine-influxdb
+    container_name: whisperengine-containerized-influxdb
     ports:
-      - "8087:8086"  # InfluxDB UI access
+      - "8086:8086"  # InfluxDB UI access (containerized: 8086, multi-bot: 8087)
     environment:
       - DOCKER_INFLUXDB_INIT_MODE=setup
       - DOCKER_INFLUXDB_INIT_USERNAME=${INFLUXDB_USER:-admin}
@@ -183,24 +251,48 @@ services:
     env_file:
       - .env
     volumes:
-      - influxdb_data:/var/lib/influxdb2
-      - influxdb_config:/etc/influxdb2
+      - influxdb_containerized_data:/var/lib/influxdb2
+      - influxdb_containerized_config:/etc/influxdb2
     networks:
-      - whisperengine-network
+      - whisperengine-containerized-network
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+        reservations:
+          memory: 128M
+          cpus: '0.1'
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8086/health"]
       interval: 30s
       timeout: 10s
       retries: 3
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "25m"
+        max-file: "3"
+        tag: "influxdb-{.ImageName}-{.Name}-{.ID}"
 
 volumes:
-  postgres_data:
-  qdrant_data:
-  influxdb_data:
-  influxdb_config:
-  whisperengine_logs:
+  postgres_containerized_data:
+    name: whisperengine-containerized_postgres_data
+  qdrant_containerized_data:
+    name: whisperengine-containerized_qdrant_data
+  influxdb_containerized_data:
+    name: whisperengine-containerized_influxdb_data
+  influxdb_containerized_config:
+    name: whisperengine-containerized_influxdb_config
+  whisperengine_containerized_logs:
+    name: whisperengine-containerized_logs
 
 networks:
-  whisperengine-network:
+  whisperengine-containerized-network:
+    name: whisperengine-containerized-network
     driver: bridge
+    internal: false  # External access needed for LLM APIs
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

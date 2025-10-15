@@ -152,11 +152,11 @@ echo.
 
 REM Pull latest images first
 echo [SETUP] Pulling latest container images...
-docker-compose -f "!COMPOSE_FILE!" pull
+docker compose -p whisperengine-containerized -f "!COMPOSE_FILE!" pull
 
 REM Start WhisperEngine
 echo [SETUP] Starting services...
-docker-compose -f "!COMPOSE_FILE!" up -d
+docker compose -p whisperengine-containerized -f "!COMPOSE_FILE!" up -d
 
 echo.
 echo [SETUP] ⏳ Waiting for services to start...
@@ -169,7 +169,7 @@ set attempt=0
 if !attempt! geq !max_attempts! goto timeout
 
 REM Check if services are ready
-powershell -Command "try { Invoke-WebRequest -Uri 'http://localhost:3001' -UseBasicParsing | Out-Null; Invoke-WebRequest -Uri 'http://localhost:9090/health' -UseBasicParsing | Out-Null; exit 0 } catch { exit 1 }" >nul 2>&1
+powershell -Command "try { Invoke-WebRequest -Uri 'http://localhost:8001' -UseBasicParsing | Out-Null; Invoke-WebRequest -Uri 'http://localhost:8090/health' -UseBasicParsing | Out-Null; exit 0 } catch { exit 1 }" >nul 2>&1
 if not errorlevel 1 goto services_ready
 
 set /a attempt+=1
@@ -179,7 +179,7 @@ goto wait_loop
 
 :timeout
 echo [ERROR] Services didn't start properly. Check logs:
-echo    docker-compose -f "!COMPOSE_FILE!" logs
+echo    echo    docker compose -p whisperengine-containerized -f "!COMPOSE_FILE!" logs
 pause
 exit /b 1
 
@@ -188,9 +188,9 @@ echo.
 echo [SUCCESS] 🎉 WhisperEngine is ready!
 echo ================================
 echo.
-echo 🌐 Web UI:     http://localhost:3001
-echo 🤖 Chat API:   http://localhost:9090/api/chat
-echo 📊 Health:     http://localhost:9090/health
+echo 🌐 Web UI:     http://localhost:8001
+echo 🤖 Chat API:   http://localhost:8090/api/chat
+echo 📊 Health:     http://localhost:8090/health
 echo 📈 InfluxDB:   http://localhost:8086 (Metrics & Machine Learning)
 echo.
 echo ✨ Features:
@@ -201,22 +201,22 @@ echo • RESTful Chat APIs for integration
 echo • Optional Discord bot functionality
 echo.
 echo 📖 Next steps:
-echo 1. Visit http://localhost:3001 to create your first character
+echo 1. Visit http://localhost:8001 to create your first character
 echo 2. Test the chat API with curl or your application
 echo 3. Edit .env file to customize LLM settings if needed
 echo 4. Enable Discord integration if desired
 echo.
 echo 🔧 Management commands:
-echo    docker-compose -f !COMPOSE_FILE! stop     # Stop WhisperEngine
-echo    docker-compose -f !COMPOSE_FILE! start    # Restart WhisperEngine
-echo    docker-compose -f !COMPOSE_FILE! logs -f  # View live logs
-echo    docker-compose -f !COMPOSE_FILE! down     # Stop and remove containers
+echo    docker compose -p whisperengine-containerized -f !COMPOSE_FILE! stop     # Stop WhisperEngine
+echo    docker compose -p whisperengine-containerized -f !COMPOSE_FILE! start    # Restart WhisperEngine
+echo    docker compose -p whisperengine-containerized -f !COMPOSE_FILE! logs -f  # View live logs
+echo    docker compose -p whisperengine-containerized -f !COMPOSE_FILE! down     # Stop and remove containers
 echo.
 
 REM Auto-open browser
 echo [SETUP] 🔗 Opening web interface...
 timeout /t 2 /nobreak >nul
-start http://localhost:3001
+start http://localhost:8001
 
 echo [SUCCESS] Setup complete! Enjoy your AI character platform! 🎭
 pause
