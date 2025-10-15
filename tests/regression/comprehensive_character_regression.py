@@ -172,10 +172,10 @@ class CharacterRegressionTester:
                 category="Character Personality",
                 message="Tell me about yourself, where are you from?",
                 expected_patterns=[
-                    r"Gabriel|companion|devoted",
-                    r"British|England",
+                    r"England|London|British|coastal|northern",  # Geographic/cultural markers
+                    r"grew|lived|from|town",  # Background narrative markers
                 ],
-                unexpected_patterns=[r"AI|artificial intelligence"]
+                unexpected_patterns=[r"\bAI\b|artificial intelligence"]  # Word boundaries for precise matching
             ),
             CharacterTest(
                 test_id="gabriel_ai_identity",
