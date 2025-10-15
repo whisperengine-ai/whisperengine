@@ -18,7 +18,37 @@ WhisperEngine has completed its **Production Hardening Sprint** and **PostgreSQL
 
 ---
 
-## 🚀 Immediate Priorities (October 2025)
+## � TOP PRIORITY: Character Regression Fixes (October 2025)
+
+### 🔴 CHARACTER REGRESSION FIXES ROADMAP
+**Status**: 🔴 **BLOCKING PRODUCTION** - HIGHEST PRIORITY  
+**Timeline**: October 15-29, 2025 (2 weeks)  
+**Current Pass Rate**: 62.5% → **Target**: 90%+
+
+**Critical Issues**:
+- Gabriel background test FAILED (missing "devoted companion" identity)
+- Elena mentions AI unprompted in background questions
+- Jake doesn't acknowledge AI when directly asked
+- AI ethics layer only triggers on physical interactions (was: all AI questions)
+- Prompt complexity explosion (15+ intelligence layers overwhelming LLM)
+
+**4 Phases - 15 Tasks**:
+- **Phase 1** (Days 1-3): Critical fixes - AI identity handling, Gabriel identity, Elena timing
+- **Phase 2** (Days 4-7): Prompt simplification - consolidate 15+ layers to 5-7 core sections
+- **Phase 3** (Days 8-12): Automation - expand test suite to 40+ tests, CI/CD integration
+- **Phase 4** (Days 13-14): Documentation - AI ethics architecture, monitoring dashboard
+
+**📋 Full Details**: `docs/roadmaps/CHARACTER_REGRESSION_FIXES_ROADMAP.md`  
+**�🚀 Quick Start**: `CHARACTER_REGRESSION_QUICKSTART.md` (root directory)  
+**📊 Analysis**: `docs/testing/REGRESSION_ANALYSIS_SEPT27_TO_OCT15.md`
+
+**Root Cause**: 374 commits in 18 days added incredible intelligence features but buried character personality under complexity. Fixes are straightforward and preserve all new features while restoring personality-first architecture.
+
+**Impact**: Restore production quality, prevent future regressions, maintain character authenticity
+
+---
+
+## 🚀 Completed Priorities (October 2025)
 
 ### Phase 5: User Preferences Integration ✅ COMPLETE
 **Status**: Completed  
