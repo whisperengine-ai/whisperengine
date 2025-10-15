@@ -55,9 +55,9 @@ The setup script will:
 
 After setup, you'll need to add your LLM configuration to the `.env` file:
 
-> **� Need Help with Configuration?** See our detailed **[Configuration Guide](edit-env-after-quickstart.md)** for step-by-step instructions on setting up LLM providers, Discord integration, and more.
+> **🔧 Need Help with Configuration?** See our detailed **[Configuration Guide](edit-env-after-quickstart.md)** for step-by-step instructions on setting up LLM providers, Discord integration, and more.
 
-> **�💡 Key Concept**: `LLM_CHAT_API_URL` is what **actually determines** your LLM provider (WhisperEngine auto-detects from the URL). `LLM_CLIENT_TYPE` is mainly used for setup hints and logging.
+> **💡 Key Concept**: `LLM_CHAT_API_URL` is what **actually determines** your LLM provider (WhisperEngine auto-detects from the URL). `LLM_CLIENT_TYPE` is mainly used for setup hints and logging.
 
 ### **Option 1: OpenRouter (Recommended) - ✅ TESTED**
 ```bash
@@ -144,7 +144,7 @@ After setup completes, you can access:
 - **URL**: http://localhost:9090/health
 - **Use For**: Checking system status and performance
 
-## �� Creating Your First Character
+## 🎨 Creating Your First Character
 
 1. **Open Web Interface**: http://localhost:3001
 2. **Click "Create New Character"**
@@ -170,53 +170,53 @@ After setup completes, you can access:
 - Verify personality consistency
 
 ### **Via API**
-\`\`\`bash
-curl -X POST http://localhost:9090/api/chat \\
-  -H "Content-Type: application/json" \\
+```bash
+curl -X POST http://localhost:9090/api/chat \
+  -H "Content-Type: application/json" \
   -d '{
     "user_id": "test_user",
     "message": "Hello! Tell me about yourself.",
     "context": {"platform": "api"}
   }'
-\`\`\`
+```
 
 ### **Via Discord** (Optional)
 1. Create a Discord bot at https://discord.com/developers/applications
-2. Add the bot token to your \`.env\` file:
-   \`\`\`bash
+2. Add the bot token to your `.env` file:
+   ```bash
    DISCORD_BOT_TOKEN=your_discord_token
    ENABLE_DISCORD=true
-   \`\`\`
-3. Stop and restart: \`docker-compose stop && docker-compose up -d\`
+   ```
+3. Stop and restart: `docker-compose stop && docker-compose up -d`
 
 ## 🔄 Managing Your Installation
 
 ### **Daily Operations**
 
 **Start WhisperEngine:**
-\`\`\`bash
+```bash
 docker-compose up -d
-\`\`\`
+```
 
 **Stop WhisperEngine:**
-\`\`\`bash
+```bash
 docker-compose down
-\`\`\`
+```
 
 **View Logs:**
-\`\`\`bash
+```bash
 docker logs whisperengine-assistant
-\`\`\`
+```
 
 **Check Status:**
-\`\`\`bash
+```bash
 docker ps
-\`\`\`
+```
 
 ### **Updates**
 
 **Update to Latest Version:**
-\`\`\`bash
+```bash
 # Stop current version
 docker-compose down
 
@@ -225,41 +225,41 @@ docker-compose pull
 
 # Start with new version
 docker-compose up -d
-\`\`\`
+```
 
 **Check Version:**
-\`\`\`bash
+```bash
 curl http://localhost:9090/health
-\`\`\`
+```
 
 ## 🔧 Troubleshooting
 
 ### **Common Issues**
 
 **Docker Not Running:**
-\`\`\`bash
+```bash
 # Check Docker status
 docker info
 
 # Make sure Docker Desktop is started
-\`\`\`
+```
 
 **Port Already in Use:**
-\`\`\`bash
+```bash
 # Check what's using the ports (3001, 9090, 5432, 6333)
 lsof -i :3001  # macOS/Linux
 netstat -ano | findstr :3001  # Windows
 
 # Stop the conflicting service or change ports
-\`\`\`
+```
 
 **API Key Not Working:**
 - Verify your API key is correct (no extra spaces)
 - Test at provider's website (OpenRouter: https://openrouter.ai)
-- Check logs: \`docker logs whisperengine-assistant\`
+- Check logs: `docker logs whisperengine-assistant`
 
 **Containers Won't Start:**
-\`\`\`bash
+```bash
 # Check logs for errors
 docker-compose logs
 
@@ -268,28 +268,28 @@ docker system df
 
 # Clean up if low on space
 docker system prune
-\`\`\`
+```
 
 ### **Complete Reset**
 
 **Clean Restart (keeps data):**
-\`\`\`bash
+```bash
 docker-compose down
 docker-compose up -d
-\`\`\`
+```
 
 **Nuclear Reset (deletes ALL data):**
-\`\`\`bash
+```bash
 # ⚠️ WARNING: This deletes ALL your characters and conversations!
 docker-compose down -v
 docker volume prune
 docker-compose up -d
-\`\`\`
+```
 
 ### **Database Migration (v1.0.6 → v1.0.8+)**
 
 If upgrading from v1.0.6:
-\`\`\`bash
+```bash
 # Update containers first
 docker-compose down
 docker-compose pull
@@ -297,30 +297,30 @@ docker-compose up -d
 
 # Mark existing database as current
 docker exec whisperengine-assistant alembic stamp head
-\`\`\`
+```
 
 ## 💾 Data Backup
 
 **Create Backup:**
-\`\`\`bash
+```bash
 # Create backup directory
 mkdir -p whisperengine-backups/$(date +%Y%m%d_%H%M%S)
 
 # Backup PostgreSQL (characters, memories)
-docker run --rm \\
-  -v whisperengine_postgres_data:/source:ro \\
-  -v $(pwd)/whisperengine-backups/$(date +%Y%m%d_%H%M%S):/backup \\
+docker run --rm \
+  -v whisperengine_postgres_data:/source:ro \
+  -v $(pwd)/whisperengine-backups/$(date +%Y%m%d_%H%M%S):/backup \
   alpine tar czf /backup/postgres_data.tar.gz -C /source .
 
 # Backup Qdrant (vector memories)
-docker run --rm \\
-  -v whisperengine_qdrant_data:/source:ro \\
-  -v $(pwd)/whisperengine-backups/$(date +%Y%m%d_%H%M%S):/backup \\
+docker run --rm \
+  -v whisperengine_qdrant_data:/source:ro \
+  -v $(pwd)/whisperengine-backups/$(date +%Y%m%d_%H%M%S):/backup \
   alpine tar czf /backup/qdrant_data.tar.gz -C /source .
-\`\`\`
+```
 
 **Restore from Backup:**
-\`\`\`bash
+```bash
 # Stop services
 docker-compose down
 
@@ -330,27 +330,27 @@ docker volume rm whisperengine_postgres_data whisperengine_qdrant_data
 # Restore (replace BACKUP_DATE with your backup folder)
 BACKUP_DATE="20241012_143000"
 
-docker run --rm \\
-  -v whisperengine_postgres_data:/target \\
-  -v $(pwd)/whisperengine-backups/$BACKUP_DATE:/backup:ro \\
+docker run --rm \
+  -v whisperengine_postgres_data:/target \
+  -v $(pwd)/whisperengine-backups/$BACKUP_DATE:/backup:ro \
   alpine tar xzf /backup/postgres_data.tar.gz -C /target
 
-docker run --rm \\
-  -v whisperengine_qdrant_data:/target \\
-  -v $(pwd)/whisperengine-backups/$BACKUP_DATE:/backup:ro \\
+docker run --rm \
+  -v whisperengine_qdrant_data:/target \
+  -v $(pwd)/whisperengine-backups/$BACKUP_DATE:/backup:ro \
   alpine tar xzf /backup/qdrant_data.tar.gz -C /target
 
 # Start with restored data
 docker-compose up -d
-\`\`\`
+```
 
 ## 🛠️ Advanced Configuration
 
 ### **Model Selection**
 
-Try different AI models by editing \`.env\`:
+Try different AI models by editing `.env`:
 
-\`\`\`bash
+```bash
 # Fast and affordable (recommended for testing)
 LLM_CHAT_MODEL=anthropic/claude-3-haiku
 
@@ -361,17 +361,17 @@ LLM_CHAT_MODEL=openai/gpt-4o
 # Open source alternatives (via OpenRouter)
 LLM_CHAT_MODEL=meta-llama/llama-3.1-8b-instruct
 LLM_CHAT_MODEL=mistralai/mistral-7b-instruct
-\`\`\`
+```
 
 ### **Discord Integration**
 
 1. **Create Discord Bot**: https://discord.com/developers/applications
-2. **Add to \`.env\`**:
-   \`\`\`bash
+2. **Add to `.env`**:
+   ```bash
    DISCORD_BOT_TOKEN=your_bot_token_here
    ENABLE_DISCORD=true
-   \`\`\`
-3. **Stop and restart**: \`docker-compose stop && docker-compose up -d\`
+   ```
+3. **Stop and restart**: `docker-compose stop && docker-compose up -d`
 4. **Invite Bot**: Use OAuth2 URL Generator in Discord Developer Portal
 
 ### **Multi-Character Setup**
@@ -409,14 +409,14 @@ See [Multi-Character Guide](../setup/MULTI_CHARACTER_SETUP.md) for running multi
 
 This quickstart is for end users. Developers need source code access:
 
-\`\`\`bash
+```bash
 # Clone the repository
 git clone https://github.com/whisperengine-ai/whisperengine.git
 cd whisperengine
 
 # Follow the development guide
 # See: docs/development/DEVELOPMENT_GUIDE.md
-\`\`\`
+```
 
 **Developer Requirements:**
 - Git for source code access
