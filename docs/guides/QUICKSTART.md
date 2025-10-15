@@ -374,26 +374,7 @@ LLM_CHAT_MODEL=mistralai/mistral-7b-instruct
 3. **Stop and restart**: `docker-compose stop && docker-compose up -d`
 4. **Invite Bot**: Use OAuth2 URL Generator in Discord Developer Portal
 
-### **Multi-Character Setup**
 
-See [Multi-Character Guide](../setup/MULTI_CHARACTER_SETUP.md) for running multiple AI characters simultaneously.
-
-## 📚 Next Steps
-
-### **Learn More**
-- **[Character Creation Guide](../characters/CHARACTER_AUTHORING_GUIDE.md)** - Advanced character building
-- **[API Documentation](../api/README.md)** - Integrate with your applications
-- **[Development Guide](../development/DEVELOPMENT_GUIDE.md)** - For developers
-
-### **Advanced Features**
-- **Persistent Memory**: Characters remember conversations
-- **Adaptive Learning**: Characters improve over time
-- **Emotional Intelligence**: Sophisticated emotion analysis
-- **Vector Memory**: Semantic understanding and recall
-
-### **Production Use**
-- **[Production Deployment](../deployment/PRODUCTION_SETUP.md)** - Secure, scalable setup
-- **[Monitoring Setup](../monitoring/README.md)** - Performance monitoring
 
 ## 🆘 Getting Help
 
@@ -403,27 +384,5 @@ See [Multi-Character Guide](../setup/MULTI_CHARACTER_SETUP.md) for running multi
 
 ---
 
-## 👨‍💻 For Developers
-
-**Want to modify WhisperEngine or contribute code?**
-
-This quickstart is for end users. Developers need source code access:
-
-```bash
-# Clone the repository
-git clone https://github.com/whisperengine-ai/whisperengine.git
-cd whisperengine
-
-# Follow the development guide
-# See: docs/development/DEVELOPMENT_GUIDE.md
-```
-
-**Developer Requirements:**
-- Git for source code access
-- Python 3.11+ for local development
-- Node.js for web UI development
-- Docker for containerized development
-
----
 
 **🎉 Congratulations!** You now have a fully functional AI character platform running locally. Start creating your first character and explore the possibilities of persistent AI personalities! 🚀
