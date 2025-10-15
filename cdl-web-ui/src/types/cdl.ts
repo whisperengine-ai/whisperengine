@@ -18,8 +18,8 @@ export interface Character {
   description: string | null
   
   // Character archetype and AI behavior
-  character_archetype: 'real-world' | 'fantasy' | 'narrative-ai'
-  allow_full_roleplay_immersion: boolean
+  archetype: 'real-world' | 'fantasy' | 'narrative-ai'
+  allow_full_roleplay: boolean
   
   // Enhanced JSONB CDL data
   cdl_data: Record<string, unknown> | null
@@ -98,6 +98,81 @@ export interface EvolutionHistory {
   validation_status: 'pending' | 'validated' | 'rejected'
 }
 
+export interface CharacterLLMConfig {
+  id: number
+  character_id: number
+  llm_client_type: string
+  llm_chat_api_url: string
+  llm_chat_model: string
+  llm_chat_api_key: string | null
+  llm_temperature: number
+  llm_max_tokens: number
+  llm_top_p: number
+  llm_frequency_penalty: number
+  llm_presence_penalty: number
+  is_active: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface CharacterDiscordConfig {
+  id: number
+  character_id: number
+  discord_bot_token: string | null
+  discord_application_id: string | null
+  discord_guild_id: string | null
+  enable_discord: boolean
+  discord_guild_restrictions: string[]
+  discord_channel_restrictions: string[]
+  discord_status: 'online' | 'idle' | 'dnd' | 'invisible'
+  discord_activity_type: 'playing' | 'streaming' | 'listening' | 'watching'
+  max_message_length: number
+  typing_delay_seconds: number
+  enable_reactions: boolean
+  enable_typing_indicator: boolean
+  is_active: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface CharacterDeploymentConfig {
+  id: number
+  character_id: number
+  
+  // Deployment Settings
+  health_check_port: number | null
+  container_name: string | null
+  docker_image: string
+  
+  // Environment Overrides
+  env_overrides: Record<string, unknown>
+  
+  // Resource Limits
+  memory_limit: string
+  cpu_limit: string
+  
+  // Deployment Status
+  deployment_status: 'inactive' | 'pending' | 'active' | 'failed'
+  last_deployed_at: string | null
+  deployment_logs: string | null
+  
+  // Auto-deployment settings (additional fields for UI)
+  enabled?: boolean
+  auto_start?: boolean
+  port?: number // Alias for health_check_port for UI convenience
+  
+  // Configuration metadata
+  is_active: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface CharacterWithConfigs extends Character {
+  llm_config?: CharacterLLMConfig
+  discord_config?: CharacterDiscordConfig
+  deployment_config?: CharacterDeploymentConfig
+}
+
 export interface InteractionMode {
   id: number
   character_id: number
@@ -120,8 +195,8 @@ export interface CharacterFormData {
   age_range?: string
   background?: string
   description?: string
-  character_archetype: 'real-world' | 'fantasy' | 'narrative-ai'
-  allow_full_roleplay_immersion: boolean
+  archetype: 'real-world' | 'fantasy' | 'narrative-ai'
+  allow_full_roleplay: boolean
   notes?: string
 }
 

@@ -9,7 +9,7 @@ services:
       - NODE_ENV=production
       - NEXT_TELEMETRY_DISABLED=1
       - PGHOST=host.docker.internal
-      - PGPORT=5433
+      - PGPORT=5432
       - PGDATABASE=whisperengine
       - PGUSER=whisperengine
       - PGPASSWORD=whisperengine_password

@@ -85,7 +85,7 @@ class CDLYAMLImporter:
             print(f"❌ Failed to load YAML file: {e}")
             return False
         
-        # Validate structure
+        # Validate structure - support both old and new formats
         if 'identity' not in yaml_data or 'name' not in yaml_data.get('identity', {}):
             print("❌ Invalid YAML structure: missing identity/name")
             return False
@@ -118,7 +118,15 @@ class CDLYAMLImporter:
                 char_id = await self._create_character(conn, normalized_name, yaml_data)
                 print(f"✅ Created character '{character_name}' (ID: {char_id})")
             
-            # Import related data
+            # Import related data - support comprehensive format
+            await self._import_personality_data(conn, char_id, yaml_data.get('personality', {}))
+            await self._import_background_data(conn, char_id, yaml_data.get('background', {}))
+            await self._import_interests_data(conn, char_id, yaml_data.get('interests', {}))
+            await self._import_communication_patterns(conn, char_id, yaml_data.get('communication_patterns', {}))
+            await self._import_speech_patterns(conn, char_id, yaml_data.get('speech_patterns', {}))
+            await self._import_response_style(conn, char_id, yaml_data.get('response_style', {}))
+            
+            # Legacy support
             await self._import_values(conn, char_id, yaml_data.get('values', []))
             await self._import_interests(conn, char_id, yaml_data.get('interests', []))
             
@@ -209,9 +217,14 @@ class CDLYAMLImporter:
             char_id
         )
         
-        # Clear existing related data
+        # Clear existing related data (comprehensive cleanup)
         await conn.execute("DELETE FROM character_values WHERE character_id = $1", char_id)
         await conn.execute("DELETE FROM character_interest_topics WHERE character_id = $1", char_id)
+        await conn.execute("DELETE FROM character_background WHERE character_id = $1", char_id)
+        await conn.execute("DELETE FROM character_communication_patterns WHERE character_id = $1", char_id)
+        await conn.execute("DELETE FROM character_speech_patterns WHERE character_id = $1", char_id)
+        await conn.execute("DELETE FROM character_response_guidelines WHERE character_id = $1", char_id)
+        await conn.execute("DELETE FROM personality_traits WHERE character_id = $1", char_id)
     
     async def _import_values(self, conn: asyncpg.Connection, char_id: int, values: List[str]) -> None:
         """Import character values"""
@@ -231,12 +244,108 @@ class CDLYAMLImporter:
                 """, char_id, str(value).strip())
     
     async def _import_interests(self, conn: asyncpg.Connection, char_id: int, interests: List[str]) -> None:
-        """Import character interests"""
+        """Import character interests (legacy format)"""
         for interest in interests:
             await conn.execute("""
                 INSERT INTO character_interest_topics (character_id, topic_keyword)
                 VALUES ($1, $2)
             """, char_id, str(interest).strip())
+    
+    async def _import_personality_data(self, conn: asyncpg.Connection, char_id: int, personality: Dict[str, Any]) -> None:
+        """Import comprehensive personality data"""
+        # Import Big Five traits
+        big_five = personality.get('big_five', {})
+        for trait_name, value in big_five.items():
+            if isinstance(value, (int, float)):
+                await conn.execute("""
+                    INSERT INTO personality_traits (character_id, trait_name, trait_value, intensity)
+                    VALUES ($1, $2, $3, $4)
+                """, char_id, trait_name, float(value), 'medium')
+        
+        # Import values
+        values = personality.get('values', [])
+        for i, value in enumerate(values):
+            await conn.execute("""
+                INSERT INTO character_values (character_id, value_key, value_description, importance_level)
+                VALUES ($1, $2, $3, $4)
+            """, char_id, f"value_{i+1}", str(value), 5)
+    
+    async def _import_background_data(self, conn: asyncpg.Connection, char_id: int, background: Dict[str, Any]) -> None:
+        """Import background entries"""
+        entries = background.get('entries', [])
+        for entry in entries:
+            await conn.execute("""
+                INSERT INTO character_background (character_id, category, period, title, description, importance_level)
+                VALUES ($1, $2, $3, $4, $5, $6)
+            """, 
+                char_id,
+                entry.get('category', 'general'),
+                entry.get('period'),
+                entry.get('title', ''),
+                entry.get('description', ''),
+                entry.get('importance_level', 5)
+            )
+    
+    async def _import_interests_data(self, conn: asyncpg.Connection, char_id: int, interests: Dict[str, Any]) -> None:
+        """Import comprehensive interests data"""
+        entries = interests.get('entries', [])
+        for entry in entries:
+            await conn.execute("""
+                INSERT INTO character_interest_topics (character_id, category, interest_text, proficiency_level, importance)
+                VALUES ($1, $2, $3, $4, $5)
+            """,
+                char_id,
+                entry.get('category', 'general'),
+                entry.get('interest_text', ''),
+                entry.get('proficiency_level', 1),
+                entry.get('importance', 'medium')
+            )
+    
+    async def _import_communication_patterns(self, conn: asyncpg.Connection, char_id: int, comm_patterns: Dict[str, Any]) -> None:
+        """Import communication patterns"""
+        patterns = comm_patterns.get('patterns', [])
+        for pattern in patterns:
+            await conn.execute("""
+                INSERT INTO character_communication_patterns (character_id, pattern_type, pattern_name, pattern_value, context, frequency)
+                VALUES ($1, $2, $3, $4, $5, $6)
+            """,
+                char_id,
+                pattern.get('pattern_type', 'general'),
+                pattern.get('pattern_name', ''),
+                pattern.get('pattern_value', ''),
+                pattern.get('context'),
+                pattern.get('frequency', 'medium')
+            )
+    
+    async def _import_speech_patterns(self, conn: asyncpg.Connection, char_id: int, speech_patterns: Dict[str, Any]) -> None:
+        """Import speech patterns"""
+        patterns = speech_patterns.get('patterns', [])
+        for pattern in patterns:
+            await conn.execute("""
+                INSERT INTO character_speech_patterns (character_id, pattern_type, pattern_value, usage_frequency, context, priority)
+                VALUES ($1, $2, $3, $4, $5, $6)
+            """,
+                char_id,
+                pattern.get('pattern_type', 'general'),
+                pattern.get('pattern_value', ''),
+                pattern.get('usage_frequency', 'medium'),
+                pattern.get('context'),
+                pattern.get('priority', 5)
+            )
+    
+    async def _import_response_style(self, conn: asyncpg.Connection, char_id: int, response_style: Dict[str, Any]) -> None:
+        """Import response style guidelines"""
+        items = response_style.get('items', [])
+        for item in items:
+            await conn.execute("""
+                INSERT INTO character_response_guidelines (character_id, guideline_type, guideline_content, priority)
+                VALUES ($1, $2, $3, $4)
+            """,
+                char_id,
+                item.get('item_type', 'general'),
+                item.get('item_text', ''),
+                item.get('sort_order', 5)
+            )
     
     def _normalize_name(self, name: str) -> str:
         """Convert character name to normalized form"""

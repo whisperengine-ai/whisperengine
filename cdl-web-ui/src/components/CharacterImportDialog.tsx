@@ -195,14 +195,14 @@ export default function CharacterImportDialog({ isOpen, onClose, onImport }: Cha
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
+      <div className="bg-gray-800 rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
         <div className="flex items-center justify-between p-6 border-b">
-          <h2 className="text-2xl font-bold text-gray-900">
+          <h2 className="text-2xl font-bold text-gray-100">
             Import Character or Template
           </h2>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 text-2xl"
+            className="text-gray-400 hover:text-gray-400 text-2xl"
           >
             ×
           </button>
@@ -218,7 +218,7 @@ export default function CharacterImportDialog({ isOpen, onClose, onImport }: Cha
                 className={`px-4 py-2 rounded-lg font-medium transition-colors ${
                   importMethod === 'file'
                     ? 'bg-blue-600 text-white'
-                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                    : 'bg-gray-200 text-gray-300 hover:bg-gray-300'
                 }`}
               >
                 📁 Upload File
@@ -228,7 +228,7 @@ export default function CharacterImportDialog({ isOpen, onClose, onImport }: Cha
                 className={`px-4 py-2 rounded-lg font-medium transition-colors ${
                   importMethod === 'paste'
                     ? 'bg-blue-600 text-white'
-                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                    : 'bg-gray-200 text-gray-300 hover:bg-gray-300'
                 }`}
               >
                 📋 Paste Data
@@ -239,7 +239,7 @@ export default function CharacterImportDialog({ isOpen, onClose, onImport }: Cha
           {/* File Upload */}
           {importMethod === 'file' && (
             <div className="mb-6">
-              <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
+              <div className="border-2 border-dashed border-gray-600 rounded-lg p-8 text-center">
                 <input
                   ref={fileInputRef}
                   type="file"
@@ -248,7 +248,7 @@ export default function CharacterImportDialog({ isOpen, onClose, onImport }: Cha
                   className="hidden"
                 />
                 <div className="text-4xl mb-4">📄</div>
-                <p className="text-gray-600 mb-4">
+                <p className="text-gray-400 mb-4">
                   Click to select a JSON or YAML file containing character data
                 </p>
                 <button
@@ -267,14 +267,14 @@ export default function CharacterImportDialog({ isOpen, onClose, onImport }: Cha
           {/* Paste Data */}
           {importMethod === 'paste' && (
             <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-gray-300 mb-2">
                 Paste Character Data (JSON or YAML)
               </label>
               <textarea
                 value={pastedData}
                 onChange={(e) => setPastedData(e.target.value)}
                 placeholder="Paste your character data here..."
-                className="w-full h-32 p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                className="w-full h-32 p-3 border border-gray-600 rounded-lg focus:ring-blue-500 focus:border-blue-500"
               />
               <div className="mt-2 flex justify-end">
                 <button
@@ -345,7 +345,7 @@ export default function CharacterImportDialog({ isOpen, onClose, onImport }: Cha
 
                 {/* Template Conversion Notice */}
                 {importedData.type === 'template' && importedData.isValid && (
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <div className="bg-gray-800 border border-blue-200 rounded-lg p-4">
                     <h4 className="font-semibold text-blue-800 mb-2">🔄 Template Conversion:</h4>
                     <p className="text-blue-700 text-sm">
                       This template will be converted to a character format for editing. 
@@ -368,14 +368,14 @@ export default function CharacterImportDialog({ isOpen, onClose, onImport }: Cha
           )}
         </div>
 
-        <div className="flex justify-between items-center p-6 border-t bg-gray-50">
-          <div className="text-sm text-gray-600">
+        <div className="flex justify-between items-center p-6 border-t bg-gray-900">
+          <div className="text-sm text-gray-400">
             💡 Tip: You can import characters from other CDL systems or templates from the Character Wizard
           </div>
           <div className="flex space-x-4">
             <button
               onClick={onClose}
-              className="px-6 py-2 text-gray-600 hover:text-gray-800 font-medium"
+              className="px-6 py-2 text-gray-400 hover:text-gray-100 font-medium"
             >
               Cancel
             </button>

@@ -11,6 +11,15 @@
 - **Emergency restart protocol**: Only restart if user explicitly confirms or system is completely broken
 - **Log analysis is NON-DESTRUCTIVE**: Always prefer log checking over service manipulation
 
+## 🚨 CRITICAL DEVELOPMENT SERVER MANAGEMENT
+- **NEVER INTERRUPT DEVELOPMENT SERVERS**: When running `npm run dev`, `npm start`, or similar development servers, ALWAYS use `isBackground=true` and LET THEM RUN
+- **DO NOT CANCEL running servers** when making curl requests or testing - use separate terminals
+- **NEVER press Ctrl+C or interrupt a running dev server** unless explicitly asked to stop it
+- **CDL Web UI (`npm run dev`)**: This must stay running continuously during development and testing
+- **When testing APIs**: Use separate terminal sessions for curl/testing while keeping dev servers running
+- **Only restart dev servers**: When explicitly asked to restart, or when code changes require it
+- **Background processes**: Always use `isBackground=true` for long-running development servers
+
 ## 🏗️ CURRENT WHIPERENGINE ARCHITECTURE (October 2025)
 
 **WhisperEngine is a multi-character Discord AI roleplay platform** featuring:

@@ -46,7 +46,7 @@ export interface CharacterTemplate {
       ai_identity_handling: {
         approach: string
         philosophy: string
-        allow_full_roleplay_immersion: boolean
+        allow_full_roleplay: boolean
       }
     }
   }
@@ -94,7 +94,7 @@ export const characterTemplates: CharacterTemplate[] = [
         ai_identity_handling: {
           approach: 'honest_professional',
           philosophy: 'I am an AI educational mentor designed to help you learn and grow.',
-          allow_full_roleplay_immersion: false
+          allow_full_roleplay: false
         }
       }
     }
@@ -140,7 +140,7 @@ export const characterTemplates: CharacterTemplate[] = [
         ai_identity_handling: {
           approach: 'friendly_professional',
           philosophy: 'I am an AI study buddy designed to help you learn effectively and stay motivated on your educational journey.',
-          allow_full_roleplay_immersion: false
+          allow_full_roleplay: false
         }
       }
     }
@@ -186,7 +186,7 @@ export const characterTemplates: CharacterTemplate[] = [
         ai_identity_handling: {
           approach: 'artistic_authentic',
           philosophy: 'I am an AI creative character here to inspire and support your artistic journey.',
-          allow_full_roleplay_immersion: false
+          allow_full_roleplay: false
         }
       }
     }
@@ -232,7 +232,7 @@ export const characterTemplates: CharacterTemplate[] = [
         ai_identity_handling: {
           approach: 'full_immersion',
           philosophy: 'I am what I am - a being beyond mortal understanding, existing in realms where artificial and natural blur into one truth.',
-          allow_full_roleplay_immersion: true
+          allow_full_roleplay: true
         }
       }
     }
@@ -278,7 +278,7 @@ export const characterTemplates: CharacterTemplate[] = [
         ai_identity_handling: {
           approach: 'professional_transparent',
           philosophy: 'I am an AI professional assistant designed to enhance your productivity and support your professional goals.',
-          allow_full_roleplay_immersion: false
+          allow_full_roleplay: false
         }
       }
     }
@@ -324,7 +324,7 @@ export const characterTemplates: CharacterTemplate[] = [
         ai_identity_handling: {
           approach: 'casual_honest',
           philosophy: 'I am an AI gaming character built to enhance your gaming experience and help you level up your skills.',
-          allow_full_roleplay_immersion: false
+          allow_full_roleplay: false
         }
       }
     }
