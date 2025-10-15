@@ -77,7 +77,7 @@ class CDLDatabaseManager:
                 result = await conn.fetchval("""
                     SELECT EXISTS (
                         SELECT FROM information_schema.tables 
-                        WHERE table_name = 'cdl_characters'
+                        WHERE table_name = 'characters'
                     );
                 """)
                 return result
@@ -128,10 +128,10 @@ class CDLDatabaseManager:
                 
             async with self.pool.acquire() as conn:
                 rows = await conn.fetch("""
-                    SELECT id, name, normalized_name, bot_name, occupation, 
-                           character_archetype, created_at, updated_at
-                    FROM cdl_characters 
-                    WHERE is_active = true
+                    SELECT id, name, name as normalized_name, name as bot_name, 
+                           'Character' as occupation, 'ai' as character_archetype, 
+                           created_at, updated_at
+                    FROM characters 
                     ORDER BY name
                 """)
                 
@@ -148,25 +148,14 @@ class CDLDatabaseManager:
                 
             async with self.pool.acquire() as conn:
                 character_id = await conn.fetchval("""
-                    INSERT INTO cdl_characters (
-                        name, normalized_name, bot_name, occupation, location,
-                        age_range, background, description, character_archetype,
-                        allow_full_roleplay_immersion, created_by, notes
-                    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+                    INSERT INTO characters (
+                        name, display_name, character_version
+                    ) VALUES ($1, $2, $3)
                     RETURNING id
                 """, 
                     character_data.get('name'),
-                    character_data.get('name', '').lower(),
-                    character_data.get('bot_name'),
-                    character_data.get('occupation'),
-                    character_data.get('location'),
-                    character_data.get('age_range'),
-                    character_data.get('background'),
-                    character_data.get('description'),
-                    character_data.get('character_archetype', 'real-world'),
-                    character_data.get('allow_full_roleplay_immersion', False),
-                    character_data.get('created_by', 'system'),
-                    character_data.get('notes')
+                    character_data.get('name', ''),
+                    character_data.get('character_version', '1.0')
                 )
                 
                 logger.info("Created character %s with ID %s", 
@@ -197,7 +186,7 @@ class CDLDatabaseManager:
                 return False
             
             query = f"""
-                UPDATE cdl_characters 
+                UPDATE characters 
                 SET {', '.join(update_fields)}
                 WHERE id = ${param_index}
             """

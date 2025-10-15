@@ -125,7 +125,7 @@ async def analyze_quality_issues():
         print("\n🔗 UNUSUAL RELATIONSHIP TYPES")
         unusual_rels = await conn.fetch("""
             SELECT relationship_type, COUNT(*) as count,
-                   ARRAY_AGG(DISTINCT fe.entity_name LIMIT 3) as example_entities
+                   ARRAY_AGG(DISTINCT fe.entity_name) as example_entities
             FROM user_fact_relationships ufr
             JOIN fact_entities fe ON ufr.entity_id = fe.id
             WHERE relationship_type NOT IN ('likes', 'dislikes', 'enjoys', 'owns', 'visited', 'wants', 'prefers', 'loves', 'has')

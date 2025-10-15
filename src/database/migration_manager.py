@@ -91,10 +91,11 @@ class DatabaseMigrationManager:
                 )
             """)
             
-            # Insert initial version if not exists
+            # Insert initial version if not exists - PostgreSQL compatible
             conn.execute("""
-                INSERT OR IGNORE INTO database_version (id, current_version, migration_count)
+                INSERT INTO database_version (id, current_version, migration_count)
                 VALUES (1, '0.0.0', 0)
+                ON CONFLICT (id) DO NOTHING
             """)
             
             conn.commit()

@@ -227,18 +227,14 @@ class WhisperEngineSchema:
                     "id INTEGER PRIMARY KEY AUTOINCREMENT", "id SERIAL PRIMARY KEY"
                 )
 
-        # Add indexes for better performance
-        schema[
-            "indexes"
-        ] = """
-            CREATE INDEX IF NOT EXISTS idx_conversations_user_id ON conversations(user_id);
-            CREATE INDEX IF NOT EXISTS idx_conversations_timestamp ON conversations(timestamp);
-            CREATE INDEX IF NOT EXISTS idx_memory_entries_user_id ON memory_entries(user_id);
-            CREATE INDEX IF NOT EXISTS idx_facts_user_id ON facts(user_id);
-            CREATE INDEX IF NOT EXISTS idx_emotions_user_id ON emotions(user_id);
-            CREATE INDEX IF NOT EXISTS idx_banned_users_discord_id ON banned_users(discord_user_id);
-            CREATE INDEX IF NOT EXISTS idx_banned_users_active ON banned_users(is_active);
-        """
+        # Add indexes for better performance - each as separate schema entries
+        schema["idx_conversations_user_id"] = "CREATE INDEX IF NOT EXISTS idx_conversations_user_id ON conversations(user_id)"
+        schema["idx_conversations_timestamp"] = "CREATE INDEX IF NOT EXISTS idx_conversations_timestamp ON conversations(timestamp)"
+        schema["idx_memory_entries_user_id"] = "CREATE INDEX IF NOT EXISTS idx_memory_entries_user_id ON memory_entries(user_id)"
+        schema["idx_facts_user_id"] = "CREATE INDEX IF NOT EXISTS idx_facts_user_id ON facts(user_id)"
+        schema["idx_emotions_user_id"] = "CREATE INDEX IF NOT EXISTS idx_emotions_user_id ON emotions(user_id)"
+        schema["idx_banned_users_discord_id"] = "CREATE INDEX IF NOT EXISTS idx_banned_users_discord_id ON banned_users(discord_user_id)"
+        schema["idx_banned_users_active"] = "CREATE INDEX IF NOT EXISTS idx_banned_users_active ON banned_users(is_active)"
 
         return schema
 
@@ -305,9 +301,13 @@ class DatabaseIntegrationManager:
         }
 
         for key, value in default_settings.items():
-            # Insert or ignore if already exists
+            # PostgreSQL compatible upsert
             await self.database_manager.query(
-                "INSERT OR IGNORE INTO system_settings (key, value) VALUES (:key, :value)",
+                """
+                INSERT INTO system_settings (key, value)
+                VALUES (:key, :value)
+                ON CONFLICT (key) DO NOTHING
+                """,
                 {"key": key, "value": value},
             )
 
@@ -369,9 +369,13 @@ async def main():
             # Get database manager for operations
             db_manager = db_integration.get_database_manager()
 
-            # Example operation: insert a user
+            # Example operation: insert a user with PostgreSQL-compatible syntax
             await db_manager.query(
-                "INSERT OR IGNORE INTO users (user_id, username) VALUES (:user_id, :username)",
+                """
+                INSERT INTO users (user_id, username) 
+                VALUES (:user_id, :username)
+                ON CONFLICT (user_id) DO NOTHING
+                """,
                 {"user_id": "test_user_123", "username": "TestUser"},
             )
 

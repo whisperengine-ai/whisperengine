@@ -597,6 +597,11 @@ class SemanticKnowledgeRouter:
         Returns:
             True if successful
         """
+        # Validate and fix null relationship_type
+        if relationship_type is None or relationship_type == "":
+            relationship_type = "mentions"  # Default fallback
+            logger.warning(f"⚠️ NULL relationship_type detected for entity '{entity_name}', using default 'mentions'")
+        
         try:
             async with self.postgres.acquire() as conn:
                 async with conn.transaction():
