@@ -177,6 +177,12 @@ services:
     restart: unless-stopped
     environment:
       # PostgreSQL connection (same as WhisperEngine bots)
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: whisperengine
+      POSTGRES_USER: whisperengine
+      POSTGRES_PASSWORD: whisperengine_password
+      # Legacy PG* variables for compatibility
       PGHOST: postgres
       PGPORT: 5432
       PGDATABASE: whisperengine
