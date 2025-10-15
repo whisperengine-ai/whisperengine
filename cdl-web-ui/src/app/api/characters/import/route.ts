@@ -1,15 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createCharacter } from '@/lib/db'
+import { createCharacter, getDatabaseConfig } from '@/lib/db'
 import * as yaml from 'js-yaml'
 import { Pool } from 'pg'
 
-const pool = new Pool({
-  host: process.env.POSTGRES_HOST || 'localhost',
-  port: parseInt(process.env.POSTGRES_PORT || '5433'),
-  database: process.env.POSTGRES_DB || 'whisperengine',
-  user: process.env.POSTGRES_USER || 'whisperengine',
-  password: process.env.POSTGRES_PASSWORD || 'whisperengine_pass',
-})
+const pool = new Pool(getDatabaseConfig())
 
 // Helper function to create character within existing transaction
 async function createCharacterWithinTransaction(client: any, characterData: any) {

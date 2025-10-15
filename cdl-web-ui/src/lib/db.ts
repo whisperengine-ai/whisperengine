@@ -4,22 +4,35 @@ import { Character, CharacterLLMConfig, CharacterDiscordConfig, CharacterDeploym
 // Re-export Character type for convenience
 export type { Character, CharacterLLMConfig, CharacterDiscordConfig, CharacterDeploymentConfig, CharacterWithConfigs } from '@/types/cdl';
 
+// Helper function to get database config from environment variables
+// Supports both POSTGRES_* and PG* prefixes for backward compatibility
+export function getDatabaseConfig() {
+  // Determine the appropriate database host based on environment
+  const isDocker = process.env.NODE_ENV === 'production' || process.env.DOCKER_ENV === 'true';
+  const defaultHost = isDocker ? 'host.docker.internal' : 'localhost';
+  
+  return {
+    host: process.env.POSTGRES_HOST || process.env.PGHOST || defaultHost,
+    port: parseInt(
+      process.env.POSTGRES_PORT || 
+      process.env.PGPORT || 
+      '5432'
+    ),
+    database: process.env.POSTGRES_DB || 
+             process.env.POSTGRES_DATABASE || 
+             process.env.PGDATABASE || 
+             'whisperengine',
+    user: process.env.POSTGRES_USER || process.env.PGUSER || 'whisperengine',
+    password: process.env.POSTGRES_PASSWORD || process.env.PGPASSWORD || 'whisperengine_password',
+    ssl: false,
+  };
+}
+
 class DatabaseAdapter {
   private pool: Pool;
 
   constructor() {
-    // Determine the appropriate database host based on environment
-    const isDocker = process.env.NODE_ENV === 'production' || process.env.DOCKER_ENV === 'true';
-    const defaultHost = isDocker ? 'host.docker.internal' : 'localhost';
-    
-    this.pool = new Pool({
-      host: process.env.POSTGRES_HOST || defaultHost,
-      port: parseInt(process.env.POSTGRES_PORT || '5432'),
-      database: process.env.POSTGRES_DB || 'whisperengine',
-      user: process.env.POSTGRES_USER || 'whisperengine',
-      password: process.env.POSTGRES_PASSWORD || 'whisperengine_password',
-      ssl: false,
-    });
+    this.pool = new Pool(getDatabaseConfig());
   }
 
   async testConnection(): Promise<boolean> {

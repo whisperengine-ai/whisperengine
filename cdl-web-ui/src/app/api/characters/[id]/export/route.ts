@@ -1,15 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getCharacterById } from '@/lib/db'
+import { getCharacterById, getDatabaseConfig } from '@/lib/db'
 import { Pool } from 'pg'
 import * as yaml from 'js-yaml'
 
-const pool = new Pool({
-  host: process.env.POSTGRES_HOST || 'localhost',
-  port: parseInt(process.env.POSTGRES_PORT || '5433'),
-  database: process.env.POSTGRES_DB || 'whisperengine',
-  user: process.env.POSTGRES_USER || 'whisperengine',
-  password: process.env.POSTGRES_PASSWORD || 'whisperengine_pass',
-})
+const pool = new Pool(getDatabaseConfig())
 
 interface PageProps {
   params: Promise<{

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { exec } from 'child_process'
 import { promisify } from 'util'
 import { Pool } from 'pg'
+import { getDatabaseConfig } from '@/lib/db'
 
 const execAsync = promisify(exec)
 
@@ -23,13 +24,7 @@ export async function POST(request: Request) {
     const collectionName = `whisperengine_memory_${sanitizedName}`
     
     // Check if character exists in database
-    const pool = new Pool({
-      host: process.env.PGHOST || 'localhost',
-      port: parseInt(process.env.PGPORT || '5432'),
-      database: process.env.PGDATABASE || 'whisperengine',
-      user: process.env.PGUSER || 'whisperengine',
-      password: process.env.PGPASSWORD || 'whisperengine_password',
-    })
+    const pool = new Pool(getDatabaseConfig())
     
     const characterQuery = 'SELECT * FROM characters WHERE id = $1'
     const characterResult = await pool.query(characterQuery, [character_id])
@@ -165,13 +160,7 @@ async function getNextAvailablePort(): Promise<number> {
   while (port <= maxPort) {
     try {
       // Check if port is in use by querying existing deployments
-      const pool = new Pool({
-        host: process.env.PGHOST || 'localhost',
-        port: parseInt(process.env.PGPORT || '5432'),
-        database: process.env.PGDATABASE || 'whisperengine',
-        user: process.env.PGUSER || 'whisperengine',
-        password: process.env.PGPASSWORD || 'whisperengine_password',
-      })
+      const pool = new Pool(getDatabaseConfig())
       
       const result = await pool.query('SELECT COUNT(*) FROM bot_deployments WHERE port = $1 AND status IN ($2, $3)', [port, 'running', 'deploying'])
       await pool.end()
@@ -203,14 +192,7 @@ function generateDockerRunCommand(config: any): string {
 // GET endpoint to list all deployments
 export async function GET() {
   try {
-    const { Pool } = require('pg')
-    const pool = new Pool({
-      host: process.env.PGHOST || 'localhost',
-      port: parseInt(process.env.PGPORT || '5432'),
-      database: process.env.PGDATABASE || 'whisperengine',
-      user: process.env.PGUSER || 'whisperengine',
-      password: process.env.PGPASSWORD || 'whisperengine_password',
-    })
+    const pool = new Pool(getDatabaseConfig())
     
     const query = `
       SELECT bd.*, c.name as character_name, c.occupation, c.description

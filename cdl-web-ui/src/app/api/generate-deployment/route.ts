@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { Pool } from 'pg'
+import { getDatabaseConfig } from '@/lib/db'
 
 export async function POST(request: Request) {
   try {
@@ -19,13 +20,7 @@ export async function POST(request: Request) {
     const collectionName = `whisperengine_memory_${sanitizedName}`
     
     // Check if character exists in database
-    const pool = new Pool({
-      host: process.env.PGHOST || 'localhost',
-      port: parseInt(process.env.PGPORT || '5432'),
-      database: process.env.PGDATABASE || 'whisperengine',
-      user: process.env.PGUSER || 'whisperengine',
-      password: process.env.PGPASSWORD || 'whisperengine_password',
-    })
+    const pool = new Pool(getDatabaseConfig())
     
     const characterQuery = 'SELECT * FROM characters WHERE id = $1'
     const characterResult = await pool.query(characterQuery, [character_id])
@@ -202,13 +197,7 @@ async function getNextAvailablePort(): Promise<number> {
   while (port <= maxPort) {
     try {
       // Check if port is in use by querying existing deployments
-      const pool = new Pool({
-        host: process.env.PGHOST || 'localhost',
-        port: parseInt(process.env.PGPORT || '5432'),
-        database: process.env.PGDATABASE || 'whisperengine',
-        user: process.env.PGUSER || 'whisperengine',
-        password: process.env.PGPASSWORD || 'whisperengine_password',
-      })
+      const pool = new Pool(getDatabaseConfig())
       
       const result = await pool.query('SELECT COUNT(*) FROM bot_deployments WHERE port = $1 AND status IN ($2, $3, $4)', [port, 'running', 'deploying', 'generated'])
       await pool.end()

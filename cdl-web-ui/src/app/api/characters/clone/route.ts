@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { Pool } from 'pg'
+import { getDatabaseConfig } from '@/lib/db'
 
 export async function POST(request: NextRequest) {
   try {
@@ -12,14 +13,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const pool = new Pool({
-      host: process.env.POSTGRES_HOST || 'host.docker.internal',
-      port: parseInt(process.env.POSTGRES_PORT || '5432'),
-      database: process.env.POSTGRES_DB || 'whisperengine',
-      user: process.env.POSTGRES_USER || 'whisperengine',
-      password: process.env.POSTGRES_PASSWORD || 'whisperengine_password',
-      ssl: false,
-    })
+    const pool = new Pool(getDatabaseConfig())
 
     const client = await pool.connect()
     

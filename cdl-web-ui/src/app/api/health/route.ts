@@ -3,15 +3,10 @@
 
 import { NextResponse } from 'next/server'
 import { Pool } from 'pg'
+import { getDatabaseConfig } from '@/lib/db'
 
-// Uses same environment variables as main WhisperEngine app (no PG* prefix)
-const pool = new Pool({
-  host: process.env.POSTGRES_HOST || 'localhost',
-  port: parseInt(process.env.POSTGRES_PORT || '5432'),
-  database: process.env.POSTGRES_DB || 'whisperengine',
-  user: process.env.POSTGRES_USER || 'whisperengine',
-  password: process.env.POSTGRES_PASSWORD || 'whisperengine_password',
-})
+// Uses environment variables with POSTGRES_* and PG* prefix support for backward compatibility
+const pool = new Pool(getDatabaseConfig())
 
 export async function GET() {
   try {
