@@ -26,6 +26,8 @@ services:
   whisperengine-assistant:
     image: whisperengine/whisperengine:latest
     container_name: whisperengine-assistant
+    entrypoint: []  # Override broken entrypoint from Dockerfile
+    command: ["python", "/app/run.py"]  # Use run.py as the main entry point
     ports:
       - "9090:9090"  # Chat API endpoint
     environment:
@@ -106,11 +108,20 @@ services:
     environment:
       - NODE_ENV=production
       - NEXT_TELEMETRY_DISABLED=1
+      # Standard PG* variables (for compatibility)
       - PGHOST=postgres
       - PGPORT=5432
       - PGDATABASE=whisperengine
       - PGUSER=whisperengine
       - PGPASSWORD=whisperengine_password
+      # POSTGRES_* variables (what the CDL Web UI actually expects)
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=whisperengine
+      - POSTGRES_USER=whisperengine
+      - POSTGRES_PASSWORD=whisperengine_password
+      # Database URL for Node.js applications (alternative to PG* vars)
+      - DATABASE_URL=postgresql://whisperengine:whisperengine_password@postgres:5432/whisperengine
       # API endpoint for bot management
       - WHISPERENGINE_API_URL=http://whisperengine-assistant:9090
     networks:
