@@ -137,8 +137,14 @@ class BotEventHandlers:
         )
         
         # Initialize Vector-Based Emoji Response Intelligence 
+        # Try to get CDL database manager from message_processor for connection pooling
+        cdl_db_manager = None
+        if hasattr(bot_core, 'message_processor') and hasattr(bot_core.message_processor, 'cdl_database_manager'):
+            cdl_db_manager = bot_core.message_processor.cdl_database_manager
+        
         self.emoji_response_intelligence = EmojiResponseIntegration(
-            memory_manager=self.memory_manager
+            memory_manager=self.memory_manager,
+            cdl_database_manager=cdl_db_manager
         )
 
         # Per-user message processing locks to prevent race conditions
@@ -493,6 +499,24 @@ class BotEventHandlers:
         else:
             await self._handle_guild_message(message)
 
+    async def _get_character_name_from_cdl(self) -> str:
+        """
+        🎯 Get actual character name from CDL database for emoji frequency lookup.
+        Returns the full character name (e.g., "Jake Sterling", "Elena Martinez").
+        """
+        try:
+            from src.prompts.cdl_ai_integration import CDLAIPromptIntegration
+            
+            cdl_integration = CDLAIPromptIntegration()
+            character = await cdl_integration.load_character()
+            
+            # Return the actual character name from database
+            return character.identity.name if character.identity.name else "Unknown"
+                
+        except Exception as e:
+            logger.warning(f"Failed to get character name from CDL database: {e}")
+            return "Unknown"
+    
     async def _get_character_type_from_cdl(self) -> str:
         """
         🎯 CHARACTER-AGNOSTIC: Determine character type from CDL data instead of hardcoded names.
@@ -571,8 +595,9 @@ class BotEventHandlers:
             
             # 🎭 EMOJI INTELLIGENCE: Use emoji response for inappropriate content
             try:
-                # 🎯 CHARACTER-AGNOSTIC: Determine bot character from CDL instead of hardcoded names
-                bot_character = await self._get_character_type_from_cdl()
+                # 🎯 Get character name for emoji frequency lookup
+                from src.memory.vector_memory_system import get_normalized_bot_name_from_env
+                bot_character = get_normalized_bot_name_from_env()  # e.g., "jake"
                 
                 # Evaluate emoji response for inappropriate content
                 emoji_decision = await self.emoji_response_intelligence.evaluate_emoji_response(
@@ -680,6 +705,10 @@ class BotEventHandlers:
                     
                     logger.info("🎯 FOOTER DEBUG: metadata exists: %s", bool(result.metadata))
                     logger.info("🎯 FOOTER DEBUG: ai_components keys: %s", list(ai_components.keys()) if ai_components else [])
+                    logger.info("🎯 FOOTER DEBUG: relationship_state present: %s", 'relationship_state' in ai_components)
+                    logger.info("🎯 FOOTER DEBUG: conversation_intelligence present: %s", 'conversation_intelligence' in ai_components)
+                    if 'conversation_intelligence' in ai_components:
+                        logger.info("🎯 FOOTER DEBUG: conversation_intelligence content: %s", ai_components['conversation_intelligence'])
                     logger.info("🎯 FOOTER DEBUG: memory_count: %d", memory_count)
                     logger.info("🎯 FOOTER DEBUG: processing_time_ms: %d", result.processing_time_ms or 0)
                     
@@ -702,8 +731,9 @@ class BotEventHandlers:
                     
                     # 🎭 BOT EMOJI REACTIONS: Add emoji reaction to user's message (multimodal feedback)
                     try:
-                        # Get character type from CDL for emoji selection
-                        bot_character = await self._get_character_type_from_cdl()
+                        # Get character name for emoji frequency lookup
+                        from src.memory.vector_memory_system import get_normalized_bot_name_from_env
+                        bot_character = get_normalized_bot_name_from_env()
                         
                         # Evaluate whether to add emoji reaction based on context
                         emoji_decision = await self.emoji_response_intelligence.evaluate_emoji_response(
@@ -858,8 +888,9 @@ class BotEventHandlers:
             
             # 🎭 EMOJI INTELLIGENCE: Use emoji response for inappropriate content
             try:
-                # 🎯 CHARACTER-AGNOSTIC: Determine bot character from CDL instead of hardcoded names
-                bot_character = await self._get_character_type_from_cdl()
+                # Get character name for emoji frequency lookup
+                from src.memory.vector_memory_system import get_normalized_bot_name_from_env
+                bot_character = get_normalized_bot_name_from_env()
                 
                 # Evaluate emoji response for inappropriate content
                 emoji_decision = await self.emoji_response_intelligence.evaluate_emoji_response(
@@ -936,9 +967,15 @@ class BotEventHandlers:
                     # Generate optional status footer for Discord (NEVER stored in memory)
                     from src.utils.discord_status_footer import generate_discord_status_footer
                     
-                    logger.info("🎯 FOOTER DEBUG (Guild): Calling generate_discord_status_footer")
+                    ai_components_debug = result.metadata.get('ai_components', {}) if result.metadata else {}
+                    logger.info("🎯 FOOTER DEBUG (Guild): ai_components keys: %s", list(ai_components_debug.keys()))
+                    logger.info("🎯 FOOTER DEBUG (Guild): relationship_state present: %s", 
+                               'relationship_state' in ai_components_debug)
+                    logger.info("🎯 FOOTER DEBUG (Guild): conversation_intelligence present: %s",
+                               'conversation_intelligence' in ai_components_debug)
+                    
                     status_footer = generate_discord_status_footer(
-                        ai_components=result.metadata.get('ai_components', {}) if result.metadata else {},
+                        ai_components=ai_components_debug,
                         processing_time_ms=result.processing_time_ms,
                         memory_count=result.metadata.get('memory_count', 0) if result.metadata else 0
                     )
@@ -956,8 +993,9 @@ class BotEventHandlers:
                     
                     # 🎭 BOT EMOJI REACTIONS: Add emoji reaction to user's mention (multimodal feedback)
                     try:
-                        # Get character type from CDL for emoji selection
-                        bot_character = await self._get_character_type_from_cdl()
+                        # Get character name for emoji frequency lookup
+                        from src.memory.vector_memory_system import get_normalized_bot_name_from_env
+                        bot_character = get_normalized_bot_name_from_env()
                         
                         # Evaluate whether to add emoji reaction based on context
                         emoji_decision = await self.emoji_response_intelligence.evaluate_emoji_response(

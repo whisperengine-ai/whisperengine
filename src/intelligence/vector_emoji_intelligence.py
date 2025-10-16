@@ -95,10 +95,12 @@ class VectorEmojiIntelligence:
     def __init__(
         self, 
         memory_manager: MemoryManagerProtocol,
-        emoji_mapper: Optional[EmojiEmotionMapper] = None
+        emoji_mapper: Optional[EmojiEmotionMapper] = None,
+        cdl_database_manager=None  # Optional CDLDatabaseManager for connection pooling
     ):
         self.memory_manager = memory_manager
         self.emoji_mapper = emoji_mapper or EmojiEmotionMapper()
+        self.cdl_database = cdl_database_manager  # Store CDL database manager
         
         # Initialize Enhanced Vector Emotion Analyzer if available
         self.enhanced_emotion_analyzer = None
@@ -144,6 +146,111 @@ class VectorEmojiIntelligence:
         logger.info("🧠 VectorEmojiIntelligence initialized with character-aware emoji sets")
         logger.info("🎯 Emoji config: enabled=%s, base_threshold=%.2f, new_user_threshold=%.2f", 
                    self.emoji_enabled, self.base_threshold, self.new_user_threshold)
+        
+        # Character emoji frequency cache
+        self._emoji_frequency_cache: Dict[str, str] = {}
+    
+    async def _get_character_emoji_frequency(self, bot_character: str) -> str:
+        """
+        Fetch character's emoji_frequency setting from database using connection pool.
+        
+        Returns one of: 'none', 'minimal', 'low', 'moderate', 'high', 'selective_symbolic'
+        Defaults to 'moderate' if not found.
+        """
+        # Check cache first
+        if bot_character in self._emoji_frequency_cache:
+            return self._emoji_frequency_cache[bot_character]
+        
+        try:
+            # Use CDL database manager's connection pool if available
+            if self.cdl_database and self.cdl_database.pool:
+                async with self.cdl_database.pool.acquire() as conn:
+                    # Query by normalized_name (e.g., "jake" → "Jake Sterling")
+                    result = await conn.fetchrow(
+                        'SELECT emoji_frequency FROM characters WHERE LOWER(normalized_name) = LOWER($1)',
+                        bot_character
+                    )
+                    
+                    if result and result['emoji_frequency']:
+                        frequency = result['emoji_frequency']
+                        self._emoji_frequency_cache[bot_character] = frequency
+                        logger.info("📊 Character '%s' emoji_frequency: %s", bot_character, frequency)
+                        return frequency
+                    else:
+                        logger.warning("⚠️ Character '%s' not found in database, using 'moderate'", bot_character)
+                        self._emoji_frequency_cache[bot_character] = 'moderate'
+                        return 'moderate'
+            else:
+                # Fallback: create temporary connection (not recommended for production)
+                logger.warning("⚠️ CDL database manager not available, using temporary connection")
+                import asyncpg
+                
+                conn = await asyncpg.connect(
+                    host=os.getenv('POSTGRES_HOST', 'localhost'),
+                    port=int(os.getenv('POSTGRES_PORT', '5432')),
+                    user=os.getenv('POSTGRES_USER', 'whisperengine'),
+                    password=os.getenv('POSTGRES_PASSWORD', 'whisperengine_dev'),
+                    database=os.getenv('POSTGRES_DB', 'whisperengine')
+                )
+                
+                # Query by normalized_name (e.g., "jake" → "Jake Sterling")
+                result = await conn.fetchrow(
+                    'SELECT emoji_frequency FROM characters WHERE LOWER(normalized_name) = LOWER($1)',
+                    bot_character
+                )
+                
+                await conn.close()
+                
+                if result and result['emoji_frequency']:
+                    frequency = result['emoji_frequency']
+                    self._emoji_frequency_cache[bot_character] = frequency
+                    logger.info("📊 Character '%s' emoji_frequency: %s", bot_character, frequency)
+                    return frequency
+                else:
+                    logger.warning("⚠️ Character '%s' not found in database, using 'moderate'", bot_character)
+                    self._emoji_frequency_cache[bot_character] = 'moderate'
+                    return 'moderate'
+                
+        except Exception as e:
+            logger.error("Error fetching character emoji frequency: %s", str(e))
+            # Fallback to moderate
+            return 'moderate'
+    
+    def _apply_emoji_frequency_modifier(
+        self,
+        emoji_frequency: str,
+        confidence_score: float,
+        base_threshold: float
+    ) -> Tuple[float, float]:
+        """
+        Apply emoji frequency setting to adjust confidence score and threshold.
+        
+        Frequency probabilities:
+        - none: 0% (never use emoji)
+        - minimal: 10%
+        - low: 30%
+        - moderate: 60%
+        - high: 90%
+        - selective_symbolic: 20% (but meaningful)
+        
+        Returns: (adjusted_threshold, probability_modifier)
+        """
+        frequency_config = {
+            'none': {'threshold': 1.0, 'probability': 0.0},  # Impossible threshold
+            'minimal': {'threshold': base_threshold + 0.4, 'probability': 0.10},
+            'low': {'threshold': base_threshold + 0.2, 'probability': 0.30},
+            'moderate': {'threshold': base_threshold, 'probability': 0.60},
+            'high': {'threshold': base_threshold - 0.15, 'probability': 0.90},
+            'selective_symbolic': {'threshold': base_threshold + 0.25, 'probability': 0.20}
+        }
+        
+        config = frequency_config.get(emoji_frequency, frequency_config['moderate'])
+        adjusted_threshold = config['threshold']
+        probability = config['probability']
+        
+        logger.info(f"🎚️ Emoji frequency '{emoji_frequency}': threshold={adjusted_threshold:.2f}, target_probability={probability:.0%}")
+        
+        return adjusted_threshold, probability
     
     def _is_celebratory_emoji(self, emoji: str) -> bool:
         """
@@ -1145,16 +1252,34 @@ class VectorEmojiIntelligence:
             # Established user - use normal threshold
             base_threshold = self.base_threshold
         
-        # Adjust threshold based on user's emoji comfort
-        if emoji_comfort > 0.8:
-            emoji_threshold = base_threshold - 0.1  # More emoji-friendly
-        elif emoji_comfort < 0.2:
-            emoji_threshold = base_threshold + 0.15  # More conservative
-        else:
-            emoji_threshold = base_threshold
+        # 🎯 Apply character-specific emoji frequency from database
+        logger.info("🔍 DEBUG: About to call _get_character_emoji_frequency for bot_character='%s'", bot_character)
+        character_emoji_frequency = await self._get_character_emoji_frequency(bot_character)
+        logger.info("🔍 DEBUG: Got emoji frequency: '%s'", character_emoji_frequency)
+        adjusted_threshold, target_probability = self._apply_emoji_frequency_modifier(
+            character_emoji_frequency,
+            confidence_score,
+            base_threshold
+        )
+        logger.info("🔍 DEBUG: Applied frequency modifier - adjusted_threshold=%.2f, target=%.0f%%", 
+                   adjusted_threshold, target_probability)
         
-        # Final decision
-        should_use_emoji = confidence_score >= emoji_threshold
+        # Use the adjusted threshold from character settings
+        emoji_threshold = adjusted_threshold
+        
+        # Adjust threshold based on user's emoji comfort (minor adjustments only)
+        if emoji_comfort > 0.8:
+            emoji_threshold = emoji_threshold - 0.05  # Slight adjustment for emoji-friendly users
+        elif emoji_comfort < 0.2:
+            emoji_threshold = emoji_threshold + 0.05  # Slight adjustment for conservative users
+        
+        # Special case: 'none' frequency means never use emoji
+        if character_emoji_frequency == 'none':
+            should_use_emoji = False
+            emoji_threshold = 1.0  # Impossible threshold
+        else:
+            # Final decision based on adjusted threshold
+            should_use_emoji = confidence_score >= emoji_threshold
         
         # Select optimal emoji with enhanced context
         emoji_choice = None
@@ -1184,7 +1309,10 @@ class VectorEmojiIntelligence:
                 "emoji_comfort_level": emoji_comfort,
                 "conversation_count": relationship_context.get("conversation_count", 0),
                 "emotional_state": emotional_state.get("current_emotion", "neutral"),
-                "threshold_used": emoji_threshold
+                "threshold_used": emoji_threshold,
+                "character_emoji_frequency": character_emoji_frequency,
+                "target_probability": target_probability,
+                "base_threshold": base_threshold
             }
         )
     
@@ -1877,8 +2005,11 @@ class EmojiResponseIntegration:
     🔧 INTEGRATION LAYER: Connects emoji intelligence with Discord bot events
     """
     
-    def __init__(self, memory_manager: MemoryManagerProtocol):
-        self.vector_emoji_intelligence = VectorEmojiIntelligence(memory_manager)
+    def __init__(self, memory_manager: MemoryManagerProtocol, cdl_database_manager=None):
+        self.vector_emoji_intelligence = VectorEmojiIntelligence(
+            memory_manager, 
+            cdl_database_manager=cdl_database_manager
+        )
         logger.info("🔧 EmojiResponseIntegration initialized")
     
     async def evaluate_emoji_response(

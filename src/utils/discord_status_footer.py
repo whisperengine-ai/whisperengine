@@ -103,17 +103,36 @@ def generate_discord_status_footer(
     try:
         logger.info("🔍 FOOTER: Starting relationship status section")
         # Try to get actual dynamic relationship scores first
-        relationship_state = ai_components.get('relationship_state', {})
-        conv_intelligence = ai_components.get('conversation_intelligence', {})
+        relationship_state = ai_components.get('relationship_state', {}) or {}
+        conv_intelligence = ai_components.get('conversation_intelligence', {}) or {}
         
         # DEBUG: Log what we found
         logger.info("🔍 RELATIONSHIP DEBUG: relationship_state exists: %s", bool(relationship_state))
+        logger.info("🔍 RELATIONSHIP DEBUG: relationship_state type: %s", type(relationship_state))
+        logger.info("🔍 RELATIONSHIP DEBUG: relationship_state content: %s", relationship_state)
         logger.info("🔍 RELATIONSHIP DEBUG: conv_intelligence exists: %s", bool(conv_intelligence))
+        logger.info("🔍 RELATIONSHIP DEBUG: conv_intelligence type: %s", type(conv_intelligence))
+        logger.info("🔍 RELATIONSHIP DEBUG: conv_intelligence content: %s", conv_intelligence)
         logger.info("🔍 RELATIONSHIP DEBUG: conv_intelligence keys: %s", list(conv_intelligence.keys()) if conv_intelligence else [])
         
         # Get relationship level for emoji and label
-        relationship_level = conv_intelligence.get('relationship_level', 'acquaintance')
+        # Try multiple sources for relationship level
+        relationship_level = (
+            conv_intelligence.get('relationship_level') or 
+            relationship_state.get('relationship_depth') or 
+            'acquaintance'
+        )
         logger.info("🔍 RELATIONSHIP DEBUG: relationship_level: %s", relationship_level)
+        
+        # Map relationship_depth terms to standard relationship_level terms
+        depth_to_level = {
+            'initial_contact': 'stranger',
+            'building_rapport': 'acquaintance',
+            'growing_connection': 'friend',
+            'strong_connection': 'close_friend',
+            'deep_bond': 'best_friend'
+        }
+        relationship_level = depth_to_level.get(relationship_level, relationship_level)
         
         # Map relationship level to emoji
         relationship_emoji = {
