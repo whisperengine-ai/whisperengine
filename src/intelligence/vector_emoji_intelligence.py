@@ -1344,43 +1344,27 @@ class VectorEmojiIntelligence:
             return "🙏"
         
         # EMOTION-SPECIFIC EMPATHY SELECTION
+        # 🚨 CRITICAL FIX: For emoji REACTIONS, NEVER mirror distress emotions
+        # Mirroring sadness/fear/anger feels tone-deaf and insensitive
+        # Use SUPPORTIVE emojis only (�, 🫂) for all distress emotions
         
-        # Sadness → Mirror with crying/pensive faces OR blue heart
+        # Sadness → ALWAYS use supportive blue heart (no mirroring)
         if primary_emotion in ['sadness', 'grief', 'melancholy']:
-            if intensity > 0.7:
-                # Deep sadness → crying face (strong empathy mirroring)
-                logger.debug("💙 Empathy: Deep sadness (%.2f) → crying face", intensity)
-                return "😢"
-            elif intensity > 0.5:
-                # Moderate sadness → pensive face
-                logger.debug("💙 Empathy: Moderate sadness (%.2f) → pensive face", intensity)
-                return "😔"
-            else:
-                # Mild sadness → blue heart (gentle support)
-                logger.debug("💙 Empathy: Mild sadness (%.2f) → blue heart", intensity)
-                return "💙"
+            # All intensities → blue heart (gentle support, not mirroring)
+            logger.debug("💙 Empathy: Sadness (%.2f) → blue heart (supportive, not mirroring)", intensity)
+            return "💙"
         
-        # Fear/Anxiety → Worried face OR comforting heart
+        # Fear/Anxiety → ALWAYS use supportive blue heart (no worried faces)
         if primary_emotion in ['fear', 'anxiety', 'nervousness', 'worry']:
-            if intensity > 0.6:
-                # High fear → worried face (empathy mirroring)
-                logger.debug("💙 Empathy: High fear (%.2f) → worried face", intensity)
-                return "😟"
-            else:
-                # Moderate fear → blue heart (reassurance)
-                logger.debug("💙 Empathy: Moderate fear (%.2f) → blue heart", intensity)
-                return "💙"
+            # All intensities → blue heart (reassurance, not mirroring)
+            logger.debug("💙 Empathy: Fear (%.2f) → blue heart (supportive, not mirroring)", intensity)
+            return "💙"
         
-        # Anger/Frustration → Disappointed face OR broken heart
+        # Anger/Frustration → ALWAYS use supportive blue heart (no angry/disappointed faces)
         if primary_emotion in ['anger', 'frustration', 'irritation', 'annoyance']:
-            if intensity > 0.7:
-                # High anger → broken heart (acknowledge pain)
-                logger.debug("💙 Empathy: High anger (%.2f) → broken heart", intensity)
-                return "💔"
-            else:
-                # Moderate anger → disappointed face
-                logger.debug("💙 Empathy: Moderate anger (%.2f) → disappointed face", intensity)
-                return "😞"
+            # All intensities → blue heart (understanding, not mirroring)
+            logger.debug("💙 Empathy: Anger (%.2f) → blue heart (supportive, not mirroring)", intensity)
+            return "�"
         
         # Disappointment → Disappointed face OR pleading face
         if primary_emotion in ['disappointment', 'regret', 'shame']:
@@ -1520,14 +1504,22 @@ class VectorEmojiIntelligence:
         
         # 🎭 PRIORITY 0: EMOTION MIRRORING (highest priority when conditions are met)
         # Mirror user's emotion if detected with high confidence AND high intensity
+        # ⚠️ CRITICAL FIX: Do NOT mirror distress emotions (sadness, fear, anger) - use support instead
         if emotional_confidence > 0.7 and emotional_intensity > 0.6:
-            mirroring_emoji = self._get_emotion_mirroring_emoji(current_emotion, emotional_intensity)
-            if mirroring_emoji:
+            # Skip mirroring for distress emotions - it's tone-deaf to add 😢 to a sad message
+            if current_emotion not in ["sadness", "fear", "anger"]:
+                mirroring_emoji = self._get_emotion_mirroring_emoji(current_emotion, emotional_intensity)
+                if mirroring_emoji:
+                    logger.info(
+                        "🎭 Emotion mirroring activated: emotion=%s, intensity=%.2f, confidence=%.2f, emoji=%s",
+                        current_emotion, emotional_intensity, emotional_confidence, mirroring_emoji
+                    )
+                    return mirroring_emoji, EmojiResponseContext.EMOTIONAL_OVERWHELM
+            else:
                 logger.info(
-                    "🎭 Emotion mirroring activated: emotion=%s, intensity=%.2f, confidence=%.2f, emoji=%s",
-                    current_emotion, emotional_intensity, emotional_confidence, mirroring_emoji
+                    "🎭 Emotion mirroring SKIPPED for distress emotion: emotion=%s (would be inappropriate for reaction)",
+                    current_emotion
                 )
-                return mirroring_emoji, EmojiResponseContext.EMOTIONAL_OVERWHELM
         
         if current_emotion in ["sadness", "fear", "anger"] and emotional_intensity > 0.6:
             user_in_distress = True

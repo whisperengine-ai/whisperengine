@@ -45,6 +45,9 @@ from src.relationships.trust_recovery import create_trust_recovery_system
 # Emoji Intelligence component
 from src.intelligence.database_emoji_selector import create_database_emoji_selector
 
+# Emotional Adaptation component
+from src.intelligence.emotional_context_engine import EmotionalContextEngine, EmotionalContext, EmotionalState
+
 logger = logging.getLogger(__name__)
 
 
@@ -307,6 +310,14 @@ class MessageProcessor:
         
         # Get character name for emoji selection
         self.character_name = get_normalized_bot_name_from_env()
+        
+        # Initialize Emotional Context Engine for tactical personality adaptation
+        try:
+            self.emotional_context_engine = EmotionalContextEngine()
+            logger.info("🎭 Emotional Context Engine initialized - tactical Big Five adaptation enabled")
+        except Exception as e:
+            logger.warning("Emotional context engine initialization failed: %s", e)
+            self.emotional_context_engine = None
         
         # Track processing state for debugging
         self._last_security_validation = None
@@ -3128,6 +3139,69 @@ class MessageProcessor:
                 else:
                     # Use advanced analysis as primary emotion data
                     ai_components['emotion_data'] = advanced_emotion
+            
+            # 🎭 NEW: Tactical Big Five Emotional Adaptation
+            # Create emotional adaptation strategy based on user's emotional state
+            if self.emotional_context_engine and ai_components.get('emotion_analysis'):
+                try:
+                    emotion_analysis = ai_components['emotion_analysis']
+                    relationship_state = ai_components.get('relationship_state', {})
+                    
+                    # Map primary emotion to EmotionalState enum
+                    primary_emotion_str = emotion_analysis.get('primary_emotion', 'neutral').upper()
+                    try:
+                        primary_emotion = EmotionalState[primary_emotion_str]
+                    except KeyError:
+                        primary_emotion = EmotionalState.NEUTRAL
+                    
+                    # Create EmotionalContext from emotion analysis with all required fields
+                    emotional_context = EmotionalContext(
+                        user_id=message_context.user_id,
+                        context_id=f"{message_context.user_id}_{datetime.now().isoformat()}",
+                        timestamp=datetime.now(),
+                        # Current emotional state
+                        primary_emotion=primary_emotion,
+                        emotion_confidence=emotion_analysis.get('confidence', 0.5),
+                        emotion_intensity=emotion_analysis.get('confidence', 0.5),
+                        # Emotional analysis data
+                        all_emotions=emotion_analysis.get('all_emotions', {}),
+                        sentiment_score=emotion_analysis.get('sentiment_score', 0.0),
+                        emotional_triggers=[],
+                        # Personality context
+                        personality_alignment=0.8,  # Default - could be enhanced later
+                        relationship_depth=relationship_state.get('normalized_trust', 0.5),
+                        trust_level=relationship_state.get('normalized_trust', 0.5),
+                        # Contextual factors
+                        conversation_length=len(conversation_context) if conversation_context else 0,
+                        response_time_context=None,
+                        topic_emotional_weight=emotion_analysis.get('confidence', 0.5),
+                        # Adaptation recommendations
+                        response_tone_adjustment='neutral',
+                        empathy_level_needed=min(1.0, emotion_analysis.get('confidence', 0.5) + 0.2),
+                        support_opportunity=primary_emotion in [EmotionalState.SADNESS, EmotionalState.FEAR],
+                        celebration_opportunity=primary_emotion == EmotionalState.JOY
+                    )
+                    
+                    # Create adaptation strategy with Big Five tactical shifts
+                    adaptation_strategy = await self.emotional_context_engine.create_adaptation_strategy(
+                        emotional_context=emotional_context
+                    )
+                    
+                    if adaptation_strategy and adaptation_strategy.big_five_tactical_shifts:
+                        # Add to ai_components for CDL prompt integration
+                        ai_components['emotional_adaptation'] = {
+                            'big_five_tactical_shifts': adaptation_strategy.big_five_tactical_shifts,
+                            'strategy_id': adaptation_strategy.strategy_id,
+                            'tone_adjustments': adaptation_strategy.tone_adjustments,
+                            'empathy_emphasis': adaptation_strategy.empathy_emphasis
+                        }
+                        logger.info(f"🎭 Tactical Big Five adaptation enabled: {adaptation_strategy.big_five_tactical_shifts}")
+                    
+                except Exception as e:
+                    logger.warning(f"🎭 Emotional adaptation processing failed: {e}")
+                    import traceback
+                    logger.debug(f"🎭 Traceback: {traceback.format_exc()}")
+                    ai_components['emotional_adaptation'] = None
                 logger.info("🎭 Enhanced emotion analysis with advanced multi-modal intelligence")
             
             # Memory Aging Intelligence integration

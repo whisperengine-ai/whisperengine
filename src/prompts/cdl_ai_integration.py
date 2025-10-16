@@ -781,9 +781,18 @@ class CDLAIPromptIntegration:
             
             # 🎯 SPRINT 4: Extract CharacterEvolution optimization data from pipeline
             character_optimization = None
+            big_five_tactical_shifts = {}  # NEW: Tactical emotional adaptation
             try:
                 if pipeline_dict and 'ai_components' in pipeline_dict:
                     ai_components = pipeline_dict['ai_components']
+                    
+                    # NEW: Check for Big Five tactical shifts from emotional adaptation
+                    if isinstance(ai_components, dict) and 'emotional_adaptation' in ai_components:
+                        emotional_adaptation = ai_components['emotional_adaptation']
+                        if isinstance(emotional_adaptation, dict) and 'big_five_tactical_shifts' in emotional_adaptation:
+                            big_five_tactical_shifts = emotional_adaptation['big_five_tactical_shifts']
+                            logger.info(f"🎭 CHARACTER: Found tactical Big Five shifts: {big_five_tactical_shifts}")
+                    
                     # Check for character_optimization (actual field name used in message processor)
                     if isinstance(ai_components, dict) and 'character_optimization' in ai_components:
                         character_optimization = ai_components['character_optimization']
@@ -799,7 +808,7 @@ class CDLAIPromptIntegration:
             except Exception as e:
                 logger.info(f"🎭 CHARACTER: Could not extract optimization data: {e}")
             
-            # Helper function to get adaptive trait description with Sprint 4 optimization
+            # Helper function to get adaptive trait description with Sprint 4 optimization AND tactical shifts
             def get_adaptive_trait_info(trait_obj, trait_name):
                 # Get base CDL trait value
                 base_score = None
@@ -829,7 +838,19 @@ class CDLAIPromptIntegration:
                     level = 'High' if base_score > 0.7 else 'Moderate' if base_score > 0.4 else 'Low'
                     base_description = f"{trait_label}: {level}"
                 
-                # 🎯 SPRINT 4: Apply optimization adjustments if available
+                # 🎯 NEW: Apply tactical emotional adaptation shifts FIRST (short-term, conversation-level)
+                if big_five_tactical_shifts and trait_name in big_five_tactical_shifts and base_score is not None:
+                    tactical_shift = big_five_tactical_shifts[trait_name]
+                    tactically_adjusted_score = base_score + tactical_shift
+                    # Clamp to valid range
+                    tactically_adjusted_score = max(0.0, min(1.0, tactically_adjusted_score))
+                    
+                    # Apply tactical shift with emoji indicator
+                    direction = "⚡↗" if tactical_shift > 0 else "⚡↘" if tactical_shift < 0 else "⚡→"
+                    base_description = f"{trait_label}: {level}"
+                    return f"{base_description} ({base_score:.1f} {direction} {tactically_adjusted_score:.2f}) - Emotionally adapted for current conversation"
+                
+                # 🎯 SPRINT 4: Apply optimization adjustments if available (long-term, performance-based)
                 if character_optimization and isinstance(character_optimization, dict):
                     # Check for direct personality_optimizations field
                     optimizations = character_optimization.get('personality_optimizations', {})

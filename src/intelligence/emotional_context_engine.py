@@ -206,6 +206,9 @@ class EmotionalAdaptationStrategy:
     # Personality-based adaptations
     personality_based_adjustments: dict[PersonalityDimension, float]
     communication_style_override: str | None
+    
+    # Big Five tactical shifts (NEW: tactical personality adaptation)
+    big_five_tactical_shifts: dict[str, float]  # {"extraversion": -0.1, "agreeableness": +0.15, ...}
 
     # Response strategies
     acknowledge_emotion: bool
@@ -407,6 +410,9 @@ class EmotionalContextEngine:
 
         # Get personality-based adaptations
         personality_adaptations = self._get_personality_based_adaptations(emotional_context)
+        
+        # Get Big Five tactical shifts (NEW: tactical personality adaptation)
+        big_five_shifts = self._get_big_five_tactical_shifts(emotional_context)
 
         # Determine tone adjustments
         tone_adjustments = self._calculate_tone_adjustments(emotional_context, historical_patterns)
@@ -428,6 +434,7 @@ class EmotionalContextEngine:
             empathy_emphasis=emotional_context.empathy_level_needed,
             personality_based_adjustments=personality_adaptations,
             communication_style_override=self._get_communication_style_override(emotional_context),
+            big_five_tactical_shifts=big_five_shifts,
             acknowledge_emotion=response_strategies["acknowledge_emotion"],
             offer_support=response_strategies["offer_support"],
             provide_validation=response_strategies["provide_validation"],
@@ -862,6 +869,77 @@ class EmotionalContextEngine:
             adaptations[PersonalityDimension.HUMOR_STYLE] = 0.6  # Some humor
 
         return adaptations
+    
+    def _get_big_five_tactical_shifts(
+        self, context: EmotionalContext
+    ) -> dict[str, float]:
+        """
+        Generate Big Five tactical shifts based on emotional context.
+        
+        These are SHORT-TERM personality adjustments that help the character
+        mirror/adapt to the user's emotional state within the conversation.
+        
+        Returns:
+            Dictionary with Big Five trait adjustments (e.g., {"extraversion": -0.10, "agreeableness": +0.15})
+            Adjustments are constrained to ±0.15 (±15%) to maintain personality consistency
+        """
+        shifts = {}
+        
+        # SADNESS: Become more subdued, empathetic, supportive
+        if context.primary_emotion == EmotionalState.SADNESS:
+            if context.emotion_intensity > 0.7:
+                # High intensity sadness - significant emotional support needed
+                shifts["extraversion"] = -0.12  # More reserved, less energetic
+                shifts["agreeableness"] = +0.15  # Maximum empathy and support
+                shifts["neuroticism"] = +0.08   # Show emotional attunement (slight vulnerability)
+            elif context.emotion_intensity > 0.4:
+                # Moderate sadness - gentle support
+                shifts["extraversion"] = -0.08
+                shifts["agreeableness"] = +0.10
+                shifts["neuroticism"] = +0.05
+        
+        # JOY: Match user's positive energy
+        elif context.primary_emotion == EmotionalState.JOY:
+            if context.emotion_intensity > 0.7:
+                # High joy - amplify enthusiasm
+                shifts["extraversion"] = +0.12   # More outgoing, energetic
+                shifts["openness"] = +0.08       # More creative, playful
+            elif context.emotion_intensity > 0.4:
+                shifts["extraversion"] = +0.08
+                shifts["openness"] = +0.05
+        
+        # ANGER: Become calmer, more stable, less reactive
+        elif context.primary_emotion == EmotionalState.ANGER:
+            shifts["neuroticism"] = -0.15        # Maximum stability/calmness
+            shifts["agreeableness"] = +0.10      # More understanding
+            shifts["extraversion"] = -0.05       # Slightly more reserved
+        
+        # FEAR/ANXIETY: Provide calm, reassuring presence
+        elif context.primary_emotion == EmotionalState.FEAR:
+            shifts["neuroticism"] = -0.12        # Very stable, calm
+            shifts["conscientiousness"] = +0.08  # More organized, reliable
+            shifts["agreeableness"] = +0.08      # Supportive
+        
+        # SURPRISE: Adapt based on valence
+        elif context.primary_emotion == EmotionalState.SURPRISE:
+            if context.emotion_intensity > 0.5:
+                shifts["openness"] = +0.10       # More curious, exploratory
+                shifts["extraversion"] = +0.05   # Slightly more engaged
+        
+        # Relationship depth modifier: deeper relationships = larger adaptive shifts
+        relationship_multiplier = min(1.0, context.relationship_depth + 0.3)
+        for trait in shifts:
+            shifts[trait] = shifts[trait] * relationship_multiplier
+        
+        # Empathy level modifier: high empathy needs = stronger agreeableness boost
+        if context.empathy_level_needed > 0.7 and "agreeableness" in shifts:
+            shifts["agreeableness"] = min(0.15, shifts["agreeableness"] + 0.05)
+        
+        # Ensure all shifts are within ±0.15 constraint (15% boundary)
+        for trait in shifts:
+            shifts[trait] = max(-0.15, min(0.15, shifts[trait]))
+        
+        return shifts
 
     def _calculate_tone_adjustments(
         self, context: EmotionalContext, historical_patterns: dict
