@@ -320,6 +320,16 @@ class BotEventHandlers:
         @self.bot.event
         async def on_reaction_remove(reaction, user):
             return await event_handler_instance.on_reaction_remove(reaction, user)
+        
+        @self.bot.event
+        async def on_raw_reaction_add(payload):
+            # Handle reactions on messages not in cache (older messages)
+            return await event_handler_instance.on_raw_reaction_add(payload)
+        
+        @self.bot.event
+        async def on_raw_reaction_remove(payload):
+            # Handle reaction removal on messages not in cache
+            return await event_handler_instance.on_raw_reaction_remove(payload)
 
     async def on_ready(self):
         """
@@ -1643,6 +1653,160 @@ class BotEventHandlers:
                 
         except Exception as e:
             logger.error(f"Error processing emoji reaction remove: {e}")
+    
+    async def on_raw_reaction_add(self, payload: discord.RawReactionActionEvent):
+        """
+        Handle emoji reactions on messages not in cache (older messages).
+        
+        This event fires for ALL reactions, regardless of message cache status.
+        Critical for capturing reactions on older bot messages.
+        
+        Args:
+            payload: RawReactionActionEvent containing reaction data
+        """
+        try:
+            logger.debug(f"🎭 RAW REACTION ADD: Received event - emoji: {payload.emoji}, user: {payload.user_id}, message: {payload.message_id}")
+            
+            # Get user who added reaction first (needed for DM handling and bot check)
+            user = self.bot.get_user(payload.user_id)
+            if not user:
+                try:
+                    user = await self.bot.fetch_user(payload.user_id)
+                except Exception as e:
+                    logger.debug(f"🎭 RAW REACTION ADD: Could not fetch user {payload.user_id}: {e}")
+                    return
+            
+            # Skip if bot added the reaction
+            if user.bot:
+                logger.debug(f"🎭 RAW REACTION ADD: Skipping - user is bot")
+                return
+            
+            # Handle DM vs Guild channels differently
+            channel = None
+            
+            if payload.guild_id is None:  # DM channel
+                logger.debug(f"🎭 RAW REACTION ADD: Processing DM reaction")
+                
+                # Get or create DM channel
+                channel = user.dm_channel
+                if not channel:
+                    try:
+                        channel = await user.create_dm()
+                    except Exception as e:
+                        logger.debug(f"🎭 RAW REACTION ADD: Could not create DM with user {payload.user_id}: {e}")
+                        return
+                logger.debug(f"🎭 RAW REACTION ADD: Using DM channel: {channel}")
+            else:
+                # Guild channel
+                channel = self.bot.get_channel(payload.channel_id)
+                if not channel:
+                    # Try to fetch the channel from guild
+                    try:
+                        guild = self.bot.get_guild(payload.guild_id)
+                        if guild:
+                            channel = guild.get_channel(payload.channel_id)
+                            logger.debug(f"🎭 RAW REACTION ADD: Found guild channel: {channel} in {guild.name}")
+                    except Exception as e:
+                        logger.debug(f"🎭 RAW REACTION ADD: Error getting guild channel: {e}")
+                
+            if not channel:
+                logger.debug(f"🎭 RAW REACTION ADD: Channel {payload.channel_id} not found (guild_id: {payload.guild_id})")
+                return
+            
+            # Different logging for DM vs guild channels
+            if hasattr(channel, 'name'):
+                logger.debug(f"🎭 RAW REACTION ADD: Fetching message {payload.message_id} from channel {channel.name}")
+            else:
+                logger.debug(f"🎭 RAW REACTION ADD: Fetching message {payload.message_id} from DM channel")
+            
+            try:
+                message = await channel.fetch_message(payload.message_id)
+            except discord.NotFound:
+                logger.debug(f"🎭 RAW REACTION ADD: Message {payload.message_id} not found")
+                return
+            except discord.Forbidden:
+                logger.debug(f"🎭 RAW REACTION ADD: No permission to fetch message {payload.message_id}")
+                return
+            except Exception as e:
+                logger.error(f"🎭 RAW REACTION ADD: Error fetching message: {e}")
+                return
+            
+            logger.debug(f"🎭 RAW REACTION ADD: Message author ID: {message.author.id}, Bot ID: {self.bot.user.id}")
+            
+            # Check if message is from bot
+            if message.author.id != self.bot.user.id:
+                logger.debug(f"🎭 RAW REACTION ADD: Message not from bot (author: {message.author.id})")
+                return
+            
+            # User already validated above - now process the reaction
+            
+            logger.debug(f"🎭 RAW REACTION ADD: Processing emoji reaction - user: {user.display_name}, emoji: {payload.emoji}")
+            
+            # Process through emoji intelligence system
+            from src.intelligence.emoji_reaction_intelligence import EmojiReactionData, EmojiEmotionMapper
+            from datetime import datetime
+            
+            emoji_str = str(payload.emoji)
+            user_id = str(user.id)
+            message_id = str(message.id)
+            
+            logger.debug(f"🎭 RAW REACTION ADD: Mapping emoji {emoji_str} to emotion")
+            
+            # Map emoji to emotional reaction
+            reaction_type, confidence = EmojiEmotionMapper.map_emoji_to_emotion(emoji_str)
+            
+            logger.debug(f"🎭 RAW REACTION ADD: Emoji mapped to {reaction_type.value} (confidence: {confidence})")
+            
+            # Create reaction data
+            reaction_data = EmojiReactionData(
+                emoji=emoji_str,
+                user_id=user_id,
+                message_id=message_id,
+                bot_message_content=message.content,
+                reaction_type=reaction_type,
+                confidence_score=confidence,
+                timestamp=datetime.utcnow(),
+                character_context=self.emoji_reaction_intelligence._determine_character_context(message.content),
+                conversation_context=self.emoji_reaction_intelligence._extract_conversation_context(message.content)
+            )
+            
+            logger.info(f"🎭 RAW emoji reaction captured: {emoji_str} → {reaction_type.value} (confidence: {confidence:.2f}) from user {user_id}")
+            
+            # Store in memory system
+            logger.debug(f"🎭 RAW REACTION ADD: Storing reaction in memory")
+            await self.emoji_reaction_intelligence._store_reaction_in_memory(reaction_data)
+            
+            # Update reaction history
+            if user_id not in self.emoji_reaction_intelligence.reaction_history:
+                self.emoji_reaction_intelligence.reaction_history[user_id] = []
+            self.emoji_reaction_intelligence.reaction_history[user_id].append(reaction_data)
+            
+            # Keep only recent reactions (last 50 per user)
+            if len(self.emoji_reaction_intelligence.reaction_history[user_id]) > 50:
+                self.emoji_reaction_intelligence.reaction_history[user_id] = self.emoji_reaction_intelligence.reaction_history[user_id][-50:]
+            
+        except Exception as e:
+            logger.error(f"Error processing raw emoji reaction add: {e}", exc_info=True)
+    
+    async def on_raw_reaction_remove(self, payload: discord.RawReactionActionEvent):
+        """
+        Handle emoji reaction removal on messages not in cache.
+        
+        Args:
+            payload: RawReactionActionEvent containing reaction removal data
+        """
+        try:
+            # Only log for tracking purposes
+            if payload.user_id != self.bot.user.id:
+                emoji_str = str(payload.emoji)
+                user_id = str(payload.user_id)
+                logger.debug(f"🎭 RAW emoji reaction removed: {emoji_str} by user {user_id}")
+                
+                # Note: We don't remove from memory since the initial reaction still provides
+                # valuable emotional feedback data
+                
+        except Exception as e:
+            logger.error(f"Error processing raw emoji reaction remove: {e}")
 
     def get_user_emotional_context(self, user_id: str) -> dict:
         """
