@@ -2299,7 +2299,7 @@ class VectorMemoryStore:
                                                       user_id: str,
                                                       memory_types: Optional[List[str]] = None,
                                                       top_k: int = 10,
-                                                      min_score: float = 0.3,  # 🔧 TUNING: Lowered from 0.7 to 0.3 for better recall
+                                                      min_score: float = 0.1,  # 🔧 TUNING: Lowered from 0.3 to 0.1 - short queries like "aethys" have low scores (~0.12)
                                                       emotional_context: Optional[str] = None,
                                                       prefer_recent: bool = True) -> List[Dict[str, Any]]:
         """
@@ -3492,7 +3492,7 @@ class VectorMemoryStore:
             user_id=user_id,
             memory_types=vector_memory_types,  # Already strings, no conversion needed
             top_k=limit,  # Convert limit to top_k for internal method
-            min_score=0.3,  # 🔧 TUNING: Lowered from 0.7 to 0.3 for better recall
+            min_score=0.1,  # 🔧 TUNING: Lowered from 0.3 to 0.1 - short queries like "aethys" have low scores (~0.12)
             prefer_recent=True
         )
 

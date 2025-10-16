@@ -254,10 +254,10 @@ class QdrantQueryOptimizer:
         import os
         
         # Start with required conditions
+        # 🎯 COLLECTION-PER-BOT ARCHITECTURE: bot_name filter REMOVED
+        # Each bot has its own dedicated Qdrant collection, so no bot_name filtering needed
         must_conditions = [
-            models.FieldCondition(key="user_id", match=models.MatchValue(value=user_id)),
-            # 🎯 NORMALIZED Bot-specific filtering for multi-bot architecture
-            models.FieldCondition(key="bot_name", match=models.MatchValue(value=get_normalized_bot_name_from_env()))
+            models.FieldCondition(key="user_id", match=models.MatchValue(value=user_id))
         ]
         
         # Content exclusion conditions (most important for our debugging contamination fix)
