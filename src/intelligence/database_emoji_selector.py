@@ -340,11 +340,11 @@ class DatabaseEmojiSelector:
                 source = 'database'
                 reasoning = f"bot emotion='{bot_emotion}', patterns={len(emoji_patterns)}, intensity={bot_emotion_data.get('intensity', 0.5):.2f}"
             else:
-                # Fallback to taxonomy
+                # Fallback to taxonomy with proper confidence
                 selected_emojis = self._fallback_to_taxonomy(
                     emotion=bot_emotion,
                     character_name=character_name,
-                    intensity=bot_emotion_data.get('intensity', 0.5)
+                    bot_emotion_data=bot_emotion_data
                 )
                 source = 'taxonomy'
                 reasoning = f"bot emotion='{bot_emotion}' (taxonomy fallback)"
@@ -645,17 +645,56 @@ class DatabaseEmojiSelector:
         self,
         emotion: str,
         character_name: str,
-        intensity: float
+        bot_emotion_data: Dict
     ) -> List[str]:
-        """Fallback to UniversalEmotionTaxonomy when no database patterns found."""
+        """
+        🎯 CONFIDENCE FIX: Fallback to UniversalEmotionTaxonomy with proper confidence.
+        
+        BEFORE: Passed intensity as confidence (mislabeled)
+        AFTER: Uses actual roberta_confidence + variance adjustment
+        
+        Args:
+            emotion: Emotion label to look up in taxonomy
+            character_name: Character name for emoji selection
+            bot_emotion_data: Complete emotion analysis with confidence + variance
+        
+        Returns:
+            List of emoji strings (0-1 emojis)
+        """
         # Standardize emotion label
         standardized_emotion = self.taxonomy.standardize_emotion_label(emotion)
         
-        # Get emoji from taxonomy
+        # Extract actual confidence (not intensity!)
+        confidence = bot_emotion_data.get('roberta_confidence', 0.5)
+        variance = bot_emotion_data.get('emotional_variance', 0.5)
+        
+        # Adjust confidence based on emotional variance
+        # Low variance (stable emotion) → boost confidence
+        # High variance (unstable emotion) → reduce confidence
+        adjusted_confidence = confidence
+        if variance < 0.3:  # Stable emotion
+            adjusted_confidence = min(confidence * 1.1, 1.0)
+            logger.debug(
+                "📊 Taxonomy: Stable emotion (variance=%.2f) → confidence boosted %.2f → %.2f",
+                variance, confidence, adjusted_confidence
+            )
+        elif variance > 0.7:  # Unstable emotion
+            adjusted_confidence = confidence * 0.9
+            logger.debug(
+                "📊 Taxonomy: Unstable emotion (variance=%.2f) → confidence reduced %.2f → %.2f",
+                variance, confidence, adjusted_confidence
+            )
+        else:
+            logger.debug(
+                "📊 Taxonomy: Normal variance (%.2f) → confidence unchanged %.2f",
+                variance, confidence
+            )
+        
+        # Get emoji from taxonomy with properly adjusted confidence
         emoji = self.taxonomy.roberta_to_emoji_choice(
             roberta_emotion=standardized_emotion,
             character=character_name,
-            confidence=intensity
+            confidence=adjusted_confidence  # ✅ Now using actual confidence!
         )
         
         if emoji:
