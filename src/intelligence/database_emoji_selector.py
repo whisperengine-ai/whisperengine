@@ -80,6 +80,114 @@ class DatabaseEmojiSelector:
         self.db_pool = db_pool
         self.taxonomy = UniversalEmotionTaxonomy()
     
+    def _should_mirror_user_emotion(
+        self, 
+        user_emotion_data: Dict, 
+        bot_emotion_data: Dict
+    ) -> bool:
+        """
+        Determine if we should mirror the user's emotion.
+        
+        Criteria:
+        - User emotion confidence > 0.7 (high confidence detection)
+        - User emotion intensity > 0.6 (strong emotional state)
+        - Bot emotion similar or empathetic to user emotion
+        
+        Returns True if emotion mirroring is appropriate.
+        """
+        user_emotion = user_emotion_data.get('primary_emotion')
+        user_confidence = user_emotion_data.get('confidence', 0.0)
+        user_intensity = user_emotion_data.get('intensity', 0.0)
+        bot_emotion = bot_emotion_data.get('primary_emotion')
+        
+        # Require high confidence and intensity
+        if user_confidence <= 0.7 or user_intensity <= 0.6:
+            return False
+        
+        # Mirror if emotions align or bot is responding empathetically
+        empathetic_pairs = {
+            ('sadness', 'concern'),
+            ('sadness', 'sadness'),  # Bot shares user's sadness
+            ('fear', 'concern'),
+            ('fear', 'fear'),        # Bot acknowledges user's fear
+            ('anger', 'concern'),
+            ('anger', 'anger'),      # Bot validates user's anger
+            ('joy', 'joy'),          # Bot shares user's joy
+            ('excitement', 'joy'),
+            ('excitement', 'excitement'),
+        }
+        
+        return (user_emotion, bot_emotion) in empathetic_pairs or user_emotion == bot_emotion
+    
+    def _get_emotion_mirroring_emoji(self, emotion: str, intensity: float) -> Optional[str]:
+        """
+        🎭 EMOTION MIRRORING: Select emoji that mirrors user's detected emotion.
+        
+        Returns emoji that reflects the user's emotional state back to them,
+        providing empathetic acknowledgment and emotional validation.
+        
+        Args:
+            emotion: Primary emotion detected (sadness, joy, fear, anger, etc.)
+            intensity: Emotion intensity (0.0-1.0)
+            
+        Returns:
+            Mirroring emoji if appropriate, None otherwise
+        """
+        # Emotion → Mirroring Emoji Map (intensity-aware)
+        EMOTION_MIRROR_MAP = {
+            'sadness': {
+                'high': '😢',      # Crying face for intense sadness
+                'medium': '😔',    # Pensive face for moderate sadness
+                'low': '🙁'        # Slightly frowning for mild sadness
+            },
+            'joy': {
+                'high': '😄',      # Beaming smile for intense joy
+                'medium': '😊',    # Smiling face for moderate joy
+                'low': '🙂'        # Slightly smiling for mild joy
+            },
+            'fear': {
+                'high': '😰',      # Anxious face for intense fear
+                'medium': '😟',    # Worried face for moderate fear
+                'low': '😕'        # Confused face for mild fear
+            },
+            'anger': {
+                'high': '😤',      # Face with steam for intense anger
+                'medium': '😠',    # Angry face for moderate anger
+                'low': '😒'        # Unamused face for mild anger
+            },
+            'surprise': {
+                'high': '😲',      # Astonished face for intense surprise
+                'medium': '😮',    # Open mouth for moderate surprise
+                'low': '😯'        # Hushed face for mild surprise
+            },
+            'disgust': {
+                'high': '🤢',      # Nauseated face for intense disgust
+                'medium': '😖',    # Confounded face for moderate disgust
+                'low': '😑'        # Expressionless for mild disgust
+            },
+            'excitement': {
+                'high': '🤩',      # Star-struck for intense excitement
+                'medium': '😃',    # Grinning face for moderate excitement
+                'low': '🙂'        # Slightly smiling for mild excitement
+            },
+            'neutral': None,    # Don't mirror neutral emotions
+        }
+        
+        # Map intensity to category
+        if intensity > 0.8:
+            intensity_level = 'high'
+        elif intensity > 0.6:
+            intensity_level = 'medium'
+        else:
+            intensity_level = 'low'
+        
+        # Get mirroring emoji for this emotion
+        emotion_map = EMOTION_MIRROR_MAP.get(emotion)
+        if emotion_map and isinstance(emotion_map, dict):
+            return emotion_map.get(intensity_level)
+        
+        return None
+    
     async def select_emojis(
         self,
         character_name: str,
@@ -189,6 +297,28 @@ class DatabaseEmojiSelector:
                     upbeat_topics = ['spanish_expressions', 'science_discovery', 'celebration']
                     detected_topics = [t for t in (detected_topics or []) if t not in upbeat_topics]
             
+            # 🎭 EMOTION MIRRORING: If bot emotion matches user emotion with high confidence, mirror it
+            # This provides empathetic validation and emotional resonance
+            if user_emotion_data and self._should_mirror_user_emotion(user_emotion_data, bot_emotion_data):
+                user_emotion = user_emotion_data.get('primary_emotion')
+                user_intensity = user_emotion_data.get('intensity', 0.5)
+                user_confidence = user_emotion_data.get('confidence', 0.0)
+                
+                mirroring_emoji = self._get_emotion_mirroring_emoji(user_emotion, user_intensity)
+                if mirroring_emoji:
+                    logger.info(
+                        "🎭 LLM Response Emotion Mirroring: user_emotion=%s, intensity=%.2f, confidence=%.2f, emoji=%s",
+                        user_emotion, user_intensity, user_confidence, mirroring_emoji
+                    )
+                    # Return mirroring emoji directly - highest priority
+                    return EmojiSelection(
+                        emojis=[mirroring_emoji],
+                        placement=character_config['emoji_placement'],
+                        should_use=True,
+                        reasoning=f"emotion_mirroring: user={user_emotion}, intensity={user_intensity:.2f}, confidence={user_confidence:.2f}",
+                        source='emotion_mirroring'
+                    )
+            
             # Step 5: Query database for relevant emoji patterns
             emoji_patterns = await self._query_emoji_patterns(
                 character_name=character_name,
@@ -198,12 +328,14 @@ class DatabaseEmojiSelector:
                 response_type=response_type
             )
             
-            # Step 6: Select emojis from patterns
+            # Step 6: Select emojis from patterns with multi-factor intelligence
             if emoji_patterns:
                 selected_emojis = self._select_from_patterns(
                     emoji_patterns,
                     intensity=bot_emotion_data.get('intensity', 0.5),
-                    combination_style=character_config['emoji_combination']
+                    combination_style=character_config['emoji_combination'],
+                    bot_emotion_data=bot_emotion_data,
+                    user_emotion_data=user_emotion_data
                 )
                 source = 'database'
                 reasoning = f"bot emotion='{bot_emotion}', patterns={len(emoji_patterns)}, intensity={bot_emotion_data.get('intensity', 0.5):.2f}"
@@ -348,13 +480,108 @@ class DatabaseEmojiSelector:
             logger.error(f"Error querying emoji patterns: {e}")
             return []
     
+    def _calculate_emotionally_intelligent_emoji_count(
+        self,
+        intensity: float,
+        combination_style: str,
+        bot_emotion_data: Dict,
+        user_emotion_data: Optional[Dict] = None
+    ) -> int:
+        """
+        🎯 EMOTIONAL INTELLIGENCE: Multi-factor emoji count selection.
+        
+        Considers:
+        - Emotional intensity (how strong the emotion)
+        - RoBERTa confidence (how certain we are)
+        - Emotional variance (emotion stability)
+        - User preferences (would be integrated when available)
+        - Character personality (combination_style)
+        
+        Args:
+            intensity: Bot emotion intensity (0.0-1.0)
+            combination_style: Character's emoji combination preference
+            bot_emotion_data: Full RoBERTa analysis with confidence, variance, etc.
+            user_emotion_data: Optional user emotion data for context
+        
+        Returns:
+            Optimal emoji count (1-3)
+        """
+        # Factor 1: Base count from intensity (existing logic)
+        if intensity > 0.8:
+            base_count = 3
+        elif intensity > 0.5:
+            base_count = 2
+        else:
+            base_count = 1
+        
+        # Factor 2: Confidence boost
+        # High confidence in emotion detection = more expressive
+        confidence = bot_emotion_data.get('confidence', 0.5)
+        if confidence > 0.85 and base_count < 3:
+            base_count += 1
+            logger.debug(
+                "🎯 Emoji count boost: high confidence (%.2f) increased count to %d",
+                confidence, base_count
+            )
+        
+        # Factor 3: Emotional stability (low variance = consistent emotion)
+        # If emotion is stable and strong, we can be more expressive
+        variance = bot_emotion_data.get('emotional_variance', 0.5)
+        if variance < 0.3 and intensity > 0.7 and base_count < 3:
+            base_count += 1
+            logger.debug(
+                "🎯 Emoji count boost: stable strong emotion (variance=%.2f, intensity=%.2f) increased count to %d",
+                variance, intensity, base_count
+            )
+        
+        # Factor 4: High variance = reduce expressiveness
+        # Unstable emotion = be more conservative
+        elif variance > 0.7 and base_count > 1:
+            base_count -= 1
+            logger.debug(
+                "🎯 Emoji count reduction: high variance (%.2f) decreased count to %d",
+                variance, base_count
+            )
+        
+        # Factor 5: User emotion context
+        # If user in distress with high intensity, be more conservative
+        if user_emotion_data:
+            user_emotion = user_emotion_data.get('primary_emotion', 'neutral')
+            user_intensity = user_emotion_data.get('intensity', 0.5)
+            
+            if user_emotion in ['sadness', 'fear', 'anger'] and user_intensity > 0.7:
+                # High distress = more conservative emoji usage
+                base_count = min(base_count, 1)
+                logger.debug(
+                    "🎯 Emoji count reduction: user in distress (%s, intensity=%.2f) decreased count to %d",
+                    user_emotion, user_intensity, base_count
+                )
+        
+        # Factor 6: Character personality constraints (ALWAYS enforced)
+        if combination_style == 'minimal_symbolic_emoji':
+            return 1  # Override: always minimal
+        elif combination_style == 'text_with_accent_emoji':
+            return 1  # Override: always single accent
+        elif combination_style == 'emoji_only':
+            return min(base_count, 2)  # Cap at 2 for emoji-only
+        
+        # Final cap at 3 emojis maximum
+        return min(base_count, 3)
+    
     def _select_from_patterns(
         self,
         patterns: List[Dict],
         intensity: float,
-        combination_style: str
+        combination_style: str,
+        bot_emotion_data: Optional[Dict] = None,
+        user_emotion_data: Optional[Dict] = None
     ) -> List[str]:
-        """Select individual emojis from pattern sequences based on intensity."""
+        """
+        Select individual emojis from pattern sequences using multi-factor intelligence.
+        
+        Enhanced to use emotional confidence, variance, and context rather than
+        just raw intensity thresholds.
+        """
         if not patterns:
             return []
         
@@ -367,23 +594,31 @@ class DatabaseEmojiSelector:
         if not emojis:
             return []
         
-        # Determine how many emojis to use based on intensity and combination style
-        if combination_style == 'minimal_symbolic_emoji':
-            count = 1  # Always just one
-        elif combination_style == 'text_with_accent_emoji':
-            count = 1  # Single accent
-        elif combination_style == 'text_plus_emoji':
-            # Scale with intensity
-            if intensity > 0.8:
-                count = min(3, len(emojis))
-            elif intensity > 0.5:
+        # 🎯 NEW: Use multi-factor intelligence for emoji count
+        if bot_emotion_data:
+            count = self._calculate_emotionally_intelligent_emoji_count(
+                intensity=intensity,
+                combination_style=combination_style,
+                bot_emotion_data=bot_emotion_data,
+                user_emotion_data=user_emotion_data
+            )
+        else:
+            # Fallback to original logic if no emotion data
+            if combination_style == 'minimal_symbolic_emoji':
+                count = 1
+            elif combination_style == 'text_with_accent_emoji':
+                count = 1
+            elif combination_style == 'text_plus_emoji':
+                if intensity > 0.8:
+                    count = min(3, len(emojis))
+                elif intensity > 0.5:
+                    count = min(2, len(emojis))
+                else:
+                    count = 1
+            elif combination_style == 'emoji_only':
                 count = min(2, len(emojis))
             else:
                 count = 1
-        elif combination_style == 'emoji_only':
-            count = min(2, len(emojis))  # Can use more for emoji-only
-        else:
-            count = 1
         
         return emojis[:count]
     
@@ -500,13 +735,22 @@ class DatabaseEmojiSelector:
             return message
         
         # WHITELIST APPROACH: Define ALLOWED emojis for distress contexts
-        # Better to remove all emojis except these safe, empathetic ones
-        # Keep list minimal - only universal empathy/support emojis
+        # Better to remove celebratory emojis, but ALLOW empathy-mirroring emojis
+        # Includes: support emojis + emotion-mirroring emojis (sad faces OK for sad users)
         allowed_empathy_emojis = [
+            # Support & care emojis
             '💙',  # Blue heart - empathy
             '💔',  # Broken heart - acknowledgment
             '🙏',  # Praying hands - support
             '❤️',  # Red heart - love/care
+            '🫂',  # Hugging face - comfort
+            # Empathy-mirroring emojis (reflect user's emotion back)
+            '😢',  # Crying face - mirrors sadness
+            '😔',  # Pensive face - mirrors contemplation/sadness
+            '😞',  # Disappointed face - mirrors disappointment
+            '🥺',  # Pleading face - mirrors vulnerability
+            '😟',  # Worried face - mirrors concern/worry
+            '😥',  # Sad but relieved - mirrors mixed emotions
         ]
         
         # Extract all emojis from message
