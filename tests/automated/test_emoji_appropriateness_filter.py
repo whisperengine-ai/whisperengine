@@ -46,17 +46,17 @@ class TestEmojiAppropriatenessFilter:
             user_emotion_data=user_emotion_data
         )
         
-        # Assertions - non-whitelisted emojis should be removed
-        assert '✨' not in filtered_response, "Sparkle emoji should be removed (not in whitelist)"
-        assert '🔥' not in filtered_response, "Fire emoji should be removed (not in whitelist)"
-        assert '🎉' not in filtered_response, "Party emoji should be removed (not in whitelist)"
+        # Assertions - CELEBRATORY emojis should be removed (not appropriate for distress)
+        assert '✨' not in filtered_response, "Sparkle emoji should be removed (celebratory)"
+        assert '🔥' not in filtered_response, "Fire emoji should be removed (celebratory)"
+        assert '🎉' not in filtered_response, "Party emoji should be removed (celebratory)"
         assert '🌊' not in filtered_response, "Ocean emoji should be removed (character-specific, not in universal whitelist)"
-        assert '��' not in filtered_response, "Sad emoji should be removed (not in minimal empathy whitelist)"
         
-        # But whitelisted empathy emojis should remain
-        assert '💙' in filtered_response, "Blue heart emoji should remain (in whitelist)"
+        # But empathy emojis (support + emotion-mirroring) should remain
+        assert '💙' in filtered_response, "Blue heart emoji should remain (support emoji)"
+        assert '😢' in filtered_response, "Sad emoji should remain (empathy-mirroring emoji, appropriate for sad user)"
         
-        print("✅ Test passed: Non-whitelisted emojis filtered using whitelist approach")
+        print("✅ Test passed: Celebratory emojis filtered, empathy-mirroring emojis preserved")
     
     def test_no_filtering_when_user_happy(self):
         """Test that emojis are NOT filtered when user is happy."""

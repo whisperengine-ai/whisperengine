@@ -155,14 +155,23 @@ class VectorEmojiIntelligence:
         During distress, ONLY allow empathetic/neutral emojis.
         """
         # WHITELIST: Emojis that ARE appropriate during distress
-        # Keep list minimal - only universal empathy/support emojis
+        # Includes: support emojis + empathy-mirroring emojis (sad faces OK for sad users)
         allowed_empathy_emojis = [
+            # Support & care emojis
             '💙',  # Blue heart - empathy
             '💔',  # Broken heart - acknowledgment
             '🙏',  # Praying hands - support
             '❤️',  # Red heart - love/care
+            '🫂',  # Hugging face - comfort
             '👍',  # Thumbs up - simple acknowledgment
             '✅',  # Check mark - simple acknowledgment
+            # Empathy-mirroring emojis (reflect user's emotion back)
+            '😢',  # Crying face - mirrors sadness
+            '😔',  # Pensive face - mirrors contemplation/sadness
+            '😞',  # Disappointed face - mirrors disappointment
+            '🥺',  # Pleading face - mirrors vulnerability
+            '😟',  # Worried face - mirrors concern/worry
+            '😥',  # Sad but relieved - mirrors mixed emotions
         ]
         
         # If emoji is in allowed list, it's NOT celebratory (return False)
@@ -1016,6 +1025,98 @@ class VectorEmojiIntelligence:
             }
         )
     
+    def _select_trajectory_aware_emoji(
+        self,
+        emotional_state: Dict[str, Any],
+        bot_character: str,
+        user_in_distress: bool
+    ) -> Optional[Tuple[str, EmojiResponseContext]]:
+        """
+        🎯 TRAJECTORY-AWARE SELECTION: Select emoji based on emotional trajectory, not keywords.
+        
+        Replaces hard-coded keyword matching with intelligent analysis of:
+        - Emotional trajectory (rising, falling, stable)
+        - Primary emotion + intensity
+        - RoBERTa confidence
+        - User distress context
+        
+        Args:
+            emotional_state: Complete emotional analysis with trajectory
+            bot_character: Character type for emoji selection
+            user_in_distress: Whether user is in emotional distress
+        
+        Returns:
+            Tuple of (emoji, context) or None to fall through
+        """
+        # Extract trajectory data
+        trajectory = emotional_state.get("emotional_trajectory", "stable")
+        primary_emotion = emotional_state.get("current_emotion", "neutral")
+        intensity = emotional_state.get("intensity", 0.5)
+        confidence = emotional_state.get("confidence", 0.5)
+        
+        # Only use trajectory logic for high confidence emotions (>0.65)
+        if confidence < 0.65:
+            logger.debug(
+                "🎯 Trajectory skip: Low confidence (%.2f) - falling through",
+                confidence
+            )
+            return None
+        
+        character_emojis = self.character_emoji_sets.get(bot_character, self.character_emoji_sets["general"])
+        
+        # SKIP celebratory trajectory responses if user in distress
+        if user_in_distress:
+            logger.debug("🎯 Trajectory skip: User in distress - being conservative")
+            return None
+        
+        # TRAJECTORY 1: Rising positive emotions → Enthusiastic response
+        if trajectory == "rising" and primary_emotion in ['joy', 'excitement', 'hope', 'contentment'] and intensity > 0.6:
+            logger.info(
+                "🎯 Trajectory match: Rising %s (intensity=%.2f) → enthusiastic",
+                primary_emotion, intensity
+            )
+            return character_emojis["wonder"][0], EmojiResponseContext.EMOTIONAL_OVERWHELM
+        
+        # TRAJECTORY 2: Stable positive emotions → Warm acknowledgment
+        if trajectory == "stable" and primary_emotion in ['joy', 'contentment', 'gratitude'] and intensity > 0.5:
+            logger.info(
+                "🎯 Trajectory match: Stable %s (intensity=%.2f) → warm",
+                primary_emotion, intensity
+            )
+            return character_emojis["positive"][0], EmojiResponseContext.SIMPLE_ACKNOWLEDGMENT
+        
+        # TRAJECTORY 3: Rising negative emotions → DO NOT USE celebratory
+        # Just fall through - let other logic handle it
+        if trajectory == "rising" and primary_emotion in ['sadness', 'anger', 'fear', 'anxiety']:
+            logger.debug(
+                "🎯 Trajectory skip: Rising negative %s - avoiding celebratory",
+                primary_emotion
+            )
+            return None
+        
+        # TRAJECTORY 4: Falling negative emotions (improving) → Supportive encouragement
+        if trajectory == "falling" and primary_emotion in ['sadness', 'fear', 'anxiety'] and intensity < 0.7:
+            logger.info(
+                "🎯 Trajectory match: Falling %s (improving) → supportive",
+                primary_emotion
+            )
+            return "💙", EmojiResponseContext.EMOTIONAL_OVERWHELM
+        
+        # TRAJECTORY 5: Excitement-based emotions → Playful response
+        if primary_emotion in ['excitement', 'surprise'] and intensity > 0.7 and confidence > 0.7:
+            logger.info(
+                "🎯 Trajectory match: High %s (intensity=%.2f, confidence=%.2f) → playful",
+                primary_emotion, intensity, confidence
+            )
+            return character_emojis["playful"][0], EmojiResponseContext.PLAYFUL_INTERACTION
+        
+        # No trajectory-based match, fall through to other logic
+        logger.debug(
+            "🎯 Trajectory fall-through: emotion=%s, trajectory=%s, intensity=%.2f",
+            primary_emotion, trajectory, intensity
+        )
+        return None
+    
     def _select_enhanced_optimal_emoji(
         self, 
         user_message: str, 
@@ -1025,13 +1126,25 @@ class VectorEmojiIntelligence:
         personality_context: Dict[str, Any],
         communication_style: Dict[str, Any]
     ) -> Tuple[str, EmojiResponseContext]:
-        """Enhanced emoji selection with comprehensive context"""
+        """Enhanced emoji selection with comprehensive context and emotion mirroring"""
         
         # CRITICAL: Check for user emotional distress FIRST
         # Prevent celebration/excitement emojis when user is sad/anxious/angry
         user_in_distress = False
         current_emotion = emotional_state.get("current_emotion", "neutral")
         emotional_intensity = emotional_state.get("intensity", 0.0)
+        emotional_confidence = emotional_state.get("confidence", 0.0)
+        
+        # 🎭 PRIORITY 0: EMOTION MIRRORING (highest priority when conditions are met)
+        # Mirror user's emotion if detected with high confidence AND high intensity
+        if emotional_confidence > 0.7 and emotional_intensity > 0.6:
+            mirroring_emoji = self._get_emotion_mirroring_emoji(current_emotion, emotional_intensity)
+            if mirroring_emoji:
+                logger.info(
+                    "🎭 Emotion mirroring activated: emotion=%s, intensity=%.2f, confidence=%.2f, emoji=%s",
+                    current_emotion, emotional_intensity, emotional_confidence, mirroring_emoji
+                )
+                return mirroring_emoji, EmojiResponseContext.EMOTIONAL_OVERWHELM
         
         if current_emotion in ["sadness", "fear", "anger"] and emotional_intensity > 0.6:
             user_in_distress = True
@@ -1092,20 +1205,19 @@ class VectorEmojiIntelligence:
             elif current_emotion in ["gratitude"]:
                 return character_emojis["acknowledgment"][0], EmojiResponseContext.SIMPLE_ACKNOWLEDGMENT
         
-        # Priority 4: Context-based selection (enhanced) - FILTER celebratory for distress
+        # Priority 4: Trajectory-aware context selection (replaces keyword matching)
+        # Use emotional trajectory data instead of hard-coded keywords
+        trajectory_emoji = self._select_trajectory_aware_emoji(
+            emotional_state=emotional_state,
+            bot_character=bot_character,
+            user_in_distress=user_in_distress
+        )
+        if trajectory_emoji:
+            emoji, context = trajectory_emoji
+            return emoji, context
+        
+        # Priority 5: Fallback keyword detection for gratitude (works in all contexts)
         message_lower = user_message.lower()
-        character_emojis = self.character_emoji_sets.get(bot_character, self.character_emoji_sets["general"])
-        
-        # If user in distress, skip celebratory context-based selections
-        if not user_in_distress:
-            # Enhanced context detection (only if NOT in distress)
-            if any(word in message_lower for word in ["amazing", "incredible", "fantastic", "mind-blowing", "wow"]):
-                return character_emojis["wonder"][0], EmojiResponseContext.EMOTIONAL_OVERWHELM
-            
-            if any(word in message_lower for word in ["fun", "funny", "lol", "haha", "hilarious", "😄"]):
-                return character_emojis["playful"][0], EmojiResponseContext.PLAYFUL_INTERACTION
-        
-        # Gratitude and thanks are OK even in distress
         if any(word in message_lower for word in ["thanks", "thank you", "appreciate", "grateful"]):
             # Use approved empathy emoji for acknowledgment
             return "💙", EmojiResponseContext.SIMPLE_ACKNOWLEDGMENT
@@ -1348,18 +1460,104 @@ class VectorEmojiIntelligence:
             }
         )
     
+    def _get_emotion_mirroring_emoji(self, emotion: str, intensity: float) -> Optional[str]:
+        """
+        🎭 EMOTION MIRRORING: Select emoji that mirrors user's detected emotion.
+        
+        Returns emoji that reflects the user's emotional state back to them,
+        providing empathetic acknowledgment and emotional validation.
+        
+        Args:
+            emotion: Primary emotion detected (sadness, joy, fear, anger, etc.)
+            intensity: Emotion intensity (0.0-1.0)
+            
+        Returns:
+            Mirroring emoji if appropriate, None otherwise
+        """
+        # Emotion → Mirroring Emoji Map (intensity-aware)
+        EMOTION_MIRROR_MAP = {
+            'sadness': {
+                'high': '😢',      # Crying face for intense sadness
+                'medium': '😔',    # Pensive face for moderate sadness
+                'low': '🙁'        # Slightly frowning for mild sadness
+            },
+            'joy': {
+                'high': '😄',      # Beaming smile for intense joy
+                'medium': '😊',    # Smiling face for moderate joy
+                'low': '🙂'        # Slightly smiling for mild joy
+            },
+            'fear': {
+                'high': '😰',      # Anxious face for intense fear
+                'medium': '😟',    # Worried face for moderate fear
+                'low': '😕'        # Confused face for mild fear
+            },
+            'anger': {
+                'high': '😤',      # Face with steam for intense anger
+                'medium': '😠',    # Angry face for moderate anger
+                'low': '😒'        # Unamused face for mild anger
+            },
+            'surprise': {
+                'high': '😲',      # Astonished face for intense surprise
+                'medium': '😮',    # Open mouth for moderate surprise
+                'low': '😯'        # Hushed face for mild surprise
+            },
+            'disgust': {
+                'high': '🤢',      # Nauseated face for intense disgust
+                'medium': '😖',    # Confounded face for moderate disgust
+                'low': '😑'        # Expressionless for mild disgust
+            },
+            'neutral': None,    # Don't mirror neutral emotions
+        }
+        
+        # Map intensity to category
+        if intensity > 0.8:
+            intensity_level = 'high'
+        elif intensity > 0.6:
+            intensity_level = 'medium'
+        else:
+            intensity_level = 'low'
+        
+        # Get mirroring emoji for this emotion
+        emotion_map = EMOTION_MIRROR_MAP.get(emotion)
+        if emotion_map and isinstance(emotion_map, dict):
+            return emotion_map.get(intensity_level)
+        
+        return None
+    
     def _select_optimal_emoji(
         self, 
         user_message: str, 
         bot_character: str,
         conversation_patterns: ConversationPattern,
-        emotion_score: float
+        emotion_score: float,
+        user_emotion_data: Optional[Dict[str, Any]] = None
     ) -> Tuple[str, EmojiResponseContext]:
-        """Select the best emoji based on context and character"""
+        """
+        Select the best emoji based on context and character.
+        
+        NEW: Supports emotionally intelligent mirroring when user emotion is detected
+        with high confidence and intensity.
+        """
         message_lower = user_message.lower()
         
         # Get character-specific emoji set
         character_emojis = self.character_emoji_sets.get(bot_character, self.character_emoji_sets["general"])
+        
+        # 🎯 EMOTION MIRRORING: Mirror user's emotion if detected with high confidence
+        if user_emotion_data:
+            user_emotion = user_emotion_data.get('primary_emotion')
+            user_intensity = user_emotion_data.get('intensity', 0)
+            user_confidence = user_emotion_data.get('confidence', 0)
+            
+            # Only mirror if BOTH confidence and intensity are high (emotionally intelligent)
+            if user_confidence > 0.7 and user_intensity > 0.6:
+                mirroring_emoji = self._get_emotion_mirroring_emoji(user_emotion, user_intensity)
+                if mirroring_emoji:
+                    logger.info(
+                        "🎭 Emotion mirroring: user_emotion=%s, intensity=%.2f, confidence=%.2f, emoji=%s",
+                        user_emotion, user_intensity, user_confidence, mirroring_emoji
+                    )
+                    return mirroring_emoji, EmojiResponseContext.EMOTIONAL_OVERWHELM
         
         # Prioritize user's historical preferences if available
         if conversation_patterns.preferred_emojis:
