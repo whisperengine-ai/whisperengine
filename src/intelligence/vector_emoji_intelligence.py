@@ -145,6 +145,30 @@ class VectorEmojiIntelligence:
         logger.info("🎯 Emoji config: enabled=%s, base_threshold=%.2f, new_user_threshold=%.2f", 
                    self.emoji_enabled, self.base_threshold, self.new_user_threshold)
     
+    def _is_celebratory_emoji(self, emoji: str) -> bool:
+        """
+        Check if emoji is appropriate for distress contexts (WHITELIST approach).
+        
+        Returns False if emoji is in the ALLOWED list for empathy/distress.
+        Returns True if emoji should be filtered out.
+        
+        During distress, ONLY allow empathetic/neutral emojis.
+        """
+        # WHITELIST: Emojis that ARE appropriate during distress
+        # Keep list minimal - only universal empathy/support emojis
+        allowed_empathy_emojis = [
+            '💙',  # Blue heart - empathy
+            '💔',  # Broken heart - acknowledgment
+            '🙏',  # Praying hands - support
+            '❤️',  # Red heart - love/care
+            '👍',  # Thumbs up - simple acknowledgment
+            '✅',  # Check mark - simple acknowledgment
+        ]
+        
+        # If emoji is in allowed list, it's NOT celebratory (return False)
+        # If emoji is NOT in allowed list, filter it out (return True)
+        return emoji not in allowed_empathy_emojis
+    
     async def should_respond_with_emoji(
         self,
         user_id: str,
@@ -1003,27 +1027,49 @@ class VectorEmojiIntelligence:
     ) -> Tuple[str, EmojiResponseContext]:
         """Enhanced emoji selection with comprehensive context"""
         
+        # CRITICAL: Check for user emotional distress FIRST
+        # Prevent celebration/excitement emojis when user is sad/anxious/angry
+        user_in_distress = False
+        current_emotion = emotional_state.get("current_emotion", "neutral")
+        emotional_intensity = emotional_state.get("intensity", 0.0)
+        
+        if current_emotion in ["sadness", "fear", "anger"] and emotional_intensity > 0.6:
+            user_in_distress = True
+            logger.debug(
+                "⚠️ User in emotional distress: %s (intensity: %.2f) - filtering celebratory emojis",
+                current_emotion, emotional_intensity
+            )
+        
         # Priority 1: User's historical preferences (if established relationship)
         if conversation_patterns.preferred_emojis and len(conversation_patterns.similar_conversations) > 10:
             preferred_emoji = conversation_patterns.preferred_emojis[0][0]
             character_emojis = self.character_emoji_sets.get(bot_character, self.character_emoji_sets["general"])
             all_character_emojis = [emoji for emoji_list in character_emojis.values() for emoji in emoji_list]
             
-            if preferred_emoji in all_character_emojis:
+            # Filter out inappropriate emojis if user in distress
+            if user_in_distress and self._is_celebratory_emoji(preferred_emoji):
+                logger.debug("Filtered preferred emoji %s due to user distress", preferred_emoji)
+            elif preferred_emoji in all_character_emojis:
                 return preferred_emoji, EmojiResponseContext.REPEATED_PATTERN
         
-        # Priority 2: Emotional support needs
-        if emotional_state.get("needs_emotional_support", False):
+        # Priority 2: Emotional support needs OR user in distress
+        if emotional_state.get("needs_emotional_support", False) or user_in_distress:
+            # Use empathy emojis, not celebration
             if bot_character == "mystical":
                 return "🙏", EmojiResponseContext.EMOTIONAL_OVERWHELM
             elif bot_character == "technical":
-                return "👍", EmojiResponseContext.EMOTIONAL_OVERWHELM
+                return "💙", EmojiResponseContext.EMOTIONAL_OVERWHELM  # Blue heart for empathy
             else:
-                return "❤️", EmojiResponseContext.EMOTIONAL_OVERWHELM
+                return "💙", EmojiResponseContext.EMOTIONAL_OVERWHELM  # Empathy, not celebration
         
         # Priority 3: High emotional intensity - use universal taxonomy
         if emotional_state.get("intensity", 0.5) > 0.7:
             current_emotion = emotional_state.get("current_emotion", "neutral")
+            
+            # FILTER: Don't use celebratory emojis if user is in distress
+            if user_in_distress:
+                # For distress, use empathy emojis regardless of intensity
+                return "💙", EmojiResponseContext.EMOTIONAL_OVERWHELM
             
             # Import universal taxonomy for character-aware emoji selection
             from src.intelligence.emotion_taxonomy import get_emoji_for_roberta_emotion
@@ -1034,7 +1080,8 @@ class VectorEmojiIntelligence:
                 confidence=emotional_state.get("intensity", 0.5)
             )
             
-            if taxonomy_emoji:
+            # Filter celebratory taxonomy emoji if it exists
+            if taxonomy_emoji and not self._is_celebratory_emoji(taxonomy_emoji):
                 return taxonomy_emoji, EmojiResponseContext.EMOTIONAL_OVERWHELM
             
             # Fallback to existing logic if taxonomy doesn't have mapping
@@ -1045,29 +1092,40 @@ class VectorEmojiIntelligence:
             elif current_emotion in ["gratitude"]:
                 return character_emojis["acknowledgment"][0], EmojiResponseContext.SIMPLE_ACKNOWLEDGMENT
         
-        # Priority 4: Context-based selection (enhanced)
+        # Priority 4: Context-based selection (enhanced) - FILTER celebratory for distress
         message_lower = user_message.lower()
         character_emojis = self.character_emoji_sets.get(bot_character, self.character_emoji_sets["general"])
         
-        # Enhanced context detection
-        if any(word in message_lower for word in ["amazing", "incredible", "fantastic", "mind-blowing", "wow"]):
-            return character_emojis["wonder"][0], EmojiResponseContext.EMOTIONAL_OVERWHELM
+        # If user in distress, skip celebratory context-based selections
+        if not user_in_distress:
+            # Enhanced context detection (only if NOT in distress)
+            if any(word in message_lower for word in ["amazing", "incredible", "fantastic", "mind-blowing", "wow"]):
+                return character_emojis["wonder"][0], EmojiResponseContext.EMOTIONAL_OVERWHELM
+            
+            if any(word in message_lower for word in ["fun", "funny", "lol", "haha", "hilarious", "😄"]):
+                return character_emojis["playful"][0], EmojiResponseContext.PLAYFUL_INTERACTION
         
+        # Gratitude and thanks are OK even in distress
         if any(word in message_lower for word in ["thanks", "thank you", "appreciate", "grateful"]):
-            return character_emojis["acknowledgment"][0], EmojiResponseContext.SIMPLE_ACKNOWLEDGMENT
+            # Use approved empathy emoji for acknowledgment
+            return "💙", EmojiResponseContext.SIMPLE_ACKNOWLEDGMENT
         
-        if any(word in message_lower for word in ["fun", "funny", "lol", "haha", "hilarious", "😄"]):
-            return character_emojis["playful"][0], EmojiResponseContext.PLAYFUL_INTERACTION
+        # If user in distress, DON'T use character-specific emojis
+        # Better to skip than to use potentially inappropriate ones
+        if user_in_distress:
+            # Already handled empathy emojis above - if we get here, skip emoji
+            logger.debug("Skipping emoji for distressed user - no approved emoji found")
+            return "💙", EmojiResponseContext.SIMPLE_ACKNOWLEDGMENT  # Safe fallback
         
-        # Technical appreciation for technical characters
+        # Technical appreciation for technical characters (NOT in distress)
         if bot_character == "technical" and any(word in message_lower for word in ["code", "algorithm", "system", "data", "tech"]):
             return character_emojis["positive"][0], EmojiResponseContext.TECHNICAL_APPRECIATION
         
-        # Mystical wonder for mystical characters
+        # Mystical wonder for mystical characters (NOT in distress)
         if bot_character == "mystical" and any(word in message_lower for word in ["magic", "energy", "spiritual", "mystical", "dream"]):
             return character_emojis["wonder"][0], EmojiResponseContext.MYSTICAL_WONDER
         
-        # Default based on communication style preference
+        # Default based on communication style preference (NOT in distress)
         if communication_style.get("prefers_brief_responses", False):
             return character_emojis["acknowledgment"][0], EmojiResponseContext.SIMPLE_ACKNOWLEDGMENT
         else:

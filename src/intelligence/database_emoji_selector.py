@@ -157,15 +157,37 @@ class DatabaseEmojiSelector:
                 )
             
             # Step 4: Check user emotion for appropriateness filter
+            # CRITICAL: Prevent celebratory/excited emojis when user is in emotional distress
             if user_emotion_data:
                 user_emotion = user_emotion_data.get('primary_emotion')
                 user_intensity = user_emotion_data.get('intensity', 0.5)
                 
-                # Don't use cheerful emojis if user is in distress
-                if user_emotion in ['sadness', 'fear', 'anger'] and user_intensity > 0.7:
-                    if bot_emotion == 'joy':
-                        logger.debug("Filtering out joyful emojis - user in distress")
+                # Detect user in distress: high intensity negative emotions
+                if user_emotion in ['sadness', 'fear', 'anger'] and user_intensity > 0.6:
+                    logger.debug(
+                        "⚠️ User in emotional distress: %s (intensity: %.2f)",
+                        user_emotion, user_intensity
+                    )
+                    
+                    # Switch bot emotion from upbeat → empathetic
+                    if bot_emotion in ['joy', 'excitement', 'surprise']:
+                        logger.debug(
+                            "Filtering out %s emojis - switching to concern",
+                            bot_emotion
+                        )
                         bot_emotion = 'concern'  # Switch to empathetic emojis
+                    
+                    # Filter out upbeat topics/response_types that would inject celebration emojis
+                    if response_type in ['celebration', 'greeting']:
+                        logger.debug(
+                            "Neutralizing response_type '%s' due to user distress",
+                            response_type
+                        )
+                        response_type = 'concern'  # Override to empathetic response
+                    
+                    # Filter out upbeat topics (spanish_expressions, science_discovery)
+                    upbeat_topics = ['spanish_expressions', 'science_discovery', 'celebration']
+                    detected_topics = [t for t in (detected_topics or []) if t not in upbeat_topics]
             
             # Step 5: Query database for relevant emoji patterns
             emoji_patterns = await self._query_emoji_patterns(
@@ -448,6 +470,74 @@ class DatabaseEmojiSelector:
         
         # Strategy 4: Default to neutral (real neutral, not false)
         return 'neutral'
+    
+    def filter_inappropriate_emojis(
+        self,
+        message: str,
+        user_emotion_data: Optional[Dict] = None
+    ) -> str:
+        """
+        Filter out inappropriate emojis from LLM-generated response.
+        
+        This handles emojis that the LLM itself added (not our decoration).
+        Removes celebration/excitement emojis when user is in emotional distress.
+        
+        Args:
+            message: The LLM's response text (may contain emojis)
+            user_emotion_data: RoBERTa analysis of user's emotion
+        
+        Returns:
+            Message with inappropriate emojis removed
+        """
+        if not user_emotion_data:
+            return message
+        
+        user_emotion = user_emotion_data.get('primary_emotion')
+        user_intensity = user_emotion_data.get('intensity', 0.5)
+        
+        # Only filter if user is in emotional distress
+        if user_emotion not in ['sadness', 'fear', 'anger'] or user_intensity <= 0.6:
+            return message
+        
+        # WHITELIST APPROACH: Define ALLOWED emojis for distress contexts
+        # Better to remove all emojis except these safe, empathetic ones
+        # Keep list minimal - only universal empathy/support emojis
+        allowed_empathy_emojis = [
+            '💙',  # Blue heart - empathy
+            '💔',  # Broken heart - acknowledgment
+            '🙏',  # Praying hands - support
+            '❤️',  # Red heart - love/care
+        ]
+        
+        # Extract all emojis from message
+        emoji_pattern = re.compile(
+            "[\U0001F600-\U0001F64F]|"  # Emoticons
+            "[\U0001F300-\U0001F5FF]|"  # Symbols & pictographs
+            "[\U0001F680-\U0001F6FF]|"  # Transport & map symbols
+            "[\U0001F1E0-\U0001F1FF]|"  # Flags
+            "[\U00002702-\U000027B0]|"  # Dingbats
+            "[\U000024C2-\U0001F251]"   # Enclosed characters
+        )
+        
+        found_emojis = emoji_pattern.findall(message)
+        
+        # Remove any emoji that's NOT in the allowed list
+        filtered_message = message
+        for emoji in found_emojis:
+            if emoji not in allowed_empathy_emojis:
+                filtered_message = filtered_message.replace(emoji, '')
+        
+        # Clean up extra spaces left by removed emojis
+        filtered_message = re.sub(r'\s{2,}', ' ', filtered_message)
+        filtered_message = re.sub(r'\s+([,.!?])', r'\1', filtered_message)
+        
+        if filtered_message != message:
+            logger.debug(
+                "Filtered inappropriate emojis from LLM response (user in distress: %s, intensity: %.2f)",
+                user_emotion, user_intensity
+            )
+        
+        return filtered_message.strip()
     
     def apply_emojis(
         self,

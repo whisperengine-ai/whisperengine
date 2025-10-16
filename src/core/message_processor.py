@@ -442,9 +442,24 @@ class MessageProcessor:
             
             if self.emoji_selector and self.character_name:
                 try:
+                    # Step 1: Filter inappropriate emojis from LLM's own response
+                    # (e.g., remove celebration emojis when user is in distress)
+                    filtered_response = self.emoji_selector.filter_inappropriate_emojis(
+                        message=response,
+                        user_emotion_data=ai_components.get('emotion_analysis')
+                    )
+                    
+                    if filtered_response != response:
+                        logger.debug(
+                            "Filtered inappropriate emojis from LLM response (%d → %d chars)",
+                            len(response), len(filtered_response)
+                        )
+                        response = filtered_response
+                    
+                    # Step 2: Select and apply appropriate emojis via database patterns
                     emoji_selection = await self.emoji_selector.select_emojis(
                         character_name=self.character_name,
-                        bot_emotion_data=bot_emotion,
+                        bot_emotion_data=bot_emotion or {},
                         user_emotion_data=ai_components.get('emotion_analysis'),
                         detected_topics=ai_components.get('detected_topics', []),
                         response_type=ai_components.get('response_type'),
