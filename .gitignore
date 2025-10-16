@@ -171,3 +171,5 @@ characters/examples_legacy_backup/aetheris.json
 .gitignore
 characters/examples_legacy_backup/gabriel.json
 character_intelligence_validation_results.json
+# Validation report directories
+*_validation_report.json/
