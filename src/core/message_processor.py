@@ -4934,9 +4934,9 @@ class MessageProcessor:
             # 🚨 CRITICAL PATTERNS: Known recursive failure indicators
             recursive_patterns = [
                 r'remember that you can remember',
-                r'(\w+\s+){25,}',  # Same words repeating 25+ times (raised from 10)
+                r'(\b\w+\b)(\s+\1){24,}',  # FIXED: Same word repeating 25+ times (word + 24 more repetitions)
                 r'(that you can\s+){5,}',  # "that you can" repeating
-                r'(\w+\s+\w+\s+){20,}',  # Any two-word pattern repeating 20+ times (raised from 15)
+                r'(\b\w+\s+\w+\b)(\s+\1){19,}',  # FIXED: Same two-word phrase repeating 20+ times
                 r'(being able to\s+){3,}',  # "being able to" repeating
                 r'EEREE|Eternalized Eternally',  # Specific nonsense patterns from Ryan
                 r'(processing data.*entertainment.*){3,}',  # Recursive tech explanations
