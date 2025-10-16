@@ -656,6 +656,7 @@ class BotEventHandlers:
                     platform="discord",
                     channel_id=str(reply_channel.id),
                     channel_type="dm" if reply_channel.type.name == "private" else "guild",
+                    metadata_level="standard",  # Request ai_components for footer generation
                     metadata={
                         'discord_message_id': str(message.id),
                         'discord_author_id': str(message.author.id),
@@ -670,8 +671,34 @@ class BotEventHandlers:
                     result = await self.message_processor.process_message(message_context)
                 
                 if result.success:
+                    logger.info("🎯 FOOTER DEBUG: Processing successful result, generating footer...")
+                    # Generate optional status footer for Discord (NEVER stored in memory)
+                    from src.utils.discord_status_footer import generate_discord_status_footer
+                    
+                    ai_components = result.metadata.get('ai_components', {}) if result.metadata else {}
+                    memory_count = result.metadata.get('memory_count', 0) if result.metadata else 0
+                    
+                    logger.info("🎯 FOOTER DEBUG: metadata exists: %s", bool(result.metadata))
+                    logger.info("🎯 FOOTER DEBUG: ai_components keys: %s", list(ai_components.keys()) if ai_components else [])
+                    logger.info("🎯 FOOTER DEBUG: memory_count: %d", memory_count)
+                    logger.info("🎯 FOOTER DEBUG: processing_time_ms: %d", result.processing_time_ms or 0)
+                    
+                    status_footer = generate_discord_status_footer(
+                        ai_components=ai_components,
+                        processing_time_ms=result.processing_time_ms,
+                        memory_count=memory_count
+                    )
+                    
+                    logger.info("🎯 FOOTER DEBUG: Generated footer length: %d chars", len(status_footer))
+                    
+                    # Append footer to Discord response (NOT stored in memory)
+                    display_response = result.response + status_footer
+                    
+                    logger.info("🎯 FOOTER DEBUG: Sending response with footer, total length: %d chars", 
+                               len(display_response))
+                    
                     # Send response using chunking method (no reply pattern for DM)
-                    await self._send_response_chunks(reply_channel, result.response, reference_message=None)
+                    await self._send_response_chunks(reply_channel, display_response, reference_message=None)
                     
                     # 🎭 BOT EMOJI REACTIONS: Add emoji reaction to user's message (multimodal feedback)
                     try:
@@ -886,6 +913,7 @@ class BotEventHandlers:
                     platform="discord",
                     channel_id=str(reply_channel.id),
                     channel_type="guild",
+                    metadata_level="standard",  # Request ai_components for footer generation
                     metadata={
                         'discord_message_id': str(message.id),
                         'discord_author_id': str(message.author.id),
@@ -904,8 +932,27 @@ class BotEventHandlers:
                     result = await self.message_processor.process_message(message_context)
                 
                 if result.success:
+                    logger.info("🎯 FOOTER DEBUG (Guild): Processing successful result, generating footer...")
+                    # Generate optional status footer for Discord (NEVER stored in memory)
+                    from src.utils.discord_status_footer import generate_discord_status_footer
+                    
+                    logger.info("🎯 FOOTER DEBUG (Guild): Calling generate_discord_status_footer")
+                    status_footer = generate_discord_status_footer(
+                        ai_components=result.metadata.get('ai_components', {}) if result.metadata else {},
+                        processing_time_ms=result.processing_time_ms,
+                        memory_count=result.metadata.get('memory_count', 0) if result.metadata else 0
+                    )
+                    
+                    logger.info("🎯 FOOTER DEBUG (Guild): Generated footer length: %d chars", len(status_footer))
+                    
+                    # Append footer to Discord response (NOT stored in memory)
+                    display_response = result.response + status_footer
+                    
+                    logger.info("🎯 FOOTER DEBUG (Guild): Sending response, total length: %d chars", 
+                               len(display_response))
+                    
                     # Send response using chunking method with reply pattern for guild mentions
-                    await self._send_response_chunks(reply_channel, result.response, reference_message=message)
+                    await self._send_response_chunks(reply_channel, display_response, reference_message=message)
                     
                     # 🎭 BOT EMOJI REACTIONS: Add emoji reaction to user's mention (multimodal feedback)
                     try:

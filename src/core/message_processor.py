@@ -5545,8 +5545,13 @@ Be conservative - only extract clear statements about the bot's own characterist
             return False
         
         try:
-            # 🛡️ FINAL SAFETY CHECK: Don't store obviously broken responses
-            if self._is_response_safe_to_store(response):
+            # � CRITICAL: Strip status footer from response before storage
+            # Footer is for Discord display ONLY and must NEVER be stored in vector memory
+            from src.utils.discord_status_footer import strip_footer_from_response
+            clean_response = strip_footer_from_response(response)
+            
+            # �🛡️ FINAL SAFETY CHECK: Don't store obviously broken responses
+            if self._is_response_safe_to_store(clean_response):
                 # Extract bot emotion from ai_components (Phase 7.5)
                 bot_emotion = ai_components.get('bot_emotion')
                 
@@ -5564,7 +5569,7 @@ Be conservative - only extract clear statements about the bot's own characterist
                 await self.memory_manager.store_conversation(
                     user_id=message_context.user_id,
                     user_message=message_context.content,
-                    bot_response=response,
+                    bot_response=clean_response,  # Use clean_response without footer
                     pre_analyzed_emotion_data=ai_components.get('emotion_data'),  # User emotion
                     metadata=bot_metadata  # Bot emotion in metadata
                 )
@@ -5859,6 +5864,12 @@ Be conservative - only extract clear statements about the bot's own characterist
             "ai_components": ai_components,
             "security_validation": validation_result
         }
+        
+        # Add workflow data if available (from message_context.metadata)
+        if message_context.metadata and 'workflow_result' in message_context.metadata:
+            # Include workflow data in ai_components for footer display
+            if ai_components and isinstance(ai_components, dict):
+                ai_components['workflow_result'] = message_context.metadata['workflow_result']
         
         # Return standard level if not extended
         if metadata_level != "extended":
