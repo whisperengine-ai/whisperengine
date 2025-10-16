@@ -188,12 +188,23 @@ ROADMAP CLAIMED:                    ACTUAL CODEBASE STATUS:
 - **API Response Time**: <2 seconds for character intelligence queries
 - **Memory Collections**: Elena (4,834), Marcus (2,738), Gabriel (2,897), Sophia (3,131)
 
-### ⚠️ **SINGLE ISSUE: ENVIRONMENT CONFIGURATION**
+### ⚠️ **KNOWN ISSUES & TECHNICAL DEBT**
 
+#### **Issue 1: Environment Configuration**
 **Root Cause**: Database credentials missing in live bot container `.env.*` files
 **Impact**: Character intelligence works perfectly in direct testing, needs environment config for live Discord bots
 **Solution**: Update environment variables with database connection details
 **Timeline**: 30 minutes to resolve
+
+#### **Issue 2: Missing InfluxDB Bot Emotion Query Methods** 🆕
+**Root Cause**: `TemporalIntelligenceClient` missing `get_bot_emotion_trend()` and `get_bot_emotion_overall_trend()` methods
+**Impact**: Phase 6.5 uses Qdrant workaround instead of intended InfluxDB time-series queries
+**Current Status**: System functional with Qdrant semantic search (no user-facing issues)
+**Evidence**: `CharacterTemporalEvolutionAnalyzer:220` calls missing methods
+**Documentation**: `docs/roadmaps/TODO_IMPLEMENT_INFLUXDB_BOT_EMOTION_QUERIES.md`
+**Priority**: Medium (functional workaround exists, but missing time-series analysis capability)
+**Timeline**: 2-4 hours to implement
+**Related**: Phase 6.5 Bot Emotional Self-Awareness, Phase 7.5 Bot Emotion Storage
 
 ### 🏆 **ACHIEVEMENT SUMMARY**
 

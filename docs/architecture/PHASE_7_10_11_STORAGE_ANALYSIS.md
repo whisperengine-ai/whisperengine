@@ -400,8 +400,10 @@ CONVERSATION 1:
                            ↓
 CONVERSATION 2:
 ┌─────────────────────────────────────────────────────────────────┐
-│ Phase 6.5: Retrieve bot emotional trajectory from InfluxDB     │
-│            Query: "Get Elena's last 20 emotional states"       │
+│ Phase 6.5: Retrieve bot emotional trajectory                   │
+│            Current: Queries Qdrant (semantic search)           │
+│            Intended: Should query InfluxDB (missing methods)   │
+│            Query: "Get Elena's last 10 emotional states"       │
 │            Result: [joy(0.8), curiosity(0.7), joy(0.9)...]     │
 │                                                                 │
 │ Phase 6.7: Retrieve relationship context from PostgreSQL       │
@@ -423,24 +425,51 @@ CONVERSATION 2:
 #### Phase 6.5 Retrieves Phase 7.5 Data
 
 **Query**: "Get bot emotional trajectory"  
-**Source**: InfluxDB `bot_emotion` measurement  
-**Code**: `src/core/message_processor.py:3670-3720`
+**Intended Source**: InfluxDB `bot_emotion` measurement (missing implementation)  
+**Current Source**: Qdrant conversation metadata (workaround)  
+**Code**: `src/core/message_processor.py:4173-4230`
 
 ```python
-# Phase 6.5: Retrieve bot emotional trajectory from InfluxDB
-bot_emotional_state = await temporal_client.get_bot_emotional_trajectory(
-    bot_name=self.bot_name,
+# Phase 6.5: CURRENT IMPLEMENTATION (queries Qdrant, not InfluxDB)
+# Should query InfluxDB but methods don't exist in TemporalIntelligenceClient
+
+recent_bot_memories = await self.memory_manager.retrieve_relevant_memories(
     user_id=message_context.user_id,
-    limit=20  # Last 20 emotional states
+    query=f"emotional responses by {bot_name}",
+    limit=10  # Last 10 bot responses
 )
 
-# Returns list like:
+# Extract bot emotions from Qdrant metadata
+for memory in recent_bot_memories:
+    bot_emotion = memory['metadata']['bot_emotion']  # Stored by Phase 9
+```
+
+**INTENDED DESIGN** (not yet implemented):
+```python
+# Phase 6.5 SHOULD query InfluxDB directly for time-series emotion data
+bot_emotional_trajectory = await temporal_client.get_bot_emotion_trend(
+    bot_name=self.bot_name,
+    user_id=message_context.user_id,
+    hours_back=24  # Last 24 hours
+)
+
+# But get_bot_emotion_trend() method DOESN'T EXIST in TemporalIntelligenceClient!
+```
+
+**Returns list like**:
+```python
 # [
 #   {'primary_emotion': 'joy', 'intensity': 0.87, 'confidence': 0.92, 'timestamp': ...},
 #   {'primary_emotion': 'curiosity', 'intensity': 0.75, 'confidence': 0.88, ...},
 #   ...
 # ]
 ```
+
+**Implementation Gap**: 
+- ⚠️ `CharacterTemporalEvolutionAnalyzer` (line 220) calls `temporal_client.get_bot_emotion_trend()`
+- ⚠️ But this method is MISSING from `TemporalIntelligenceClient`
+- ✅ Current workaround: Query Qdrant for semantic search of bot emotions
+- ❌ Trade-off: Loses pure chronological time-series analysis
 
 **Prompt Integration**: Phase 6.5 creates dict for Phase 4/5 prompt building:
 
@@ -649,6 +678,20 @@ influx query 'from(bucket: "whisperengine")
 ---
 
 ## Common Questions & Answers
+
+### Q: Does Phase 6.5 query InfluxDB or Qdrant for bot emotions?
+
+**A**: **Currently Qdrant** (but SHOULD be InfluxDB)!
+
+- **Intended Design**: Phase 6.5 should query InfluxDB `bot_emotion` measurement for time-series trajectory
+- **Missing Implementation**: Methods `get_bot_emotion_trend()` and `get_bot_emotion_overall_trend()` don't exist in `TemporalIntelligenceClient`
+- **Current Workaround**: Queries Qdrant vector memory using semantic search
+- **Evidence**: `CharacterTemporalEvolutionAnalyzer` (line 220) calls the missing InfluxDB methods
+- **Trade-off**: Qdrant provides context-aware retrieval; InfluxDB would provide pure chronological time-series
+
+**Why this matters**:
+- ✅ **Current (Qdrant)**: Semantically relevant emotions, filtered by conversation context
+- ❌ **Intended (InfluxDB)**: Pure chronological trajectory, complete emotion history over time
 
 ### Q: Why does bot emotion get stored twice (InfluxDB + Qdrant)?
 

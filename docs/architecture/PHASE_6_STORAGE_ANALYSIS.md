@@ -8,7 +8,8 @@
 ## 🎯 QUICK ANSWER
 
 **Phase 6.5 (Bot Emotional State)**:
-- 🔍 **RETRIEVES from Qdrant**: Past bot emotions from conversation metadata (last 10 responses)
+- 🔍 **CURRENTLY RETRIEVES from Qdrant**: Past bot emotions from conversation metadata (last 10 responses)
+- ⚠️ **SHOULD RETRIEVE from InfluxDB**: Missing query methods in TemporalIntelligenceClient
 - ✅ **STORED in InfluxDB**: Bot emotion metrics (phase 7.5, after LLM response)
 - ✅ **STORED in Qdrant**: Bot emotion in conversation metadata (phase 9)
 - ❌ **NOT stored separately**: `bot_emotional_state` dict (ephemeral/prompt-only)
@@ -23,9 +24,11 @@
 
 ## 📊 PHASE 6.5: BOT EMOTIONAL SELF-AWARENESS
 
-### **Data Source: Retrieves from Qdrant**
+### **Data Source: Currently Qdrant (Should be InfluxDB)**
 
-**Phase 6.5 RETRIEVES bot's past emotions from Qdrant vector memory** (not InfluxDB):
+⚠️ **IMPLEMENTATION GAP DISCOVERED**: Phase 6.5 SHOULD query InfluxDB for bot emotion time-series, but due to missing query methods in `TemporalIntelligenceClient`, it currently queries Qdrant instead.
+
+**CURRENT IMPLEMENTATION** (queries Qdrant):
 
 ```python
 # Phase 6.5: Query Qdrant for bot's recent emotional responses
@@ -33,7 +36,7 @@
 async def _analyze_bot_emotional_trajectory(self, message_context: MessageContext):
     bot_memory_query = f"emotional responses by {bot_name}"
     
-    # CRITICAL: This queries QDRANT, not InfluxDB!
+    # CURRENT: Queries QDRANT (workaround for missing InfluxDB methods)
     recent_bot_memories = await self.memory_manager.retrieve_relevant_memories(
         user_id=message_context.user_id,
         query=bot_memory_query,
@@ -46,10 +49,34 @@ async def _analyze_bot_emotional_trajectory(self, message_context: MessageContex
         bot_emotion = metadata.get('bot_emotion')  # Stored by Phase 9
 ```
 
-**Why Qdrant instead of InfluxDB?**
-- **Qdrant**: Enables semantic search ("find bot's emotional responses about dolphins")
-- **InfluxDB**: Only time-series queries (no semantic/vector search capability)
-- Phase 6.5 needs **context-aware retrieval**, not just chronological time-series
+**INTENDED DESIGN** (should query InfluxDB):
+
+```python
+# Phase 6.5 SHOULD query InfluxDB for bot emotion time-series
+# Evidence: character_temporal_evolution_analyzer.py:220 calls this:
+
+bot_emotions = await temporal_client.get_bot_emotion_trend(
+    bot_name=bot_name,
+    user_id=user_id,
+    hours_back=24  # Last 24 hours
+)
+
+# But this method DOESN'T EXIST in temporal_intelligence_client.py!
+# Missing methods:
+# - get_bot_emotion_trend()
+# - get_bot_emotion_overall_trend()
+```
+
+**Why This Matters**:
+- **Qdrant (current)**: Semantic search, context-aware, but limited to stored conversations
+- **InfluxDB (intended)**: Pure time-series, chronological order, complete emotion history
+- **Trade-off**: Qdrant gives contextually relevant emotions; InfluxDB gives chronological trajectory
+
+**Why Qdrant Works (for now)**:
+- ✅ Still retrieves bot emotions from past conversations
+- ✅ Semantic search provides context-relevant emotional history  
+- ✅ No critical functionality lost (just different query strategy)
+- ❌ Missing true time-series analysis (e.g., "emotion trend over last 7 days")
 
 ### **What Gets Created**
 
@@ -574,15 +601,17 @@ scores = await self.relationship_engine._get_current_scores(
 
 ### **Summary: Retrieval vs Storage**
 
-| Phase | Retrieves From | Stores To | Purpose |
-|-------|----------------|-----------|---------|
-| **Phase 6.5** | Qdrant (bot_emotion metadata) | ❌ Nothing | Build bot emotional trajectory for prompt |
-| **Phase 6.7** | PostgreSQL (relationship_scores) | ❌ Nothing | Load relationship context for prompt |
-| **Phase 7.5** | ❌ Nothing (creates new data) | InfluxDB + Qdrant | Store bot's CURRENT emotion after generation |
-| **Phase 9** | ❌ Nothing (stores conversation) | Qdrant + InfluxDB | Store full conversation with all metadata |
-| **Phase 11** | PostgreSQL (reads current scores) | PostgreSQL + InfluxDB | Update relationship scores after conversation |
+| Phase | Intended Source | Current Source | Stores To | Purpose |
+|-------|----------------|----------------|-----------|---------|
+| **Phase 6.5** | ❌ InfluxDB (missing methods) | ✅ Qdrant (bot_emotion metadata) | ❌ Nothing | Build bot emotional trajectory for prompt |
+| **Phase 6.7** | ✅ PostgreSQL (relationship_scores) | ✅ PostgreSQL (relationship_scores) | ❌ Nothing | Load relationship context for prompt |
+| **Phase 7.5** | N/A | ❌ Nothing (creates new data) | ✅ InfluxDB + Qdrant | Store bot's CURRENT emotion after generation |
+| **Phase 9** | N/A | ❌ Nothing (stores conversation) | ✅ Qdrant + InfluxDB | Store full conversation with all metadata |
+| **Phase 11** | N/A | ✅ PostgreSQL (reads current scores) | ✅ PostgreSQL + InfluxDB | Update relationship scores after conversation |
 
 **Key Pattern**: Phase 6.5/6.7 are **READERS** (retrieve data for prompts), Phase 7.5/9/11 are **WRITERS** (store data for future retrieval).
+
+**Implementation Note**: Phase 6.5 has a **missing InfluxDB query implementation** - methods `get_bot_emotion_trend()` and `get_bot_emotion_overall_trend()` are called by `CharacterTemporalEvolutionAnalyzer` but don't exist in `TemporalIntelligenceClient`. Current workaround uses Qdrant semantic search instead.
 
 ---
 
