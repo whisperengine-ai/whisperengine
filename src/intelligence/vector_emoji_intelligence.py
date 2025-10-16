@@ -1025,6 +1025,92 @@ class VectorEmojiIntelligence:
             }
         )
     
+    def _select_emotion_aware_empathy_emoji(
+        self,
+        emotional_state: Dict[str, Any],
+        bot_character: str
+    ) -> str:
+        """
+        🎯 EMOTION-AWARE EMPATHY: Select empathy emoji based on user's actual emotion.
+        
+        Replaces hard-coded "💙" with intelligent selection based on:
+        - User's primary emotion (sadness, fear, anger, disappointment)
+        - Emotional intensity (mild concern vs deep distress)
+        - Character archetype (mystical uses 🙏, others use hearts/faces)
+        
+        Args:
+            emotional_state: Complete emotional analysis with primary_emotion and intensity
+            bot_character: Character type for archetype-specific empathy
+        
+        Returns:
+            Appropriate empathy emoji string
+        """
+        primary_emotion = emotional_state.get("current_emotion", "neutral")
+        intensity = emotional_state.get("intensity", 0.5)
+        
+        # MYSTICAL characters use prayer hands for empathy
+        if bot_character == "mystical":
+            return "🙏"
+        
+        # EMOTION-SPECIFIC EMPATHY SELECTION
+        
+        # Sadness → Mirror with crying/pensive faces OR blue heart
+        if primary_emotion in ['sadness', 'grief', 'melancholy']:
+            if intensity > 0.7:
+                # Deep sadness → crying face (strong empathy mirroring)
+                logger.debug("💙 Empathy: Deep sadness (%.2f) → crying face", intensity)
+                return "😢"
+            elif intensity > 0.5:
+                # Moderate sadness → pensive face
+                logger.debug("💙 Empathy: Moderate sadness (%.2f) → pensive face", intensity)
+                return "😔"
+            else:
+                # Mild sadness → blue heart (gentle support)
+                logger.debug("💙 Empathy: Mild sadness (%.2f) → blue heart", intensity)
+                return "💙"
+        
+        # Fear/Anxiety → Worried face OR comforting heart
+        if primary_emotion in ['fear', 'anxiety', 'nervousness', 'worry']:
+            if intensity > 0.6:
+                # High fear → worried face (empathy mirroring)
+                logger.debug("💙 Empathy: High fear (%.2f) → worried face", intensity)
+                return "😟"
+            else:
+                # Moderate fear → blue heart (reassurance)
+                logger.debug("💙 Empathy: Moderate fear (%.2f) → blue heart", intensity)
+                return "💙"
+        
+        # Anger/Frustration → Disappointed face OR broken heart
+        if primary_emotion in ['anger', 'frustration', 'irritation', 'annoyance']:
+            if intensity > 0.7:
+                # High anger → broken heart (acknowledge pain)
+                logger.debug("💙 Empathy: High anger (%.2f) → broken heart", intensity)
+                return "💔"
+            else:
+                # Moderate anger → disappointed face
+                logger.debug("💙 Empathy: Moderate anger (%.2f) → disappointed face", intensity)
+                return "😞"
+        
+        # Disappointment → Disappointed face OR pleading face
+        if primary_emotion in ['disappointment', 'regret', 'shame']:
+            if intensity > 0.6:
+                # High disappointment → pleading face (vulnerability)
+                logger.debug("💙 Empathy: High disappointment (%.2f) → pleading face", intensity)
+                return "🥺"
+            else:
+                # Moderate disappointment → disappointed face
+                logger.debug("💙 Empathy: Moderate disappointment (%.2f) → disappointed face", intensity)
+                return "😞"
+        
+        # Mixed/Complex negative emotions → Sad but relieved
+        if primary_emotion in ['confusion', 'overwhelm', 'conflicted']:
+            logger.debug("💙 Empathy: Complex emotion (%s) → sad but relieved", primary_emotion)
+            return "😥"
+        
+        # DEFAULT: Blue heart for general empathy (safe fallback)
+        logger.debug("💙 Empathy: Default for %s → blue heart", primary_emotion)
+        return "💙"
+    
     def _select_trajectory_aware_emoji(
         self,
         emotional_state: Dict[str, Any],
@@ -1097,10 +1183,15 @@ class VectorEmojiIntelligence:
         # TRAJECTORY 4: Falling negative emotions (improving) → Supportive encouragement
         if trajectory == "falling" and primary_emotion in ['sadness', 'fear', 'anxiety'] and intensity < 0.7:
             logger.info(
-                "🎯 Trajectory match: Falling %s (improving) → supportive",
+                "🎯 Trajectory match: Falling %s (improving) → emotion-aware empathy",
                 primary_emotion
             )
-            return "💙", EmojiResponseContext.EMOTIONAL_OVERWHELM
+            # Use emotion-aware empathy selection for improving negative emotions
+            empathy_emoji = self._select_emotion_aware_empathy_emoji(
+                emotional_state=emotional_state,
+                bot_character=bot_character
+            )
+            return empathy_emoji, EmojiResponseContext.EMOTIONAL_OVERWHELM
         
         # TRAJECTORY 5: Excitement-based emotions → Playful response
         if primary_emotion in ['excitement', 'surprise'] and intensity > 0.7 and confidence > 0.7:
@@ -1167,13 +1258,12 @@ class VectorEmojiIntelligence:
         
         # Priority 2: Emotional support needs OR user in distress
         if emotional_state.get("needs_emotional_support", False) or user_in_distress:
-            # Use empathy emojis, not celebration
-            if bot_character == "mystical":
-                return "🙏", EmojiResponseContext.EMOTIONAL_OVERWHELM
-            elif bot_character == "technical":
-                return "💙", EmojiResponseContext.EMOTIONAL_OVERWHELM  # Blue heart for empathy
-            else:
-                return "💙", EmojiResponseContext.EMOTIONAL_OVERWHELM  # Empathy, not celebration
+            # Use emotion-aware empathy emoji selection
+            empathy_emoji = self._select_emotion_aware_empathy_emoji(
+                emotional_state=emotional_state,
+                bot_character=bot_character
+            )
+            return empathy_emoji, EmojiResponseContext.EMOTIONAL_OVERWHELM
         
         # Priority 3: High emotional intensity - use universal taxonomy
         if emotional_state.get("intensity", 0.5) > 0.7:
@@ -1181,8 +1271,12 @@ class VectorEmojiIntelligence:
             
             # FILTER: Don't use celebratory emojis if user is in distress
             if user_in_distress:
-                # For distress, use empathy emojis regardless of intensity
-                return "💙", EmojiResponseContext.EMOTIONAL_OVERWHELM
+                # For distress, use emotion-aware empathy emoji
+                empathy_emoji = self._select_emotion_aware_empathy_emoji(
+                    emotional_state=emotional_state,
+                    bot_character=bot_character
+                )
+                return empathy_emoji, EmojiResponseContext.EMOTIONAL_OVERWHELM
             
             # Import universal taxonomy for character-aware emoji selection
             from src.intelligence.emotion_taxonomy import get_emoji_for_roberta_emotion
@@ -1219,15 +1313,23 @@ class VectorEmojiIntelligence:
         # Priority 5: Fallback keyword detection for gratitude (works in all contexts)
         message_lower = user_message.lower()
         if any(word in message_lower for word in ["thanks", "thank you", "appreciate", "grateful"]):
-            # Use approved empathy emoji for acknowledgment
-            return "💙", EmojiResponseContext.SIMPLE_ACKNOWLEDGMENT
+            # Use emotion-aware empathy emoji for acknowledgment
+            empathy_emoji = self._select_emotion_aware_empathy_emoji(
+                emotional_state=emotional_state,
+                bot_character=bot_character
+            )
+            return empathy_emoji, EmojiResponseContext.SIMPLE_ACKNOWLEDGMENT
         
         # If user in distress, DON'T use character-specific emojis
         # Better to skip than to use potentially inappropriate ones
         if user_in_distress:
-            # Already handled empathy emojis above - if we get here, skip emoji
-            logger.debug("Skipping emoji for distressed user - no approved emoji found")
-            return "💙", EmojiResponseContext.SIMPLE_ACKNOWLEDGMENT  # Safe fallback
+            # Already handled empathy emojis above - if we get here, use emotion-aware selection
+            logger.debug("Using emotion-aware empathy for distressed user - safe fallback")
+            empathy_emoji = self._select_emotion_aware_empathy_emoji(
+                emotional_state=emotional_state,
+                bot_character=bot_character
+            )
+            return empathy_emoji, EmojiResponseContext.SIMPLE_ACKNOWLEDGMENT
         
         # Technical appreciation for technical characters (NOT in distress)
         if bot_character == "technical" and any(word in message_lower for word in ["code", "algorithm", "system", "data", "tech"]):
