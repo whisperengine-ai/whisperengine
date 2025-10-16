@@ -2,9 +2,54 @@
 
 This directory contains automated regression testing scripts for validating WhisperEngine functionality.
 
-## 🧪 Test Scripts
+## ⭐ NEW: Unified YAML-Driven Test Harness (Phase 3)
 
-### `comprehensive_character_regression.py` ⭐ **PRIMARY TEST SUITE**
+### `unified_test_harness.py` 🚀 **RECOMMENDED TEST RUNNER**
+**YAML-based test runner with declarative test definitions**
+
+**What it tests:**
+- ✅ Character personality and AI ethics (16 tests)
+- ✅ Memory storage and conversation continuity (10 tests)
+- ✅ Advanced intelligence systems (23 tests, 8 systems)
+
+**Key Features:**
+- 📝 Declarative YAML test definitions (easy to read and maintain)
+- 🎯 Flexible filtering by type/bot/category
+- 📊 Beautiful reporting with archetype awareness
+- 🔧 Non-programmers can contribute tests
+- 🔄 Backward compatible with legacy test runners
+
+**Quick Start:**
+```bash
+source .venv/bin/activate
+
+# Run all tests (49 total)
+python tests/regression/unified_test_harness.py
+
+# Run specific test types
+python tests/regression/unified_test_harness.py --type character
+python tests/regression/unified_test_harness.py --type memory,intelligence
+
+# Filter by bot
+python tests/regression/unified_test_harness.py --bots elena,marcus
+
+# Filter by category
+python tests/regression/unified_test_harness.py --category "AI Ethics"
+
+# Combine filters
+python tests/regression/unified_test_harness.py --type character --bots elena --category "AI Ethics"
+```
+
+**Documentation:**
+- `test_definitions/README.md` - Complete YAML schema reference
+- `MIGRATION_GUIDE.md` - Python to YAML conversion guide
+- `PHASE3_COMPLETE.md` - Phase 3 summary and achievements
+
+---
+
+## 🧪 Legacy Test Scripts (Still Functional)
+
+### `comprehensive_character_regression.py`
 **Comprehensive character personality and AI ethics testing via HTTP Chat API**
 
 **What it tests:**
