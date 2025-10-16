@@ -74,7 +74,7 @@ class UniversalEmotionTaxonomy:
             core_emotion=CoreEmotion.SADNESS,
             roberta_label="sadness",
             confidence_threshold=0.6, 
-            emoji_reactions=["sadness", "negative_mild"],  # Added sadness reaction type
+            emoji_reactions=["sadness"],  # Only true sadness reactions
             bot_emoji_choices=["😢", "😔", "💔"],
             character_emojis={}  # Use CDL files instead of hardcoded mappings
         ),
@@ -83,7 +83,7 @@ class UniversalEmotionTaxonomy:
             core_emotion=CoreEmotion.FEAR,
             roberta_label="fear",
             confidence_threshold=0.7,
-            emoji_reactions=["negative_mild", "confusion"],  # Fear often shows as confusion
+            emoji_reactions=["negative_mild", "confusion"],  # Fear often shows as awkwardness/confusion
             bot_emoji_choices=["😰", "😨", "😱"],
             character_emojis={}  # Use CDL files instead of hardcoded mappings
         ),
@@ -190,6 +190,8 @@ class UniversalEmotionTaxonomy:
         if not core_emotion:
             return None
             
+        # Character parameter left for future CDL-aware overrides
+        _ = character
         mapping = cls.EMOTION_MAPPINGS[core_emotion]
         
         # Check confidence threshold
@@ -237,6 +239,8 @@ class UniversalEmotionTaxonomy:
         Returns:
             List of default emoji choices for the emotion
         """
+        # Character parameter reserved for CDL-aware overrides
+        _ = character
         # Find matching mapping
         core_emotion = None
         emotion_lower = emotion.lower()
