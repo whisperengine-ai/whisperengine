@@ -4675,11 +4675,33 @@ class MessageProcessor:
             # The emotion enhancement is already included in CDL enhancement, so no need for separate step
             final_context = enhanced_context if enhanced_context else conversation_context
             
-            # 📝 COMPREHENSIVE PROMPT LOGGING: Log full prompts to file for review
+            # � TOKEN BUDGET ENFORCEMENT: Prevent oversized context from walls of text
+            # This is STAGE 2 management (full conversation array) - happens AFTER PromptAssembler (system message only)
+            from src.utils.context_size_manager import truncate_context, count_context_tokens
+            
+            # Count tokens BEFORE truncation
+            pre_truncation_tokens = count_context_tokens(final_context)
+            logger.info("📊 CONTEXT SIZE: %d messages, ~%d tokens before truncation", 
+                       len(final_context), pre_truncation_tokens)
+            
+            # Apply smart truncation (preserves system message + recent 2-4 messages, drops oldest first)
+            # 🚨 WALL-OF-TEXT PROTECTION: Only keep 2-4 recent messages if user is spamming long content
+            final_context, tokens_removed = truncate_context(
+                final_context, 
+                max_tokens=2000,  # Production data: P90 = 3572 total - 1400 system = 2000 for conversation
+                min_recent_messages=2  # ADAPTIVE: Guarantees last 1 exchange minimum, but keeps MORE if they fit budget
+            )
+            
+            if tokens_removed > 0:
+                logger.warning("✂️ CONTEXT TRUNCATED: Removed %d tokens to fit budget (walls of text from user)", 
+                             tokens_removed)
+            
+            # �📝 COMPREHENSIVE PROMPT LOGGING: Log full prompts to file for review
             await self._log_full_prompt_to_file(final_context, message_context.user_id, ai_components)
             
             # Generate response using LLM
-            logger.info("🎯 GENERATING: Sending %d messages to LLM", len(final_context))
+            logger.info("🎯 GENERATING: Sending %d messages (~%d tokens) to LLM", 
+                       len(final_context), count_context_tokens(final_context))
             
             from src.llm.llm_client import LLMClient
             llm_client = LLMClient()

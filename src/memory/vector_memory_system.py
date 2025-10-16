@@ -2767,7 +2767,7 @@ class VectorMemoryStore:
                     limit=cluster_size - 1,  # -1 because we include the seed memory
                     score_threshold=0.7,
                     with_payload=True,
-                    using="content"  # Specify named vector for recommendations
+                    using="semantic"  # Use semantic vector for concept-level clustering (not word-level content)
                 )
                 
                 # Create semantic cluster
