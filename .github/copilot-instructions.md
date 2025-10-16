@@ -3,8 +3,10 @@
 ## 🚨 CRITICAL LIVE SYSTEM OPERATIONS - ASK BEFORE RESTARTING
 - **NEVER restart bots, services, or containers without explicit user permission**
 - **WhisperEngine is a PRODUCTION MULTI-CHARACTER DISCORD PLATFORM** - users actively chat with 10+ AI characters
-- **ALWAYS ASK before running restart commands**: `docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml restart`, `docker restart`, `docker-compose restart`
-- **ALWAYS ASK before running stop commands**: `docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml down`, `docker stop`, `docker-compose down`
+- **USE multi-bot.sh SCRIPT**: `./multi-bot.sh bot BOT_NAME` to start, `./multi-bot.sh stop-bot BOT_NAME` to stop
+- **ALWAYS ASK before running restart commands**: `./multi-bot.sh restart`, `docker restart`, or manual docker compose restart
+- **ALWAYS ASK before running stop commands**: `./multi-bot.sh down`, `docker stop`, or stopping all services
+- **PREFERRED: Start/stop individual bots**: `./multi-bot.sh bot marcus` or `./multi-bot.sh stop-bot marcus` - affects ONLY that bot
 - **DEBUGGING FIRST**: Use log inspection, health checks, and direct Python testing before considering restarts
 - **Code changes**: Test with direct Python validation scripts before restarting live services
 - **For urgent fixes**: Ask user "Should I restart [specific bot/service] to apply this fix?"
@@ -148,13 +150,17 @@ memories = await memory_manager.retrieve_relevant_memories(
 
 ### **Docker-First Development**
 ```bash
-# Start infrastructure + specific characters
-docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml up -d postgres qdrant
-docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml up -d elena-bot
+# Use the multi-bot.sh script for all operations (PREFERRED)
+./multi-bot.sh infra              # Start infrastructure only
+./multi-bot.sh bot elena          # Start specific bot
+./multi-bot.sh stop-bot elena     # Stop specific bot
+./multi-bot.sh logs elena-bot     # View logs
+./multi-bot.sh status             # Check all services
+./multi-bot.sh health             # Health checks
 
-# Monitor health and logs
-docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml ps
-docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml logs elena-bot
+# Direct docker compose (if needed)
+docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml up -d postgres qdrant
+docker compose -p whisperengine-multi -f docker-compose.multi-bot.yml up -d --no-deps elena-bot
 
 # Configuration management
 source .venv/bin/activate

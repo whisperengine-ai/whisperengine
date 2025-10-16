@@ -5,10 +5,10 @@ Provides state-of-art emotion detection using RoBERTa transformer models
 with VADER sentiment analysis as fallback/enhancement.
 
 Models:
-- j-hartmann/emotion-english-distilroberta-base (Primary)
-  * Emotions: anger, disgust, fear, joy, neutral, sadness, surprise
+- cardiffnlp/twitter-roberta-base-emotion-multilabel-latest (Primary)
+  * Emotions: anger, anticipation, disgust, fear, joy, love, optimism, pessimism, sadness, surprise, trust (11 emotions)
   * Accuracy: ~85-90% on emotion classification
-  * Size: ~250MB (vs VADER 125KB)
+  * Size: ~300MB (vs VADER 125KB)
 
 Architecture: RoBERTa Primary + VADER Fallback + Keywords Backup
 """

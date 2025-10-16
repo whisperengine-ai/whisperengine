@@ -2,7 +2,7 @@
 Advanced Emotion Detector for WhisperEngine Sprint 5
 
 Multi-modal emotion detection leveraging existing RoBERTa analysis and emoji intelligence.
-Extends 7-emotion RoBERTa system to 12+ emotions with temporal patterns and cultural adaptation.
+Extends 11-emotion RoBERTa system to 12+ emotions with temporal patterns and cultural adaptation.
 """
 import logging
 import re
@@ -24,7 +24,7 @@ class AdvancedEmotionDetector:
     Sprint 5 Advanced Emotion Detection System
     
     Features:
-    - Leverages existing RoBERTa 7-emotion analysis as foundation
+    - Leverages existing RoBERTa 11-emotion analysis as foundation
     - Extends to 12+ emotions through advanced mapping and synthesis
     - Multi-modal analysis using existing emoji intelligence systems  
     - Temporal pattern recognition from conversation history
@@ -32,12 +32,13 @@ class AdvancedEmotionDetector:
     - Zero duplication - builds on existing WhisperEngine systems
     """
     
-    # Extended emotion set: 7 RoBERTa core + 5+ advanced emotions
+    # Extended emotion set: 11 RoBERTa core + additional advanced emotions
     CORE_EMOTIONS = {
-        # RoBERTa core emotions (7)
-        "joy", "sadness", "anger", "fear", "surprise", "disgust", "neutral",
-        # Extended emotions (5+) mapped from RoBERTa patterns
-        "love", "contempt", "pride", "shame", "guilt", "awe", "confusion", "disappointment"
+        # RoBERTa core emotions (11) - Cardiff NLP model
+        "anger", "anticipation", "disgust", "fear", "joy", "love", 
+        "optimism", "pessimism", "sadness", "surprise", "trust",
+        # Extended emotions mapped from RoBERTa patterns
+        "contempt", "pride", "shame", "guilt", "awe", "confusion", "disappointment"
     }
     
     # Advanced emotion synthesis rules: Map RoBERTa patterns to extended emotions

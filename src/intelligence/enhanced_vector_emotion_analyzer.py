@@ -707,7 +707,7 @@ class EnhancedVectorEmotionAnalyzer:
                     
                     # 🔥 CARDIFF NLP FIX: Select HIGHEST emotion BEFORE mapping to preserve fidelity
                     # Problem: Aggregating multiple emotions (pessimism + sadness) artificially inflates scores
-                    # Solution: Find the single strongest emotion in 11-emotion space, THEN map to 7-emotion taxonomy
+                    # Solution: Find the single strongest emotion in 11-emotion space, THEN use WhisperEngine's 11-emotion taxonomy
                     raw_emotions = {}  # Store all 11 emotions with original labels
                     for result in results[0]:  # First (only) text result
                         raw_label = result["label"]  # type: ignore
@@ -721,7 +721,7 @@ class EnhancedVectorEmotionAnalyzer:
                         max_label, max_confidence = max_emotion
                         logger.info(f"🤖 ROBERTA ANALYSIS: Highest emotion: {max_label} ({max_confidence:.3f})")
                         
-                        # NOW map the single highest emotion to 7-emotion taxonomy
+                        # NOW map the single highest emotion to WhisperEngine's 11-emotion taxonomy
                         emotion_label = self._map_roberta_emotion_label(max_label)
                         emotion_scores[emotion_label] = max_confidence
                         logger.info(f"🤖 ROBERTA ANALYSIS: Mapped to primary: {max_label} → {emotion_label}: {max_confidence:.3f}")

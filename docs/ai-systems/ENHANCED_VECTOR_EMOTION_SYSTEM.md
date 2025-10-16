@@ -188,7 +188,7 @@ emotion_analyzer = EnhancedVectorEmotionAnalyzer(
 ## 🎭 **Emotional Intelligence Features**
 
 ### Supported Emotions
-- **Primary Categories**: joy, sadness, anger, fear, surprise, disgust, neutral
+- **Primary Categories**: anger, anticipation, disgust, fear, joy, love, optimism, pessimism, sadness, surprise, trust (11 emotions from Cardiff NLP RoBERTa model)
 - **Intensity Levels**: 0.0 (very low) to 1.0 (very high)
 - **Secondary Emotions**: excitement, frustration, contentment, anxiety, hope, etc.
 - **Complex States**: Mixed emotions, emotional transitions, contextual modifiers

@@ -769,7 +769,15 @@ class CDLAIPromptIntegration:
         # Add Big Five personality integration with Sprint 4 CharacterEvolution optimization
         if hasattr(character, 'personality') and hasattr(character.personality, 'big_five'):
             big_five = character.personality.big_five
-            prompt += f"\n\n🧬 PERSONALITY PROFILE:\n"
+            prompt += f"\n\n🧬 PERSONALITY PROFILE (Big Five Model):\n"
+            prompt += "WhisperEngine uses the Big Five psychological model to guide your personality expression.\n\n"
+            prompt += "**Big Five Trait Scale (0.0-1.0):**\n"
+            prompt += "- **Openness**: Low (0.0-0.3) = Traditional, practical | Medium (0.4-0.6) = Balanced | High (0.7-1.0) = Creative, curious, loves new experiences\n"
+            prompt += "- **Conscientiousness**: Low (0.0-0.3) = Spontaneous, flexible | Medium (0.4-0.6) = Organized | High (0.7-1.0) = Disciplined, careful, extremely precise\n"
+            prompt += "- **Extraversion**: Low (0.0-0.3) = Reserved, quiet, introspective | Medium (0.4-0.6) = Ambivert | High (0.7-1.0) = Outgoing, energetic, very social\n"
+            prompt += "- **Agreeableness**: Low (0.0-0.3) = Direct, competitive | Medium (0.4-0.6) = Balanced | High (0.7-1.0) = Empathetic, cooperative, very supportive\n"
+            prompt += "- **Neuroticism**: Low (0.0-0.3) = Calm, stable, fearless | Medium (0.4-0.6) = Moderate emotional range | High (0.7-1.0) = Sensitive, anxious, emotionally reactive\n\n"
+            prompt += "**Your Character's Big Five Profile:**\n"
             
             # 🎯 SPRINT 4: Extract CharacterEvolution optimization data from pipeline
             character_optimization = None
@@ -3239,6 +3247,7 @@ Stay authentic to {character.identity.name}'s personality while being transparen
         # Sections that are handled by specialized logic, not dumped as prompt text
         skip_sections = [
             'identity',  # Handled separately as character identity
+            'personality',  # Handled separately with Big Five trait optimization (line ~768)
             'behavioral_triggers',  # Now handled by trigger-based mode controller
             'message_triggers',  # Now handled by trigger-based mode controller
             'interaction_modes'  # Now handled by trigger-based mode controller

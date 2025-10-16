@@ -88,7 +88,7 @@ Message Input → Parallel AI Pipeline → Enhanced Vector Emotion Analyzer → 
 ## 🎭 Emotional Intelligence Features
 
 ### Supported Emotion Categories
-- **Primary Emotions**: joy, sadness, anger, fear, surprise, disgust, neutral
+- **Primary Emotions**: anger, anticipation, disgust, fear, joy, love, optimism, pessimism, sadness, surprise, trust (11 emotions from Cardiff NLP RoBERTa)
 - **Intensity Levels**: 0.0 (very low) to 1.0 (very high) continuous scale
 - **Mixed Emotions**: Simultaneous detection of multiple emotional states
 - **Complex States**: Emotional transitions, contextual modifiers

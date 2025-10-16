@@ -266,10 +266,10 @@ async def retrieve_emotionally_similar_memories(
 
 ## 🧠 RoBERTa Model Details
 
-**Model**: `j-hartmann/emotion-english-distilroberta-base`
-**Architecture**: DistilRoBERTa transformer (distilled from RoBERTa-base)
-**Training**: Fine-tuned on emotion classification datasets
-**Emotions detected**: joy, sadness, anger, fear, surprise, disgust, neutral
+**Model**: `cardiffnlp/twitter-roberta-base-emotion-multilabel-latest`
+**Architecture**: RoBERTa transformer fine-tuned for emotion classification
+**Training**: Fine-tuned on Twitter emotion datasets
+**Emotions detected**: anger, anticipation, disgust, fear, joy, love, optimism, pessimism, sadness, surprise, trust (11 emotions)
 **Performance**: 
 - Confidence: Typically 0.7-0.95 for clear emotions
 - Multi-emotion: Detects 2-3 simultaneous emotions
