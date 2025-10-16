@@ -1652,22 +1652,35 @@ class CDLAIPromptIntegration:
                     
                     is_multi_modal = emotion_data.get('multi_modal', False)
                     
-                    # Build rich emotional context prompt
+                    # Build rich emotional context prompt with probabilistic framing
                     if secondary_emotions and len(secondary_emotions) > 0:
                         secondary_str = ', '.join(secondary_emotions[:2])  # Limit to 2 for clarity
-                        prompt += f"\n\n🎭 USER EMOTIONAL STATE: {primary_emotion} with undertones of {secondary_str} (confidence: {confidence:.2f})"
+                        prompt += f"\n\n🎭 EMOTION READING (PROBABILISTIC): {primary_emotion} with undertones of {secondary_str} (confidence: {confidence:.2f})"
                     else:
-                        prompt += f"\n\n🎭 USER EMOTIONAL STATE: {primary_emotion} (confidence: {confidence:.2f})"
+                        prompt += f"\n\n🎭 EMOTION READING (PROBABILISTIC): {primary_emotion} (confidence: {confidence:.2f})"
+                    
+                    # Add multi-modal analysis indicator
+                    if is_multi_modal:
+                        prompt += f"\n📱 ANALYSIS METHOD: Multi-modal detection (text + emoji + patterns)"
+                    
+                    # CRITICAL: Emphasize probabilistic nature
+                    prompt += f"\n⚠️ UNCERTAINTY NOTE: Emotion detection is probabilistic. Validate through conversation."
+                    if confidence < 0.7:
+                        prompt += f"\n💡 LOW CONFIDENCE: Use tentative language ('I sense...', 'it seems...') and invite user to share their actual state."
+                    elif confidence < 0.85:
+                        prompt += f"\n💡 MODERATE CONFIDENCE: Use gentle observational language ('you seem...', 'I'm picking up...') rather than declarative statements."
+                    else:
+                        prompt += f"\n💡 HIGH CONFIDENCE: Still use tentative phrasing ('I sense...', 'there's a...') to avoid assumptions. Never state user emotions as absolute fact."
                     
                     # Add emotional trajectory context
                     if emotional_trajectory and len(emotional_trajectory) > 0:
                         trajectory_pattern = emotional_trajectory[-1] if emotional_trajectory else 'stable'
                         if trajectory_pattern in ['intensifying', 'escalating']:
-                            prompt += f"\n📈 EMOTIONAL TREND: Their emotions are intensifying - respond with extra sensitivity"
+                            prompt += f"\n📈 EMOTIONAL TREND: Their emotions may be intensifying - respond with extra sensitivity"
                         elif trajectory_pattern in ['calming', 'settling']:
-                            prompt += f"\n📉 EMOTIONAL TREND: Their emotions are calming - provide gentle support"
+                            prompt += f"\n📉 EMOTIONAL TREND: Their emotions may be calming - provide gentle support"
                         elif trajectory_pattern in ['fluctuating', 'mixed']:
-                            prompt += f"\n🌊 EMOTIONAL TREND: Complex emotional state - be especially attentive to nuances"
+                            prompt += f"\n🌊 EMOTIONAL TREND: Complex emotional state detected - be especially attentive to nuances"
                     
                     # Add cultural context awareness
                     if cultural_context and isinstance(cultural_context, dict):
@@ -1680,11 +1693,7 @@ class CDLAIPromptIntegration:
                         # Handle case where cultural_context is a string (like "western")
                         prompt += f"\n🗺️ CULTURAL CONTEXT: {cultural_context} communication style"
                     
-                    # Add multi-modal analysis indicator
-                    if is_multi_modal:
-                        prompt += f"\n📱 ANALYSIS: Multi-modal emotion detection (text + emoji + patterns) - high accuracy"
-                    
-                    prompt += f"\nRespond with nuanced empathy matching their emotional complexity and communication style."
+                    prompt += f"\n\n� EMPATHY GUIDANCE: Respond with nuanced empathy matching their emotional complexity and communication style."
 
         # Add memory context intelligence
         if relevant_memories:
